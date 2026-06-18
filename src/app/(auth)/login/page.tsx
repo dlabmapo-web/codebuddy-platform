@@ -102,14 +102,13 @@ export default function LoginPage() {
               </div>
               <div style={{ paddingLeft: 32 }}>
                 <span style={{ color: '#D4D4D4' }}>comp = target - num</span>
-              </div>
-              <div style={{ color: '#6A9955', paddingLeft: 32 }}># 선생님 커서 ↑</div>
+              </div>              
             </div>
           </div>
         </div>
 
         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
-          © 2025 페어코드. All rights reserved.
+          © 2026 페어코드. All rights reserved.
         </div>
       </div>
 

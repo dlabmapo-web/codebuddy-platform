@@ -10,6 +10,7 @@ import {
   MessageSquare,
   FileText,
   UserCheck,
+  FlaskConical,
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types/db';
 
@@ -20,6 +21,7 @@ interface NavItem {
 }
 
 const studentNav: NavItem[] = [
+  { icon: <FlaskConical size={16} />, label: '데모 문제', href: '/demo' },
   { icon: <BookOpen size={16} />, label: '문제 풀이', href: '/problems' },
   { icon: <History size={16} />, label: '내 풀이기록', href: '/me' },
 ];

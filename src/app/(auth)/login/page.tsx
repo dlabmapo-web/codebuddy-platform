@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
+import { LogoIcon, LogoBadge } from '@/components/ui/LogoIcon';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,31 +16,39 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!username.trim() || !password) {
+      setError('아이디와 비밀번호를 입력해주세요.');
+      return;
+    }
     setError('');
     setLoading(true);
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error ?? '로그인에 실패했습니다.');
-      return;
+      if (!res.ok) {
+        setError(data?.error?.message ?? '로그인에 실패했습니다.');
+        return;
+      }
+
+      const role = data.user.role as string;
+      const homeMap: Record<string, string> = {
+        student: '/problems',
+        teacher: '/students',
+        admin: '/admin/problems',
+      };
+      router.replace(homeMap[role] ?? '/problems');
+    } catch {
+      setError('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
     }
-
-    const role = data.user.role as string;
-    const homeMap: Record<string, string> = {
-      student: '/problems',
-      teacher: '/students',
-      admin: '/admin/problems',
-    };
-    router.push(homeMap[role] ?? '/problems');
-    router.refresh();
   }
 
   return (
@@ -48,7 +57,8 @@ export default function LoginPage() {
         className="w-[40%] flex-shrink-0 flex flex-col justify-between p-12"
         style={{ backgroundColor: '#1B64DA' }}
       >
-        <span style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
+        <span className="flex items-center gap-2" style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <LogoIcon size={24} color="#FFFFFF" strokeWidth={2} />
           페어코드
         </span>
 
@@ -74,10 +84,25 @@ export default function LoginPage() {
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginLeft: 8 }}>solution.py</span>
             </div>
             <div className="px-4 py-4" style={{ fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.7 }}>
-              <div><span style={{ color: '#569CD6' }}>def</span> <span style={{ color: '#DCDCAA' }}>two_sum</span><span style={{ color: '#D4D4D4' }}>(nums, target):</span></div>
-              <div style={{ paddingLeft: 16 }}><span style={{ color: '#569CD6' }}>seen</span> <span style={{ color: '#D4D4D4' }}>= {'{}'}</span></div>
-              <div style={{ paddingLeft: 16 }}><span style={{ color: '#C586C0' }}>for</span> <span style={{ color: '#D4D4D4' }}>i, num </span><span style={{ color: '#C586C0' }}>in</span> <span style={{ color: '#DCDCAA' }}>enumerate</span><span style={{ color: '#D4D4D4' }}>(nums):</span></div>
-              <div style={{ paddingLeft: 32 }}><span style={{ color: '#D4D4D4' }}>comp = target - num</span></div>
+              <div>
+                <span style={{ color: '#569CD6' }}>def</span>{' '}
+                <span style={{ color: '#DCDCAA' }}>two_sum</span>
+                <span style={{ color: '#D4D4D4' }}>(nums, target):</span>
+              </div>
+              <div style={{ paddingLeft: 16 }}>
+                <span style={{ color: '#569CD6' }}>seen</span>
+                <span style={{ color: '#D4D4D4' }}> = {'{}'}</span>
+              </div>
+              <div style={{ paddingLeft: 16 }}>
+                <span style={{ color: '#C586C0' }}>for</span>
+                <span style={{ color: '#D4D4D4' }}> i, num </span>
+                <span style={{ color: '#C586C0' }}>in</span>
+                <span style={{ color: '#DCDCAA' }}> enumerate</span>
+                <span style={{ color: '#D4D4D4' }}>(nums):</span>
+              </div>
+              <div style={{ paddingLeft: 32 }}>
+                <span style={{ color: '#D4D4D4' }}>comp = target - num</span>
+              </div>
               <div style={{ color: '#6A9955', paddingLeft: 32 }}># 선생님 커서 ↑</div>
             </div>
           </div>
@@ -109,6 +134,7 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="아이디를 입력하세요"
+                  autoComplete="username"
                   className="w-full pl-9 pr-3 rounded-lg outline-none transition-colors"
                   style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
                   onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
@@ -128,6 +154,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="비밀번호를 입력하세요"
+                  autoComplete="current-password"
                   className="w-full pl-9 pr-10 rounded-lg outline-none transition-colors"
                   style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
                   onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
@@ -138,13 +165,21 @@ export default function LoginPage() {
                   onClick={() => setShowPw(!showPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2"
                   style={{ color: '#5A6270' }}
+                  tabIndex={-1}
                 >
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
 
-            {error && <p style={{ fontSize: '13px', color: '#DC2626' }}>{error}</p>}
+            {error && (
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}
+              >
+                <span style={{ fontSize: '13px', color: '#DC2626' }}>{error}</span>
+              </div>
+            )}
 
             <button
               type="submit"

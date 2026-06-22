@@ -138,7 +138,7 @@ export default function DemoPage() {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Pyodide CDN 로드 실패'));
+        script.onerror = () => reject(new Error('실행 환경을 불러오지 못했습니다'));
         document.head.appendChild(script);
       });
       const instance = await (window as unknown as { loadPyodide: () => Promise<PyodideInstance> }).loadPyodide();
@@ -160,7 +160,7 @@ export default function DemoPage() {
     if (isRunning) return;
     setIsRunning(true);
     setTerminalOpen(true);
-    setTerminalLines([{ text: 'Pyodide 초기화 중...', type: 'info' }]);
+    setTerminalLines([{ text: '실행 환경 초기화 중...', type: 'info' }]);
 
     try {
       const pyodide = await getPyodide();
@@ -321,7 +321,7 @@ export default function DemoPage() {
 
         <div className="flex items-center gap-2">
           {pyodideStatus === 'loading' && (
-            <span style={{ fontSize: '12px', color: '#D97706' }}>Pyodide 로딩 중...</span>
+            <span style={{ fontSize: '12px', color: '#D97706' }}>실행 환경 로딩 중...</span>
           )}
           {pyodideStatus === 'ready' && (
             <span

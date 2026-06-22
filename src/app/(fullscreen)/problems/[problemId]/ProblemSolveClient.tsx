@@ -209,7 +209,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Pyodide CDN 로드 실패'));
+        script.onerror = () => reject(new Error('실행 환경을 불러오지 못했습니다'));
         document.head.appendChild(script);
       });
       const instance = await (window as unknown as { loadPyodide: () => Promise<PyodideInstance> }).loadPyodide();
@@ -226,7 +226,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     setIsRunning(true);
     setTerminalOpen(true);
     const sampleInput = problem.test_cases.find((tc) => tc.is_sample)?.input ?? '';
-    setTerminalLines([{ text: 'Pyodide 초기화 중...', type: 'info' }]);
+    setTerminalLines([{ text: '실행 환경 초기화 중...', type: 'info' }]);
     try {
       const pyodide = await getPyodide();
       setTerminalLines([{ text: '실행 중...', type: 'info' }]);
@@ -392,7 +392,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
 
         <div className="flex items-center gap-2">
-          {pyodideStatus === 'loading' && <span style={{ fontSize: '12px', color: '#D97706' }}>Pyodide 로딩 중...</span>}
+          {pyodideStatus === 'loading' && <span style={{ fontSize: '12px', color: '#D97706' }}>실행 환경 로딩 중...</span>}
           {pyodideStatus === 'ready' && (
             <span className="flex items-center gap-1" style={{ fontSize: '12px', color: '#16A34A' }}>
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16A34A' }} /> 준비됨

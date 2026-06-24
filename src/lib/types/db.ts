@@ -42,6 +42,7 @@ export interface DbProblem {
   input_format: string | null;
   output_format: string | null;
   constraint_text: string | null;
+  starter_code: string | null;
   time_limit_ms: number;
   memory_limit_mb: number;
   is_published: boolean;

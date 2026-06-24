@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/session';
 import { Gnb } from '@/components/layout/Gnb';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { Heartbeat } from '@/components/layout/Heartbeat';
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -10,6 +11,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex flex-col h-screen">
+      <Heartbeat />
       <Gnb user={user} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar role="teacher" />

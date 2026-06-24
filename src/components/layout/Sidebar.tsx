@@ -7,9 +7,9 @@ import {
   History,
   Users,
   BarChart2,
-  MessageSquare,
   FileText,
   UserCheck,
+  FlaskConical,
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types/db';
 
@@ -20,6 +20,7 @@ interface NavItem {
 }
 
 const studentNav: NavItem[] = [
+  { icon: <FlaskConical size={16} />, label: '데모 문제', href: '/demo' },
   { icon: <BookOpen size={16} />, label: '문제 풀이', href: '/problems' },
   { icon: <History size={16} />, label: '내 풀이기록', href: '/me' },
 ];
@@ -27,7 +28,6 @@ const studentNav: NavItem[] = [
 const teacherNav: NavItem[] = [
   { icon: <Users size={16} />, label: '학생 현황', href: '/students' },
   { icon: <BarChart2 size={16} />, label: '풀이 현황', href: '/progress' },
-  { icon: <MessageSquare size={16} />, label: '실시간 피드백', href: '/feedback/list' },
 ];
 
 const adminNav: NavItem[] = [

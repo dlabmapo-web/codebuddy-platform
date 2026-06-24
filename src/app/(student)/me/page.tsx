@@ -112,7 +112,7 @@ export default function MyHistoryPage() {
 
       <div className="flex items-center gap-2">
         {(['all', 'pass', 'fail'] as const).map((f) => {
-          const label = f === 'all' ? '전체 기록' : f === 'pass' ? '✓ 정답만' : '✗ 오답만';
+          const label = f === 'all' ? '전체 기록' : f === 'pass' ? '정답만' : '오답만';
           return (
             <button
               key={f}

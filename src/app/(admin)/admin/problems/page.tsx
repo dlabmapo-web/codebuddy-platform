@@ -6,6 +6,11 @@ import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, X, Check, He
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 
+const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
+  ssr: false,
+  loading: () => <div className="rounded-xl animate-pulse" style={{ height: 200, backgroundColor: '#F3F4F6', border: '1px solid #E5E8EC' }} />,
+});
+
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
@@ -390,13 +395,10 @@ export default function AdminProblemsPage() {
                     </FormField>
 
                   <FormField label="문제 내용" required>
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-                      style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.7 }}
-                      rows={5}
-                      placeholder="학생에게 보여줄 문제 설명을 입력하세요.&#10;예) 두 정수 A와 B가 주어졌을 때, A+B를 출력하는 프로그램을 작성하시오."
+                    <RichEditor
                       value={form.description}
-                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      onChange={(html) => setForm((f) => ({ ...f, description: html }))}
+                      placeholder="학생에게 보여줄 문제 내용을 입력하세요. 이미지, 표, 색상 등을 활용해 알기 쉽게 작성하세요."
                     />
                   </FormField>
 

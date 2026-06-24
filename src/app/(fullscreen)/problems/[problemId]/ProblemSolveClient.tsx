@@ -3,9 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
+import { supabaseBrowser } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { OnMount } from '@monaco-editor/react';
 import type { DbProblem, DbTestCase, ProblemDifficulty } from '@/lib/types/db';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -35,6 +39,8 @@ type SubmitResult = {
   failedCases: number[];
   attemptNo: number;
 };
+
+type PresenceUser = { userId: string; name: string; role: string };
 
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
@@ -74,30 +80,22 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4"
-        style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-center mb-5">
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
-            <span style={{ fontSize: 32 }}>{isPass ? '✓' : '✗'}</span>
+            {isPass
+              ? <CheckCircle2 size={36} style={{ color: '#16A34A' }} />
+              : <XCircle size={36} style={{ color: '#DC2626' }} />}
           </div>
         </div>
-
         <h2 className="text-center mb-1" style={{ fontSize: '20px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>
           {isPass ? '정답입니다!' : result.status === 'partial' ? '일부 통과' : '오답입니다'}
         </h2>
-        <p className="text-center mb-5" style={{ fontSize: '13px', color: '#5A6270' }}>
-          {result.attemptNo}번째 제출
-        </p>
-
+        <p className="text-center mb-5" style={{ fontSize: '13px', color: '#5A6270' }}>{result.attemptNo}번째 제출</p>
         <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
           <div className="text-center">
             <div style={{ fontSize: '11px', color: '#5A6270', marginBottom: 2 }}>통과한 케이스</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>
-              {result.passedCount} / {result.totalCount}
-            </div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{result.passedCount} / {result.totalCount}</div>
           </div>
           <div style={{ width: 1, backgroundColor: '#E5E8EC' }} />
           <div className="text-center">
@@ -105,7 +103,6 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
             <div style={{ fontSize: '18px', fontWeight: 700, color: '#16181D' }}>{timeLabel}</div>
           </div>
         </div>
-
         {!isPass && result.failedCases.length > 0 && (
           <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#FFF5F5', border: '1px solid #FCA5A5' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>실패한 케이스</div>
@@ -113,28 +110,15 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
             <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
           </div>
         )}
-
         {isPass ? (
           <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>닫기</button>
-            <Link href="/problems" className="flex-1 rounded-xl text-white flex items-center justify-center transition-colors" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
-            >
-              다른 문제 풀기
-            </Link>
+            <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>닫기</button>
+            <Link href="/problems" className="flex-1 rounded-xl text-white flex items-center justify-center" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}>다른 문제 풀기</Link>
           </div>
         ) : (
           <div className="flex gap-2">
-            <button onClick={onHint} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
-              힌트 보기
-            </button>
-            <button onClick={onRetry} className="flex-1 rounded-xl text-white transition-colors" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
-            >
-              다시 풀기
-            </button>
+            <button onClick={onHint} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>힌트 보기</button>
+            <button onClick={onRetry} className="flex-1 rounded-xl text-white" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}>다시 풀기</button>
           </div>
         )}
       </div>
@@ -147,6 +131,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [loadError, setLoadError] = useState(false);
   const [code, setCode] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
+  const [editorFontSize, setEditorFontSize] = useState(13);
   const [terminalLines, setTerminalLines] = useState<Array<{ text: string; type: 'info' | 'out' | 'err' | 'meta' }>>([
     { text: '실행 버튼을 눌러 코드를 실행해보세요.', type: 'info' },
   ]);
@@ -158,12 +143,115 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [leftWidth, setLeftWidth] = useState(46);
   const [pyodideStatus, setPyodideStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [starterCode, setStarterCode] = useState('');
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [teacherOnline, setTeacherOnline] = useState(false);
+  const [teacherName, setTeacherName] = useState<string | null>(null);
+  const [myInfo, setMyInfo] = useState<{ id: string; name: string } | null>(null);
+  const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
+  const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
 
   const pyodideRef = useRef<PyodideInstance | null>(null);
   const pyodideLoadPromise = useRef<Promise<PyodideInstance> | null>(null);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCursorSentRef = useRef(0);
+  const codeRef = useRef(code);
+  const sessionIdRef = useRef<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const awaitingSyncRef = useRef(false);
+  const lastSavedCodeRef = useRef<string | null>(null);
+  // 세션에서 저장된 코드를 복원했는지 표시 → 문제 로드의 starter_code가 덮어쓰지 않도록 보호
+  const codeRestoredRef = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const monacoRef = useRef<any>(null);
+  const remoteCursorDecorationsRef = useRef<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const remoteCursorWidgetRef = useRef<any>(null);
+
+  useEffect(() => { codeRef.current = code; }, [code]);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+
+  const updateRemoteCursor = useCallback((name: string, role: string, position: { lineNumber: number; column: number }) => {
+    const editor = editorRef.current;
+    const monacoInstance = monacoRef.current;
+    if (!editor || !monacoInstance) return;
+    const color = CURSOR_COLORS[role] ?? CURSOR_COLORS.teacher;
+    const className = `remote-cursor-${role}`;
+
+    remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, [{
+      range: new monacoInstance.Range(position.lineNumber, position.column, position.lineNumber, Math.max(position.column, position.column + 1)),
+      options: { className, zIndex: 100 },
+    }]);
+
+    if (remoteCursorWidgetRef.current) editor.removeContentWidget(remoteCursorWidgetRef.current);
+    const dom = document.createElement('div');
+    dom.className = 'remote-cursor-label';
+    dom.style.backgroundColor = color;
+    dom.textContent = name.length > 5 ? name.charAt(0) : name;
+    const widget = {
+      getId: () => 'remote-cursor',
+      getDomNode: () => dom,
+      getPosition: () => ({ position, preference: [1] }),
+    };
+    remoteCursorWidgetRef.current = widget;
+    editor.addContentWidget(widget);
+  }, []);
+
+  const handleEditorMount: OnMount = useCallback((editor, monacoInstance) => {
+    editorRef.current = editor;
+    monacoRef.current = monacoInstance;
+    injectCursorStyles();
+
+    editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
+      if (!myInfo || !channelRef.current) return;
+      const now = Date.now();
+      if (now - lastCursorSentRef.current < 250) return;
+      lastCursorSentRef.current = now;
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'cursor:move',
+        payload: { senderId: myInfo.id, name: myInfo.name, role: 'student', position: e.position },
+      });
+    });
+  }, [myInfo]);
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(json => {
+      if (json.user) setMyInfo({ id: json.user.id, name: json.user.name });
+    });
+  }, []);
+
+  useEffect(() => {
+    let prevCount = -1;
+
+    const loadFeedbacks = () => {
+      if (document.hidden) return;
+      fetch(`/api/feedbacks?problem_id=${problemId}`)
+        .then(r => r.json())
+        .then(json => {
+          if (!json.feedbacks) return;
+          const list = (json.feedbacks as { users?: { name: string }; content: string; created_at: string }[]).map(fb => ({
+            teacherName: fb.users?.name ?? '선생님',
+            content: fb.content,
+            createdAt: fb.created_at,
+          }));
+          if (prevCount >= 0 && list.length > prevCount) {
+            setFeedbackPanelOpen(true);
+          }
+          prevCount = list.length;
+          setFeedbacks(list);
+        });
+    };
+
+    loadFeedbacks();
+    const interval = setInterval(loadFeedbacks, 3000);
+    return () => clearInterval(interval);
+  }, [problemId]);
 
   useEffect(() => {
     fetch(`/api/problems/${problemId}`)
@@ -173,7 +261,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         setProblem({ ...json.problem, test_cases: json.test_cases ?? [] });
         const sc = json.problem.starter_code ?? '';
         setStarterCode(sc);
-        if (!submissionId) setCode(sc);
+        // 세션에서 저장 코드를 이미 복원했으면 starter_code로 덮어쓰지 않음 (race 방지)
+        if (!submissionId && !codeRestoredRef.current) { setCode(sc); codeRef.current = sc; }
       })
       .catch(() => setLoadError(true));
 
@@ -187,6 +276,150 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         .then((json) => { if (json.submission?.code) setCode(json.submission.code); });
     }
   }, [problemId, submissionId]);
+
+  useEffect(() => {
+    fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem_id: problemId }),
+    })
+      .then(r => r.json())
+      .then(json => {
+        if (!json.session?.id) return;
+        setSessionId(json.session.id);
+        // 이전에 작성하던 코드가 있으면 복원 (제출 코드 열람 중이 아닐 때만)
+        if (!submissionId && json.session.final_code) {
+          codeRestoredRef.current = true;
+          setCode(json.session.final_code);
+          codeRef.current = json.session.final_code;
+          lastSavedCodeRef.current = json.session.final_code;
+        }
+      });
+
+    return () => {
+      const sid = sessionIdRef.current;
+      if (sid) {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        // codeRef.current가 비어있으면 final_code를 전송하지 않음 (auto-save된 코드 유지)
+        const body: Record<string, unknown> = { status: 'ended' };
+        if (codeRef.current) body.final_code = codeRef.current;
+        fetch(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          keepalive: true,
+        });
+      }
+    };
+  }, [problemId]);
+
+  // 누가 입력했든(로컬/원격) 현재 코드를 디바운스 저장 → 새로고침 시 항상 복원 가능.
+  // 혼자 풀 때도(선생님 없이도) 동일하게 동작한다.
+  const scheduleAutoSave = useCallback((nextCode: string) => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      const sid = sessionIdRef.current;
+      if (sid && nextCode !== lastSavedCodeRef.current) {
+        lastSavedCodeRef.current = nextCode;
+        fetch(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ final_code: nextCode }),
+        });
+      }
+    }, 1000);
+  }, []);
+
+  // 안전장치: 디바운스를 놓치는 경우를 대비해 10초마다 변경분을 추가 저장
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const sid = sessionIdRef.current;
+      if (sid && codeRef.current && codeRef.current !== lastSavedCodeRef.current) {
+        lastSavedCodeRef.current = codeRef.current;
+        fetch(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ final_code: codeRef.current }),
+        });
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || !myInfo) return;
+
+    const supabase = supabaseBrowser();
+    const channel = supabase.channel(`session:${sessionId}`, { config: { broadcast: { self: false } } });
+
+    channel
+      .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
+        if (payload.senderId === myInfo.id) return;
+        // 원격(선생님) 편집도 내 화면에 반영 + 지속 저장 → 새로고침해도 유지됨
+        setCode(payload.code);
+        codeRef.current = payload.code;
+        scheduleAutoSave(payload.code);
+      })
+      .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
+        if (payload.senderId === myInfo.id) return;
+        updateRemoteCursor(payload.name, payload.role, payload.position);
+      })
+      // 다른 참가자가 "최신 코드 주세요"라고 요청하면, 내 현재 코드를 응답
+      .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
+        if (payload.senderId === myInfo.id) return;
+        channel.send({
+          type: 'broadcast',
+          event: 'sync:state',
+          payload: { senderId: myInfo.id, targetId: payload.senderId, code: codeRef.current },
+        });
+      })
+      // 내가 요청한 최신 코드 응답을 받으면 에디터에 반영 (재접속 직후 1회만)
+      .on('broadcast', { event: 'sync:state' }, ({ payload }: { payload: { senderId: string; targetId: string; code: string } }) => {
+        if (payload.targetId !== myInfo.id || !awaitingSyncRef.current) return;
+        awaitingSyncRef.current = false;
+        if (typeof payload.code === 'string') {
+          setCode(payload.code);
+          codeRef.current = payload.code;
+          scheduleAutoSave(payload.code);
+        }
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<PresenceUser>();
+        const all = Object.values(state).flat();
+        const teacher = all.find(p => p.role === 'teacher');
+        setTeacherOnline(!!teacher);
+        setTeacherName(teacher?.name ?? null);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ userId: myInfo.id, name: myInfo.name, role: 'student' });
+          // 접속/재접속 시 현재 방에 있는 참가자에게 최신 코드를 요청
+          awaitingSyncRef.current = true;
+          channel.send({ type: 'broadcast', event: 'sync:request', payload: { senderId: myInfo.id } });
+          // 3초 내 응답이 없으면(혼자 있음) DB에서 불러온 코드 유지
+          setTimeout(() => { awaitingSyncRef.current = false; }, 3000);
+        }
+      });
+
+    channelRef.current = channel;
+    return () => { channel.unsubscribe(); channelRef.current = null; };
+  }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
+
+  const handleCodeChange = useCallback((newCode: string) => {
+    setCode(newCode);
+    codeRef.current = newCode; // cleanup에서 최신 코드 사용을 위해 ref 동기화
+    scheduleAutoSave(newCode);
+
+    if (!myInfo || !channelRef.current) return;
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+    broadcastTimerRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'code:update',
+        payload: { senderId: myInfo.id, code: newCode },
+      });
+    }, 800);
+  }, [myInfo, scheduleAutoSave]);
 
   useEffect(() => {
     const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -299,8 +532,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       }
 
       const runtimeMs = Date.now() - t0;
-      const status: 'pass' | 'fail' | 'partial' =
-        passedCount === judgeCases.length ? 'pass' : passedCount > 0 ? 'partial' : 'fail';
+      const status: 'pass' | 'fail' | 'partial' = passedCount === judgeCases.length ? 'pass' : passedCount > 0 ? 'partial' : 'fail';
       const score = Math.round((passedCount / judgeCases.length) * 100);
       const newAttempt = attemptCount + 1;
 
@@ -311,24 +543,22 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_id: problemId,
-          language: 'python',
-          code,
-          status,
-          score,
-          passed_count: passedCount,
-          total_count: judgeCases.length,
-          runtime_ms: runtimeMs,
-          elapsed_sec: seconds,
-        }),
+        body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: passedCount, total_count: judgeCases.length, runtime_ms: runtimeMs, elapsed_sec: seconds }),
       });
+
+      if (sessionId) {
+        await fetch(`/api/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ final_code: code }),
+        });
+      }
 
       setModalResult({ status, passedCount, totalCount: judgeCases.length, runtimeMs, elapsedSec: seconds, failedCases, attemptNo: newAttempt });
     } catch (e) {
       setTerminalLines([{ text: e instanceof Error ? e.message : '채점 중 오류 발생', type: 'err' }]);
     } finally { setIsRunning(false); }
-  }, [isRunning, code, problem, problemId, getPyodide, seconds, attemptCount]);
+  }, [isRunning, code, problem, problemId, getPyodide, seconds, attemptCount, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -379,7 +609,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           </span>
         </div>
 
-        <div className="flex-1 flex justify-center gap-4">
+        <div className="flex-1 flex justify-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1 rounded-lg" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
             <Clock size={14} style={{ color: '#5A6270' }} />
             <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', fontFamily: 'monospace' }}>{timeStr}</span>
@@ -387,6 +617,20 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           {attemptCount > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
               <span style={{ fontSize: '12px', color: '#5A6270' }}>제출 {attemptCount}회</span>
+            </div>
+          )}
+          {teacherOnline && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#F5F3FF', border: '1px solid #C4B5FD' }}>
+              <div
+                className="flex items-center justify-center rounded-full text-white font-bold"
+                style={{ width: 22, height: 22, fontSize: 11, backgroundColor: CURSOR_COLORS.teacher, flexShrink: 0 }}
+              >
+                {(teacherName ?? '선').charAt(0)}
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: CURSOR_COLORS.teacher }}>
+                {teacherName ?? '선생님'} 접속 중
+              </span>
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: CURSOR_COLORS.teacher }} />
             </div>
           )}
         </div>
@@ -398,12 +642,41 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16A34A' }} /> 준비됨
             </span>
           )}
-          <button
-            onClick={() => setCode(starterCode)}
-            title="코드 초기화"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[#F6F7F9]"
-            style={{ fontSize: '12px', color: '#5A6270', border: '1px solid #E5E8EC', height: 32 }}
-          >
+          {feedbacks.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setFeedbackPanelOpen(o => !o)}
+                className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
+                style={{ height: 32, border: `1px solid ${CURSOR_COLORS.teacher}`, backgroundColor: feedbackPanelOpen ? '#F5F3FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: CURSOR_COLORS.teacher }}
+              >
+                <MessageSquare size={14} /> 피드백
+                <span className="flex items-center justify-center rounded-full text-white" style={{ width: 18, height: 18, fontSize: 10, backgroundColor: CURSOR_COLORS.teacher }}>{feedbacks.length}</span>
+              </button>
+              {feedbackPanelOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg overflow-hidden" style={{ width: 340, maxHeight: 400, overflowY: 'auto', zIndex: 50, border: `1px solid #E5E8EC` }}>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC', position: 'sticky', top: 0, backgroundColor: '#FFFFFF' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>선생님 피드백</span>
+                    <button onClick={() => setFeedbackPanelOpen(false)} className="flex items-center justify-center rounded" style={{ width: 24, height: 24, color: '#BCC0C7' }}><X size={14} /></button>
+                  </div>
+                  {feedbacks.map((fb, i) => (
+                    <div key={i} style={{ padding: '12px 16px', borderBottom: i < feedbacks.length - 1 ? '1px solid #F5F3FF' : 'none' }}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <div className="rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{ width: 22, height: 22, fontSize: 11, backgroundColor: CURSOR_COLORS.teacher }}>
+                          {fb.teacherName.charAt(0)}
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: CURSOR_COLORS.teacher }}>{fb.teacherName} 선생님</span>
+                        <span style={{ fontSize: '11px', color: '#BCC0C7', marginLeft: 'auto' }}>
+                          {new Date(fb.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button onClick={() => setCode(starterCode)} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[#F6F7F9]" style={{ fontSize: '12px', color: '#5A6270', border: '1px solid #E5E8EC', height: 32 }}>
             <RotateCcw size={12} /> 초기화
           </button>
           <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50" style={{ height: 36, border: '1px solid #E5E8EC', backgroundColor: '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#16181D' }}>
@@ -433,7 +706,11 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
             </div>
 
             <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>문제</h3>
-            <p style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, whiteSpace: 'pre-line', marginBottom: 20 }}>{problem.description}</p>
+            <div
+                className="tiptap-render"
+                style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, marginBottom: 20 }}
+                dangerouslySetInnerHTML={{ __html: problem.description }}
+              />
 
             {problem.input_format && (
               <>
@@ -457,16 +734,12 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                       {tc.input && (
                         <div className="flex-1">
                           <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>예제 입력 {i + 1}</div>
-                          <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>
-                            {tc.input}
-                          </div>
+                          <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>{tc.input}</div>
                         </div>
                       )}
                       <div className="flex-1">
                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>예제 출력 {i + 1}</div>
-                        <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>
-                          {tc.expected_output}
-                        </div>
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>{tc.expected_output}</div>
                       </div>
                     </div>
                   ))}
@@ -495,9 +768,28 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E8EC' }}>
             <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
-            <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[#F6F7F9]" style={{ height: 32, fontSize: '13px', color: '#5A6270' }}>
-              <Lightbulb size={14} /> 힌트 보기
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+                <button
+                  onClick={() => setEditorFontSize(s => Math.max(10, s - 1))}
+                  className="flex items-center justify-center transition-colors hover:bg-[#F6F7F9]"
+                  style={{ width: 28, height: 28, fontSize: '16px', color: '#5A6270', fontWeight: 600 }}
+                  title="글자 크기 줄이기"
+                >−</button>
+                <span style={{ fontSize: '12px', color: '#5A6270', minWidth: 28, textAlign: 'center', lineHeight: '28px', borderLeft: '1px solid #E5E8EC', borderRight: '1px solid #E5E8EC' }}>
+                  {editorFontSize}
+                </span>
+                <button
+                  onClick={() => setEditorFontSize(s => Math.min(24, s + 1))}
+                  className="flex items-center justify-center transition-colors hover:bg-[#F6F7F9]"
+                  style={{ width: 28, height: 28, fontSize: '16px', color: '#5A6270', fontWeight: 600 }}
+                  title="글자 크기 키우기"
+                >+</button>
+              </div>
+              <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[#F6F7F9]" style={{ height: 32, fontSize: '13px', color: '#5A6270' }}>
+                <Lightbulb size={14} /> 힌트 보기
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
@@ -506,9 +798,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               language="python"
               theme="paircode-dark"
               beforeMount={registerPaircodeTheme}
+              onMount={handleEditorMount}
               value={code}
-              onChange={(v) => setCode(v ?? '')}
-              options={{ fontSize: 13, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
+              onChange={(v) => handleCodeChange(v ?? '')}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
             />
           </div>
 
@@ -530,12 +823,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       </div>
 
       {modalResult && (
-        <ResultModal
-          result={modalResult}
-          onClose={() => setModalResult(null)}
-          onRetry={() => setModalResult(null)}
-          onHint={() => { setModalResult(null); setShowHint(true); }}
-        />
+        <ResultModal result={modalResult} onClose={() => setModalResult(null)} onRetry={() => setModalResult(null)} onHint={() => { setModalResult(null); setShowHint(true); }} />
       )}
       {showHint && <HintPanel onClose={() => setShowHint(false)} />}
     </div>

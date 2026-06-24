@@ -10,8 +10,24 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
+  const studentId = searchParams.get('student_id');
 
   const db = supabaseAdmin();
+
+  if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
+    let query = db
+      .from('submissions')
+      .select('id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at, problems(problem_no, title, difficulty), users(id, name, username)')
+      .eq('user_id', studentId)
+      .order('submitted_at', { ascending: false });
+
+    if (problemId) query = query.eq('problem_id', problemId);
+
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiOk({ submissions: data });
+  }
+
   let query = db
     .from('submissions')
     .select('id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at, problems(problem_no, title, difficulty)')

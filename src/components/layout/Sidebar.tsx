@@ -7,7 +7,6 @@ import {
   History,
   Users,
   BarChart2,
-  MessageSquare,
   FileText,
   UserCheck,
   FlaskConical,
@@ -29,7 +28,6 @@ const studentNav: NavItem[] = [
 const teacherNav: NavItem[] = [
   { icon: <Users size={16} />, label: '학생 현황', href: '/students' },
   { icon: <BarChart2 size={16} />, label: '풀이 현황', href: '/progress' },
-  { icon: <MessageSquare size={16} />, label: '실시간 피드백', href: '/feedback/list' },
 ];
 
 const adminNav: NavItem[] = [

@@ -218,7 +218,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
 
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value, false);
+      editor.commands.setContent(value, { emitUpdate: false });
     }
   }, [value, editor]);
 

@@ -7,6 +7,8 @@ import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, Rota
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
+import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
+import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -149,6 +151,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [myInfo, setMyInfo] = useState<{ id: string; name: string } | null>(null);
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
+  const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
 
   const pyodideRef = useRef<PyodideInstance | null>(null);
   const pyodideLoadPromise = useRef<Promise<PyodideInstance> | null>(null);
@@ -157,7 +160,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const terminalRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCodeSentRef = useRef(0);
+  const pendingCodeRef = useRef<string | null>(null);
   const lastCursorSentRef = useRef(0);
+  const lastPointerSentRef = useRef(0);
+  const editorPaneRef = useRef<HTMLDivElement>(null);
+  const isApplyingRemoteRef = useRef(false);
+  const hasPeerRef = useRef(false);
   const codeRef = useRef(code);
   const sessionIdRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -208,7 +217,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     injectCursorStyles();
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
-      if (!myInfo || !channelRef.current) return;
+      if (!myInfo || !channelRef.current || !hasPeerRef.current) return;
       const now = Date.now();
       if (now - lastCursorSentRef.current < 250) return;
       lastCursorSentRef.current = now;
@@ -218,6 +227,30 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         payload: { senderId: myInfo.id, name: myInfo.name, role: 'student', position: e.position },
       });
     });
+  }, [myInfo]);
+
+  const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!myInfo || !channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
+    const now = Date.now();
+    if (now - lastPointerSentRef.current < 80) return;
+    lastPointerSentRef.current = now;
+    const rect = editorPaneRef.current.getBoundingClientRect();
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'pointer:move',
+      payload: {
+        senderId: myInfo.id,
+        name: myInfo.name,
+        role: 'student',
+        xPct: (e.clientX - rect.left) / rect.width,
+        yPct: (e.clientY - rect.top) / rect.height,
+      },
+    });
+  }, [myInfo]);
+
+  const handlePaneMouseLeave = useCallback(() => {
+    if (!myInfo || !channelRef.current || !hasPeerRef.current) return;
+    channelRef.current.send({ type: 'broadcast', event: 'pointer:leave', payload: { senderId: myInfo.id } });
   }, [myInfo]);
 
   useEffect(() => {
@@ -355,14 +388,30 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     channel
       .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
         if (payload.senderId === myInfo.id) return;
-        // 원격(선생님) 편집도 내 화면에 반영 + 지속 저장 → 새로고침해도 유지됨
-        setCode(payload.code);
-        codeRef.current = payload.code;
-        scheduleAutoSave(payload.code);
+        if (editorRef.current && monacoRef.current) {
+          isApplyingRemoteRef.current = true;
+          applyMinimalEdit(editorRef.current, monacoRef.current, payload.code);
+          isApplyingRemoteRef.current = false;
+        } else {
+          codeRef.current = payload.code;
+          setCode(payload.code);
+          scheduleAutoSave(payload.code);
+        }
       })
       .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
         if (payload.senderId === myInfo.id) return;
         updateRemoteCursor(payload.name, payload.role, payload.position);
+      })
+      .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
+        if (payload.senderId === myInfo.id) return;
+        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: payload.name, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
+      })
+      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
+        setRemotePointers(prev => {
+          const next = { ...prev };
+          delete next[payload.senderId];
+          return next;
+        });
       })
       // 다른 참가자가 "최신 코드 주세요"라고 요청하면, 내 현재 코드를 응답
       .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
@@ -387,8 +436,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         const state = channel.presenceState<PresenceUser>();
         const all = Object.values(state).flat();
         const teacher = all.find(p => p.role === 'teacher');
+        hasPeerRef.current = !!teacher;
         setTeacherOnline(!!teacher);
         setTeacherName(teacher?.name ?? null);
+        if (!teacher) setRemotePointers({});
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -407,18 +458,29 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode);
-    codeRef.current = newCode; // cleanup에서 최신 코드 사용을 위해 ref 동기화
+    codeRef.current = newCode;
     scheduleAutoSave(newCode);
 
-    if (!myInfo || !channelRef.current) return;
-    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
-    broadcastTimerRef.current = setTimeout(() => {
+    if (isApplyingRemoteRef.current) return;
+    if (!myInfo || !channelRef.current || !hasPeerRef.current) return;
+    pendingCodeRef.current = newCode;
+    const flush = () => {
+      if (pendingCodeRef.current === null) return;
+      lastCodeSentRef.current = Date.now();
       channelRef.current?.send({
         type: 'broadcast',
         event: 'code:update',
-        payload: { senderId: myInfo.id, code: newCode },
+        payload: { senderId: myInfo.id, code: pendingCodeRef.current },
       });
-    }, 800);
+      pendingCodeRef.current = null;
+    };
+    const elapsed = Date.now() - lastCodeSentRef.current;
+    if (elapsed >= 80) {
+      flush();
+    } else {
+      if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+      broadcastTimerRef.current = setTimeout(flush, 80 - elapsed);
+    }
   }, [myInfo, scheduleAutoSave]);
 
   useEffect(() => {
@@ -765,7 +827,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
         <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: '#E5E8EC' }} onMouseDown={handleMouseDown} />
 
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div
+          ref={editorPaneRef}
+          className="flex flex-col flex-1 overflow-hidden relative"
+          onMouseMove={handlePaneMouseMove}
+          onMouseLeave={handlePaneMouseLeave}
+        >
+          <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E8EC' }}>
             <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
             <div className="flex items-center gap-2">

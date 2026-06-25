@@ -7,6 +7,8 @@ import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check } from 'luci
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
+import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
+import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { ProblemDifficulty } from '@/lib/types/db';
@@ -59,6 +61,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(true);
   const [editorFontSize, setEditorFontSize] = useState(13);
+  const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +69,12 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const codeRef = useRef('');
   const awaitingSyncRef = useRef(false);
   const lastCursorSentRef = useRef(0);
+  const lastCodeSentRef = useRef(0);
+  const pendingCodeRef = useRef<string | null>(null);
+  const lastPointerSentRef = useRef(0);
+  const editorPaneRef = useRef<HTMLDivElement>(null);
+  const isApplyingRemoteRef = useRef(false);
+  const hasPeerRef = useRef(false);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,13 +150,30 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     channel
       .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
         if (payload.senderId === teacherId) return;
-        setCode(payload.code);
-        codeRef.current = payload.code;
-        scheduleAutoSave(payload.code);
+        if (editorRef.current && monacoRef.current) {
+          isApplyingRemoteRef.current = true;
+          applyMinimalEdit(editorRef.current, monacoRef.current, payload.code);
+          isApplyingRemoteRef.current = false;
+        } else {
+          codeRef.current = payload.code;
+          setCode(payload.code);
+          scheduleAutoSave(payload.code);
+        }
       })
       .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
         if (payload.senderId === teacherId) return;
         updateRemoteCursor(payload.name, payload.role, payload.position);
+      })
+      .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
+        if (payload.senderId === teacherId) return;
+        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: payload.name, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
+      })
+      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
+        setRemotePointers(prev => {
+          const next = { ...prev };
+          delete next[payload.senderId];
+          return next;
+        });
       })
       // 다른 참가자가 최신 코드를 요청하면 내 현재 코드로 응답
       .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
@@ -171,8 +197,10 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
         const state = channel.presenceState<PresenceUser>();
         const all = Object.values(state).flat();
         const student = all.find(p => p.role === 'student');
+        hasPeerRef.current = !!student;
         setStudentOnline(!!student);
         if (student && student.name) setStudentName(student.name);
+        if (!student) setRemotePointers({});
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -193,7 +221,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     injectCursorStyles();
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
-      if (!channelRef.current) return;
+      if (!channelRef.current || !hasPeerRef.current) return;
       const now = Date.now();
       if (now - lastCursorSentRef.current < 250) return;
       lastCursorSentRef.current = now;
@@ -205,19 +233,54 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     });
   }, [teacherId, teacherName]);
 
+  const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
+    const now = Date.now();
+    if (now - lastPointerSentRef.current < 80) return;
+    lastPointerSentRef.current = now;
+    const rect = editorPaneRef.current.getBoundingClientRect();
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'pointer:move',
+      payload: {
+        senderId: teacherId,
+        name: teacherName,
+        role: 'teacher',
+        xPct: (e.clientX - rect.left) / rect.width,
+        yPct: (e.clientY - rect.top) / rect.height,
+      },
+    });
+  }, [teacherId, teacherName]);
+
+  const handlePaneMouseLeave = useCallback(() => {
+    if (!channelRef.current || !hasPeerRef.current) return;
+    channelRef.current.send({ type: 'broadcast', event: 'pointer:leave', payload: { senderId: teacherId } });
+  }, [teacherId]);
+
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode);
     codeRef.current = newCode;
     scheduleAutoSave(newCode);
-    if (!channelRef.current) return;
-    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
-    broadcastTimerRef.current = setTimeout(() => {
+    if (isApplyingRemoteRef.current) return;
+    if (!channelRef.current || !hasPeerRef.current) return;
+    pendingCodeRef.current = newCode;
+    const flush = () => {
+      if (pendingCodeRef.current === null) return;
+      lastCodeSentRef.current = Date.now();
       channelRef.current?.send({
         type: 'broadcast',
         event: 'code:update',
-        payload: { senderId: teacherId, code: newCode },
+        payload: { senderId: teacherId, code: pendingCodeRef.current },
       });
-    }, 800);
+      pendingCodeRef.current = null;
+    };
+    const elapsed = Date.now() - lastCodeSentRef.current;
+    if (elapsed >= 80) {
+      flush();
+    } else {
+      if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+      broadcastTimerRef.current = setTimeout(flush, 80 - elapsed);
+    }
   }, [teacherId, scheduleAutoSave]);
 
   const handleSaveFeedback = async () => {
@@ -340,7 +403,13 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
 
         <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: '#2D2D2D' }} onMouseDown={handleMouseDown} />
 
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div
+          ref={editorPaneRef}
+          className="flex flex-col flex-1 overflow-hidden relative"
+          onMouseMove={handlePaneMouseMove}
+          onMouseLeave={handlePaneMouseLeave}
+        >
+          <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center px-4 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E' }}>
             <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
             <span style={{ fontSize: '11px', color: '#6A9955', marginLeft: 12, flex: 1 }}>

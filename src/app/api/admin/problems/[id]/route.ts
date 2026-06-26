@@ -55,6 +55,8 @@ export async function PATCH(req: Request, { params }: Params) {
     time_limit_ms?: number;
     memory_limit_mb?: number;
     is_published?: boolean;
+    category_id?: string;
+    order_no?: number;
     test_cases?: Array<{ input: string; expected_output: string; is_sample: boolean; is_hidden: boolean; order_no: number }>;
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
   };
@@ -72,6 +74,8 @@ export async function PATCH(req: Request, { params }: Params) {
   if (fields.time_limit_ms !== undefined) updateFields.time_limit_ms = fields.time_limit_ms;
   if (fields.memory_limit_mb !== undefined) updateFields.memory_limit_mb = fields.memory_limit_mb;
   if (fields.is_published !== undefined) updateFields.is_published = fields.is_published;
+  if (fields.category_id !== undefined) updateFields.category_id = fields.category_id;
+  if (fields.order_no !== undefined) updateFields.order_no = fields.order_no;
 
   if (Object.keys(updateFields).length > 0) {
     const { error } = await db.from('problems').update(updateFields).eq('id', id);

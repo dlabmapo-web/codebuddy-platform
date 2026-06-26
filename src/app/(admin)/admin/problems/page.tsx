@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, X, Check, HelpCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, ChevronRight, X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers } from 'lucide-react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 
@@ -20,7 +20,16 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
-type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'title' | 'difficulty' | 'is_published' | 'created_at'>;
+type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'category_id' | 'order_no' | 'title' | 'difficulty' | 'is_published' | 'created_at'>;
+
+type CategoryRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  order_no: number;
+  is_published: boolean;
+  problem_count: number;
+};
 
 type TestCaseForm = {
   input: string;
@@ -37,6 +46,7 @@ type HintForm = {
 };
 
 type ProblemForm = {
+  category_id: string;
   title: string;
   difficulty: ProblemDifficulty;
   description: string;
@@ -50,6 +60,7 @@ type ProblemForm = {
 };
 
 const EMPTY_FORM: ProblemForm = {
+  category_id: '',
   title: '',
   difficulty: 'easy',
   description: '',
@@ -121,8 +132,78 @@ function DeleteConfirmModal({ title, onConfirm, onCancel }: { title: string; onC
   );
 }
 
+function CategoryModal({
+  initial, onSave, onClose, saving,
+}: {
+  initial: { title: string; description: string; is_published: boolean } | null;
+  onSave: (data: { title: string; description: string; is_published: boolean }) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [isPublished, setIsPublished] = useState(initial?.is_published ?? true);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#16181D', marginBottom: 4 }}>
+          {initial ? '카테고리 수정' : '새 카테고리'}
+        </h3>
+        <p style={{ fontSize: '13px', color: '#8A8F98', marginBottom: 18 }}>
+          예) 파이썬 기초, 자료구조, 알고리즘 입문
+        </p>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>카테고리 이름 <span style={{ color: '#DC2626' }}>*</span></label>
+            <input
+              autoFocus
+              className="w-full px-3 rounded-lg focus:outline-none"
+              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              placeholder="예) 파이썬 기초"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>설명 (선택)</label>
+            <textarea
+              className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
+              style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
+              rows={2}
+              placeholder="이 카테고리에 대한 간단한 설명"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
+            <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="w-4 h-4 accent-primary" />
+            <span style={{ fontSize: '14px', color: '#16181D' }}>학생에게 공개</span>
+            <span style={{ fontSize: '12px', color: '#8A8F98' }}>(끄면 하위 문제도 함께 숨겨집니다)</span>
+          </label>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <button onClick={onClose} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+          <button
+            onClick={() => onSave({ title, description, is_published: isPublished })}
+            disabled={saving || !title.trim()}
+            className="flex-1 rounded-xl text-white transition-colors disabled:opacity-50"
+            style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+          >
+            {saving ? '저장 중...' : initial ? '수정' : '추가'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProblemsPage() {
   const [problems, setProblems] = useState<ProblemRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [panelMode, setPanelMode] = useState<'closed' | 'create' | 'edit'>('closed');
   const [editId, setEditId] = useState<string | null>(null);
@@ -131,24 +212,32 @@ export default function AdminProblemsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProblemRow | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'err' } | null>(null);
   const [expandedSection, setExpandedSection] = useState<'basic' | 'starter' | 'testcases' | 'hints'>('basic');
+  const [catModal, setCatModal] = useState<{ mode: 'create' | 'edit'; id?: string; title: string; description: string; is_published: boolean } | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
+  const [deleteCatTarget, setDeleteCatTarget] = useState<CategoryRow | null>(null);
 
   const showToast = (message: string, type: 'ok' | 'err') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchProblems = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/admin/problems');
-    const json = await res.json();
-    setProblems(json.problems ?? []);
+    const [pRes, cRes] = await Promise.all([
+      fetch('/api/admin/problems'),
+      fetch('/api/admin/categories'),
+    ]);
+    const pJson = await pRes.json();
+    const cJson = await cRes.json();
+    setProblems(pJson.problems ?? []);
+    setCategories(cJson.categories ?? []);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchProblems(); }, [fetchProblems]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
+  const openCreate = (categoryId?: string) => {
+    setForm({ ...EMPTY_FORM, category_id: categoryId ?? categories[0]?.id ?? '' });
     setEditId(null);
     setPanelMode('create');
     setExpandedSection('basic');
@@ -160,6 +249,7 @@ export default function AdminProblemsPage() {
     if (!json.problem) { showToast('문제를 불러올 수 없습니다.', 'err'); return; }
     const { problem, test_cases, hints } = json as { problem: DbProblem; test_cases: DbTestCase[]; hints: DbProblemHint[] };
     setForm({
+      category_id: problem.category_id ?? '',
       title: problem.title,
       difficulty: problem.difficulty,
       description: problem.description,
@@ -181,12 +271,15 @@ export default function AdminProblemsPage() {
   const closePanel = () => { setPanelMode('closed'); setEditId(null); };
 
   const handleSave = async () => {
+    if (!form.category_id) { showToast('카테고리를 선택해주세요.', 'err'); return; }
     if (!form.title.trim()) { showToast('문제 제목을 입력해주세요.', 'err'); return; }
     if (!form.description.trim()) { showToast('문제 내용을 입력해주세요.', 'err'); return; }
 
     setSaving(true);
     const validTc = form.test_cases.filter((tc) => tc.expected_output.trim());
+    if (validTc.length === 0) { setSaving(false); showToast('정답을 1개 이상 입력해주세요.', 'err'); return; }
     const body = {
+      category_id: form.category_id,
       title: form.title,
       difficulty: form.difficulty,
       description: form.description,
@@ -210,7 +303,7 @@ export default function AdminProblemsPage() {
     if (!res.ok) { showToast(json.error?.message ?? '저장 중 오류가 발생했습니다.', 'err'); return; }
     showToast(panelMode === 'edit' ? '문제가 수정되었습니다.' : '문제가 등록되었습니다.', 'ok');
     closePanel();
-    fetchProblems();
+    fetchAll();
   };
 
   const handleDelete = async (problem: ProblemRow) => {
@@ -218,7 +311,7 @@ export default function AdminProblemsPage() {
     setDeleteTarget(null);
     if (!res.ok) { showToast('삭제 중 오류가 발생했습니다.', 'err'); return; }
     showToast('문제가 삭제되었습니다.', 'ok');
-    fetchProblems();
+    fetchAll();
   };
 
   const togglePublish = async (problem: ProblemRow) => {
@@ -227,7 +320,63 @@ export default function AdminProblemsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_published: !problem.is_published }),
     });
-    fetchProblems();
+    fetchAll();
+  };
+
+  const saveCategory = async (data: { title: string; description: string; is_published: boolean }) => {
+    if (!catModal) return;
+    setCatSaving(true);
+    const url = catModal.mode === 'edit' ? `/api/admin/categories/${catModal.id}` : '/api/admin/categories';
+    const method = catModal.mode === 'edit' ? 'PATCH' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    setCatSaving(false);
+    if (!res.ok) { showToast('카테고리 저장 중 오류가 발생했습니다.', 'err'); return; }
+    showToast(catModal.mode === 'edit' ? '카테고리가 수정되었습니다.' : '카테고리가 추가되었습니다.', 'ok');
+    setCatModal(null);
+    fetchAll();
+  };
+
+  const toggleCategoryPublish = async (cat: CategoryRow) => {
+    await fetch(`/api/admin/categories/${cat.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !cat.is_published }),
+    });
+    fetchAll();
+  };
+
+  const handleDeleteCategory = async (cat: CategoryRow) => {
+    const res = await fetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE' });
+    const json = await res.json();
+    setDeleteCatTarget(null);
+    if (!res.ok) { showToast(json.error?.message ?? '삭제 중 오류가 발생했습니다.', 'err'); return; }
+    showToast('카테고리가 삭제되었습니다.', 'ok');
+    fetchAll();
+  };
+
+  const moveCategory = async (cat: CategoryRow, dir: -1 | 1) => {
+    const sorted = [...categories].sort((a, b) => a.order_no - b.order_no);
+    const idx = sorted.findIndex((c) => c.id === cat.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const other = sorted[swapIdx];
+    await Promise.all([
+      fetch(`/api/admin/categories/${cat.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
+      fetch(`/api/admin/categories/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: cat.order_no }) }),
+    ]);
+    fetchAll();
+  };
+
+  const moveProblem = async (p: ProblemRow, siblings: ProblemRow[], dir: -1 | 1) => {
+    const idx = siblings.findIndex((x) => x.id === p.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    await Promise.all([
+      fetch(`/api/admin/problems/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
+      fetch(`/api/admin/problems/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: p.order_no }) }),
+    ]);
+    fetchAll();
   };
 
   const updateTc = (i: number, field: keyof TestCaseForm, value: unknown) => {
@@ -273,18 +422,31 @@ export default function AdminProblemsPage() {
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>문제 관리</h1>
-          <p style={{ fontSize: '14px', color: '#5A6270', marginTop: 2 }}>문제를 등록하고 관리하세요.</p>
+          <p style={{ fontSize: '14px', color: '#5A6270', marginTop: 2 }}>카테고리(주제) 아래에 문제를 등록하고 관리하세요.</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
-          style={{ height: 40, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
-        >
-          <Plus size={16} />
-          문제 등록
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCatModal({ mode: 'create', title: '', description: '', is_published: true })}
+            className="flex items-center gap-2 px-4 rounded-xl transition-colors"
+            style={{ height: 40, border: '1px solid #E5E8EC', backgroundColor: '#FFFFFF', fontSize: '14px', fontWeight: 600, color: '#16181D' }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F6F7F9')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+          >
+            <FolderPlus size={16} style={{ color: '#5A6270' }} />
+            카테고리 추가
+          </button>
+          <button
+            onClick={() => openCreate()}
+            disabled={categories.length === 0}
+            className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors disabled:opacity-50"
+            style={{ height: 40, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+          >
+            <Plus size={16} />
+            문제 등록
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-5 flex-1 overflow-hidden min-h-0">
@@ -298,57 +460,118 @@ export default function AdminProblemsPage() {
         >
           {loading ? (
             <div className="flex-1 flex items-center justify-center" style={{ color: '#5A6270', fontSize: '14px' }}>불러오는 중...</div>
-          ) : problems.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2">
-              <p style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>등록된 문제가 없습니다</p>
-              <p style={{ fontSize: '13px', color: '#5A6270' }}>문제 등록 버튼을 눌러 첫 번째 문제를 추가하세요.</p>
+          ) : categories.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
+              <Layers size={36} style={{ color: '#D1D5DB' }} />
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>아직 카테고리가 없습니다</p>
+              <p style={{ fontSize: '13px', color: '#8A8F98' }}>먼저 카테고리(주제)를 만든 뒤 문제를 등록하세요.</p>
+              <button
+                onClick={() => setCatModal({ mode: 'create', title: '', description: '', is_published: true })}
+                className="flex items-center gap-2 px-4 mt-2 rounded-xl text-white"
+                style={{ height: 38, backgroundColor: '#1B64DA', fontSize: '13px', fontWeight: 600 }}
+              >
+                <FolderPlus size={15} /> 카테고리 추가
+              </button>
             </div>
           ) : (
-            <div className="overflow-auto flex-1">
-              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #E5E8EC', backgroundColor: '#F6F7F9' }}>
-                    {['번호', '제목', '난이도', '공개', '관리'].map((h) => (
-                      <th key={h} className="text-left px-4 py-3" style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {problems.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #F0F1F3' }} className="hover:bg-[#F6F7F9] transition-colors">
-                      <td className="px-4 py-3" style={{ fontSize: '13px', color: '#5A6270', width: 60 }}>{p.problem_no}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => openEdit(p.id)} className="text-left" style={{ fontSize: '14px', fontWeight: 500, color: '#16181D' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#1B64DA')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#16181D')}
-                        >
-                          {p.title}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[p.difficulty].bg, color: DIFF_STYLE[p.difficulty].color }}>
-                          {DIFF_LABEL[p.difficulty]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => togglePublish(p)} title={p.is_published ? '비공개로 전환' : '공개로 전환'} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#F0F1F3]">
-                          {p.is_published ? <Eye size={15} style={{ color: '#1B64DA' }} /> : <EyeOff size={15} style={{ color: '#BCC0C7' }} />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => openEdit(p.id)} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#EAF1FD]" title="수정">
-                            <Pencil size={14} style={{ color: '#1B64DA' }} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#FEE2E2]" title="삭제">
-                            <Trash2 size={14} style={{ color: '#DC2626' }} />
-                          </button>
+            <div className="overflow-auto flex-1 p-3 flex flex-col gap-2.5">
+              {[...categories].sort((a, b) => a.order_no - b.order_no).map((cat, catIdx, catArr) => {
+                const catProblems = problems
+                  .filter((p) => p.category_id === cat.id)
+                  .sort((a, b) => a.order_no - b.order_no);
+                const isCollapsed = collapsed[cat.id];
+                return (
+                  <div key={cat.id} className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+                    <div
+                      className="flex items-center gap-2 px-3 py-2.5"
+                      style={{ backgroundColor: cat.is_published ? '#F0F7FF' : '#F6F7F9', borderBottom: isCollapsed ? 'none' : '1px solid #E5E8EC' }}
+                    >
+                      <button
+                        onClick={() => setCollapsed((c) => ({ ...c, [cat.id]: !c[cat.id] }))}
+                        className="flex items-center justify-center w-6 h-6 rounded-md transition-colors hover:bg-white/60 shrink-0"
+                      >
+                        {isCollapsed ? <ChevronRight size={15} style={{ color: '#5A6270' }} /> : <ChevronDown size={15} style={{ color: '#5A6270' }} />}
+                      </button>
+                      <span className="flex items-center justify-center rounded-md shrink-0" style={{ width: 22, height: 22, backgroundColor: cat.is_published ? '#1B64DA' : '#BCC0C7', color: '#fff', fontSize: '12px', fontWeight: 700 }}>
+                        {catIdx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" style={{ fontSize: '14px', fontWeight: 700, color: cat.is_published ? '#16181D' : '#8A8F98' }}>{cat.title}</span>
+                          <span style={{ fontSize: '12px', color: '#8A8F98' }}>· {catProblems.length}문제</span>
+                          {!cat.is_published && <span className="px-1.5 py-px rounded" style={{ fontSize: '10px', fontWeight: 600, backgroundColor: '#E5E8EC', color: '#8A8F98' }}>숨김</span>}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button onClick={() => moveCategory(cat, -1)} disabled={catIdx === 0} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/70 disabled:opacity-30" title="위로">
+                          <ArrowUp size={13} style={{ color: '#5A6270' }} />
+                        </button>
+                        <button onClick={() => moveCategory(cat, 1)} disabled={catIdx === catArr.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/70 disabled:opacity-30" title="아래로">
+                          <ArrowDown size={13} style={{ color: '#5A6270' }} />
+                        </button>
+                        <button onClick={() => toggleCategoryPublish(cat)} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/70" title={cat.is_published ? '숨기기' : '공개'}>
+                          {cat.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}
+                        </button>
+                        <button onClick={() => setCatModal({ mode: 'edit', id: cat.id, title: cat.title, description: cat.description ?? '', is_published: cat.is_published })} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/70" title="카테고리 수정">
+                          <Pencil size={13} style={{ color: '#5A6270' }} />
+                        </button>
+                        <button onClick={() => setDeleteCatTarget(cat)} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/70" title="카테고리 삭제">
+                          <Trash2 size={13} style={{ color: '#DC2626' }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="flex flex-col">
+                        {catProblems.length === 0 ? (
+                          <div className="px-4 py-3" style={{ fontSize: '12px', color: '#BCC0C7' }}>아직 문제가 없습니다.</div>
+                        ) : (
+                          catProblems.map((p, pIdx) => (
+                            <div key={p.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-[#F6F7F9] transition-colors" style={{ borderBottom: pIdx < catProblems.length - 1 ? '1px solid #F0F1F3' : 'none' }}>
+                              <span className="shrink-0 text-center" style={{ width: 34, fontSize: '12px', fontWeight: 700, color: '#8A8F98', fontFamily: 'monospace' }}>
+                                {catIdx + 1}-{pIdx + 1}
+                              </span>
+                              <button onClick={() => openEdit(p.id)} className="flex-1 min-w-0 text-left truncate" style={{ fontSize: '14px', fontWeight: 500, color: p.is_published ? '#16181D' : '#8A8F98' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#1B64DA')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = p.is_published ? '#16181D' : '#8A8F98')}
+                              >
+                                {p.title}
+                              </button>
+                              <span className="px-2 py-0.5 rounded shrink-0" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[p.difficulty].bg, color: DIFF_STYLE[p.difficulty].color }}>
+                                {DIFF_LABEL[p.difficulty]}
+                              </span>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <button onClick={() => moveProblem(p, catProblems, -1)} disabled={pIdx === 0} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-[#F0F1F3] disabled:opacity-30" title="위로">
+                                  <ArrowUp size={13} style={{ color: '#5A6270' }} />
+                                </button>
+                                <button onClick={() => moveProblem(p, catProblems, 1)} disabled={pIdx === catProblems.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-[#F0F1F3] disabled:opacity-30" title="아래로">
+                                  <ArrowDown size={13} style={{ color: '#5A6270' }} />
+                                </button>
+                                <button onClick={() => togglePublish(p)} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-[#F0F1F3]" title={p.is_published ? '비공개로 전환' : '공개로 전환'}>
+                                  {p.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}
+                                </button>
+                                <button onClick={() => openEdit(p.id)} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-[#EAF1FD]" title="수정">
+                                  <Pencil size={13} style={{ color: '#1B64DA' }} />
+                                </button>
+                                <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-[#FEE2E2]" title="삭제">
+                                  <Trash2 size={13} style={{ color: '#DC2626' }} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        <button
+                          onClick={() => openCreate(cat.id)}
+                          className="flex items-center gap-1.5 px-3 py-2 transition-colors hover:bg-[#F6F7F9]"
+                          style={{ fontSize: '12px', color: '#1B64DA', fontWeight: 600, borderTop: '1px solid #F0F1F3' }}
+                        >
+                          <Plus size={13} /> 이 카테고리에 문제 추가
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -371,6 +594,20 @@ export default function AdminProblemsPage() {
                 onToggle={() => setExpandedSection(expandedSection === 'basic' ? 'starter' : 'basic')}
               >
                 <div className="flex flex-col gap-4">
+                  <FormField label="카테고리" required tooltip={'이 문제가 속할 1레벨 주제입니다.\n예) 파이썬 기초 → print문, if문'}>
+                    <select
+                      className="w-full px-3 rounded-lg focus:outline-none"
+                      style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+                      value={form.category_id}
+                      onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
+                    >
+                      <option value="" disabled>카테고리를 선택하세요</option>
+                      {[...categories].sort((a, b) => a.order_no - b.order_no).map((c, i) => (
+                        <option key={c.id} value={c.id}>{i + 1}. {c.title}</option>
+                      ))}
+                    </select>
+                  </FormField>
+
                   <FormField label="문제 제목" required>
                     <input
                       className="w-full px-3 rounded-lg focus:outline-none"
@@ -399,34 +636,6 @@ export default function AdminProblemsPage() {
                       value={form.description}
                       onChange={(html) => setForm((f) => ({ ...f, description: html }))}
                       placeholder="학생에게 보여줄 문제 내용을 입력하세요. 이미지, 표, 색상 등을 활용해 알기 쉽게 작성하세요."
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="입력 설명"
-                    tooltip={'학생의 코드가 어떤 형태로 입력을 받아야 하는지 설명하세요.\n예) 첫째 줄에 정수 A와 B가 공백으로 구분되어 주어진다. (1 ≤ A, B ≤ 10)'}
-                  >
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-                      style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
-                      rows={2}
-                      placeholder="예) 첫째 줄에 정수 A와 B가 공백으로 구분되어 주어진다."
-                      value={form.input_format}
-                      onChange={(e) => setForm((f) => ({ ...f, input_format: e.target.value }))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="출력 설명"
-                    tooltip={'학생의 코드가 어떤 값을 출력해야 하는지 설명하세요.\n예) A+B를 출력한다.'}
-                  >
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-                      style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
-                      rows={2}
-                      placeholder="예) A+B를 출력한다."
-                      value={form.output_format}
-                      onChange={(e) => setForm((f) => ({ ...f, output_format: e.target.value }))}
                     />
                   </FormField>
 
@@ -510,32 +719,22 @@ export default function AdminProblemsPage() {
               </Section>
 
               <Section
-                label={`채점 케이스 (${form.test_cases.length}개)`}                expanded={expandedSection === 'testcases'}
+                label={`정답 (${form.test_cases.length}개)`}
+                expanded={expandedSection === 'testcases'}
                 onToggle={() => setExpandedSection(expandedSection === 'testcases' ? 'starter' : 'testcases')}
-                tooltip={'모든 케이스를 통과해야 정답으로 처리됩니다.\n\n• 예제 공개: 학생 화면에 보이는 케이스\n• 숨김 채점용: 학생에게 보이지 않지만 채점에 포함\n\n입력이 없는 문제(Hello World 등)는\n입력값을 비워두면 됩니다.\n\n하나라도 실패하면 오답 처리됩니다.'}
+                tooltip={'학생 코드가 출력해야 할 정답을 입력합니다.\n정답을 여러 개 등록할 수 있고, 모든 정답을 맞춰야 통과입니다.\n최소 1개 이상 등록해야 저장됩니다.'}
               >
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ backgroundColor: '#EAF1FD', border: '1px solid #C7D9F7' }}>
                     <span style={{ fontSize: '12px', color: '#1450B5', lineHeight: 1.6 }}>
-                      <strong>모든 케이스를 통과해야 정답</strong>으로 처리됩니다. 하나라도 실패하면 오답입니다.<br />
-                      입력이 없는 문제(예: &quot;Hello, World!&quot; 출력)는 <strong>입력값을 비워두면</strong> 됩니다.
+                      학생 코드가 출력해야 할 <strong>정답을 1개 이상</strong> 등록하세요. 모든 정답을 통과해야 맞음으로 처리됩니다.
                     </span>
                   </div>
                   {form.test_cases.map((tc, i) => (
                     <div key={i} className="rounded-xl p-4" style={{ border: '1px solid #E5E8EC', backgroundColor: '#F6F7F9' }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>케이스 {i + 1}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>정답 {i + 1}</span>
                         <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={tc.is_sample} onChange={(e) => updateTc(i, 'is_sample', e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
-                            <span style={{ fontSize: '12px', color: '#5A6270' }}>학생에게 예제 공개</span>
-                            <Tooltip text={'체크하면 학생 화면에 예제로 표시됩니다.\n학생이 문제를 이해하는 데 도움이 되는 케이스에 체크하세요.'} />
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={tc.is_hidden} onChange={(e) => updateTc(i, 'is_hidden', e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
-                            <span style={{ fontSize: '12px', color: '#5A6270' }}>숨김 채점용</span>
-                            <Tooltip direction="left" text={'체크하면 학생에게 보이지 않고\n정답 채점에만 사용됩니다.\n더 어려운 케이스를 숨겨서 정확한 채점에 사용하세요.'} />
-                          </label>
                           {form.test_cases.length > 1 && (
                             <button onClick={() => removeTc(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#FEE2E2] transition-colors">
                               <X size={12} style={{ color: '#DC2626' }} />
@@ -543,29 +742,16 @@ export default function AdminProblemsPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>입력값</div>
-                          <textarea
-                            className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
-                            style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
-                            rows={3}
-                            placeholder={"입력값 (없으면 비워두세요)"}
-                            value={tc.input}
-                            onChange={(e) => updateTc(i, 'input', e.target.value)}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>정답 출력</div>
-                          <textarea
-                            className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
-                            style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
-                            rows={3}
-                            placeholder="코드가 출력해야 할 정답"
-                            value={tc.expected_output}
-                            onChange={(e) => updateTc(i, 'expected_output', e.target.value)}
-                          />
-                        </div>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>정답 출력값</div>
+                        <textarea
+                          className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
+                          style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '13px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
+                          rows={3}
+                          placeholder="코드가 출력해야 할 정답을 입력하세요"
+                          value={tc.expected_output}
+                          onChange={(e) => updateTc(i, 'expected_output', e.target.value)}
+                        />
                       </div>
                     </div>
                   ))}
@@ -574,7 +760,7 @@ export default function AdminProblemsPage() {
                     className="flex items-center gap-2 px-3 rounded-lg transition-colors"
                     style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: '#5A6270', width: '100%', justifyContent: 'center' }}
                   >
-                    <Plus size={14} /> 케이스 추가
+                    <Plus size={14} /> 정답 추가
                   </button>
                 </div>
               </Section>
@@ -664,6 +850,31 @@ export default function AdminProblemsPage() {
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+
+      {catModal && (
+        <CategoryModal
+          initial={catModal.mode === 'edit' ? { title: catModal.title, description: catModal.description, is_published: catModal.is_published } : null}
+          onSave={saveCategory}
+          onClose={() => setCatModal(null)}
+          saving={catSaving}
+        />
+      )}
+
+      {deleteCatTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={() => setDeleteCatTarget(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>카테고리 삭제</h3>
+            <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>
+              <span style={{ fontWeight: 600, color: '#16181D' }}>{deleteCatTarget.title}</span> 카테고리를 삭제하시겠습니까?<br />
+              하위 문제가 있으면 삭제할 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteCatTarget(null)} className="flex-1 rounded-lg transition-colors" style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+              <button onClick={() => handleDeleteCategory(deleteCatTarget)} className="flex-1 rounded-lg text-white transition-colors" style={{ height: 40, backgroundColor: '#DC2626', fontSize: '14px', fontWeight: 600 }}>삭제</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

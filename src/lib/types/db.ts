@@ -33,9 +33,21 @@ export interface DbTeacherStudent {
 
 export type ProblemDifficulty = 'easy' | 'medium' | 'hard';
 
+export interface DbCategory {
+  id: string;
+  title: string;
+  description: string | null;
+  order_no: number;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DbProblem {
   id: string;
   problem_no: number;
+  category_id: string | null;
+  order_no: number;
   title: string;
   description: string;
   difficulty: ProblemDifficulty;

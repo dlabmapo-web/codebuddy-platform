@@ -41,7 +41,7 @@ export async function PATCH(req: Request, { params }: Params) {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
-  const { status, final_code, teacher_id } = body as { status?: string; final_code?: string; teacher_id?: string };
+  const { status, final_code, teacher_id } = body as { status?: string; final_code?: string | null; teacher_id?: string };
   const updates: Record<string, unknown> = {};
 
   if (status) updates.status = status;

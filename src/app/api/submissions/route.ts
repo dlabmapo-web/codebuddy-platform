@@ -71,5 +71,15 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 정답 통과 시 해당 학생+문제 세션의 draft 코드를 지워서 "이어서 풀기"에서 제거
+  if (status === 'pass') {
+    await supabaseAdmin()
+      .from('collaboration_sessions')
+      .update({ final_code: null })
+      .eq('student_id', user.id)
+      .eq('problem_id', problem_id);
+  }
+
   return apiOk({ submission: data }, 201);
 }

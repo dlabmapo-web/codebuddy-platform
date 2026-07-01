@@ -55,10 +55,23 @@ export async function POST(req: Request) {
       .eq('status', 'active')
       .neq('id', existing.id);
 
-    // 기존 세션을 다시 active 상태로 (final_code는 그대로 유지)
+    // 이미 정답(pass)을 맞춘 문제라면 draft 코드를 클리어해서 새 코드로 시작
+    const { count: passCount } = await db
+      .from('submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('problem_id', problem_id ?? '')
+      .eq('status', 'pass');
+
+    const clearDraft = (passCount ?? 0) > 0;
+
     const { data: reactivated, error: reErr } = await db
       .from('collaboration_sessions')
-      .update({ status: 'active', ended_at: null })
+      .update({
+        status: 'active',
+        ended_at: null,
+        ...(clearDraft ? { final_code: null } : {}),
+      })
       .eq('id', existing.id)
       .select()
       .single();

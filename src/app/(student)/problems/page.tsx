@@ -139,7 +139,16 @@ export default function ProblemsPage() {
 
   useEffect(() => { fetchProblems(); }, [fetchProblems]);
 
-  const pendingDrafts = draftsLoading ? [] : drafts;
+  const pendingDrafts = useMemo(() => {
+    if (draftsLoading) return [];
+    const solvedIds = new Set<string>();
+    for (const c of categories) {
+      for (const p of c.problems) {
+        if (p.solve_status === 'solved') solvedIds.add(p.id);
+      }
+    }
+    return drafts.filter((d) => !solvedIds.has(d.problem_id));
+  }, [draftsLoading, drafts, categories]);
 
   const { solvedCount, triedCount, totalCount } = useMemo(() => {
     let solved = 0, tried = 0, total = 0;

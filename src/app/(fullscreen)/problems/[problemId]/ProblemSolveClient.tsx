@@ -25,7 +25,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 
 type PyodideInstance = {
   runPythonAsync: (code: string) => Promise<unknown>;
-  globals: { set: (key: string, value: string) => void };
+  globals: { set: (key: string, value: unknown) => void };
 };
 
 type ProblemDetail = DbProblem & {
@@ -51,10 +51,13 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
-async function runWithPyodide(pyodide: PyodideInstance, userCode: string, stdinInput: string) {
+async function runWithPyodide(pyodide: PyodideInstance, userCode: string, stdinLines?: string[]) {
   pyodide.globals.set('_user_code', userCode);
-  pyodide.globals.set('_stdin_input', stdinInput);
-  const result = await pyodide.runPythonAsync(`
+
+  // For submission/judge: use pre-supplied stdin lines via io.StringIO
+  if (stdinLines !== undefined) {
+    pyodide.globals.set('_stdin_input', stdinLines.join('\n'));
+    const result = await pyodide.runPythonAsync(`
 import sys, io
 _saved_stdin = sys.stdin
 _saved_stdout = sys.stdout
@@ -71,7 +74,45 @@ finally:
     sys.stdout = _saved_stdout
 (_captured.getvalue(), _stderr_msg)
 `) as [string, string];
-  return { stdout: result[0], stderr: result[1] };
+    return { stdout: result[0], stderr: result[1], inputLog: [] as string[] };
+  }
+
+  // For interactive "Run" button: intercept input() with window.prompt()
+  const inputLog: { prompt: string; value: string }[] = [];
+  pyodide.globals.set('_js_input', (prompt: string) => {
+    const value = window.prompt(prompt || '입력값을 입력하세요 (input)');
+    if (value === null) throw new Error('EOFError: EOF when reading a line');
+    inputLog.push({ prompt, value });
+    return value;
+  });
+
+  const result = await pyodide.runPythonAsync(`
+import sys, io, builtins
+_saved_stdout = sys.stdout
+_captured = io.StringIO()
+sys.stdout = _captured
+_original_input = builtins.input
+_stderr_msg = ''
+
+def _patched_input(prompt=''):
+    if prompt:
+        sys.stdout.write(str(prompt))
+        sys.stdout.flush()
+    result = _js_input(str(prompt) if prompt else '')
+    sys.stdout.write(str(result) + '\\n')
+    return str(result)
+
+builtins.input = _patched_input
+try:
+    exec(compile(_user_code, '<solution>', 'exec'), {})
+except Exception as _e:
+    _stderr_msg = type(_e).__name__ + ': ' + str(_e)
+finally:
+    builtins.input = _original_input
+    sys.stdout = _saved_stdout
+(_captured.getvalue(), _stderr_msg)
+`) as [string, string];
+  return { stdout: result[0], stderr: result[1], inputLog };
 }
 
 function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResult; onClose: () => void; onRetry: () => void; onHint: () => void }) {
@@ -148,6 +189,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [teacherOnline, setTeacherOnline] = useState(false);
   const [teacherName, setTeacherName] = useState<string | null>(null);
+  const teacherNameRef = useRef<string | null>(null);
   const [myInfo, setMyInfo] = useState<{ id: string; name: string } | null>(null);
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
@@ -201,7 +243,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     const dom = document.createElement('div');
     dom.className = 'remote-cursor-label';
     dom.style.backgroundColor = color;
-    dom.textContent = name.length > 5 ? name.charAt(0) : name;
+    dom.textContent = name.length > 4 ? name.slice(0, 4) : name;
     const widget = {
       getId: () => 'remote-cursor',
       getDomNode: () => dom,
@@ -400,7 +442,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       })
       .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
         if (payload.senderId === myInfo.id) return;
-        updateRemoteCursor(payload.name, payload.role, payload.position);
+        const displayName = teacherNameRef.current ?? payload.name;
+        updateRemoteCursor(displayName, payload.role, payload.position);
       })
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
         if (payload.senderId === myInfo.id) return;
@@ -439,7 +482,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         hasPeerRef.current = !!teacher;
         setTeacherOnline(!!teacher);
         setTeacherName(teacher?.name ?? null);
-        if (!teacher) setRemotePointers({});
+        teacherNameRef.current = teacher?.name ?? null;
+        if (!teacher) {
+          setRemotePointers({});
+          const editor = editorRef.current;
+          if (editor) {
+            remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, []);
+            if (remoteCursorWidgetRef.current) {
+              editor.removeContentWidget(remoteCursorWidgetRef.current);
+              remoteCursorWidgetRef.current = null;
+            }
+          }
+        }
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -520,15 +574,14 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     if (isRunning || !problem) return;
     setIsRunning(true);
     setTerminalOpen(true);
-    const sampleInput = problem.test_cases.find((tc) => tc.is_sample)?.input ?? '';
     setTerminalLines([{ text: '실행 환경 초기화 중...', type: 'info' }]);
     try {
       const pyodide = await getPyodide();
-      setTerminalLines([{ text: '실행 중...', type: 'info' }]);
+      setTerminalLines([{ text: '실행 중... (input() 호출 시 입력 창이 뜹니다)', type: 'info' }]);
       const t0 = Date.now();
       const { stdout, stderr } = await Promise.race([
-        runWithPyodide(pyodide, code, sampleInput),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과 (5초)')), 5000)),
+        runWithPyodide(pyodide, code),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과 (30초)')), 30000)),
       ]);
       const elapsed = Date.now() - t0;
       const lines: typeof terminalLines = [{ text: '$ python solution.py', type: 'meta' }];
@@ -572,7 +625,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         const tc = judgeCases[i];
         try {
           const { stdout, stderr } = await Promise.race([
-            runWithPyodide(pyodide, code, tc.input),
+            runWithPyodide(pyodide, code, [tc.input]),
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('시간 초과')), 5000)),
           ]);
           const actual = stdout.trim();

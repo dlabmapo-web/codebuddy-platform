@@ -56,6 +56,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const [code, setCode] = useState('');
   const [studentOnline, setStudentOnline] = useState(false);
   const [studentName, setStudentName] = useState<string | null>(null);
+  const studentNameRef = useRef<string | null>(null);
   const [leftWidth, setLeftWidth] = useState(42);
   const [feedback, setFeedback] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -137,7 +138,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
       const dom = document.createElement('div');
       dom.className = 'remote-cursor-label';
       dom.style.backgroundColor = color;
-      dom.textContent = name.length > 5 ? name.charAt(0) : name;
+      dom.textContent = name.length > 4 ? name.slice(0, 4) : name;
       const widget = {
         getId: () => 'remote-cursor',
         getDomNode: () => dom,
@@ -162,7 +163,8 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
       })
       .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
         if (payload.senderId === teacherId) return;
-        updateRemoteCursor(payload.name, payload.role, payload.position);
+        const displayName = studentNameRef.current ?? payload.name;
+        updateRemoteCursor(displayName, payload.role, payload.position);
       })
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
         if (payload.senderId === teacherId) return;
@@ -199,8 +201,22 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
         const student = all.find(p => p.role === 'student');
         hasPeerRef.current = !!student;
         setStudentOnline(!!student);
-        if (student && student.name) setStudentName(student.name);
-        if (!student) setRemotePointers({});
+        if (student && student.name) {
+          setStudentName(student.name);
+          studentNameRef.current = student.name;
+        }
+        if (!student) studentNameRef.current = null;
+        if (!student) {
+          setRemotePointers({});
+          const editor = editorRef.current;
+          if (editor) {
+            remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, []);
+            if (remoteCursorWidgetRef.current) {
+              editor.removeContentWidget(remoteCursorWidgetRef.current);
+              remoteCursorWidgetRef.current = null;
+            }
+          }
+        }
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {

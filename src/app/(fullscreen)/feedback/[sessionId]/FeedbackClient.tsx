@@ -129,20 +129,25 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
       const monacoInstance = monacoRef.current;
       if (!editor || !monacoInstance) return;
       const color = CURSOR_COLORS[role] ?? CURSOR_COLORS.student;
-      const className = `remote-cursor-${role}`;
-      remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, [{
-        range: new monacoInstance.Range(position.lineNumber, position.column, position.lineNumber, Math.max(position.column, position.column + 1)),
-        options: { className, zIndex: 100 },
-      }]);
+
       if (remoteCursorWidgetRef.current) editor.removeContentWidget(remoteCursorWidgetRef.current);
+
       const dom = document.createElement('div');
-      dom.className = 'remote-cursor-label';
-      dom.style.backgroundColor = color;
-      dom.textContent = name.length > 4 ? name.slice(0, 4) : name;
+      dom.className = 'remote-cursor-widget';
+      const caret = document.createElement('div');
+      caret.className = 'remote-cursor-caret';
+      caret.style.backgroundColor = color;
+      const label = document.createElement('div');
+      label.className = 'remote-cursor-label';
+      label.style.backgroundColor = color;
+      label.textContent = name.length > 4 ? name.slice(0, 4) : name;
+      dom.appendChild(caret);
+      dom.appendChild(label);
+
       const widget = {
         getId: () => 'remote-cursor',
         getDomNode: () => dom,
-        getPosition: () => ({ position, preference: [1] }),
+        getPosition: () => ({ position, preference: [0] }),
       };
       remoteCursorWidgetRef.current = widget;
       editor.addContentWidget(widget);
@@ -154,7 +159,8 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
         if (editorRef.current && monacoRef.current) {
           isApplyingRemoteRef.current = true;
           applyMinimalEdit(editorRef.current, monacoRef.current, payload.code);
-          isApplyingRemoteRef.current = false;
+          // 편집 직후 비동기로 발생하는 커서 이동 이벤트까지 억제
+          setTimeout(() => { isApplyingRemoteRef.current = false; }, 0);
         } else {
           codeRef.current = payload.code;
           setCode(payload.code);
@@ -237,6 +243,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     injectCursorStyles();
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
+      if (isApplyingRemoteRef.current) return;
       if (!channelRef.current || !hasPeerRef.current) return;
       const now = Date.now();
       if (now - lastCursorSentRef.current < 250) return;

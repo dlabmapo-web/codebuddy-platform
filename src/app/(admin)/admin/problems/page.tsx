@@ -408,7 +408,7 @@ export default function AdminProblemsPage() {
   }));
 
   return (
-    <div className="h-full flex flex-col">
+    <div>
       {toast && (
         <div
           className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl text-white"
@@ -419,7 +419,7 @@ export default function AdminProblemsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>문제 관리</h1>
           <p style={{ fontSize: '14px', color: '#5A6270', marginTop: 2 }}>카테고리(주제) 아래에 문제를 등록하고 관리하세요.</p>
@@ -449,12 +449,13 @@ export default function AdminProblemsPage() {
         </div>
       </div>
 
-      <div className="flex gap-5 flex-1 overflow-hidden min-h-0">
+      <div className="flex gap-5 items-start">
         <div
           className="flex flex-col bg-white rounded-2xl overflow-hidden"
           style={{
-            flex: panelMode !== 'closed' ? '0 0 auto' : '1',
-            width: panelMode !== 'closed' ? '460px' : undefined,
+            flex: '0 0 auto',
+            width: panelMode !== 'closed' ? '460px' : '100%',
+            maxWidth: panelMode !== 'closed' ? '460px' : '860px',
             border: '1px solid #E5E8EC',
           }}
         >
@@ -474,7 +475,7 @@ export default function AdminProblemsPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-auto flex-1 p-3 flex flex-col gap-2.5">
+            <div className="p-3 flex flex-col gap-2.5">
               {[...categories].sort((a, b) => a.order_no - b.order_no).map((cat, catIdx, catArr) => {
                 const catProblems = problems
                   .filter((p) => p.category_id === cat.id)
@@ -527,7 +528,7 @@ export default function AdminProblemsPage() {
                           <div className="px-4 py-3" style={{ fontSize: '12px', color: '#BCC0C7' }}>아직 문제가 없습니다.</div>
                         ) : (
                           catProblems.map((p, pIdx) => (
-                            <div key={p.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-[#F6F7F9] transition-colors" style={{ borderBottom: pIdx < catProblems.length - 1 ? '1px solid #F0F1F3' : 'none' }}>
+                            <div key={p.id} className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: pIdx < catProblems.length - 1 ? '1px solid #F0F1F3' : 'none', backgroundColor: pIdx % 2 === 0 ? '#FFFFFF' : '#FAFBFC' }}>
                               <span className="shrink-0 text-center" style={{ width: 34, fontSize: '12px', fontWeight: 700, color: '#8A8F98', fontFamily: 'monospace' }}>
                                 {catIdx + 1}-{pIdx + 1}
                               </span>
@@ -577,7 +578,7 @@ export default function AdminProblemsPage() {
         </div>
 
         {panelMode !== 'closed' && (
-          <div className="bg-white rounded-2xl flex flex-col flex-1 overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="bg-white rounded-2xl flex flex-col min-w-0 overflow-hidden" style={{ flex: '1', border: '1px solid #E5E8EC', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 80px)' }}>
             <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D' }}>
                 {panelMode === 'create' ? '문제 등록' : '문제 수정'}
@@ -587,7 +588,7 @@ export default function AdminProblemsPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               <Section
                 label="기본 정보"
                 expanded={expandedSection === 'basic'}

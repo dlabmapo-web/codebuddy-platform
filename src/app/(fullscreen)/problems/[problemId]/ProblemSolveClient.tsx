@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Keyboard } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
@@ -51,13 +51,12 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
-async function runWithPyodide(pyodide: PyodideInstance, userCode: string, stdinLines?: string[]) {
-  pyodide.globals.set('_user_code', userCode);
+const CODE_NEEDS_INPUT = /(^|[^.\w])input\s*\(/;
 
-  // For submission/judge: use pre-supplied stdin lines via io.StringIO
-  if (stdinLines !== undefined) {
-    pyodide.globals.set('_stdin_input', stdinLines.join('\n'));
-    const result = await pyodide.runPythonAsync(`
+async function runWithPyodide(pyodide: PyodideInstance, userCode: string, stdin: string) {
+  pyodide.globals.set('_user_code', userCode);
+  pyodide.globals.set('_stdin_input', stdin);
+  const result = await pyodide.runPythonAsync(`
 import sys, io
 _saved_stdin = sys.stdin
 _saved_stdout = sys.stdout
@@ -74,45 +73,76 @@ finally:
     sys.stdout = _saved_stdout
 (_captured.getvalue(), _stderr_msg)
 `) as [string, string];
-    return { stdout: result[0], stderr: result[1], inputLog: [] as string[] };
-  }
+  return { stdout: result[0], stderr: result[1] };
+}
 
-  // For interactive "Run" button: intercept input() with window.prompt()
-  const inputLog: { prompt: string; value: string }[] = [];
-  pyodide.globals.set('_js_input', (prompt: string) => {
-    const value = window.prompt(prompt || '입력값을 입력하세요 (input)');
-    if (value === null) throw new Error('EOFError: EOF when reading a line');
-    inputLog.push({ prompt, value });
-    return value;
-  });
+function InputModal({
+  mode, initialValue, onConfirm, onCancel,
+}: {
+  mode: 'run' | 'submit';
+  initialValue: string;
+  onConfirm: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const result = await pyodide.runPythonAsync(`
-import sys, io, builtins
-_saved_stdout = sys.stdout
-_captured = io.StringIO()
-sys.stdout = _captured
-_original_input = builtins.input
-_stderr_msg = ''
+  useEffect(() => {
+    const t = setTimeout(() => textareaRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
 
-def _patched_input(prompt=''):
-    if prompt:
-        sys.stdout.write(str(prompt))
-        sys.stdout.flush()
-    result = _js_input(str(prompt) if prompt else '')
-    sys.stdout.write(str(result) + '\\n')
-    return str(result)
+  const submit = () => onConfirm(value);
+  const isSubmit = mode === 'submit';
 
-builtins.input = _patched_input
-try:
-    exec(compile(_user_code, '<solution>', 'exec'), {})
-except Exception as _e:
-    _stderr_msg = type(_e).__name__ + ': ' + str(_e)
-finally:
-    builtins.input = _original_input
-    sys.stdout = _saved_stdout
-(_captured.getvalue(), _stderr_msg)
-`) as [string, string];
-  return { stdout: result[0], stderr: result[1], inputLog };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onCancel}>
+      <div className="bg-white rounded-2xl w-full max-w-md mx-4 overflow-hidden" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.2)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
+          <span className="flex items-center justify-center rounded-lg" style={{ width: 34, height: 34, backgroundColor: '#EAF1FD' }}>
+            <Keyboard size={18} style={{ color: '#1B64DA' }} />
+          </span>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D' }}>입력값 넣기</h3>
+            <p style={{ fontSize: '12px', color: '#8A8F98' }}>이 문제는 <code style={{ fontFamily: 'monospace' }}>input()</code> 으로 값을 받아요</p>
+          </div>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg mb-3" style={{ backgroundColor: '#F0F7FF', border: '1px solid #C7D9F7' }}>
+            <span style={{ fontSize: '12px', color: '#1450B5', lineHeight: 1.65 }}>
+              코드의 <code style={{ fontFamily: 'monospace' }}>input()</code> 이 위에서부터 <strong>한 줄씩</strong> 이 값을 순서대로 읽어요.<br />
+              한 줄에 여러 값이 필요하면 <strong>띄어쓰기</strong>로 구분하세요. (예: <code style={{ fontFamily: 'monospace' }}>3 5</code>)
+            </span>
+          </div>
+          <label className="block mb-1.5" style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270' }}>입력값</label>
+          <textarea
+            ref={textareaRef}
+            className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
+            style={{ height: 110, border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.7, backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
+            placeholder={'예)\n3 5'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submit(); }
+            }}
+          />
+          <p className="mt-1.5" style={{ fontSize: '11px', color: '#8A8F98' }}>입력이 필요 없으면 비워두고 진행해도 됩니다. · ⌘/Ctrl + Enter 로 실행</p>
+        </div>
+
+        <div className="flex gap-2 px-5 py-4" style={{ borderTop: '1px solid #E5E8EC' }}>
+          <button onClick={onCancel} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+          <button
+            onClick={submit}
+            className="flex-1 rounded-xl text-white transition-colors flex items-center justify-center gap-1.5"
+            style={{ height: 44, backgroundColor: isSubmit ? '#16A34A' : '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+          >
+            {isSubmit ? <><Send size={15} /> 제출하기</> : <><Play size={15} /> 실행하기</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResult; onClose: () => void; onRetry: () => void; onHint: () => void }) {
@@ -137,8 +167,8 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
         <p className="text-center mb-5" style={{ fontSize: '13px', color: '#5A6270' }}>{result.attemptNo}번째 제출</p>
         <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
           <div className="text-center">
-            <div style={{ fontSize: '11px', color: '#5A6270', marginBottom: 2 }}>통과한 케이스</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{result.passedCount} / {result.totalCount}</div>
+            <div style={{ fontSize: '11px', color: '#5A6270', marginBottom: 2 }}>채점 결과</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{isPass ? '정답' : '오답'}</div>
           </div>
           <div style={{ width: 1, backgroundColor: '#E5E8EC' }} />
           <div className="text-center">
@@ -146,10 +176,10 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
             <div style={{ fontSize: '18px', fontWeight: 700, color: '#16181D' }}>{timeLabel}</div>
           </div>
         </div>
-        {!isPass && result.failedCases.length > 0 && (
+        {!isPass && (
           <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#FFF5F5', border: '1px solid #FCA5A5' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>실패한 케이스</div>
-            <div style={{ fontSize: '13px', color: '#5A6270' }}>케이스 {result.failedCases.join(', ')}에서 오류가 발생했습니다.</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>출력이 정답과 달라요</div>
+            <div style={{ fontSize: '13px', color: '#5A6270' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
             <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
           </div>
         )}
@@ -194,6 +224,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
   const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
+  const [inputModal, setInputModal] = useState<{ mode: 'run' | 'submit' } | null>(null);
+  const inputResolveRef = useRef<((value: string | null) => void) | null>(null);
+  const lastStdinRef = useRef('');
 
   const pyodideRef = useRef<PyodideInstance | null>(null);
   const pyodideLoadPromise = useRef<Promise<PyodideInstance> | null>(null);
@@ -575,21 +608,45 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     catch (e) { pyodideLoadPromise.current = null; setPyodideStatus('error'); throw e; }
   }, []);
 
+  const requestInput = useCallback((mode: 'run' | 'submit'): Promise<string | null> => {
+    return new Promise((resolve) => {
+      inputResolveRef.current = resolve;
+      setInputModal({ mode });
+    });
+  }, []);
+
+  const closeInputModal = useCallback((value: string | null) => {
+    setInputModal(null);
+    const resolve = inputResolveRef.current;
+    inputResolveRef.current = null;
+    resolve?.(value);
+  }, []);
+
   const handleRun = useCallback(async () => {
     if (isRunning || !problem) return;
+
+    let stdin = '';
+    if (CODE_NEEDS_INPUT.test(code)) {
+      const value = await requestInput('run');
+      if (value === null) return;
+      stdin = value;
+      lastStdinRef.current = value;
+    }
+
     setIsRunning(true);
     setTerminalOpen(true);
     setTerminalLines([{ text: '실행 환경 초기화 중...', type: 'info' }]);
     try {
       const pyodide = await getPyodide();
-      setTerminalLines([{ text: '실행 중... (input() 호출 시 입력 창이 뜹니다)', type: 'info' }]);
+      setTerminalLines([{ text: '실행 중...', type: 'info' }]);
       const t0 = Date.now();
       const { stdout, stderr } = await Promise.race([
-        runWithPyodide(pyodide, code),
+        runWithPyodide(pyodide, code, stdin),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과 (30초)')), 30000)),
       ]);
       const elapsed = Date.now() - t0;
       const lines: typeof terminalLines = [{ text: '$ python solution.py', type: 'meta' }];
+      if (stdin.trim()) lines.push({ text: `입력: ${stdin.replace(/\n/g, ' ⏎ ')}`, type: 'info' });
       if (stdout) stdout.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'out' }));
       if (stderr) stderr.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'err' }));
       if (!stdout && !stderr) lines.push({ text: '(출력 없음)', type: 'info' });
@@ -601,69 +658,67 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         { text: e instanceof Error ? e.message : '실행 오류', type: 'err' },
       ]);
     } finally { setIsRunning(false); }
-  }, [isRunning, code, problem, getPyodide]);
+  }, [isRunning, code, problem, getPyodide, requestInput]);
 
   const handleSubmit = useCallback(async () => {
     if (isRunning || !problem) return;
-    setIsRunning(true);
-    setTerminalOpen(true);
-    setTerminalLines([{ text: '채점 중...', type: 'info' }]);
 
     const res = await fetch(`/api/problems/${problemId}/judge-cases`).catch(() => null);
     const judgeJson = res?.ok ? await res.json().catch(() => null) : null;
     const judgeCases: Array<{ input: string; expected_output: string }> = judgeJson?.test_cases ?? problem.test_cases;
 
     if (judgeCases.length === 0) {
-      setTerminalLines([{ text: '채점할 테스트케이스가 없습니다. 관리자에게 문의하세요.', type: 'err' }]);
-      setIsRunning(false);
+      setTerminalOpen(true);
+      setTerminalLines([{ text: '채점할 정답이 없습니다. 관리자에게 문의하세요.', type: 'err' }]);
       return;
     }
 
+    // 등록된 정답(출력값)들 = 허용되는 출력 목록
+    const expectedOutputs = judgeCases
+      .map((tc) => tc.expected_output.trim())
+      .filter((o) => o.length > 0);
+
+    // 학생이 직접 입력값을 넣고 제출 (input()을 쓰는 경우)
+    let stdin = '';
+    if (CODE_NEEDS_INPUT.test(code)) {
+      const value = await requestInput('submit');
+      if (value === null) return;
+      stdin = value;
+      lastStdinRef.current = value;
+    }
+
+    setIsRunning(true);
+    setTerminalOpen(true);
+    setTerminalLines([{ text: '채점 중...', type: 'info' }]);
+
     try {
       const pyodide = await getPyodide();
-      const lines: typeof terminalLines = [];
-      let passedCount = 0;
-      const failedCases: number[] = [];
       const t0 = Date.now();
-
-      for (let i = 0; i < judgeCases.length; i++) {
-        const tc = judgeCases[i];
-        try {
-          const { stdout, stderr } = await Promise.race([
-            runWithPyodide(pyodide, code, [tc.input]),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('시간 초과')), 5000)),
-          ]);
-          const actual = stdout.trim();
-          const expected = tc.expected_output.trim();
-          if (stderr) {
-            lines.push({ text: `케이스 ${i + 1}: 오류 — ${stderr.split('\n').pop() ?? stderr}`, type: 'err' });
-            failedCases.push(i + 1);
-          } else if (actual === expected) {
-            lines.push({ text: `케이스 ${i + 1}: ✓ 통과`, type: 'out' });
-            passedCount++;
-          } else {
-            lines.push({ text: `케이스 ${i + 1}: ✗ 실패`, type: 'err' });
-            failedCases.push(i + 1);
-          }
-        } catch {
-          lines.push({ text: `케이스 ${i + 1}: 시간 초과`, type: 'err' });
-          failedCases.push(i + 1);
-        }
-      }
-
+      const { stdout, stderr } = await Promise.race([
+        runWithPyodide(pyodide, code, stdin),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과')), 10000)),
+      ]);
       const runtimeMs = Date.now() - t0;
-      const status: 'pass' | 'fail' | 'partial' = passedCount === judgeCases.length ? 'pass' : passedCount > 0 ? 'partial' : 'fail';
-      const score = Math.round((passedCount / judgeCases.length) * 100);
+      const actual = stdout.trim();
+      const matched = !stderr && expectedOutputs.some((e) => e === actual);
+
+      const lines: typeof terminalLines = [{ text: '$ python solution.py', type: 'meta' }];
+      if (stdin.trim()) lines.push({ text: `입력: ${stdin.replace(/\n/g, ' ⏎ ')}`, type: 'info' });
+      if (actual) actual.split('\n').forEach((l) => lines.push({ text: l, type: 'out' }));
+      if (stderr) stderr.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'err' }));
+
+      const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
+      const score = matched ? 100 : 0;
       const newAttempt = attemptCount + 1;
 
-      lines.push({ text: `채점 완료 — ${passedCount}/${judgeCases.length} 통과 (${runtimeMs}ms)`, type: 'meta' });
+      lines.push({ text: matched ? `정답입니다! (${runtimeMs}ms)` : `오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)`, type: matched ? 'out' : 'err' });
       setTerminalLines(lines);
       setAttemptCount(newAttempt);
 
       await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: passedCount, total_count: judgeCases.length, runtime_ms: runtimeMs, elapsed_sec: seconds }),
+        body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
       });
 
       if (sessionId) {
@@ -674,11 +729,11 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         });
       }
 
-      setModalResult({ status, passedCount, totalCount: judgeCases.length, runtimeMs, elapsedSec: seconds, failedCases, attemptNo: newAttempt });
+      setModalResult({ status, passedCount: matched ? 1 : 0, totalCount: 1, runtimeMs, elapsedSec: seconds, failedCases: matched ? [] : [1], attemptNo: newAttempt });
     } catch (e) {
       setTerminalLines([{ text: e instanceof Error ? e.message : '채점 중 오류 발생', type: 'err' }]);
     } finally { setIsRunning(false); }
-  }, [isRunning, code, problem, problemId, getPyodide, seconds, attemptCount, sessionId]);
+  }, [isRunning, code, problem, problemId, getPyodide, seconds, attemptCount, sessionId, requestInput]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -948,6 +1003,14 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
       </div>
 
+      {inputModal && (
+        <InputModal
+          mode={inputModal.mode}
+          initialValue={lastStdinRef.current}
+          onConfirm={(value) => closeInputModal(value)}
+          onCancel={() => closeInputModal(null)}
+        />
+      )}
       {modalResult && (
         <ResultModal result={modalResult} onClose={() => setModalResult(null)} onRetry={() => setModalResult(null)} onHint={() => { setModalResult(null); setShowHint(true); }} />
       )}

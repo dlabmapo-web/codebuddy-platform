@@ -723,12 +723,14 @@ export default function AdminProblemsPage() {
                 label={`정답 (${form.test_cases.length}개)`}
                 expanded={expandedSection === 'testcases'}
                 onToggle={() => setExpandedSection(expandedSection === 'testcases' ? 'starter' : 'testcases')}
-                tooltip={'학생 코드가 출력해야 할 정답을 입력합니다.\n정답을 여러 개 등록할 수 있고, 모든 정답을 맞춰야 통과입니다.\n최소 1개 이상 등록해야 저장됩니다.'}
+                tooltip={'학생 코드가 출력해야 할 정답을 입력합니다.\ninput()을 쓰는 문제는 입력값도 함께 채워주세요.\n정답을 여러 개 등록할 수 있고, 모든 정답을 맞춰야 통과입니다.\n최소 1개 이상 등록해야 저장됩니다.'}
               >
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ backgroundColor: '#EAF1FD', border: '1px solid #C7D9F7' }}>
                     <span style={{ fontSize: '12px', color: '#1450B5', lineHeight: 1.6 }}>
                       학생 코드가 출력해야 할 <strong>정답을 1개 이상</strong> 등록하세요. 모든 정답을 통과해야 맞음으로 처리됩니다.
+                      <br />
+                      <code>input()</code>을 사용하는 문제라면 <strong>입력값</strong>도 함께 채워주세요. (사용하지 않으면 비워두세요)
                     </span>
                   </div>
                   {form.test_cases.map((tc, i) => (
@@ -742,6 +744,20 @@ export default function AdminProblemsPage() {
                             </button>
                           )}
                         </div>
+                      </div>
+                      <div className="mb-3">
+                        <div className="flex items-center gap-1 mb-1" style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270' }}>
+                          입력값 (input)
+                          <span style={{ fontWeight: 400, color: '#8A8F98' }}>· input()이 없으면 비워두세요</span>
+                        </div>
+                        <textarea
+                          className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
+                          style={{ border: '1px solid #E5E8EC', fontFamily: 'monospace', fontSize: '13px', backgroundColor: '#FFFFFF', color: '#16181D' }}
+                          rows={2}
+                          placeholder={'input()에 넣어줄 값 (여러 줄 가능)\n예) 3 5'}
+                          value={tc.input}
+                          onChange={(e) => updateTc(i, 'input', e.target.value)}
+                        />
                       </div>
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>정답 출력값</div>

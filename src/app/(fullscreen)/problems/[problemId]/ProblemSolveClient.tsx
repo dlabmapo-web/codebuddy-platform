@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Keyboard } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
+import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
+import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
+import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -22,11 +25,6 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
     </div>
   ),
 });
-
-type PyodideInstance = {
-  runPythonAsync: (code: string) => Promise<unknown>;
-  globals: { set: (key: string, value: unknown) => void };
-};
 
 type ProblemDetail = DbProblem & {
   test_cases: Pick<DbTestCase, 'id' | 'input' | 'expected_output' | 'is_sample' | 'order_no'>[];
@@ -51,98 +49,55 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
-const CODE_NEEDS_INPUT = /(^|[^.\w])input\s*\(/;
+// 출력 정규화: 개행 통일 + 각 줄 우측 공백 제거 + 앞뒤 빈 줄 제거
+function normalizeOutput(s: string): string {
+  return s
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .join('\n')
+    .trim();
+}
 
-async function runWithPyodide(pyodide: PyodideInstance, userCode: string, stdin: string) {
-  pyodide.globals.set('_user_code', userCode);
-  pyodide.globals.set('_stdin_input', stdin);
-  const result = await pyodide.runPythonAsync(`
-import sys, io
-_saved_stdin = sys.stdin
+// 채점: 전체 출력이 정답과 같거나, 정답이 출력의 마지막 줄(블록)과 일치하면 정답 인정.
+// (학생이 print('입력하세요:') 처럼 안내 문구를 출력해도 실제 정답 부분만 비교)
+function outputMatches(rawStdout: string, expectedOutputs: string[]): boolean {
+  const actual = normalizeOutput(rawStdout);
+  const actualLines = actual.length ? actual.split('\n') : [];
+  return expectedOutputs.some((exp) => {
+    const e = normalizeOutput(exp);
+    if (e === actual) return true;
+    const eLines = e.length ? e.split('\n') : [];
+    if (eLines.length === 0 || eLines.length > actualLines.length) return false;
+    const tail = actualLines.slice(actualLines.length - eLines.length).join('\n');
+    return tail === eLines.join('\n');
+  });
+}
+
+// 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
+async function runFallbackOnce(userCode: string): Promise<{ stdout: string; stderr: string }> {
+  const pyodide = await loadPyodideFallback();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const py = pyodide as any;
+  py.globals.set('_user_code', userCode);
+  const result = await py.runPythonAsync(`
+import sys, io, traceback
 _saved_stdout = sys.stdout
-sys.stdin = io.StringIO(_stdin_input)
+_saved_stdin = sys.stdin
 _captured = io.StringIO()
 sys.stdout = _captured
+sys.stdin = io.StringIO('')
 _stderr_msg = ''
 try:
-    exec(compile(_user_code, '<solution>', 'exec'), {})
-except Exception as _e:
-    _stderr_msg = type(_e).__name__ + ': ' + str(_e)
+    exec(compile(_user_code, '<solution>', 'exec'), {'__name__': '__main__'})
+except BaseException:
+    _stderr_msg = traceback.format_exc()
 finally:
-    sys.stdin = _saved_stdin
     sys.stdout = _saved_stdout
+    sys.stdin = _saved_stdin
 (_captured.getvalue(), _stderr_msg)
 `) as [string, string];
   return { stdout: result[0], stderr: result[1] };
-}
-
-function InputModal({
-  mode, initialValue, onConfirm, onCancel,
-}: {
-  mode: 'run' | 'submit';
-  initialValue: string;
-  onConfirm: (value: string) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(initialValue);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => textareaRef.current?.focus(), 50);
-    return () => clearTimeout(t);
-  }, []);
-
-  const submit = () => onConfirm(value);
-  const isSubmit = mode === 'submit';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onCancel}>
-      <div className="bg-white rounded-2xl w-full max-w-md mx-4 overflow-hidden" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.2)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
-          <span className="flex items-center justify-center rounded-lg" style={{ width: 34, height: 34, backgroundColor: '#EAF1FD' }}>
-            <Keyboard size={18} style={{ color: '#1B64DA' }} />
-          </span>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D' }}>입력값 넣기</h3>
-            <p style={{ fontSize: '12px', color: '#8A8F98' }}>이 문제는 <code style={{ fontFamily: 'monospace' }}>input()</code> 으로 값을 받아요</p>
-          </div>
-        </div>
-
-        <div className="px-5 py-4">
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg mb-3" style={{ backgroundColor: '#F0F7FF', border: '1px solid #C7D9F7' }}>
-            <span style={{ fontSize: '12px', color: '#1450B5', lineHeight: 1.65 }}>
-              코드의 <code style={{ fontFamily: 'monospace' }}>input()</code> 이 위에서부터 <strong>한 줄씩</strong> 이 값을 순서대로 읽어요.<br />
-              한 줄에 여러 값이 필요하면 <strong>띄어쓰기</strong>로 구분하세요. (예: <code style={{ fontFamily: 'monospace' }}>3 5</code>)
-            </span>
-          </div>
-          <label className="block mb-1.5" style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270' }}>입력값</label>
-          <textarea
-            ref={textareaRef}
-            className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-            style={{ height: 110, border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.7, backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
-            placeholder={'예)\n3 5'}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submit(); }
-            }}
-          />
-          <p className="mt-1.5" style={{ fontSize: '11px', color: '#8A8F98' }}>입력이 필요 없으면 비워두고 진행해도 됩니다. · ⌘/Ctrl + Enter 로 실행</p>
-        </div>
-
-        <div className="flex gap-2 px-5 py-4" style={{ borderTop: '1px solid #E5E8EC' }}>
-          <button onClick={onCancel} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
-          <button
-            onClick={submit}
-            className="flex-1 rounded-xl text-white transition-colors flex items-center justify-center gap-1.5"
-            style={{ height: 44, backgroundColor: isSubmit ? '#16A34A' : '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-          >
-            {isSubmit ? <><Send size={15} /> 제출하기</> : <><Play size={15} /> 실행하기</>}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResult; onClose: () => void; onRetry: () => void; onHint: () => void }) {
@@ -204,17 +159,17 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [loadError, setLoadError] = useState(false);
   const [code, setCode] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
+  const [terminalHeight, setTerminalHeight] = useState(220);
   const [editorFontSize, setEditorFontSize] = useState(13);
-  const [terminalLines, setTerminalLines] = useState<Array<{ text: string; type: 'info' | 'out' | 'err' | 'meta' }>>([
-    { text: '실행 버튼을 눌러 코드를 실행해보세요.', type: 'info' },
-  ]);
+  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
+  const [awaitingInput, setAwaitingInput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [modalResult, setModalResult] = useState<SubmitResult | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   const [leftWidth, setLeftWidth] = useState(46);
-  const [pyodideStatus, setPyodideStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [interactiveSupported, setInteractiveSupported] = useState(true);
   const [starterCode, setStarterCode] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [teacherOnline, setTeacherOnline] = useState(false);
@@ -224,15 +179,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
   const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
-  const [inputModal, setInputModal] = useState<{ mode: 'run' | 'submit' } | null>(null);
-  const inputResolveRef = useRef<((value: string | null) => void) | null>(null);
-  const lastStdinRef = useRef('');
 
-  const pyodideRef = useRef<PyodideInstance | null>(null);
-  const pyodideLoadPromise = useRef<Promise<PyodideInstance> | null>(null);
+  const runnerRef = useRef<InteractiveRunner | null>(null);
+  const runOffRef = useRef<(() => void) | null>(null);
+  const runFinishRef = useRef<((stopped: boolean) => void) | null>(null);
+  const runStdoutRef = useRef('');
+  const runStderrRef = useRef('');
+  const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
+  const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const myInfoRef = useRef<{ id: string; name: string } | null>(null);
   const isDragging = useRef(false);
+  const isDraggingTerminalRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCodeSentRef = useRef(0);
@@ -580,85 +538,167 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => { myInfoRef.current = myInfo; }, [myInfo]);
+
   useEffect(() => {
-    if (terminalRef.current) terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-  }, [terminalLines]);
+    setInteractiveSupported(isInteractiveSupported());
+    return () => { runnerRef.current?.dispose(); runnerRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!isDraggingTerminalRef.current || !editorPaneRef.current) return;
+      const rect = editorPaneRef.current.getBoundingClientRect();
+      const h = rect.bottom - e.clientY;
+      setTerminalHeight(Math.max(120, Math.min(rect.height - 160, h)));
+    };
+    const up = () => {
+      if (isDraggingTerminalRef.current) {
+        isDraggingTerminalRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  }, []);
+
+  const startTerminalDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!terminalOpen) return;
+    isDraggingTerminalRef.current = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [terminalOpen]);
 
   const timeStr = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
-  const getPyodide = useCallback(async (): Promise<PyodideInstance> => {
-    if (pyodideRef.current) return pyodideRef.current;
-    if (pyodideLoadPromise.current) return pyodideLoadPromise.current;
-    setPyodideStatus('loading');
-    pyodideLoadPromise.current = (async () => {
-      await new Promise<void>((resolve, reject) => {
-        if ((window as { loadPyodide?: unknown }).loadPyodide) { resolve(); return; }
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('실행 환경을 불러오지 못했습니다'));
-        document.head.appendChild(script);
-      });
-      const instance = await (window as unknown as { loadPyodide: () => Promise<PyodideInstance> }).loadPyodide();
-      pyodideRef.current = instance;
-      setPyodideStatus('ready');
-      return instance;
-    })();
-    try { return await pyodideLoadPromise.current; }
-    catch (e) { pyodideLoadPromise.current = null; setPyodideStatus('error'); throw e; }
+  const appendTerminal = useCallback((text: string, kind: TerminalLine['kind']) => {
+    setTerminalLines((prev) => [...prev, { text, kind }]);
   }, []);
 
-  const requestInput = useCallback((mode: 'run' | 'submit'): Promise<string | null> => {
+  const broadcastRun = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!channelRef.current || !hasPeerRef.current || !myInfoRef.current) return;
+    channelRef.current.send({ type: 'broadcast', event, payload: { senderId: myInfoRef.current.id, ...payload } });
+  }, []);
+
+  const flushRunOut = useCallback(() => {
+    if (runOutTimerRef.current) { clearTimeout(runOutTimerRef.current); runOutTimerRef.current = null; }
+    if (runOutBufRef.current.length === 0) return;
+    const chunks = runOutBufRef.current;
+    runOutBufRef.current = [];
+    broadcastRun('run:stdout', { chunks });
+  }, [broadcastRun]);
+
+  const queueRunOut = useCallback((text: string, kind: TerminalLine['kind']) => {
+    runOutBufRef.current.push({ text, kind });
+    if (!runOutTimerRef.current) {
+      runOutTimerRef.current = setTimeout(() => { runOutTimerRef.current = null; flushRunOut(); }, 100);
+    }
+  }, [flushRunOut]);
+
+  const ensureRunner = useCallback((): InteractiveRunner | null => {
+    if (runnerRef.current && !runnerRef.current.isFailed) return runnerRef.current;
+    if (runnerRef.current) { runnerRef.current.dispose(); runnerRef.current = null; }
+    if (!isInteractiveSupported()) return null;
+    try {
+      runnerRef.current = new InteractiveRunner();
+    } catch {
+      return null;
+    }
+    return runnerRef.current;
+  }, []);
+
+  // 터미널에서 코드를 대화식으로 실행하고, 프로그램 종료(done) 시 누적 출력을 반환
+  const executeInTerminal = useCallback((sourceCode: string): Promise<{ stdout: string; stderr: string; stopped: boolean }> => {
+    runStdoutRef.current = '';
+    runStderrRef.current = '';
+    broadcastRun('run:start', {});
+    const runner = ensureRunner();
+
+    if (!runner) {
+      return runFallbackOnce(sourceCode)
+        .then(({ stdout, stderr }) => {
+          if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
+          if (stderr) { appendTerminal(stderr, 'err'); queueRunOut(stderr, 'err'); }
+          if (!stdout && !stderr) appendTerminal('(출력 없음)\n', 'info');
+          flushRunOut();
+          broadcastRun('run:end', {});
+          return { stdout, stderr, stopped: false };
+        })
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : '실행 오류';
+          appendTerminal(msg + '\n', 'err');
+          broadcastRun('run:end', {});
+          return { stdout: '', stderr: msg, stopped: false };
+        });
+    }
+
+    if (!runner.isReady) {
+      appendTerminal('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
+    }
+
     return new Promise((resolve) => {
-      inputResolveRef.current = resolve;
-      setInputModal({ mode });
-    });
-  }, []);
+      const finish = (stopped: boolean) => {
+        if (runOffRef.current) { runOffRef.current(); runOffRef.current = null; }
+        runFinishRef.current = null;
+        setAwaitingInput(false);
+        flushRunOut();
+        broadcastRun('run:end', {});
+        resolve({ stdout: runStdoutRef.current, stderr: runStderrRef.current, stopped });
+      };
+      runFinishRef.current = finish;
 
-  const closeInputModal = useCallback((value: string | null) => {
-    setInputModal(null);
-    const resolve = inputResolveRef.current;
-    inputResolveRef.current = null;
-    resolve?.(value);
-  }, []);
+      const off = runner.on((ev) => {
+        if (ev.type === 'stdout') {
+          runStdoutRef.current += ev.text;
+          appendTerminal(ev.text, 'out');
+          queueRunOut(ev.text, 'out');
+        } else if (ev.type === 'stderr') {
+          runStderrRef.current += ev.text;
+          appendTerminal(ev.text, 'err');
+          queueRunOut(ev.text, 'err');
+        } else if (ev.type === 'stdin') {
+          setAwaitingInput(true);
+          flushRunOut();
+          broadcastRun('run:waiting', {});
+        } else if (ev.type === 'done') {
+          finish(false);
+        } else if (ev.type === 'fatal') {
+          appendTerminal((ev.text || '실행 오류') + '\n', 'err');
+          finish(false);
+        }
+      });
+      runOffRef.current = off;
+      runner.run(sourceCode);
+    });
+  }, [ensureRunner, appendTerminal, broadcastRun, queueRunOut, flushRunOut]);
+
+  const handleTerminalInput = useCallback((value: string) => {
+    appendTerminal(value + '\n', 'in');
+    broadcastRun('run:stdin', { text: value });
+    setAwaitingInput(false);
+    runnerRef.current?.provideInput(value);
+  }, [appendTerminal, broadcastRun]);
+
+  const handleStop = useCallback(() => {
+    runnerRef.current?.stop();
+    appendTerminal('\n[실행을 중단했습니다]\n', 'meta');
+    runFinishRef.current?.(true);
+    setAwaitingInput(false);
+    setIsRunning(false);
+  }, [appendTerminal]);
 
   const handleRun = useCallback(async () => {
     if (isRunning || !problem) return;
-
-    let stdin = '';
-    if (CODE_NEEDS_INPUT.test(code)) {
-      const value = await requestInput('run');
-      if (value === null) return;
-      stdin = value;
-      lastStdinRef.current = value;
-    }
-
     setIsRunning(true);
     setTerminalOpen(true);
-    setTerminalLines([{ text: '실행 환경 초기화 중...', type: 'info' }]);
-    try {
-      const pyodide = await getPyodide();
-      setTerminalLines([{ text: '실행 중...', type: 'info' }]);
-      const t0 = Date.now();
-      const { stdout, stderr } = await Promise.race([
-        runWithPyodide(pyodide, code, stdin),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과 (30초)')), 30000)),
-      ]);
-      const elapsed = Date.now() - t0;
-      const lines: typeof terminalLines = [{ text: '$ python solution.py', type: 'meta' }];
-      if (stdin.trim()) lines.push({ text: `입력: ${stdin.replace(/\n/g, ' ⏎ ')}`, type: 'info' });
-      if (stdout) stdout.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'out' }));
-      if (stderr) stderr.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'err' }));
-      if (!stdout && !stderr) lines.push({ text: '(출력 없음)', type: 'info' });
-      lines.push({ text: `완료 (${elapsed}ms)`, type: 'meta' });
-      setTerminalLines(lines);
-    } catch (e) {
-      setTerminalLines([
-        { text: '$ python solution.py', type: 'meta' },
-        { text: e instanceof Error ? e.message : '실행 오류', type: 'err' },
-      ]);
-    } finally { setIsRunning(false); }
-  }, [isRunning, code, problem, getPyodide, requestInput]);
+    setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
+    await executeInTerminal(code);
+    appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
+    setIsRunning(false);
+  }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
 
   const handleSubmit = useCallback(async () => {
     if (isRunning || !problem) return;
@@ -669,7 +709,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
     if (judgeCases.length === 0) {
       setTerminalOpen(true);
-      setTerminalLines([{ text: '채점할 정답이 없습니다. 관리자에게 문의하세요.', type: 'err' }]);
+      setTerminalLines([{ text: '채점할 정답이 없습니다. 관리자에게 문의하세요.\n', kind: 'err' }]);
       return;
     }
 
@@ -678,62 +718,44 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       .map((tc) => tc.expected_output.trim())
       .filter((o) => o.length > 0);
 
-    // 학생이 직접 입력값을 넣고 제출 (input()을 쓰는 경우)
-    let stdin = '';
-    if (CODE_NEEDS_INPUT.test(code)) {
-      const value = await requestInput('submit');
-      if (value === null) return;
-      stdin = value;
-      lastStdinRef.current = value;
-    }
-
     setIsRunning(true);
     setTerminalOpen(true);
-    setTerminalLines([{ text: '채점 중...', type: 'info' }]);
+    setTerminalLines([{ text: '$ python solution.py   (제출)\n', kind: 'meta' }]);
 
-    try {
-      const pyodide = await getPyodide();
-      const t0 = Date.now();
-      const { stdout, stderr } = await Promise.race([
-        runWithPyodide(pyodide, code, stdin),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('실행 시간 초과')), 10000)),
-      ]);
-      const runtimeMs = Date.now() - t0;
-      const actual = stdout.trim();
-      const matched = !stderr && expectedOutputs.some((e) => e === actual);
+    const t0 = Date.now();
+    const { stdout, stderr, stopped } = await executeInTerminal(code);
+    if (stopped) { setIsRunning(false); return; }
 
-      const lines: typeof terminalLines = [{ text: '$ python solution.py', type: 'meta' }];
-      if (stdin.trim()) lines.push({ text: `입력: ${stdin.replace(/\n/g, ' ⏎ ')}`, type: 'info' });
-      if (actual) actual.split('\n').forEach((l) => lines.push({ text: l, type: 'out' }));
-      if (stderr) stderr.trimEnd().split('\n').forEach((l) => lines.push({ text: l, type: 'err' }));
+    const runtimeMs = Date.now() - t0;
+    const actual = stdout.trim();
+    const matched = !stderr.trim() && outputMatches(stdout, expectedOutputs);
+    const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
+    const score = matched ? 100 : 0;
+    const newAttempt = attemptCount + 1;
 
-      const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
-      const score = matched ? 100 : 0;
-      const newAttempt = attemptCount + 1;
+    appendTerminal(
+      matched ? `\n채점 결과: 정답입니다! (${runtimeMs}ms)\n` : `\n채점 결과: 오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)\n`,
+      matched ? 'out' : 'err',
+    );
+    setAttemptCount(newAttempt);
 
-      lines.push({ text: matched ? `정답입니다! (${runtimeMs}ms)` : `오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)`, type: matched ? 'out' : 'err' });
-      setTerminalLines(lines);
-      setAttemptCount(newAttempt);
+    await fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
+    });
 
-      await fetch('/api/submissions', {
-        method: 'POST',
+    if (sessionId) {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
+        body: JSON.stringify({ final_code: code }),
       });
+    }
 
-      if (sessionId) {
-        await fetch(`/api/sessions/${sessionId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ final_code: code }),
-        });
-      }
-
-      setModalResult({ status, passedCount: matched ? 1 : 0, totalCount: 1, runtimeMs, elapsedSec: seconds, failedCases: matched ? [] : [1], attemptNo: newAttempt });
-    } catch (e) {
-      setTerminalLines([{ text: e instanceof Error ? e.message : '채점 중 오류 발생', type: 'err' }]);
-    } finally { setIsRunning(false); }
-  }, [isRunning, code, problem, problemId, getPyodide, seconds, attemptCount, sessionId, requestInput]);
+    setModalResult({ status, passedCount: matched ? 1 : 0, totalCount: 1, runtimeMs, elapsedSec: seconds, failedCases: matched ? [] : [1], attemptNo: newAttempt });
+    setIsRunning(false);
+  }, [isRunning, problem, problemId, code, executeInTerminal, appendTerminal, attemptCount, seconds, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -742,13 +764,6 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     setLeftWidth(Math.max(28, Math.min(65, ((e.clientX - rect.left) / rect.width) * 100)));
   };
   const handleMouseUp = () => { isDragging.current = false; };
-
-  const termColor = (type: string) => {
-    if (type === 'err') return '#F87171';
-    if (type === 'out') return '#D4D4D4';
-    if (type === 'meta') return '#6A9955';
-    return '#8C8C8C';
-  };
 
   if (loadError) {
     return (
@@ -811,12 +826,6 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
 
         <div className="flex items-center gap-2">
-          {pyodideStatus === 'loading' && <span style={{ fontSize: '12px', color: '#D97706' }}>실행 환경 로딩 중...</span>}
-          {pyodideStatus === 'ready' && (
-            <span className="flex items-center gap-1" style={{ fontSize: '12px', color: '#16A34A' }}>
-              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16A34A' }} /> 준비됨
-            </span>
-          )}
           {feedbacks.length > 0 && (
             <div className="relative">
               <button
@@ -986,31 +995,39 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
             />
           </div>
 
-          <div className="flex-shrink-0" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? 180 : 38, transition: 'height 0.2s ease' }}>
-            <button onClick={() => setTerminalOpen((o) => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#8C8C8C' }}>실행 결과</span>
-              {terminalOpen ? <ChevronDown size={13} style={{ color: '#8C8C8C' }} /> : <ChevronUp size={13} style={{ color: '#8C8C8C' }} />}
-            </button>
+          <div className="flex-shrink-0 relative" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? terminalHeight : 38 }}>
             {terminalOpen && (
-              <div ref={terminalRef} className="px-4 py-3 overflow-auto" style={{ height: 142, fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.7 }}>
-                {terminalLines.map((line, i) => (
-                  <div key={i} style={{ color: termColor(line.type), whiteSpace: 'pre-wrap' }}>{line.text}</div>
-                ))}
-                {isRunning && <div style={{ color: '#D97706' }}>▌</div>}
-              </div>
+              <div
+                onMouseDown={startTerminalDrag}
+                className="absolute left-0 right-0"
+                style={{ top: 0, height: 7, transform: 'translateY(-3px)', cursor: 'row-resize', zIndex: 5 }}
+                title="드래그하여 터미널 높이 조절"
+              />
+            )}
+            <div className="flex items-center justify-between px-4" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
+              <button onClick={() => setTerminalOpen((o) => !o)} className="flex items-center gap-2">
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#8C8C8C' }}>터미널</span>
+                {terminalOpen ? <ChevronDown size={13} style={{ color: '#8C8C8C' }} /> : <ChevronUp size={13} style={{ color: '#8C8C8C' }} />}
+              </button>
+              {terminalOpen && isRunning && (
+                <button onClick={handleStop} className="flex items-center gap-1 px-2 rounded transition-colors" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
+                  <Square size={10} /> 정지
+                </button>
+              )}
+            </div>
+            {terminalOpen && (
+              <ConsoleTerminal
+                lines={terminalLines}
+                awaitingInput={awaitingInput}
+                onSubmitInput={handleTerminalInput}
+                supported={interactiveSupported}
+                height={terminalHeight - 38}
+              />
             )}
           </div>
         </div>
       </div>
 
-      {inputModal && (
-        <InputModal
-          mode={inputModal.mode}
-          initialValue={lastStdinRef.current}
-          onConfirm={(value) => closeInputModal(value)}
-          onCancel={() => closeInputModal(null)}
-        />
-      )}
       {modalResult && (
         <ResultModal result={modalResult} onClose={() => setModalResult(null)} onRetry={() => setModalResult(null)} onHint={() => { setModalResult(null); setShowHint(true); }} />
       )}

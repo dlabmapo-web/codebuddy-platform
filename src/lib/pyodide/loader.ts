@@ -1,4 +1,5 @@
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js';
+const PYODIDE_BASE = '/pyodide/';
+const PYODIDE_SCRIPT = PYODIDE_BASE + 'pyodide.js';
 
 type PyodideInstance = {
   runPythonAsync: (code: string) => Promise<unknown>;
@@ -15,14 +16,15 @@ export async function loadPyodide(): Promise<PyodideInstance> {
   }
 
   await new Promise<void>((resolve, reject) => {
+    if ((window as { loadPyodide?: unknown }).loadPyodide) { resolve(); return; }
     const script = document.createElement('script');
-    script.src = PYODIDE_CDN;
+    script.src = PYODIDE_SCRIPT;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Pyodide CDN 로드 실패'));
+    script.onerror = () => reject(new Error('Pyodide 로드 실패'));
     document.head.appendChild(script);
   });
 
-  // @ts-expect-error - loaded via CDN
-  instance = await window.loadPyodide();
+  // @ts-expect-error - loaded via script tag
+  instance = await window.loadPyodide({ indexURL: PYODIDE_BASE });
   return instance!;
 }

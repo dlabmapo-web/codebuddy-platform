@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
+import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
+import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
+import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { ProblemDifficulty } from '@/lib/types/db';
@@ -63,7 +66,18 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const [feedbackOpen, setFeedbackOpen] = useState(true);
   const [editorFontSize, setEditorFontSize] = useState(13);
   const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('student');
+  const [teacherLines, setTeacherLines] = useState<TerminalLine[]>([]);
+  const [studentLines, setStudentLines] = useState<TerminalLine[]>([]);
+  const [teacherAwaiting, setTeacherAwaiting] = useState(false);
+  const [studentWaiting, setStudentWaiting] = useState(false);
+  const [teacherRunning, setTeacherRunning] = useState(false);
+  const [interactiveSupported, setInteractiveSupported] = useState(true);
 
+  const runnerRef = useRef<InteractiveRunner | null>(null);
+  const runOffRef = useRef<(() => void) | null>(null);
+  const runFinishRef = useRef<(() => void) | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,6 +215,32 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
           codeRef.current = payload.code;
         }
       })
+      // 학생 실행 결과 미러링 (단방향: 학생 → 선생님) → 학생 탭에 표시
+      .on('broadcast', { event: 'run:start' }, ({ payload }: { payload: { senderId: string } }) => {
+        if (payload.senderId === teacherId) return;
+        setTerminalOpen(true);
+        setActiveTab('student');
+        setStudentWaiting(false);
+        setStudentLines([{ text: `▶ ${studentNameRef.current ?? '학생'} 실행\n`, kind: 'meta' }]);
+      })
+      .on('broadcast', { event: 'run:stdout' }, ({ payload }: { payload: { senderId: string; chunks: Array<{ text: string; kind: TerminalLine['kind'] }> } }) => {
+        if (payload.senderId === teacherId) return;
+        setStudentLines(prev => [...prev, ...payload.chunks]);
+      })
+      .on('broadcast', { event: 'run:stdin' }, ({ payload }: { payload: { senderId: string; text: string } }) => {
+        if (payload.senderId === teacherId) return;
+        setStudentWaiting(false);
+        setStudentLines(prev => [...prev, { text: payload.text + '\n', kind: 'in' }]);
+      })
+      .on('broadcast', { event: 'run:waiting' }, ({ payload }: { payload: { senderId: string } }) => {
+        if (payload.senderId === teacherId) return;
+        setStudentWaiting(true);
+      })
+      .on('broadcast', { event: 'run:end' }, ({ payload }: { payload: { senderId: string } }) => {
+        if (payload.senderId === teacherId) return;
+        setStudentWaiting(false);
+        setStudentLines(prev => [...prev, { text: '\n■ 실행 종료\n', kind: 'meta' }]);
+      })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState<PresenceUser>();
         const all = Object.values(state).flat();
@@ -332,6 +372,110 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   };
   const handleMouseUp = () => { isDragging.current = false; };
 
+  useEffect(() => {
+    setInteractiveSupported(isInteractiveSupported());
+    return () => { runnerRef.current?.dispose(); runnerRef.current = null; };
+  }, []);
+
+  const appendTeacher = useCallback((text: string, kind: TerminalLine['kind']) => {
+    setTeacherLines(prev => [...prev, { text, kind }]);
+  }, []);
+
+  const ensureRunner = useCallback((): InteractiveRunner | null => {
+    if (runnerRef.current && !runnerRef.current.isFailed) return runnerRef.current;
+    if (runnerRef.current) { runnerRef.current.dispose(); runnerRef.current = null; }
+    if (!isInteractiveSupported()) return null;
+    try {
+      runnerRef.current = new InteractiveRunner();
+    } catch {
+      return null;
+    }
+    return runnerRef.current;
+  }, []);
+
+  // 선생님 직접 실행: 채점/전송 없이 순수하게 결과만 확인 (전체 트레이스백 노출)
+  const handleTeacherRun = useCallback(async () => {
+    if (teacherRunning) return;
+    setTerminalOpen(true);
+    setActiveTab('teacher');
+    setTeacherLines([{ text: '$ python solution.py   (선생님 실행)\n', kind: 'meta' }]);
+    setTeacherRunning(true);
+
+    if (!runnerRef.current?.isReady) {
+      appendTeacher('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
+    }
+
+    const runner = ensureRunner();
+    if (!runner) {
+      try {
+        const pyodide = await loadPyodideFallback();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const py = pyodide as any;
+        py.globals.set('_user_code', codeRef.current);
+        const [stdout, stderr] = await py.runPythonAsync(`
+import sys, io, traceback
+_saved = sys.stdout
+_saved_in = sys.stdin
+_cap = io.StringIO()
+sys.stdout = _cap
+sys.stdin = io.StringIO('')
+_err = ''
+try:
+    exec(compile(_user_code, '<solution>', 'exec'), {'__name__': '__main__'})
+except BaseException:
+    _err = traceback.format_exc()
+finally:
+    sys.stdout = _saved
+    sys.stdin = _saved_in
+(_cap.getvalue(), _err)
+`) as [string, string];
+        if (stdout) appendTeacher(stdout, 'out');
+        if (stderr) appendTeacher(stderr, 'err');
+        if (!stdout && !stderr) appendTeacher('(출력 없음)\n', 'info');
+      } catch (e) {
+        appendTeacher((e instanceof Error ? e.message : '실행 오류') + '\n', 'err');
+      }
+      appendTeacher('\n[프로그램이 종료되었습니다]\n', 'meta');
+      setTeacherRunning(false);
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const finish = () => {
+        if (runOffRef.current) { runOffRef.current(); runOffRef.current = null; }
+        runFinishRef.current = null;
+        setTeacherAwaiting(false);
+        resolve();
+      };
+      runFinishRef.current = finish;
+      const off = runner.on((ev) => {
+        if (ev.type === 'stdout') appendTeacher(ev.text, 'out');
+        else if (ev.type === 'stderr') appendTeacher(ev.text, 'err');
+        else if (ev.type === 'stdin') setTeacherAwaiting(true);
+        else if (ev.type === 'done') finish();
+        else if (ev.type === 'fatal') { appendTeacher((ev.text || '실행 오류') + '\n', 'err'); finish(); }
+      });
+      runOffRef.current = off;
+      runner.run(codeRef.current);
+    });
+    appendTeacher('\n[프로그램이 종료되었습니다]\n', 'meta');
+    setTeacherRunning(false);
+  }, [teacherRunning, ensureRunner, appendTeacher]);
+
+  const handleTeacherInput = useCallback((value: string) => {
+    appendTeacher(value + '\n', 'in');
+    setTeacherAwaiting(false);
+    runnerRef.current?.provideInput(value);
+  }, [appendTeacher]);
+
+  const handleTeacherStop = useCallback(() => {
+    runnerRef.current?.stop();
+    appendTeacher('\n[실행을 중단했습니다]\n', 'meta');
+    runFinishRef.current?.();
+    setTeacherAwaiting(false);
+    setTeacherRunning(false);
+  }, [appendTeacher]);
+
   if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: '#F6F7F9' }}>
@@ -438,6 +582,33 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
             <span style={{ fontSize: '11px', color: '#6A9955', marginLeft: 12, flex: 1 }}>
               {studentOnline ? `${studentName ?? '학생'}의 코드를 함께 편집 중입니다` : '학생이 접속하면 실시간으로 연동됩니다'}
             </span>
+            {teacherRunning ? (
+              <button
+                onClick={handleTeacherStop}
+                className="flex items-center gap-1.5 px-3 rounded-lg mr-2"
+                style={{ height: 28, backgroundColor: '#3A2020', color: '#F87171', fontSize: '12px', fontWeight: 600 }}
+                title="실행 정지"
+              >
+                <Square size={12} /> 정지
+              </button>
+            ) : (
+              <button
+                onClick={handleTeacherRun}
+                className="flex items-center gap-1.5 px-3 rounded-lg mr-2"
+                style={{ height: 28, backgroundColor: '#1B64DA', color: '#FFFFFF', fontSize: '12px', fontWeight: 600 }}
+                title="현재 코드 직접 실행 (채점 없음)"
+              >
+                <Play size={12} /> 실행
+              </button>
+            )}
+            <button
+              onClick={() => setTerminalOpen(o => !o)}
+              className="flex items-center gap-1.5 px-2.5 rounded-lg mr-2"
+              style={{ height: 28, border: '1px solid #3D3D3D', backgroundColor: terminalOpen ? '#2D2D2D' : 'transparent', fontSize: '12px', fontWeight: 600, color: terminalOpen ? '#D4D4D4' : '#8C8C8C' }}
+              title="터미널 열기/닫기"
+            >
+              <Terminal size={13} /> 터미널
+            </button>
             <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid #3D3D3D' }}>
               <button
                 onClick={() => setEditorFontSize(s => Math.max(10, s - 1))}
@@ -469,6 +640,67 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
               options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
             />
           </div>
+
+          {terminalOpen && (
+            <div className="flex-shrink-0" style={{ borderTop: '1px solid #2D2D2D', height: 220, backgroundColor: '#1E1E1E' }}>
+              <div className="flex items-center justify-between pr-3" style={{ height: 38, borderBottom: '1px solid #2D2D2D' }}>
+                <div className="flex items-stretch h-full">
+                  <button
+                    onClick={() => setActiveTab('teacher')}
+                    className="flex items-center gap-1.5 px-4"
+                    style={{ fontSize: '12px', fontWeight: 600, color: activeTab === 'teacher' ? '#D4D4D4' : '#8C8C8C', backgroundColor: activeTab === 'teacher' ? '#1E1E1E' : 'transparent', borderBottom: activeTab === 'teacher' ? '2px solid #1B64DA' : '2px solid transparent' }}
+                  >
+                    선생님
+                    {teacherRunning && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#4ADE80' }} />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('student')}
+                    className="flex items-center gap-1.5 px-4"
+                    style={{ fontSize: '12px', fontWeight: 600, color: activeTab === 'student' ? '#D4D4D4' : '#8C8C8C', backgroundColor: activeTab === 'student' ? '#1E1E1E' : 'transparent', borderBottom: activeTab === 'student' ? `2px solid ${CURSOR_COLORS.student}` : '2px solid transparent' }}
+                  >
+                    {studentName ?? '학생'}
+                    {studentWaiting && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CURSOR_COLORS.student }} />}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {activeTab === 'teacher' && (
+                    teacherRunning ? (
+                      <button onClick={handleTeacherStop} className="flex items-center gap-1 px-2 rounded" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
+                        <Square size={10} /> 정지
+                      </button>
+                    ) : (
+                      <button onClick={handleTeacherRun} className="flex items-center gap-1 px-2 rounded" style={{ height: 24, backgroundColor: '#1B3A2A', color: '#4ADE80', fontSize: '11px', fontWeight: 600 }} title="선생님 직접 실행 (채점 없음)">
+                        <Play size={10} /> 실행
+                      </button>
+                    )
+                  )}
+                  <button onClick={() => setTerminalOpen(false)} className="flex items-center justify-center rounded" style={{ width: 22, height: 22, color: '#8C8C8C' }} title="닫기">
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+              {activeTab === 'teacher' ? (
+                <ConsoleTerminal
+                  lines={teacherLines}
+                  awaitingInput={teacherAwaiting}
+                  onSubmitInput={handleTeacherInput}
+                  mode="interactive"
+                  supported={interactiveSupported}
+                  emptyHint="오른쪽 위 실행 버튼을 눌러 현재 코드를 직접 실행할 수 있어요. (채점 없음)"
+                  height={182}
+                />
+              ) : (
+                <ConsoleTerminal
+                  lines={studentLines}
+                  awaitingInput={studentWaiting}
+                  mode="mirror"
+                  supported={interactiveSupported}
+                  emptyHint="학생이 코드를 실행하면 여기에 실시간으로 표시됩니다."
+                  height={182}
+                />
+              )}
+            </div>
+          )}
 
           <div className="flex-shrink-0 bg-white" style={{ borderTop: '1px solid #E5E8EC', height: feedbackOpen ? 180 : 44 }}>
             <button onClick={() => setFeedbackOpen(o => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 44, borderBottom: feedbackOpen ? '1px solid #E5E8EC' : 'none' }}>

@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X } from 'lucide-react';
+import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X, Sparkles } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
+import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -42,6 +43,7 @@ type SessionDetail = {
     input_format: string | null;
     output_format: string | null;
     starter_code: string | null;
+    use_ai_feedback: boolean;
   } | null;
   users: { id: string; name: string; username: string } | null;
 };
@@ -74,6 +76,9 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const [studentWaiting, setStudentWaiting] = useState(false);
   const [teacherRunning, setTeacherRunning] = useState(false);
   const [interactiveSupported, setInteractiveSupported] = useState(true);
+  const [aiFeedbacks, setAiFeedbacks] = useState<AiFeedbackItem[]>([]);
+  const [aiFeedbackPanelOpen, setAiFeedbackPanelOpen] = useState(false);
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
 
   const runnerRef = useRef<InteractiveRunner | null>(null);
   const runOffRef = useRef<(() => void) | null>(null);
@@ -119,6 +124,27 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
       })
       .catch(() => setLoadError(true));
   }, [sessionId, teacherId]);
+
+  // 학생이 이 문제에서 받은 AI 피드백 이력을 선생님 화면에도 동일하게 표시
+  useEffect(() => {
+    if (!session?.problems?.use_ai_feedback || !session.problem_id) return;
+    const studentId = session.student_id;
+    const problemId = session.problem_id;
+
+    const loadAiFeedbacks = () => {
+      if (document.hidden) return;
+      setAiFeedbackLoading(true);
+      fetch(`/api/ai-feedbacks?problem_id=${problemId}&student_id=${studentId}`)
+        .then((r) => r.json())
+        .then((json) => setAiFeedbacks(json.feedbacks ?? []))
+        .catch(() => {})
+        .finally(() => setAiFeedbackLoading(false));
+    };
+
+    loadAiFeedbacks();
+    const interval = setInterval(loadAiFeedbacks, 5000);
+    return () => clearInterval(interval);
+  }, [session?.problems?.use_ai_feedback, session?.problem_id, session?.student_id]);
 
   // 선생님이 입력하거나 학생 코드를 받았을 때도 세션에 지속 저장 (양쪽 모두 최신 유지)
   const scheduleAutoSave = useCallback((nextCode: string) => {
@@ -534,6 +560,25 @@ finally:
             {studentOnline && <div className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: CURSOR_COLORS.student }} />}
           </div>
         </div>
+
+        {problem?.use_ai_feedback && (
+          <div className="relative">
+            <button
+              onClick={() => setAiFeedbackPanelOpen((o) => !o)}
+              className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
+              style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? '#EEF2FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
+            >
+              <Sparkles size={14} /> AI 피드백
+              {aiFeedbacks.length > 0 && (
+                <span className="flex items-center justify-center rounded-full text-white" style={{ width: 18, height: 18, fontSize: 10, backgroundColor: '#4F46E5' }}>{aiFeedbacks.length}</span>
+              )}
+              {aiFeedbackLoading && aiFeedbacks.length === 0 && <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#4F46E5' }} />}
+            </button>
+            {aiFeedbackPanelOpen && (
+              <AiFeedbackPanel feedbacks={aiFeedbacks} loading={aiFeedbackLoading && aiFeedbacks.length === 0} onClose={() => setAiFeedbackPanelOpen(false)} />
+            )}
+          </div>
+        )}
 
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#1B64DA' }}>{teacherName} 선생님</span>
       </header>

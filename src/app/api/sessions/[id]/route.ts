@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const { data, error } = await supabaseAdmin()
     .from('collaboration_sessions')
-    .select('*, problems(problem_no, title, difficulty, description, input_format, output_format, constraint_text, starter_code, time_limit_ms), users!collaboration_sessions_student_id_fkey(id, name, username)')
+    .select('*, problems(problem_no, title, difficulty, description, input_format, output_format, constraint_text, starter_code, time_limit_ms, use_ai_feedback), users!collaboration_sessions_student_id_fkey(id, name, username)')
     .eq('id', id)
     .single();
 

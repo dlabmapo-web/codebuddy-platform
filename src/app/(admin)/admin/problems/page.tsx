@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, ChevronRight, X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, ChevronRight, X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers, Sparkles } from 'lucide-react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 
@@ -20,7 +20,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
-type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'category_id' | 'order_no' | 'title' | 'difficulty' | 'is_published' | 'created_at'>;
+type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'category_id' | 'order_no' | 'title' | 'difficulty' | 'is_published' | 'use_ai_feedback' | 'created_at'>;
 
 type CategoryRow = {
   id: string;
@@ -55,6 +55,7 @@ type ProblemForm = {
   constraint_text: string;
   starter_code: string;
   is_published: boolean;
+  use_ai_feedback: boolean;
   test_cases: TestCaseForm[];
   hints: HintForm[];
 };
@@ -69,6 +70,7 @@ const EMPTY_FORM: ProblemForm = {
   constraint_text: '',
   starter_code: '',
   is_published: false,
+  use_ai_feedback: false,
   test_cases: [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
   hints: [],
 };
@@ -258,6 +260,7 @@ export default function AdminProblemsPage() {
       constraint_text: problem.constraint_text ?? '',
       starter_code: problem.starter_code ?? '',
       is_published: problem.is_published,
+      use_ai_feedback: problem.use_ai_feedback,
       test_cases: test_cases.length > 0
         ? test_cases.map((tc) => ({ input: tc.input, expected_output: tc.expected_output, is_sample: tc.is_sample, is_hidden: tc.is_hidden, order_no: tc.order_no }))
         : [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
@@ -290,6 +293,7 @@ export default function AdminProblemsPage() {
       time_limit_ms: 3000,
       memory_limit_mb: 256,
       is_published: form.is_published,
+      use_ai_feedback: form.use_ai_feedback,
       test_cases: validTc,
       hints: form.hints.filter((h) => h.hint_text.trim()),
     };
@@ -538,6 +542,11 @@ export default function AdminProblemsPage() {
                               >
                                 {p.title}
                               </button>
+                              {p.use_ai_feedback && (
+                                <span className="px-2 py-0.5 rounded shrink-0 flex items-center gap-1" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#EEF2FF', color: '#4F46E5' }}>
+                                  <Sparkles size={11} /> AI
+                                </span>
+                              )}
                               <span className="px-2 py-0.5 rounded shrink-0" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[p.difficulty].bg, color: DIFF_STYLE[p.difficulty].color }}>
                                 {DIFF_LABEL[p.difficulty]}
                               </span>
@@ -663,6 +672,17 @@ export default function AdminProblemsPage() {
                     />
                     <span style={{ fontSize: '14px', color: '#16181D' }}>즉시 공개</span>
                     <span style={{ fontSize: '12px', color: '#5A6270' }}>(체크하면 학생 화면에 바로 표시됩니다)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer w-fit">
+                    <input
+                      type="checkbox"
+                      checked={form.use_ai_feedback}
+                      onChange={(e) => setForm((f) => ({ ...f, use_ai_feedback: e.target.checked }))}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span style={{ fontSize: '14px', color: '#16181D' }}>AI 피드백 사용</span>
+                    <span style={{ fontSize: '12px', color: '#5A6270' }}>(체크하면 오답 시 AI가 코드를 분석해 피드백을 제공합니다)</span>
                   </label>
                 </div>
               </Section>

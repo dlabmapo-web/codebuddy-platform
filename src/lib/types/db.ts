@@ -58,6 +58,7 @@ export interface DbProblem {
   time_limit_ms: number;
   memory_limit_mb: number;
   is_published: boolean;
+  use_ai_feedback: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -146,6 +147,32 @@ export interface DbAiHintLog {
   student_code: string | null;
   error_message: string | null;
   hint_response: string | null;
+  model: string;
+  created_at: string;
+}
+
+export type AiFeedbackPatternType = 'for' | 'while';
+
+export interface DbAiFeedbackPattern {
+  id: string;
+  pattern_type: AiFeedbackPatternType;
+  error_category: string;
+  criteria: string;
+  example_code: string | null;
+  tutor_feedback: string;
+  order_no: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbAiFeedback {
+  id: string;
+  submission_id: string;
+  problem_id: string | null;
+  student_id: string;
+  matched_pattern_id: string | null;
+  content: string;
   model: string;
   created_at: string;
 }

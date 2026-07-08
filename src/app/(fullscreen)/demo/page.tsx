@@ -55,6 +55,11 @@ const TEST_CASES = [
   { input: '2\n3 3\n6', expected: '0 1' },
 ];
 
+const DEMO_HINTS = [
+  '배열을 한 번만 순회하면서, 이미 본 숫자들 중 현재 숫자와 합쳐서 target이 되는 숫자가 있는지 빠르게 확인할 방법을 생각해보세요.',
+  'O(1) 시간에 숫자의 존재 여부를 확인할 수 있는 자료구조를 활용하면 전체 시간 복잡도를 크게 줄일 수 있어요. 딕셔너리(해시맵)를 활용해보세요.',
+];
+
 const DIFF_STYLE = {
   쉬움: { bg: '#DCFCE7', color: '#15803D' },
   보통: { bg: '#EAF1FD', color: '#1450B5' },
@@ -559,7 +564,7 @@ export default function DemoPage() {
         />
       )}
 
-      {showHint && <HintPanel onClose={() => setShowHint(false)} />}
+      {showHint && <HintPanel hints={DEMO_HINTS} onClose={() => setShowHint(false)} />}
     </div>
   );
 }

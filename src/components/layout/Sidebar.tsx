@@ -10,6 +10,7 @@ import {
   FileText,
   UserCheck,
   FlaskConical,
+  Sparkles,
 } from 'lucide-react';
 import type { UserRole } from '@/lib/types/db';
 
@@ -32,6 +33,7 @@ const teacherNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { icon: <FileText size={16} />, label: '문제 관리', href: '/admin/problems' },
+  { icon: <Sparkles size={16} />, label: 'AI 피드백 기준', href: '/admin/ai-feedback' },
   { icon: <UserCheck size={16} />, label: '사용자 관리', href: '/admin/users' },
 ];
 

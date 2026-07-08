@@ -27,5 +27,11 @@ export async function GET(_req: Request, { params }: Params) {
     .eq('is_sample', true)
     .order('order_no', { ascending: true });
 
-  return apiOk({ problem, test_cases: test_cases ?? [] });
+  const { data: hints } = await db
+    .from('problem_hints')
+    .select('id, hint_text, order_no')
+    .eq('problem_id', id)
+    .order('order_no', { ascending: true });
+
+  return apiOk({ problem, test_cases: test_cases ?? [], hints: hints ?? [] });
 }

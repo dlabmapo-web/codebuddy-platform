@@ -3,19 +3,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
+import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
-import type { DbProblem, DbTestCase, ProblemDifficulty } from '@/lib/types/db';
+import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -28,6 +29,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 
 type ProblemDetail = DbProblem & {
   test_cases: Pick<DbTestCase, 'id' | 'input' | 'expected_output' | 'is_sample' | 'order_no'>[];
+  hints: Pick<DbProblemHint, 'id' | 'hint_text' | 'order_no'>[];
 };
 
 type SubmitResult = {
@@ -100,15 +102,24 @@ finally:
   return { stdout: result[0], stderr: result[1] };
 }
 
-function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResult; onClose: () => void; onRetry: () => void; onHint: () => void }) {
+function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent }: {
+  result: SubmitResult;
+  onClose: () => void;
+  onRetry: () => void;
+  onHint: () => void;
+  aiFeedbackEnabled: boolean;
+  aiFeedbackLoading: boolean;
+  aiFeedbackContent: string | null;
+}) {
   const isPass = result.status === 'pass';
   const minutes = Math.floor(result.elapsedSec / 60);
   const secs = result.elapsedSec % 60;
   const timeLabel = minutes > 0 ? `${minutes}분 ${secs}초` : `${secs}초`;
+  const showAiBox = !isPass && aiFeedbackEnabled;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-white rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-center mb-5">
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
             {isPass
@@ -131,11 +142,30 @@ function ResultModal({ result, onClose, onRetry, onHint }: { result: SubmitResul
             <div style={{ fontSize: '18px', fontWeight: 700, color: '#16181D' }}>{timeLabel}</div>
           </div>
         </div>
-        {!isPass && (
+        {!isPass && !showAiBox && (
           <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#FFF5F5', border: '1px solid #FCA5A5' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>출력이 정답과 달라요</div>
             <div style={{ fontSize: '13px', color: '#5A6270' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
             <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
+          </div>
+        )}
+        {showAiBox && (
+          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#EEF2FF', border: '1px solid #C7D2FE' }}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles size={14} style={{ color: '#4F46E5' }} className="flex-shrink-0" />
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5' }}>AI 피드백</span>
+            </div>
+            {aiFeedbackContent ? (
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{aiFeedbackContent}</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: '#4F46E5', borderTopColor: 'transparent' }} />
+                <span style={{ fontSize: '13px', color: '#4F46E5', fontWeight: 600 }}>AI가 코드를 분석하고 있어요...</span>
+              </div>
+            )}
+            <div className="mt-2" style={{ fontSize: '11px', color: '#4F46E5' }}>* 정답은 직접 알려주지 않는 참고용 피드백입니다</div>
           </div>
         )}
         {isPass ? (
@@ -178,6 +208,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [myInfo, setMyInfo] = useState<{ id: string; name: string } | null>(null);
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
+  const [aiFeedbacks, setAiFeedbacks] = useState<AiFeedbackItem[]>([]);
+  const [aiFeedbackPanelOpen, setAiFeedbackPanelOpen] = useState(false);
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
+  const [currentAiFeedback, setCurrentAiFeedback] = useState<AiFeedbackItem | null>(null);
   const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
 
   const runnerRef = useRef<InteractiveRunner | null>(null);
@@ -324,11 +358,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [problemId]);
 
   useEffect(() => {
+    fetch(`/api/ai-feedbacks?problem_id=${problemId}`)
+      .then((r) => r.json())
+      .then((json) => setAiFeedbacks(json.feedbacks ?? []))
+      .catch(() => {});
+  }, [problemId]);
+
+  useEffect(() => {
     fetch(`/api/problems/${problemId}`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.problem) { setLoadError(true); return; }
-        setProblem({ ...json.problem, test_cases: json.test_cases ?? [] });
+        setProblem({ ...json.problem, test_cases: json.test_cases ?? [], hints: json.hints ?? [] });
         const sc = json.problem.starter_code ?? '';
         setStarterCode(sc);
         // 세션에서 저장 코드를 이미 복원했으면 starter_code로 덮어쓰지 않음 (race 방지)
@@ -721,6 +762,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     setIsRunning(true);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py   (제출)\n', kind: 'meta' }]);
+    setCurrentAiFeedback(null);
 
     const t0 = Date.now();
     const { stdout, stderr, stopped } = await executeInTerminal(code);
@@ -739,11 +781,30 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     );
     setAttemptCount(newAttempt);
 
-    await fetch('/api/submissions', {
+    const subRes = await fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
     });
+    const subJson = await subRes.json().catch(() => null);
+
+    if (!matched && problem.use_ai_feedback && subJson?.submission?.id) {
+      setAiFeedbackLoading(true);
+      fetch('/api/ai-feedbacks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submission_id: subJson.submission.id, problem_id: problemId, code, error_message: stderr.trim() || undefined }),
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.feedback) {
+            setAiFeedbacks((prev) => [json.feedback, ...prev]);
+            setCurrentAiFeedback(json.feedback);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAiFeedbackLoading(false));
+    }
 
     if (sessionId) {
       await fetch(`/api/sessions/${sessionId}`, {
@@ -857,6 +918,24 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+          {problem.use_ai_feedback && (
+            <div className="relative">
+              <button
+                onClick={() => setAiFeedbackPanelOpen((o) => !o)}
+                className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
+                style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? '#EEF2FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
+              >
+                <Sparkles size={14} /> AI 피드백
+                {aiFeedbacks.length > 0 && (
+                  <span className="flex items-center justify-center rounded-full text-white" style={{ width: 18, height: 18, fontSize: 10, backgroundColor: '#4F46E5' }}>{aiFeedbacks.length}</span>
+                )}
+                {aiFeedbackLoading && <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#4F46E5' }} />}
+              </button>
+              {aiFeedbackPanelOpen && (
+                <AiFeedbackPanel feedbacks={aiFeedbacks} loading={aiFeedbackLoading} onClose={() => setAiFeedbackPanelOpen(false)} />
               )}
             </div>
           )}
@@ -1029,9 +1108,22 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       </div>
 
       {modalResult && (
-        <ResultModal result={modalResult} onClose={() => setModalResult(null)} onRetry={() => setModalResult(null)} onHint={() => { setModalResult(null); setShowHint(true); }} />
+        <ResultModal
+          result={modalResult}
+          onClose={() => setModalResult(null)}
+          onRetry={() => setModalResult(null)}
+          onHint={() => { setModalResult(null); setShowHint(true); }}
+          aiFeedbackEnabled={problem.use_ai_feedback}
+          aiFeedbackLoading={aiFeedbackLoading}
+          aiFeedbackContent={currentAiFeedback?.content ?? null}
+        />
       )}
-      {showHint && <HintPanel onClose={() => setShowHint(false)} />}
+      {showHint && (
+        <HintPanel
+          hints={problem.hints.map((h) => h.hint_text)}
+          onClose={() => setShowHint(false)}
+        />
+      )}
     </div>
   );
 }

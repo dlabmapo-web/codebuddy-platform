@@ -10,7 +10,7 @@ export async function GET() {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from('problems')
-    .select('id, problem_no, category_id, order_no, title, difficulty, is_published, created_at')
+    .select('id, problem_no, category_id, order_no, title, difficulty, is_published, use_ai_feedback, created_at')
     .order('order_no', { ascending: true });
 
   if (error) return apiError('문제 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body) return apiError('잘못된 요청입니다.', 'BAD_REQUEST', 400);
 
-  const { title, difficulty, description, input_format, output_format, constraint_text, starter_code, time_limit_ms, memory_limit_mb, is_published, category_id, test_cases, hints } = body as {
+  const { title, difficulty, description, input_format, output_format, constraint_text, starter_code, time_limit_ms, memory_limit_mb, is_published, use_ai_feedback, category_id, test_cases, hints } = body as {
     title: string;
     difficulty: string;
     description: string;
@@ -37,6 +37,7 @@ export async function POST(req: Request) {
     time_limit_ms?: number;
     memory_limit_mb?: number;
     is_published?: boolean;
+    use_ai_feedback?: boolean;
     category_id?: string | null;
     test_cases?: Array<{ input: string; expected_output: string; is_sample: boolean; is_hidden: boolean; order_no: number }>;
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
       time_limit_ms: time_limit_ms ?? 3000,
       memory_limit_mb: memory_limit_mb ?? 256,
       is_published: is_published ?? false,
+      use_ai_feedback: use_ai_feedback ?? false,
       created_by: user.id,
     })
     .select('*')

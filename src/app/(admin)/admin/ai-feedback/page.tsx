@@ -14,7 +14,7 @@ type PatternForm = {
 };
 
 const EMPTY_FORM: PatternForm = {
-  pattern_type: 'for',
+  pattern_type: '',
   error_category: '',
   criteria: '',
   example_code: '',
@@ -22,10 +22,16 @@ const EMPTY_FORM: PatternForm = {
   is_active: true,
 };
 
-const TYPE_STYLE: Record<AiFeedbackPatternType, { bg: string; color: string; label: string }> = {
-  for: { bg: '#EAF1FD', color: '#1450B5', label: 'for' },
-  while: { bg: '#F3E8FF', color: '#7C3AED', label: 'while' },
+const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
+  for: { bg: '#EAF1FD', color: '#1450B5' },
+  while: { bg: '#F3E8FF', color: '#7C3AED' },
 };
+
+const DEFAULT_TYPE_STYLE = { bg: '#ECFDF5', color: '#047857' };
+
+function getTypeStyle(type: string) {
+  return TYPE_STYLE[type] ?? DEFAULT_TYPE_STYLE;
+}
 
 function Toast({ message, type }: { message: string; type: 'ok' | 'err' }) {
   return (
@@ -60,16 +66,17 @@ function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; on
 }
 
 function PatternModal({
-  initial, onSave, onClose, saving,
+  initial, typeOptions, onSave, onClose, saving,
 }: {
   initial: PatternForm | null;
+  typeOptions: string[];
   onSave: (data: PatternForm) => void;
   onClose: () => void;
   saving: boolean;
 }) {
   const [form, setForm] = useState<PatternForm>(initial ?? EMPTY_FORM);
 
-  const canSave = form.error_category.trim() && form.criteria.trim() && form.tutor_feedback.trim();
+  const canSave = form.pattern_type.trim() && form.error_category.trim() && form.criteria.trim() && form.tutor_feedback.trim();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
@@ -90,25 +97,18 @@ function PatternModal({
         <div className="px-6 py-5 flex flex-col gap-4 overflow-auto">
           <div>
             <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>유형 <span style={{ color: '#DC2626' }}>*</span></label>
-            <div className="flex gap-2">
-              {(['for', 'while'] as AiFeedbackPatternType[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setForm((f) => ({ ...f, pattern_type: t }))}
-                  className="flex-1 rounded-lg transition-colors"
-                  style={{
-                    height: 40,
-                    border: `1px solid ${form.pattern_type === t ? TYPE_STYLE[t].color : '#E5E8EC'}`,
-                    backgroundColor: form.pattern_type === t ? TYPE_STYLE[t].bg : '#FFFFFF',
-                    color: form.pattern_type === t ? TYPE_STYLE[t].color : '#5A6270',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            <input
+              className="w-full px-3 rounded-lg focus:outline-none"
+              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              placeholder="예) for, while, 조건문, 리스트, 함수"
+              list="ai-feedback-pattern-types"
+              value={form.pattern_type}
+              onChange={(e) => setForm((f) => ({ ...f, pattern_type: e.target.value }))}
+            />
+            <datalist id="ai-feedback-pattern-types">
+              {typeOptions.map((type) => <option key={type} value={type} />)}
+            </datalist>
+            <p style={{ fontSize: '12px', color: '#8A8F98', marginTop: 6 }}>기존 유형을 선택하거나 새로운 유형을 직접 입력할 수 있습니다.</p>
           </div>
 
           <div>
@@ -205,9 +205,8 @@ export default function AdminAiFeedbackPage() {
 
   useEffect(() => { fetchPatterns(); }, [fetchPatterns]);
 
+  const typeOptions = Array.from(new Set(patterns.map((p) => p.pattern_type))).sort((a, b) => a.localeCompare(b, 'ko'));
   const visible = patterns.filter((p) => typeFilter === 'all' || p.pattern_type === typeFilter);
-  const forCount = patterns.filter((p) => p.pattern_type === 'for').length;
-  const whileCount = patterns.filter((p) => p.pattern_type === 'while').length;
 
   const handleSave = async (data: PatternForm) => {
     if (!modal) return;
@@ -219,26 +218,39 @@ export default function AdminAiFeedbackPage() {
     setSaving(false);
 
     if (!res.ok) { showToast(json.error?.message ?? '저장 중 오류가 발생했습니다.', 'err'); return; }
+    const saved = json.pattern as DbAiFeedbackPattern;
+    setPatterns((current) => (
+      modal.mode === 'edit'
+        ? current.map((pattern) => pattern.id === saved.id ? saved : pattern)
+        : [...current, saved].sort((a, b) => a.order_no - b.order_no)
+    ));
     showToast(modal.mode === 'edit' ? '기준이 수정되었습니다.' : '기준이 추가되었습니다.', 'ok');
     setModal(null);
-    fetchPatterns();
   };
 
   const handleDelete = async (pattern: DbAiFeedbackPattern) => {
     const res = await fetch(`/api/admin/ai-feedback-patterns/${pattern.id}`, { method: 'DELETE' });
     setDeleteTarget(null);
     if (!res.ok) { showToast('삭제 중 오류가 발생했습니다.', 'err'); return; }
+    setPatterns((current) => current.filter((item) => item.id !== pattern.id));
     showToast('기준이 삭제되었습니다.', 'ok');
-    fetchPatterns();
   };
 
   const toggleActive = async (pattern: DbAiFeedbackPattern) => {
-    await fetch(`/api/admin/ai-feedback-patterns/${pattern.id}`, {
+    const nextActive = !pattern.is_active;
+    setPatterns((current) => current.map((item) => item.id === pattern.id ? { ...item, is_active: nextActive } : item));
+    const res = await fetch(`/api/admin/ai-feedback-patterns/${pattern.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !pattern.is_active }),
+      body: JSON.stringify({ is_active: nextActive }),
     });
-    fetchPatterns();
+    const json = await res.json();
+    if (!res.ok) {
+      setPatterns((current) => current.map((item) => item.id === pattern.id ? pattern : item));
+      showToast(json.error?.message ?? '사용 여부 변경 중 오류가 발생했습니다.', 'err');
+      return;
+    }
+    setPatterns((current) => current.map((item) => item.id === pattern.id ? json.pattern : item));
   };
 
   return (
@@ -247,7 +259,7 @@ export default function AdminAiFeedbackPage() {
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#16181D' }}>AI 피드백 기준</h1>
           <p style={{ fontSize: '15px', color: '#5A6270', marginTop: 3 }}>
-            오답 채점 시 AI가 학생 코드를 판정할 for/while 오류 패턴을 관리하세요. 모든 문제에 공통으로 적용됩니다.
+            오답 채점 시 AI가 학생 코드를 판정할 다양한 오류 패턴을 관리하세요. 모든 문제에 공통으로 적용됩니다.
           </p>
         </div>
         <button
@@ -263,11 +275,10 @@ export default function AdminAiFeedbackPage() {
       </div>
 
       <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-white w-fit" style={{ border: '1px solid #E5E8EC' }}>
-        {([
+        {[
           { key: 'all', label: `전체 ${patterns.length}` },
-          { key: 'for', label: `for ${forCount}` },
-          { key: 'while', label: `while ${whileCount}` },
-        ] as const).map(({ key, label }) => (
+          ...typeOptions.map((type) => ({ key: type, label: `${type} ${patterns.filter((p) => p.pattern_type === type).length}` })),
+        ].map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTypeFilter(key)}
@@ -297,7 +308,9 @@ export default function AdminAiFeedbackPage() {
             <p style={{ fontSize: '14px', color: '#5A6270' }}>새 패턴을 추가해 AI 피드백 기준을 만들어보세요</p>
           </div>
         ) : (
-          visible.map((p) => (
+          visible.map((p) => {
+            const typeStyle = getTypeStyle(p.pattern_type);
+            return (
             <div
               key={p.id}
               className="bg-white rounded-2xl p-5 flex flex-col gap-3"
@@ -305,8 +318,8 @@ export default function AdminAiFeedbackPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-lg" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: TYPE_STYLE[p.pattern_type].bg, color: TYPE_STYLE[p.pattern_type].color }}>
-                    {TYPE_STYLE[p.pattern_type].label}
+                  <span className="px-2 py-0.5 rounded-lg" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: typeStyle.bg, color: typeStyle.color }}>
+                    {p.pattern_type}
                   </span>
                   <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>{p.error_category}</span>
                   {!p.is_active && (
@@ -356,13 +369,15 @@ export default function AdminAiFeedbackPage() {
                 <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{p.tutor_feedback}</p>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {modal && (
         <PatternModal
           initial={modal.mode === 'edit' ? modal.data : null}
+          typeOptions={typeOptions}
           onSave={handleSave}
           onClose={() => setModal(null)}
           saving={saving}

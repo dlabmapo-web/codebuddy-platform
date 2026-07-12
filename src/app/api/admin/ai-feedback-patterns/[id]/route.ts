@@ -24,6 +24,19 @@ export async function PATCH(req: Request, { params }: Params) {
     is_active?: boolean;
   };
 
+  if (pattern_type !== undefined && !pattern_type.trim()) {
+    return apiError('유형을 입력해주세요.', 'INVALID_PATTERN_TYPE', 400);
+  }
+  if (error_category !== undefined && !error_category.trim()) {
+    return apiError('오류 분류를 입력해주세요.', 'INVALID_ERROR_CATEGORY', 400);
+  }
+  if (criteria !== undefined && !criteria.trim()) {
+    return apiError('판단 기준을 입력해주세요.', 'INVALID_CRITERIA', 400);
+  }
+  if (tutor_feedback !== undefined && !tutor_feedback.trim()) {
+    return apiError('튜터 피드백을 입력해주세요.', 'INVALID_TUTOR_FEEDBACK', 400);
+  }
+
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (pattern_type !== undefined) updates.pattern_type = pattern_type.trim();
   if (error_category !== undefined) updates.error_category = error_category.trim();

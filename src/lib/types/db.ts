@@ -151,7 +151,7 @@ export interface DbAiHintLog {
   created_at: string;
 }
 
-export type AiFeedbackPatternType = 'for' | 'while';
+export type AiFeedbackPatternType = string;
 
 export interface DbAiFeedbackPattern {
   id: string;

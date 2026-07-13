@@ -145,8 +145,30 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
   const studentId = searchParams.get('student_id');
+  const sessionId = searchParams.get('session_id');
 
   const db = supabaseAdmin();
+  let sessionScope: {
+    student_id: string;
+    problem_id: string | null;
+    started_at: string;
+    ended_at: string | null;
+  } | null = null;
+
+  if (sessionId) {
+    const { data: session } = await db
+      .from('collaboration_sessions')
+      .select('student_id, problem_id, started_at, ended_at')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (!session) return apiError('풀이 세션을 찾을 수 없습니다.', 'SESSION_NOT_FOUND', 404);
+    if (user.role === 'student' && session.student_id !== user.id) {
+      return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
+    }
+    sessionScope = session;
+  }
+
   let query = db
     .from('ai_feedbacks')
     .select('*, ai_feedback_patterns(error_category, pattern_type)')
@@ -154,13 +176,21 @@ export async function GET(req: Request) {
 
   if (user.role === 'student') {
     query = query.eq('student_id', user.id);
+  } else if (sessionScope && (user.role === 'teacher' || user.role === 'admin')) {
+    query = query.eq('student_id', sessionScope.student_id);
   } else if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
     query = query.eq('student_id', studentId);
   } else if (user.role !== 'admin') {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
-  if (problemId) query = query.eq('problem_id', problemId);
+  if (sessionScope) {
+    if (sessionScope.problem_id) query = query.eq('problem_id', sessionScope.problem_id);
+    query = query.gte('created_at', sessionScope.started_at);
+    if (sessionScope.ended_at) query = query.lte('created_at', sessionScope.ended_at);
+  } else if (problemId) {
+    query = query.eq('problem_id', problemId);
+  }
 
   const { data, error } = await query;
   if (error) return apiError('AI 피드백 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);

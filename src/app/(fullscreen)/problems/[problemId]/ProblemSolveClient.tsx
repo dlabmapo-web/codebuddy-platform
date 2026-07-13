@@ -331,11 +331,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, []);
 
   useEffect(() => {
+    if (!sessionId) return;
     let prevCount = -1;
+    setFeedbacks([]);
 
     const loadFeedbacks = () => {
       if (document.hidden) return;
-      fetch(`/api/feedbacks?problem_id=${problemId}`)
+      fetch(`/api/feedbacks?session_id=${sessionId}`)
         .then(r => r.json())
         .then(json => {
           if (!json.feedbacks) return;
@@ -355,14 +357,16 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     loadFeedbacks();
     const interval = setInterval(loadFeedbacks, 3000);
     return () => clearInterval(interval);
-  }, [problemId]);
+  }, [sessionId]);
 
   useEffect(() => {
-    fetch(`/api/ai-feedbacks?problem_id=${problemId}`)
+    if (!sessionId) return;
+    setAiFeedbacks([]);
+    fetch(`/api/ai-feedbacks?session_id=${sessionId}`)
       .then((r) => r.json())
       .then((json) => setAiFeedbacks(json.feedbacks ?? []))
       .catch(() => {});
-  }, [problemId]);
+  }, [sessionId]);
 
   useEffect(() => {
     fetch(`/api/problems/${problemId}`)

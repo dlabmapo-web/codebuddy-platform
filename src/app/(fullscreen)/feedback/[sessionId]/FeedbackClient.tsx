@@ -128,13 +128,10 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   // 학생이 이 문제에서 받은 AI 피드백 이력을 선생님 화면에도 동일하게 표시
   useEffect(() => {
     if (!session?.problems?.use_ai_feedback || !session.problem_id) return;
-    const studentId = session.student_id;
-    const problemId = session.problem_id;
-
     const loadAiFeedbacks = () => {
       if (document.hidden) return;
       setAiFeedbackLoading(true);
-      fetch(`/api/ai-feedbacks?problem_id=${problemId}&student_id=${studentId}`)
+      fetch(`/api/ai-feedbacks?session_id=${sessionId}`)
         .then((r) => r.json())
         .then((json) => setAiFeedbacks(json.feedbacks ?? []))
         .catch(() => {})
@@ -144,7 +141,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     loadAiFeedbacks();
     const interval = setInterval(loadAiFeedbacks, 5000);
     return () => clearInterval(interval);
-  }, [session?.problems?.use_ai_feedback, session?.problem_id, session?.student_id]);
+  }, [session?.problems?.use_ai_feedback, session?.problem_id, sessionId]);
 
   // 선생님이 입력하거나 학생 코드를 받았을 때도 세션에 지속 저장 (양쪽 모두 최신 유지)
   const scheduleAutoSave = useCallback((nextCode: string) => {

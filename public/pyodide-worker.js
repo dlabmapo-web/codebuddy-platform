@@ -11,6 +11,19 @@ let pyodide = null;
 let control = null;
 let dataBuf = null;
 const decoder = new TextDecoder();
+const stdoutDecoder = new TextDecoder();
+const stderrDecoder = new TextDecoder();
+
+function streamOutput(type, outputDecoder, buffer) {
+  const text = outputDecoder.decode(buffer, { stream: true });
+  if (text) self.postMessage({ type, text });
+  return buffer.length;
+}
+
+function flushOutput(type, outputDecoder) {
+  const text = outputDecoder.decode();
+  if (text) self.postMessage({ type, text });
+}
 
 function readStdin() {
   // 메인 스레드에 입력을 요청하고, 값이 채워질 때까지 워커 스레드를 블로킹
@@ -33,8 +46,8 @@ async function initPyodide() {
   // worker(importScripts) 환경에서는 indexURL 자동 감지가 안 되므로 명시한다
   // eslint-disable-next-line no-undef
   pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
-  pyodide.setStdout({ batched: (s) => self.postMessage({ type: 'stdout', text: s + '\n' }) });
-  pyodide.setStderr({ batched: (s) => self.postMessage({ type: 'stderr', text: s + '\n' }) });
+  pyodide.setStdout({ write: (buffer) => streamOutput('stdout', stdoutDecoder, buffer) });
+  pyodide.setStderr({ write: (buffer) => streamOutput('stderr', stderrDecoder, buffer) });
   // autoEOF:true → stdin() 한 번 호출이 input() 한 줄에 대응 (라인 기반 입력)
   pyodide.setStdin({ stdin: readStdin, autoEOF: true });
   self.postMessage({ type: 'ready' });
@@ -67,6 +80,8 @@ self.onmessage = async (e) => {
       const text = err && err.message ? err.message : String(err);
       self.postMessage({ type: 'stderr', text: text.endsWith('\n') ? text : text + '\n' });
     }
+    flushOutput('stdout', stdoutDecoder);
+    flushOutput('stderr', stderrDecoder);
     self.postMessage({ type: 'done' });
   }
 };

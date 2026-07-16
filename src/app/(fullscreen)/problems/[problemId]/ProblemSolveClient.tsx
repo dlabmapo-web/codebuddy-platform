@@ -102,7 +102,7 @@ finally:
   return { stdout: result[0], stderr: result[1] };
 }
 
-function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent }: {
+function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent, nextProblemId, stageId }: {
   result: SubmitResult;
   onClose: () => void;
   onRetry: () => void;
@@ -110,6 +110,8 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
   aiFeedbackEnabled: boolean;
   aiFeedbackLoading: boolean;
   aiFeedbackContent: string | null;
+  nextProblemId: string | null;
+  stageId: string | null;
 }) {
   const isPass = result.status === 'pass';
   const minutes = Math.floor(result.elapsedSec / 60);
@@ -171,7 +173,17 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
         {isPass ? (
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>닫기</button>
-            <Link href="/problems" className="flex-1 rounded-xl text-white flex items-center justify-center" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}>다른 문제 풀기</Link>
+            <Link
+              href={nextProblemId
+                ? `/problems/${nextProblemId}`
+                : stageId
+                  ? `/problems?stage=${stageId}`
+                  : '/problems'}
+              className="flex-1 rounded-xl text-white flex items-center justify-center"
+              style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+            >
+              {nextProblemId ? '다음 문제 풀기' : '목록으로'}
+            </Link>
           </div>
         ) : (
           <div className="flex gap-2">
@@ -186,6 +198,8 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
 
 export default function ProblemSolveClient({ problemId, submissionId }: { problemId: string; submissionId?: string }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
+  const [nextProblemId, setNextProblemId] = useState<string | null>(null);
+  const [stageId, setStageId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [code, setCode] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
@@ -369,11 +383,15 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [sessionId]);
 
   useEffect(() => {
+    setNextProblemId(null);
+    setStageId(null);
     fetch(`/api/problems/${problemId}`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.problem) { setLoadError(true); return; }
         setProblem({ ...json.problem, test_cases: json.test_cases ?? [], hints: json.hints ?? [] });
+        setNextProblemId(json.next_problem_id ?? null);
+        setStageId(json.stage_id ?? null);
         const sc = json.problem.starter_code ?? '';
         setStarterCode(sc);
         // 세션에서 저장 코드를 이미 복원했으면 starter_code로 덮어쓰지 않음 (race 방지)
@@ -1120,6 +1138,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           aiFeedbackEnabled={problem.use_ai_feedback}
           aiFeedbackLoading={aiFeedbackLoading}
           aiFeedbackContent={currentAiFeedback?.content ?? null}
+          nextProblemId={nextProblemId}
+          stageId={stageId}
         />
       )}
       {showHint && (

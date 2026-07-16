@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
@@ -13,6 +13,7 @@ import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleT
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
+import { explainPythonError, type PythonExecutionError } from '@/lib/pyodide/pythonError';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -77,29 +78,63 @@ function outputMatches(rawStdout: string, expectedOutputs: string[]): boolean {
 }
 
 // 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
-async function runFallbackOnce(userCode: string): Promise<{ stdout: string; stderr: string }> {
+async function runFallbackOnce(userCode: string): Promise<{
+  stdout: string;
+  stderr: string;
+  pythonError: PythonExecutionError | null;
+}> {
   const pyodide = await loadPyodideFallback();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const py = pyodide as any;
   py.globals.set('_user_code', userCode);
   const result = await py.runPythonAsync(`
-import sys, io, traceback
+import sys, io, traceback, json, linecache
 _saved_stdout = sys.stdout
 _saved_stdin = sys.stdin
 _captured = io.StringIO()
 sys.stdout = _captured
 sys.stdin = io.StringIO('')
 _stderr_msg = ''
+_error = None
 try:
-    exec(compile(_user_code, '<solution>', 'exec'), {'__name__': '__main__'})
-except BaseException:
-    _stderr_msg = traceback.format_exc()
+    linecache.cache['solution.py'] = (
+        len(_user_code),
+        None,
+        _user_code.splitlines(True),
+        'solution.py',
+    )
+    exec(compile(_user_code, 'solution.py', 'exec'), {'__name__': '__main__'})
+except BaseException as exc:
+    error_type = type(exc).__name__
+    error_message = str(exc)
+    error_line = getattr(exc, 'lineno', None)
+    if isinstance(exc, SyntaxError):
+        error_display = ''.join(traceback.format_exception_only(type(exc), exc))
+    else:
+        frames = [frame for frame in traceback.extract_tb(exc.__traceback__) if frame.filename == 'solution.py']
+        if frames:
+            error_line = frames[-1].lineno
+        error_display = (
+            'Traceback (most recent call last):\\n'
+            + ''.join(traceback.format_list(frames))
+            + ''.join(traceback.format_exception_only(type(exc), exc))
+        )
+    _error = json.dumps({
+        'type': error_type,
+        'message': error_message,
+        'line': error_line,
+        'display': error_display,
+    }, ensure_ascii=False)
 finally:
     sys.stdout = _saved_stdout
     sys.stdin = _saved_stdin
-(_captured.getvalue(), _stderr_msg)
-`) as [string, string];
-  return { stdout: result[0], stderr: result[1] };
+(_captured.getvalue(), _stderr_msg, _error)
+`) as [string, string, string | null];
+  return {
+    stdout: result[0],
+    stderr: result[1],
+    pythonError: result[2] ? JSON.parse(result[2]) as PythonExecutionError : null,
+  };
 }
 
 function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent, nextProblemId, stageId }: {
@@ -206,6 +241,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [terminalHeight, setTerminalHeight] = useState(220);
   const [editorFontSize, setEditorFontSize] = useState(13);
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
+  const [lastPythonError, setLastPythonError] = useState<PythonExecutionError | null>(null);
+  const [terminalTab, setTerminalTab] = useState<'terminal' | 'error'>('terminal');
+  const [errorExplainSeen, setErrorExplainSeen] = useState(false);
   const [awaitingInput, setAwaitingInput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [modalResult, setModalResult] = useState<SubmitResult | null>(null);
@@ -233,6 +271,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const runFinishRef = useRef<((stopped: boolean) => void) | null>(null);
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
+  const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
   const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const myInfoRef = useRef<{ id: string; name: string } | null>(null);
@@ -674,27 +713,41 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, []);
 
   // 터미널에서 코드를 대화식으로 실행하고, 프로그램 종료(done) 시 누적 출력을 반환
-  const executeInTerminal = useCallback((sourceCode: string): Promise<{ stdout: string; stderr: string; stopped: boolean }> => {
+  const executeInTerminal = useCallback((sourceCode: string): Promise<{
+    stdout: string;
+    stderr: string;
+    pythonError: PythonExecutionError | null;
+    stopped: boolean;
+  }> => {
     runStdoutRef.current = '';
     runStderrRef.current = '';
+    runPythonErrorRef.current = null;
+    setLastPythonError(null);
+    setTerminalTab('terminal');
+    setErrorExplainSeen(false);
     broadcastRun('run:start', {});
     const runner = ensureRunner();
 
     if (!runner) {
       return runFallbackOnce(sourceCode)
-        .then(({ stdout, stderr }) => {
+        .then(({ stdout, stderr, pythonError }) => {
           if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
           if (stderr) { appendTerminal(stderr, 'err'); queueRunOut(stderr, 'err'); }
-          if (!stdout && !stderr) appendTerminal('(출력 없음)\n', 'info');
+          if (pythonError) {
+            appendTerminal(pythonError.display, 'err');
+            queueRunOut(pythonError.display, 'err');
+            setLastPythonError(pythonError);
+          }
+          if (!stdout && !stderr && !pythonError) appendTerminal('(출력 없음)\n', 'info');
           flushRunOut();
           broadcastRun('run:end', {});
-          return { stdout, stderr, stopped: false };
+          return { stdout, stderr, pythonError, stopped: false };
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : '실행 오류';
           appendTerminal(msg + '\n', 'err');
           broadcastRun('run:end', {});
-          return { stdout: '', stderr: msg, stopped: false };
+          return { stdout: '', stderr: msg, pythonError: null, stopped: false };
         });
     }
 
@@ -709,7 +762,12 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         setAwaitingInput(false);
         flushRunOut();
         broadcastRun('run:end', {});
-        resolve({ stdout: runStdoutRef.current, stderr: runStderrRef.current, stopped });
+        resolve({
+          stdout: runStdoutRef.current,
+          stderr: runStderrRef.current,
+          pythonError: runPythonErrorRef.current,
+          stopped,
+        });
       };
       runFinishRef.current = finish;
 
@@ -722,6 +780,11 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           runStderrRef.current += ev.text;
           appendTerminal(ev.text, 'err');
           queueRunOut(ev.text, 'err');
+        } else if (ev.type === 'pythonError') {
+          runPythonErrorRef.current = ev.error;
+          setLastPythonError(ev.error);
+          appendTerminal(ev.error.display, 'err');
+          queueRunOut(ev.error.display, 'err');
         } else if (ev.type === 'stdin') {
           setAwaitingInput(true);
           flushRunOut();
@@ -729,7 +792,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         } else if (ev.type === 'done') {
           finish(false);
         } else if (ev.type === 'fatal') {
-          appendTerminal((ev.text || '실행 오류') + '\n', 'err');
+          const message = ev.text || '실행 오류';
+          runStderrRef.current += message;
+          appendTerminal(message + '\n', 'err');
           finish(false);
         }
       });
@@ -787,18 +852,21 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     setCurrentAiFeedback(null);
 
     const t0 = Date.now();
-    const { stdout, stderr, stopped } = await executeInTerminal(code);
+    const { stdout, stderr, pythonError, stopped } = await executeInTerminal(code);
     if (stopped) { setIsRunning(false); return; }
 
     const runtimeMs = Date.now() - t0;
-    const actual = stdout.trim();
-    const matched = !stderr.trim() && outputMatches(stdout, expectedOutputs);
+    const matched = !pythonError && !stderr.trim() && outputMatches(stdout, expectedOutputs);
     const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
     const score = matched ? 100 : 0;
     const newAttempt = attemptCount + 1;
 
     appendTerminal(
-      matched ? `\n채점 결과: 정답입니다! (${runtimeMs}ms)\n` : `\n채점 결과: 오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)\n`,
+      matched
+        ? `\n채점 결과: 정답입니다! (${runtimeMs}ms)\n`
+        : pythonError
+          ? '\n코드에 오류가 있어 채점하지 못했어요. 위의 [해석] 버튼을 눌러 확인해 보세요.\n'
+          : `\n채점 결과: 오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)\n`,
       matched ? 'out' : 'err',
     );
     setAttemptCount(newAttempt);
@@ -815,7 +883,12 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       fetch('/api/ai-feedbacks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submission_id: subJson.submission.id, problem_id: problemId, code, error_message: stderr.trim() || undefined }),
+        body: JSON.stringify({
+          submission_id: subJson.submission.id,
+          problem_id: problemId,
+          code,
+          error_message: pythonError?.display.trim() || undefined,
+        }),
       })
         .then((r) => r.json())
         .then((json) => {
@@ -1105,25 +1178,101 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                 title="드래그하여 터미널 높이 조절"
               />
             )}
-            <div className="flex items-center justify-between px-4" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
-              <button onClick={() => setTerminalOpen((o) => !o)} className="flex items-center gap-2">
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#8C8C8C' }}>터미널</span>
-                {terminalOpen ? <ChevronDown size={13} style={{ color: '#8C8C8C' }} /> : <ChevronUp size={13} style={{ color: '#8C8C8C' }} />}
-              </button>
-              {terminalOpen && isRunning && (
-                <button onClick={handleStop} className="flex items-center gap-1 px-2 rounded transition-colors" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
-                  <Square size={10} /> 정지
+            <div className="flex items-center justify-between pr-3" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
+              <div className="flex items-stretch h-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTerminalOpen(true);
+                    setTerminalTab('terminal');
+                  }}
+                  className="flex items-center gap-1.5 px-4"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: terminalTab === 'terminal' ? '#D4D4D4' : '#8C8C8C',
+                    backgroundColor: terminalTab === 'terminal' && terminalOpen ? '#1E1E1E' : 'transparent',
+                    borderBottom: terminalTab === 'terminal' && terminalOpen ? '2px solid #1B64DA' : '2px solid transparent',
+                  }}
+                >
+                  터미널
+                  {terminalOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
                 </button>
-              )}
+                {lastPythonError && !isRunning && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTerminalOpen(true);
+                      setTerminalTab('error');
+                      setErrorExplainSeen(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-4 motion-reduce:animate-none ${errorExplainSeen ? '' : 'animate-bounce'}`}
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: terminalTab === 'error' ? '#BFDBFE' : '#93C5FD',
+                      backgroundColor: terminalTab === 'error' && terminalOpen ? '#1E1E1E' : 'transparent',
+                      borderBottom: terminalTab === 'error' && terminalOpen ? '2px solid #3B82F6' : '2px solid transparent',
+                      boxShadow: errorExplainSeen ? 'none' : '0 0 12px rgba(59, 130, 246, 0.55)',
+                    }}
+                  >
+                    <CircleHelp size={13} />
+                    오류해석
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {terminalOpen && isRunning && (
+                  <button onClick={handleStop} className="flex items-center gap-1 px-2 rounded transition-colors" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
+                    <Square size={10} /> 정지
+                  </button>
+                )}
+                {terminalOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setTerminalOpen(false)}
+                    className="flex items-center justify-center rounded"
+                    style={{ width: 22, height: 22, color: '#8C8C8C' }}
+                    title="닫기"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
             </div>
             {terminalOpen && (
-              <ConsoleTerminal
-                lines={terminalLines}
-                awaitingInput={awaitingInput}
-                onSubmitInput={handleTerminalInput}
-                supported={interactiveSupported}
-                height={terminalHeight - 38}
-              />
+              terminalTab === 'error' && lastPythonError ? (
+                <div
+                  className="overflow-auto px-4 py-3"
+                  style={{ height: terminalHeight - 38, backgroundColor: '#1E1E1E' }}
+                >
+                  <div
+                    className="rounded-xl px-4 py-3"
+                    style={{ backgroundColor: '#172033', border: '1px solid #334155', color: '#E2E8F0', fontFamily: 'Pretendard, sans-serif', fontSize: '13px', lineHeight: 1.7 }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <CircleHelp size={14} style={{ color: '#93C5FD' }} />
+                      <strong style={{ color: '#93C5FD', fontSize: '13px' }}>
+                        {lastPythonError.type}를 쉽게 설명하면
+                      </strong>
+                    </div>
+                    <p style={{ margin: 0 }}>{explainPythonError(lastPythonError)}</p>
+                    {lastPythonError.line && (
+                      <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                        에디터 {lastPythonError.line}번째 줄을 확인해 보세요.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <ConsoleTerminal
+                  lines={terminalLines}
+                  awaitingInput={awaitingInput}
+                  onSubmitInput={handleTerminalInput}
+                  supported={interactiveSupported}
+                  height={terminalHeight - 38}
+                />
+              )
             )}
           </div>
         </div>

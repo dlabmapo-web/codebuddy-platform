@@ -74,11 +74,59 @@ self.onmessage = async (e) => {
       return;
     }
     try {
-      await pyodide.runPythonAsync(msg.code);
+      pyodide.globals.set('_paircode_source', msg.code);
+      const errorJson = await pyodide.runPythonAsync(`
+import json as _paircode_json
+import linecache as _paircode_linecache
+import traceback as _paircode_traceback
+
+_paircode_error = None
+try:
+    _paircode_linecache.cache['solution.py'] = (
+        len(_paircode_source),
+        None,
+        _paircode_source.splitlines(True),
+        'solution.py',
+    )
+    exec(compile(_paircode_source, 'solution.py', 'exec'), {'__name__': '__main__'})
+except BaseException as _paircode_exc:
+    _paircode_type = type(_paircode_exc).__name__
+    _paircode_message = str(_paircode_exc)
+    _paircode_line = getattr(_paircode_exc, 'lineno', None)
+
+    if isinstance(_paircode_exc, SyntaxError):
+        _paircode_display = ''.join(
+            _paircode_traceback.format_exception_only(type(_paircode_exc), _paircode_exc)
+        )
+    else:
+        _paircode_frames = [
+            _frame for _frame in _paircode_traceback.extract_tb(_paircode_exc.__traceback__)
+            if _frame.filename == 'solution.py'
+        ]
+        if _paircode_frames:
+            _paircode_line = _paircode_frames[-1].lineno
+        _paircode_display = (
+            'Traceback (most recent call last):\\n'
+            + ''.join(_paircode_traceback.format_list(_paircode_frames))
+            + ''.join(_paircode_traceback.format_exception_only(type(_paircode_exc), _paircode_exc))
+        )
+
+    _paircode_error = _paircode_json.dumps({
+        'type': _paircode_type,
+        'message': _paircode_message,
+        'line': _paircode_line,
+        'display': _paircode_display,
+    }, ensure_ascii=False)
+
+_paircode_error
+`);
+      if (errorJson) {
+        self.postMessage({ type: 'pythonError', error: JSON.parse(errorJson) });
+      }
     } catch (err) {
-      // Pyodide PythonError.message 는 전체 트레이스백을 포함한다 (VS Code 처럼 파일/라인/스택 노출)
+      // 실행기 자체의 오류만 fatal 로 전달한다. 학생 코드 오류는 위 pythonError 로 분리된다.
       const text = err && err.message ? err.message : String(err);
-      self.postMessage({ type: 'stderr', text: text.endsWith('\n') ? text : text + '\n' });
+      self.postMessage({ type: 'fatal', text });
     }
     flushOutput('stdout', stdoutDecoder);
     flushOutput('stderr', stderrDecoder);

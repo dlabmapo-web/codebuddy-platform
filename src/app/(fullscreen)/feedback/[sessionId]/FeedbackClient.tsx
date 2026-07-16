@@ -416,7 +416,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
     return runnerRef.current;
   }, []);
 
-  // 선생님 직접 실행: 채점/전송 없이 순수하게 결과만 확인 (전체 트레이스백 노출)
+  // 선생님 직접 실행: 채점/전송 없이 순수하게 결과만 확인
   const handleTeacherRun = useCallback(async () => {
     if (teacherRunning) return;
     setTerminalOpen(true);
@@ -435,8 +435,8 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const py = pyodide as any;
         py.globals.set('_user_code', codeRef.current);
-        const [stdout, stderr] = await py.runPythonAsync(`
-import sys, io, traceback
+        const [stdout, pythonError] = await py.runPythonAsync(`
+import sys, io, traceback, linecache
 _saved = sys.stdout
 _saved_in = sys.stdin
 _cap = io.StringIO()
@@ -444,17 +444,31 @@ sys.stdout = _cap
 sys.stdin = io.StringIO('')
 _err = ''
 try:
-    exec(compile(_user_code, '<solution>', 'exec'), {'__name__': '__main__'})
-except BaseException:
-    _err = traceback.format_exc()
+    linecache.cache['solution.py'] = (
+        len(_user_code),
+        None,
+        _user_code.splitlines(True),
+        'solution.py',
+    )
+    exec(compile(_user_code, 'solution.py', 'exec'), {'__name__': '__main__'})
+except BaseException as exc:
+    if isinstance(exc, SyntaxError):
+        _err = ''.join(traceback.format_exception_only(type(exc), exc))
+    else:
+        frames = [frame for frame in traceback.extract_tb(exc.__traceback__) if frame.filename == 'solution.py']
+        _err = (
+            'Traceback (most recent call last):\\n'
+            + ''.join(traceback.format_list(frames))
+            + ''.join(traceback.format_exception_only(type(exc), exc))
+        )
 finally:
     sys.stdout = _saved
     sys.stdin = _saved_in
 (_cap.getvalue(), _err)
 `) as [string, string];
         if (stdout) appendTeacher(stdout, 'out');
-        if (stderr) appendTeacher(stderr, 'err');
-        if (!stdout && !stderr) appendTeacher('(출력 없음)\n', 'info');
+        if (pythonError) appendTeacher(pythonError, 'err');
+        if (!stdout && !pythonError) appendTeacher('(출력 없음)\n', 'info');
       } catch (e) {
         appendTeacher((e instanceof Error ? e.message : '실행 오류') + '\n', 'err');
       }
@@ -474,6 +488,7 @@ finally:
       const off = runner.on((ev) => {
         if (ev.type === 'stdout') appendTeacher(ev.text, 'out');
         else if (ev.type === 'stderr') appendTeacher(ev.text, 'err');
+        else if (ev.type === 'pythonError') appendTeacher(ev.error.display, 'err');
         else if (ev.type === 'stdin') setTeacherAwaiting(true);
         else if (ev.type === 'done') finish();
         else if (ev.type === 'fatal') { appendTeacher((ev.text || '실행 오류') + '\n', 'err'); finish(); }

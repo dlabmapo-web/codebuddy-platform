@@ -1,7 +1,10 @@
+import type { PythonExecutionError } from './pythonError';
+
 export type RunnerEvent =
   | { type: 'ready' }
   | { type: 'stdout'; text: string }
   | { type: 'stderr'; text: string }
+  | { type: 'pythonError'; error: PythonExecutionError }
   | { type: 'stdin' }
   | { type: 'done' }
   | { type: 'fatal'; text: string };
@@ -55,7 +58,7 @@ export class InteractiveRunner {
     Atomics.store(this.control, 0, 0);
     Atomics.store(this.control, 1, 0);
     Atomics.store(this.control, 2, 0);
-    this.worker = new Worker('/pyodide-worker.js?v=4');
+    this.worker = new Worker('/pyodide-worker.js?v=5');
     this.worker.onmessage = (e: MessageEvent<RunnerEvent>) => this.handle(e.data);
     this.worker.onerror = (e) => {
       const detail = e.message || (e.filename ? `${e.filename}:${e.lineno}` : '워커를 시작할 수 없습니다');

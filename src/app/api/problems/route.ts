@@ -9,40 +9,59 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q')?.trim() ?? '';
-  const categoryId = searchParams.get('category')?.trim() ?? '';
+  const chapterId = searchParams.get('chapter_id')?.trim() ?? '';
+
+  if (!chapterId) return apiError('챕터를 선택해주세요.', 'INVALID_CHAPTER', 400);
 
   const db = supabaseAdmin();
 
-  const { data: categories, error: catErr } = await db
-    .from('categories')
-    .select('id, title, description, order_no, is_published')
+  const { data: chapter } = await db
+    .from('chapters')
+    .select('id, title, description, order_no, stage_id, is_published')
+    .eq('id', chapterId)
     .eq('is_published', true)
-    .order('order_no', { ascending: true });
+    .maybeSingle();
 
-  if (catErr) return apiError('카테고리 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  if (!chapter) return apiError('챕터를 찾을 수 없습니다.', 'NOT_FOUND', 404);
+
+  const { data: stage } = await db
+    .from('stages')
+    .select('id, title, order_no, subject_id, is_published')
+    .eq('id', chapter.stage_id)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!stage) return apiError('단계를 찾을 수 없습니다.', 'NOT_FOUND', 404);
+
+  const { data: subject } = await db
+    .from('subjects')
+    .select('id, title, order_no, is_published')
+    .eq('id', stage.subject_id)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!subject) return apiError('과목을 찾을 수 없습니다.', 'NOT_FOUND', 404);
 
   let problemQuery = db
     .from('problems')
-    .select('id, problem_no, category_id, order_no, title, difficulty, is_published, created_at')
+    .select('id, problem_no, chapter_id, order_no, title, difficulty, is_published, created_at')
     .eq('is_published', true)
+    .eq('chapter_id', chapterId)
     .order('order_no', { ascending: true });
 
   if (q) problemQuery = problemQuery.ilike('title', `%${q}%`);
-  if (categoryId) problemQuery = problemQuery.eq('category_id', categoryId);
 
   const { data: problems, error } = await problemQuery;
   if (error) return apiError('문제 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
-  const publishedCatIds = new Set((categories ?? []).map((c) => c.id));
-  const visibleProblems = (problems ?? []).filter((p) => p.category_id && publishedCatIds.has(p.category_id));
-
+  const list = problems ?? [];
   const statusMap: Record<string, 'pass' | 'fail' | 'partial'> = {};
-  if (visibleProblems.length > 0) {
+  if (list.length > 0) {
     const { data: submissions } = await db
       .from('submissions')
       .select('problem_id, status')
       .eq('user_id', user.id)
-      .in('problem_id', visibleProblems.map((p) => p.id));
+      .in('problem_id', list.map((p) => p.id));
 
     for (const s of submissions ?? []) {
       const prev = statusMap[s.problem_id];
@@ -50,31 +69,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const byCategory: Record<string, typeof visibleProblems> = {};
-  for (const p of visibleProblems) {
-    (byCategory[p.category_id!] ??= []).push(p);
-  }
-
-  const result = (categories ?? [])
-    .map((c, idx) => ({
-      id: c.id,
-      title: c.title,
-      description: c.description,
-      order_no: c.order_no,
-      level_no: idx + 1,
-      problems: (byCategory[c.id] ?? []).map((p, pIdx) => {
-        const best = statusMap[p.id];
-        return {
-          id: p.id,
-          problem_no: p.problem_no,
-          title: p.title,
-          difficulty: p.difficulty,
-          sub_no: pIdx + 1,
-          solve_status: best === 'pass' ? 'solved' : best ? 'tried' : 'unsolved',
-        };
-      }),
-    }))
-    .filter((c) => c.problems.length > 0);
-
-  return apiOk({ categories: result });
+  return apiOk({
+    subject,
+    stage,
+    chapter,
+    problems: list.map((p, pIdx) => {
+      const best = statusMap[p.id];
+      return {
+        id: p.id,
+        problem_no: p.problem_no,
+        order_no: p.order_no,
+        title: p.title,
+        difficulty: p.difficulty,
+        sub_no: pIdx + 1,
+        solve_status: best === 'pass' ? 'solved' : best ? 'tried' : 'unsolved',
+      };
+    }),
+  });
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Clock, MinusCircle, BookOpen, Trophy, Target } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, MinusCircle, BookOpen, Trophy, Target, Layers3, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ProblemDifficulty } from '@/lib/types/db';
 
@@ -16,8 +16,46 @@ type Submission = {
   runtime_ms: number | null;
   elapsed_sec: number | null;
   submitted_at: string;
-  problems: { problem_no: number; title: string; difficulty: ProblemDifficulty } | null;
+  problems: ProblemRef | ProblemRef[] | null;
 };
+
+type SubjectRef = { id: string; title: string; order_no: number };
+type StageRef = {
+  id: string;
+  title: string;
+  order_no: number;
+  subject_id: string;
+  subjects: SubjectRef | SubjectRef[] | null;
+};
+type ChapterRef = {
+  id: string;
+  title: string;
+  order_no: number;
+  stage_id: string;
+  stages: StageRef | StageRef[] | null;
+};
+type ProblemRef = {
+  problem_no: number;
+  title: string;
+  difficulty: ProblemDifficulty;
+  order_no: number;
+  chapter_id: string | null;
+  chapters: ChapterRef | ChapterRef[] | null;
+};
+type CurriculumOption = { id: string; title: string; order_no: number };
+
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function curriculumOf(submission: Submission) {
+  const problem = one(submission.problems);
+  const chapter = one(problem?.chapters);
+  const stage = one(chapter?.stages);
+  const subject = one(stage?.subjects);
+  return { problem, chapter, stage, subject };
+}
 
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_COLOR: Record<ProblemDifficulty, { bg: string; color: string }> = {
@@ -51,7 +89,7 @@ function formatDate(iso: string) {
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color?: string }) {
   return (
     <div className="bg-white rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
-      <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 52, height: 52, backgroundColor: '#F6F7F9' }}>
+      <div className="rounded-2xl flex items-center justify-center shrink-0" style={{ width: 52, height: 52, backgroundColor: '#F6F7F9' }}>
         {icon}
       </div>
       <div>
@@ -81,6 +119,9 @@ export default function MyHistoryPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pass' | 'fail'>('all');
+  const [subjectId, setSubjectId] = useState('');
+  const [stageId, setStageId] = useState('');
+  const [chapterId, setChapterId] = useState('');
 
   useEffect(() => {
     fetch('/api/submissions')
@@ -89,9 +130,52 @@ export default function MyHistoryPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'all' ? submissions : submissions.filter((s) =>
-    filter === 'pass' ? s.status === 'pass' : s.status !== 'pass'
-  );
+  const curriculumOptions = useMemo(() => {
+    const subjects = new Map<string, CurriculumOption>();
+    const stages = new Map<string, CurriculumOption & { subject_id: string }>();
+    const chapters = new Map<string, CurriculumOption & { stage_id: string }>();
+
+    for (const submission of submissions) {
+      const curriculum = curriculumOf(submission);
+      if (curriculum.subject) subjects.set(curriculum.subject.id, curriculum.subject);
+      if (curriculum.stage) {
+        stages.set(curriculum.stage.id, {
+          id: curriculum.stage.id,
+          title: curriculum.stage.title,
+          order_no: curriculum.stage.order_no,
+          subject_id: curriculum.stage.subject_id,
+        });
+      }
+      if (curriculum.chapter) {
+        chapters.set(curriculum.chapter.id, {
+          id: curriculum.chapter.id,
+          title: curriculum.chapter.title,
+          order_no: curriculum.chapter.order_no,
+          stage_id: curriculum.chapter.stage_id,
+        });
+      }
+    }
+
+    return {
+      subjects: Array.from(subjects.values()).sort((a, b) => a.order_no - b.order_no),
+      stages: Array.from(stages.values())
+        .filter((stage) => !subjectId || stage.subject_id === subjectId)
+        .sort((a, b) => a.order_no - b.order_no),
+      chapters: Array.from(chapters.values())
+        .filter((chapter) => !stageId || chapter.stage_id === stageId)
+        .sort((a, b) => a.order_no - b.order_no),
+    };
+  }, [submissions, subjectId, stageId]);
+
+  const filtered = useMemo(() => submissions.filter((submission) => {
+    if (filter === 'pass' && submission.status !== 'pass') return false;
+    if (filter === 'fail' && submission.status === 'pass') return false;
+    const curriculum = curriculumOf(submission);
+    if (subjectId && curriculum.subject?.id !== subjectId) return false;
+    if (stageId && curriculum.stage?.id !== stageId) return false;
+    if (chapterId && curriculum.chapter?.id !== chapterId) return false;
+    return true;
+  }), [submissions, filter, subjectId, stageId, chapterId]);
 
   const totalAttempts = submissions.length;
   const solvedProblems = new Set(submissions.filter((s) => s.status === 'pass').map((s) => s.problem_id)).size;
@@ -104,7 +188,7 @@ export default function MyHistoryPage() {
         <p style={{ fontSize: '15px', color: '#5A6270', marginTop: 3 }}>지금까지 풀었던 문제들을 확인해보세요.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard icon={<BookOpen size={24} style={{ color: '#1B64DA' }} />} label="총 제출 횟수" value={`${totalAttempts}회`} />
         <StatCard icon={<Trophy size={24} style={{ color: '#15803D' }} />} label="해결한 문제" value={`${solvedProblems}개`} color="#15803D" />
         <StatCard icon={<Target size={24} style={{ color: '#D97706' }} />} label="정답률" value={`${correctRate}%`} />
@@ -136,6 +220,62 @@ export default function MyHistoryPage() {
         )}
       </div>
 
+      <section className="rounded-2xl bg-white p-4" style={{ border: '1px solid #E5E8EC' }}>
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-light text-primary">
+            <Layers3 size={16} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>학습 경로 필터</h2>
+            <p style={{ fontSize: '11px', color: '#8A8F98', marginTop: 1 }}>과목·단계·챕터별 풀이기록을 확인하세요.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select
+            value={subjectId}
+            onChange={(event) => {
+              setSubjectId(event.target.value);
+              setStageId('');
+              setChapterId('');
+            }}
+            className="h-10 rounded-xl px-3 outline-none"
+            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+          >
+            <option value="">전체 과목</option>
+            {curriculumOptions.subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>{subject.order_no}. {subject.title}</option>
+            ))}
+          </select>
+          <select
+            value={stageId}
+            disabled={!subjectId}
+            onChange={(event) => {
+              setStageId(event.target.value);
+              setChapterId('');
+            }}
+            className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
+            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+          >
+            <option value="">전체 단계</option>
+            {curriculumOptions.stages.map((stage) => (
+              <option key={stage.id} value={stage.id}>{stage.order_no}. {stage.title}</option>
+            ))}
+          </select>
+          <select
+            value={chapterId}
+            disabled={!stageId}
+            onChange={(event) => setChapterId(event.target.value)}
+            className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
+            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+          >
+            <option value="">전체 챕터</option>
+            {curriculumOptions.chapters.map((chapter) => (
+              <option key={chapter.id} value={chapter.id}>{chapter.order_no}. {chapter.title}</option>
+            ))}
+          </select>
+        </div>
+      </section>
+
       <div className="flex flex-col gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
@@ -155,8 +295,9 @@ export default function MyHistoryPage() {
         ) : (
           filtered.map((s) => {
             const st = STATUS_INFO[s.status];
-            const diff = s.problems?.difficulty ? DIFF_COLOR[s.problems.difficulty] : null;
-            const href = s.problems ? `/problems/${s.problem_id}?sid=${s.id}` : null;
+            const { problem, chapter, stage, subject } = curriculumOf(s);
+            const diff = problem?.difficulty ? DIFF_COLOR[problem.difficulty] : null;
+            const href = problem ? `/problems/${s.problem_id}?sid=${s.id}` : null;
 
             return (
               <div
@@ -172,7 +313,7 @@ export default function MyHistoryPage() {
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E8EC'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <div
-                  className="rounded-2xl flex items-center justify-center flex-shrink-0"
+                  className="rounded-2xl flex items-center justify-center shrink-0"
                   style={{ width: 52, height: 52, backgroundColor: st.bg }}
                 >
                   <st.Icon size={26} style={{ color: st.color }} />
@@ -180,21 +321,32 @@ export default function MyHistoryPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
-                    {s.problems ? (
+                    {problem ? (
                       <>
-                        <span style={{ fontSize: '13px', color: '#BCC0C7', flexShrink: 0 }}>{s.problems.problem_no}번</span>
-                        <span style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }} className="truncate group-hover:text-[#1B64DA] transition-colors">
-                          {s.problems.title}
+                        <span style={{ fontSize: '13px', color: '#BCC0C7', flexShrink: 0 }}>
+                          {chapter ? `${chapter.order_no}-${problem.order_no}` : `${problem.problem_no}번`}
+                        </span>
+                        <span style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }} className="truncate group-hover:text-primary transition-colors">
+                          {problem.title}
                         </span>
                       </>
                     ) : (
                       <span style={{ fontSize: '15px', color: '#BCC0C7' }}>삭제된 문제</span>
                     )}
                   </div>
+                  {subject && stage && chapter && (
+                    <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden" style={{ fontSize: '11px', color: '#8A8F98' }}>
+                      <span className="truncate">{subject.title}</span>
+                      <ChevronRight size={10} className="shrink-0" />
+                      <span className="truncate">{stage.title}</span>
+                      <ChevronRight size={10} className="shrink-0" />
+                      <span className="truncate">{chapter.title}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 flex-wrap">
-                    {diff && s.problems && (
+                    {diff && problem && (
                       <span className="px-2.5 py-0.5 rounded-lg" style={{ fontSize: '12px', fontWeight: 700, backgroundColor: diff.bg, color: diff.color }}>
-                        {DIFF_LABEL[s.problems.difficulty]}
+                        {DIFF_LABEL[problem.difficulty]}
                       </span>
                     )}
                     <span style={{ fontSize: '13px', fontWeight: 700, color: st.color }}>{st.label}</span>
@@ -213,7 +365,7 @@ export default function MyHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex-shrink-0 text-right">
+                <div className="shrink-0 text-right">
                   <div style={{ fontSize: '16px', fontWeight: 700, color: st.color }}>
                     {st.label}
                   </div>

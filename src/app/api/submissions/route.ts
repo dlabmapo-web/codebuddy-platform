@@ -17,7 +17,20 @@ export async function GET(req: NextRequest) {
   if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
     let query = db
       .from('submissions')
-      .select('id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at, problems(problem_no, title, difficulty), users(id, name, username)')
+      .select(`
+        id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at,
+        problems(
+          problem_no, title, difficulty, order_no, chapter_id,
+          chapters(
+            id, title, order_no, stage_id,
+            stages(
+              id, title, order_no, subject_id,
+              subjects(id, title, order_no)
+            )
+          )
+        ),
+        users(id, name, username)
+      `)
       .eq('user_id', studentId)
       .order('submitted_at', { ascending: false });
 
@@ -30,7 +43,19 @@ export async function GET(req: NextRequest) {
 
   let query = db
     .from('submissions')
-    .select('id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at, problems(problem_no, title, difficulty)')
+    .select(`
+      id, problem_id, code, status, score, passed_count, total_count, runtime_ms, elapsed_sec, submitted_at,
+      problems(
+        problem_no, title, difficulty, order_no, chapter_id,
+        chapters(
+          id, title, order_no, stage_id,
+          stages(
+            id, title, order_no, subject_id,
+            subjects(id, title, order_no)
+          )
+        )
+      )
+    `)
     .eq('user_id', user.id)
     .order('submitted_at', { ascending: false });
 

@@ -1,17 +1,22 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
+import { NextRequest } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
   if (user.role !== 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const db = supabaseAdmin();
-  const { data, error } = await db
+  const chapterId = req.nextUrl.searchParams.get('chapter_id')?.trim();
+  let query = db
     .from('problems')
-    .select('id, problem_no, category_id, order_no, title, difficulty, is_published, use_ai_feedback, created_at')
+    .select('id, problem_no, chapter_id, order_no, title, difficulty, is_published, use_ai_feedback, created_at')
     .order('order_no', { ascending: true });
+  if (chapterId) query = query.eq('chapter_id', chapterId);
+
+  const { data, error } = await query;
 
   if (error) return apiError('문제 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
@@ -26,7 +31,22 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body) return apiError('잘못된 요청입니다.', 'BAD_REQUEST', 400);
 
-  const { title, difficulty, description, input_format, output_format, constraint_text, starter_code, time_limit_ms, memory_limit_mb, is_published, use_ai_feedback, category_id, test_cases, hints } = body as {
+  const {
+    title,
+    difficulty,
+    description,
+    input_format,
+    output_format,
+    constraint_text,
+    starter_code,
+    time_limit_ms,
+    memory_limit_mb,
+    is_published,
+    use_ai_feedback,
+    chapter_id,
+    test_cases,
+    hints,
+  } = body as {
     title: string;
     difficulty: string;
     description: string;
@@ -38,7 +58,7 @@ export async function POST(req: Request) {
     memory_limit_mb?: number;
     is_published?: boolean;
     use_ai_feedback?: boolean;
-    category_id?: string | null;
+    chapter_id?: string | null;
     test_cases?: Array<{ input: string; expected_output: string; is_sample: boolean; is_hidden: boolean; order_no: number }>;
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
   };
@@ -46,7 +66,7 @@ export async function POST(req: Request) {
   if (!title?.trim()) return apiError('문제 제목을 입력해주세요.', 'INVALID_TITLE', 400);
   if (!['easy', 'medium', 'hard'].includes(difficulty)) return apiError('올바른 난이도를 선택해주세요.', 'INVALID_DIFFICULTY', 400);
   if (!description?.trim()) return apiError('문제 설명을 입력해주세요.', 'INVALID_DESCRIPTION', 400);
-  if (!category_id) return apiError('카테고리를 선택해주세요.', 'INVALID_CATEGORY', 400);
+  if (!chapter_id) return apiError('챕터를 선택해주세요.', 'INVALID_CHAPTER', 400);
 
   const db = supabaseAdmin();
 
@@ -60,7 +80,7 @@ export async function POST(req: Request) {
   const { data: maxOrder } = await db
     .from('problems')
     .select('order_no')
-    .eq('category_id', category_id)
+    .eq('chapter_id', chapter_id)
     .order('order_no', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -71,7 +91,7 @@ export async function POST(req: Request) {
     .from('problems')
     .insert({
       problem_no: nextNo,
-      category_id,
+      chapter_id,
       order_no: (maxOrder?.order_no ?? 0) + 1,
       title: title.trim(),
       difficulty,

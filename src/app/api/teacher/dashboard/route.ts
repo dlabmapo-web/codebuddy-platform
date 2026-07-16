@@ -3,6 +3,8 @@ import { apiError, apiOk } from '@/lib/api/response';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type {
   AiErrorCategoryPoint,
+  ChapterPerformancePoint,
+  CurriculumFilterOption,
   DashboardRange,
   ProblemPerformancePoint,
   StudentActivityPoint,
@@ -32,11 +34,34 @@ type SubmissionRow = {
   submitted_at: string;
 };
 
+type SubjectEmbed = { id: string; title: string; order_no: number };
+type StageEmbed = {
+  id: string;
+  title: string;
+  order_no: number;
+  subject_id: string;
+  subjects: SubjectEmbed | SubjectEmbed[] | null;
+};
+type ChapterEmbed = {
+  id: string;
+  title: string;
+  order_no: number;
+  stage_id: string;
+  stages: StageEmbed | StageEmbed[] | null;
+};
 type ProblemRow = {
   id: string;
   problem_no: number;
   title: string;
+  order_no: number;
+  chapter_id: string | null;
+  chapters: ChapterEmbed | ChapterEmbed[] | null;
 };
+
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 type AiFeedbackRow = {
   ai_feedback_patterns:
@@ -93,12 +118,24 @@ function buildTrend(submissions: SubmissionRow[], range: DashboardRange, now: Da
   return Array.from(buckets.values()).sort((a, b) => a.period.localeCompare(b.period));
 }
 
+function curriculumOf(problem: ProblemRow) {
+  const chapter = one(problem.chapters);
+  const stage = one(chapter?.stages);
+  const subject = one(stage?.subjects);
+  if (!chapter || !stage || !subject) return null;
+  return { chapter, stage, subject };
+}
+
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
   if (user.role !== 'teacher') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
-  const range = parseRange(new URL(req.url).searchParams.get('range'));
+  const url = new URL(req.url);
+  const range = parseRange(url.searchParams.get('range'));
+  const filterSubjectId = url.searchParams.get('subject_id')?.trim() || null;
+  const filterStageId = url.searchParams.get('stage_id')?.trim() || null;
+  const filterChapterId = url.searchParams.get('chapter_id')?.trim() || null;
   const now = new Date();
   const from = rangeStart(range, now);
   const db = supabaseAdmin();
@@ -125,10 +162,52 @@ export async function GET(req: Request) {
 
   const students = (studentData ?? []) as StudentRow[];
   const studentIds = students.map((student) => student.id);
+
+  const { data: subjectRows } = await db
+    .from('subjects')
+    .select('id, title, order_no')
+    .eq('is_published', true)
+    .order('order_no', { ascending: true });
+
+  let stageQuery = db
+    .from('stages')
+    .select('id, title, order_no, subject_id')
+    .eq('is_published', true)
+    .order('order_no', { ascending: true });
+  if (filterSubjectId) stageQuery = stageQuery.eq('subject_id', filterSubjectId);
+
+  const { data: stageRows } = await stageQuery;
+
+  let chapterQuery = db
+    .from('chapters')
+    .select('id, title, order_no, stage_id')
+    .eq('is_published', true)
+    .order('order_no', { ascending: true });
+  if (filterStageId) {
+    chapterQuery = chapterQuery.eq('stage_id', filterStageId);
+  } else if (filterSubjectId) {
+    const stageIds = (stageRows ?? []).map((s) => s.id);
+    if (stageIds.length === 0) {
+      chapterQuery = chapterQuery.eq('stage_id', '00000000-0000-0000-0000-000000000000');
+    } else {
+      chapterQuery = chapterQuery.in('stage_id', stageIds);
+    }
+  }
+
+  const { data: chapterRows } = await chapterQuery;
+
+  const curriculum = {
+    subjects: (subjectRows ?? []) as CurriculumFilterOption[],
+    stages: (stageRows ?? []) as CurriculumFilterOption[],
+    chapters: (chapterRows ?? []) as CurriculumFilterOption[],
+  };
+
   const empty: TeacherDashboardData = {
     range,
+    filters: { subjectId: filterSubjectId, stageId: filterStageId, chapterId: filterChapterId },
+    curriculum,
     summary: {
-      totalStudents: 0,
+      totalStudents: students.length,
       totalSubmissions: 0,
       totalWrongAnswers: 0,
       solvedProblemPairs: 0,
@@ -136,12 +215,40 @@ export async function GET(req: Request) {
     },
     submissionTrend: [],
     problemPerformance: [],
+    chapterPerformance: [],
     studentActivity: [],
     aiErrorCategories: [],
     studentsNeedingHelp: [],
   };
 
   if (studentIds.length === 0) return apiOk({ ...empty });
+
+  const { data: problemData, error: problemError } = await db
+    .from('problems')
+    .select(`
+      id, problem_no, title, order_no, chapter_id,
+      chapters (
+        id, title, order_no, stage_id,
+        stages (
+          id, title, order_no, subject_id,
+          subjects ( id, title, order_no )
+        )
+      )
+    `)
+    .eq('is_published', true);
+
+  if (problemError) return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+
+  const allProblems = (problemData ?? []) as unknown as ProblemRow[];
+  const filteredProblems = allProblems.filter((problem) => {
+    const cur = curriculumOf(problem);
+    if (!cur) return false;
+    if (filterSubjectId && cur.subject.id !== filterSubjectId) return false;
+    if (filterStageId && cur.stage.id !== filterStageId) return false;
+    if (filterChapterId && cur.chapter.id !== filterChapterId) return false;
+    return true;
+  });
+  const filteredProblemIds = new Set(filteredProblems.map((p) => p.id));
 
   let submissionQuery = db
     .from('submissions')
@@ -157,18 +264,14 @@ export async function GET(req: Request) {
     aiFeedbackQuery = aiFeedbackQuery.gte('created_at', from);
   }
 
-  const [submissionResult, problemResult, aiFeedbackResult] = await Promise.all([
-    submissionQuery,
-    db.from('problems').select('id, problem_no, title').eq('is_published', true),
-    aiFeedbackQuery,
-  ]);
+  const [submissionResult, aiFeedbackResult] = await Promise.all([submissionQuery, aiFeedbackQuery]);
 
   if (submissionResult.error) return apiError('제출 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-  if (problemResult.error) return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
   if (aiFeedbackResult.error) return apiError('AI 피드백 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
-  const submissions = (submissionResult.data ?? []) as SubmissionRow[];
-  const problems = (problemResult.data ?? []) as ProblemRow[];
+  const submissions = ((submissionResult.data ?? []) as SubmissionRow[])
+    .filter((s) => filteredProblemIds.has(s.problem_id));
+  const problems = filteredProblems;
   const aiFeedbacks = (aiFeedbackResult.data ?? []) as AiFeedbackRow[];
   const studentMap = new Map(students.map((student) => [student.id, student]));
   const problemMap = new Map(problems.map((problem) => [problem.id, problem]));
@@ -240,12 +343,29 @@ export async function GET(req: Request) {
   const problemPerformance: ProblemPerformancePoint[] = Array.from(problemStats.entries())
     .map(([problemId, stat]) => {
       const problem = problemMap.get(problemId);
+      const cur = problem ? curriculumOf(problem) : null;
       const attemptedStudents = stat.attempted.size;
       const solvedStudents = stat.solved.size;
+      const chapterOrder = cur?.chapter.order_no;
+      const problemOrder = problem?.order_no;
+      const shortLabel = chapterOrder != null && problemOrder != null
+        ? `${chapterOrder}-${problemOrder}. ${problem?.title ?? '삭제된 문제'}`
+        : problem ? `${problem.problem_no}. ${problem.title}` : '삭제된 문제';
+      const pathLabel = cur
+        ? `${cur.subject.title} / ${cur.stage.title} / ${cur.chapter.title}`
+        : '';
       return {
         problemId,
-        label: problem ? `${problem.problem_no}. ${problem.title}` : '삭제된 문제',
+        label: shortLabel,
         title: problem?.title ?? '삭제된 문제',
+        pathLabel,
+        subjectId: cur?.subject.id ?? null,
+        subjectTitle: cur?.subject.title ?? null,
+        stageId: cur?.stage.id ?? null,
+        stageTitle: cur?.stage.title ?? null,
+        chapterId: cur?.chapter.id ?? null,
+        chapterTitle: cur?.chapter.title ?? null,
+        chapterOrderNo: cur?.chapter.order_no ?? null,
         attemptedStudents,
         solvedStudents,
         solveRate: attemptedStudents > 0 ? Math.round((solvedStudents / attemptedStudents) * 100) : 0,
@@ -258,6 +378,67 @@ export async function GET(req: Request) {
       const bReliable = b.attemptedStudents >= 3 ? 1 : 0;
       return bReliable - aReliable || a.solveRate - b.solveRate || b.submissionCount - a.submissionCount;
     })
+    .slice(0, 8);
+
+  const chapterAgg = new Map<string, {
+    chapterId: string;
+    subjectTitle: string;
+    stageTitle: string;
+    chapterTitle: string;
+    chapterOrder: number;
+    submissions: number;
+    wrong: number;
+    attempted: Set<string>;
+    solved: Set<string>;
+    problemIds: Set<string>;
+  }>();
+
+  for (const problem of problems) {
+    const cur = curriculumOf(problem);
+    if (!cur) continue;
+    const agg = chapterAgg.get(cur.chapter.id) ?? {
+      chapterId: cur.chapter.id,
+      subjectTitle: cur.subject.title,
+      stageTitle: cur.stage.title,
+      chapterTitle: cur.chapter.title,
+      chapterOrder: cur.chapter.order_no,
+      submissions: 0,
+      wrong: 0,
+      attempted: new Set<string>(),
+      solved: new Set<string>(),
+      problemIds: new Set<string>(),
+    };
+    agg.problemIds.add(problem.id);
+    const pStat = problemStats.get(problem.id);
+    if (pStat) {
+      agg.submissions += pStat.submissions;
+      agg.wrong += pStat.wrong;
+      for (const uid of pStat.attempted) agg.attempted.add(uid);
+      for (const uid of pStat.solved) agg.solved.add(uid);
+    }
+    chapterAgg.set(cur.chapter.id, agg);
+  }
+
+  const chapterPerformance: ChapterPerformancePoint[] = Array.from(chapterAgg.values())
+    .map((agg) => {
+      const attemptedStudents = agg.attempted.size;
+      const solvedStudents = agg.solved.size;
+      return {
+        chapterId: agg.chapterId,
+        label: `${agg.chapterOrder}. ${agg.chapterTitle}`,
+        subjectTitle: agg.subjectTitle,
+        stageTitle: agg.stageTitle,
+        chapterTitle: agg.chapterTitle,
+        attemptedStudents,
+        solvedStudents,
+        solveRate: attemptedStudents > 0 ? Math.round((solvedStudents / attemptedStudents) * 100) : 0,
+        submissionCount: agg.submissions,
+        wrongAnswerCount: agg.wrong,
+        problemCount: agg.problemIds.size,
+      };
+    })
+    .filter((c) => c.submissionCount > 0)
+    .sort((a, b) => a.solveRate - b.solveRate || b.wrongAnswerCount - a.wrongAnswerCount)
     .slice(0, 8);
 
   const categoryCounts = new Map<string, number>();
@@ -294,6 +475,8 @@ export async function GET(req: Request) {
 
   const response: TeacherDashboardData = {
     range,
+    filters: { subjectId: filterSubjectId, stageId: filterStageId, chapterId: filterChapterId },
+    curriculum,
     summary: {
       totalStudents: students.length,
       totalSubmissions: submissions.length,
@@ -303,6 +486,7 @@ export async function GET(req: Request) {
     },
     submissionTrend: buildTrend(submissions, range, now),
     problemPerformance,
+    chapterPerformance,
     studentActivity,
     aiErrorCategories,
     studentsNeedingHelp,

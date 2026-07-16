@@ -56,7 +56,7 @@ export async function PATCH(req: Request, { params }: Params) {
     memory_limit_mb?: number;
     is_published?: boolean;
     use_ai_feedback?: boolean;
-    category_id?: string;
+    chapter_id?: string;
     order_no?: number;
     test_cases?: Array<{ input: string; expected_output: string; is_sample: boolean; is_hidden: boolean; order_no: number }>;
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
@@ -76,7 +76,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (fields.memory_limit_mb !== undefined) updateFields.memory_limit_mb = fields.memory_limit_mb;
   if (fields.is_published !== undefined) updateFields.is_published = fields.is_published;
   if (fields.use_ai_feedback !== undefined) updateFields.use_ai_feedback = fields.use_ai_feedback;
-  if (fields.category_id !== undefined) updateFields.category_id = fields.category_id;
+  if (fields.chapter_id !== undefined) updateFields.chapter_id = fields.chapter_id;
   if (fields.order_no !== undefined) updateFields.order_no = fields.order_no;
 
   if (Object.keys(updateFields).length > 0) {

@@ -19,11 +19,41 @@ export interface ProblemPerformancePoint {
   problemId: string;
   label: string;
   title: string;
+  pathLabel: string;
+  subjectId: string | null;
+  subjectTitle: string | null;
+  stageId: string | null;
+  stageTitle: string | null;
+  chapterId: string | null;
+  chapterTitle: string | null;
+  chapterOrderNo: number | null;
   attemptedStudents: number;
   solvedStudents: number;
   solveRate: number;
   submissionCount: number;
   wrongAnswerCount: number;
+}
+
+export interface ChapterPerformancePoint {
+  chapterId: string;
+  label: string;
+  subjectTitle: string;
+  stageTitle: string;
+  chapterTitle: string;
+  attemptedStudents: number;
+  solvedStudents: number;
+  solveRate: number;
+  submissionCount: number;
+  wrongAnswerCount: number;
+  problemCount: number;
+}
+
+export interface CurriculumFilterOption {
+  id: string;
+  title: string;
+  order_no: number;
+  subject_id?: string;
+  stage_id?: string;
 }
 
 export interface StudentActivityPoint {
@@ -53,9 +83,20 @@ export interface StudentNeedingHelp {
 
 export interface TeacherDashboardData {
   range: DashboardRange;
+  filters: {
+    subjectId: string | null;
+    stageId: string | null;
+    chapterId: string | null;
+  };
+  curriculum: {
+    subjects: CurriculumFilterOption[];
+    stages: CurriculumFilterOption[];
+    chapters: CurriculumFilterOption[];
+  };
   summary: TeacherDashboardSummary;
   submissionTrend: SubmissionTrendPoint[];
   problemPerformance: ProblemPerformancePoint[];
+  chapterPerformance: ChapterPerformancePoint[];
   studentActivity: StudentActivityPoint[];
   aiErrorCategories: AiErrorCategoryPoint[];
   studentsNeedingHelp: StudentNeedingHelp[];

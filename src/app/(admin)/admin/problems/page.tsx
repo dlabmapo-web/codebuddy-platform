@@ -2,9 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, X, Check, HelpCircle } from 'lucide-react';
+import {
+  Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, ChevronRight,
+  X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers, Sparkles, FileSpreadsheet,
+} from 'lucide-react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { CurriculumExcelImportModal } from '@/components/admin/CurriculumExcelImportModal';
 
 const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
   ssr: false,
@@ -20,7 +24,16 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
-type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'title' | 'difficulty' | 'is_published' | 'created_at'>;
+type ProblemRow = Pick<DbProblem, 'id' | 'problem_no' | 'chapter_id' | 'order_no' | 'title' | 'difficulty' | 'is_published' | 'use_ai_feedback' | 'created_at'>;
+
+type HierarchyRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  order_no: number;
+  is_published: boolean;
+  child_count?: number;
+};
 
 type TestCaseForm = {
   input: string;
@@ -37,6 +50,7 @@ type HintForm = {
 };
 
 type ProblemForm = {
+  chapter_id: string;
   title: string;
   difficulty: ProblemDifficulty;
   description: string;
@@ -45,11 +59,16 @@ type ProblemForm = {
   constraint_text: string;
   starter_code: string;
   is_published: boolean;
+  use_ai_feedback: boolean;
   test_cases: TestCaseForm[];
   hints: HintForm[];
 };
 
+type NavLevel = 'subjects' | 'stages' | 'chapters' | 'problems';
+type HierarchyKind = 'subject' | 'stage' | 'chapter';
+
 const EMPTY_FORM: ProblemForm = {
+  chapter_id: '',
   title: '',
   difficulty: 'easy',
   description: '',
@@ -58,6 +77,7 @@ const EMPTY_FORM: ProblemForm = {
   constraint_text: '',
   starter_code: '',
   is_published: false,
+  use_ai_feedback: false,
   test_cases: [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
   hints: [],
 };
@@ -67,6 +87,12 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
   medium: { bg: '#EAF1FD', color: '#1450B5' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
+};
+
+const KIND_LABEL: Record<HierarchyKind, string> = {
+  subject: '과목',
+  stage: '단계',
+  chapter: '챕터',
 };
 
 function Tooltip({ text, direction = 'right' }: { text: string; direction?: 'right' | 'left' }) {
@@ -110,8 +136,6 @@ function DeleteConfirmModal({ title, onConfirm, onCancel }: { title: string; onC
             onClick={onConfirm}
             className="flex-1 rounded-lg text-white transition-colors"
             style={{ height: 40, backgroundColor: '#DC2626', fontSize: '14px', fontWeight: 600 }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#B91C1C')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#DC2626')}
           >
             삭제
           </button>
@@ -121,8 +145,104 @@ function DeleteConfirmModal({ title, onConfirm, onCancel }: { title: string; onC
   );
 }
 
+function HierarchyModal({
+  kind, initial, defaultOrderNo, onSave, onClose, saving,
+}: {
+  kind: HierarchyKind;
+  initial: { title: string; description: string; is_published: boolean; order_no: number } | null;
+  defaultOrderNo: number;
+  onSave: (data: { title: string; description: string; is_published: boolean; order_no: number }) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [isPublished, setIsPublished] = useState(initial?.is_published ?? true);
+  const [orderNo, setOrderNo] = useState(String(initial?.order_no ?? defaultOrderNo));
+  const label = KIND_LABEL[kind];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#16181D', marginBottom: 4 }}>
+          {initial ? `${label} 수정` : `새 ${label}`}
+        </h3>
+        <p style={{ fontSize: '13px', color: '#8A8F98', marginBottom: 18 }}>
+          번호와 이름을 입력하세요.
+        </p>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>{label} 번호 <span style={{ color: '#DC2626' }}>*</span></label>
+            <input
+              type="number"
+              min={1}
+              className="w-full px-3 rounded-lg focus:outline-none"
+              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              value={orderNo}
+              onChange={(e) => setOrderNo(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>{label} 이름 <span style={{ color: '#DC2626' }}>*</span></label>
+            <input
+              autoFocus
+              className="w-full px-3 rounded-lg focus:outline-none"
+              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              placeholder={`예) ${kind === 'subject' ? '파이썬' : kind === 'stage' ? '1단계' : '변수와 입출력'}`}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>설명 (선택)</label>
+            <textarea
+              className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
+              style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
+              rows={2}
+              placeholder={`이 ${label}에 대한 간단한 설명`}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
+            <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="w-4 h-4 accent-primary" />
+            <span style={{ fontSize: '14px', color: '#16181D' }}>학생에게 공개</span>
+            <span style={{ fontSize: '12px', color: '#8A8F98' }}>(끄면 하위도 함께 숨겨집니다)</span>
+          </label>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <button onClick={onClose} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+          <button
+            onClick={() => onSave({
+              title,
+              description,
+              is_published: isPublished,
+              order_no: Math.max(1, Number(orderNo) || defaultOrderNo),
+            })}
+            disabled={saving || !title.trim()}
+            className="flex-1 rounded-xl text-white transition-colors disabled:opacity-50"
+            style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+          >
+            {saving ? '저장 중...' : initial ? '수정' : '추가'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminProblemsPage() {
+  const [level, setLevel] = useState<NavLevel>('subjects');
+  const [subjects, setSubjects] = useState<HierarchyRow[]>([]);
+  const [stages, setStages] = useState<HierarchyRow[]>([]);
+  const [chapters, setChapters] = useState<HierarchyRow[]>([]);
   const [problems, setProblems] = useState<ProblemRow[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<HierarchyRow | null>(null);
+  const [selectedStage, setSelectedStage] = useState<HierarchyRow | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<HierarchyRow | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [panelMode, setPanelMode] = useState<'closed' | 'create' | 'edit'>('closed');
   const [editId, setEditId] = useState<string | null>(null);
@@ -132,23 +252,65 @@ export default function AdminProblemsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'err' } | null>(null);
   const [expandedSection, setExpandedSection] = useState<'basic' | 'starter' | 'testcases' | 'hints'>('basic');
 
+  const [hierModal, setHierModal] = useState<{
+    kind: HierarchyKind;
+    mode: 'create' | 'edit';
+    id?: string;
+    title: string;
+    description: string;
+    is_published: boolean;
+    order_no: number;
+  } | null>(null);
+  const [hierSaving, setHierSaving] = useState(false);
+  const [deleteHierTarget, setDeleteHierTarget] = useState<{ kind: HierarchyKind; row: HierarchyRow } | null>(null);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
+
   const showToast = (message: string, type: 'ok' | 'err') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchProblems = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch('/api/admin/problems');
+  const loadSubjects = useCallback(async () => {
+    const res = await fetch('/api/admin/subjects');
     const json = await res.json();
-    setProblems(json.problems ?? []);
-    setLoading(false);
+    setSubjects((json.subjects ?? []).map((s: HierarchyRow & { stage_count?: number }) => ({
+      ...s,
+      child_count: s.stage_count ?? 0,
+    })));
   }, []);
 
-  useEffect(() => { fetchProblems(); }, [fetchProblems]);
+  const loadStages = useCallback(async (subjectId: string) => {
+    const res = await fetch(`/api/admin/stages?subject_id=${subjectId}`);
+    const json = await res.json();
+    setStages((json.stages ?? []).map((s: HierarchyRow & { chapter_count?: number }) => ({
+      ...s,
+      child_count: s.chapter_count ?? 0,
+    })));
+  }, []);
+
+  const loadChapters = useCallback(async (stageId: string) => {
+    const res = await fetch(`/api/admin/chapters?stage_id=${stageId}`);
+    const json = await res.json();
+    setChapters((json.chapters ?? []).map((c: HierarchyRow & { problem_count?: number }) => ({
+      ...c,
+      child_count: c.problem_count ?? 0,
+    })));
+  }, []);
+
+  const loadProblems = useCallback(async (chapterId: string) => {
+    const res = await fetch(`/api/admin/problems?chapter_id=${chapterId}`);
+    const json = await res.json();
+    const chapterProblems: ProblemRow[] = json.problems ?? [];
+    setProblems(chapterProblems.sort((a, b) => a.order_no - b.order_no));
+  }, []);
+
+  useEffect(() => {
+    loadSubjects().finally(() => setLoading(false));
+  }, [loadSubjects]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
+    if (!selectedChapter) { showToast('챕터를 먼저 선택해주세요.', 'err'); return; }
+    setForm({ ...EMPTY_FORM, chapter_id: selectedChapter.id });
     setEditId(null);
     setPanelMode('create');
     setExpandedSection('basic');
@@ -160,6 +322,7 @@ export default function AdminProblemsPage() {
     if (!json.problem) { showToast('문제를 불러올 수 없습니다.', 'err'); return; }
     const { problem, test_cases, hints } = json as { problem: DbProblem; test_cases: DbTestCase[]; hints: DbProblemHint[] };
     setForm({
+      chapter_id: problem.chapter_id ?? selectedChapter?.id ?? '',
       title: problem.title,
       difficulty: problem.difficulty,
       description: problem.description,
@@ -168,6 +331,7 @@ export default function AdminProblemsPage() {
       constraint_text: problem.constraint_text ?? '',
       starter_code: problem.starter_code ?? '',
       is_published: problem.is_published,
+      use_ai_feedback: problem.use_ai_feedback,
       test_cases: test_cases.length > 0
         ? test_cases.map((tc) => ({ input: tc.input, expected_output: tc.expected_output, is_sample: tc.is_sample, is_hidden: tc.is_hidden, order_no: tc.order_no }))
         : [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
@@ -181,12 +345,15 @@ export default function AdminProblemsPage() {
   const closePanel = () => { setPanelMode('closed'); setEditId(null); };
 
   const handleSave = async () => {
+    if (!form.chapter_id) { showToast('챕터를 선택해주세요.', 'err'); return; }
     if (!form.title.trim()) { showToast('문제 제목을 입력해주세요.', 'err'); return; }
     if (!form.description.trim()) { showToast('문제 내용을 입력해주세요.', 'err'); return; }
 
     setSaving(true);
     const validTc = form.test_cases.filter((tc) => tc.expected_output.trim());
+    if (validTc.length === 0) { setSaving(false); showToast('정답을 1개 이상 입력해주세요.', 'err'); return; }
     const body = {
+      chapter_id: form.chapter_id,
       title: form.title,
       difficulty: form.difficulty,
       description: form.description,
@@ -197,6 +364,7 @@ export default function AdminProblemsPage() {
       time_limit_ms: 3000,
       memory_limit_mb: 256,
       is_published: form.is_published,
+      use_ai_feedback: form.use_ai_feedback,
       test_cases: validTc,
       hints: form.hints.filter((h) => h.hint_text.trim()),
     };
@@ -210,7 +378,7 @@ export default function AdminProblemsPage() {
     if (!res.ok) { showToast(json.error?.message ?? '저장 중 오류가 발생했습니다.', 'err'); return; }
     showToast(panelMode === 'edit' ? '문제가 수정되었습니다.' : '문제가 등록되었습니다.', 'ok');
     closePanel();
-    fetchProblems();
+    if (selectedChapter) loadProblems(selectedChapter.id);
   };
 
   const handleDelete = async (problem: ProblemRow) => {
@@ -218,7 +386,7 @@ export default function AdminProblemsPage() {
     setDeleteTarget(null);
     if (!res.ok) { showToast('삭제 중 오류가 발생했습니다.', 'err'); return; }
     showToast('문제가 삭제되었습니다.', 'ok');
-    fetchProblems();
+    if (selectedChapter) loadProblems(selectedChapter.id);
   };
 
   const togglePublish = async (problem: ProblemRow) => {
@@ -227,7 +395,85 @@ export default function AdminProblemsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_published: !problem.is_published }),
     });
-    fetchProblems();
+    if (selectedChapter) loadProblems(selectedChapter.id);
+  };
+
+  const apiBase = (kind: HierarchyKind) =>
+    kind === 'subject' ? '/api/admin/subjects' : kind === 'stage' ? '/api/admin/stages' : '/api/admin/chapters';
+
+  const saveHierarchy = async (data: { title: string; description: string; is_published: boolean; order_no: number }) => {
+    if (!hierModal) return;
+    setHierSaving(true);
+    const url = hierModal.mode === 'edit' ? `${apiBase(hierModal.kind)}/${hierModal.id}` : apiBase(hierModal.kind);
+    const method = hierModal.mode === 'edit' ? 'PATCH' : 'POST';
+    const body: Record<string, unknown> = { ...data };
+    if (hierModal.mode === 'create') {
+      if (hierModal.kind === 'stage' && selectedSubject) body.subject_id = selectedSubject.id;
+      if (hierModal.kind === 'chapter' && selectedStage) body.stage_id = selectedStage.id;
+    }
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    setHierSaving(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      showToast(json?.error?.message ?? `${KIND_LABEL[hierModal.kind]} 저장 중 오류가 발생했습니다.`, 'err');
+      return;
+    }
+    showToast(hierModal.mode === 'edit' ? `${KIND_LABEL[hierModal.kind]}가 수정되었습니다.` : `${KIND_LABEL[hierModal.kind]}가 추가되었습니다.`, 'ok');
+    setHierModal(null);
+    if (hierModal.kind === 'subject') loadSubjects();
+    else if (hierModal.kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
+    else if (hierModal.kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+  };
+
+  const toggleHierPublish = async (kind: HierarchyKind, row: HierarchyRow) => {
+    await fetch(`${apiBase(kind)}/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !row.is_published }),
+    });
+    if (kind === 'subject') loadSubjects();
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+  };
+
+  const handleDeleteHierarchy = async () => {
+    if (!deleteHierTarget) return;
+    const { kind, row } = deleteHierTarget;
+    const res = await fetch(`${apiBase(kind)}/${row.id}`, { method: 'DELETE' });
+    const json = await res.json();
+    setDeleteHierTarget(null);
+    if (!res.ok) { showToast(json.error?.message ?? '삭제 중 오류가 발생했습니다.', 'err'); return; }
+    showToast(`${KIND_LABEL[kind]}가 삭제되었습니다.`, 'ok');
+    if (kind === 'subject') loadSubjects();
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+  };
+
+  const moveHierarchy = async (kind: HierarchyKind, row: HierarchyRow, siblings: HierarchyRow[], dir: -1 | 1) => {
+    const sorted = [...siblings].sort((a, b) => a.order_no - b.order_no);
+    const idx = sorted.findIndex((c) => c.id === row.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const other = sorted[swapIdx];
+    await Promise.all([
+      fetch(`${apiBase(kind)}/${row.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
+      fetch(`${apiBase(kind)}/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: row.order_no }) }),
+    ]);
+    if (kind === 'subject') loadSubjects();
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+  };
+
+  const moveProblem = async (p: ProblemRow, siblings: ProblemRow[], dir: -1 | 1) => {
+    const idx = siblings.findIndex((x) => x.id === p.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    await Promise.all([
+      fetch(`/api/admin/problems/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
+      fetch(`/api/admin/problems/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: p.order_no }) }),
+    ]);
+    if (selectedChapter) loadProblems(selectedChapter.id);
   };
 
   const updateTc = (i: number, field: keyof TestCaseForm, value: unknown) => {
@@ -258,8 +504,88 @@ export default function AdminProblemsPage() {
     hints: f.hints.filter((_, idx) => idx !== i).map((h, idx) => ({ ...h, order_no: idx + 1 })),
   }));
 
+  const enterSubject = (row: HierarchyRow) => {
+    setSelectedSubject(row);
+    setSelectedStage(null);
+    setSelectedChapter(null);
+    setLevel('stages');
+    closePanel();
+    loadStages(row.id);
+  };
+
+  const enterStage = (row: HierarchyRow) => {
+    setSelectedStage(row);
+    setSelectedChapter(null);
+    setLevel('chapters');
+    closePanel();
+    loadChapters(row.id);
+  };
+
+  const enterChapter = (row: HierarchyRow) => {
+    setSelectedChapter(row);
+    setLevel('problems');
+    closePanel();
+    loadProblems(row.id);
+  };
+
+  const goTo = (target: NavLevel) => {
+    closePanel();
+    if (target === 'subjects') {
+      setLevel('subjects');
+      setSelectedSubject(null);
+      setSelectedStage(null);
+      setSelectedChapter(null);
+      loadSubjects();
+    } else if (target === 'stages' && selectedSubject) {
+      setLevel('stages');
+      setSelectedStage(null);
+      setSelectedChapter(null);
+      loadStages(selectedSubject.id);
+    } else if (target === 'chapters' && selectedStage) {
+      setLevel('chapters');
+      setSelectedChapter(null);
+      loadChapters(selectedStage.id);
+    }
+  };
+
+  const currentRows =
+    level === 'subjects' ? subjects
+      : level === 'stages' ? stages
+        : level === 'chapters' ? chapters
+          : [];
+
+  const currentKind: HierarchyKind | null =
+    level === 'subjects' ? 'subject'
+      : level === 'stages' ? 'stage'
+        : level === 'chapters' ? 'chapter'
+          : null;
+
+  const childLabel =
+    level === 'subjects' ? '단계'
+      : level === 'stages' ? '챕터'
+        : level === 'chapters' ? '문제'
+          : '문제';
+
+  const nextOrderNo = (() => {
+    if (level === 'problems') return (problems.reduce((m, p) => Math.max(m, p.order_no), 0) || 0) + 1;
+    const rows = currentRows;
+    return (rows.reduce((m, r) => Math.max(m, r.order_no), 0) || 0) + 1;
+  })();
+
+  const openCreateHier = () => {
+    if (!currentKind) return;
+    setHierModal({
+      kind: currentKind,
+      mode: 'create',
+      title: '',
+      description: '',
+      is_published: true,
+      order_no: nextOrderNo,
+    });
+  };
+
   return (
-    <div className="h-full flex flex-col">
+    <div>
       {toast && (
         <div
           className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl text-white"
@@ -270,107 +596,210 @@ export default function AdminProblemsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>문제 관리</h1>
-          <p style={{ fontSize: '14px', color: '#5A6270', marginTop: 2 }}>문제를 등록하고 관리하세요.</p>
+          <p style={{ fontSize: '14px', color: '#5A6270', marginTop: 2 }}>과목 → 단계 → 챕터 → 문제 순으로 관리하세요.</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
-          style={{ height: 40, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
-        >
-          <Plus size={16} />
-          문제 등록
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setExcelImportOpen(true)}
+            className="flex items-center gap-2 px-4 rounded-xl transition-colors"
+            style={{ height: 40, border: '1px solid #C7D9F7', backgroundColor: '#F8FBFF', fontSize: '14px', fontWeight: 600, color: '#1B64DA' }}
+          >
+            <FileSpreadsheet size={16} />
+            엑셀 일괄 등록
+          </button>
+          {currentKind && (
+            <button
+              onClick={openCreateHier}
+              className="flex items-center gap-2 px-4 rounded-xl transition-colors"
+              style={{ height: 40, border: '1px solid #E5E8EC', backgroundColor: '#FFFFFF', fontSize: '14px', fontWeight: 600, color: '#16181D' }}
+            >
+              <FolderPlus size={16} style={{ color: '#5A6270' }} />
+              {KIND_LABEL[currentKind]} 추가
+            </button>
+          )}
+          {level === 'problems' && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
+              style={{ height: 40, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+            >
+              <Plus size={16} />
+              문제 등록
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-5 flex-1 overflow-hidden min-h-0">
+      <nav className="flex items-center gap-1.5 mb-4 flex-wrap" style={{ fontSize: '13px' }}>
+        <button onClick={() => goTo('subjects')} style={{ fontWeight: level === 'subjects' ? 700 : 500, color: level === 'subjects' ? '#1B64DA' : '#5A6270' }}>
+          과목
+        </button>
+        {selectedSubject && (
+          <>
+            <ChevronRight size={14} style={{ color: '#BCC0C7' }} />
+            <button onClick={() => goTo('stages')} style={{ fontWeight: level === 'stages' ? 700 : 500, color: level === 'stages' ? '#1B64DA' : '#5A6270' }}>
+              {selectedSubject.order_no}. {selectedSubject.title}
+            </button>
+          </>
+        )}
+        {selectedStage && (
+          <>
+            <ChevronRight size={14} style={{ color: '#BCC0C7' }} />
+            <button onClick={() => goTo('chapters')} style={{ fontWeight: level === 'chapters' ? 700 : 500, color: level === 'chapters' ? '#1B64DA' : '#5A6270' }}>
+              {selectedStage.order_no}. {selectedStage.title}
+            </button>
+          </>
+        )}
+        {selectedChapter && (
+          <>
+            <ChevronRight size={14} style={{ color: '#BCC0C7' }} />
+            <span style={{ fontWeight: 700, color: '#1B64DA' }}>
+              {selectedChapter.order_no}. {selectedChapter.title}
+            </span>
+          </>
+        )}
+      </nav>
+
+      <div className="flex gap-5 items-start">
         <div
           className="flex flex-col bg-white rounded-2xl overflow-hidden"
           style={{
-            flex: panelMode !== 'closed' ? '0 0 auto' : '1',
-            width: panelMode !== 'closed' ? '460px' : undefined,
+            flex: '0 0 auto',
+            width: panelMode !== 'closed' ? '460px' : '100%',
+            maxWidth: panelMode !== 'closed' ? '460px' : '860px',
             border: '1px solid #E5E8EC',
+            minHeight: 320,
           }}
         >
           {loading ? (
-            <div className="flex-1 flex items-center justify-center" style={{ color: '#5A6270', fontSize: '14px' }}>불러오는 중...</div>
-          ) : problems.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2">
-              <p style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>등록된 문제가 없습니다</p>
-              <p style={{ fontSize: '13px', color: '#5A6270' }}>문제 등록 버튼을 눌러 첫 번째 문제를 추가하세요.</p>
+            <div className="flex-1 flex items-center justify-center py-16" style={{ color: '#5A6270', fontSize: '14px' }}>불러오는 중...</div>
+          ) : level !== 'problems' && currentRows.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center py-16">
+              <Layers size={36} style={{ color: '#D1D5DB' }} />
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>아직 {currentKind ? KIND_LABEL[currentKind] : ''}가 없습니다</p>
+              <button
+                onClick={openCreateHier}
+                className="flex items-center gap-2 px-4 mt-2 rounded-xl text-white"
+                style={{ height: 38, backgroundColor: '#1B64DA', fontSize: '13px', fontWeight: 600 }}
+              >
+                <FolderPlus size={15} /> {currentKind ? KIND_LABEL[currentKind] : ''} 추가
+              </button>
+            </div>
+          ) : level === 'problems' ? (
+            <div className="flex flex-col">
+              {problems.length === 0 ? (
+                <div className="px-4 py-10 text-center" style={{ fontSize: '13px', color: '#BCC0C7' }}>
+                  아직 문제가 없습니다.
+                  <button onClick={openCreate} className="block mx-auto mt-3 text-primary" style={{ fontSize: '13px', fontWeight: 600 }}>
+                    + 문제 추가
+                  </button>
+                </div>
+              ) : (
+                problems.map((p, pIdx) => (
+                  <div key={p.id} className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: pIdx < problems.length - 1 ? '1px solid #F0F1F3' : 'none', backgroundColor: pIdx % 2 === 0 ? '#FFFFFF' : '#FAFBFC' }}>
+                    <span className="shrink-0 text-center" style={{ width: 40, fontSize: '12px', fontWeight: 700, color: '#8A8F98', fontFamily: 'monospace' }}>
+                      {selectedChapter?.order_no}-{pIdx + 1}
+                    </span>
+                    <button onClick={() => openEdit(p.id)} className="flex-1 min-w-0 text-left truncate" style={{ fontSize: '14px', fontWeight: 500, color: p.is_published ? '#16181D' : '#8A8F98' }}>
+                      {p.title}
+                    </button>
+                    {p.use_ai_feedback && (
+                      <span className="px-2 py-0.5 rounded shrink-0 flex items-center gap-1" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#EEF2FF', color: '#4F46E5' }}>
+                        <Sparkles size={11} /> AI
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded shrink-0" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[p.difficulty].bg, color: DIFF_STYLE[p.difficulty].color }}>
+                      {DIFF_LABEL[p.difficulty]}
+                    </span>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button onClick={() => moveProblem(p, problems, -1)} disabled={pIdx === 0} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#F0F1F3] disabled:opacity-30"><ArrowUp size={13} style={{ color: '#5A6270' }} /></button>
+                      <button onClick={() => moveProblem(p, problems, 1)} disabled={pIdx === problems.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#F0F1F3] disabled:opacity-30"><ArrowDown size={13} style={{ color: '#5A6270' }} /></button>
+                      <button onClick={() => togglePublish(p)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#F0F1F3]">{p.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}</button>
+                      <button onClick={() => openEdit(p.id)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-primary-light"><Pencil size={13} style={{ color: '#1B64DA' }} /></button>
+                      <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[#FEE2E2]"><Trash2 size={13} style={{ color: '#DC2626' }} /></button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           ) : (
-            <div className="overflow-auto flex-1">
-              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #E5E8EC', backgroundColor: '#F6F7F9' }}>
-                    {['번호', '제목', '난이도', '공개', '관리'].map((h) => (
-                      <th key={h} className="text-left px-4 py-3" style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {problems.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #F0F1F3' }} className="hover:bg-[#F6F7F9] transition-colors">
-                      <td className="px-4 py-3" style={{ fontSize: '13px', color: '#5A6270', width: 60 }}>{p.problem_no}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => openEdit(p.id)} className="text-left" style={{ fontSize: '14px', fontWeight: 500, color: '#16181D' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#1B64DA')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#16181D')}
-                        >
-                          {p.title}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[p.difficulty].bg, color: DIFF_STYLE[p.difficulty].color }}>
-                          {DIFF_LABEL[p.difficulty]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => togglePublish(p)} title={p.is_published ? '비공개로 전환' : '공개로 전환'} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#F0F1F3]">
-                          {p.is_published ? <Eye size={15} style={{ color: '#1B64DA' }} /> : <EyeOff size={15} style={{ color: '#BCC0C7' }} />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => openEdit(p.id)} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#EAF1FD]" title="수정">
-                            <Pencil size={14} style={{ color: '#1B64DA' }} />
-                          </button>
-                          <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-[#FEE2E2]" title="삭제">
-                            <Trash2 size={14} style={{ color: '#DC2626' }} />
-                          </button>
+            <div className="p-3 flex flex-col gap-2">
+              {[...currentRows].sort((a, b) => a.order_no - b.order_no).map((row, idx, arr) => (
+                <div key={row.id} className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+                  <div className="flex items-center gap-2 px-3 py-2.5" style={{ backgroundColor: row.is_published ? '#F0F7FF' : '#F6F7F9' }}>
+                    <button
+                      onClick={() => {
+                        if (level === 'subjects') enterSubject(row);
+                        else if (level === 'stages') enterStage(row);
+                        else enterChapter(row);
+                      }}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      <span className="flex items-center justify-center rounded-md shrink-0" style={{ width: 28, height: 28, backgroundColor: row.is_published ? '#1B64DA' : '#BCC0C7', color: '#fff', fontSize: '12px', fontWeight: 700 }}>
+                        {row.order_no}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" style={{ fontSize: '14px', fontWeight: 700, color: row.is_published ? '#16181D' : '#8A8F98' }}>{row.title}</span>
+                          <span style={{ fontSize: '12px', color: '#8A8F98' }}>· {row.child_count ?? 0}{childLabel}</span>
+                          {!row.is_published && <span className="px-1.5 py-px rounded" style={{ fontSize: '10px', fontWeight: 600, backgroundColor: '#E5E8EC', color: '#8A8F98' }}>숨김</span>}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {row.description && <p className="truncate mt-0.5" style={{ fontSize: '12px', color: '#8A8F98' }}>{row.description}</p>}
+                      </div>
+                      <ChevronRight size={16} style={{ color: '#BCC0C7' }} />
+                    </button>
+                    {currentKind && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, -1)} disabled={idx === 0} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70 disabled:opacity-30"><ArrowUp size={13} style={{ color: '#5A6270' }} /></button>
+                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, 1)} disabled={idx === arr.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70 disabled:opacity-30"><ArrowDown size={13} style={{ color: '#5A6270' }} /></button>
+                        <button onClick={() => toggleHierPublish(currentKind, row)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70">{row.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}</button>
+                        <button
+                          onClick={() => setHierModal({
+                            kind: currentKind,
+                            mode: 'edit',
+                            id: row.id,
+                            title: row.title,
+                            description: row.description ?? '',
+                            is_published: row.is_published,
+                            order_no: row.order_no,
+                          })}
+                          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70"
+                        >
+                          <Pencil size={13} style={{ color: '#5A6270' }} />
+                        </button>
+                        <button onClick={() => setDeleteHierTarget({ kind: currentKind, row })} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70"><Trash2 size={13} style={{ color: '#DC2626' }} /></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         {panelMode !== 'closed' && (
-          <div className="bg-white rounded-2xl flex flex-col flex-1 overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
-            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid #E5E8EC' }}>
+          <div className="bg-white rounded-2xl flex flex-col min-w-0 overflow-hidden" style={{ flex: '1', border: '1px solid #E5E8EC', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 80px)' }}>
+            <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D' }}>
                 {panelMode === 'create' ? '문제 등록' : '문제 수정'}
               </h2>
-              <button onClick={closePanel} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F6F7F9] transition-colors">
+              <button onClick={closePanel} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface transition-colors">
                 <X size={16} style={{ color: '#5A6270' }} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto">
-              <Section
-                label="기본 정보"
-                expanded={expandedSection === 'basic'}
-                onToggle={() => setExpandedSection(expandedSection === 'basic' ? 'starter' : 'basic')}
-              >
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <Section label="기본 정보" expanded={expandedSection === 'basic'} onToggle={() => setExpandedSection(expandedSection === 'basic' ? 'starter' : 'basic')}>
                 <div className="flex flex-col gap-4">
+                  <FormField label="챕터" required tooltip="현재 선택된 챕터에 문제가 등록됩니다.">
+                    <div className="px-3 rounded-lg flex items-center" style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', backgroundColor: '#F6F7F9' }}>
+                      {selectedSubject?.title} / {selectedStage?.title} / {selectedChapter?.title}
+                    </div>
+                  </FormField>
+
                   <FormField label="문제 제목" required>
                     <input
                       className="w-full px-3 rounded-lg focus:outline-none"
@@ -382,77 +811,44 @@ export default function AdminProblemsPage() {
                   </FormField>
 
                   <FormField label="난이도" required>
-                      <select
-                        className="w-full px-3 rounded-lg focus:outline-none"
-                        style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
-                        value={form.difficulty}
-                        onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value as ProblemDifficulty }))}
-                      >
-                        <option value="easy">쉬움</option>
-                        <option value="medium">보통</option>
-                        <option value="hard">어려움</option>
-                      </select>
-                    </FormField>
+                    <select
+                      className="w-full px-3 rounded-lg focus:outline-none"
+                      style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+                      value={form.difficulty}
+                      onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value as ProblemDifficulty }))}
+                    >
+                      <option value="easy">쉬움</option>
+                      <option value="medium">보통</option>
+                      <option value="hard">어려움</option>
+                    </select>
+                  </FormField>
 
                   <FormField label="문제 내용" required>
                     <RichEditor
                       value={form.description}
                       onChange={(html) => setForm((f) => ({ ...f, description: html }))}
-                      placeholder="학생에게 보여줄 문제 내용을 입력하세요. 이미지, 표, 색상 등을 활용해 알기 쉽게 작성하세요."
+                      placeholder="학생에게 보여줄 문제 내용을 입력하세요."
                     />
                   </FormField>
 
-                  <FormField
-                    label="입력 설명"
-                    tooltip={'학생의 코드가 어떤 형태로 입력을 받아야 하는지 설명하세요.\n예) 첫째 줄에 정수 A와 B가 공백으로 구분되어 주어진다. (1 ≤ A, B ≤ 10)'}
-                  >
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-                      style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
-                      rows={2}
-                      placeholder="예) 첫째 줄에 정수 A와 B가 공백으로 구분되어 주어진다."
-                      value={form.input_format}
-                      onChange={(e) => setForm((f) => ({ ...f, input_format: e.target.value }))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="출력 설명"
-                    tooltip={'학생의 코드가 어떤 값을 출력해야 하는지 설명하세요.\n예) A+B를 출력한다.'}
-                  >
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-                      style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
-                      rows={2}
-                      placeholder="예) A+B를 출력한다."
-                      value={form.output_format}
-                      onChange={(e) => setForm((f) => ({ ...f, output_format: e.target.value }))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="조건 및 제약 (선택)"
-                    tooltip={'풀이에서 주의해야 할 범위나 규칙을 입력하세요.\n예) • 1 ≤ A, B ≤ 1,000\n• A와 B는 항상 양의 정수이다.'}
-                  >
+                  <FormField label="조건 및 제약 (선택)" tooltip={'풀이에서 주의해야 할 범위나 규칙을 입력하세요.'}>
                     <textarea
                       className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
                       style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
                       rows={3}
-                      placeholder="예) • 1 ≤ A, B ≤ 1,000&#10;• 입력은 항상 양의 정수이다."
                       value={form.constraint_text}
                       onChange={(e) => setForm((f) => ({ ...f, constraint_text: e.target.value }))}
                     />
                   </FormField>
 
                   <label className="flex items-center gap-2 cursor-pointer w-fit">
-                    <input
-                      type="checkbox"
-                      checked={form.is_published}
-                      onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
-                      className="w-4 h-4 accent-primary"
-                    />
+                    <input type="checkbox" checked={form.is_published} onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))} className="w-4 h-4 accent-primary" />
                     <span style={{ fontSize: '14px', color: '#16181D' }}>즉시 공개</span>
-                    <span style={{ fontSize: '12px', color: '#5A6270' }}>(체크하면 학생 화면에 바로 표시됩니다)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" checked={form.use_ai_feedback} onChange={(e) => setForm((f) => ({ ...f, use_ai_feedback: e.target.checked }))} className="w-4 h-4 accent-primary" />
+                    <span style={{ fontSize: '14px', color: '#16181D' }}>AI 피드백 사용</span>
                   </label>
                 </div>
               </Section>
@@ -461,120 +857,59 @@ export default function AdminProblemsPage() {
                 label="초기 코드 (에디터 기본값)"
                 expanded={expandedSection === 'starter'}
                 onToggle={() => setExpandedSection(expandedSection === 'starter' ? 'basic' : 'starter')}
-                tooltip={'학생이 문제 풀이 화면에 들어왔을 때 에디터에 미리 입력되어 있는 코드입니다.\n코드 구조나 함수 시그니처를 미리 제공하면 학생이 방향을 잡는 데 도움이 됩니다.'}
               >
-                <div>
-                  <div
-                    className="rounded-xl overflow-hidden"
-                    style={{ border: '1px solid #2D2D2D' }}
-                  >
-                    <div
-                      className="flex items-center justify-between px-3 py-2"
-                      style={{ backgroundColor: '#2D2D2D' }}
-                    >
-                      <span style={{ fontSize: '12px', color: '#8C8C8C', fontFamily: 'monospace' }}>Python 3</span>
-                      {form.starter_code && (
-                        <button
-                          onClick={() => setForm((f) => ({ ...f, starter_code: '' }))}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded transition-colors hover:bg-[#3D3D3D]"
-                          style={{ fontSize: '11px', color: '#8C8C8C' }}
-                        >
-                          <X size={10} /> 초기화
-                        </button>
-                      )}
-                    </div>
-                    <MonacoEditor
-                      height={220}
-                      language="python"
-                      theme="paircode-dark"
-                      beforeMount={registerPaircodeTheme}
-                      value={form.starter_code}
-                      onChange={(v) => setForm((f) => ({ ...f, starter_code: v ?? '' }))}
-                      options={{
-                        fontSize: 13,
-                        fontFamily: "'Fira Code', Consolas, monospace",
-                        minimap: { enabled: false },
-                        scrollBeyondLastLine: false,
-                        lineNumbers: 'on',
-                        padding: { top: 10, bottom: 10 },
-                        automaticLayout: true,
-                        tabSize: 4,
-                        wordWrap: 'off',
-                      }}
-                    />
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2D2D2D' }}>
+                  <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: '#2D2D2D' }}>
+                    <span style={{ fontSize: '12px', color: '#8C8C8C', fontFamily: 'monospace' }}>Python 3</span>
                   </div>
-                  <p className="mt-2" style={{ fontSize: '12px', color: '#5A6270' }}>
-                    비워두면 학생 에디터가 빈 상태로 시작합니다.
-                  </p>
+                  <MonacoEditor
+                    height={220}
+                    language="python"
+                    theme="paircode-dark"
+                    beforeMount={registerPaircodeTheme}
+                    value={form.starter_code}
+                    onChange={(v) => setForm((f) => ({ ...f, starter_code: v ?? '' }))}
+                    options={{
+                      fontSize: 13,
+                      fontFamily: "'Fira Code', Consolas, monospace",
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      lineNumbers: 'on',
+                      padding: { top: 10, bottom: 10 },
+                      automaticLayout: true,
+                      tabSize: 4,
+                      wordWrap: 'off',
+                    }}
+                  />
                 </div>
               </Section>
 
               <Section
-                label={`채점 케이스 (${form.test_cases.length}개)`}                expanded={expandedSection === 'testcases'}
+                label={`정답 (${form.test_cases.length}개)`}
+                expanded={expandedSection === 'testcases'}
                 onToggle={() => setExpandedSection(expandedSection === 'testcases' ? 'starter' : 'testcases')}
-                tooltip={'모든 케이스를 통과해야 정답으로 처리됩니다.\n\n• 예제 공개: 학생 화면에 보이는 케이스\n• 숨김 채점용: 학생에게 보이지 않지만 채점에 포함\n\n입력이 없는 문제(Hello World 등)는\n입력값을 비워두면 됩니다.\n\n하나라도 실패하면 오답 처리됩니다.'}
               >
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ backgroundColor: '#EAF1FD', border: '1px solid #C7D9F7' }}>
-                    <span style={{ fontSize: '12px', color: '#1450B5', lineHeight: 1.6 }}>
-                      <strong>모든 케이스를 통과해야 정답</strong>으로 처리됩니다. 하나라도 실패하면 오답입니다.<br />
-                      입력이 없는 문제(예: &quot;Hello, World!&quot; 출력)는 <strong>입력값을 비워두면</strong> 됩니다.
-                    </span>
-                  </div>
                   {form.test_cases.map((tc, i) => (
                     <div key={i} className="rounded-xl p-4" style={{ border: '1px solid #E5E8EC', backgroundColor: '#F6F7F9' }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>케이스 {i + 1}</span>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={tc.is_sample} onChange={(e) => updateTc(i, 'is_sample', e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
-                            <span style={{ fontSize: '12px', color: '#5A6270' }}>학생에게 예제 공개</span>
-                            <Tooltip text={'체크하면 학생 화면에 예제로 표시됩니다.\n학생이 문제를 이해하는 데 도움이 되는 케이스에 체크하세요.'} />
-                          </label>
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={tc.is_hidden} onChange={(e) => updateTc(i, 'is_hidden', e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
-                            <span style={{ fontSize: '12px', color: '#5A6270' }}>숨김 채점용</span>
-                            <Tooltip direction="left" text={'체크하면 학생에게 보이지 않고\n정답 채점에만 사용됩니다.\n더 어려운 케이스를 숨겨서 정확한 채점에 사용하세요.'} />
-                          </label>
-                          {form.test_cases.length > 1 && (
-                            <button onClick={() => removeTc(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#FEE2E2] transition-colors">
-                              <X size={12} style={{ color: '#DC2626' }} />
-                            </button>
-                          )}
-                        </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>정답 {i + 1}</span>
+                        {form.test_cases.length > 1 && (
+                          <button onClick={() => removeTc(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#FEE2E2]"><X size={12} style={{ color: '#DC2626' }} /></button>
+                        )}
                       </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>입력값</div>
-                          <textarea
-                            className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
-                            style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
-                            rows={3}
-                            placeholder={"입력값 (없으면 비워두세요)"}
-                            value={tc.input}
-                            onChange={(e) => updateTc(i, 'input', e.target.value)}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>정답 출력</div>
-                          <textarea
-                            className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none"
-                            style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '12px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }}
-                            rows={3}
-                            placeholder="코드가 출력해야 할 정답"
-                            value={tc.expected_output}
-                            onChange={(e) => updateTc(i, 'expected_output', e.target.value)}
-                          />
-                        </div>
+                      <div className="mb-3">
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>입력값 (input)</div>
+                        <textarea className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none" style={{ border: '1px solid #E5E8EC', fontFamily: 'monospace', fontSize: '13px', backgroundColor: '#FFFFFF' }} rows={2} value={tc.input} onChange={(e) => updateTc(i, 'input', e.target.value)} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>정답 출력값</div>
+                        <textarea className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none" style={{ border: '1px solid #2D2D2D', fontFamily: 'monospace', fontSize: '13px', backgroundColor: '#1E1E1E', color: '#D4D4D4' }} rows={3} value={tc.expected_output} onChange={(e) => updateTc(i, 'expected_output', e.target.value)} />
                       </div>
                     </div>
                   ))}
-                  <button
-                    onClick={addTc}
-                    className="flex items-center gap-2 px-3 rounded-lg transition-colors"
-                    style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: '#5A6270', width: '100%', justifyContent: 'center' }}
-                  >
-                    <Plus size={14} /> 케이스 추가
+                  <button onClick={addTc} className="flex items-center gap-2 px-3 rounded-lg" style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: '#5A6270', width: '100%', justifyContent: 'center' }}>
+                    <Plus size={14} /> 정답 추가
                   </button>
                 </div>
               </Section>
@@ -583,74 +918,37 @@ export default function AdminProblemsPage() {
                 label={`힌트 (${form.hints.length}개)`}
                 expanded={expandedSection === 'hints'}
                 onToggle={() => setExpandedSection(expandedSection === 'hints' ? 'starter' : 'hints')}
-                tooltip="학생이 막혔을 때 AI가 보여줄 힌트입니다. 정답 코드는 포함하지 마세요."
               >
                 <div className="flex flex-col gap-3">
                   {form.hints.map((h, i) => (
                     <div key={i} className="rounded-xl p-4" style={{ border: '1px solid #E5E8EC', backgroundColor: '#F6F7F9' }}>
                       <div className="flex items-center justify-between mb-3">
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>힌트 {i + 1}</span>
-                        <button onClick={() => removeHint(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#FEE2E2] transition-colors">
-                          <X size={12} style={{ color: '#DC2626' }} />
-                        </button>
+                        <button onClick={() => removeHint(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#FEE2E2]"><X size={12} style={{ color: '#DC2626' }} /></button>
                       </div>
-                      <FormField label="힌트 내용">
-                        <textarea
-                          className="w-full px-3 py-2 rounded-lg focus:outline-none resize-none"
-                          style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D', lineHeight: 1.6 }}
-                          rows={3}
-                          placeholder="예) 배열을 한 번 순회하면서 이미 본 숫자를 기억해두는 방법을 생각해보세요."
-                          value={h.hint_text}
-                          onChange={(e) => {
-                            const hints = [...form.hints];
-                            hints[i] = { ...hints[i], hint_text: e.target.value };
-                            setForm((f) => ({ ...f, hints }));
-                          }}
-                        />
-                      </FormField>
-                      <div className="mt-3">
-                        <FormField
-                          label="표시 조건 키워드 (선택)"
-                          tooltip={'학생 코드에 이 단어가 없을 때 힌트를 보여줍니다.\n예) dictionary → 딕셔너리를 쓰지 않은 학생에게 이 힌트를 표시'}
-                        >
-                          <input
-                            className="w-full px-3 rounded-lg focus:outline-none"
-                            style={{ height: 36, border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
-                            placeholder="예) dictionary, for loop (비워두면 항상 표시)"
-                            value={h.trigger_pattern}
-                            onChange={(e) => {
-                              const hints = [...form.hints];
-                              hints[i] = { ...hints[i], trigger_pattern: e.target.value };
-                              setForm((f) => ({ ...f, hints }));
-                            }}
-                          />
-                        </FormField>
-                      </div>
+                      <textarea
+                        className="w-full px-3 py-2 rounded-lg focus:outline-none resize-none"
+                        style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D', lineHeight: 1.6 }}
+                        rows={3}
+                        value={h.hint_text}
+                        onChange={(e) => {
+                          const hints = [...form.hints];
+                          hints[i] = { ...hints[i], hint_text: e.target.value };
+                          setForm((f) => ({ ...f, hints }));
+                        }}
+                      />
                     </div>
                   ))}
-                  <button
-                    onClick={addHint}
-                    className="flex items-center gap-2 px-3 rounded-lg transition-colors"
-                    style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: '#5A6270', width: '100%', justifyContent: 'center' }}
-                  >
+                  <button onClick={addHint} className="flex items-center gap-2 px-3 rounded-lg" style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: '#5A6270', width: '100%', justifyContent: 'center' }}>
                     <Plus size={14} /> 힌트 추가
                   </button>
                 </div>
               </Section>
             </div>
 
-            <div className="flex items-center gap-2 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid #E5E8EC' }}>
-              <button onClick={closePanel} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
-                취소
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 rounded-xl text-white transition-colors disabled:opacity-60"
-                style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
-              >
+            <div className="flex items-center gap-2 px-5 py-4 shrink-0" style={{ borderTop: '1px solid #E5E8EC' }}>
+              <button onClick={closePanel} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl text-white disabled:opacity-60" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}>
                 {saving ? '저장 중...' : panelMode === 'edit' ? '수정 완료' : '등록'}
               </button>
             </div>
@@ -658,12 +956,54 @@ export default function AdminProblemsPage() {
         )}
       </div>
 
-      {deleteTarget && (
-        <DeleteConfirmModal
-          title={deleteTarget.title}
-          onConfirm={() => handleDelete(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
+      {excelImportOpen && (
+        <CurriculumExcelImportModal
+          onClose={() => setExcelImportOpen(false)}
+          onImported={(message) => {
+            setExcelImportOpen(false);
+            showToast(message, 'ok');
+            loadSubjects();
+            if (selectedSubject) loadStages(selectedSubject.id);
+            if (selectedStage) loadChapters(selectedStage.id);
+            if (selectedChapter) loadProblems(selectedChapter.id);
+          }}
         />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal title={deleteTarget.title} onConfirm={() => handleDelete(deleteTarget)} onCancel={() => setDeleteTarget(null)} />
+      )}
+
+      {hierModal && (
+        <HierarchyModal
+          kind={hierModal.kind}
+          initial={hierModal.mode === 'edit' ? {
+            title: hierModal.title,
+            description: hierModal.description,
+            is_published: hierModal.is_published,
+            order_no: hierModal.order_no,
+          } : null}
+          defaultOrderNo={hierModal.order_no}
+          onSave={saveHierarchy}
+          onClose={() => setHierModal(null)}
+          saving={hierSaving}
+        />
+      )}
+
+      {deleteHierTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={() => setDeleteHierTarget(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>{KIND_LABEL[deleteHierTarget.kind]} 삭제</h3>
+            <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>
+              <span style={{ fontWeight: 600, color: '#16181D' }}>{deleteHierTarget.row.title}</span>을(를) 삭제하시겠습니까?<br />
+              하위 항목이 있으면 삭제할 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteHierTarget(null)} className="flex-1 rounded-lg" style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600 }}>취소</button>
+              <button onClick={handleDeleteHierarchy} className="flex-1 rounded-lg text-white" style={{ height: 40, backgroundColor: '#DC2626', fontSize: '14px', fontWeight: 600 }}>삭제</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -676,7 +1016,7 @@ function Section({
 }) {
   return (
     <div style={{ borderBottom: '1px solid #E5E8EC' }}>
-      <button onClick={onToggle} className="flex items-center justify-between w-full px-5 py-3.5 hover:bg-[#F6F7F9] transition-colors">
+      <button onClick={onToggle} className="flex items-center justify-between w-full px-5 py-3.5 hover:bg-surface transition-colors">
         <span className="flex items-center gap-2" style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
           {label}
           {tooltip && <Tooltip text={tooltip} />}

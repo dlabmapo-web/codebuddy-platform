@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronRight, Clock, FileCode2, X, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
@@ -24,6 +24,7 @@ type Submission = {
 type ProblemStat = {
   id: string;
   problem_no: number;
+  order_no: number;
   title: string;
   difficulty: ProblemDifficulty;
   student_count: number;
@@ -31,6 +32,36 @@ type ProblemStat = {
   pass_count: number;
   pass_rate: number;
   avg_elapsed_sec: number | null;
+  chapter_id: string;
+  chapter_title: string;
+  chapter_order_no: number;
+  stage_id: string;
+  stage_title: string;
+  stage_order_no: number;
+  subject_id: string;
+  subject_title: string;
+  subject_order_no: number;
+};
+
+type ChapterNode = {
+  id: string;
+  title: string;
+  order_no: number;
+  problems: ProblemStat[];
+};
+
+type StageNode = {
+  id: string;
+  title: string;
+  order_no: number;
+  chapters: ChapterNode[];
+};
+
+type SubjectNode = {
+  id: string;
+  title: string;
+  order_no: number;
+  stages: StageNode[];
 };
 
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
@@ -66,12 +97,51 @@ function groupByProblem(subs: Submission[]) {
   return map;
 }
 
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ id: string; title: string; order_no: number }>;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="flex flex-col gap-1 min-w-0">
+      <span style={{ fontSize: '11px', fontWeight: 600, color: '#8A8F98' }}>{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg px-2.5 focus:outline-none disabled:opacity-50"
+        style={{ height: 34, border: '1px solid #E5E8EC', fontSize: '12px', color: '#16181D', minWidth: 128 }}
+      >
+        <option value="">전체</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.order_no}. {option.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export default function ProgressPage() {
   const [tab, setTab] = useState<'student' | 'problem'>('student');
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [subjects, setSubjects] = useState<SubjectNode[]>([]);
   const [problemStats, setProblemStats] = useState<ProblemStat[]>([]);
+  const [subjectId, setSubjectId] = useState('');
+  const [stageId, setStageId] = useState('');
+  const [chapterId, setChapterId] = useState('');
+  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
   const [expandedProblems, setExpandedProblems] = useState<Set<string>>(new Set());
   const [codeModal, setCodeModal] = useState<{ sub: Submission; studentName: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +153,7 @@ export default function ProgressPage() {
       if (list.length > 0) setSelectedStudent(list[0]);
     });
     fetch('/api/progress').then(r => r.json()).then(json => {
+      setSubjects(json.subjects ?? []);
       setProblemStats(json.problems ?? []);
     });
   }, []);
@@ -100,6 +171,76 @@ export default function ProgressPage() {
     if (selectedStudent) loadStudentSubmissions(selectedStudent.id);
   }, [selectedStudent, loadStudentSubmissions]);
 
+  const subjectOptions = useMemo(
+    () => subjects.map((s) => ({ id: s.id, title: s.title, order_no: s.order_no })),
+    [subjects],
+  );
+
+  const stageOptions = useMemo(() => {
+    const subject = subjects.find((s) => s.id === subjectId);
+    return (subject?.stages ?? []).map((s) => ({ id: s.id, title: s.title, order_no: s.order_no }));
+  }, [subjects, subjectId]);
+
+  const chapterOptions = useMemo(() => {
+    if (stageId) {
+      for (const subject of subjects) {
+        const stage = subject.stages.find((s) => s.id === stageId);
+        if (stage) return stage.chapters.map((c) => ({ id: c.id, title: c.title, order_no: c.order_no }));
+      }
+    }
+    if (subjectId) {
+      const subject = subjects.find((s) => s.id === subjectId);
+      return (subject?.stages ?? []).flatMap((stage) =>
+        stage.chapters.map((c) => ({ id: c.id, title: c.title, order_no: c.order_no })),
+      );
+    }
+    return subjects.flatMap((subject) =>
+      subject.stages.flatMap((stage) =>
+        stage.chapters.map((c) => ({ id: c.id, title: c.title, order_no: c.order_no })),
+      ),
+    );
+  }, [subjects, subjectId, stageId]);
+
+  const filteredProblems = useMemo(() => {
+    return problemStats.filter((p) => {
+      if (subjectId && p.subject_id !== subjectId) return false;
+      if (stageId && p.stage_id !== stageId) return false;
+      if (chapterId && p.chapter_id !== chapterId) return false;
+      return true;
+    });
+  }, [problemStats, subjectId, stageId, chapterId]);
+
+  const groupedChapters = useMemo(() => {
+    const map = new Map<string, {
+      chapterId: string;
+      chapterTitle: string;
+      chapterOrder: number;
+      stageTitle: string;
+      subjectTitle: string;
+      problems: ProblemStat[];
+    }>();
+
+    for (const p of filteredProblems) {
+      const key = p.chapter_id;
+      const group = map.get(key) ?? {
+        chapterId: p.chapter_id,
+        chapterTitle: p.chapter_title,
+        chapterOrder: p.chapter_order_no,
+        stageTitle: p.stage_title,
+        subjectTitle: p.subject_title,
+        problems: [],
+      };
+      group.problems.push(p);
+      map.set(key, group);
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.subjectTitle.localeCompare(b.subjectTitle)
+      || a.stageTitle.localeCompare(b.stageTitle)
+      || a.chapterOrder - b.chapterOrder,
+    );
+  }, [filteredProblems]);
+
   const grouped = groupByProblem(submissions);
 
   const allProblems = Array.from(
@@ -114,11 +255,19 @@ export default function ProgressPage() {
     });
   };
 
+  const toggleChapter = (chapterIdKey: string) => {
+    setCollapsedChapters((prev) => {
+      const next = new Set(prev);
+      next.has(chapterIdKey) ? next.delete(chapterIdKey) : next.add(chapterIdKey);
+      return next;
+    });
+  };
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 min-w-0">
       <div>
         <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>풀이 현황</h1>
-        <p style={{ fontSize: '13px', color: '#8A8F98', marginTop: 2 }}>학생별·문제별 제출 현황과 코드를 확인하세요.</p>
+        <p style={{ fontSize: '13px', color: '#8A8F98', marginTop: 2 }}>학생별·문제별 제출 현황을 과목/단계/챕터 단위로 확인하세요.</p>
       </div>
 
       <div className="flex gap-1 bg-white rounded-xl p-1 w-fit" style={{ border: '1px solid #E5E8EC' }}>
@@ -139,7 +288,7 @@ export default function ProgressPage() {
       </div>
 
       {tab === 'student' ? (
-        <div className="flex gap-4" style={{ minHeight: 480 }}>
+        <div className="flex gap-4 min-w-0" style={{ minHeight: 480 }}>
           <div className="bg-white rounded-xl overflow-hidden shrink-0" style={{ width: 176, border: '1px solid #E5E8EC' }}>
             <div className="px-4 py-3" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#8A8F98' }}>학생 목록</span>
@@ -171,7 +320,7 @@ export default function ProgressPage() {
             )}
           </div>
 
-          <div className="flex-1 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="flex-1 min-w-0 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
             <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
                 {selectedStudent ? `${selectedStudent.name}님의 제출 기록` : '학생을 선택하세요'}
@@ -198,6 +347,7 @@ export default function ProgressPage() {
                   const isExpanded = expandedProblems.has(problemId);
                   const diff = problem?.difficulty;
                   const StatusIcon = best ? STATUS_CONFIG[best.status].Icon : null;
+                  const meta = problemStats.find((p) => p.id === problemId);
 
                   return (
                     <div key={problemId}>
@@ -207,9 +357,11 @@ export default function ProgressPage() {
                       >
                         {isExpanded ? <ChevronDown size={15} style={{ color: '#8A8F98', flexShrink: 0 }} /> : <ChevronRight size={15} style={{ color: '#8A8F98', flexShrink: 0 }} />}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
-                              {problem?.problem_no}. {problem?.title}
+                              {meta
+                                ? `${meta.chapter_order_no}-${meta.order_no}. ${problem?.title}`
+                                : `${problem?.problem_no}. ${problem?.title}`}
                             </span>
                             {diff && (
                               <span className="px-1.5 py-px rounded" style={{ fontSize: '10px', fontWeight: 600, backgroundColor: DIFF_COLOR[diff].bg, color: DIFF_COLOR[diff].color }}>
@@ -217,6 +369,11 @@ export default function ProgressPage() {
                               </span>
                             )}
                           </div>
+                          {meta && (
+                            <p className="truncate mt-0.5" style={{ fontSize: '11px', color: '#8A8F98' }}>
+                              {meta.subject_title} / {meta.stage_title} / {meta.chapter_title}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
                           <span style={{ fontSize: '12px', color: '#8A8F98' }}>{subs.length}회 제출</span>
@@ -274,63 +431,137 @@ export default function ProgressPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E8EC' }}>
-                {['번호', '문제', '난이도', '응시 학생', '제출 수', '정답률', '평균 소요시간'].map((col, i) => (
-                  <th key={i} className="px-5 py-3 text-left" style={{ fontSize: '12px', fontWeight: 600, color: '#8A8F98' }}>
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {problemStats.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-16 text-center" style={{ fontSize: '14px', color: '#BCC0C7' }}>
-                    등록된 문제가 없습니다
-                  </td>
-                </tr>
-              ) : (
-                problemStats.map((p, idx) => (
-                  <tr key={p.id} style={{ borderBottom: idx < problemStats.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                    <td className="px-5 py-4" style={{ fontSize: '13px', color: '#8A8F98', width: 48 }}>
-                      {p.problem_no}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span style={{ fontSize: '14px', fontWeight: 500, color: '#16181D' }}>{p.title}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_COLOR[p.difficulty].bg, color: DIFF_COLOR[p.difficulty].color }}>
-                        {DIFF_LABEL[p.difficulty]}
+        <div className="flex flex-col gap-3 min-w-0">
+          <div className="flex flex-wrap items-end gap-3">
+            <FilterSelect
+              label="과목"
+              value={subjectId}
+              options={subjectOptions}
+              onChange={(value) => {
+                setSubjectId(value);
+                setStageId('');
+                setChapterId('');
+              }}
+            />
+            <FilterSelect
+              label="단계"
+              value={stageId}
+              options={stageOptions}
+              disabled={!subjectId}
+              onChange={(value) => {
+                setStageId(value);
+                setChapterId('');
+              }}
+            />
+            <FilterSelect
+              label="챕터"
+              value={chapterId}
+              options={chapterOptions}
+              disabled={!subjectId && !stageId}
+              onChange={setChapterId}
+            />
+            <span style={{ fontSize: '12px', color: '#8A8F98', paddingBottom: 8 }}>
+              {filteredProblems.length}개 문제
+            </span>
+          </div>
+
+          {groupedChapters.length === 0 ? (
+            <div className="bg-white rounded-xl flex flex-col items-center justify-center py-16" style={{ border: '1px solid #E5E8EC' }}>
+              <p style={{ fontSize: '14px', color: '#BCC0C7' }}>표시할 문제가 없습니다</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 min-w-0">
+              {groupedChapters.map((group) => {
+                const collapsed = collapsedChapters.has(group.chapterId);
+                return (
+                  <div key={group.chapterId} className="bg-white rounded-xl overflow-hidden min-w-0" style={{ border: '1px solid #E5E8EC' }}>
+                    <button
+                      onClick={() => toggleChapter(group.chapterId)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                      style={{ backgroundColor: '#F0F7FF', borderBottom: collapsed ? 'none' : '1px solid #E5E8EC' }}
+                    >
+                      {collapsed
+                        ? <ChevronRight size={15} style={{ color: '#5A6270', flexShrink: 0 }} />
+                        : <ChevronDown size={15} style={{ color: '#5A6270', flexShrink: 0 }} />}
+                      <span className="flex items-center justify-center rounded-md shrink-0" style={{ width: 26, height: 26, backgroundColor: '#1B64DA', color: '#fff', fontSize: '12px', fontWeight: 700 }}>
+                        {group.chapterOrder}
                       </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span style={{ fontSize: '14px', color: '#16181D' }}>{p.student_count}명</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span style={{ fontSize: '14px', color: '#16181D' }}>{p.submission_count}회</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-full overflow-hidden" style={{ width: 72, height: 5, backgroundColor: '#E5E8EC' }}>
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${p.pass_rate}%`, backgroundColor: p.pass_rate >= 70 ? '#16A34A' : p.pass_rate >= 40 ? '#1B64DA' : '#DC2626' }}
-                          />
+                      <div className="flex-1 min-w-0">
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#16181D' }}>{group.chapterTitle}</div>
+                        <div className="truncate" style={{ fontSize: '11px', color: '#8A8F98', marginTop: 1 }}>
+                          {group.subjectTitle} / {group.stageTitle} · {group.problems.length}문제
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>{p.pass_rate}%</span>
                       </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span style={{ fontSize: '13px', color: '#8A8F98' }}>{formatElapsed(p.avg_elapsed_sec)}</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </button>
+
+                    {!collapsed && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse" style={{ minWidth: 720, tableLayout: 'fixed' }}>
+                          <colgroup>
+                            <col style={{ width: 72 }} />
+                            <col />
+                            <col style={{ width: 72 }} />
+                            <col style={{ width: 88 }} />
+                            <col style={{ width: 80 }} />
+                            <col style={{ width: 140 }} />
+                            <col style={{ width: 110 }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E8EC' }}>
+                              {['번호', '문제', '난이도', '응시 학생', '제출 수', '정답률', '평균 소요'].map((col) => (
+                                <th key={col} className="px-3 py-2.5 text-left whitespace-nowrap" style={{ fontSize: '11px', fontWeight: 600, color: '#8A8F98' }}>
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.problems.map((p, idx) => (
+                              <tr key={p.id} style={{ borderBottom: idx < group.problems.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 700, color: '#8A8F98', fontFamily: 'monospace' }}>
+                                  {p.chapter_order_no}-{p.order_no}
+                                </td>
+                                <td className="px-3 py-3 min-w-0">
+                                  <span className="block truncate" style={{ fontSize: '13px', fontWeight: 500, color: '#16181D' }} title={p.title}>
+                                    {p.title}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_COLOR[p.difficulty].bg, color: DIFF_COLOR[p.difficulty].color }}>
+                                    {DIFF_LABEL[p.difficulty]}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: '#16181D' }}>
+                                  {p.student_count}명
+                                </td>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: '#16181D' }}>
+                                  {p.submission_count}회
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="rounded-full overflow-hidden shrink-0" style={{ width: 56, height: 5, backgroundColor: '#E5E8EC' }}>
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{ width: `${p.pass_rate}%`, backgroundColor: p.pass_rate >= 70 ? '#16A34A' : p.pass_rate >= 40 ? '#1B64DA' : '#DC2626' }}
+                                      />
+                                    </div>
+                                    <span className="whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 600, color: '#16181D' }}>{p.pass_rate}%</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', color: '#8A8F98' }}>
+                                  {formatElapsed(p.avg_elapsed_sec)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -338,13 +569,13 @@ export default function ProgressPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="bg-white rounded-2xl flex flex-col overflow-hidden" style={{ width: '60vw', height: '80vh', maxWidth: 900 }}>
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC', flexShrink: 0 }}>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <FileCode2 size={18} style={{ color: '#1B64DA' }} />
-                <div>
+                <div className="min-w-0">
                   <div style={{ fontSize: '15px', fontWeight: 700, color: '#16181D' }}>
                     {codeModal.sub.problems?.problem_no}. {codeModal.sub.problems?.title}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span style={{ fontSize: '12px', color: '#8A8F98' }}>{codeModal.studentName}</span>
                     <span style={{ fontSize: '11px', color: '#BCC0C7' }}>·</span>
                     <span style={{ fontSize: '12px', color: '#8A8F98' }}>{formatDate(codeModal.sub.submitted_at)}</span>
@@ -357,20 +588,12 @@ export default function ProgressPage() {
                         </span>
                       );
                     })()}
-                    <span style={{ fontSize: '12px', color: '#8A8F98' }}>
-                      · {codeModal.sub.passed_count}/{codeModal.sub.total_count} 케이스
-                    </span>
-                    {codeModal.sub.elapsed_sec && (
-                      <span style={{ fontSize: '12px', color: '#8A8F98' }}>
-                        · {formatElapsed(codeModal.sub.elapsed_sec)}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setCodeModal(null)}
-                className="flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
+                className="flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100 shrink-0"
                 style={{ width: 32, height: 32, color: '#8A8F98' }}
               >
                 <X size={16} />

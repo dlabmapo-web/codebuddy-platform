@@ -2,20 +2,7 @@
 
 import { X, Lightbulb } from 'lucide-react';
 
-const HINTS = [
-  {
-    title: '접근 방법 힌트',
-    content:
-      '배열을 한 번만 순회하면서, 이미 본 숫자들 중 현재 숫자와 합쳐서 target이 되는 숫자가 있는지 빠르게 확인할 방법을 생각해보세요.',
-  },
-  {
-    title: '자료구조 힌트',
-    content:
-      'O(1) 시간에 숫자의 존재 여부를 확인할 수 있는 자료구조를 활용하면 전체 시간 복잡도를 크게 줄일 수 있어요. 딕셔너리(해시맵)를 활용해보세요.',
-  },
-];
-
-export function HintPanel({ onClose }: { onClose: () => void }) {
+export function HintPanel({ hints, onClose }: { hints: string[]; onClose: () => void }) {
   return (
     <>
       <div
@@ -44,38 +31,33 @@ export function HintPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex-1 overflow-auto p-5 flex flex-col gap-3">
-          {HINTS.map((hint, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-4"
-              style={{ border: '1px solid #E5E8EC' }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: '#EAF1FD', fontSize: '11px', fontWeight: 700, color: '#1B64DA' }}
-                >
-                  {i + 1}
-                </span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>{hint.title}</span>
+          {hints.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16">
+              <Lightbulb size={32} style={{ color: '#E5E8EC' }} />
+              <p style={{ fontSize: '13px', color: '#8A8F98', textAlign: 'center' }}>
+                이 문제에 등록된 힌트가 없습니다.
+              </p>
+            </div>
+          ) : (
+            hints.map((hint, i) => (
+              <div
+                key={i}
+                className="rounded-xl p-4"
+                style={{ border: '1px solid #E5E8EC' }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: '#EAF1FD', fontSize: '11px', fontWeight: 700, color: '#1B64DA' }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>힌트 {i + 1}</span>
+                </div>
+                <p style={{ fontSize: '13px', color: '#5A6270', lineHeight: 1.7, whiteSpace: 'pre-line' }}>{hint}</p>
               </div>
-              <p style={{ fontSize: '13px', color: '#5A6270', lineHeight: 1.7 }}>{hint.content}</p>
-            </div>
-          ))}
-
-          <div
-            className="rounded-xl p-4"
-            style={{ border: '1px solid #FEF3C7', backgroundColor: '#FFFBEB' }}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Lightbulb size={14} style={{ color: '#D97706' }} />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#B45309' }}>풀이 방향</span>
-            </div>
-            <p style={{ fontSize: '13px', color: '#92400E', lineHeight: 1.7 }}>
-              반복문 안에서 <code style={{ backgroundColor: '#FEF3C7', padding: '1px 4px', borderRadius: 4 }}>complement = target - num</code>을 계산하고,
-              이 값이 이미 딕셔너리에 있는지 확인해보세요.
-            </p>
-          </div>
+            ))
+          )}
         </div>
 
         <div

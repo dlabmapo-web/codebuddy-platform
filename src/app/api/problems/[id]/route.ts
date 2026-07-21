@@ -27,5 +27,41 @@ export async function GET(_req: Request, { params }: Params) {
     .eq('is_sample', true)
     .order('order_no', { ascending: true });
 
-  return apiOk({ problem, test_cases: test_cases ?? [] });
+  const { data: hints } = await db
+    .from('problem_hints')
+    .select('id, hint_text, order_no')
+    .eq('problem_id', id)
+    .order('order_no', { ascending: true });
+
+  let next_problem_id: string | null = null;
+  let stage_id: string | null = null;
+
+  if (problem.chapter_id) {
+    const [{ data: nextProblem }, { data: chapter }] = await Promise.all([
+      db
+        .from('problems')
+        .select('id')
+        .eq('chapter_id', problem.chapter_id)
+        .eq('is_published', true)
+        .gt('order_no', problem.order_no)
+        .order('order_no', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      db
+        .from('chapters')
+        .select('stage_id')
+        .eq('id', problem.chapter_id)
+        .maybeSingle(),
+    ]);
+    next_problem_id = nextProblem?.id ?? null;
+    stage_id = chapter?.stage_id ?? null;
+  }
+
+  return apiOk({
+    problem,
+    test_cases: test_cases ?? [],
+    hints: hints ?? [],
+    next_problem_id,
+    stage_id,
+  });
 }

@@ -42,6 +42,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
+  const sessionId = searchParams.get('session_id');
 
   const db = supabaseAdmin();
   let query = db
@@ -51,12 +52,12 @@ export async function GET(req: Request) {
 
   if (user.role === 'student') {
     query = query.eq('student_id', user.id);
-    // 학생 조회 시 문제별 필터 적용
-    if (problemId) query = query.eq('problem_id', problemId);
   } else if (user.role === 'teacher') {
     query = query.eq('teacher_id', user.id);
-    if (problemId) query = query.eq('problem_id', problemId);
   }
+
+  if (sessionId) query = query.eq('session_id', sessionId);
+  else if (problemId) query = query.eq('problem_id', problemId);
 
   const { data, error } = await query;
   if (error) return apiError('피드백 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);

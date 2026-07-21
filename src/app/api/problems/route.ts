@@ -9,39 +9,81 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q')?.trim() ?? '';
-  const sort = searchParams.get('sort') ?? 'no';
+  const chapterId = searchParams.get('chapter_id')?.trim() ?? '';
+
+  if (!chapterId) return apiError('챕터를 선택해주세요.', 'INVALID_CHAPTER', 400);
 
   const db = supabaseAdmin();
-  let query = db
+
+  const { data: chapter } = await db
+    .from('chapters')
+    .select('id, title, description, order_no, stage_id, is_published')
+    .eq('id', chapterId)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!chapter) return apiError('챕터를 찾을 수 없습니다.', 'NOT_FOUND', 404);
+
+  const { data: stage } = await db
+    .from('stages')
+    .select('id, title, order_no, subject_id, is_published')
+    .eq('id', chapter.stage_id)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!stage) return apiError('단계를 찾을 수 없습니다.', 'NOT_FOUND', 404);
+
+  const { data: subject } = await db
+    .from('subjects')
+    .select('id, title, order_no, is_published')
+    .eq('id', stage.subject_id)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!subject) return apiError('과목을 찾을 수 없습니다.', 'NOT_FOUND', 404);
+
+  let problemQuery = db
     .from('problems')
-    .select('id, problem_no, title, difficulty, time_limit_ms, memory_limit_mb, is_published, created_at')
-    .eq('is_published', true);
+    .select('id, problem_no, chapter_id, order_no, title, difficulty, is_published, created_at')
+    .eq('is_published', true)
+    .eq('chapter_id', chapterId)
+    .order('order_no', { ascending: true });
 
-  if (q) query = query.ilike('title', `%${q}%`);
-  query = query.order(sort === 'difficulty' ? 'difficulty' : 'problem_no', { ascending: true });
+  if (q) problemQuery = problemQuery.ilike('title', `%${q}%`);
 
-  const { data: problems, error } = await query;
+  const { data: problems, error } = await problemQuery;
   if (error) return apiError('문제 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
-  if (!problems?.length) return apiOk({ problems: [] });
-
-  const { data: submissions } = await db
-    .from('submissions')
-    .select('problem_id, status')
-    .eq('user_id', user.id)
-    .in('problem_id', problems.map((p) => p.id));
-
+  const list = problems ?? [];
   const statusMap: Record<string, 'pass' | 'fail' | 'partial'> = {};
-  for (const s of submissions ?? []) {
-    const prev = statusMap[s.problem_id];
-    if (!prev || s.status === 'pass') statusMap[s.problem_id] = s.status;
+  if (list.length > 0) {
+    const { data: submissions } = await db
+      .from('submissions')
+      .select('problem_id, status')
+      .eq('user_id', user.id)
+      .in('problem_id', list.map((p) => p.id));
+
+    for (const s of submissions ?? []) {
+      const prev = statusMap[s.problem_id];
+      if (!prev || s.status === 'pass') statusMap[s.problem_id] = s.status;
+    }
   }
 
-  const result = problems.map((p) => {
-    const best = statusMap[p.id];
-    const solveStatus = best === 'pass' ? 'solved' : best ? 'tried' : 'unsolved';
-    return { ...p, solve_status: solveStatus };
+  return apiOk({
+    subject,
+    stage,
+    chapter,
+    problems: list.map((p, pIdx) => {
+      const best = statusMap[p.id];
+      return {
+        id: p.id,
+        problem_no: p.problem_no,
+        order_no: p.order_no,
+        title: p.title,
+        difficulty: p.difficulty,
+        sub_no: pIdx + 1,
+        solve_status: best === 'pass' ? 'solved' : best ? 'tried' : 'unsolved',
+      };
+    }),
   });
-
-  return apiOk({ problems: result });
 }

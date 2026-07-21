@@ -1,0 +1,20 @@
+# Netlify CDN은 public/ 정적 파일을 Next.js 서버 계층 없이 직접 서빙하므로
+# next.config.ts 의 headers() 가 적용되지 않는다. 대화식 Python 실행에 필요한
+# SharedArrayBuffer(cross-origin isolated)를 위해 워커/Pyodide 정적 자산에도
+# 동일한 COOP/COEP/CORP 헤더를 명시한다.
+
+/pyodide-worker.js
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+/pyodide/*
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+# 페이지가 어디서 진입하든 격리가 유지되도록 전역 기본값도 명시 (SSR 라우트는
+# next.config.ts 에서도 적용되지만, 정적으로 서빙될 수 있는 경로까지 이중 보장)
+/*
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin

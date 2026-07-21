@@ -4,19 +4,29 @@ export const CURSOR_COLORS: Record<string, string> = {
 };
 
 export function injectCursorStyles() {
-  if (document.getElementById('paircode-cursor-styles')) return;
+  const existing = document.getElementById('paircode-cursor-styles');
+  if (existing) existing.remove();
   const style = document.createElement('style');
   style.id = 'paircode-cursor-styles';
   style.textContent = `
-    .remote-cursor-teacher {
-      border-left: 2px solid #7C3AED !important;
-      margin-left: -1px;
+    .remote-cursor-widget {
+      position: relative;
+      pointer-events: none;
+      width: 0;
+      height: 0;
     }
-    .remote-cursor-student {
-      border-left: 2px solid #1B64DA !important;
-      margin-left: -1px;
+    .remote-cursor-caret {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 2px;
+      height: 18px;
+      pointer-events: none;
     }
     .remote-cursor-label {
+      position: absolute;
+      left: 0;
+      top: -15px;
       padding: 1px 5px;
       border-radius: 3px 3px 3px 0;
       font-size: 10px;
@@ -24,7 +34,7 @@ export function injectCursorStyles() {
       color: white;
       white-space: nowrap;
       pointer-events: none;
-      line-height: 16px;
+      line-height: 14px;
     }
   `;
   document.head.appendChild(style);

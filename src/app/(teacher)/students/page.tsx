@@ -75,10 +75,12 @@ export default function StudentsPage() {
     }));
 
     rows.sort((a, b) => {
-      if (a.activeSession && !b.activeSession) return -1;
-      if (!a.activeSession && b.activeSession) return 1;
       const aOnline = isOnline(a.last_active_at);
       const bOnline = isOnline(b.last_active_at);
+      const aSolving = aOnline && !!a.activeSession;
+      const bSolving = bOnline && !!b.activeSession;
+      if (aSolving && !bSolving) return -1;
+      if (!aSolving && bSolving) return 1;
       if (aOnline && !bOnline) return -1;
       if (!aOnline && bOnline) return 1;
       return 0;
@@ -99,8 +101,8 @@ export default function StudentsPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const onlineCount = students.filter(s => isOnline(s.last_active_at) || !!s.activeSession).length;
-  const solvingCount = students.filter(s => s.activeSession).length;
+  const onlineCount = students.filter(s => isOnline(s.last_active_at)).length;
+  const solvingCount = students.filter(s => s.activeSession && isOnline(s.last_active_at)).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -163,8 +165,8 @@ export default function StudentsPage() {
           </div>
         ) : (
           students.map((s, idx) => {
-            const session = s.activeSession;
-            const online = isOnline(s.last_active_at) || !!session;
+            const online = isOnline(s.last_active_at);
+            const session = online ? s.activeSession : null;
             const diff = session?.problems?.difficulty;
 
             return (

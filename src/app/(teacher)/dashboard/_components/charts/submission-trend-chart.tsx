@@ -1,17 +1,8 @@
 'use client';
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { SubmissionTrendPoint } from '@/lib/types/teacherDashboard';
-import { CHART_COLORS, TOOLTIP_STYLE } from './chartTheme';
+import { CHART_COLORS, TOOLTIP_STYLE } from './chart-theme';
 
 export default function SubmissionTrendChart({ data }: { data: SubmissionTrendPoint[] }) {
   return (

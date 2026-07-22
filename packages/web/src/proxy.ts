@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth/jwt';
 import type { UserRole } from '@/lib/types/db';
+import { updateSupabaseSession } from '@/lib/supabase/proxy';
 
 const COOKIE_NAME = 'pc_token';
 
@@ -42,6 +43,10 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get(COOKIE_NAME)?.value;
 
+  if (pathname.startsWith('/auth')) {
+    return updateSupabaseSession(req);
+  }
+
   if (AUTH_PAGES.some((p) => pathname.startsWith(p))) {
     if (token) {
       const payload = await verifyToken(token);
@@ -77,6 +82,7 @@ export const config = {
   matcher: [
     '/login',
     '/signup',
+    '/auth/:path*',
     '/problems/:path*',
     '/me/:path*',
     '/students/:path*',

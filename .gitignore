@@ -46,6 +46,9 @@ yarn-error.log*
 next-env.d.ts
 project/
 
+# Supabase CLI local state
+supabase/.temp/
+
 기능정의서.md
 .gitmessage.txt
 

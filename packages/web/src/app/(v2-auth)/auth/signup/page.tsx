@@ -3,7 +3,10 @@ import { SignupForm } from './_components/signup-form';
 
 export default function SignupPage() {
   return (
-    <AuthCard title="Create your Cove account" description="One account can belong to multiple academies with a different role in each.">
+    <AuthCard
+      description="One account works across every DLAB academy — with its own role in each."
+      title="Create your account"
+    >
       <SignupForm />
     </AuthCard>
   );

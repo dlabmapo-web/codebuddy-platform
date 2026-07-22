@@ -6,10 +6,12 @@ import { useState } from 'react';
 import { publicConfig } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
 
+import { GoogleIcon, KakaoIcon, NaverIcon } from './provider-icons';
+
 const providers = [
-  { id: 'google', label: 'Continue with Google' },
-  { id: 'kakao', label: 'Continue with Kakao' },
-  { id: 'custom:naver', label: 'Continue with Naver' },
+  { id: 'google', label: 'Google', Icon: GoogleIcon },
+  { id: 'kakao', label: 'Kakao', Icon: KakaoIcon },
+  { id: 'custom:naver', label: 'Naver', Icon: NaverIcon },
 ] as const;
 
 export function SocialLoginButtons() {
@@ -25,24 +27,34 @@ export function SocialLoginButtons() {
     });
     if (oauthError) {
       setPending(undefined);
-      setError('This login provider is not configured yet.');
+      setError('This sign-in provider is not available yet.');
     }
   }
 
   return (
-    <div className="space-y-2">
-      {providers.map((provider) => (
-        <button
-          className="h-11 w-full rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
-          disabled={Boolean(pending)}
-          key={provider.id}
-          onClick={() => void signIn(provider.id)}
-          type="button"
-        >
-          {pending === provider.id ? 'Connecting…' : provider.label}
-        </button>
-      ))}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    <div>
+      <div className="grid grid-cols-3 gap-3">
+        {providers.map(({ id, label, Icon }) => (
+          <button
+            aria-label={`Continue with ${label}`}
+            className="flex h-14 items-center justify-center gap-2.5 rounded-xl border border-border bg-white text-[15px] font-semibold text-ink transition-colors hover:border-ink/25 hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+            disabled={Boolean(pending)}
+            key={id}
+            onClick={() => void signIn(id)}
+            type="button"
+          >
+            {pending === id ? (
+              <span className="font-mono text-sm text-sub">…</span>
+            ) : (
+              <>
+                <Icon className="h-6 w-6" />
+                <span className="hidden sm:inline">{label}</span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      {error ? <p className="mt-3 text-[14px] text-danger">{error}</p> : null}
     </div>
   );
 }

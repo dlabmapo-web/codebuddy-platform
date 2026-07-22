@@ -3,7 +3,10 @@ import { LoginForm } from './_components/login-form';
 
 export default function LoginPage() {
   return (
-    <AuthCard title="Sign in" description="Use your Cove account. Your academy manager controls academy access and roles.">
+    <AuthCard
+      description="Sign in to pick up where you left off. Your academy manager controls academy access and roles."
+      title="Welcome back"
+    >
       <LoginForm />
     </AuthCard>
   );

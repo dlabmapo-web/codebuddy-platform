@@ -1,9 +1,11 @@
 'use client';
 
+import { Mail, User } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState } from 'react';
 
 import { signupAction, type AuthFormState } from '../../actions';
+import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
 
 const initialState: AuthFormState = {};
@@ -12,18 +14,48 @@ export function SignupForm() {
   const [state, action, pending] = useActionState(signupAction, initialState);
 
   return (
-    <>
+    <div>
       <SocialLoginButtons />
-      <div className="my-6 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or<span className="h-px flex-1 bg-slate-200" /></div>
-      <form action={action} className="space-y-4">
-        <label className="block text-sm font-medium text-slate-800">Name<input className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3" name="displayName" required /></label>
-        <label className="block text-sm font-medium text-slate-800">Email<input className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3" name="email" required type="email" /></label>
-        <label className="block text-sm font-medium text-slate-800">Password<input className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3" minLength={8} name="password" required type="password" /></label>
-        {state.message ? <p className={state.success ? 'text-sm text-green-700' : 'text-sm text-red-600'}>{state.message}</p> : null}
-        <button className="h-11 w-full rounded-lg bg-blue-700 text-sm font-semibold text-white disabled:opacity-50" disabled={pending || state.success} type="submit">{pending ? 'Creating account…' : 'Create account'}</button>
+
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">or with email</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form action={action} className="space-y-5">
+        <TextField autoComplete="name" icon={User} label="Name" name="displayName" placeholder="Your name" required />
+        <TextField autoComplete="email" icon={Mail} label="Email" name="email" placeholder="you@example.com" required type="email" />
+        <PasswordField autoComplete="new-password" hint="At least 8 characters." minLength={8} />
+
+        {state.message ? (
+          <p className={state.success ? 'text-[14px] text-success' : 'text-[14px] text-danger'}>{state.message}</p>
+        ) : null}
+
+        <button
+          className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          disabled={pending || state.success}
+          type="submit"
+        >
+          {pending ? 'Creating account…' : 'Create account'}
+        </button>
       </form>
-      <p className="mt-4 rounded-lg bg-blue-50 p-3 text-xs leading-5 text-blue-900">You do not choose a role during signup. An academy manager assigns your role when approving or inviting you.</p>
-      <p className="mt-6 text-center text-sm text-slate-600">Already registered? <Link className="font-medium text-blue-700" href="/auth/login">Sign in</Link></p>
-    </>
+
+      <div className="mt-5 flex gap-3 rounded-xl border border-border bg-warm-canvas px-4 py-3.5 text-[14px] leading-6 text-sub">
+        <svg aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-brand" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" fill="currentColor" opacity="0.12" r="10" />
+          <circle cx="12" cy="8" fill="currentColor" r="1.25" />
+          <path d="M12 11.5v5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+        </svg>
+        <p>You don&apos;t pick a role here. An academy manager gives you your role when they approve or invite you.</p>
+      </div>
+
+      <p className="mt-6 text-center text-[15px] text-sub">
+        Already have an account?{' '}
+        <Link className="font-bold text-brand hover:text-brand-deep" href="/auth/login">
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }

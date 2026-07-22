@@ -1,0 +1,68 @@
+import { HttpStatus, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import { AppException } from "../common/app-exception.js";
+import type { ApiEnvironment } from "../config/env.schema.js";
+import type { SupabaseIdentity } from "./auth.types.js";
+
+@Injectable()
+export class SupabaseAuthService {
+  private readonly client: SupabaseClient;
+
+  constructor(config: ConfigService<ApiEnvironment, true>) {
+    this.client = createClient(
+      config.get("SUPABASE_URL", { infer: true }),
+      config.get("SUPABASE_SECRET_KEY", { infer: true }),
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+  }
+
+  async verifyAccessToken(token: string): Promise<SupabaseIdentity> {
+    const { data, error } = await this.client.auth.getClaims(token);
+    const claims = data?.claims;
+
+    if (error || !claims || typeof claims.sub !== "string") {
+      throw new AppException("TOKEN_INVALID", HttpStatus.UNAUTHORIZED);
+    }
+
+    const metadata = isRecord(claims.user_metadata)
+      ? claims.user_metadata
+      : {};
+    const email = typeof claims.email === "string"
+      ? claims.email.trim().toLowerCase()
+      : null;
+    const emailVerified = claims.email_verified === true ||
+      metadata.email_verified === true ||
+      metadata.email_confirmed === true;
+
+    return {
+      authUserId: claims.sub,
+      email,
+      emailVerified: email !== null && emailVerified,
+      displayName: firstString(metadata.full_name, metadata.name),
+      avatarUrl: firstUrl(metadata.avatar_url, metadata.picture),
+    };
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function firstUrl(...values: unknown[]): string | null {
+  const value = firstString(...values);
+  if (!value) return null;
+  try {
+    return new URL(value).toString();
+  } catch {
+    return null;
+  }
+}

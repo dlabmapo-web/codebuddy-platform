@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cove Studio
 
-## Getting Started
+Cove Studio is the Cove v2 learning platform. This branch keeps the existing Next.js MVP working while introducing an independently deployable NestJS API and shared contracts.
 
-First, run the development server:
+## Packages
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+packages/
+├── api/       NestJS backend
+├── shared/    Shared schemas, contracts, types, enums, and error codes
+└── web/       Next.js frontend and the preserved V1 route handlers
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The V1 route handlers intentionally remain in `packages/web/src/app/api` during the incremental migration. Do not remove one until its NestJS replacement and web integration are verified.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Requirements
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 22 or newer
+- pnpm 9.15.9
 
-## Learn More
+## Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm install
+pnpm build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The existing local Next.js environment files live in `packages/web/` and remain ignored by Git. Add future NestJS-only secrets to `packages/api/.env`; never expose database or Supabase secret keys with a `NEXT_PUBLIC_` prefix.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Cove v2 API environment
 
-## Deploy on Vercel
+Create the local API environment from the committed template:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+cp packages/api/.env.example packages/api/.env
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Fill it with values from the Cove Studio Supabase project. Use `DATABASE_URL` for the runtime connection and `DIRECT_URL` for Prisma CLI operations. The local `.env` is ignored by Git, and the existing V1 web environment remains separate.
+
+Validate the database setup without creating tables:
+
+```bash
+pnpm --filter @cove/api db:validate
+pnpm --filter @cove/api db:generate
+```
+
+## Development
+
+Run both applications:
+
+```bash
+pnpm dev
+```
+
+Or run them separately:
+
+```bash
+pnpm dev:web
+pnpm dev:api
+```
+
+- Web: [http://localhost:3000](http://localhost:3000)
+- API health: [http://localhost:4000/api/health](http://localhost:4000/api/health)
+
+## Verification
+
+```bash
+pnpm typecheck
+pnpm build
+```
+
+The current V1 source has pre-existing lint violations. `pnpm lint` is available as a baseline and will become blocking after those violations are fixed or baselined separately.
+
+## Design
+
+- [Cove v2 system design](docs/design/2026-07-22-cove-v2-system-design.md)
+- [Phase 0 migration plan](docs/design/2026-07-22-cove-v2-phase-0-migration-plan.md)

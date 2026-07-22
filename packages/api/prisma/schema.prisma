@@ -1,0 +1,217 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PlatformRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING_PROFILE
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum AcademyStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum AcademyRole {
+  STUDENT
+  TEACHER
+  TEAM_LEAD
+  MANAGER
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  LEFT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model User {
+  id                 String       @id @default(uuid()) @db.Uuid
+  authUserId         String?      @unique @map("auth_user_id") @db.Uuid
+  email              String?      @unique
+  displayName        String?      @map("display_name")
+  avatarUrl          String?      @map("avatar_url")
+  platformRole       PlatformRole @default(USER) @map("platform_role")
+  status             UserStatus   @default(PENDING_PROFILE)
+  legacyUserId       String?      @unique @map("legacy_user_id")
+  legacyUsername     String?      @unique @map("legacy_username")
+  legacyPasswordHash String?      @map("legacy_password_hash")
+  migratedAt         DateTime?    @map("migrated_at") @db.Timestamptz(6)
+  lastSignInAt       DateTime?    @map("last_sign_in_at") @db.Timestamptz(6)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships           AcademyMembership[]
+  invitationsCreated    AcademyInvitation[]  @relation("InvitationCreator")
+  invitationsAccepted   AcademyInvitation[]  @relation("InvitationAcceptor")
+  joinRequests          AcademyJoinRequest[] @relation("JoinRequester")
+  joinRequestsReviewed  AcademyJoinRequest[] @relation("JoinReviewer")
+  membershipInvitations AcademyMembership[]  @relation("MembershipInviter")
+  membershipApprovals   AcademyMembership[]  @relation("MembershipApprover")
+  auditLogs             AuditLog[]           @relation("AuditActor")
+
+  @@index([status])
+  @@map("users")
+}
+
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String             @unique
+  status    OrganizationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academies Academy[]
+
+  @@map("organizations")
+}
+
+model Academy {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  name           String
+  slug           String
+  status         AcademyStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships  AcademyMembership[]
+  invitations  AcademyInvitation[]
+  joinRequests AcademyJoinRequest[]
+  auditLogs    AuditLog[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+  @@map("academies")
+}
+
+model AcademyMembership {
+  id               String           @id @default(uuid()) @db.Uuid
+  academyId        String           @map("academy_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  role             AcademyRole
+  status           MembershipStatus @default(INVITED)
+  invitedByUserId  String?          @map("invited_by_user_id") @db.Uuid
+  approvedByUserId String?          @map("approved_by_user_id") @db.Uuid
+  joinedAt         DateTime?        @map("joined_at") @db.Timestamptz(6)
+  suspendedAt      DateTime?        @map("suspended_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy    Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy  User?   @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  approvedBy User?   @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([academyId, userId])
+  @@index([userId, status])
+  @@index([academyId, role, status])
+  @@map("academy_memberships")
+}
+
+model AcademyInvitation {
+  id               String           @id @default(uuid()) @db.Uuid
+  academyId        String           @map("academy_id") @db.Uuid
+  email            String
+  role             AcademyRole
+  tokenHash        String           @unique @map("token_hash")
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz(6)
+  invitedByUserId  String           @map("invited_by_user_id") @db.Uuid
+  acceptedByUserId String?          @map("accepted_by_user_id") @db.Uuid
+  acceptedAt       DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  revokedAt        DateTime?        @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy    Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  invitedBy  User    @relation("InvitationCreator", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  acceptedBy User?   @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([academyId, email, status])
+  @@index([expiresAt, status])
+  @@map("academy_invitations")
+}
+
+model AcademyJoinRequest {
+  id               String            @id @default(uuid()) @db.Uuid
+  academyId        String            @map("academy_id") @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  message          String?
+  status           JoinRequestStatus @default(PENDING)
+  approvedRole     AcademyRole?      @map("approved_role")
+  reviewedByUserId String?           @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime?         @map("reviewed_at") @db.Timestamptz(6)
+  reviewReason     String?           @map("review_reason")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy    Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user       User    @relation("JoinRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User?   @relation("JoinReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([academyId, status, createdAt])
+  @@index([userId, status])
+  @@map("academy_join_requests")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  academyId   String?  @map("academy_id") @db.Uuid
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String?  @map("target_id")
+  before      Json?
+  after       Json?
+  requestId   String?  @map("request_id")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  academy Academy? @relation(fields: [academyId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([academyId, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}

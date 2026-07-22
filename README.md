@@ -27,6 +27,23 @@ pnpm build
 
 The existing local Next.js environment files live in `packages/web/` and remain ignored by Git. Add future NestJS-only secrets to `packages/api/.env`; never expose database or Supabase secret keys with a `NEXT_PUBLIC_` prefix.
 
+### Cove v2 API environment
+
+Create the local API environment from the committed template:
+
+```bash
+cp packages/api/.env.example packages/api/.env
+```
+
+Fill it with values from the Cove Studio Supabase project. Use `DATABASE_URL` for the runtime connection and `DIRECT_URL` for Prisma CLI operations. The local `.env` is ignored by Git, and the existing V1 web environment remains separate.
+
+Validate the database setup without creating tables:
+
+```bash
+pnpm --filter @cove/api db:validate
+pnpm --filter @cove/api db:generate
+```
+
 ## Development
 
 Run both applications:

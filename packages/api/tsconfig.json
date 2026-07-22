@@ -4,12 +4,12 @@
     "declaration": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "removeComments": true,
     "sourceMap": true,
-    "target": "ES2022"
+    "target": "ES2023"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]

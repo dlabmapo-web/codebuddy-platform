@@ -35,7 +35,7 @@ export function AuthCard({
           </div>
         </div>
 
-        <p className="relative text-[12px] text-white/50">© 2026 Cove Studio. All rights reserved.</p>
+        <p className="relative text-[12px] text-white/50">© 2026 CoveEdu AI. All rights reserved.</p>
       </aside>
 
       {/* Form panel */}

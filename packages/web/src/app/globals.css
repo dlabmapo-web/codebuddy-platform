@@ -2,9 +2,9 @@
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 @theme {
-  --color-primary: #1B64DA;
-  --color-primary-hover: #1450B5;
-  --color-primary-light: #EAF1FD;
+  --color-primary: #E8461C;
+  --color-primary-hover: #C93A15;
+  --color-primary-light: #FDEDE7;
   --color-ink: #16181D;
   --color-sub: #5A6270;
   --color-border: #E5E8EC;
@@ -13,6 +13,11 @@
   --color-danger: #DC2626;
   --color-warning: #D97706;
   --color-editor-bg: #1E1E1E;
+
+  /* Auth-specific warm neutrals */
+  --color-brand: #E8461C;
+  --color-brand-deep: #C4380F;
+  --color-warm-canvas: #FAF7F4;
 
   --radius: 8px;
   --radius-card: 10px;

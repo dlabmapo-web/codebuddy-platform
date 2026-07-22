@@ -26,8 +26,10 @@
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
+    "@orpc/server": "^1.14.4",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
+    "@supabase/supabase-js": "^2.108.2",
     "dotenv": "^17.4.2",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.15.0",
     "@types/pg": "^8.20.0",
     "prisma": "^7.9.0",

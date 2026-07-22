@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import ProblemsPageInner from './ProblemsPageInner';
+import { ProblemsScreen } from './_components/problems-screen';
 
 export default function ProblemsPage() {
   return (
@@ -10,7 +10,7 @@ export default function ProblemsPage() {
         </div>
       }
     >
-      <ProblemsPageInner />
+      <ProblemsScreen />
     </Suspense>
   );
 }

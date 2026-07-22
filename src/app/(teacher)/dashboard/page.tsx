@@ -1,6 +1,4 @@
-'use client';
-
-import { TeacherAnalyticsDashboard } from '@/components/dashboard/TeacherAnalyticsDashboard';
+import { TeacherDashboardScreen } from './_components/teacher-dashboard-screen';
 
 export default function TeacherDashboardPage() {
   return (
@@ -11,7 +9,7 @@ export default function TeacherDashboardPage() {
           담당 학생의 제출·오답·해결 현황과 학습 분석을 한눈에 확인하세요.
         </p>
       </div>
-      <TeacherAnalyticsDashboard />
+      <TeacherDashboardScreen />
     </div>
   );
 }

@@ -11,6 +11,6 @@
     "sourceMap": true,
     "target": "ES2023"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "prisma/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

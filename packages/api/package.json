@@ -16,6 +16,7 @@
     "db:format": "prisma format",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed/seed.ts",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio"
@@ -42,6 +43,7 @@
     "@types/node": "^22.15.0",
     "@types/pg": "^8.20.0",
     "prisma": "^7.9.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

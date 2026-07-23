@@ -4,10 +4,10 @@ export const CURSOR_COLORS: Record<string, string> = {
 };
 
 export function injectCursorStyles() {
-  const existing = document.getElementById('paircode-cursor-styles');
+  const existing = document.getElementById('cove-cursor-styles');
   if (existing) existing.remove();
   const style = document.createElement('style');
-  style.id = 'paircode-cursor-styles';
+  style.id = 'cove-cursor-styles';
   style.textContent = `
     .remote-cursor-widget {
       position: relative;

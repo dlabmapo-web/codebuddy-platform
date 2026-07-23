@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { registerCoveTheme } from '@/lib/monaco/theme';
 import {
   ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock,
 } from 'lucide-react';
@@ -492,8 +492,8 @@ export default function DemoPage() {
             <MonacoEditor
               height="100%"
               language="python"
-              theme="paircode-dark"
-              beforeMount={registerPaircodeTheme}
+              theme="cove-dark"
+              beforeMount={registerCoveTheme}
               value={code}
               onChange={(v) => setCode(v ?? '')}
               options={{

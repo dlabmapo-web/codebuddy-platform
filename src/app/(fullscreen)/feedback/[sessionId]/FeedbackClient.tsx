@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X, Sparkles } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
@@ -689,8 +689,8 @@ finally:
             <MonacoEditor
               height="100%"
               language="python"
-              theme="paircode-dark"
-              beforeMount={registerPaircodeTheme}
+              theme="cove-dark"
+              beforeMount={registerCoveTheme}
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}

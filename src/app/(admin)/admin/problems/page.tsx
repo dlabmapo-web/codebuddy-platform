@@ -7,7 +7,7 @@ import {
   X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers, Sparkles, FileSpreadsheet,
 } from 'lucide-react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { registerCoveTheme } from '@/lib/monaco/theme';
 import { CurriculumExcelImportModal } from '@/components/admin/CurriculumExcelImportModal';
 
 const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
@@ -865,8 +865,8 @@ export default function AdminProblemsPage() {
                   <MonacoEditor
                     height={220}
                     language="python"
-                    theme="paircode-dark"
-                    beforeMount={registerPaircodeTheme}
+                    theme="cove-dark"
+                    beforeMount={registerCoveTheme}
                     value={form.starter_code}
                     onChange={(v) => setForm((f) => ({ ...f, starter_code: v ?? '' }))}
                     options={{

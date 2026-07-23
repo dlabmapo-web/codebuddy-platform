@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
@@ -1160,8 +1160,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
             <MonacoEditor
               height="100%"
               language="python"
-              theme="paircode-dark"
-              beforeMount={registerPaircodeTheme}
+              theme="cove-dark"
+              beforeMount={registerCoveTheme}
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}

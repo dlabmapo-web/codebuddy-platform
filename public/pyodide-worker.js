@@ -74,51 +74,51 @@ self.onmessage = async (e) => {
       return;
     }
     try {
-      pyodide.globals.set('_paircode_source', msg.code);
+      pyodide.globals.set('_cove_source', msg.code);
       const errorJson = await pyodide.runPythonAsync(`
-import json as _paircode_json
-import linecache as _paircode_linecache
-import traceback as _paircode_traceback
+import json as _cove_json
+import linecache as _cove_linecache
+import traceback as _cove_traceback
 
-_paircode_error = None
+_cove_error = None
 try:
-    _paircode_linecache.cache['solution.py'] = (
-        len(_paircode_source),
+    _cove_linecache.cache['solution.py'] = (
+        len(_cove_source),
         None,
-        _paircode_source.splitlines(True),
+        _cove_source.splitlines(True),
         'solution.py',
     )
-    exec(compile(_paircode_source, 'solution.py', 'exec'), {'__name__': '__main__'})
-except BaseException as _paircode_exc:
-    _paircode_type = type(_paircode_exc).__name__
-    _paircode_message = str(_paircode_exc)
-    _paircode_line = getattr(_paircode_exc, 'lineno', None)
+    exec(compile(_cove_source, 'solution.py', 'exec'), {'__name__': '__main__'})
+except BaseException as _cove_exc:
+    _cove_type = type(_cove_exc).__name__
+    _cove_message = str(_cove_exc)
+    _cove_line = getattr(_cove_exc, 'lineno', None)
 
-    if isinstance(_paircode_exc, SyntaxError):
-        _paircode_display = ''.join(
-            _paircode_traceback.format_exception_only(type(_paircode_exc), _paircode_exc)
+    if isinstance(_cove_exc, SyntaxError):
+        _cove_display = ''.join(
+            _cove_traceback.format_exception_only(type(_cove_exc), _cove_exc)
         )
     else:
-        _paircode_frames = [
-            _frame for _frame in _paircode_traceback.extract_tb(_paircode_exc.__traceback__)
+        _cove_frames = [
+            _frame for _frame in _cove_traceback.extract_tb(_cove_exc.__traceback__)
             if _frame.filename == 'solution.py'
         ]
-        if _paircode_frames:
-            _paircode_line = _paircode_frames[-1].lineno
-        _paircode_display = (
+        if _cove_frames:
+            _cove_line = _cove_frames[-1].lineno
+        _cove_display = (
             'Traceback (most recent call last):\\n'
-            + ''.join(_paircode_traceback.format_list(_paircode_frames))
-            + ''.join(_paircode_traceback.format_exception_only(type(_paircode_exc), _paircode_exc))
+            + ''.join(_cove_traceback.format_list(_cove_frames))
+            + ''.join(_cove_traceback.format_exception_only(type(_cove_exc), _cove_exc))
         )
 
-    _paircode_error = _paircode_json.dumps({
-        'type': _paircode_type,
-        'message': _paircode_message,
-        'line': _paircode_line,
-        'display': _paircode_display,
+    _cove_error = _cove_json.dumps({
+        'type': _cove_type,
+        'message': _cove_message,
+        'line': _cove_line,
+        'display': _cove_display,
     }, ensure_ascii=False)
 
-_paircode_error
+_cove_error
 `);
       if (errorJson) {
         self.postMessage({ type: 'pythonError', error: JSON.parse(errorJson) });

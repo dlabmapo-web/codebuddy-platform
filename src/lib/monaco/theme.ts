@@ -1,7 +1,7 @@
 import type { Monaco } from '@monaco-editor/react';
 
-export function registerPaircodeTheme(monaco: Monaco) {
-  monaco.editor.defineTheme('paircode-dark', {
+export function registerCoveTheme(monaco: Monaco) {
+  monaco.editor.defineTheme('cove-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [

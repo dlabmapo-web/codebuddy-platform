@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { academyRoleSchema, platformRoleSchema } from "./roles.js";
+import { academyApplicationSummarySchema } from "../memberships/academy.js";
 
 export const userStatuses = [
   "PENDING_PROFILE",
@@ -32,6 +33,7 @@ export const authUserSchema = z.object({
   platformRole: platformRoleSchema,
   status: userStatusSchema,
   memberships: z.array(academyMembershipSummarySchema),
+  applications: z.array(academyApplicationSummarySchema),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 

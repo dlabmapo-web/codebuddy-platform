@@ -30,6 +30,9 @@ export class AcademyAccessService {
     if (!user) {
       throw new AppException("PROFILE_INCOMPLETE", HttpStatus.FORBIDDEN);
     }
+    if (user.status === "PENDING_PROFILE") {
+      throw new AppException("PROFILE_INCOMPLETE", HttpStatus.FORBIDDEN);
+    }
     if (user.status === "SUSPENDED" || user.status === "DELETED") {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }

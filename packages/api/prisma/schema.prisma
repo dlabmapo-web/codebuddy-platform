@@ -60,6 +60,12 @@ enum JoinRequestStatus {
   CANCELLED
 }
 
+enum OAuthOnboardingIntentStatus {
+  PENDING
+  CONSUMED
+  EXPIRED
+}
+
 model User {
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
@@ -111,15 +117,35 @@ model Academy {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships  AcademyMembership[]
-  invitations  AcademyInvitation[]
-  joinRequests AcademyJoinRequest[]
-  auditLogs    AuditLog[]
+  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships            AcademyMembership[]
+  invitations            AcademyInvitation[]
+  joinRequests           AcademyJoinRequest[]
+  oauthOnboardingIntents OAuthOnboardingIntent[]
+  auditLogs              AuditLog[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
   @@map("academies")
+}
+
+model OAuthOnboardingIntent {
+  id                   String                      @id @default(uuid()) @db.Uuid
+  tokenHash            String                      @unique @map("token_hash")
+  academyId            String                      @map("academy_id") @db.Uuid
+  provider             String
+  status               OAuthOnboardingIntentStatus @default(PENDING)
+  expiresAt            DateTime                    @map("expires_at") @db.Timestamptz(6)
+  consumedAt           DateTime?                   @map("consumed_at") @db.Timestamptz(6)
+  consumedByAuthUserId String?                     @map("consumed_by_auth_user_id") @db.Uuid
+  createdAt            DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@index([academyId, createdAt])
+  @@map("oauth_onboarding_intents")
 }
 
 model AcademyMembership {

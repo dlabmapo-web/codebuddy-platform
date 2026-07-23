@@ -1,10 +1,9 @@
 'use client';
 
-import type { Provider } from '@supabase/supabase-js';
 import { useState } from 'react';
+import type { SocialAuthProvider } from '@cove/shared';
 
-import { publicConfig } from '@/lib/config';
-import { createClient } from '@/lib/supabase/client';
+import { startSocialAuthAction } from '../actions';
 
 import { GoogleIcon, KakaoIcon, NaverIcon } from './provider-icons';
 
@@ -24,22 +23,32 @@ function Spinner() {
   );
 }
 
-export function SocialLoginButtons() {
+export function SocialLoginButtons({
+  requestedAcademyId,
+  academyRequired = false,
+}: {
+  requestedAcademyId?: string;
+  academyRequired?: boolean;
+}) {
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState<string>();
 
-  async function signIn(provider: (typeof providers)[number]['id']) {
+  async function signIn(provider: SocialAuthProvider) {
+    if (academyRequired && !requestedAcademyId) {
+      setError('Choose an academy first.');
+      document.getElementById('academyId')?.focus();
+      return;
+    }
+
     setPending(provider);
     setError(undefined);
-    const { error: oauthError } = await createClient().auth.signInWithOAuth({
-      provider: provider as Provider,
-      options: { redirectTo: `${publicConfig.siteUrl}/auth/callback` },
+    const result = await startSocialAuthAction({
+      provider,
+      academyId: requestedAcademyId,
     });
-    // On success the browser redirects to the provider, so the pending state
-    // persists until the page unloads. Only reset it when the call fails.
-    if (oauthError) {
+    if (result.message) {
       setPending(undefined);
-      setError('This sign-in provider is not available yet.');
+      setError(result.message);
     }
   }
 

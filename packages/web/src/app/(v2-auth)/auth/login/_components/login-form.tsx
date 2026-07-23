@@ -10,7 +10,7 @@ import { SocialLoginButtons } from '../../_components/social-login-buttons';
 
 const initialState: AuthFormState = {};
 
-export function LoginForm() {
+export function LoginForm({ initialError }: { initialError?: string }) {
   const [state, action, pending] = useActionState(loginAction, initialState);
 
   return (
@@ -36,7 +36,11 @@ export function LoginForm() {
           <PasswordField label="" minLength={8} />
         </div>
 
-        {state.message ? <p className="text-[14px] text-danger">{state.message}</p> : null}
+        {state.message || initialError ? (
+          <p className="text-[14px] text-danger">
+            {state.message ?? initialError}
+          </p>
+        ) : null}
 
         <button
           className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"

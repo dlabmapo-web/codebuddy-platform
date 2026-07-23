@@ -4,4 +4,6 @@ export type SupabaseIdentity = {
   emailVerified: boolean;
   displayName: string | null;
   avatarUrl: string | null;
+  provider: string | null;
+  requestedAcademyId: string | null;
 };

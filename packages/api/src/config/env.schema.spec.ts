@@ -42,4 +42,19 @@ describe("validateEnvironment", () => {
       expect(String(error)).not.toContain(secretValue);
     }
   });
+
+  it("requires the BFF shared secret in production", () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        NODE_ENV: "production",
+      }),
+    ).toThrowError(/BFF_SHARED_SECRET/);
+
+    expect(validateEnvironment({
+      ...validEnvironment,
+      NODE_ENV: "production",
+      BFF_SHARED_SECRET: "a-production-secret-with-at-least-32-bytes",
+    })).toMatchObject({ NODE_ENV: "production" });
+  });
 });

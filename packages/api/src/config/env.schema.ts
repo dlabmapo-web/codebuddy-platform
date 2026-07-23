@@ -38,8 +38,17 @@ export const apiEnvironmentSchema = z.object({
   WEB_ORIGIN: httpUrlSchema,
   SUPABASE_URL: httpsUrlSchema,
   SUPABASE_SECRET_KEY: z.string().min(1),
+  BFF_SHARED_SECRET: z.string().min(32).optional(),
   DATABASE_URL: postgresUrlSchema,
   DIRECT_URL: postgresUrlSchema,
+}).superRefine((environment, context) => {
+  if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {
+    context.addIssue({
+      code: "custom",
+      path: ["BFF_SHARED_SECRET"],
+      message: "is required in production",
+    });
+  }
 });
 
 export type ApiEnvironment = z.infer<typeof apiEnvironmentSchema>;

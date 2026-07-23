@@ -29,6 +29,9 @@ export class SupabaseAuthService {
     const metadata = isRecord(claims.user_metadata)
       ? claims.user_metadata
       : {};
+    const appMetadata = isRecord(claims.app_metadata)
+      ? claims.app_metadata
+      : {};
     const email = typeof claims.email === "string"
       ? claims.email.trim().toLowerCase()
       : null;
@@ -42,8 +45,18 @@ export class SupabaseAuthService {
       emailVerified: email !== null && emailVerified,
       displayName: firstString(metadata.full_name, metadata.name),
       avatarUrl: firstUrl(metadata.avatar_url, metadata.picture),
+      provider: firstString(appMetadata.provider),
+      requestedAcademyId: firstUuid(metadata.requested_academy_id),
     };
   }
+}
+
+function firstUuid(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(value)
+    ? value.toLowerCase()
+    : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

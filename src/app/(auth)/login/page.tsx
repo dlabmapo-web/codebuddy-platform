@@ -117,7 +117,7 @@ export default function LoginPage() {
           <img
             src="/dlab-logo.svg"
             alt="디랩코딩 D·LAB Coding"
-            style={{ height: 40, width: 'auto' }}
+            style={{ height: 52, width: 'auto' }}
           />
           <span style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', letterSpacing: '-0.01em' }}>
             마포캠퍼스

@@ -25,3 +25,8 @@ export const academyInvitationSchema = z.object({
 export const acceptAcademyInvitationSchema = z.object({
   token: z.string().min(32).max(512),
 });
+
+export const revokeAcademyInvitationSchema = z.object({
+  academyId: z.uuid(),
+  invitationId: z.uuid(),
+});

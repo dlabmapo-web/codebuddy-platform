@@ -63,7 +63,7 @@ export function Gnb({ user }: GnbProps) {
       <header className="h-14 flex items-center justify-between px-6 bg-white border-b border-border">
         <Link href={homeHref} className="flex items-center gap-2 tracking-tight">
           <LogoBadge size={28} />
-          <span className="text-[17px] font-bold text-primary">페어코드</span>
+          <span className="text-[17px] font-bold text-primary">코브 스튜디오</span>
         </Link>
 
         <div className="relative" ref={dropdownRef}>

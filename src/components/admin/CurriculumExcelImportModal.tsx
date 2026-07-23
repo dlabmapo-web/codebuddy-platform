@@ -281,7 +281,7 @@ export function CurriculumExcelImportModal({
               </ol>
             </div>
             <a
-              href="/templates/paircode-curriculum-import-sample.xlsx"
+              href="/templates/cove-curriculum-import-sample.xlsx"
               download
               className="flex items-center justify-center gap-2 rounded-xl px-4 text-primary transition-colors hover:bg-primary-light"
               style={{ minHeight: 46, border: '1px solid #C7D9F7', fontSize: '13px', fontWeight: 700 }}

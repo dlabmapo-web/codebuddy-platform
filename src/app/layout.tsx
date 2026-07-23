@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '페어코드',
+  title: '코브 스튜디오',
   description: '실시간 협업 코딩 교육 플랫폼',
 };
 

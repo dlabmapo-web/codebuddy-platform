@@ -59,7 +59,7 @@ export default function LoginPage() {
       >
         <span className="flex items-center gap-2" style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
           <LogoIcon size={24} color="#FFFFFF" strokeWidth={2} />
-          페어코드
+          코브 스튜디오
         </span>
 
         <div>
@@ -108,11 +108,21 @@ export default function LoginPage() {
         </div>
 
         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
-          © 2026 페어코드. All rights reserved.
+          © 2026 CoveEdu AI. All rights reserved.
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-white">
+      <div className="relative flex-1 flex items-center justify-center bg-white">
+        <div className="absolute top-8 right-10 flex flex-col items-end gap-1.5">
+          <img
+            src="/dlab-logo.svg"
+            alt="디랩코딩 D·LAB Coding"
+            style={{ height: 40, width: 'auto' }}
+          />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', letterSpacing: '-0.01em' }}>
+            마포캠퍼스
+          </span>
+        </div>
         <div className="w-full max-w-sm px-8">
           <div className="mb-8">
             <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#16181D' }}>로그인</h2>

@@ -103,10 +103,10 @@ export default function SignupPage() {
         <div className="mb-6">
           <Link href="/login" className="flex items-center gap-2" style={{ fontSize: '22px', fontWeight: 700, color: '#1B64DA' }}>
             <LogoBadge size={28} />
-            페어코드
+            코브 스튜디오
           </Link>
           <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#16181D', marginTop: 8 }}>회원가입</h2>
-          <p style={{ fontSize: '13px', color: '#5A6270', marginTop: 2 }}>페어코드 계정을 만들어 시작하세요</p>
+          <p style={{ fontSize: '13px', color: '#5A6270', marginTop: 2 }}>코브 스튜디오 계정을 만들어 시작하세요</p>
         </div>
 
         <div className="mb-5">
@@ -264,6 +264,16 @@ export default function SignupPage() {
         <div className="mt-4 text-center">
           <span style={{ fontSize: '13px', color: '#5A6270' }}>이미 계정이 있으신가요?</span>{' '}
           <Link href="/login" style={{ fontSize: '13px', color: '#1B64DA', fontWeight: 500 }}>로그인</Link>
+        </div>
+
+        <div
+          className="mt-6 pt-5 flex flex-col items-center gap-1.5"
+          style={{ borderTop: '1px solid #EEF0F3' }}
+        >
+          <img src="/dlab-logo.svg" alt="디랩코딩 D·LAB Coding" style={{ height: 30, width: 'auto' }} />
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#8A929E', letterSpacing: '-0.01em' }}>
+            마포캠퍼스
+          </span>
         </div>
       </div>
     </div>

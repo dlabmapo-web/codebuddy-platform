@@ -43,7 +43,7 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get(COOKIE_NAME)?.value;
 
-  if (pathname.startsWith('/auth')) {
+  if (pathname.startsWith('/auth') || pathname.startsWith('/studio')) {
     return updateSupabaseSession(req);
   }
 
@@ -83,6 +83,7 @@ export const config = {
     '/login',
     '/signup',
     '/auth/:path*',
+    '/studio/:path*',
     '/problems/:path*',
     '/me/:path*',
     '/students/:path*',

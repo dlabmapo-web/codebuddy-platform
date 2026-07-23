@@ -10,7 +10,7 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen w-full bg-warm-canvas lg:grid lg:grid-cols-[1.05fr_1fr]">
+    <main className="min-h-screen w-full bg-canvas lg:grid lg:grid-cols-[1.05fr_1fr]">
       {/* Brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-brand px-14 py-14 text-white lg:flex lg:flex-col lg:justify-between">
         <div

@@ -14,10 +14,10 @@
   --color-warning: #D97706;
   --color-editor-bg: #1E1E1E;
 
-  /* Auth-specific warm neutrals */
-  --color-brand: #E8461C;
-  --color-brand-deep: #C4380F;
-  --color-warm-canvas: #FAF7F4;
+  /* Auth-specific brand + cool neutrals */
+  --color-brand: #1B64DA;
+  --color-brand-deep: #1450B5;
+  --color-canvas: #F4F7FC;
 
   --radius: 8px;
   --radius-card: 10px;

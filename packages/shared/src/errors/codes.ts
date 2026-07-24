@@ -34,6 +34,9 @@ export const appErrorCodes = [
   "CONTENT_PARENT_MISMATCH",
   "CONTENT_POSITION_CONFLICT",
   "CONTENT_VALIDATION_FAILED",
+  "EXERCISE_NOT_FOUND",
+  "EXERCISE_VALIDATION_FAILED",
+  "CONTENT_EDIT_CONFLICT",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -80,4 +83,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   CONTENT_PARENT_MISMATCH: "The content does not belong to the selected parent.",
   CONTENT_POSITION_CONFLICT: "Two content items cannot use the same position.",
   CONTENT_VALIDATION_FAILED: "Fix the content validation issues and try again.",
+  EXERCISE_NOT_FOUND: "The selected programming problem was not found.",
+  EXERCISE_VALIDATION_FAILED: "Complete the required problem fields and try again.",
+  CONTENT_EDIT_CONFLICT: "This problem changed in another session. Reload it before saving again.",
 };

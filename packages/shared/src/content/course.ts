@@ -82,6 +82,7 @@ export const programmingExerciseSchema = z.object({
   timeLimitMs: z.number().int().min(100).max(60_000),
   memoryLimitMb: z.number().int().min(16).max(4_096),
   aiFeedbackEnabled: z.boolean(),
+  updatedAt: z.iso.datetime(),
   testCases: z.array(exerciseTestCaseSchema),
   hints: z.array(exerciseHintSchema),
 });
@@ -181,6 +182,68 @@ export const reorderLecturesSchema = courseVersionInputSchema.extend({
   moduleId: z.uuid(),
   orderedLectureIds: z.array(z.uuid()).min(1),
 });
+
+const richDescriptionSchema = z.string().max(10_000);
+
+export const exerciseTestCaseDraftSchema = z.object({
+  input: z.string().max(100_000),
+  expectedOutput: z.string().max(100_000),
+  visibility: testCaseVisibilitySchema,
+});
+
+export const exerciseHintDraftSchema = z.object({
+  content: z.string().trim().min(1).max(10_000),
+  triggerExpression: z.string().trim().max(2_000).nullable(),
+});
+
+export const exerciseDraftFieldsSchema = z.object({
+  title: titleSchema,
+  difficulty: exerciseDifficultySchema,
+  description: richDescriptionSchema,
+  inputFormat: z.string().max(10_000),
+  outputFormat: z.string().max(10_000),
+  constraints: z.string().max(10_000),
+  starterCode: z.string().max(100_000),
+  aiFeedbackEnabled: z.boolean(),
+  testCases: z.array(exerciseTestCaseDraftSchema).min(1),
+  hints: z.array(exerciseHintDraftSchema),
+});
+export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
+
+export const exerciseParentInputSchema = courseVersionInputSchema.extend({
+  lectureId: z.uuid(),
+});
+
+export const createProgrammingExerciseSchema =
+  exerciseParentInputSchema.extend(exerciseDraftFieldsSchema.shape).strict();
+
+export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
+  materialId: z.uuid(),
+});
+
+export const updateProgrammingExerciseSchema =
+  exerciseMaterialInputSchema.extend({
+    ...exerciseDraftFieldsSchema.shape,
+    expectedUpdatedAt: z.iso.datetime(),
+  }).strict();
+
+export const deleteProgrammingExerciseSchema = exerciseMaterialInputSchema;
+
+export const reorderProgrammingExercisesSchema =
+  exerciseParentInputSchema.extend({
+    orderedMaterialIds: z.array(z.uuid()).min(1),
+  });
+
+export const exerciseAuthoringContextSchema = z.object({
+  course: z.object({ id: z.uuid(), title: titleSchema }),
+  version: courseVersionSummarySchema,
+  module: z.object({ id: z.uuid(), title: titleSchema }),
+  lecture: z.object({ id: z.uuid(), title: titleSchema }),
+  material: materialSchema.nullable(),
+});
+export type ExerciseAuthoringContext = z.infer<
+  typeof exerciseAuthoringContextSchema
+>;
 
 /**
  * Publish blockers are reported per item so the builder can link an issue

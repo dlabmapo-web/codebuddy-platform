@@ -10,14 +10,20 @@ import {
   createCourseModuleSchema,
   createCourseSchema,
   createLectureSchema,
+  createProgrammingExerciseSchema,
+  deleteProgrammingExerciseSchema,
+  exerciseAuthoringContextSchema,
+  exerciseMaterialInputSchema,
   deleteCourseModuleSchema,
   deleteLectureSchema,
   publishCourseVersionResultSchema,
   reorderCourseModulesSchema,
   reorderLecturesSchema,
+  reorderProgrammingExercisesSchema,
   updateCourseModuleSchema,
   updateCourseSchema,
   updateLectureSchema,
+  updateProgrammingExerciseSchema,
 } from "../../content/course.js";
 
 export const academyCoursesContract = {
@@ -48,6 +54,21 @@ export const academyCoursesContract = {
   deleteLecture: oc.input(deleteLectureSchema).output(courseDraftTreeSchema),
   reorderLectures: oc
     .input(reorderLecturesSchema)
+    .output(courseDraftTreeSchema),
+  getExercise: oc
+    .input(exerciseMaterialInputSchema)
+    .output(exerciseAuthoringContextSchema),
+  createExercise: oc
+    .input(createProgrammingExerciseSchema)
+    .output(exerciseAuthoringContextSchema),
+  updateExercise: oc
+    .input(updateProgrammingExerciseSchema)
+    .output(exerciseAuthoringContextSchema),
+  deleteExercise: oc
+    .input(deleteProgrammingExerciseSchema)
+    .output(courseDraftTreeSchema),
+  reorderExercises: oc
+    .input(reorderProgrammingExercisesSchema)
     .output(courseDraftTreeSchema),
   validateVersion: oc
     .input(courseVersionInputSchema)

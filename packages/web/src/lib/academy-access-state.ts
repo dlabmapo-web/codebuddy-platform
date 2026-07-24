@@ -14,10 +14,26 @@ export type AcademyAccessState =
   | { kind: 'application'; application: Application }
   | { kind: 'welcome' };
 
+/**
+ * Which of the pending screen's seven states applies. This resolves the state
+ * only — the copy for each lives in the `auth` namespace and is looked up by
+ * the component, so this module stays free of user-visible strings and the
+ * lookups stay literal enough for i18next's typed keys to check them.
+ */
+export type PendingStateKind =
+  | 'approved'
+  | 'suspended'
+  | 'none'
+  | 'pending'
+  | 'application_approved'
+  | 'rejected'
+  | 'cancelled';
+
 export type PendingStateView = {
-  heading: string;
-  description: string;
-  statusLabel: string | null;
+  state: PendingStateKind;
+  /** Interpolated into the heading/description copy. */
+  academyName?: string;
+  role?: AcademyRole;
   statusTone: 'amber' | 'green' | 'red' | 'slate';
   canCancel: boolean;
   canReapply: boolean;
@@ -64,9 +80,9 @@ export function pendingStateView(
 ): PendingStateView {
   if (state.kind === 'active') {
     return {
-      heading: "You're approved",
-      description: `${state.membership.academy.name} approved you as ${formatRole(state.membership.role)}. Your current session already has access.`,
-      statusLabel: 'Active',
+      state: 'approved',
+      academyName: state.membership.academy.name,
+      role: state.membership.role,
       statusTone: 'green',
       canCancel: false,
       canReapply: false,
@@ -75,9 +91,8 @@ export function pendingStateView(
 
   if (state.kind === 'suspended') {
     return {
-      heading: 'Academy access suspended',
-      description: `Your access to ${state.membership.academy.name} is suspended. Contact an academy manager if you believe this is a mistake.`,
-      statusLabel: 'Suspended',
+      state: 'suspended',
+      academyName: state.membership.academy.name,
       statusTone: 'slate',
       canCancel: false,
       canReapply: false,
@@ -86,9 +101,7 @@ export function pendingStateView(
 
   if (state.kind === 'welcome') {
     return {
-      heading: 'No academy application',
-      description: 'No academy membership or application is associated with this account.',
-      statusLabel: null,
+      state: 'none',
       statusTone: 'slate',
       canCancel: false,
       canReapply: false,
@@ -99,36 +112,32 @@ export function pendingStateView(
   switch (state.application.status) {
     case 'PENDING':
       return {
-        heading: 'Waiting for academy approval',
-        description: `${academyName} is reviewing your application. Student is the default role, but the manager may select another academy role.`,
-        statusLabel: 'Pending',
+        state: 'pending',
+        academyName,
         statusTone: 'amber',
         canCancel: true,
         canReapply: false,
       };
     case 'APPROVED':
       return {
-        heading: 'Application approved',
-        description: `${academyName} approved your application. Your academy membership is being prepared.`,
-        statusLabel: 'Approved',
+        state: 'application_approved',
+        academyName,
         statusTone: 'green',
         canCancel: false,
         canReapply: false,
       };
     case 'REJECTED':
       return {
-        heading: 'Application not approved',
-        description: `${academyName} did not approve your application. You may apply again if your circumstances change.`,
-        statusLabel: 'Rejected',
+        state: 'rejected',
+        academyName,
         statusTone: 'red',
         canCancel: false,
         canReapply: true,
       };
     case 'CANCELLED':
       return {
-        heading: 'Application cancelled',
-        description: `Your application to ${academyName} was cancelled. You may apply again.`,
-        statusLabel: 'Cancelled',
+        state: 'cancelled',
+        academyName,
         statusTone: 'slate',
         canCancel: false,
         canReapply: true,
@@ -142,8 +151,4 @@ export function canManageAcademy(role: AcademyRole | null | undefined): boolean 
 
 export function canManageContent(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'curriculum.manage') : false;
-}
-
-function formatRole(role: Membership['role']): string {
-  return role.replace('_', ' ');
 }

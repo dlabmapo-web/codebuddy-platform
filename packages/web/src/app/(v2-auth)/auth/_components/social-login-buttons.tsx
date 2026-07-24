@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { SocialAuthProvider } from '@cove/shared';
 
+import { useLayoutTranslation } from '@/i18n';
+
 import { startSocialAuthAction } from '../actions';
 
 import { GoogleIcon, KakaoIcon, NaverIcon } from './provider-icons';
@@ -30,12 +32,13 @@ export function SocialLoginButtons({
   requestedAcademyId?: string;
   academyRequired?: boolean;
 }) {
+  const { t } = useLayoutTranslation('auth');
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState<string>();
 
   async function signIn(provider: SocialAuthProvider) {
     if (academyRequired && !requestedAcademyId) {
-      setError('Choose an academy first.');
+      setError(t('error.social_choose_academy'));
       document.getElementById('academyId')?.focus();
       return;
     }
@@ -61,7 +64,11 @@ export function SocialLoginButtons({
           return (
             <button
               aria-busy={isPending}
-              aria-label={isPending ? `Connecting to ${label}` : `Continue with ${label}`}
+              aria-label={
+                isPending
+                  ? t('social.connecting_to', { provider: label })
+                  : t('social.continue_with', { provider: label })
+              }
               className={[
                 'flex h-14 items-center justify-center gap-2.5 rounded-xl border bg-white text-[15px] font-semibold text-ink transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed',
                 isPending
@@ -77,7 +84,9 @@ export function SocialLoginButtons({
               {isPending ? (
                 <>
                   <Spinner />
-                  <span className="hidden text-brand sm:inline">Connecting…</span>
+                  <span className="hidden text-brand sm:inline">
+                    {t('social.connecting')}
+                  </span>
                 </>
               ) : (
                 <>

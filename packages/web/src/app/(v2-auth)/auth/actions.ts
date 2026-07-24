@@ -9,6 +9,7 @@ import {
   type SocialAuthProvider,
 } from '@cove/shared';
 
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { publicConfig } from '@/lib/config';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { createClient } from '@/lib/supabase/server';
@@ -38,11 +39,14 @@ export async function loginAction(
     email: formData.get('email'),
     password: formData.get('password'),
   });
-  if (!input.success) return { message: 'Enter a valid email and password.' };
+  const { t } = await getServerTranslation(['auth', 'validation']);
+  if (!input.success) {
+    return { message: t('validation:credentials_invalid') };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(input.data);
-  if (error) return { message: 'The email or password is incorrect.' };
+  if (error) return { message: t('error.credentials_rejected') };
   if ((await cookies()).has('cove_invitation')) redirect('/auth/invitation');
   redirect('/auth/welcome');
 }
@@ -57,8 +61,9 @@ export async function signupAction(
     password: formData.get('password'),
     academyId: formData.get('academyId'),
   });
+  const { t } = await getServerTranslation(['auth', 'validation']);
   if (!input.success) {
-    return { message: 'Use a valid email, name, and password of 8+ characters.' };
+    return { message: t('validation:signup_invalid') };
   }
 
   const supabase = await createClient();
@@ -76,14 +81,14 @@ export async function signupAction(
       emailRedirectTo: `${publicConfig.siteUrl}/auth/callback`,
     },
   });
-  if (error) return { message: 'Unable to create the account.' };
+  if (error) return { message: t('error.signup_failed') };
   if (data.session) {
     redirect(hasInvitation ? '/auth/invitation' : '/auth/welcome');
   }
 
   return {
     success: true,
-    message: 'Check your email to verify your account, then sign in.',
+    message: t('error.signup_verify_email'),
   };
 }
 
@@ -91,9 +96,10 @@ export async function startSocialAuthAction(input: {
   provider: SocialAuthProvider;
   academyId?: string;
 }): Promise<AuthFormState> {
+  const { t } = await getServerTranslation(['auth', 'validation']);
   const parsed = socialAuthSchema.safeParse(input);
   if (!parsed.success) {
-    return { message: 'Choose a valid academy and social provider.' };
+    return { message: t('validation:social_request_invalid') };
   }
 
   const cookieStore = await cookies();
@@ -121,7 +127,7 @@ export async function startSocialAuthAction(input: {
         secure: process.env.NODE_ENV === 'production',
       });
     } catch {
-      return { message: 'Unable to start social signup. Try again.' };
+      return { message: t('error.social_start_failed') };
     }
   }
 
@@ -135,7 +141,7 @@ export async function startSocialAuthAction(input: {
   });
   if (error || !data.url) {
     cookieStore.delete('cove_oauth_intent');
-    return { message: 'This sign-in provider is not available yet.' };
+    return { message: t('error.social_unavailable') };
   }
   redirect(data.url);
 }

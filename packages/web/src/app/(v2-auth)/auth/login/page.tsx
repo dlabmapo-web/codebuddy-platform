@@ -1,3 +1,5 @@
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
+
 import { AuthCard } from '../_components/auth-card';
 import { LoginForm } from './_components/login-form';
 
@@ -7,15 +9,16 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const query = await searchParams;
+  const { t } = await getServerTranslation(['auth']);
   const initialError = query.error === 'identity-conflict'
-    ? 'This email already has a Cove account. Sign in with its existing method.'
+    ? t('error.identity_conflict')
     : query.error
-      ? 'Sign in could not be completed. Try again.'
+      ? t('error.sign_in_failed')
       : undefined;
   return (
     <AuthCard
-      description="Sign in to pick up where you left off. Your academy manager controls academy access and roles."
-      title="Welcome back"
+      description={t('login.description')}
+      title={t('login.title')}
     >
       <LoginForm initialError={initialError} />
     </AuthCard>

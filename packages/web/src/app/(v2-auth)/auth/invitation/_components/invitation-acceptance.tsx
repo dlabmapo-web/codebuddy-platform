@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react';
 
+import { useLayoutTranslation } from '@/i18n';
+
 import {
   acceptInvitationAction,
   type InvitationActionState,
@@ -10,6 +12,7 @@ import {
 const initialState: InvitationActionState = {};
 
 export function InvitationAcceptance() {
+  const { t } = useLayoutTranslation('auth');
   const [state, action, pending] = useActionState(
     acceptInvitationAction,
     initialState,
@@ -17,7 +20,7 @@ export function InvitationAcceptance() {
   return (
     <form action={action} className="space-y-5">
       <p className="text-sm leading-6 text-sub">
-        Accepting adds your verified account to the academy with the role selected by its manager.
+        {t('invitation.explanation')}
       </p>
       {state.message ? <p className="text-sm text-danger">{state.message}</p> : null}
       <button
@@ -25,7 +28,7 @@ export function InvitationAcceptance() {
         disabled={pending}
         type="submit"
       >
-        {pending ? 'Accepting…' : 'Accept invitation'}
+        {pending ? t('invitation.submitting') : t('invitation.submit')}
       </button>
     </form>
   );

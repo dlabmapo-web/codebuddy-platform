@@ -4,6 +4,8 @@ import { Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState } from 'react';
 
+import { useLayoutTranslation } from '@/i18n';
+
 import { loginAction, type AuthFormState } from '../../actions';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
@@ -11,6 +13,7 @@ import { SocialLoginButtons } from '../../_components/social-login-buttons';
 const initialState: AuthFormState = {};
 
 export function LoginForm({ initialError }: { initialError?: string }) {
+  const { t } = useLayoutTranslation('auth');
   const [state, action, pending] = useActionState(loginAction, initialState);
 
   return (
@@ -19,18 +22,30 @@ export function LoginForm({ initialError }: { initialError?: string }) {
 
       <div className="my-6 flex items-center gap-3">
         <span className="h-px flex-1 bg-border" />
-        <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">or with email</span>
+        <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">
+          {t('divider.or_with_email')}
+        </span>
         <span className="h-px flex-1 bg-border" />
       </div>
 
       <form action={action} className="space-y-5">
-        <TextField autoComplete="email" icon={Mail} label="Email" name="email" placeholder="you@example.com" required type="email" />
+        <TextField
+          autoComplete="email"
+          icon={Mail}
+          label={t('field.email')}
+          name="email"
+          placeholder={t('field.email_placeholder')}
+          required
+          type="email"
+        />
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[15px] font-semibold text-ink">Password</span>
+            <span className="text-[15px] font-semibold text-ink">
+              {t('field.password')}
+            </span>
             <Link className="text-[14px] font-semibold text-brand hover:text-brand-deep" href="/auth/forgot">
-              Forgot password?
+              {t('login.forgot_password')}
             </Link>
           </div>
           <PasswordField label="" minLength={8} />
@@ -47,14 +62,14 @@ export function LoginForm({ initialError }: { initialError?: string }) {
           disabled={pending}
           type="submit"
         >
-          {pending ? 'Signing in…' : 'Sign in'}
+          {pending ? t('login.submitting') : t('login.submit')}
         </button>
       </form>
 
       <p className="mt-7 text-center text-[15px] text-sub">
-        New to Cove Studio?{' '}
+        {t('login.no_account')}{' '}
         <Link className="font-bold text-brand hover:text-brand-deep" href="/auth/signup">
-          Create an account
+          {t('login.create_account')}
         </Link>
       </p>
     </div>

@@ -3,6 +3,8 @@
 import { Eye, EyeOff, Lock, type LucideIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 
+import { useLayoutTranslation } from '@/i18n';
+
 const baseInput =
   'h-14 w-full rounded-xl border border-border bg-white text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
 
@@ -49,31 +51,34 @@ export function TextField({
 }
 
 export function PasswordField({
-  label = 'Password',
+  label,
   name = 'password',
   autoComplete = 'current-password',
   hint,
   minLength,
 }: {
+  /** Pass '' to hide the label when the caller renders its own. */
   label?: string;
   name?: string;
   autoComplete?: string;
   hint?: string;
   minLength?: number;
 }) {
+  const { t } = useLayoutTranslation('auth');
   const id = useId();
   const [visible, setVisible] = useState(false);
+  const fieldLabel = label ?? t('field.password');
   return (
     <div>
-      {label ? (
+      {fieldLabel ? (
         <label className={labelClass} htmlFor={id}>
-          {label}
+          {fieldLabel}
         </label>
       ) : null}
       <div className="relative">
         <Lock className={iconClass} size={20} strokeWidth={1.75} />
         <input
-          aria-label={label || 'Password'}
+          aria-label={fieldLabel || t('field.password')}
           autoComplete={autoComplete}
           className={`${baseInput} pl-12 pr-12`}
           id={id}
@@ -84,7 +89,7 @@ export function PasswordField({
           type={visible ? 'text' : 'password'}
         />
         <button
-          aria-label={visible ? 'Hide password' : 'Show password'}
+          aria-label={visible ? t('field.password_hide') : t('field.password_show')}
           aria-pressed={visible}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-sub transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
           onClick={() => setVisible((v) => !v)}

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { forwardRef, useActionState, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { useLayoutTranslation } from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
+
 import { signupAction, type AuthFormState } from '../../actions';
 import {
   ResponsiveSelector,
@@ -20,11 +23,12 @@ const initialState: AuthFormState = {};
 /** Matches the height and shape of the auth form's text fields. */
 const AcademyTrigger = forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>(
   function AcademyTrigger({ className, selectedItem, ...props }, ref) {
+    const { t } = useLayoutTranslation('auth');
     // Disabled with nothing chosen means the list is still being fetched.
     const placeholder =
       props.disabled && !selectedItem
-        ? 'Loading academies…'
-        : 'Choose your academy';
+        ? t('field.academy_loading')
+        : t('field.academy_choose');
     return (
       <button
         aria-controls={undefined}
@@ -54,6 +58,8 @@ export function SignupForm({
   invitedAcademyId?: string;
   socialError?: string;
 }) {
+  const { t } = useLayoutTranslation('auth');
+  const errorText = useErrorText();
   const [state, action, pending] = useActionState(signupAction, initialState);
   const [academyId, setAcademyId] = useState(invitedAcademyId ?? '');
   const academies = useQuery({
@@ -66,21 +72,23 @@ export function SignupForm({
     <div>
       <div className="mb-5">
         <span className="mb-2 block text-[15px] font-semibold text-ink">
-          Academy branch
+          {t('field.academy')}
         </span>
         <ResponsiveSelector
           disabled={
             academies.isPending || academies.isError || Boolean(invitedAcademyId)
           }
-          drawerTitle="Choose your academy"
+          drawerTitle={t('field.academy_choose')}
           list={academies.data?.academies ?? []}
           onSelect={(academy) => setAcademyId(academy.id)}
-          placeholder="Search academies…"
+          placeholder={t('field.academy_search')}
           selectedId={academyId || null}
           TriggerComp={AcademyTrigger}
         />
         {academies.isError ? (
-          <p className="mt-2 text-[14px] text-danger">Academies are unavailable right now. Try again shortly.</p>
+          <p className="mt-2 text-[14px] text-danger">
+            {errorText(academies.error, t('error.academies_unavailable'))}
+          </p>
         ) : null}
         {socialError ? (
           <p className="mt-2 text-[14px] text-danger">{socialError}</p>
@@ -89,9 +97,28 @@ export function SignupForm({
 
       <form action={action} className="space-y-5">
         <input name="academyId" type="hidden" value={academyId} />
-        <TextField autoComplete="name" icon={User} label="Name" name="displayName" placeholder="Your name" required />
-        <TextField autoComplete="email" icon={Mail} label="Email" name="email" placeholder="you@example.com" required type="email" />
-        <PasswordField autoComplete="new-password" hint="At least 8 characters." minLength={8} />
+        <TextField
+          autoComplete="name"
+          icon={User}
+          label={t('field.name')}
+          name="displayName"
+          placeholder={t('field.name_placeholder')}
+          required
+        />
+        <TextField
+          autoComplete="email"
+          icon={Mail}
+          label={t('field.email')}
+          name="email"
+          placeholder={t('field.email_placeholder')}
+          required
+          type="email"
+        />
+        <PasswordField
+          autoComplete="new-password"
+          hint={t('field.password_hint')}
+          minLength={8}
+        />
 
         {state.message ? (
           <p className={state.success ? 'text-[14px] text-success' : 'text-[14px] text-danger'}>{state.message}</p>
@@ -102,14 +129,14 @@ export function SignupForm({
           disabled={pending || state.success || !academyId}
           type="submit"
         >
-          {pending ? 'Creating account…' : 'Create account'}
+          {pending ? t('signup.submitting') : t('signup.submit')}
         </button>
       </form>
 
       <div className="my-6 flex items-center gap-3">
         <span className="h-px flex-1 bg-border" />
         <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">
-          or continue with
+          {t('divider.or_continue_with')}
         </span>
         <span className="h-px flex-1 bg-border" />
       </div>
@@ -125,13 +152,13 @@ export function SignupForm({
           <circle cx="12" cy="8" fill="currentColor" r="1.25" />
           <path d="M12 11.5v5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
         </svg>
-        <p>You don&apos;t pick a role here. An academy manager gives you your role when they approve or invite you.</p>
+        <p>{t('signup.role_notice')}</p>
       </div>
 
       <p className="mt-6 text-center text-[15px] text-sub">
-        Already have an account?{' '}
+        {t('signup.have_account')}{' '}
         <Link className="font-bold text-brand hover:text-brand-deep" href="/auth/login">
-          Sign in
+          {t('signup.sign_in')}
         </Link>
       </p>
     </div>

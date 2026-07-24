@@ -1,3 +1,5 @@
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
+
 import { AuthCard } from '../_components/auth-card';
 import { SignupForm } from './_components/signup-form';
 
@@ -11,15 +13,16 @@ export default async function SignupPage({
   }>;
 }) {
   const query = await searchParams;
+  const { t } = await getServerTranslation(['auth']);
   const socialError = query.error === 'academy-required'
-    ? 'Choose your academy and try social signup again.'
+    ? t('error.academy_required')
     : query.error === 'oauth'
-      ? 'Social signup could not be completed. Try again.'
+      ? t('error.oauth_failed')
       : undefined;
   return (
     <AuthCard
-      description="One account works across every DLAB academy — with its own role in each."
-      title="Create your account"
+      description={t('signup.description')}
+      title={t('signup.title')}
     >
       <SignupForm
         invitedAcademyId={query.invited === '1' ? query.academy : undefined}

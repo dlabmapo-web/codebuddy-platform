@@ -16,14 +16,75 @@ import { SignOutControl } from '../../_components/sign-out-control';
 import {
   pendingStateView,
   resolveAcademyAccessState,
+  type PendingStateKind,
 } from '@/lib/academy-access-state';
+import { formatTime } from '@cove/i18n/format';
+
+import {
+  useLayoutTranslation,
+  useLocale,
+  type TranslationKey,
+} from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
+
+/**
+ * State-to-copy map. Written out rather than built from a template string so
+ * i18next's typed keys can check every one of them.
+ */
+const stateCopy: Record<
+  PendingStateKind,
+  {
+    heading: TranslationKey<'auth'>;
+    description: TranslationKey<'auth'>;
+    status: `common:${TranslationKey<'common'>}` | null;
+  }
+> = {
+  approved: {
+    heading: 'pending.state.approved_heading',
+    description: 'pending.state.approved_description',
+    status: 'common:membership_status.ACTIVE',
+  },
+  suspended: {
+    heading: 'pending.state.suspended_heading',
+    description: 'pending.state.suspended_description',
+    status: 'common:membership_status.SUSPENDED',
+  },
+  none: {
+    heading: 'pending.state.none_heading',
+    description: 'pending.state.none_description',
+    status: null,
+  },
+  pending: {
+    heading: 'pending.state.pending_heading',
+    description: 'pending.state.pending_description',
+    status: 'common:join_request_status.PENDING',
+  },
+  application_approved: {
+    heading: 'pending.state.application_approved_heading',
+    description: 'pending.state.application_approved_description',
+    status: 'common:join_request_status.APPROVED',
+  },
+  rejected: {
+    heading: 'pending.state.rejected_heading',
+    description: 'pending.state.rejected_description',
+    status: 'common:join_request_status.REJECTED',
+  },
+  cancelled: {
+    heading: 'pending.state.cancelled_heading',
+    description: 'pending.state.cancelled_description',
+    status: 'common:join_request_status.CANCELLED',
+  },
+};
 
 export function PendingApproval({
   initialAccount,
 }: {
   initialAccount: AuthMeResponse;
 }) {
+  const { t } = useLayoutTranslation(['auth', 'common']);
+  const errorText = useErrorText();
+  const locale = useLocale();
   const [lastCheckedAt, setLastCheckedAt] = useState<Date>();
   const account = useQuery({
     queryKey: ['auth', 'me', initialAccount.user.authUserId],
@@ -36,6 +97,7 @@ export function PendingApproval({
 
   const state = resolveAcademyAccessState(account.data);
   const view = pendingStateView(state);
+  const copy = stateCopy[view.state];
   const application = state.kind === 'application'
     ? state.application
     : undefined;
@@ -57,12 +119,14 @@ export function PendingApproval({
   }
 
   if (account.isPending) {
-    return <p className="text-sm text-sub">Checking your application…</p>;
+    return <p className="text-sm text-sub">{t('pending.checking')}</p>;
   }
   if (account.isError) {
     return (
       <div className="space-y-5">
-        <p className="text-sm text-danger">We could not load your academy access.</p>
+        <p className="text-sm text-danger">
+          {errorText(account.error, t('pending.load_failed'))}
+        </p>
         <SignOutControl />
       </div>
     );
@@ -77,26 +141,36 @@ export function PendingApproval({
     <div className="space-y-5">
       <StateIcon kind={state.kind} status={application?.status} />
       <div>
-        <h2 className="text-xl font-bold text-ink">{view.heading}</h2>
+        <h2 className="text-xl font-bold text-ink">{t(copy.heading)}</h2>
         <p className="mt-2 text-sm leading-6 text-sub">
-          {view.description}
+          {t(copy.description, {
+            academy: view.academyName ?? '',
+          })}
         </p>
         {application?.status === 'REJECTED' && application.reviewReason ? (
           <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">{application.reviewReason}</p>
         ) : null}
       </div>
-      {academy && view.statusLabel ? (
+      {academy && copy.status ? (
         <div className="rounded-xl border border-border bg-canvas p-4 text-sm">
           <div className="flex justify-between gap-4">
-            <span className="text-sub">Academy</span>
+            <span className="text-sub">{t('pending.academy')}</span>
             <strong className="text-right text-ink">{academy.name}</strong>
           </div>
           <div className="mt-2 flex justify-between gap-4">
-            <span className="text-sub">Status</span>
+            <span className="text-sub">{t('pending.status')}</span>
             <strong className={statusToneClass(view.statusTone)}>
-              {view.statusLabel}
+              {t(copy.status)}
             </strong>
           </div>
+          {view.role ? (
+            <div className="mt-2 flex justify-between gap-4">
+              <span className="text-sub">{t('pending.role')}</span>
+              <strong className="text-right text-ink">
+                {t(`common:role.${view.role}`)}
+              </strong>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {state.kind === 'active' ? (
@@ -104,7 +178,7 @@ export function PendingApproval({
           className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-5 font-bold text-white hover:bg-brand-deep"
           href={`/studio/academies/${state.membership.academy.id}`}
         >
-          Enter academy
+          {t('pending.enter_academy')}
         </Link>
       ) : null}
       <button
@@ -113,7 +187,9 @@ export function PendingApproval({
         onClick={() => void checkStatus()}
         type="button"
       >
-        {account.isFetching ? 'Checking…' : 'Check approval status'}
+        {account.isFetching
+          ? t('pending.checking_status')
+          : t('pending.check_status')}
       </button>
       {view.canCancel ? (
         <button
@@ -122,7 +198,7 @@ export function PendingApproval({
           onClick={() => requestAction.mutate('cancel')}
           type="button"
         >
-          Cancel application
+          {t('pending.cancel_application')}
         </button>
       ) : view.canReapply ? (
         <button
@@ -131,16 +207,24 @@ export function PendingApproval({
           onClick={() => requestAction.mutate('reapply')}
           type="button"
         >
-          Apply again
+          {t('pending.apply_again')}
         </button>
       ) : null}
       {requestAction.isError ? (
-        <p className="text-sm text-danger">The application could not be updated.</p>
+        <p className="text-sm text-danger">
+          {errorText(requestAction.error, t('pending.update_failed'))}
+        </p>
       ) : null}
       {lastCheckedAt ? (
-        <p className="text-center text-xs text-sub">Checked at {lastCheckedAt.toLocaleTimeString()}</p>
+        <p className="text-center text-xs text-sub">
+          {t('pending.checked_at', {
+            time: formatTime(lastCheckedAt, locale),
+          })}
+        </p>
       ) : (
-        <p className="text-center text-xs text-sub">This page does not refresh automatically.</p>
+        <p className="text-center text-xs text-sub">
+          {t('pending.no_auto_refresh')}
+        </p>
       )}
       <SignOutControl className="w-full text-sm font-semibold text-sub hover:text-ink" />
     </div>

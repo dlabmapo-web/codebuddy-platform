@@ -2,13 +2,14 @@
 
 **Date:** 2026-07-24  
 **Status:** Approved for implementation  
-**Scope:** New Studio `content`, `invitations`, and `members` routes
+**Scope:** New Studio academy management and new authentication routes
 
 ## Goal
 
-Make the new Studio code easy to read, navigate, test, and extend by replacing
-large route files with focused, feature-local modules. Preserve every existing
-route, permission, translation, request, response, and visible behavior.
+Make the new Studio and authentication code easy to read, navigate, test, and
+extend by replacing large route files with focused, feature-local modules.
+Preserve every existing route, permission, translation, request, response, and
+visible behavior.
 
 The organization follows the useful pattern in `jurabek10/kichkintoy`: route
 files remain thin, feature-specific modules live beside their route, and
@@ -17,16 +18,25 @@ shared UI is promoted only when it is genuinely reused.
 ## In Scope
 
 - `packages/web/src/app/(v2-studio)/studio/academies/[academyId]/content`
+- `packages/web/src/app/(v2-studio)/studio/academies/[academyId]/applications`
 - `packages/web/src/app/(v2-studio)/studio/academies/[academyId]/invitations`
 - `packages/web/src/app/(v2-studio)/studio/academies/[academyId]/members`
+- `packages/web/src/app/(v2-auth)/auth/login`
+- `packages/web/src/app/(v2-auth)/auth/pending`
+- `packages/web/src/app/(v2-auth)/auth/signup`
 
 The main refactor targets are:
 
 - `exercise-workspace.tsx`
 - `course-builder.tsx`
 - `courses-manager.tsx`
+- `applications-manager.tsx`
 - `invitations-manager.tsx`
 - `members-manager.tsx`
+- `pending-approval.tsx`
+- `signup-form.tsx`
+- Supporting login modules when an extraction improves locality or creates a
+  genuinely reused authentication module
 - Supporting content modules when extracting a responsibility improves
   locality
 
@@ -37,7 +47,8 @@ The main refactor targets are:
 - UI redesign
 - Translation-copy changes
 - New functionality
-- Applications and academy shell/sidebar refactors
+- Academy shell/sidebar refactors
+- Authentication routes other than login, pending, and signup
 - Introducing a global state library
 - Moving route features into a global `features` directory
 
@@ -178,6 +189,25 @@ The hook owns form state, query state, mutation behavior, cache invalidation,
 and error state. The form and list expose focused interfaces and do not know
 how ORPC cache keys are managed.
 
+## Applications Structure
+
+Target organization:
+
+```text
+applications/
+├── _components/
+│   ├── applications-manager.tsx
+│   ├── applications-list.tsx
+│   └── application-card.tsx
+└── _hooks/
+    └── use-applications-manager.ts
+```
+
+The hook owns application querying, review mutation, cache invalidation,
+pending state, and error state. Each application card owns only its local role
+and review-reason input state. ORPC behavior remains behind the feature hook
+and is not repeated in rendering modules.
+
 ## Members Structure
 
 Target organization:
@@ -193,6 +223,76 @@ members/
 
 The hook owns member querying, role mutation, cache invalidation, pending
 state, and error state. The table owns column construction and role controls.
+
+## Authentication Structure
+
+Authentication modules remain route-local under `(v2-auth)`. Shared
+authentication fields and social-login modules that are already reused remain
+under `auth/_components`; route-specific behavior stays beside its route.
+
+### Login
+
+The current login form is already small. It remains a single route-local
+module unless a repeated visual concept can be shared with signup without
+increasing its interface. The route page remains a thin server module.
+
+No hook is introduced for `useActionState`; wrapping one action-state call
+would create a shallow module.
+
+### Pending approval
+
+Target organization:
+
+```text
+pending/
+├── _components/
+│   ├── pending-approval.tsx
+│   ├── pending-status-card.tsx
+│   └── pending-actions.tsx
+├── _hooks/
+│   └── use-pending-approval.ts
+└── _lib/
+    └── pending-presentation.ts
+```
+
+Responsibilities:
+
+- `pending-approval` composes the state view.
+- `use-pending-approval` owns account querying, manual status refresh,
+  cancel/reapply mutation behavior, and last-checked state.
+- `pending-presentation` owns the typed state-to-copy map, icon selection, and
+  status-tone mapping without importing React or ORPC.
+- `pending-status-card` renders academy, membership/application status, role,
+  and rejection reason.
+- `pending-actions` renders the state-dependent enter, refresh, cancel,
+  reapply, and sign-out actions.
+
+### Signup
+
+Target organization:
+
+```text
+signup/
+├── _components/
+│   ├── signup-form.tsx
+│   ├── academy-selector-field.tsx
+│   └── signup-notice.tsx
+└── _hooks/
+    └── use-signup-academies.ts
+```
+
+Responsibilities:
+
+- `signup-form` composes academy selection, credential fields, social login,
+  role notice, and the login link.
+- `use-signup-academies` owns the signup-academy query and selected-academy
+  state, including invited-academy locking.
+- `academy-selector-field` owns the selector trigger and academy loading/error
+  presentation.
+- `signup-notice` owns the role-notice presentation.
+
+`useActionState(signupAction)` stays in the form because it is the native form
+submission seam and does not benefit from another module interface.
 
 ## Interface and Dependency Rules
 
@@ -228,6 +328,10 @@ The refactor must preserve:
 - Team Lead editing and Manager read-only behavior
 - Course, module, lecture, and exercise workflows
 - Manual problem draft conversion and fixed service limits
+- Login and signup form actions
+- Signup academy loading and invitation locking
+- Pending-account state resolution, refresh, cancellation, and reapplication
+- Application review role and reason handling
 - Dirty-state and navigation warnings
 - Concurrent-edit conflict handling
 - Query invalidation and route refresh behavior
@@ -264,7 +368,12 @@ Using the signed-in local Studio sessions:
 - The continuous problem form still renders all sections.
 - Inline answer and hint controls still work.
 - Manager remains read-only.
+- Academy applications retain review controls and states.
 - Members and invitations retain their current controls and states.
+- Login and signup retain credentials and social-login flows without
+  submitting test data.
+- Pending approval retains every membership/application state and manual
+  refresh behavior.
 - No new browser console errors appear.
 
 Browser checks must not create or save test data.

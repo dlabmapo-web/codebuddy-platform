@@ -1,4 +1,13 @@
+'use client';
+
 import type { CourseSummary } from '@cove/shared';
+import { formatShortDate } from '@cove/i18n/format';
+
+import {
+  useLayoutTranslation,
+  useLocale,
+  type TranslationKey,
+} from '@/i18n';
 
 /**
  * One vocabulary for version state, reused across the library and the builder:
@@ -18,10 +27,13 @@ const stateDotClass: Record<VersionState, string> = {
   retired: 'border-retired bg-retired-soft',
 };
 
-export const stateLabel: Record<VersionState, string> = {
-  draft: 'Draft',
-  published: 'Published',
-  retired: 'Retired',
+const versionPrefix = 'v';
+
+/** Key per state, so the label is looked up in the reader's language. */
+const stateLabelKey: Record<VersionState, TranslationKey<'content'>> = {
+  draft: 'version.draft',
+  published: 'version.published',
+  retired: 'version.retired',
 };
 
 export function VersionChip({
@@ -31,15 +43,16 @@ export function VersionChip({
   state: VersionState;
   versionNumber?: number;
 }) {
+  const { t } = useLayoutTranslation('content');
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${stateChipClass[state]}`}
     >
       <span className={`size-2 rounded-full border-2 ${stateDotClass[state]}`} />
       {versionNumber === undefined ? null : (
-        <span className="font-mono">v{versionNumber}</span>
+        <span className="font-mono">{versionPrefix}{versionNumber}</span>
       )}
-      {stateLabel[state]}
+      {t(stateLabelKey[state])}
     </span>
   );
 }
@@ -48,6 +61,7 @@ export function VersionChip({
  * The version spine: what is live, and what is being written next.
  */
 export function VersionSpine({ course }: { course: CourseSummary }) {
+  const { t } = useLayoutTranslation('content');
   const rows: Array<{ state: VersionState; versionNumber: number }> = [];
   if (course.draftVersion) {
     rows.push({ state: 'draft', versionNumber: course.draftVersion.versionNumber });
@@ -63,7 +77,7 @@ export function VersionSpine({ course }: { course: CourseSummary }) {
     return (
       <div className="flex items-center gap-2 text-[12px] font-semibold text-sub">
         <span className="size-2 rounded-full border-2 border-border" />
-        No versions
+        {t('version.none')}
       </div>
     );
   }
@@ -82,14 +96,14 @@ export function VersionSpine({ course }: { course: CourseSummary }) {
             className={`size-2 shrink-0 rounded-full border-2 ${stateDotClass[row.state]}`}
           />
           <span className="font-mono text-[13px] font-bold tabular-nums">
-            v{row.versionNumber}
+            {versionPrefix}{row.versionNumber}
           </span>
           <span
             className={`text-[12px] font-semibold ${
               row.state === 'draft' ? 'text-draft' : 'text-brand'
             }`}
           >
-            {stateLabel[row.state]}
+            {t(stateLabelKey[row.state])}
           </span>
         </li>
       ))}
@@ -97,12 +111,8 @@ export function VersionSpine({ course }: { course: CourseSummary }) {
   );
 }
 
-const dateFormat = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'Asia/Seoul',
-});
-
-export function formatContentDate(iso: string): string {
-  return dateFormat.format(new Date(iso));
+/** Table cells drop the year; the locale decides the rest. */
+export function useContentDate(): (iso: string) => string {
+  const locale = useLocale();
+  return (iso: string) => formatShortDate(iso, locale);
 }

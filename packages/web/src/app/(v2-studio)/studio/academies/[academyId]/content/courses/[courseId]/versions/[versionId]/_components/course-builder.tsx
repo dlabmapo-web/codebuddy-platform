@@ -16,6 +16,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useLayoutTranslation } from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { VersionChip } from '../../../../../_components/version-marks';
 
@@ -34,6 +36,8 @@ export function CourseBuilder({
   versionId: string;
   initialTree: Tree;
 }) {
+  const { t } = useLayoutTranslation(['content', 'common']);
+  const errorText = useErrorText();
   const queryClient = useQueryClient();
   const router = useRouter();
   const queryKey = ['academy', academyId, 'course-version', versionId];
@@ -133,15 +137,16 @@ export function CourseBuilder({
     },
   });
 
-  const structuralError =
-    createModule.isError ||
-    updateModule.isError ||
-    deleteModule.isError ||
-    reorderModules.isError ||
-    createLecture.isError ||
-    updateLecture.isError ||
-    deleteLecture.isError ||
-    reorderLectures.isError;
+  const structuralError = [
+    createModule,
+    updateModule,
+    deleteModule,
+    reorderModules,
+    createLecture,
+    updateLecture,
+    deleteLecture,
+    reorderLectures,
+  ].find((mutation) => mutation.isError)?.error;
 
   const moduleIds = data.modules.map((item) => item.id);
   const lectureCount = data.modules.reduce(
@@ -161,7 +166,7 @@ export function CourseBuilder({
         href={`/studio/academies/${academyId}/content/courses`}
       >
         <ArrowLeft className="size-3.5" />
-        All courses
+        {t('builder.all_courses')}
       </Link>
 
       {editable ? null : (
@@ -170,11 +175,12 @@ export function CourseBuilder({
             <Lock className="mt-0.5 size-4 shrink-0 text-brand" />
             <div>
               <h2 className="text-[14px] font-bold text-brand">
-                Version {data.version.versionNumber} is published and read-only
+                {t('builder.locked_heading', {
+                  version: data.version.versionNumber,
+                })}
               </h2>
               <p className="mt-1 text-[13.5px] leading-[1.55] text-brand-deep/80">
-                Classes rely on this exact content. To change it, start the next
-                draft — it opens as a copy of this version.
+                {t('builder.locked_body')}
               </p>
             </div>
           </div>
@@ -184,7 +190,9 @@ export function CourseBuilder({
             onClick={() => startNextDraft.mutate()}
             type="button"
           >
-            {startNextDraft.isPending ? 'Starting…' : 'Start next draft'}
+            {startNextDraft.isPending
+              ? t('builder.starting')
+              : t('builder.start_next_draft')}
           </button>
         </div>
       )}
@@ -193,10 +201,9 @@ export function CourseBuilder({
         <section className="space-y-3">
           {data.modules.length === 0 ? (
             <div className="rounded-card border border-dashed border-border bg-white px-6 py-12 text-center">
-              <h3 className="text-[15.5px] font-bold">Start with a module</h3>
+              <h3 className="text-[15.5px] font-bold">{t('empty.heading')}</h3>
               <p className="mx-auto mt-2 max-w-sm text-[13.5px] leading-[1.55] text-sub">
-                A module is a chunk of the course — “Loops”, “Functions”. Lectures
-                live inside it, and exercises live inside lectures.
+                {t('empty.body')}
               </p>
             </div>
           ) : (
@@ -255,7 +262,7 @@ export function CourseBuilder({
                 className="h-10 min-w-48 flex-1 rounded-lg border border-border bg-white px-3 text-[14px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
                 maxLength={200}
                 onChange={(event) => setModuleTitle(event.target.value)}
-                placeholder="New module title — e.g. Conditionals"
+                placeholder={t('module.title_placeholder')}
                 value={moduleTitle}
               />
               <button
@@ -264,14 +271,14 @@ export function CourseBuilder({
                 type="submit"
               >
                 <Plus className="size-4" />
-                {createModule.isPending ? 'Adding…' : 'Add module'}
+                {createModule.isPending ? t('module.adding') : t('module.add')}
               </button>
             </form>
           ) : null}
 
           {structuralError ? (
             <p className="text-[13px] font-semibold text-danger">
-              That change did not save. Reload the page to see the current draft.
+              {errorText(structuralError, t('builder.structural_error'))}
             </p>
           ) : null}
         </section>
@@ -280,7 +287,7 @@ export function CourseBuilder({
           <div className="rounded-card border border-border bg-white p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-[13px] font-bold uppercase tracking-wider text-sub">
-                This version
+                {t('sidebar.heading')}
               </h2>
               <VersionChip
                 state={
@@ -294,8 +301,8 @@ export function CourseBuilder({
               />
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3">
-              <Stat label="Modules" value={data.modules.length} />
-              <Stat label="Lectures" value={lectureCount} />
+              <Stat label={t('sidebar.modules')} value={data.modules.length} />
+              <Stat label={t('sidebar.lectures')} value={lectureCount} />
             </dl>
 
             {editable ? (
@@ -306,7 +313,9 @@ export function CourseBuilder({
                   onClick={() => validate.mutate()}
                   type="button"
                 >
-                  {validate.isPending ? 'Checking…' : 'Check before publishing'}
+                  {validate.isPending
+                    ? t('sidebar.checking')
+                    : t('sidebar.check')}
                 </button>
                 <button
                   className="h-10 w-full rounded-lg bg-brand text-[14px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
@@ -315,20 +324,21 @@ export function CourseBuilder({
                   type="button"
                 >
                   {publish.isPending
-                    ? 'Publishing…'
-                    : `Publish v${data.version.versionNumber}`}
+                    ? t('sidebar.publishing')
+                    : t('sidebar.publish', {
+                        version: data.version.versionNumber,
+                      })}
                 </button>
                 <p className="text-[12.5px] leading-[1.55] text-sub">
                   {issues === null
-                    ? 'Run the check to unlock publishing.'
+                    ? t('sidebar.hint_unchecked')
                     : issues.length === 0
-                      ? 'Publishing freezes this version and makes it the one classes use.'
-                      : 'Fix the items below, then check again.'}
+                      ? t('sidebar.hint_ready')
+                      : t('sidebar.hint_blocked')}
                 </p>
                 {publish.isError ? (
                   <p className="text-[12px] font-semibold text-danger">
-                    Publishing was refused. Run the check again for the current
-                    blockers.
+                    {errorText(publish.error, t('sidebar.publish_refused'))}
                   </p>
                 ) : null}
               </div>
@@ -346,13 +356,13 @@ export function CourseBuilder({
               {issues.length === 0 ? (
                 <p className="flex items-center gap-2 text-[14px] font-bold text-success">
                   <Check className="size-4" />
-                  Ready to publish
+                  {t('issues.ready')}
                 </p>
               ) : (
                 <>
                   <p className="flex items-center gap-2 text-[14px] font-bold text-draft">
                     <TriangleAlert className="size-4" />
-                    {issues.length} item{issues.length === 1 ? '' : 's'} to fix
+                    {t('issues.count', { count: issues.length })}
                   </p>
                   <ul className="mt-3 space-y-2.5">
                     {issues.map((issue) => (
@@ -370,8 +380,7 @@ export function CourseBuilder({
           ) : null}
 
           <p className="px-1 text-[12.5px] leading-[1.55] text-sub">
-            Programming exercises, test cases, and Excel import arrive in the next
-            release. Modules and lectures you write now carry over.
+            {t('sidebar.roadmap')}
           </p>
         </aside>
       </div>
@@ -418,6 +427,7 @@ function ModuleCard({
   onStartLecture: () => void;
   savingLecture: boolean;
 }) {
+  const { t } = useLayoutTranslation(['content', 'common']);
   return (
     <article
       className={`overflow-hidden rounded-card border bg-white ${
@@ -436,11 +446,12 @@ function ModuleCard({
             value={courseModule.title}
           />
           <p className="text-[12px] text-sub">
-            {courseModule.lectures.length} lecture
-            {courseModule.lectures.length === 1 ? '' : 's'}
+            {t('module.lecture_count', {
+              count: courseModule.lectures.length,
+            })}
             {issueCount > 0 ? (
               <span className="ml-2 font-semibold text-draft">
-                · {issueCount} to fix
+                {t('module.issue_count', { count: issueCount })}
               </span>
             ) : null}
           </p>
@@ -450,11 +461,14 @@ function ModuleCard({
             <MoveButtons
               canMoveDown={index < moduleCount - 1}
               canMoveUp={index > 0}
-              label="module"
+              moveDownLabel={t('module.move_down')}
+              moveUpLabel={t('module.move_up')}
               onMove={onMove}
             />
             <DeleteButton
-              label={`module “${courseModule.title}” and its lectures`}
+              ariaLabel={t('module.delete_aria', {
+                title: courseModule.title,
+              })}
               onDelete={onDelete}
             />
           </div>
@@ -490,7 +504,7 @@ function ModuleCard({
               className="h-9 min-w-40 flex-1 rounded-lg border border-border bg-white px-3 text-[14px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
               maxLength={200}
               onChange={(event) => onLectureTitleChange(event.target.value)}
-              placeholder="Lecture title"
+              placeholder={t('lecture.title_placeholder')}
               value={lectureTitle}
             />
             <button
@@ -498,14 +512,14 @@ function ModuleCard({
               disabled={savingLecture || !lectureTitle.trim()}
               type="submit"
             >
-              Add lecture
+              {t('lecture.add')}
             </button>
             <button
               className="h-9 px-2 text-[13.5px] font-semibold text-sub transition-colors hover:text-ink"
               onClick={onCancelLecture}
               type="button"
             >
-              Cancel
+              {t('common:action.cancel')}
             </button>
           </form>
         ) : (
@@ -515,7 +529,7 @@ function ModuleCard({
             type="button"
           >
             <Plus className="size-3.5" />
-            Add lecture
+            {t('lecture.add')}
           </button>
         )
       ) : null}
@@ -540,6 +554,7 @@ function LectureRow({
   onMove: (direction: -1 | 1) => void;
   onRename: (title: string) => void;
 }) {
+  const { t } = useLayoutTranslation('content');
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
       <span className="w-6 shrink-0 font-mono text-[12px] tabular-nums text-sub">
@@ -555,18 +570,24 @@ function LectureRow({
       </div>
       <span className="shrink-0 text-[12px] text-sub">
         {lecture.materials.length === 0
-          ? 'No exercises'
-          : `${lecture.materials.length} exercise${lecture.materials.length === 1 ? '' : 's'}`}
+          ? t('lecture.no_exercises')
+          : t('lecture.exercise_count', {
+              count: lecture.materials.length,
+            })}
       </span>
       {editable ? (
         <div className="flex shrink-0 items-center gap-0.5">
           <MoveButtons
             canMoveDown={index < lectureCount - 1}
             canMoveUp={index > 0}
-            label="lecture"
+            moveDownLabel={t('lecture.move_down')}
+            moveUpLabel={t('lecture.move_up')}
             onMove={onMove}
           />
-          <DeleteButton label={`lecture “${lecture.title}”`} onDelete={onDelete} />
+          <DeleteButton
+            ariaLabel={t('lecture.delete_aria', { title: lecture.title })}
+            onDelete={onDelete}
+          />
         </div>
       ) : null}
     </li>
@@ -585,6 +606,7 @@ function EditableTitle({
   onSave: (title: string) => void;
   value: string;
 }) {
+  const { t } = useLayoutTranslation('content');
   const [draft, setDraft] = useState<string | null>(null);
 
   if (!editable || draft === null) {
@@ -592,7 +614,7 @@ function EditableTitle({
       <button
         className={`${className} block max-w-full truncate rounded text-left transition-colors hover:text-brand`}
         onClick={() => setDraft(value)}
-        title="Rename"
+        title={t('rename')}
         type="button"
       >
         {value}
@@ -624,15 +646,22 @@ function EditableTitle({
   );
 }
 
+/**
+ * Labels arrive fully formed rather than as "Move {{thing}} up": Korean
+ * attaches particles to the noun, so a sentence built around an interpolated
+ * "module"/"lecture" comes out ungrammatical about half the time.
+ */
 function MoveButtons({
   canMoveDown,
   canMoveUp,
-  label,
+  moveDownLabel,
+  moveUpLabel,
   onMove,
 }: {
   canMoveDown: boolean;
   canMoveUp: boolean;
-  label: string;
+  moveDownLabel: string;
+  moveUpLabel: string;
   onMove: (direction: -1 | 1) => void;
 }) {
   const buttonClass =
@@ -640,7 +669,7 @@ function MoveButtons({
   return (
     <>
       <button
-        aria-label={`Move ${label} up`}
+        aria-label={moveUpLabel}
         className={buttonClass}
         disabled={!canMoveUp}
         onClick={() => onMove(-1)}
@@ -649,7 +678,7 @@ function MoveButtons({
         <ChevronUp className="size-4" />
       </button>
       <button
-        aria-label={`Move ${label} down`}
+        aria-label={moveDownLabel}
         className={buttonClass}
         disabled={!canMoveDown}
         onClick={() => onMove(1)}
@@ -663,12 +692,13 @@ function MoveButtons({
 
 /** Two-step delete: the second click confirms, so nothing vanishes by accident. */
 function DeleteButton({
-  label,
+  ariaLabel,
   onDelete,
 }: {
-  label: string;
+  ariaLabel: string;
   onDelete: () => void;
 }) {
+  const { t } = useLayoutTranslation('common');
   const [armed, setArmed] = useState(false);
 
   if (armed) {
@@ -682,14 +712,14 @@ function DeleteButton({
           }}
           type="button"
         >
-          Delete
+          {t('action.delete')}
         </button>
         <button
           className="h-7 px-1.5 text-[12px] font-semibold text-sub"
           onClick={() => setArmed(false)}
           type="button"
         >
-          Keep
+          {t('action.keep')}
         </button>
       </span>
     );
@@ -697,7 +727,7 @@ function DeleteButton({
 
   return (
     <button
-      aria-label={`Delete ${label}`}
+      aria-label={ariaLabel}
       className="grid size-7 place-items-center rounded-md text-sub transition-colors hover:bg-danger/10 hover:text-danger"
       onClick={() => setArmed(true)}
       type="button"

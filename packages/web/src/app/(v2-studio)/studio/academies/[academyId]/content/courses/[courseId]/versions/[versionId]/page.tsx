@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { StudioShell } from '../../../../../_components/studio-shell';
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { CourseBuilder } from './_components/course-builder';
 
@@ -14,6 +15,7 @@ export default async function CourseBuilderPage({
   }>;
 }) {
   const { academyId, courseId, versionId } = await params;
+  const { t } = await getServerTranslation(['content']);
   let initialTree = null;
 
   try {
@@ -30,11 +32,11 @@ export default async function CourseBuilderPage({
       description={
         initialTree
           ? initialTree.version.status === 'DRAFT'
-            ? 'Arrange modules and lectures. Nothing reaches classes until you publish.'
-            : 'A published version is a fixed record of what classes are teaching.'
+            ? t('builder.draft_description')
+            : t('builder.published_description')
           : undefined
       }
-      title={initialTree?.course.title ?? 'Course builder'}
+      title={initialTree?.course.title ?? t('builder.fallback_title')}
     >
       {initialTree ? (
         <CourseBuilder
@@ -46,16 +48,16 @@ export default async function CourseBuilderPage({
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">
           <h2 className="text-[15px] font-bold text-danger">
-            This course version is not available
+            {t('builder.unavailable_title')}
           </h2>
           <p className="mt-1.5 text-[14px] leading-6 text-sub">
-            It belongs to another academy, or your membership cannot open it.
+            {t('builder.unavailable_body')}
           </p>
           <Link
             className="mt-4 inline-block text-[14px] font-bold text-brand underline underline-offset-4"
             href={`/studio/academies/${academyId}/content/courses`}
           >
-            Back to courses
+            {t('builder.back_to_courses')}
           </Link>
         </div>
       )}

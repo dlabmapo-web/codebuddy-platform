@@ -12,10 +12,12 @@ import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
 import { Input } from '@/components/studio/primitives';
 import { orpc } from '@/lib/orpc';
+import { useLayoutTranslation, LayoutTrans } from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
 import {
   VersionChip,
   VersionSpine,
-  formatContentDate,
+  useContentDate,
 } from '../../_components/version-marks';
 
 export function CoursesManager({
@@ -25,6 +27,9 @@ export function CoursesManager({
   academyId: string;
   initialCourses: CourseSummary[];
 }) {
+  const { t } = useLayoutTranslation(['courses', 'common']);
+  const errorText = useErrorText();
+  const contentDate = useContentDate();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [showCreate, setShowCreate] = React.useState(initialCourses.length === 0);
@@ -76,7 +81,7 @@ export function CoursesManager({
       {
         id: 'course',
         accessorFn: (course) => `${course.title} ${course.description}`,
-        header: 'Course',
+        header: t('column.course'),
         cell: ({ row }) => {
           const course = row.original;
           return (
@@ -85,12 +90,12 @@ export function CoursesManager({
                 <span className="font-semibold">{course.title}</span>
                 {course.status === 'ARCHIVED' ? (
                   <span className="rounded-full bg-retired-soft px-2 py-0.5 text-[11px] font-bold text-retired">
-                    Archived
+                    {t('archived')}
                   </span>
                 ) : null}
               </div>
               <p className="mt-0.5 line-clamp-1 text-[13px] text-sub">
-                {course.description || 'No description yet.'}
+                {course.description || t('no_description')}
               </p>
             </div>
           );
@@ -98,23 +103,28 @@ export function CoursesManager({
       },
       {
         id: 'versions',
-        header: 'Versions',
+        header: t('column.versions'),
         enableSorting: false,
         cell: ({ row }) => <VersionSpine course={row.original} />,
       },
       {
         id: 'updated',
         accessorFn: (course) => course.updatedAt,
-        header: 'Last change',
+        header: t('column.updated'),
         cell: ({ row }) => (
           <div className="whitespace-nowrap text-[13px] text-sub">
             <p className="font-semibold text-ink">
-              {formatContentDate(row.original.updatedAt)}
+              {contentDate(row.original.updatedAt)}
             </p>
             <p className="mt-0.5 text-[12px]">
               {row.original.publishedVersion
-                ? `Live since ${formatContentDate(row.original.publishedVersion.publishedAt ?? row.original.publishedVersion.updatedAt)}`
-                : 'Never published'}
+                ? t('live_since', {
+                    date: contentDate(
+                      row.original.publishedVersion.publishedAt ??
+                        row.original.publishedVersion.updatedAt,
+                    ),
+                  })
+                : t('never_published')}
             </p>
           </div>
         ),
@@ -131,7 +141,7 @@ export function CoursesManager({
                 className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-bold text-brand transition-colors hover:text-brand-deep"
                 href={`/studio/academies/${academyId}/content/courses/${course.id}/versions/${course.draftVersion.id}`}
               >
-                Continue draft
+                {t('continue_draft')}
                 <ArrowRight className="size-3.5" />
               </Link>
             );
@@ -146,14 +156,14 @@ export function CoursesManager({
               onClick={() => startDraft.mutate(course.id)}
               type="button"
             >
-              {pending ? 'Starting…' : 'Start next draft'}
+              {pending ? t('starting') : t('start_next_draft')}
               <ArrowRight className="size-3.5" />
             </button>
           );
         },
       },
     ],
-    [academyId, startDraft],
+    [academyId, contentDate, startDraft, t],
   );
 
   return (
@@ -162,12 +172,16 @@ export function CoursesManager({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[14px] font-semibold text-sub">
-          <span className="font-mono text-ink">{list.length}</span> course
-          {list.length === 1 ? '' : 's'} in this academy
+          <LayoutTrans
+            components={[<span className="font-mono text-ink" key="count" />]}
+            count={list.length}
+            i18nKey="courses:course_count"
+            values={{ count: list.length }}
+          />
         </p>
         <Button onClick={() => setShowCreate((value) => !value)}>
           {showCreate ? <X /> : <Plus />}
-          {showCreate ? 'Cancel' : 'New course'}
+          {showCreate ? t('common:action.cancel') : t('new_course')}
         </Button>
       </div>
 
@@ -179,31 +193,34 @@ export function CoursesManager({
             createCourse.mutate();
           }}
         >
-          <h2 className="text-[15px] font-bold">Name the course</h2>
+          <h2 className="text-[15px] font-bold">{t('create.heading')}</h2>
           <p className="mt-1 text-[13.5px] leading-[1.55] text-sub">
-            Cove opens Draft v1 straight away. Nothing is visible to teachers or
-            students until you publish it.
+            {t('create.body')}
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]">
             <label className="grid gap-1.5">
-              <span className="text-[13px] font-semibold">Course title</span>
+              <span className="text-[13px] font-semibold">
+                {t('create.title_label')}
+              </span>
               <Input
                 maxLength={200}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Python Foundations"
+                placeholder={t('create.title_placeholder')}
                 required
                 value={title}
               />
             </label>
             <label className="grid gap-1.5">
               <span className="text-[13px] font-semibold">
-                What students learn{' '}
-                <span className="font-normal text-sub">(optional)</span>
+                {t('create.description_label')}{' '}
+                <span className="font-normal text-sub">
+                  {t('create.description_optional')}
+                </span>
               </span>
               <Input
                 maxLength={10000}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="Variables, loops, and functions through 40 problems"
+                placeholder={t('create.description_placeholder')}
                 value={description}
               />
             </label>
@@ -213,12 +230,14 @@ export function CoursesManager({
               type="submit"
               variant="ink"
             >
-              {createCourse.isPending ? 'Creating…' : 'Create and open'}
+              {createCourse.isPending
+                ? t('create.submitting')
+                : t('create.submit')}
             </Button>
           </div>
           {createCourse.isError ? (
             <p className="mt-3 text-[13px] font-semibold text-danger">
-              Another active course already uses this title. Pick a different one.
+              {errorText(createCourse.error, t('create.title_conflict'))}
             </p>
           ) : null}
         </form>
@@ -227,14 +246,14 @@ export function CoursesManager({
       <DataTable
         columns={columns}
         data={list}
-        emptyMessage="No courses yet. Start with the one you teach most often."
+        emptyMessage={t('empty')}
         pageSize={12}
-        searchPlaceholder={list.length > 5 ? 'Search courses' : undefined}
+        searchPlaceholder={list.length > 5 ? t('search_placeholder') : undefined}
       />
 
       {startDraft.isError ? (
         <p className="text-[13px] font-semibold text-danger">
-          A new draft could not be started. This course may already have one open.
+          {errorText(startDraft.error, t('draft_start_failed'))}
         </p>
       ) : null}
     </div>
@@ -246,20 +265,24 @@ export function CoursesManager({
  * before the list rather than hiding it in a tooltip.
  */
 function LifecycleGuide() {
+  const { t } = useLayoutTranslation('courses');
   const steps = [
     {
-      title: 'Write a draft',
-      body: 'Only content editors see a draft. Add modules, lectures, and exercises in any order.',
+      id: 'draft',
+      title: t('lifecycle.draft_title'),
+      body: t('lifecycle.draft_body'),
       chip: <VersionChip state="draft" versionNumber={2} />,
     },
     {
-      title: 'Check what blocks publishing',
-      body: 'Cove lists every empty module or missing test case, and links each one to the item to fix.',
+      id: 'check',
+      title: t('lifecycle.check_title'),
+      body: t('lifecycle.check_body'),
       chip: null,
     },
     {
-      title: 'Publish a version',
-      body: 'The draft freezes and becomes the version classes use. Editing it later starts the next draft.',
+      id: 'publish',
+      title: t('lifecycle.publish_title'),
+      body: t('lifecycle.publish_body'),
       chip: <VersionChip state="published" versionNumber={2} />,
     },
   ];
@@ -267,11 +290,11 @@ function LifecycleGuide() {
   return (
     <section className="rounded-card border border-border bg-white p-5">
       <h2 className="text-[12px] font-bold uppercase tracking-[0.08em] text-sub">
-        How a course goes live
+        {t('lifecycle.heading')}
       </h2>
       <ol className="mt-4 grid gap-5 sm:grid-cols-3">
         {steps.map((step, index) => (
-          <li className="relative sm:pr-4" key={step.title}>
+          <li className="relative sm:pr-4" key={step.id}>
             <div className="flex items-center gap-2.5">
               <span className="grid size-6 shrink-0 place-items-center rounded-full bg-brand-soft font-mono text-[12px] font-bold text-brand">
                 {index + 1}

@@ -3,6 +3,12 @@ import Link from 'next/link';
 import { StudioShell } from '../../../../../_components/studio-shell';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
+import {
+  academyRoleFor,
+  canManageContent,
+  canManageExercises,
+  canPublishContent,
+} from '@/lib/academy-access-state';
 import { CourseBuilder } from './_components/course-builder';
 
 export default async function CourseBuilderPage({
@@ -17,10 +23,21 @@ export default async function CourseBuilderPage({
   const { academyId, courseId, versionId } = await params;
   const { t } = await getServerTranslation(['content']);
   let initialTree = null;
+  let canEditCurriculum = false;
+  let canEditExercises = false;
+  let canPublish = false;
 
   try {
-    initialTree = await createServerORPCClient().academyCourses
-      .getDraftTree({ academyId, courseId, versionId });
+    const client = createServerORPCClient();
+    const [tree, account] = await Promise.all([
+      client.academyCourses.getDraftTree({ academyId, courseId, versionId }),
+      client.auth.me({}),
+    ]);
+    initialTree = tree;
+    const role = academyRoleFor(account, academyId);
+    canEditCurriculum = canManageContent(role);
+    canEditExercises = canManageExercises(role);
+    canPublish = canPublishContent(role);
   } catch {
     // The scoped not-found/forbidden state is rendered below.
   }
@@ -41,6 +58,9 @@ export default async function CourseBuilderPage({
       {initialTree ? (
         <CourseBuilder
           academyId={academyId}
+          canEditCurriculum={canEditCurriculum}
+          canEditExercises={canEditExercises}
+          canPublish={canPublish}
           courseId={courseId}
           initialTree={initialTree}
           versionId={versionId}

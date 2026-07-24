@@ -144,11 +144,246 @@ describe("CourseService", () => {
     expect(access.requirePermission).toHaveBeenCalledWith(
       identity.authUserId,
       academyId,
-      "curriculum.read",
+      "curriculum.review",
     );
     expect(prisma.course.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { academyId } }),
     );
+  });
+});
+
+const courseId = "40000000-0000-4000-8000-000000000001";
+const versionId = "50000000-0000-4000-8000-000000000001";
+const moduleId = "80000000-0000-4000-8000-000000000001";
+const lectureId = "90000000-0000-4000-8000-000000000001";
+const materialId = "60000000-0000-4000-8000-000000000001";
+
+const exerciseInput = {
+  academyId,
+  courseId,
+  versionId,
+  lectureId,
+  title: "Sum two numbers",
+  difficulty: "EASY" as const,
+  description: "<p>Add two integers.</p>",
+  inputFormat: "Two integers",
+  outputFormat: "Their sum",
+  constraints: "",
+  starterCode: "",
+  aiFeedbackEnabled: false,
+  testCases: [{
+    input: "1 2",
+    expectedOutput: "3",
+    visibility: "SAMPLE" as const,
+  }],
+  hints: [{ content: "Use +", triggerExpression: null }],
+};
+
+function createExerciseRecord() {
+  return {
+    id: materialId,
+    lectureId,
+    type: "PROGRAMMING_EXERCISE" as const,
+    title: exerciseInput.title,
+    position: 1,
+    isRequired: true,
+    createdAt: now,
+    updatedAt: now,
+    lecture: {
+      id: lectureId,
+      courseModuleId: moduleId,
+      title: "Input",
+      description: "",
+      position: 1,
+      createdAt: now,
+      updatedAt: now,
+      courseModule: {
+        id: moduleId,
+        courseVersionId: versionId,
+        title: "Basics",
+        description: "",
+        position: 1,
+        createdAt: now,
+        updatedAt: now,
+        courseVersion: {
+          id: versionId,
+          courseId,
+          versionNumber: 1,
+          status: "DRAFT" as const,
+          createdByUserId: actorUserId,
+          publishedByUserId: null,
+          publishedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          course: {
+            id: courseId,
+            academyId,
+            title: "Python Foundations",
+            description: "",
+            status: "ACTIVE" as const,
+            createdByUserId: actorUserId,
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+      },
+    },
+    programmingExercise: {
+      materialId,
+      courseVersionId: versionId,
+      externalKey: "manual-test",
+      legacyProblemNo: null,
+      difficulty: "EASY" as const,
+      description: exerciseInput.description,
+      inputFormat: exerciseInput.inputFormat,
+      outputFormat: exerciseInput.outputFormat,
+      constraints: "",
+      starterCode: "",
+      language: "PYTHON" as const,
+      timeLimitMs: 3000,
+      memoryLimitMb: 256,
+      aiFeedbackEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+      testCases: [{
+        id: "70000000-0000-4000-8000-000000000001",
+        exerciseMaterialId: materialId,
+        position: 1,
+        input: "1 2",
+        expectedOutput: "3",
+        visibility: "SAMPLE" as const,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      hints: [],
+    },
+  };
+}
+
+describe("CourseService exercise authoring", () => {
+  it("creates the material, exercise, test cases, and hints atomically", async () => {
+    const transaction = {
+      material: {
+        aggregate: vi.fn().mockResolvedValue({ _max: { position: 2 } }),
+        create: vi.fn().mockResolvedValue({ id: materialId, position: 3 }),
+      },
+      auditLog: { create: vi.fn() },
+    };
+    const prisma = {
+      courseVersion: {
+        findFirst: vi.fn().mockResolvedValue({ status: "DRAFT" }),
+      },
+      lecture: {
+        findFirst: vi.fn().mockResolvedValue({ id: lectureId }),
+      },
+      $transaction: vi.fn(async (
+        callback: (tx: typeof transaction) => Promise<unknown>,
+      ) => callback(transaction)),
+    } as unknown as PrismaService;
+    const access = {
+      requirePermission: vi.fn().mockResolvedValue({
+        userId: actorUserId,
+        academyId,
+        role: "TEAM_LEAD",
+      }),
+    } as unknown as AcademyAccessService;
+    const audit = {
+      write: vi.fn().mockResolvedValue({ id: "audit-id" }),
+    } as unknown as AuditService;
+    const service = new CourseService(prisma, access, audit);
+    vi.spyOn(service, "getExercise").mockResolvedValue({} as never);
+
+    await service.createExercise(identity, exerciseInput);
+
+    expect(access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "exercises.manage",
+    );
+    expect(transaction.material.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        lectureId,
+        title: exerciseInput.title,
+        position: 3,
+        programmingExercise: {
+          create: expect.objectContaining({
+            courseVersionId: versionId,
+            timeLimitMs: 3000,
+            memoryLimitMb: 256,
+            testCases: {
+              create: [expect.objectContaining({
+                position: 1,
+                expectedOutput: "3",
+              })],
+            },
+            hints: {
+              create: [expect.objectContaining({
+                position: 1,
+                content: "Use +",
+              })],
+            },
+          }),
+        },
+      }),
+    });
+    expect(audit.write).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({
+        action: "content.programming_exercise.created",
+        targetId: materialId,
+      }),
+    );
+  });
+
+  it("rejects a stale update before replacing child collections", async () => {
+    const record = createExerciseRecord();
+    const transaction = {
+      programmingExercise: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      material: { update: vi.fn() },
+      exerciseTestCase: { deleteMany: vi.fn(), createMany: vi.fn() },
+      exerciseHint: { deleteMany: vi.fn(), createMany: vi.fn() },
+      auditLog: { create: vi.fn() },
+    };
+    const prisma = {
+      courseVersion: {
+        findFirst: vi.fn().mockResolvedValue({ status: "DRAFT" }),
+      },
+      material: { findFirst: vi.fn().mockResolvedValue(record) },
+      $transaction: vi.fn(async (
+        callback: (tx: typeof transaction) => Promise<unknown>,
+      ) => callback(transaction)),
+    } as unknown as PrismaService;
+    const access = {
+      requirePermission: vi.fn().mockResolvedValue({
+        userId: actorUserId,
+        academyId,
+        role: "TEAM_LEAD",
+      }),
+    } as unknown as AcademyAccessService;
+    const audit = {
+      write: vi.fn().mockResolvedValue({ id: "audit-id" }),
+    } as unknown as AuditService;
+    const service = new CourseService(prisma, access, audit);
+
+    await expect(service.updateExercise(identity, {
+      ...exerciseInput,
+      materialId,
+      expectedUpdatedAt: now.toISOString(),
+    })).rejects.toMatchObject({ code: "CONTENT_EDIT_CONFLICT" });
+
+    expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          timeLimitMs: 3000,
+          memoryLimitMb: 256,
+        }),
+      }),
+    );
+    expect(transaction.material.update).not.toHaveBeenCalled();
+    expect(transaction.exerciseTestCase.deleteMany).not.toHaveBeenCalled();
+    expect(transaction.exerciseHint.deleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -201,6 +436,7 @@ function createExerciseMaterial(
       timeLimitMs: 2000,
       memoryLimitMb: 256,
       aiFeedbackEnabled: false,
+      updatedAt: now.toISOString(),
       testCases: (overrides.testCases ?? [{ expectedOutput: "3" }]).map(
         (testCase, index) => ({
           id: `70000000-0000-4000-8000-00000000000${index + 1}`,
@@ -268,7 +504,7 @@ describe("collectPublishIssues", () => {
     ]);
   });
 
-  it("blocks a test case with a blank expected output", () => {
+  it("blocks an exercise when no test case has an expected output", () => {
     const issues = collectPublishIssues(
       createTree([
         createModule([
@@ -279,7 +515,37 @@ describe("collectPublishIssues", () => {
       ]),
     );
 
-    expect(issues).toMatchObject([{ code: "TEST_CASE_OUTPUT_REQUIRED" }]);
+    expect(issues).toMatchObject([{ code: "TEST_CASE_REQUIRED" }]);
+  });
+
+  it("treats empty rich-text markup as an empty description", () => {
+    const issues = collectPublishIssues(
+      createTree([
+        createModule([
+          createLecture([
+            createExerciseMaterial({ description: "<p>&nbsp;</p>" }),
+          ]),
+        ]),
+      ]),
+    );
+
+    expect(issues).toMatchObject([{ code: "EXERCISE_DESCRIPTION_REQUIRED" }]);
+  });
+
+  it("allows an optional blank case when another expected output is complete", () => {
+    const issues = collectPublishIssues(
+      createTree([
+        createModule([
+          createLecture([
+            createExerciseMaterial({
+              testCases: [{ expectedOutput: "3" }, { expectedOutput: "" }],
+            }),
+          ]),
+        ]),
+      ]),
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it("passes a complete module, lecture, and exercise", () => {

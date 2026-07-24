@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -54,6 +55,56 @@ const draftTreeInclude = {
   },
 } as const satisfies Prisma.CourseVersionInclude;
 
+const exerciseAuthoringInclude = {
+  lecture: {
+    include: {
+      courseModule: {
+        include: {
+          courseVersion: { include: { course: true } },
+        },
+      },
+    },
+  },
+  programmingExercise: {
+    include: {
+      testCases: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+      },
+      hints: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+      },
+    },
+  },
+} as const satisfies Prisma.MaterialInclude;
+
+type ExerciseRecord = Prisma.MaterialGetPayload<{
+  include: typeof exerciseAuthoringInclude;
+}>;
+
+type ExerciseWriteInput = {
+  academyId: string;
+  courseId: string;
+  versionId: string;
+  lectureId: string;
+  title: string;
+  difficulty: "EASY" | "MEDIUM" | "HARD";
+  description: string;
+  inputFormat: string;
+  outputFormat: string;
+  constraints: string;
+  starterCode: string;
+  aiFeedbackEnabled: boolean;
+  testCases: Array<{
+    input: string;
+    expectedOutput: string;
+    visibility: "SAMPLE" | "HIDDEN";
+  }>;
+  hints: Array<{
+    content: string;
+    triggerExpression: string | null;
+  }>;
+};
+
 @Injectable()
 export class CourseService {
   constructor(
@@ -66,7 +117,7 @@ export class CourseService {
     await this.access.requirePermission(
       identity.authUserId,
       academyId,
-      "curriculum.read",
+      "curriculum.review",
     );
     const courses = await this.prisma.course.findMany({
       where: { academyId },
@@ -296,7 +347,7 @@ export class CourseService {
     await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
-      "curriculum.read",
+      "curriculum.review",
     );
     const version = await this.findVersion(input);
     return toDraftTree(version);
@@ -620,6 +671,276 @@ export class CourseService {
     return this.getDraftTree(identity, input);
   }
 
+  async getExercise(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      versionId: string;
+      lectureId: string;
+      materialId: string;
+    },
+  ) {
+    await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.review",
+    );
+    return toExerciseAuthoringContext(await this.requireExercise(input));
+  }
+
+  async createExercise(
+    identity: SupabaseIdentity,
+    input: ExerciseWriteInput,
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "exercises.manage",
+    );
+    await this.requireEditableVersion(input);
+    await this.requireLecture(input.versionId, input.lectureId);
+    assertExerciseComplete(input);
+
+    const material = await this.prisma.$transaction(async (transaction) => {
+      const position = await nextMaterialPosition(transaction, input.lectureId);
+      const created = await transaction.material.create({
+        data: {
+          lectureId: input.lectureId,
+          type: "PROGRAMMING_EXERCISE",
+          title: input.title.trim(),
+          position,
+          isRequired: true,
+          programmingExercise: {
+            create: {
+              courseVersionId: input.versionId,
+              externalKey: `manual-${randomUUID()}`,
+              legacyProblemNo: null,
+              difficulty: input.difficulty,
+              description: input.description,
+              inputFormat: input.inputFormat,
+              outputFormat: input.outputFormat,
+              constraints: input.constraints,
+              starterCode: input.starterCode,
+              language: "PYTHON",
+              timeLimitMs: 3000,
+              memoryLimitMb: 256,
+              aiFeedbackEnabled: input.aiFeedbackEnabled,
+              testCases: {
+                create: input.testCases.map((testCase, index) => ({
+                  position: index + 1,
+                  input: testCase.input,
+                  expectedOutput: testCase.expectedOutput,
+                  visibility: testCase.visibility,
+                })),
+              },
+              hints: {
+                create: input.hints.map((hint, index) => ({
+                  position: index + 1,
+                  content: hint.content.trim(),
+                  triggerExpression:
+                    emptyToNull(hint.triggerExpression),
+                })),
+              },
+            },
+          },
+        },
+      });
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.created",
+        targetType: "Material",
+        targetId: created.id,
+        requestId: context.requestId,
+        after: exerciseAuditSnapshot(input, position),
+      });
+      return created;
+    });
+
+    return this.getExercise(identity, {
+      ...input,
+      materialId: material.id,
+    });
+  }
+
+  async updateExercise(
+    identity: SupabaseIdentity,
+    input: ExerciseWriteInput & {
+      materialId: string;
+      expectedUpdatedAt: string;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "exercises.manage",
+    );
+    await this.requireEditableVersion(input);
+    const current = await this.requireExercise(input);
+    assertExerciseComplete(input);
+    const expectedUpdatedAt = new Date(input.expectedUpdatedAt);
+    const nextUpdatedAt = new Date(
+      Math.max(Date.now(), expectedUpdatedAt.getTime() + 1),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      const changed = await transaction.programmingExercise.updateMany({
+        where: {
+          materialId: input.materialId,
+          updatedAt: expectedUpdatedAt,
+        },
+        data: {
+          difficulty: input.difficulty,
+          description: input.description,
+          inputFormat: input.inputFormat,
+          outputFormat: input.outputFormat,
+          constraints: input.constraints,
+          starterCode: input.starterCode,
+          timeLimitMs: 3000,
+          memoryLimitMb: 256,
+          aiFeedbackEnabled: input.aiFeedbackEnabled,
+          updatedAt: nextUpdatedAt,
+        },
+      });
+      if (changed.count !== 1) {
+        throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
+      }
+
+      await transaction.material.update({
+        where: { id: input.materialId },
+        data: { title: input.title.trim() },
+      });
+      await transaction.exerciseTestCase.deleteMany({
+        where: { exerciseMaterialId: input.materialId },
+      });
+      await transaction.exerciseHint.deleteMany({
+        where: { exerciseMaterialId: input.materialId },
+      });
+      await transaction.exerciseTestCase.createMany({
+        data: input.testCases.map((testCase, index) => ({
+          exerciseMaterialId: input.materialId,
+          position: index + 1,
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          visibility: testCase.visibility,
+        })),
+      });
+      if (input.hints.length > 0) {
+        await transaction.exerciseHint.createMany({
+          data: input.hints.map((hint, index) => ({
+            exerciseMaterialId: input.materialId,
+            position: index + 1,
+            content: hint.content.trim(),
+            triggerExpression: emptyToNull(hint.triggerExpression),
+          })),
+        });
+      }
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.updated",
+        targetType: "Material",
+        targetId: input.materialId,
+        requestId: context.requestId,
+        before: exerciseRecordAuditSnapshot(current),
+        after: exerciseAuditSnapshot(input, current.position),
+      });
+    });
+
+    return this.getExercise(identity, input);
+  }
+
+  async deleteExercise(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      versionId: string;
+      lectureId: string;
+      materialId: string;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "exercises.manage",
+    );
+    await this.requireEditableVersion(input);
+    const current = await this.requireExercise(input);
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.material.delete({ where: { id: input.materialId } });
+      const remaining = await transaction.material.findMany({
+        where: { lectureId: input.lectureId },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: { id: true },
+      });
+      await repackPositions(
+        remaining.map((item) => item.id),
+        (id, position) =>
+          transaction.material.update({ where: { id }, data: { position } }),
+      );
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.deleted",
+        targetType: "Material",
+        targetId: input.materialId,
+        requestId: context.requestId,
+        before: exerciseRecordAuditSnapshot(current),
+      });
+    });
+    return this.getDraftTree(identity, input);
+  }
+
+  async reorderExercises(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      versionId: string;
+      lectureId: string;
+      orderedMaterialIds: string[];
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "exercises.manage",
+    );
+    await this.requireEditableVersion(input);
+    await this.requireLecture(input.versionId, input.lectureId);
+    const existing = await this.prisma.material.findMany({
+      where: { lectureId: input.lectureId },
+      select: { id: true },
+    });
+    assertSameMembers(
+      existing.map((item) => item.id),
+      input.orderedMaterialIds,
+    );
+    await this.prisma.$transaction(async (transaction) => {
+      await repackPositions(
+        input.orderedMaterialIds,
+        (id, position) =>
+          transaction.material.update({ where: { id }, data: { position } }),
+      );
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.reordered",
+        targetType: "Lecture",
+        targetId: input.lectureId,
+        requestId: context.requestId,
+        after: { orderedMaterialIds: input.orderedMaterialIds },
+      });
+    });
+    return this.getDraftTree(identity, input);
+  }
+
   async validateVersion(
     identity: SupabaseIdentity,
     input: { academyId: string; courseId: string; versionId: string },
@@ -627,7 +948,7 @@ export class CourseService {
     await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
-      "curriculum.read",
+      "curriculum.review",
     );
     const version = await this.findVersion(input);
     const issues = collectPublishIssues(toDraftTree(version));
@@ -745,6 +1066,35 @@ export class CourseService {
     return lecture;
   }
 
+  private async requireExercise(input: {
+    academyId: string;
+    courseId: string;
+    versionId: string;
+    lectureId: string;
+    materialId: string;
+  }) {
+    const material = await this.prisma.material.findFirst({
+      where: {
+        id: input.materialId,
+        lectureId: input.lectureId,
+        lecture: {
+          courseModule: {
+            courseVersionId: input.versionId,
+            courseVersion: {
+              courseId: input.courseId,
+              course: { academyId: input.academyId },
+            },
+          },
+        },
+      },
+      include: exerciseAuthoringInclude,
+    });
+    if (!material?.programmingExercise) {
+      throw new AppException("EXERCISE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    return material;
+  }
+
   private async assertTitleAvailable(
     academyId: string,
     title: string,
@@ -831,6 +1181,17 @@ async function nextLecturePosition(
   return (aggregate._max.position ?? 0) + 1;
 }
 
+async function nextMaterialPosition(
+  transaction: Prisma.TransactionClient,
+  lectureId: string,
+) {
+  const aggregate = await transaction.material.aggregate({
+    where: { lectureId },
+    _max: { position: true },
+  });
+  return (aggregate._max.position ?? 0) + 1;
+}
+
 /**
  * Positions are unique per parent, so every reorder parks the rows on negative
  * placeholders before writing the final 1..n sequence.
@@ -858,6 +1219,62 @@ function assertSameMembers(existingIds: string[], submittedIds: string[]) {
       HttpStatus.UNPROCESSABLE_ENTITY,
     );
   }
+}
+
+function assertExerciseComplete(input: ExerciseWriteInput) {
+  const hasDescription = richTextToPlainText(input.description).length > 0;
+  const hasUsableTest = input.testCases.some(
+    (testCase) => testCase.expectedOutput.trim().length > 0,
+  );
+  if (!hasDescription || !hasUsableTest) {
+    throw new AppException(
+      "EXERCISE_VALIDATION_FAILED",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+function richTextToPlainText(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&[a-z]+;|&#\d+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function emptyToNull(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function exerciseAuditSnapshot(input: ExerciseWriteInput, position: number) {
+  return {
+    title: input.title.trim(),
+    difficulty: input.difficulty,
+    position,
+    language: "PYTHON",
+    timeLimitMs: 3000,
+    memoryLimitMb: 256,
+    aiFeedbackEnabled: input.aiFeedbackEnabled,
+    testCaseCount: input.testCases.length,
+    hintCount: input.hints.length,
+  };
+}
+
+function exerciseRecordAuditSnapshot(record: ExerciseRecord) {
+  const exercise = record.programmingExercise!;
+  return {
+    title: record.title,
+    difficulty: exercise.difficulty,
+    position: record.position,
+    language: exercise.language,
+    timeLimitMs: exercise.timeLimitMs,
+    memoryLimitMb: exercise.memoryLimitMb,
+    aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+    testCaseCount: exercise.testCases.length,
+    hintCount: exercise.hints.length,
+  };
 }
 
 async function copyVersionContent(
@@ -1018,7 +1435,7 @@ export function collectPublishIssues(
           });
           return;
         }
-        if (exercise.description.trim().length === 0) {
+        if (richTextToPlainText(exercise.description).length === 0) {
           issues.push({
             path: `${path}.description`,
             code: "EXERCISE_DESCRIPTION_REQUIRED",
@@ -1028,7 +1445,11 @@ export function collectPublishIssues(
             materialId: material.id,
           });
         }
-        if (exercise.testCases.length === 0) {
+        if (
+          !exercise.testCases.some(
+            (testCase) => testCase.expectedOutput.trim().length > 0,
+          )
+        ) {
           issues.push({
             path: `${path}.testCases`,
             code: "TEST_CASE_REQUIRED",
@@ -1038,19 +1459,6 @@ export function collectPublishIssues(
             materialId: material.id,
           });
         }
-        exercise.testCases.forEach((testCase, testCaseIndex) => {
-          if (testCase.expectedOutput.trim().length === 0) {
-            issues.push({
-              path: `${path}.testCases[${testCaseIndex}].expectedOutput`,
-              code: "TEST_CASE_OUTPUT_REQUIRED",
-              message:
-                `Test case ${testCaseIndex + 1} of “${material.title}” has no expected output.`,
-              moduleId: courseModule.id,
-              lectureId: lecture.id,
-              materialId: material.id,
-            });
-          }
-        });
       });
     });
   });
@@ -1145,6 +1553,8 @@ function toDraftTree(
                 memoryLimitMb: material.programmingExercise.memoryLimitMb,
                 aiFeedbackEnabled:
                   material.programmingExercise.aiFeedbackEnabled,
+                updatedAt:
+                  material.programmingExercise.updatedAt.toISOString(),
                 testCases: material.programmingExercise.testCases.map(
                   (testCase) => ({
                     id: testCase.id,
@@ -1165,5 +1575,68 @@ function toDraftTree(
         })),
       })),
     })),
+  };
+}
+
+function toExerciseAuthoringContext(record: ExerciseRecord) {
+  const courseModule = record.lecture.courseModule;
+  const version = courseModule.courseVersion;
+  const exercise = record.programmingExercise!;
+  return {
+    course: {
+      id: version.course.id,
+      title: version.course.title,
+    },
+    version: {
+      id: version.id,
+      versionNumber: version.versionNumber,
+      status: version.status,
+      publishedAt: version.publishedAt?.toISOString() ?? null,
+      updatedAt: version.updatedAt.toISOString(),
+    },
+    module: {
+      id: courseModule.id,
+      title: courseModule.title,
+    },
+    lecture: {
+      id: record.lecture.id,
+      title: record.lecture.title,
+    },
+    material: {
+      id: record.id,
+      type: record.type,
+      title: record.title,
+      position: record.position,
+      isRequired: record.isRequired,
+      programmingExercise: {
+        materialId: exercise.materialId,
+        externalKey: exercise.externalKey,
+        legacyProblemNo: exercise.legacyProblemNo,
+        difficulty: exercise.difficulty,
+        description: exercise.description,
+        inputFormat: exercise.inputFormat,
+        outputFormat: exercise.outputFormat,
+        constraints: exercise.constraints,
+        starterCode: exercise.starterCode,
+        language: exercise.language,
+        timeLimitMs: exercise.timeLimitMs,
+        memoryLimitMb: exercise.memoryLimitMb,
+        aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+        updatedAt: exercise.updatedAt.toISOString(),
+        testCases: exercise.testCases.map((testCase) => ({
+          id: testCase.id,
+          position: testCase.position,
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          visibility: testCase.visibility,
+        })),
+        hints: exercise.hints.map((hint) => ({
+          id: hint.id,
+          position: hint.position,
+          content: hint.content,
+          triggerExpression: hint.triggerExpression,
+        })),
+      },
+    },
   };
 }

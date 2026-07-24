@@ -66,21 +66,20 @@ describe('resolveAcademyAccessState', () => {
     expect(resolveAcademyAccessState(input).kind).toBe('suspended');
     expect(authDestination(input)).toBe('/auth/pending');
     expect(pendingStateView(resolveAcademyAccessState(input))).toMatchObject({
-      heading: 'Academy access suspended',
-      statusLabel: 'Suspended',
+      state: 'suspended',
       canCancel: false,
       canReapply: false,
     });
   });
 
   it.each([
-    ['PENDING', 'Pending', true, false],
-    ['APPROVED', 'Approved', false, false],
-    ['REJECTED', 'Rejected', false, true],
-    ['CANCELLED', 'Cancelled', false, true],
+    ['PENDING', 'pending', true, false],
+    ['APPROVED', 'application_approved', false, false],
+    ['REJECTED', 'rejected', false, true],
+    ['CANCELLED', 'cancelled', false, true],
   ] as const)(
     'renders an accurate %s application state',
-    (status, statusLabel, canCancel, canReapply) => {
+    (status, expectedState, canCancel, canReapply) => {
       const state = resolveAcademyAccessState(account({
         applications: [application(status)],
       }));
@@ -88,7 +87,7 @@ describe('resolveAcademyAccessState', () => {
         applications: [application(status)],
       }))).toBe('/auth/pending');
       expect(pendingStateView(state)).toMatchObject({
-        statusLabel,
+        state: expectedState,
         canCancel,
         canReapply,
       });

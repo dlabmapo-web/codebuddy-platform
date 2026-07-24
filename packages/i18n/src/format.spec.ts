@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  formatDate,
+  formatNumber,
+  formatPercent,
+  formatTime,
+} from "./format.js";
+
+describe("locale formatting", () => {
+  const instant = "2026-07-24T06:40:00.000Z";
+
+  it("formats dates in Korean academy time", () => {
+    expect(formatDate(instant, "en")).toBe("Jul 24, 2026");
+    expect(formatDate(instant, "ko")).toBe("2026년 7월 24일");
+    expect(formatTime(instant, "en")).toBe("3:40 PM");
+    expect(formatTime(instant, "ko")).toBe("오후 3:40");
+  });
+
+  it("formats numbers and percentages by locale", () => {
+    expect(formatNumber(1204, "en")).toBe("1,204");
+    expect(formatNumber(1204, "ko")).toBe("1,204");
+    expect(formatPercent(0.24, "en")).toBe("24%");
+    expect(formatPercent(0.24, "ko")).toBe("24%");
+  });
+});

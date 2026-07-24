@@ -4,6 +4,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import * as React from 'react';
 
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import {
   Command,
@@ -80,6 +81,7 @@ export const SelectorTrigger = React.forwardRef<
   HTMLButtonElement,
   TriggerProps<SelectorItem> & { label?: string }
 >(function SelectorTrigger({ className, selectedItem, label, ...props }, ref) {
+  const { t } = useLayoutTranslation('common');
   return (
     <button
       className={cn(triggerClass, className)}
@@ -91,7 +93,7 @@ export const SelectorTrigger = React.forwardRef<
       {...props}
     >
       <span className={cn('truncate', !selectedItem && 'text-sub/70')}>
-        {selectedItem?.name ?? label ?? 'Select'}
+        {selectedItem?.name ?? label ?? t('action.select')}
       </span>
       <ChevronsUpDown className="size-4 shrink-0 text-sub" />
     </button>
@@ -105,6 +107,7 @@ const MultiSelectorTrigger = React.forwardRef<
   { className, selectedItems, label, ...props },
   ref,
 ) {
+  const { t } = useLayoutTranslation('common');
   return (
     <button
       className={cn(triggerClass, className)}
@@ -117,7 +120,7 @@ const MultiSelectorTrigger = React.forwardRef<
     >
       <span className={cn('truncate', selectedItems.length === 0 && 'text-sub/70')}>
         {selectedItems.length === 0
-          ? (label ?? 'Select')
+          ? (label ?? t('action.select'))
           : selectedItems.length === 1
             ? selectedItems[0]!.name
             : `${selectedItems[0]!.name} +${selectedItems.length - 1}`}
@@ -199,8 +202,8 @@ export function ResponsiveSelector<TItem extends SelectorItem>({
   label,
   disabled,
   drawerTitle,
-  emptyLabel = 'Nothing matches that search.',
-  placeholder = 'Search…',
+  emptyLabel,
+  placeholder,
   renderItem,
   side = 'bottom',
   align = 'start',
@@ -208,9 +211,12 @@ export function ResponsiveSelector<TItem extends SelectorItem>({
   listClassName,
   itemClassName,
 }: ResponsiveSelectorProps<TItem>) {
+  const { t } = useLayoutTranslation('common');
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const selectedItem = list.find((item) => item.id === selectedId);
+  const emptyText = emptyLabel ?? t('state.no_results');
+  const searchText = placeholder ?? t('state.search_placeholder');
 
   const trigger = TriggerComp ? (
     <TriggerComp disabled={disabled} selectedItem={selectedItem} />
@@ -220,7 +226,7 @@ export function ResponsiveSelector<TItem extends SelectorItem>({
 
   const body = (
     <SelectorCommand
-      emptyLabel={emptyLabel}
+      emptyLabel={emptyText}
       itemClassName={itemClassName}
       list={list}
       listClassName={listClassName}
@@ -228,7 +234,7 @@ export function ResponsiveSelector<TItem extends SelectorItem>({
         onSelect(item);
         setIsOpen(false);
       }}
-      placeholder={placeholder}
+      placeholder={searchText}
       renderItem={renderItem}
       selectedIds={selectedId ? [selectedId] : []}
     />
@@ -238,7 +244,7 @@ export function ResponsiveSelector<TItem extends SelectorItem>({
     return (
       <Drawer onOpenChange={setIsOpen} open={isOpen}>
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-        <DrawerContent title={drawerTitle ?? label ?? 'Select'}>
+        <DrawerContent title={drawerTitle ?? label ?? t('action.select')}>
           <div className="overflow-hidden pb-4">{body}</div>
         </DrawerContent>
       </Drawer>
@@ -269,8 +275,8 @@ export function ResponsiveMultiSelector<TItem extends SelectorItem>({
   TriggerComp,
   label,
   drawerTitle,
-  emptyLabel = 'Nothing matches that search.',
-  placeholder = 'Search…',
+  emptyLabel,
+  placeholder,
   renderItem,
   side = 'bottom',
   align = 'start',
@@ -278,9 +284,12 @@ export function ResponsiveMultiSelector<TItem extends SelectorItem>({
   listClassName,
   itemClassName,
 }: ResponsiveMultiSelectorProps<TItem>) {
+  const { t } = useLayoutTranslation('common');
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const selectedItems = list.filter((item) => selectedIds.includes(item.id));
+  const emptyText = emptyLabel ?? t('state.no_results');
+  const searchText = placeholder ?? t('state.search_placeholder');
 
   const toggle = (item: TItem) => {
     const next = selectedIds.includes(item.id)
@@ -297,12 +306,12 @@ export function ResponsiveMultiSelector<TItem extends SelectorItem>({
 
   const body = (
     <SelectorCommand
-      emptyLabel={emptyLabel}
+      emptyLabel={emptyText}
       itemClassName={itemClassName}
       list={list}
       listClassName={listClassName}
       onPick={toggle}
-      placeholder={placeholder}
+      placeholder={searchText}
       renderItem={renderItem}
       selectedIds={selectedIds}
     />
@@ -312,7 +321,7 @@ export function ResponsiveMultiSelector<TItem extends SelectorItem>({
     return (
       <Drawer onOpenChange={setIsOpen} open={isOpen}>
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-        <DrawerContent title={drawerTitle ?? label ?? 'Select'}>
+        <DrawerContent title={drawerTitle ?? label ?? t('action.select')}>
           <div className="overflow-hidden pb-4">{body}</div>
         </DrawerContent>
       </Drawer>

@@ -3,25 +3,14 @@
 import { academyRoles, type AcademyRole } from '@cove/shared';
 
 import { ResponsiveSelector } from '@/components/studio/selector';
-
-export const roleOptions = academyRoles.map((role) => ({
-  id: role,
-  name: formatRoleName(role),
-}));
-
-export function formatRoleName(role: AcademyRole): string {
-  return role
-    .split('_')
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(' ');
-}
+import { useLayoutTranslation } from '@/i18n';
 
 /** Academy role picker shared by members, applications, and invitations. */
 export function RoleSelector({
   value,
   onChange,
   disabled,
-  label = 'Select role',
+  label,
   popoverClassName = 'w-48',
 }: {
   value: AcademyRole | null;
@@ -30,14 +19,21 @@ export function RoleSelector({
   label?: string;
   popoverClassName?: string;
 }) {
+  const { t } = useLayoutTranslation(['academy', 'common']);
+  // Rebuilt per render so a language switch is reflected without a remount.
+  const roleOptions = academyRoles.map((role) => ({
+    id: role,
+    name: t(`common:role.${role}`),
+  }));
+
   return (
     <ResponsiveSelector
       disabled={disabled}
-      drawerTitle="Academy role"
-      label={label}
+      drawerTitle={t('role_selector.drawer_title')}
+      label={label ?? t('role_selector.label')}
       list={roleOptions}
       onSelect={(item) => onChange(item.id as AcademyRole)}
-      placeholder="Search roles…"
+      placeholder={t('role_selector.search')}
       popoverClassName={popoverClassName}
       selectedId={value}
     />

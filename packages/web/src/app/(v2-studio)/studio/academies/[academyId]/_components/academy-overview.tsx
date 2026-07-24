@@ -1,6 +1,8 @@
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 export async function AcademyOverview({ academyId }: { academyId: string }) {
+  const { t } = await getServerTranslation(['academy', 'common']);
   let membership;
   try {
     const account = await createServerORPCClient().auth.me({});
@@ -10,20 +12,26 @@ export async function AcademyOverview({ academyId }: { academyId: string }) {
   } catch {
     membership = undefined;
   }
-  if (!membership) return <p className="text-sm text-danger">You do not have active access to this academy.</p>;
+  if (!membership) {
+    return <p className="text-sm text-danger">{t('no_access')}</p>;
+  }
   return (
     <div className="space-y-4">
       <p className="text-sub">
-        Signed in to <strong className="text-ink">{membership.academy.name}</strong> as{' '}
-        <strong className="text-ink">{membership.role.replace('_', ' ')}</strong>.
+        {t('signed_in_as', { academy: membership.academy.name })}
+      </p>
+      <p className="text-sm text-sub">
+        {t('role')}: <strong className="text-ink">
+          {t(`common:role.${membership.role}`)}
+        </strong>
       </p>
       {membership.role === 'MANAGER' ? (
         <p className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-          Use Applications, Members, and Invitations above to manage academy access.
+          {t('manager_hint')}
         </p>
       ) : (
         <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-          Role-specific learning features will appear here as Cove Studio development continues.
+          {t('member_hint')}
         </p>
       )}
     </div>

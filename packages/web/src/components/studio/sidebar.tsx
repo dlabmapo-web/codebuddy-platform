@@ -6,6 +6,7 @@ import { PanelLeft } from 'lucide-react';
 import * as React from 'react';
 
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Separator, Sheet, SheetContent, Tooltip, TooltipProvider } from './primitives';
@@ -117,6 +118,7 @@ export function Sidebar({
   ...props
 }: React.ComponentProps<'div'> & { collapsible?: 'icon' | 'offcanvas' | 'none' }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { t } = useLayoutTranslation('nav');
 
   if (collapsible === 'none') {
     return (
@@ -139,7 +141,7 @@ export function Sidebar({
           className="w-(--sidebar-width) p-0"
           side="left"
           style={{ '--sidebar-width': SIDEBAR_WIDTH } as React.CSSProperties}
-          title="Studio navigation"
+          title={t('sidebar.title')}
         >
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
@@ -189,9 +191,10 @@ export function Sidebar({
  */
 export function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   const { toggleSidebar } = useSidebar();
+  const { t } = useLayoutTranslation('nav');
   return (
     <button
-      aria-label="Toggle sidebar"
+      aria-label={t('sidebar.toggle')}
       className={cn(
         'group/rail absolute inset-y-0 right-0 z-20 hidden w-3 cursor-pointer outline-none md:block',
         className,
@@ -215,9 +218,10 @@ export function SidebarTrigger({
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
+  const { t } = useLayoutTranslation('nav');
   return (
     <Button
-      aria-label="Toggle sidebar"
+      aria-label={t('sidebar.toggle')}
       className={cn('size-8', className)}
       onClick={(event) => {
         onClick?.(event);

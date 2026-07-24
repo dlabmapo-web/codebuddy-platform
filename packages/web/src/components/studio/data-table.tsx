@@ -13,6 +13,7 @@ import {
 import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from 'lucide-react';
 import * as React from 'react';
 
+import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 
@@ -32,11 +33,12 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   searchPlaceholder,
-  emptyMessage = 'Nothing to show yet.',
+  emptyMessage,
   pageSize,
   onRowClick,
   className,
 }: DataTableProps<TData, TValue>) {
+  const { t } = useLayoutTranslation('common');
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState('');
 
@@ -127,7 +129,7 @@ export function DataTable<TData, TValue>({
                   className="px-4 py-12 text-center text-[14px] text-sub"
                   colSpan={columns.length}
                 >
-                  {emptyMessage}
+                  {emptyMessage ?? t('state.empty')}
                 </td>
               </tr>
             ) : (
@@ -155,14 +157,10 @@ export function DataTable<TData, TValue>({
       {pageSize && table.getPageCount() > 1 ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] text-sub">
-            Page{' '}
-            <span className="font-mono font-semibold text-ink">
-              {table.getState().pagination.pageIndex + 1}
-            </span>{' '}
-            of{' '}
-            <span className="font-mono font-semibold text-ink">
-              {table.getPageCount()}
-            </span>
+            {t('pagination.label', {
+              current: table.getState().pagination.pageIndex + 1,
+              total: table.getPageCount(),
+            })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -171,7 +169,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               variant="outline"
             >
-              Previous
+              {t('pagination.previous')}
             </Button>
             <Button
               disabled={!table.getCanNextPage()}
@@ -179,7 +177,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               variant="outline"
             >
-              Next
+              {t('pagination.next')}
             </Button>
           </div>
         </div>

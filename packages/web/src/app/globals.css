@@ -67,6 +67,17 @@ h1, h2, h3, h4 {
   line-height: 1.28;
 }
 
+/*
+ * Korean has no spaces inside a word, so the default `break-word` behaviour
+ * splits 어절 mid-word and reads as broken text to a native speaker.
+ * `keep-all` wraps at 어절 boundaries instead. Scoped to :lang(ko) so English
+ * keeps normal wrapping — the <html lang> attribute is set from the resolved
+ * locale in app/layout.tsx.
+ */
+:lang(ko) {
+  word-break: keep-all;
+}
+
 /* Counts, versions, and table figures should never jitter between renders. */
 .tabular,
 .font-mono {

@@ -11,7 +11,7 @@ const workerAssetHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@cove/shared"],
+  transpilePackages: ["@cove/shared", "@cove/i18n"],
   async headers() {
     return [
       // 전 경로에 cross-origin isolation 적용 → 어느 진입 경로(SPA 네비게이션 포함)에서도

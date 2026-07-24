@@ -38,6 +38,12 @@ export const appErrorCodes = [
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
 
+const appErrorCodeSet = new Set<string>(appErrorCodes);
+
+export function isAppErrorCode(value: unknown): value is AppErrorCode {
+  return typeof value === "string" && appErrorCodeSet.has(value);
+}
+
 export const appErrorFallbacks: Record<AppErrorCode, string> = {
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",

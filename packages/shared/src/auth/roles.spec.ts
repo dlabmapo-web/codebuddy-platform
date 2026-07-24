@@ -16,4 +16,20 @@ describe("roleHasPermission", () => {
     expect(roleHasPermission("STUDENT", "submissions.own.create")).toBe(true);
     expect(roleHasPermission("STUDENT", "curriculum.publish")).toBe(false);
   });
+
+  it("allows team leads and managers to manage content operations", () => {
+    for (const role of ["TEAM_LEAD", "MANAGER"] as const) {
+      expect(roleHasPermission(role, "exercises.manage")).toBe(true);
+      expect(roleHasPermission(role, "content.import")).toBe(true);
+      expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(true);
+    }
+  });
+
+  it("does not allow teachers or students to manage or import content", () => {
+    for (const role of ["TEACHER", "STUDENT"] as const) {
+      expect(roleHasPermission(role, "exercises.manage")).toBe(false);
+      expect(roleHasPermission(role, "content.import")).toBe(false);
+      expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(false);
+    }
+  });
 });

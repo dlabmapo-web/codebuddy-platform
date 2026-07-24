@@ -26,6 +26,14 @@ export const appErrorCodes = [
   "LAST_MANAGER_REQUIRED",
   "IDENTITY_LINK_CONFLICT",
   "LEGACY_ACCOUNT_ALREADY_MIGRATED",
+  "COURSE_NOT_FOUND",
+  "COURSE_TITLE_CONFLICT",
+  "COURSE_VERSION_NOT_FOUND",
+  "COURSE_VERSION_IMMUTABLE",
+  "COURSE_DRAFT_ALREADY_EXISTS",
+  "CONTENT_PARENT_MISMATCH",
+  "CONTENT_POSITION_CONFLICT",
+  "CONTENT_VALIDATION_FAILED",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -58,4 +66,12 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   LAST_MANAGER_REQUIRED: "The academy must keep at least one active manager.",
   IDENTITY_LINK_CONFLICT: "This identity cannot be linked automatically.",
   LEGACY_ACCOUNT_ALREADY_MIGRATED: "This legacy account is already migrated.",
+  COURSE_NOT_FOUND: "The selected course was not found.",
+  COURSE_TITLE_CONFLICT: "An active course already uses this title.",
+  COURSE_VERSION_NOT_FOUND: "The selected course version was not found.",
+  COURSE_VERSION_IMMUTABLE: "Published course content cannot be changed.",
+  COURSE_DRAFT_ALREADY_EXISTS: "This course already has an active draft.",
+  CONTENT_PARENT_MISMATCH: "The content does not belong to the selected parent.",
+  CONTENT_POSITION_CONFLICT: "Two content items cannot use the same position.",
+  CONTENT_VALIDATION_FAILED: "Fix the content validation issues and try again.",
 };

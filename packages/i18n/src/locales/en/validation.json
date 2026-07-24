@@ -1,0 +1,5 @@
+{
+  "credentials_invalid": "Enter a valid email and password.",
+  "signup_invalid": "Use a valid email, name, and password of 8+ characters.",
+  "social_request_invalid": "Choose a valid academy and social provider."
+}

@@ -1,0 +1,12 @@
+{
+  "title": "학원 초대",
+  "email_placeholder": "member@example.com",
+  "create": "초대 만들기",
+  "create_failed": "초대를 만들지 못했습니다.",
+  "link_notice": "이 링크는 한 번만 표시됩니다. 지금 복사하세요.",
+  "loading": "초대 목록을 불러오는 중…",
+  "load_failed": "초대 목록을 불러오지 못했습니다.",
+  "meta": "{{role}} · {{status}} · 만료 {{date}}",
+  "revoke": "초대 취소",
+  "revoke_failed": "초대를 취소하지 못했습니다."
+}

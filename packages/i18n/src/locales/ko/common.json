@@ -1,0 +1,68 @@
+{
+  "brand": {
+    "name": "코브 스튜디오",
+    "campus": "마포캠퍼스",
+    "wordmark_alt": "코브 스튜디오 — 디랩 코딩학원",
+    "copyright": "© 2026 CoveEdu AI. All rights reserved.",
+    "footer": "© 코브 스튜디오 · 디랩 마포캠퍼스"
+  },
+  "action": {
+    "cancel": "취소",
+    "copy": "복사",
+    "delete": "삭제",
+    "keep": "유지",
+    "save": "저장",
+    "search": "검색",
+    "select": "선택",
+    "sign_out": "로그아웃",
+    "try_again": "다시 시도"
+  },
+  "state": {
+    "loading": "불러오는 중…",
+    "empty": "표시할 항목이 없습니다.",
+    "no_results": "검색 결과가 없습니다.",
+    "no_actions": "가능한 작업 없음",
+    "search_placeholder": "검색…"
+  },
+  "pagination": {
+    "label": "{{total}}페이지 중 {{current}}페이지",
+    "previous": "이전",
+    "next": "다음"
+  },
+  "language": {
+    "label": "언어",
+    "ko": "한국어",
+    "en": "English"
+  },
+  "role": {
+    "STUDENT": "학생",
+    "TEACHER": "강사",
+    "TEAM_LEAD": "팀장",
+    "MANAGER": "관리자"
+  },
+  "membership_status": {
+    "INVITED": "초대됨",
+    "ACTIVE": "활성",
+    "SUSPENDED": "정지됨",
+    "LEFT": "탈퇴함"
+  },
+  "invitation_status": {
+    "PENDING": "대기 중",
+    "ACCEPTED": "수락됨",
+    "REVOKED": "취소됨",
+    "EXPIRED": "만료됨"
+  },
+  "join_request_status": {
+    "PENDING": "대기 중",
+    "APPROVED": "승인됨",
+    "REJECTED": "거절됨",
+    "CANCELLED": "취소됨"
+  },
+  "legal": {
+    "terms": "이용약관",
+    "privacy": "개인정보처리방침"
+  },
+  "fallback": {
+    "user": "코브 사용자"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Academy",
+  "no_access": "You do not have active access to this academy.",
+  "signed_in_as": "Signed in to {{academy}}.",
+  "role": "Role",
+  "manager_hint": "Use Applications, Members, and Invitations in the sidebar to manage academy access.",
+  "member_hint": "Role-specific learning features will appear here as Cove Studio development continues.",
+  "role_selector": {
+    "label": "Select role",
+    "drawer_title": "Academy role",
+    "search": "Search roles…"
+  }
+}

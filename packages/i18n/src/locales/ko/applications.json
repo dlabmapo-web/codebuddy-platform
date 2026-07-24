@@ -1,0 +1,10 @@
+{
+  "title": "가입 신청",
+  "loading": "가입 신청을 불러오는 중…",
+  "forbidden": "이 학원의 가입 신청을 볼 수 없습니다.",
+  "empty": "대기 중인 가입 신청이 없습니다.",
+  "reason_placeholder": "승인 메모(선택), 거절 시에는 필수",
+  "approve": "승인",
+  "reject": "거절",
+  "review_failed": "가입 신청을 처리하지 못했습니다."
+}

@@ -1,0 +1,24 @@
+{
+  "sidebar": {
+    "title": "스튜디오 내비게이션",
+    "toggle": "사이드바 열기/닫기"
+  },
+  "group": {
+    "overview": "학원",
+    "content": "커리큘럼",
+    "people": "구성원"
+  },
+  "link": {
+    "overview": "개요",
+    "courses": "코스",
+    "members": "멤버",
+    "applications": "가입 신청",
+    "invitations": "초대"
+  },
+  "academy_switcher": {
+    "select": "학원 선택",
+    "no_membership": "소속 없음",
+    "switch": "학원 전환",
+    "search": "학원 검색…"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "title": "Academy members",
+  "column": {
+    "member": "Member",
+    "status": "Status",
+    "role": "Role"
+  },
+  "action": {
+    "suspend": "Suspend",
+    "restore": "Restore"
+  },
+  "search_placeholder": "Search by name or email",
+  "empty": "No members yet. Invite someone to get started.",
+  "forbidden": "You cannot view this academy's members.",
+  "update_failed": "The membership could not be updated. An academy must keep at least one active manager."
+}

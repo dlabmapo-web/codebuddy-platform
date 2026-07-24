@@ -1,0 +1,45 @@
+{
+  "title": "Courses",
+  "description": "A course is curriculum you write once and teach in many classes.",
+  "forbidden_title": "Courses are not available to you",
+  "forbidden_body": "Managing academy curriculum needs an active Team Lead or Manager membership. Ask an academy manager to change your role.",
+  "lifecycle": {
+    "heading": "How a course goes live",
+    "draft_title": "Write a draft",
+    "draft_body": "Only content editors see a draft. Add modules, lectures, and exercises in any order.",
+    "check_title": "Check what blocks publishing",
+    "check_body": "Cove lists every empty module or missing test case, and links each one to the item to fix.",
+    "publish_title": "Publish a version",
+    "publish_body": "The draft freezes and becomes the version classes use. Editing it later starts the next draft."
+  },
+  "course_count_one": "<0>{{count}}</0> course in this academy",
+  "course_count_other": "<0>{{count}}</0> courses in this academy",
+  "new_course": "New course",
+  "create": {
+    "heading": "Name the course",
+    "body": "Cove opens Draft v1 straight away. Nothing is visible to teachers or students until you publish it.",
+    "title_label": "Course title",
+    "title_placeholder": "Python Foundations",
+    "description_label": "What students learn",
+    "description_optional": "(optional)",
+    "description_placeholder": "Variables, loops, and functions through 40 problems",
+    "submit": "Create and open",
+    "submitting": "Creating…",
+    "title_conflict": "Another active course already uses this title. Pick a different one."
+  },
+  "column": {
+    "course": "Course",
+    "versions": "Versions",
+    "updated": "Last change"
+  },
+  "archived": "Archived",
+  "no_description": "No description yet.",
+  "live_since": "Live since {{date}}",
+  "never_published": "Never published",
+  "continue_draft": "Continue draft",
+  "start_next_draft": "Start next draft",
+  "starting": "Starting…",
+  "empty": "No courses yet. Start with the one you teach most often.",
+  "search_placeholder": "Search courses",
+  "draft_start_failed": "A new draft could not be started. This course may already have one open."
+}

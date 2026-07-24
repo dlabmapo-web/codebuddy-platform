@@ -1,0 +1,10 @@
+{
+  "title": "Membership applications",
+  "loading": "Loading applications…",
+  "forbidden": "You cannot view this academy's applications.",
+  "empty": "No pending applications.",
+  "reason_placeholder": "Optional approval note; required for rejection",
+  "approve": "Approve",
+  "reject": "Reject",
+  "review_failed": "The application could not be reviewed."
+}

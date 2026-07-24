@@ -1,0 +1,68 @@
+{
+  "brand": {
+    "name": "Cove Studio",
+    "campus": "Mapo Campus",
+    "wordmark_alt": "Cove Studio — DLAB Coding Academy",
+    "copyright": "© 2026 CoveEdu AI. All rights reserved.",
+    "footer": "© Cove Studio · DLAB Mapo Campus"
+  },
+  "action": {
+    "cancel": "Cancel",
+    "copy": "Copy",
+    "delete": "Delete",
+    "keep": "Keep",
+    "save": "Save",
+    "search": "Search",
+    "select": "Select",
+    "sign_out": "Sign out",
+    "try_again": "Try again"
+  },
+  "state": {
+    "loading": "Loading…",
+    "empty": "Nothing to show yet.",
+    "no_results": "Nothing matches that search.",
+    "no_actions": "No actions",
+    "search_placeholder": "Search…"
+  },
+  "pagination": {
+    "label": "Page {{current}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "language": {
+    "label": "Language",
+    "ko": "한국어",
+    "en": "English"
+  },
+  "role": {
+    "STUDENT": "Student",
+    "TEACHER": "Teacher",
+    "TEAM_LEAD": "Team Lead",
+    "MANAGER": "Manager"
+  },
+  "membership_status": {
+    "INVITED": "Invited",
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "LEFT": "Left"
+  },
+  "invitation_status": {
+    "PENDING": "Pending",
+    "ACCEPTED": "Accepted",
+    "REVOKED": "Revoked",
+    "EXPIRED": "Expired"
+  },
+  "join_request_status": {
+    "PENDING": "Pending",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled"
+  },
+  "legal": {
+    "terms": "Terms",
+    "privacy": "Privacy"
+  },
+  "fallback": {
+    "user": "Cove user"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "sidebar": {
+    "title": "Studio navigation",
+    "toggle": "Toggle sidebar"
+  },
+  "group": {
+    "overview": "Academy",
+    "content": "Curriculum",
+    "people": "People"
+  },
+  "link": {
+    "overview": "Overview",
+    "courses": "Courses",
+    "members": "Members",
+    "applications": "Applications",
+    "invitations": "Invitations"
+  },
+  "academy_switcher": {
+    "select": "Select academy",
+    "no_membership": "No membership",
+    "switch": "Switch academy",
+    "search": "Search academies…"
+  }
+}

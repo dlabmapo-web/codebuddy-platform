@@ -1,0 +1,12 @@
+{
+  "title": "Academy invitations",
+  "email_placeholder": "member@example.com",
+  "create": "Create invitation",
+  "create_failed": "The invitation could not be created.",
+  "link_notice": "Copy this link now—it is shown only once.",
+  "loading": "Loading invitations…",
+  "load_failed": "The invitations could not be loaded.",
+  "meta": "{{role}} · {{status}} · expires {{date}}",
+  "revoke": "Revoke",
+  "revoke_failed": "The invitation could not be revoked."
+}

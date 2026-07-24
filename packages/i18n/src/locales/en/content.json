@@ -1,0 +1,67 @@
+{
+  "version": {
+    "draft": "Draft",
+    "published": "Published",
+    "retired": "Retired",
+    "none": "No versions"
+  },
+  "builder": {
+    "fallback_title": "Course builder",
+    "draft_description": "Arrange modules and lectures. Nothing reaches classes until you publish.",
+    "published_description": "A published version is a fixed record of what classes are teaching.",
+    "unavailable_title": "This course version is not available",
+    "unavailable_body": "It belongs to another academy, or your membership cannot open it.",
+    "back_to_courses": "Back to courses",
+    "all_courses": "All courses",
+    "locked_heading": "Version {{version}} is published and read-only",
+    "locked_body": "Classes rely on this exact content. To change it, start the next draft — it opens as a copy of this version.",
+    "start_next_draft": "Start next draft",
+    "starting": "Starting…",
+    "structural_error": "That change did not save. Reload the page to see the current draft."
+  },
+  "empty": {
+    "heading": "Start with a module",
+    "body": "A module is a chunk of the course — “Loops”, “Functions”. Lectures live inside it, and exercises live inside lectures."
+  },
+  "module": {
+    "title_placeholder": "New module title — e.g. Conditionals",
+    "add": "Add module",
+    "adding": "Adding…",
+    "lecture_count_one": "{{count}} lecture",
+    "lecture_count_other": "{{count}} lectures",
+    "issue_count": "· {{count}} to fix",
+    "move_up": "Move module up",
+    "move_down": "Move module down",
+    "delete_aria": "Delete module “{{title}}” and its lectures"
+  },
+  "lecture": {
+    "title_placeholder": "Lecture title",
+    "add": "Add lecture",
+    "no_exercises": "No exercises",
+    "exercise_count_one": "{{count}} exercise",
+    "exercise_count_other": "{{count}} exercises",
+    "move_up": "Move lecture up",
+    "move_down": "Move lecture down",
+    "delete_aria": "Delete lecture “{{title}}”"
+  },
+  "rename": "Rename",
+  "sidebar": {
+    "heading": "This version",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "check": "Check before publishing",
+    "checking": "Checking…",
+    "publish": "Publish v{{version}}",
+    "publishing": "Publishing…",
+    "hint_unchecked": "Run the check to unlock publishing.",
+    "hint_ready": "Publishing freezes this version and makes it the one classes use.",
+    "hint_blocked": "Fix the items below, then check again.",
+    "publish_refused": "Publishing was refused. Run the check again for the current blockers.",
+    "roadmap": "Programming exercises, test cases, and Excel import arrive in the next release. Modules and lectures you write now carry over."
+  },
+  "issues": {
+    "ready": "Ready to publish",
+    "count_one": "{{count}} item to fix",
+    "count_other": "{{count}} items to fix"
+  }
+}

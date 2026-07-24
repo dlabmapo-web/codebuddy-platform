@@ -7,6 +7,7 @@ import { useActionState } from 'react';
 import { useLayoutTranslation } from '@/i18n';
 
 import { loginAction, type AuthFormState } from '../../actions';
+import { AuthDivider } from '../../_components/auth-divider';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
 
@@ -20,13 +21,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     <div>
       <SocialLoginButtons />
 
-      <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-border" />
-        <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">
-          {t('divider.or_with_email')}
-        </span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
+      <AuthDivider label={t('divider.or_with_email')} />
 
       <form action={action} className="space-y-5">
         <TextField

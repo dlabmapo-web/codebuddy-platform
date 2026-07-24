@@ -1,55 +1,20 @@
 'use client';
 
-import { ChevronsUpDown, Mail, School, User } from 'lucide-react';
+import { Mail, User } from 'lucide-react';
 import Link from 'next/link';
-import { forwardRef, useActionState, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useActionState } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
-import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { signupAction, type AuthFormState } from '../../actions';
-import {
-  ResponsiveSelector,
-  type SelectorItem,
-  type TriggerProps,
-} from '@/components/studio/selector';
-import { orpc } from '@/lib/orpc';
+import { AuthDivider } from '../../_components/auth-divider';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
+import { useSignupAcademies } from '../_hooks/use-signup-academies';
+import { AcademySelectorField } from './academy-selector-field';
+import { SignupNotice } from './signup-notice';
 
 const initialState: AuthFormState = {};
-
-/** Matches the height and shape of the auth form's text fields. */
-const AcademyTrigger = forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>(
-  function AcademyTrigger({ className, selectedItem, ...props }, ref) {
-    const { t } = useLayoutTranslation('auth');
-    // Disabled with nothing chosen means the list is still being fetched.
-    const placeholder =
-      props.disabled && !selectedItem
-        ? t('field.academy_loading')
-        : t('field.academy_choose');
-    return (
-      <button
-        aria-controls={undefined}
-        aria-expanded={false}
-        className={`flex h-14 w-full items-center gap-3 rounded-xl border border-border bg-white px-4 text-left text-[16px] text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ''}`}
-        ref={ref}
-        role="combobox"
-        type="button"
-        {...props}
-      >
-        <School className="size-5 shrink-0 text-sub" strokeWidth={1.75} />
-        <span
-          className={`min-w-0 flex-1 truncate ${selectedItem ? '' : 'text-sub/60'}`}
-        >
-          {selectedItem?.name ?? placeholder}
-        </span>
-        <ChevronsUpDown className="size-4 shrink-0 text-sub" />
-      </button>
-    );
-  },
-);
 
 export function SignupForm({
   invitedAcademyId,
@@ -59,44 +24,22 @@ export function SignupForm({
   socialError?: string;
 }) {
   const { t } = useLayoutTranslation('auth');
-  const errorText = useErrorText();
   const [state, action, pending] = useActionState(signupAction, initialState);
-  const [academyId, setAcademyId] = useState(invitedAcademyId ?? '');
-  const academies = useQuery({
-    queryKey: ['academies', 'signup'],
-    queryFn: () => orpc.academies.listForSignup({}),
-    staleTime: 5 * 60_000,
-  });
+  const academies = useSignupAcademies(invitedAcademyId);
 
   return (
     <div>
-      <div className="mb-5">
-        <span className="mb-2 block text-[15px] font-semibold text-ink">
-          {t('field.academy')}
-        </span>
-        <ResponsiveSelector
-          disabled={
-            academies.isPending || academies.isError || Boolean(invitedAcademyId)
-          }
-          drawerTitle={t('field.academy_choose')}
-          list={academies.data?.academies ?? []}
-          onSelect={(academy) => setAcademyId(academy.id)}
-          placeholder={t('field.academy_search')}
-          selectedId={academyId || null}
-          TriggerComp={AcademyTrigger}
-        />
-        {academies.isError ? (
-          <p className="mt-2 text-[14px] text-danger">
-            {errorText(academies.error, t('error.academies_unavailable'))}
-          </p>
-        ) : null}
-        {socialError ? (
-          <p className="mt-2 text-[14px] text-danger">{socialError}</p>
-        ) : null}
-      </div>
+      <AcademySelectorField
+        academies={academies}
+        socialError={socialError}
+      />
 
       <form action={action} className="space-y-5">
-        <input name="academyId" type="hidden" value={academyId} />
+        <input
+          name="academyId"
+          type="hidden"
+          value={academies.academyId}
+        />
         <TextField
           autoComplete="name"
           icon={User}
@@ -121,43 +64,41 @@ export function SignupForm({
         />
 
         {state.message ? (
-          <p className={state.success ? 'text-[14px] text-success' : 'text-[14px] text-danger'}>{state.message}</p>
+          <p
+            className={
+              state.success
+                ? 'text-[14px] text-success'
+                : 'text-[14px] text-danger'
+            }
+          >
+            {state.message}
+          </p>
         ) : null}
 
         <button
           className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          disabled={pending || state.success || !academyId}
+          disabled={pending || state.success || !academies.academyId}
           type="submit"
         >
           {pending ? t('signup.submitting') : t('signup.submit')}
         </button>
       </form>
 
-      <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-border" />
-        <span className="font-mono text-[13px] uppercase tracking-[0.12em] text-sub/70">
-          {t('divider.or_continue_with')}
-        </span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
+      <AuthDivider label={t('divider.or_continue_with')} />
 
       <SocialLoginButtons
         academyRequired
-        requestedAcademyId={academyId}
+        requestedAcademyId={academies.academyId}
       />
 
-      <div className="mt-5 flex gap-3 rounded-xl border border-border bg-canvas px-4 py-3.5 text-[14px] leading-6 text-sub">
-        <svg aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-brand" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" fill="currentColor" opacity="0.12" r="10" />
-          <circle cx="12" cy="8" fill="currentColor" r="1.25" />
-          <path d="M12 11.5v5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-        </svg>
-        <p>{t('signup.role_notice')}</p>
-      </div>
+      <SignupNotice />
 
       <p className="mt-6 text-center text-[15px] text-sub">
         {t('signup.have_account')}{' '}
-        <Link className="font-bold text-brand hover:text-brand-deep" href="/auth/login">
+        <Link
+          className="font-bold text-brand hover:text-brand-deep"
+          href="/auth/login"
+        >
           {t('signup.sign_in')}
         </Link>
       </p>

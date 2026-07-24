@@ -17,7 +17,22 @@
   /* Auth-specific brand + cool neutrals */
   --color-brand: #1B64DA;
   --color-brand-deep: #1450B5;
+  --color-brand-soft: #EAF1FE;
   --color-canvas: #F4F7FC;
+
+  /* Content lifecycle: draft is in progress, brand blue is live, slate is retired */
+  --color-draft: #A45A08;
+  --color-draft-soft: #FDF4E3;
+  --color-retired: #64748B;
+  --color-retired-soft: #F1F5F9;
+
+  /* Surfaces used by the shared UI primitives */
+  --color-muted: #F6F7F9;
+  --color-accent: #F1F5F9;
+  --color-ring: #1B64DA;
+  --color-sidebar: #FFFFFF;
+  --color-sidebar-border: #E9EDF3;
+  --color-sidebar-accent: #EAF1FE;
 
   --radius: 8px;
   --radius-card: 10px;
@@ -30,11 +45,55 @@
   color-scheme: light;
 }
 
+/*
+ * Type: Pretendard renders Korean and Latin from one family, but the -0.02em
+ * tracking it wants for Korean display text makes Latin body copy hard to read.
+ * Body stays near-neutral; only display sizes tighten up.
+ */
 body {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  letter-spacing: -0.02em;
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: -0.006em;
   color: #16181D;
   background: #F6F7F9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.021em;
+  line-height: 1.28;
+}
+
+/* Counts, versions, and table figures should never jitter between renders. */
+.tabular,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Motion for the Radix-driven overlays. */
+@keyframes cove-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cove-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes cove-in-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes cove-out-left { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes cove-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes cove-out-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes cove-pop-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes cove-pop-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.97); } }
+
+.cove-overlay[data-state="open"] { animation: cove-fade-in 200ms ease-out; }
+.cove-overlay[data-state="closed"] { animation: cove-fade-out 180ms ease-in; }
+.cove-sheet-left[data-state="open"] { animation: cove-in-left 260ms cubic-bezier(0.32, 0.72, 0, 1); }
+.cove-sheet-left[data-state="closed"] { animation: cove-out-left 200ms ease-in; }
+.cove-sheet-right[data-state="open"] { animation: cove-in-right 260ms cubic-bezier(0.32, 0.72, 0, 1); }
+.cove-sheet-right[data-state="closed"] { animation: cove-out-right 200ms ease-in; }
+.cove-pop[data-state="open"] { animation: cove-pop-in 140ms ease-out; }
+.cove-pop[data-state="closed"] { animation: cove-pop-out 110ms ease-in; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop { animation: none !important; }
 }
 
 .tiptap-render p { margin: 0.4em 0; }

@@ -63,6 +63,7 @@
     "save_failed_detail": "The problem could not be saved. Check the required fields and try again.",
     "unsaved_confirm": "You have unsaved changes. Leave without saving?",
     "completeness": "Required to save",
+    "ready": "Ready to save",
     "completeness_hint": "Constraints, starter code, hints, and AI feedback are optional.",
     "required_mark": "Required",
     "preview_untitled": "Untitled problem",
@@ -103,11 +104,13 @@
     },
     "test": {
       "add": "Add answer",
-      "help": "Add input and expected-output pairs just like the original problem form.",
+      "help": "The first answer is shown to students as the sample. The rest stay hidden and are used for grading.",
       "label": "Answer {{number}}",
       "input": "Input",
       "expected": "Expected output",
-      "remove": "Remove answer {{number}}"
+      "remove": "Remove answer {{number}}",
+      "sample_badge": "Shown to students",
+      "hidden_badge": "Hidden"
     },
     "hint": {
       "add": "Add hint",

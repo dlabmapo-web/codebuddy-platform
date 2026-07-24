@@ -1,4 +1,5 @@
 import type { ExerciseDifficulty } from '@cove/shared';
+import { BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -8,6 +9,7 @@ import {
   type ExerciseDraft,
   type ExerciseDraftUpdate,
 } from '../_lib/exercise-draft';
+import { DifficultyPicker } from './difficulty-picker';
 import { Field, inputClass, SectionCard } from './authoring-fields';
 
 const RichEditor = dynamic(
@@ -32,36 +34,28 @@ export function BasicInformation({
   return (
     <SectionCard
       description={t('exercise.basic_help')}
+      icon={BookOpen}
       title={t('exercise.section.basics')}
     >
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_13rem]">
-        <Field label={t('exercise.field.title')} required>
-          <input
-            className={inputClass}
-            disabled={!editable}
-            maxLength={200}
-            onChange={(event) => update('title', event.target.value)}
-            placeholder={t('exercise.placeholder.title')}
-            value={draft.title}
-          />
-        </Field>
-        <Field label={t('exercise.field.difficulty')} required>
-          <select
-            className={inputClass}
-            disabled={!editable}
-            onChange={(event) =>
-              update('difficulty', event.target.value as ExerciseDifficulty)
-            }
-            value={draft.difficulty}
-          >
-            {(['EASY', 'MEDIUM', 'HARD'] as const).map((difficulty) => (
-              <option key={difficulty} value={difficulty}>
-                {t(`exercise.difficulty.${difficulty}`)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      <Field label={t('exercise.field.title')} required>
+        <input
+          className={inputClass}
+          disabled={!editable}
+          maxLength={200}
+          onChange={(event) => update('title', event.target.value)}
+          placeholder={t('exercise.placeholder.title')}
+          value={draft.title}
+        />
+      </Field>
+      <Field label={t('exercise.field.difficulty')} required>
+        <DifficultyPicker
+          disabled={!editable}
+          onChange={(difficulty: ExerciseDifficulty) =>
+            update('difficulty', difficulty)
+          }
+          value={draft.difficulty}
+        />
+      </Field>
 
       <Field label={t('exercise.field.description')} required>
         {editable ? (

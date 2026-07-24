@@ -1,3 +1,4 @@
+import { Code2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -23,6 +24,7 @@ export function StarterCodeEditor({
   return (
     <SectionCard
       description={t('exercise.code_help')}
+      icon={Code2}
       title={t('exercise.field.starter_code')}
     >
       <div className="overflow-hidden rounded-xl border border-[#2d2d2d] bg-[#1e1e1e]">

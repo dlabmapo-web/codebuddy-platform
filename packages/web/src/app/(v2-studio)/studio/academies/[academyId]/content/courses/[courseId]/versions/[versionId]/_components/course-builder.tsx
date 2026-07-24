@@ -83,7 +83,7 @@ export function CourseBuilder({
                 value={builder.moduleTitle}
               />
               <button
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-ink px-4 text-[14px] font-bold text-white transition-opacity disabled:opacity-40"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand px-4 text-[14px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
                 disabled={
                   builder.createModulePending || !builder.moduleTitle.trim()
                 }

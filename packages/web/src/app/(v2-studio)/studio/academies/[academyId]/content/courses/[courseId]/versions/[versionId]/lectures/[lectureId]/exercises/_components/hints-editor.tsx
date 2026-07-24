@@ -48,6 +48,7 @@ export function HintsEditor({
         ) : null
       }
       description={t('exercise.hint.help')}
+      icon={Lightbulb}
       title={t('exercise.section.hints')}
     >
       {hints.length === 0 ? (

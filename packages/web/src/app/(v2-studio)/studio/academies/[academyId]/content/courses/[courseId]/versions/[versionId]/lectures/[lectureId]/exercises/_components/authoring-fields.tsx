@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -6,31 +7,40 @@ export const inputClass =
   'h-10 w-full rounded-lg border border-border bg-white px-3 text-[14px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-canvas disabled:text-sub';
 
 export const secondaryButtonClass =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-[13.5px] font-bold text-brand hover:border-brand hover:text-brand-deep';
+  'inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-[13px] font-bold text-brand hover:border-brand hover:text-brand-deep';
 
 export function SectionCard({
   title,
   description,
+  icon: Icon,
   action,
   children,
 }: {
   title: string;
   description?: string;
+  icon?: LucideIcon;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-card border border-border bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-extrabold tracking-[-0.02em]">{title}</h2>
-          {description ? (
-            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-sub">
-              {description}
-            </p>
+        <div className="flex min-w-0 items-start gap-3">
+          {Icon ? (
+            <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
+              <Icon className="size-[1.05rem]" />
+            </span>
           ) : null}
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-bold tracking-[-0.01em]">{title}</h2>
+            {description ? (
+              <p className="mt-1 max-w-2xl text-[13px] leading-[1.5] text-sub">
+                {description}
+              </p>
+            ) : null}
+          </div>
         </div>
-        {action}
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       <div className="mt-5 space-y-5">{children}</div>
     </section>

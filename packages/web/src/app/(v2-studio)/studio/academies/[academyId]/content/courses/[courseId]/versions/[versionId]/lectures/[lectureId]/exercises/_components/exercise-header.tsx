@@ -45,24 +45,38 @@ export function ExerciseHeader({
             {context.course.title} / {context.module.title} /{' '}
             {context.lecture.title}
           </p>
-          <h1 className="mt-1 text-[1.55rem] font-extrabold tracking-[-0.025em]">
+          <h1 className="mt-1 text-[1.4rem] font-extrabold tracking-[-0.025em]">
             {savedMaterialId
               ? t('exercise.edit_title')
               : t('exercise.create_title')}
           </h1>
-          <p className="mt-1 text-[13px] font-semibold text-sub">
-            {!editable
-              ? t('exercise.read_only')
-              : savePending
-                ? t('exercise.saving')
-                : saveError
-                  ? saveConflict
-                    ? t('exercise.conflict')
-                    : t('exercise.save_failed')
-                  : dirty
-                    ? t('exercise.unsaved')
-                    : t('exercise.saved')}
-          </p>
+          <div className="mt-2">
+            <StatusPill
+              tone={
+                !editable
+                  ? 'neutral'
+                  : savePending
+                    ? 'brand'
+                    : saveError
+                      ? 'danger'
+                      : dirty
+                        ? 'draft'
+                        : 'success'
+              }
+            >
+              {!editable
+                ? t('exercise.read_only')
+                : savePending
+                  ? t('exercise.saving')
+                  : saveError
+                    ? saveConflict
+                      ? t('exercise.conflict')
+                      : t('exercise.save_failed')
+                    : dirty
+                      ? t('exercise.unsaved')
+                      : t('exercise.saved')}
+            </StatusPill>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -94,5 +108,44 @@ export function ExerciseHeader({
         </p>
       ) : null}
     </header>
+  );
+}
+
+type StatusTone = 'neutral' | 'brand' | 'danger' | 'draft' | 'success';
+
+const toneClass: Record<StatusTone, string> = {
+  neutral: 'bg-retired-soft text-retired',
+  brand: 'bg-brand-soft text-brand',
+  danger: 'bg-danger/10 text-danger',
+  draft: 'bg-draft-soft text-draft',
+  success: 'bg-success/10 text-success',
+};
+
+const dotClass: Record<StatusTone, string> = {
+  neutral: 'bg-retired',
+  brand: 'bg-brand',
+  danger: 'bg-danger',
+  draft: 'bg-draft',
+  success: 'bg-success',
+};
+
+function StatusPill({
+  tone,
+  children,
+}: {
+  tone: StatusTone;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${toneClass[tone]}`}
+    >
+      <span
+        className={`size-1.5 rounded-full ${dotClass[tone]} ${
+          tone === 'brand' ? 'animate-pulse' : ''
+        }`}
+      />
+      {children}
+    </span>
   );
 }

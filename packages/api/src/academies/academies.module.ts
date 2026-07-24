@@ -26,6 +26,7 @@ import { RateLimitService } from "./rate-limit.service.js";
     AcademyJoinRequestService,
     AcademyMembershipService,
     AcademyOnboardingService,
+    AuditService,
     RateLimitService,
   ],
 })

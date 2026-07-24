@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import type { implement } from "@orpc/server";
 import type { Request } from "express";
@@ -13,6 +13,7 @@ import type { AcademyJoinRequestService } from "../academies/academy-join-reques
 import type { AcademyMembershipService } from "../academies/academy-membership.service.js";
 import type { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import type { RateLimitService } from "../academies/rate-limit.service.js";
+import type { CourseService } from "../content/course.service.js";
 
 export type ORPCContext = { req: Request };
 export type ORPCImplementer = ReturnType<
@@ -29,6 +30,7 @@ export type ORPCDeps = {
   academyMembershipService: AcademyMembershipService;
   academyOnboardingService: AcademyOnboardingService;
   rateLimitService: RateLimitService;
+  courseService: CourseService;
 };
 
 export function requestAddress(req: Request): string {
@@ -44,6 +46,11 @@ export function requestAddress(req: Request): string {
     return forwardedAddress.slice(0, 128);
   }
   return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+export function requestId(req: Request): string {
+  return singleHeader(req.headers["x-request-id"])?.slice(0, 128) ??
+    randomUUID();
 }
 
 function singleHeader(value: string | string[] | undefined): string | null {

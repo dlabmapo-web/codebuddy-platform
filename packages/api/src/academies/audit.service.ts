@@ -11,6 +11,7 @@ export type AuditInput = {
   before?: Prisma.InputJsonValue;
   after?: Prisma.InputJsonValue;
   reason?: string;
+  requestId?: string;
 };
 
 @Injectable()
@@ -26,6 +27,7 @@ export class AuditService {
         before: input.before,
         after: input.after,
         reason: input.reason,
+        requestId: input.requestId,
       },
     });
   }

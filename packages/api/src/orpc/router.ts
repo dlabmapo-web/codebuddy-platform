@@ -15,6 +15,8 @@ import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { createAuthRouter } from "../auth/auth.router.js";
+import { CourseService } from "../content/course.service.js";
+import { createContentRouters } from "../content/content.router.js";
 import type { ORPCContext, ORPCDeps } from "./context.js";
 import { toORPCError } from "./error-mapping.js";
 
@@ -39,6 +41,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     rateLimitService: app.get(RateLimitService, { strict: false }),
+    courseService: app.get(CourseService, { strict: false }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -67,8 +70,10 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
 function createORPCRouter(deps: ORPCDeps) {
   const os = implement<typeof appContract, ORPCContext>(appContract);
   const academyRouters = createAcademiesRouters(os, deps);
+  const contentRouters = createContentRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     ...academyRouters,
+    ...contentRouters,
   });
 }

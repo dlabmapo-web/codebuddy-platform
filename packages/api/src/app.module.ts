@@ -7,6 +7,7 @@ import { AcademiesModule } from "./academies/academies.module.js";
 import { AuthorizationModule } from "./authorization/authorization.module.js";
 import { validateEnvironment } from "./config/env.schema.js";
 import { DatabaseModule } from "./database/database.module.js";
+import { ContentModule } from "./content/content.module.js";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DatabaseModule } from "./database/database.module.js";
     AcademiesModule,
     AuthModule,
     AuthorizationModule,
+    ContentModule,
   ],
   controllers: [AppController],
 })

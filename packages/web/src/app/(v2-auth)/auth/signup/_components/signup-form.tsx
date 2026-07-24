@@ -1,16 +1,51 @@
 'use client';
 
-import { Mail, User } from 'lucide-react';
+import { ChevronsUpDown, Mail, School, User } from 'lucide-react';
 import Link from 'next/link';
-import { useActionState, useState } from 'react';
+import { forwardRef, useActionState, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { signupAction, type AuthFormState } from '../../actions';
+import {
+  ResponsiveSelector,
+  type SelectorItem,
+  type TriggerProps,
+} from '@/components/studio/selector';
 import { orpc } from '@/lib/orpc';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
 
 const initialState: AuthFormState = {};
+
+/** Matches the height and shape of the auth form's text fields. */
+const AcademyTrigger = forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>(
+  function AcademyTrigger({ className, selectedItem, ...props }, ref) {
+    // Disabled with nothing chosen means the list is still being fetched.
+    const placeholder =
+      props.disabled && !selectedItem
+        ? 'Loading academies…'
+        : 'Choose your academy';
+    return (
+      <button
+        aria-controls={undefined}
+        aria-expanded={false}
+        className={`flex h-14 w-full items-center gap-3 rounded-xl border border-border bg-white px-4 text-left text-[16px] text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ''}`}
+        ref={ref}
+        role="combobox"
+        type="button"
+        {...props}
+      >
+        <School className="size-5 shrink-0 text-sub" strokeWidth={1.75} />
+        <span
+          className={`min-w-0 flex-1 truncate ${selectedItem ? '' : 'text-sub/60'}`}
+        >
+          {selectedItem?.name ?? placeholder}
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 text-sub" />
+      </button>
+    );
+  },
+);
 
 export function SignupForm({
   invitedAcademyId,
@@ -30,25 +65,20 @@ export function SignupForm({
   return (
     <div>
       <div className="mb-5">
-        <label className="mb-2 block text-[15px] font-semibold text-ink" htmlFor="academyId">
+        <span className="mb-2 block text-[15px] font-semibold text-ink">
           Academy branch
-        </label>
-        <select
-          className="h-14 w-full rounded-xl border border-border bg-white px-4 text-[16px] text-ink transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
-          disabled={academies.isPending || academies.isError || Boolean(invitedAcademyId)}
-          id="academyId"
-          name="academyId"
-          onChange={(event) => setAcademyId(event.target.value)}
-          required
-          value={academyId}
-        >
-          <option value="">
-            {academies.isPending ? 'Loading academies…' : 'Choose your academy'}
-          </option>
-          {academies.data?.academies.map((academy) => (
-            <option key={academy.id} value={academy.id}>{academy.name}</option>
-          ))}
-        </select>
+        </span>
+        <ResponsiveSelector
+          disabled={
+            academies.isPending || academies.isError || Boolean(invitedAcademyId)
+          }
+          drawerTitle="Choose your academy"
+          list={academies.data?.academies ?? []}
+          onSelect={(academy) => setAcademyId(academy.id)}
+          placeholder="Search academies…"
+          selectedId={academyId || null}
+          TriggerComp={AcademyTrigger}
+        />
         {academies.isError ? (
           <p className="mt-2 text-[14px] text-danger">Academies are unavailable right now. Try again shortly.</p>
         ) : null}

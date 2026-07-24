@@ -5,8 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
-
-const roles: AcademyRole[] = ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER'];
+import { RoleSelector } from '../../_components/role-selector';
 
 export function ApplicationsManager({ academyId }: { academyId: string }) {
   const queryClient = useQueryClient();
@@ -72,13 +71,7 @@ function ApplicationCard({
         <span className="text-xs text-sub">{new Date(request.createdAt).toLocaleDateString()}</span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[180px_1fr_auto_auto]">
-        <select
-          className="h-11 rounded-lg border border-border bg-white px-3 text-sm"
-          onChange={(event) => setRole(event.target.value as AcademyRole)}
-          value={role}
-        >
-          {roles.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}
-        </select>
+        <RoleSelector onChange={setRole} value={role} />
         <input
           className="h-11 rounded-lg border border-border px-3 text-sm"
           onChange={(event) => setReason(event.target.value)}

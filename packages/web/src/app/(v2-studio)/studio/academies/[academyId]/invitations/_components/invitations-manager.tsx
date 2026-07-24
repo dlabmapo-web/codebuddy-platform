@@ -5,8 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
-
-const roles: AcademyRole[] = ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER'];
+import { RoleSelector } from '../../_components/role-selector';
 
 export function InvitationsManager({ academyId }: { academyId: string }) {
   const queryClient = useQueryClient();
@@ -53,13 +52,7 @@ export function InvitationsManager({ academyId }: { academyId: string }) {
           type="email"
           value={email}
         />
-        <select
-          className="h-11 rounded-lg border border-border bg-white px-3 text-sm"
-          onChange={(event) => setRole(event.target.value as AcademyRole)}
-          value={role}
-        >
-          {roles.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}
-        </select>
+        <RoleSelector onChange={setRole} value={role} />
         <button
           className="h-11 rounded-lg bg-brand px-4 text-sm font-bold text-white disabled:opacity-50"
           disabled={createInvitation.isPending}

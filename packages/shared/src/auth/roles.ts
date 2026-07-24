@@ -20,6 +20,7 @@ export const academyPermissions = [
   "academy.members.manage",
   "academy.analytics.read",
   "curriculum.read",
+  "curriculum.review",
   "curriculum.draft",
   "curriculum.manage",
   "curriculum.publish",
@@ -48,6 +49,7 @@ export const academyRolePermissions = {
     "academy.members.read",
     "academy.analytics.read",
     "curriculum.read",
+    "curriculum.review",
     "curriculum.draft",
     "curriculum.manage",
     "curriculum.publish",
@@ -57,7 +59,15 @@ export const academyRolePermissions = {
     "classes.assigned.manage",
     "submissions.assigned.review",
   ],
-  MANAGER: [...academyPermissions],
+  MANAGER: [
+    "academy.read",
+    "academy.settings.manage",
+    "academy.members.read",
+    "academy.members.manage",
+    "academy.analytics.read",
+    "curriculum.read",
+    "curriculum.review",
+  ],
 } as const satisfies Record<AcademyRole, readonly AcademyPermission[]>;
 
 export function roleHasPermission(

@@ -152,3 +152,25 @@ export function canManageAcademy(role: AcademyRole | null | undefined): boolean 
 export function canManageContent(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'curriculum.manage') : false;
 }
+
+export function canReviewContent(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'curriculum.review') : false;
+}
+
+export function canManageExercises(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'exercises.manage') : false;
+}
+
+export function canPublishContent(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'curriculum.publish') : false;
+}
+
+export function academyRoleFor(
+  account: AuthMeResponse,
+  academyId: string,
+): AcademyRole | null {
+  return account.user.memberships.find(
+    (membership) =>
+      membership.status === 'ACTIVE' && membership.academy.id === academyId,
+  )?.role ?? null;
+}

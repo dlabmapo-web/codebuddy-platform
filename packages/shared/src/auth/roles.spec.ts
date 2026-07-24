@@ -17,11 +17,29 @@ describe("roleHasPermission", () => {
     expect(roleHasPermission("STUDENT", "curriculum.publish")).toBe(false);
   });
 
-  it("allows team leads and managers to manage content operations", () => {
-    for (const role of ["TEAM_LEAD", "MANAGER"] as const) {
-      expect(roleHasPermission(role, "exercises.manage")).toBe(true);
-      expect(roleHasPermission(role, "content.import")).toBe(true);
-      expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(true);
+  it("allows team leads and managers to review authoring content", () => {
+    expect(roleHasPermission("TEAM_LEAD", "curriculum.review")).toBe(true);
+    expect(roleHasPermission("MANAGER", "curriculum.review")).toBe(true);
+  });
+
+  it("keeps content mutation permissions with team leads", () => {
+    expect(roleHasPermission("TEAM_LEAD", "curriculum.manage")).toBe(true);
+    expect(roleHasPermission("TEAM_LEAD", "curriculum.publish")).toBe(true);
+    expect(roleHasPermission("TEAM_LEAD", "exercises.manage")).toBe(true);
+    expect(roleHasPermission("TEAM_LEAD", "content.import")).toBe(true);
+    expect(roleHasPermission("TEAM_LEAD", "ai-feedback-rules.manage")).toBe(true);
+  });
+
+  it("makes managers read-only reviewers of curriculum", () => {
+    for (const permission of [
+      "curriculum.draft",
+      "curriculum.manage",
+      "curriculum.publish",
+      "exercises.manage",
+      "content.import",
+      "ai-feedback-rules.manage",
+    ] as const) {
+      expect(roleHasPermission("MANAGER", permission)).toBe(false);
     }
   });
 
@@ -30,6 +48,7 @@ describe("roleHasPermission", () => {
       expect(roleHasPermission(role, "exercises.manage")).toBe(false);
       expect(roleHasPermission(role, "content.import")).toBe(false);
       expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(false);
+      expect(roleHasPermission(role, "curriculum.review")).toBe(false);
     }
   });
 });

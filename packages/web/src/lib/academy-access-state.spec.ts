@@ -3,8 +3,12 @@ import type { AuthMeResponse } from '@cove/shared';
 
 import {
   authDestination,
+  academyRoleFor,
   canManageContent,
   canManageAcademy,
+  canManageExercises,
+  canPublishContent,
+  canReviewContent,
   pendingStateView,
   resolveAcademyAccessState,
 } from './academy-access-state';
@@ -108,11 +112,29 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageAcademy(null)).toBe(false);
   });
 
-  it('exposes content management to team leads and managers', () => {
-    expect(canManageContent('MANAGER')).toBe(true);
+  it('lets managers review content without exposing authoring controls', () => {
+    expect(canReviewContent('MANAGER')).toBe(true);
+    expect(canManageContent('MANAGER')).toBe(false);
+    expect(canManageExercises('MANAGER')).toBe(false);
+    expect(canPublishContent('MANAGER')).toBe(false);
+  });
+
+  it('exposes content authoring to team leads', () => {
     expect(canManageContent('TEAM_LEAD')).toBe(true);
+    expect(canManageExercises('TEAM_LEAD')).toBe(true);
+    expect(canPublishContent('TEAM_LEAD')).toBe(true);
     expect(canManageContent('TEACHER')).toBe(false);
     expect(canManageContent('STUDENT')).toBe(false);
     expect(canManageContent(null)).toBe(false);
+  });
+
+  it('resolves only active membership roles for the selected academy', () => {
+    const input = account({
+      memberships: [{ academy, role: 'MANAGER', status: 'ACTIVE' }],
+    });
+    expect(academyRoleFor(input, academy.id)).toBe('MANAGER');
+    expect(
+      academyRoleFor(input, '90000000-0000-4000-8000-000000000001'),
+    ).toBeNull();
   });
 });

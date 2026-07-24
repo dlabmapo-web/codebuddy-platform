@@ -8,6 +8,8 @@ import * as React from 'react';
 import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
 import { Skeleton } from '@/components/studio/primitives';
+import { useLayoutTranslation } from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { RoleSelector } from '../../_components/role-selector';
 
@@ -19,6 +21,8 @@ type Member = {
 };
 
 export function MembersManager({ academyId }: { academyId: string }) {
+  const { t } = useLayoutTranslation(['members', 'common']);
+  const errorText = useErrorText();
   const queryClient = useQueryClient();
   const queryKey = ['academy', academyId, 'members'];
 
@@ -64,13 +68,15 @@ export function MembersManager({ academyId }: { academyId: string }) {
         id: 'member',
         accessorFn: (member) =>
           `${member.user.displayName ?? ''} ${member.user.email ?? ''}`,
-        header: 'Member',
+        header: t('column.member'),
         cell: ({ row }) => {
           const member = row.original;
           return (
             <div className="min-w-0">
               <p className="font-semibold">
-                {member.user.displayName ?? member.user.email ?? 'Cove user'}
+                {member.user.displayName ??
+                  member.user.email ??
+                  t('common:fallback.user')}
               </p>
               <p className="truncate text-[13px] text-sub">{member.user.email}</p>
             </div>
@@ -80,13 +86,13 @@ export function MembersManager({ academyId }: { academyId: string }) {
       {
         id: 'status',
         accessorFn: (member) => member.status,
-        header: 'Status',
+        header: t('column.status'),
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: 'role',
         accessorFn: (member) => member.role,
-        header: 'Role',
+        header: t('column.role'),
         enableSorting: false,
         cell: ({ row }) => {
           const member = row.original;
@@ -121,7 +127,7 @@ export function MembersManager({ academyId }: { academyId: string }) {
                 size="sm"
                 variant="outline"
               >
-                Suspend
+                {t('action.suspend')}
               </Button>
             );
           }
@@ -134,15 +140,19 @@ export function MembersManager({ academyId }: { academyId: string }) {
                 }
                 size="sm"
               >
-                Restore
+                {t('action.restore')}
               </Button>
             );
           }
-          return <span className="text-[13px] text-sub">No actions</span>;
+          return (
+            <span className="text-[13px] text-sub">
+              {t('common:state.no_actions')}
+            </span>
+          );
         },
       },
     ],
-    [pending, update],
+    [pending, t, update],
   );
 
   if (members.isPending) {
@@ -158,7 +168,7 @@ export function MembersManager({ academyId }: { academyId: string }) {
   if (members.isError) {
     return (
       <p className="text-[14px] font-semibold text-danger">
-        You cannot view this academy&apos;s members.
+        {errorText(members.error, t('forbidden'))}
       </p>
     );
   }
@@ -168,14 +178,13 @@ export function MembersManager({ academyId }: { academyId: string }) {
       <DataTable
         columns={columns}
         data={members.data.members as Member[]}
-        emptyMessage="No members yet. Invite someone to get started."
+        emptyMessage={t('empty')}
         pageSize={15}
-        searchPlaceholder="Search by name or email"
+        searchPlaceholder={t('search_placeholder')}
       />
       {update.isError ? (
         <p className="rounded-lg border border-danger/25 bg-danger/5 px-4 py-3 text-[13.5px] text-danger">
-          The membership could not be updated. An academy must keep at least one
-          active manager.
+          {errorText(update.error, t('update_failed'))}
         </p>
       ) : null}
     </div>
@@ -183,6 +192,7 @@ export function MembersManager({ academyId }: { academyId: string }) {
 }
 
 function StatusBadge({ status }: { status: Member['status'] }) {
+  const { t } = useLayoutTranslation('common');
   const tone =
     status === 'ACTIVE'
       ? 'bg-brand-soft text-brand'
@@ -193,7 +203,7 @@ function StatusBadge({ status }: { status: Member['status'] }) {
     <span
       className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${tone}`}
     >
-      {status.charAt(0) + status.slice(1).toLowerCase()}
+      {t(`membership_status.${status}`)}
     </span>
   );
 }

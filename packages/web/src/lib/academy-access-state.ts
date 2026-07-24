@@ -3,6 +3,7 @@ import type {
   AuthMeResponse,
   AuthUser,
 } from '@cove/shared';
+import { roleHasPermission } from '@cove/shared';
 
 type Membership = AuthUser['memberships'][number];
 type Application = AuthUser['applications'][number];
@@ -137,6 +138,10 @@ export function pendingStateView(
 
 export function canManageAcademy(role: AcademyRole | null | undefined): boolean {
   return role === 'MANAGER';
+}
+
+export function canManageContent(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'curriculum.manage') : false;
 }
 
 function formatRole(role: Membership['role']): string {

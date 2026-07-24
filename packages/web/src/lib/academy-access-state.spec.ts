@@ -3,6 +3,7 @@ import type { AuthMeResponse } from '@cove/shared';
 
 import {
   authDestination,
+  canManageContent,
   canManageAcademy,
   pendingStateView,
   resolveAcademyAccessState,
@@ -106,5 +107,13 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageAcademy('TEACHER')).toBe(false);
     expect(canManageAcademy('STUDENT')).toBe(false);
     expect(canManageAcademy(null)).toBe(false);
+  });
+
+  it('exposes content management to team leads and managers', () => {
+    expect(canManageContent('MANAGER')).toBe(true);
+    expect(canManageContent('TEAM_LEAD')).toBe(true);
+    expect(canManageContent('TEACHER')).toBe(false);
+    expect(canManageContent('STUDENT')).toBe(false);
+    expect(canManageContent(null)).toBe(false);
   });
 });

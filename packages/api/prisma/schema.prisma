@@ -66,6 +66,36 @@ enum OAuthOnboardingIntentStatus {
   EXPIRED
 }
 
+enum CourseStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum CourseVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum MaterialType {
+  PROGRAMMING_EXERCISE
+}
+
+enum ExerciseDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ExerciseLanguage {
+  PYTHON
+}
+
+enum TestCaseVisibility {
+  SAMPLE
+  HIDDEN
+}
+
 model User {
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
@@ -82,14 +112,17 @@ model User {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships           AcademyMembership[]
-  invitationsCreated    AcademyInvitation[]  @relation("InvitationCreator")
-  invitationsAccepted   AcademyInvitation[]  @relation("InvitationAcceptor")
-  joinRequests          AcademyJoinRequest[] @relation("JoinRequester")
-  joinRequestsReviewed  AcademyJoinRequest[] @relation("JoinReviewer")
-  membershipInvitations AcademyMembership[]  @relation("MembershipInviter")
-  membershipApprovals   AcademyMembership[]  @relation("MembershipApprover")
-  auditLogs             AuditLog[]           @relation("AuditActor")
+  memberships             AcademyMembership[]
+  invitationsCreated      AcademyInvitation[]  @relation("InvitationCreator")
+  invitationsAccepted     AcademyInvitation[]  @relation("InvitationAcceptor")
+  joinRequests            AcademyJoinRequest[] @relation("JoinRequester")
+  joinRequestsReviewed    AcademyJoinRequest[] @relation("JoinReviewer")
+  membershipInvitations   AcademyMembership[]  @relation("MembershipInviter")
+  membershipApprovals     AcademyMembership[]  @relation("MembershipApprover")
+  auditLogs               AuditLog[]           @relation("AuditActor")
+  coursesCreated          Course[]             @relation("CourseCreator")
+  courseVersionsCreated   CourseVersion[]      @relation("CourseVersionCreator")
+  courseVersionsPublished CourseVersion[]      @relation("CourseVersionPublisher")
 
   @@index([status])
   @@map("users")
@@ -123,6 +156,7 @@ model Academy {
   joinRequests           AcademyJoinRequest[]
   oauthOnboardingIntents OAuthOnboardingIntent[]
   auditLogs              AuditLog[]
+  courses                Course[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -240,4 +274,155 @@ model AuditLog {
   @@index([academyId, createdAt])
   @@index([targetType, targetId])
   @@map("audit_logs")
+}
+
+model Course {
+  id              String       @id @default(uuid()) @db.Uuid
+  academyId       String       @map("academy_id") @db.Uuid
+  title           String
+  description     String       @default("")
+  status          CourseStatus @default(ACTIVE)
+  createdByUserId String       @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy   Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions  CourseVersion[]
+
+  @@index([academyId, status, updatedAt])
+  @@map("courses")
+}
+
+model CourseVersion {
+  id                String              @id @default(uuid()) @db.Uuid
+  courseId          String              @map("course_id") @db.Uuid
+  versionNumber     Int                 @map("version_number")
+  status            CourseVersionStatus @default(DRAFT)
+  createdByUserId   String              @map("created_by_user_id") @db.Uuid
+  publishedByUserId String?             @map("published_by_user_id") @db.Uuid
+  publishedAt       DateTime?           @map("published_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course               Course                @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  createdBy            User                  @relation("CourseVersionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  publishedBy          User?                 @relation("CourseVersionPublisher", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+  modules              CourseModule[]
+  programmingExercises ProgrammingExercise[]
+
+  @@unique([courseId, versionNumber])
+  @@index([courseId, status])
+  @@map("course_versions")
+}
+
+model CourseModule {
+  id              String   @id @default(uuid()) @db.Uuid
+  courseVersionId String   @map("course_version_id") @db.Uuid
+  title           String
+  description     String   @default("")
+  position        Int
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  courseVersion CourseVersion @relation(fields: [courseVersionId], references: [id], onDelete: Cascade)
+  lectures      Lecture[]
+
+  @@unique([courseVersionId, position])
+  @@index([courseVersionId])
+  @@map("course_modules")
+}
+
+model Lecture {
+  id             String   @id @default(uuid()) @db.Uuid
+  courseModuleId String   @map("course_module_id") @db.Uuid
+  title          String
+  description    String   @default("")
+  position       Int
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  courseModule CourseModule @relation(fields: [courseModuleId], references: [id], onDelete: Cascade)
+  materials    Material[]
+
+  @@unique([courseModuleId, position])
+  @@index([courseModuleId])
+  @@map("lectures")
+}
+
+model Material {
+  id         String       @id @default(uuid()) @db.Uuid
+  lectureId  String       @map("lecture_id") @db.Uuid
+  type       MaterialType
+  title      String
+  position   Int
+  isRequired Boolean      @default(true) @map("is_required")
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lecture             Lecture              @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  programmingExercise ProgrammingExercise?
+
+  @@unique([lectureId, position])
+  @@index([lectureId])
+  @@map("materials")
+}
+
+model ProgrammingExercise {
+  materialId        String             @id @map("material_id") @db.Uuid
+  courseVersionId   String             @map("course_version_id") @db.Uuid
+  externalKey       String             @map("external_key")
+  legacyProblemNo   Int?               @map("legacy_problem_no")
+  difficulty        ExerciseDifficulty
+  description       String             @default("")
+  inputFormat       String             @default("") @map("input_format")
+  outputFormat      String             @default("") @map("output_format")
+  constraints       String             @default("")
+  starterCode       String             @default("") @map("starter_code")
+  language          ExerciseLanguage   @default(PYTHON)
+  timeLimitMs       Int                @default(2000) @map("time_limit_ms")
+  memoryLimitMb     Int                @default(256) @map("memory_limit_mb")
+  aiFeedbackEnabled Boolean            @default(false) @map("ai_feedback_enabled")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  material      Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  courseVersion CourseVersion      @relation(fields: [courseVersionId], references: [id], onDelete: Cascade)
+  testCases     ExerciseTestCase[]
+  hints         ExerciseHint[]
+
+  @@unique([courseVersionId, externalKey])
+  @@index([legacyProblemNo])
+  @@map("programming_exercises")
+}
+
+model ExerciseTestCase {
+  id                 String             @id @default(uuid()) @db.Uuid
+  exerciseMaterialId String             @map("exercise_material_id") @db.Uuid
+  position           Int
+  input              String
+  expectedOutput     String             @map("expected_output")
+  visibility         TestCaseVisibility
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  exercise ProgrammingExercise @relation(fields: [exerciseMaterialId], references: [materialId], onDelete: Cascade)
+
+  @@unique([exerciseMaterialId, position])
+  @@map("exercise_test_cases")
+}
+
+model ExerciseHint {
+  id                 String   @id @default(uuid()) @db.Uuid
+  exerciseMaterialId String   @map("exercise_material_id") @db.Uuid
+  position           Int
+  content            String
+  triggerExpression  String?  @map("trigger_expression")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  exercise ProgrammingExercise @relation(fields: [exerciseMaterialId], references: [materialId], onDelete: Cascade)
+
+  @@unique([exerciseMaterialId, position])
+  @@map("exercise_hints")
 }

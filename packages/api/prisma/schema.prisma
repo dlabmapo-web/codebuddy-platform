@@ -380,7 +380,7 @@ model ProgrammingExercise {
   constraints       String             @default("")
   starterCode       String             @default("") @map("starter_code")
   language          ExerciseLanguage   @default(PYTHON)
-  timeLimitMs       Int                @default(2000) @map("time_limit_ms")
+  timeLimitMs       Int                @default(3000) @map("time_limit_ms")
   memoryLimitMb     Int                @default(256) @map("memory_limit_mb")
   aiFeedbackEnabled Boolean            @default(false) @map("ai_feedback_enabled")
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)

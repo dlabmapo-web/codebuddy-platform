@@ -13,8 +13,8 @@
     "unavailable_body": "It belongs to another academy, or your membership cannot open it.",
     "back_to_courses": "Back to courses",
     "all_courses": "All courses",
-    "locked_heading": "Version {{version}} is published and read-only",
-    "locked_body": "Classes rely on this exact content. To change it, start the next draft — it opens as a copy of this version.",
+    "locked_heading": "Version {{version}} is read-only",
+    "locked_body": "Published versions are fixed. Managers can also review drafts, while Team Leads own curriculum changes.",
     "start_next_draft": "Start next draft",
     "starting": "Starting…",
     "structural_error": "That change did not save. Reload the page to see the current draft."
@@ -44,6 +44,80 @@
     "move_down": "Move lecture down",
     "delete_aria": "Delete lecture “{{title}}”"
   },
+  "exercise": {
+    "add": "Add coding problem",
+    "move_up": "Move problem up",
+    "move_down": "Move problem down",
+    "delete_aria": "Delete problem “{{title}}”",
+    "back": "Back to course builder",
+    "create_title": "Create coding problem",
+    "edit_title": "Coding problem",
+    "read_only": "Read-only review",
+    "saving": "Saving…",
+    "save_failed": "Save failed",
+    "conflict": "Changed in another session — reload before saving",
+    "unsaved": "Unsaved changes",
+    "saved": "All changes saved",
+    "preview": "Preview",
+    "save_draft": "Save draft",
+    "save_failed_detail": "The problem could not be saved. Check the required fields and try again.",
+    "unsaved_confirm": "You have unsaved changes. Leave without saving?",
+    "completeness": "Required to save",
+    "completeness_hint": "Constraints, starter code, hints, and AI feedback are optional.",
+    "required_mark": "Required",
+    "preview_untitled": "Untitled problem",
+    "preview_close": "Close preview",
+    "preview_hidden_notice": "Hidden test cases are intentionally excluded from this preview.",
+    "section": {
+      "basics": "Basic information",
+      "tests": "Answers",
+      "hints": "Hints"
+    },
+    "basic_help": "The same fields as the original manual problem form, presented together without hidden sections.",
+    "code_help": "Optional code students see when they first open the problem.",
+    "language_python": "Python 3",
+    "required": {
+      "title": "Problem title",
+      "difficulty": "Difficulty",
+      "description": "Problem description",
+      "test": "One expected output"
+    },
+    "field": {
+      "title": "Problem title",
+      "difficulty": "Difficulty",
+      "language": "Language",
+      "ai_feedback": "Enable AI feedback",
+      "ai_feedback_hint": "This stores the preference. Feedback-rule management is a later migration step.",
+      "description": "Problem description",
+      "constraints": "Conditions and constraints (optional)",
+      "starter_code": "Initial code (editor default)"
+    },
+    "placeholder": {
+      "title": "e.g. Sum two numbers",
+      "description": "Explain the task, examples, and important details."
+    },
+    "difficulty": {
+      "EASY": "Easy",
+      "MEDIUM": "Medium",
+      "HARD": "Hard"
+    },
+    "test": {
+      "add": "Add answer",
+      "help": "Add input and expected-output pairs just like the original problem form.",
+      "label": "Answer {{number}}",
+      "input": "Input",
+      "expected": "Expected output",
+      "remove": "Remove answer {{number}}"
+    },
+    "hint": {
+      "add": "Add hint",
+      "empty": "Hints are optional. Add one when a learner may need a gentle nudge.",
+      "help": "Hints are optional and appear in the order shown here.",
+      "label": "Hint {{number}}",
+      "content": "Hint content",
+      "remove": "Remove hint {{number}}"
+    }
+  },
   "rename": "Rename",
   "sidebar": {
     "heading": "This version",
@@ -57,7 +131,7 @@
     "hint_ready": "Publishing freezes this version and makes it the one classes use.",
     "hint_blocked": "Fix the items below, then check again.",
     "publish_refused": "Publishing was refused. Run the check again for the current blockers.",
-    "roadmap": "Programming exercises, test cases, and Excel import arrive in the next release. Modules and lectures you write now carry over."
+    "roadmap": "Excel import is a later migration step. Problems created here remain attached to this version."
   },
   "issues": {
     "ready": "Ready to publish",

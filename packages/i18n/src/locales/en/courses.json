@@ -37,6 +37,7 @@
   "live_since": "Live since {{date}}",
   "never_published": "Never published",
   "continue_draft": "Continue draft",
+  "review_published": "Review published",
   "start_next_draft": "Start next draft",
   "starting": "Starting…",
   "empty": "No courses yet. Start with the one you teach most often.",

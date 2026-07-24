@@ -36,6 +36,7 @@
   "live_since": "{{date}}부터 공개",
   "never_published": "게시한 적 없음",
   "continue_draft": "초안 이어서 작성",
+  "review_published": "게시 버전 검토",
   "start_next_draft": "다음 초안 시작",
   "starting": "시작하는 중…",
   "empty": "아직 코스가 없습니다. 가장 자주 가르치는 과정부터 만들어 보세요.",

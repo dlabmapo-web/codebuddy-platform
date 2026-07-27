@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
@@ -60,6 +60,16 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   medium: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
+
+const ProblemDescription = memo(function ProblemDescription({ html }: { html: string }) {
+  return (
+    <div
+      className="tiptap-render"
+      style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 20 }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+});
 
 // 출력 정규화: 개행 통일 + 각 줄 우측 공백 제거 + 앞뒤 빈 줄 제거
 function normalizeOutput(s: string): string {
@@ -1109,11 +1119,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
             </div>
 
             <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
-            <div
-                className="tiptap-render"
-                style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 20 }}
-                dangerouslySetInnerHTML={{ __html: problem.description }}
-              />
+            <ProblemDescription html={problem.description} />
 
             {problem.input_format && (
               <>

@@ -14,8 +14,10 @@ type Submission = {
   problem_id: string;
   code: string;
   status: 'pass' | 'fail' | 'partial';
+  score: number;
   passed_count: number;
   total_count: number;
+  runtime_ms: number | null;
   elapsed_sec: number | null;
   submitted_at: string;
   problems: { problem_no: number; title: string; difficulty: ProblemDifficulty } | null;
@@ -86,6 +88,27 @@ function formatElapsed(sec: number | null) {
 function formatDate(iso: string) {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function SubmissionScore({ score, compact = false }: { score: number; compact?: boolean }) {
+  const color = score === 100 ? '#16A34A' : score >= 50 ? '#D97706' : '#DC2626';
+  return (
+    <div
+      data-testid="teacher-submission-score"
+      className="flex items-center gap-2 rounded-lg"
+      style={{
+        minWidth: compact ? 82 : 112,
+        padding: compact ? '4px 8px' : '6px 9px',
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <div className="h-1 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--color-border)' }}>
+        <div className="h-full rounded-full" style={{ width: `${score}%`, backgroundColor: color }} />
+      </div>
+      <strong style={{ fontSize: compact ? 11 : 12, color, whiteSpace: 'nowrap' }}>{score}점</strong>
+    </div>
+  );
 }
 
 function groupByProblem(subs: Submission[]) {
@@ -385,6 +408,7 @@ export default function ProgressPage() {
                               </span>
                             </div>
                           )}
+                          {best && <SubmissionScore score={best.score} compact />}
                           {best?.elapsed_sec && (
                             <span className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                               <Clock size={12} /> {formatElapsed(best.elapsed_sec)}
@@ -409,6 +433,15 @@ export default function ProgressPage() {
                                 <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                                   {sub.passed_count}/{sub.total_count} 케이스
                                 </span>
+                                <SubmissionScore score={sub.score} />
+                                <span style={{ fontSize: '11px', color: 'var(--color-sub)' }}>
+                                  {subs.length - idx}번째 제출
+                                </span>
+                                {sub.runtime_ms !== null && (
+                                  <span className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
+                                    실행 {sub.runtime_ms}ms
+                                  </span>
+                                )}
                                 {sub.elapsed_sec && (
                                   <span className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                                     <Clock size={11} /> {formatElapsed(sub.elapsed_sec)}
@@ -588,6 +621,10 @@ export default function ProgressPage() {
                         </span>
                       );
                     })()}
+                    <SubmissionScore score={codeModal.sub.score} compact />
+                    <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
+                      {codeModal.sub.passed_count}/{codeModal.sub.total_count} 테스트
+                    </span>
                   </div>
                 </div>
               </div>

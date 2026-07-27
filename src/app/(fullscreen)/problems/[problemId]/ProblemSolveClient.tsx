@@ -3,7 +3,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
+import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
@@ -19,6 +19,10 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import ThemeToggle from '@/components/ThemeToggle';
+import {
+  SubmissionResultDrawer,
+  type SubmissionResult,
+} from '@/components/judge/SubmissionResultDrawer';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -32,16 +36,6 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 type ProblemDetail = DbProblem & {
   test_cases: Pick<DbTestCase, 'id' | 'input' | 'expected_output' | 'is_sample' | 'order_no'>[];
   hints: Pick<DbProblemHint, 'id' | 'hint_text' | 'order_no'>[];
-};
-
-type SubmitResult = {
-  status: 'pass' | 'fail' | 'partial';
-  passedCount: number;
-  totalCount: number;
-  runtimeMs: number;
-  elapsedSec: number;
-  failedCases: number[];
-  attemptNo: number;
 };
 
 type PresenceUser = { userId: string; name: string; role: string };
@@ -70,31 +64,6 @@ const ProblemDescription = memo(function ProblemDescription({ html }: { html: st
     />
   );
 });
-
-// 출력 정규화: 개행 통일 + 각 줄 우측 공백 제거 + 앞뒤 빈 줄 제거
-function normalizeOutput(s: string): string {
-  return s
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map((l) => l.trimEnd())
-    .join('\n')
-    .trim();
-}
-
-// 채점: 전체 출력이 정답과 같거나, 정답이 출력의 마지막 줄(블록)과 일치하면 정답 인정.
-// (학생이 print('입력하세요:') 처럼 안내 문구를 출력해도 실제 정답 부분만 비교)
-function outputMatches(rawStdout: string, expectedOutputs: string[]): boolean {
-  const actual = normalizeOutput(rawStdout);
-  const actualLines = actual.length ? actual.split('\n') : [];
-  return expectedOutputs.some((exp) => {
-    const e = normalizeOutput(exp);
-    if (e === actual) return true;
-    const eLines = e.length ? e.split('\n') : [];
-    if (eLines.length === 0 || eLines.length > actualLines.length) return false;
-    const tail = actualLines.slice(actualLines.length - eLines.length).join('\n');
-    return tail === eLines.join('\n');
-  });
-}
 
 // 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
 async function runFallbackOnce(userCode: string): Promise<{
@@ -156,100 +125,6 @@ finally:
   };
 }
 
-function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent, nextProblemId, stageId }: {
-  result: SubmitResult;
-  onClose: () => void;
-  onRetry: () => void;
-  onHint: () => void;
-  aiFeedbackEnabled: boolean;
-  aiFeedbackLoading: boolean;
-  aiFeedbackContent: string | null;
-  nextProblemId: string | null;
-  stageId: string | null;
-}) {
-  const isPass = result.status === 'pass';
-  const minutes = Math.floor(result.elapsedSec / 60);
-  const secs = result.elapsedSec % 60;
-  const timeLabel = minutes > 0 ? `${minutes}분 ${secs}초` : `${secs}초`;
-  const showAiBox = !isPass && aiFeedbackEnabled;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className={`bg-card rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center mb-5">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
-            {isPass
-              ? <CheckCircle2 size={36} style={{ color: '#16A34A' }} />
-              : <XCircle size={36} style={{ color: '#DC2626' }} />}
-          </div>
-        </div>
-        <h2 className="text-center mb-1" style={{ fontSize: '20px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>
-          {isPass ? '정답입니다!' : result.status === 'partial' ? '일부 통과' : '오답입니다'}
-        </h2>
-        <p className="text-center mb-5" style={{ fontSize: '13px', color: 'var(--color-sub)' }}>{result.attemptNo}번째 제출</p>
-        <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-          <div className="text-center">
-            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>채점 결과</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{isPass ? '정답' : '오답'}</div>
-          </div>
-          <div style={{ width: 1, backgroundColor: 'var(--color-border)' }} />
-          <div className="text-center">
-            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>풀이 시간</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-ink)' }}>{timeLabel}</div>
-          </div>
-        </div>
-        {!isPass && !showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--tint-danger-line)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>출력이 정답과 달라요</div>
-            <div style={{ fontSize: '13px', color: 'var(--color-sub)' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
-            <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
-          </div>
-        )}
-        {showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-accent)', border: '1px solid var(--tint-accent-line)' }}>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles size={14} style={{ color: '#4F46E5' }} className="flex-shrink-0" />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5' }}>AI 피드백</span>
-            </div>
-            {aiFeedbackContent ? (
-              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{aiFeedbackContent}</p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: '#4F46E5', borderTopColor: 'transparent' }} />
-                <span style={{ fontSize: '13px', color: '#4F46E5', fontWeight: 600 }}>AI가 코드를 분석하고 있어요...</span>
-              </div>
-            )}
-            <div className="mt-2" style={{ fontSize: '11px', color: '#4F46E5' }}>* 정답은 직접 알려주지 않는 참고용 피드백입니다</div>
-          </div>
-        )}
-        {isPass ? (
-          <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>닫기</button>
-            <Link
-              href={nextProblemId
-                ? `/problems/${nextProblemId}`
-                : stageId
-                  ? `/problems?stage=${stageId}`
-                  : '/problems'}
-              className="flex-1 rounded-xl text-white flex items-center justify-center"
-              style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
-            >
-              {nextProblemId ? '다음 문제 풀기' : '목록으로'}
-            </Link>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <button onClick={onHint} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>힌트 보기</button>
-            <button onClick={onRetry} className="flex-1 rounded-xl text-white" style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}>다시 풀기</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function ProblemSolveClient({ problemId, submissionId }: { problemId: string; submissionId?: string }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [nextProblemId, setNextProblemId] = useState<string | null>(null);
@@ -265,7 +140,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [errorExplainSeen, setErrorExplainSeen] = useState(false);
   const [awaitingInput, setAwaitingInput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [modalResult, setModalResult] = useState<SubmitResult | null>(null);
+  const [modalResult, setModalResult] = useState<SubmissionResult | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
@@ -885,63 +760,102 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const handleSubmit = useCallback(async () => {
     if (isRunning || !problem) return;
 
-    const res = await fetch(`/api/problems/${problemId}/judge-cases`).catch(() => null);
-    const judgeJson = res?.ok ? await res.json().catch(() => null) : null;
-    const judgeCases: Array<{ input: string; expected_output: string }> = judgeJson?.test_cases ?? problem.test_cases;
-
-    if (judgeCases.length === 0) {
-      setTerminalOpen(true);
-      setTerminalLines([{ text: '채점할 정답이 없습니다. 관리자에게 문의하세요.\n', kind: 'err' }]);
-      return;
-    }
-
-    // 등록된 정답(출력값)들 = 허용되는 출력 목록
-    const expectedOutputs = judgeCases
-      .map((tc) => tc.expected_output.trim())
-      .filter((o) => o.length > 0);
-
     setIsRunning(true);
+    setModalResult(null);
     setTerminalOpen(true);
-    setTerminalLines([{ text: '$ python solution.py   (제출)\n', kind: 'meta' }]);
+    setTerminalLines([{ text: '$ solution.py 제출\n', kind: 'meta' }, { text: '비공개 테스트를 포함한 서버 채점을 시작합니다...\n', kind: 'info' }]);
     setCurrentAiFeedback(null);
 
-    const t0 = Date.now();
-    const { stdout, stderr, pythonError, stopped } = await executeInTerminal(code);
-    if (stopped) { setIsRunning(false); return; }
-
-    const runtimeMs = Date.now() - t0;
-    const matched = !pythonError && !stderr.trim() && outputMatches(stdout, expectedOutputs);
-    const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
-    const score = matched ? 100 : 0;
-    const newAttempt = attemptCount + 1;
-
-    appendTerminal(
-      matched
-        ? `\n채점 결과: 정답입니다! (${runtimeMs}ms)\n`
-        : pythonError
-          ? '\n코드에 오류가 있어 채점하지 못했어요. 위의 [해석] 버튼을 눌러 확인해 보세요.\n'
-          : `\n채점 결과: 오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)\n`,
-      matched ? 'out' : 'err',
-    );
-    setAttemptCount(newAttempt);
+    if (sessionId) {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ final_code: code }),
+      }).catch(() => null);
+    }
 
     const subRes = await fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
-    });
+      body: JSON.stringify({ problem_id: problemId, language: 'python', code, elapsed_sec: seconds }),
+    }).catch(() => null);
+    if (!subRes) {
+      appendTerminal('\n채점 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.\n', 'err');
+      setIsRunning(false);
+      return;
+    }
     const subJson = await subRes.json().catch(() => null);
+    if (!subRes.ok || !subJson?.submission?.id) {
+      appendTerminal(`\n${subJson?.error?.message ?? '채점을 시작하지 못했습니다.'}\n`, 'err');
+      setIsRunning(false);
+      return;
+    }
 
-    if (!matched && problem.use_ai_feedback && subJson?.submission?.id) {
+    const submissionId = subJson.submission.id as string;
+    const initialTotalCount = Number(subJson.submission.total_count) || 0;
+    setModalResult({
+      status: 'judging',
+      score: 0,
+      passedCount: 0,
+      totalCount: initialTotalCount,
+      runtimeMs: 0,
+      elapsedSec: seconds,
+      attemptNo: attemptCount + 1,
+      cases: [],
+    });
+    let finalSubmission: {
+      status: 'pass' | 'fail' | 'partial' | 'judge_error';
+      score: number;
+      passed_count: number;
+      total_count: number;
+      runtime_ms: number | null;
+      cases?: SubmissionResult['cases'];
+    } | null = null;
+
+    for (let poll = 0; poll < 400; poll += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, poll === 0 ? 500 : 1500));
+      const statusRes = await fetch(`/api/submissions/${submissionId}`, { cache: 'no-store' }).catch(() => null);
+      const statusJson = statusRes?.ok ? await statusRes.json().catch(() => null) : null;
+      const next = statusJson?.submission;
+      if (next && next.status !== 'judging') {
+        finalSubmission = next;
+        break;
+      }
+    }
+
+    if (!finalSubmission) {
+      appendTerminal('\n채점이 계속 진행 중입니다. 제출 기록에서 결과를 다시 확인해주세요.\n', 'info');
+      setIsRunning(false);
+      return;
+    }
+
+    const status = finalSubmission.status;
+    const isStudentFailure = status === 'fail' || status === 'partial';
+    const newAttempt = status === 'judge_error' ? attemptCount : attemptCount + 1;
+    const runtimeMs = finalSubmission.runtime_ms ?? 0;
+    const passedCount = finalSubmission.passed_count;
+    const totalCount = finalSubmission.total_count;
+
+    appendTerminal(
+      status === 'pass'
+        ? `\n채점 결과: 모든 테스트를 통과했습니다! (${runtimeMs}ms)\n`
+        : status === 'judge_error'
+          ? '\n채점 서비스 오류가 발생했습니다. 학생의 오답으로 기록되지 않았습니다.\n'
+          : `\n채점 결과: ${passedCount}/${totalCount}개 테스트를 통과했습니다. (${runtimeMs}ms)\n`,
+      status === 'pass' ? 'out' : 'err',
+    );
+    if (status !== 'judge_error') setAttemptCount(newAttempt);
+
+    if (isStudentFailure && problem.use_ai_feedback) {
       setAiFeedbackLoading(true);
       fetch('/api/ai-feedbacks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          submission_id: subJson.submission.id,
+          submission_id: submissionId,
           problem_id: problemId,
           code,
-          error_message: pythonError?.display.trim() || undefined,
+          error_message: `${passedCount}/${totalCount} tests passed`,
         }),
       })
         .then((r) => r.json())
@@ -955,17 +869,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         .finally(() => setAiFeedbackLoading(false));
     }
 
-    if (sessionId) {
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ final_code: code }),
-      });
-    }
-
-    setModalResult({ status, passedCount: matched ? 1 : 0, totalCount: 1, runtimeMs, elapsedSec: seconds, failedCases: matched ? [] : [1], attemptNo: newAttempt });
+    setModalResult({
+      status,
+      score: finalSubmission.score,
+      passedCount,
+      totalCount,
+      runtimeMs,
+      elapsedSec: seconds,
+      attemptNo: newAttempt,
+      cases: finalSubmission.cases ?? [],
+    });
     setIsRunning(false);
-  }, [isRunning, problem, problemId, code, executeInTerminal, appendTerminal, attemptCount, seconds, sessionId]);
+  }, [isRunning, problem, problemId, code, appendTerminal, attemptCount, seconds, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -1216,7 +1131,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false }}
             />
           </div>
 
@@ -1330,7 +1245,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       </div>
 
       {modalResult && (
-        <ResultModal
+        <SubmissionResultDrawer
           result={modalResult}
           onClose={() => setModalResult(null)}
           onRetry={() => setModalResult(null)}

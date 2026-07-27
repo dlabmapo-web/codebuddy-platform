@@ -45,6 +45,11 @@ type SubmitResult = {
 
 type PresenceUser = { userId: string; name: string; role: string };
 
+// 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
+// (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
+const POINTER_IDLE_HIDE_MS = 3000;
+const CURSOR_IDLE_HIDE_MS = 3000;
+
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
@@ -284,6 +289,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const pendingCodeRef = useRef<string | null>(null);
   const lastCursorSentRef = useRef(0);
   const lastPointerSentRef = useRef(0);
+  // senderId별 "포인터 숨김" 타이머 — pointer:move가 끊기면 3초 뒤 해당 포인터를 제거
+  const pointerIdleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
@@ -301,6 +308,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const remoteCursorDecorationsRef = useRef<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remoteCursorWidgetRef = useRef<any>(null);
+  // 선생님 커서가 멈추면 일정 시간 뒤 커서 위젯을 숨기는 타이머
+  const remoteCursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { codeRef.current = code; }, [code]);
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
@@ -332,6 +341,17 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     };
     remoteCursorWidgetRef.current = widget;
     editor.addContentWidget(widget);
+
+    // 커서가 움직일 때마다 타이머 리셋 → 3초간 정지하면 학생 화면에서 커서 위젯을 숨긴다.
+    if (remoteCursorIdleTimerRef.current) clearTimeout(remoteCursorIdleTimerRef.current);
+    remoteCursorIdleTimerRef.current = setTimeout(() => {
+      remoteCursorIdleTimerRef.current = null;
+      const ed = editorRef.current;
+      if (ed && remoteCursorWidgetRef.current) {
+        ed.removeContentWidget(remoteCursorWidgetRef.current);
+        remoteCursorWidgetRef.current = null;
+      }
+    }, CURSOR_IDLE_HIDE_MS);
   }, []);
 
   const handleEditorMount: OnMount = useCallback((editor, monacoInstance) => {
@@ -546,8 +566,22 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
         if (payload.senderId === myInfo.id) return;
         setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: payload.name, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
+        // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
+        const timers = pointerIdleTimersRef.current;
+        if (timers[payload.senderId]) clearTimeout(timers[payload.senderId]);
+        timers[payload.senderId] = setTimeout(() => {
+          delete timers[payload.senderId];
+          setRemotePointers(prev => {
+            if (!prev[payload.senderId]) return prev;
+            const next = { ...prev };
+            delete next[payload.senderId];
+            return next;
+          });
+        }, POINTER_IDLE_HIDE_MS);
       })
       .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
+        const timers = pointerIdleTimersRef.current;
+        if (timers[payload.senderId]) { clearTimeout(timers[payload.senderId]); delete timers[payload.senderId]; }
         setRemotePointers(prev => {
           const next = { ...prev };
           delete next[payload.senderId];
@@ -583,6 +617,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         teacherNameRef.current = teacher?.name ?? null;
         if (!teacher) {
           setRemotePointers({});
+          Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
+          pointerIdleTimersRef.current = {};
+          if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
           const editor = editorRef.current;
           if (editor) {
             remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, []);
@@ -605,7 +642,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       });
 
     channelRef.current = channel;
-    return () => { channel.unsubscribe(); channelRef.current = null; };
+    return () => {
+      channel.unsubscribe();
+      channelRef.current = null;
+      Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
+      pointerIdleTimersRef.current = {};
+      if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
+    };
   }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
 
   const handleCodeChange = useCallback((newCode: string) => {

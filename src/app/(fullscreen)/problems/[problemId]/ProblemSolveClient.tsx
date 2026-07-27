@@ -50,6 +50,9 @@ type PresenceUser = { userId: string; name: string; role: string };
 const POINTER_IDLE_HIDE_MS = 3000;
 const CURSOR_IDLE_HIDE_MS = 3000;
 
+// 학생 화면에서는 선생님의 실제 이름(가입 시 입력값) 대신 항상 이 호칭으로 표시한다.
+const TEACHER_DISPLAY_NAME = '선생님';
+
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
@@ -260,8 +263,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [starterCode, setStarterCode] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [teacherOnline, setTeacherOnline] = useState(false);
-  const [teacherName, setTeacherName] = useState<string | null>(null);
-  const teacherNameRef = useRef<string | null>(null);
+  // 학생 화면에는 선생님 이름을 노출하지 않으므로 접속 여부(teacherOnline)만 있으면 된다.
   const [myInfo, setMyInfo] = useState<{ id: string; name: string } | null>(null);
   const [feedbacks, setFeedbacks] = useState<{ teacherName: string; content: string; createdAt: string }[]>([]);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
@@ -330,7 +332,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     const label = document.createElement('div');
     label.className = 'remote-cursor-label';
     label.style.backgroundColor = color;
-    label.textContent = name.length > 4 ? name.slice(0, 4) : name;
+    label.textContent = role === 'teacher' ? TEACHER_DISPLAY_NAME : (name.length > 4 ? name.slice(0, 4) : name);
     dom.appendChild(caret);
     dom.appendChild(label);
 
@@ -560,12 +562,12 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       })
       .on('broadcast', { event: 'cursor:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; position: { lineNumber: number; column: number } } }) => {
         if (payload.senderId === myInfo.id) return;
-        const displayName = teacherNameRef.current ?? payload.name;
-        updateRemoteCursor(displayName, payload.role, payload.position);
+        updateRemoteCursor(payload.name, payload.role, payload.position);
       })
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
         if (payload.senderId === myInfo.id) return;
-        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: payload.name, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
+        const pointerName = payload.role === 'teacher' ? TEACHER_DISPLAY_NAME : payload.name;
+        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: pointerName, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
         // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
         const timers = pointerIdleTimersRef.current;
         if (timers[payload.senderId]) clearTimeout(timers[payload.senderId]);
@@ -613,8 +615,6 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         const teacher = all.find(p => p.role === 'teacher');
         hasPeerRef.current = !!teacher;
         setTeacherOnline(!!teacher);
-        setTeacherName(teacher?.name ?? null);
-        teacherNameRef.current = teacher?.name ?? null;
         if (!teacher) {
           setRemotePointers({});
           Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
@@ -1014,10 +1014,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                 className="flex items-center justify-center rounded-full text-white font-bold"
                 style={{ width: 22, height: 22, fontSize: 11, backgroundColor: CURSOR_COLORS.teacher, flexShrink: 0 }}
               >
-                {(teacherName ?? '선').charAt(0)}
+                {TEACHER_DISPLAY_NAME.charAt(0)}
               </div>
               <span style={{ fontSize: '12px', fontWeight: 600, color: CURSOR_COLORS.teacher }}>
-                {teacherName ?? '선생님'} 접속 중
+                {TEACHER_DISPLAY_NAME} 접속 중
               </span>
               <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: CURSOR_COLORS.teacher }} />
             </div>

@@ -67,7 +67,8 @@ export async function GET() {
   const { data: submissions, error: subErr } = await db
     .from('submissions')
     .select('problem_id, status, user_id, elapsed_sec')
-    .in('problem_id', problemIds);
+    .in('problem_id', problemIds)
+    .in('status', ['pass', 'fail', 'partial']);
 
   if (subErr) return apiError('제출 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 

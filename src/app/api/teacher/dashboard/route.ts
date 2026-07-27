@@ -253,7 +253,8 @@ export async function GET(req: Request) {
   let submissionQuery = db
     .from('submissions')
     .select('user_id, problem_id, status, submitted_at')
-    .in('user_id', studentIds);
+    .in('user_id', studentIds)
+    .in('status', ['pass', 'fail', 'partial']);
   let aiFeedbackQuery = db
     .from('ai_feedbacks')
     .select('ai_feedback_patterns(error_category, pattern_type)')

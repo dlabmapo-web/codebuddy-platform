@@ -55,7 +55,8 @@ export async function GET(req: NextRequest) {
     db
       .from('submissions')
       .select('problem_id, status')
-      .eq('user_id', user.id),
+      .eq('user_id', user.id)
+      .in('status', ['pass', 'fail', 'partial']),
   ]);
 
   if (problemResult.error || submissionResult.error) {

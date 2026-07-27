@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
+import { validateTestCases } from '@/lib/judge/testCaseValidation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -61,6 +62,11 @@ export async function PATCH(req: Request, { params }: Params) {
     test_cases?: Array<{ input: string; expected_output: string; is_sample: boolean; is_hidden: boolean; order_no: number }>;
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
   };
+
+  if (test_cases !== undefined) {
+    const testCaseError = validateTestCases(test_cases);
+    if (testCaseError) return apiError(testCaseError, 'INVALID_TEST_CASES', 400);
+  }
 
   const db = supabaseAdmin();
 

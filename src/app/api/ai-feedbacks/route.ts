@@ -65,8 +65,8 @@ export async function POST(req: Request) {
   if (!submission || submission.user_id !== user.id || submission.problem_id !== problem_id) {
     return apiError('제출 내역을 찾을 수 없습니다.', 'NOT_FOUND', 404);
   }
-  if (submission.status === 'pass') {
-    return apiError('정답인 제출에는 AI 피드백을 제공하지 않습니다.', 'ALREADY_PASSED', 400);
+  if (submission.status !== 'fail' && submission.status !== 'partial') {
+    return apiError('오답 또는 일부 통과 제출에만 AI 피드백을 제공합니다.', 'FEEDBACK_NOT_AVAILABLE', 400);
   }
 
   const { data: problem } = await db

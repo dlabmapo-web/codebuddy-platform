@@ -67,7 +67,7 @@ type SubjectNode = {
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_COLOR: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#F0FDF4', color: '#15803D' },
-  medium: { bg: '#EFF6FF', color: '#1D4ED8' },
+  medium: { bg: 'var(--tint-soft)', color: '#1D4ED8' },
   hard: { bg: '#FFF1F2', color: '#BE123C' },
 };
 
@@ -112,13 +112,13 @@ function FilterSelect({
 }) {
   return (
     <label className="flex flex-col gap-1 min-w-0">
-      <span style={{ fontSize: '11px', fontWeight: 600, color: '#8A8F98' }}>{label}</span>
+      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-sub)' }}>{label}</span>
       <select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className="rounded-lg px-2.5 focus:outline-none disabled:opacity-50"
-        style={{ height: 34, border: '1px solid #E5E8EC', fontSize: '12px', color: '#16181D', minWidth: 128 }}
+        style={{ height: 34, border: '1px solid var(--color-border)', fontSize: '12px', color: 'var(--color-ink)', minWidth: 128 }}
       >
         <option value="">전체</option>
         {options.map((option) => (
@@ -266,11 +266,11 @@ export default function ProgressPage() {
   return (
     <div className="flex flex-col gap-5 min-w-0">
       <div>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>풀이 현황</h1>
-        <p style={{ fontSize: '13px', color: '#8A8F98', marginTop: 2 }}>학생별·문제별 제출 현황을 과목/단계/챕터 단위로 확인하세요.</p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-ink)' }}>풀이 현황</h1>
+        <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginTop: 2 }}>학생별·문제별 제출 현황을 과목/단계/챕터 단위로 확인하세요.</p>
       </div>
 
-      <div className="flex gap-1 bg-white rounded-xl p-1 w-fit" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex gap-1 bg-card rounded-xl p-1 w-fit" style={{ border: '1px solid var(--color-border)' }}>
         {(['student', 'problem'] as const).map(t => (
           <button
             key={t}
@@ -278,8 +278,8 @@ export default function ProgressPage() {
             style={{
               height: 34, padding: '0 16px', borderRadius: 8,
               fontSize: '13px', fontWeight: 600,
-              backgroundColor: tab === t ? '#1B64DA' : 'transparent',
-              color: tab === t ? '#FFFFFF' : '#5A6270',
+              backgroundColor: tab === t ? 'var(--color-primary)' : 'transparent',
+              color: tab === t ? 'white' : 'var(--color-sub)',
             }}
           >
             {t === 'student' ? '학생별' : '문제별'}
@@ -289,9 +289,9 @@ export default function ProgressPage() {
 
       {tab === 'student' ? (
         <div className="flex gap-4 min-w-0" style={{ minHeight: 480 }}>
-          <div className="bg-white rounded-xl overflow-hidden shrink-0" style={{ width: 176, border: '1px solid #E5E8EC' }}>
-            <div className="px-4 py-3" style={{ borderBottom: '1px solid #E5E8EC' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#8A8F98' }}>학생 목록</span>
+          <div className="bg-card rounded-xl overflow-hidden shrink-0" style={{ width: 176, border: '1px solid var(--color-border)' }}>
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)' }}>학생 목록</span>
             </div>
             {students.length === 0 ? (
               <p className="px-4 py-6 text-center" style={{ fontSize: '12px', color: '#BCC0C7' }}>학생 없음</p>
@@ -302,15 +302,15 @@ export default function ProgressPage() {
                   onClick={() => setSelectedStudent(s)}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
                   style={{
-                    borderLeft: selectedStudent?.id === s.id ? '3px solid #1B64DA' : '3px solid transparent',
-                    backgroundColor: selectedStudent?.id === s.id ? '#EFF6FF' : 'transparent',
+                    borderLeft: selectedStudent?.id === s.id ? '3px solid var(--color-primary)' : '3px solid transparent',
+                    backgroundColor: selectedStudent?.id === s.id ? 'var(--tint-soft)' : 'transparent',
                     fontSize: '13px', fontWeight: selectedStudent?.id === s.id ? 600 : 400,
-                    color: selectedStudent?.id === s.id ? '#1B64DA' : '#16181D',
+                    color: selectedStudent?.id === s.id ? 'var(--color-primary)' : 'var(--color-ink)',
                   }}
                 >
                   <div
                     className="rounded-full flex items-center justify-center shrink-0 font-semibold"
-                    style={{ width: 26, height: 26, fontSize: '11px', backgroundColor: selectedStudent?.id === s.id ? '#DBEAFE' : '#F3F4F6', color: '#1B64DA' }}
+                    style={{ width: 26, height: 26, fontSize: '11px', backgroundColor: selectedStudent?.id === s.id ? '#DBEAFE' : 'var(--color-muted)', color: 'var(--color-primary)' }}
                   >
                     {s.name.charAt(0)}
                   </div>
@@ -320,13 +320,13 @@ export default function ProgressPage() {
             )}
           </div>
 
-          <div className="flex-1 min-w-0 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
-            <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
+          <div className="flex-1 min-w-0 bg-card rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+            <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>
                 {selectedStudent ? `${selectedStudent.name}님의 제출 기록` : '학생을 선택하세요'}
               </span>
               {selectedStudent && (
-                <span style={{ fontSize: '12px', color: '#8A8F98' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                   총 {submissions.length}회 제출 · 정답 {submissions.filter(s => s.status === 'pass').length}회
                 </span>
               )}
@@ -334,11 +334,11 @@ export default function ProgressPage() {
 
             {!loading && allProblems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-2">
-                <FileCode2 size={32} style={{ color: '#E5E8EC' }} />
+                <FileCode2 size={32} style={{ color: 'var(--color-border)' }} />
                 <p style={{ fontSize: '14px', color: '#BCC0C7' }}>제출 기록이 없습니다</p>
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: '#F3F4F6', opacity: loading ? 0.4 : 1, transition: 'opacity 0.15s' }}>
+              <div className="divide-y" style={{ borderColor: 'var(--color-muted)', opacity: loading ? 0.4 : 1, transition: 'opacity 0.15s' }}>
                 {allProblems.map(([problemId, problem]) => {
                   const subs = (grouped[problemId] ?? []).sort(
                     (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
@@ -353,12 +353,12 @@ export default function ProgressPage() {
                     <div key={problemId}>
                       <button
                         onClick={() => toggleExpand(problemId)}
-                        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted transition-colors"
                       >
-                        {isExpanded ? <ChevronDown size={15} style={{ color: '#8A8F98', flexShrink: 0 }} /> : <ChevronRight size={15} style={{ color: '#8A8F98', flexShrink: 0 }} />}
+                        {isExpanded ? <ChevronDown size={15} style={{ color: 'var(--color-sub)', flexShrink: 0 }} /> : <ChevronRight size={15} style={{ color: 'var(--color-sub)', flexShrink: 0 }} />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>
                               {meta
                                 ? `${meta.chapter_order_no}-${meta.order_no}. ${problem?.title}`
                                 : `${problem?.problem_no}. ${problem?.title}`}
@@ -370,13 +370,13 @@ export default function ProgressPage() {
                             )}
                           </div>
                           {meta && (
-                            <p className="truncate mt-0.5" style={{ fontSize: '11px', color: '#8A8F98' }}>
+                            <p className="truncate mt-0.5" style={{ fontSize: '11px', color: 'var(--color-sub)' }}>
                               {meta.subject_title} / {meta.stage_title} / {meta.chapter_title}
                             </p>
                           )}
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
-                          <span style={{ fontSize: '12px', color: '#8A8F98' }}>{subs.length}회 제출</span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>{subs.length}회 제출</span>
                           {best && StatusIcon && (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: STATUS_CONFIG[best.status].bg }}>
                               <StatusIcon size={13} style={{ color: STATUS_CONFIG[best.status].color }} />
@@ -386,7 +386,7 @@ export default function ProgressPage() {
                             </div>
                           )}
                           {best?.elapsed_sec && (
-                            <span className="flex items-center gap-1" style={{ fontSize: '12px', color: '#8A8F98' }}>
+                            <span className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                               <Clock size={12} /> {formatElapsed(best.elapsed_sec)}
                             </span>
                           )}
@@ -394,28 +394,28 @@ export default function ProgressPage() {
                       </button>
 
                       {isExpanded && (
-                        <div style={{ backgroundColor: '#F9FAFB', borderTop: '1px solid #F3F4F6' }}>
+                        <div style={{ backgroundColor: 'var(--color-muted)', borderTop: '1px solid var(--color-muted)' }}>
                           {subs.map((sub, idx) => {
                             const cfg = STATUS_CONFIG[sub.status];
                             return (
                               <div
                                 key={sub.id}
                                 className="flex items-center gap-4 px-10 py-3 cursor-pointer hover:bg-blue-50 transition-colors"
-                                style={{ borderBottom: idx < subs.length - 1 ? '1px solid #F3F4F6' : 'none' }}
+                                style={{ borderBottom: idx < subs.length - 1 ? '1px solid var(--color-muted)' : 'none' }}
                                 onClick={() => setCodeModal({ sub, studentName: selectedStudent?.name ?? '' })}
                               >
                                 <cfg.Icon size={14} style={{ color: cfg.color, flexShrink: 0 }} />
                                 <span style={{ fontSize: '13px', fontWeight: 600, color: cfg.color, width: 72 }}>{cfg.label}</span>
-                                <span style={{ fontSize: '12px', color: '#8A8F98' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                                   {sub.passed_count}/{sub.total_count} 케이스
                                 </span>
                                 {sub.elapsed_sec && (
-                                  <span className="flex items-center gap-1" style={{ fontSize: '12px', color: '#8A8F98' }}>
+                                  <span className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                                     <Clock size={11} /> {formatElapsed(sub.elapsed_sec)}
                                   </span>
                                 )}
                                 <span style={{ fontSize: '12px', color: '#BCC0C7', marginLeft: 'auto' }}>{formatDate(sub.submitted_at)}</span>
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ fontSize: '11px', color: '#1B64DA', backgroundColor: '#EFF6FF', fontWeight: 600 }}>
+                                <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ fontSize: '11px', color: 'var(--color-primary)', backgroundColor: 'var(--tint-soft)', fontWeight: 600 }}>
                                   <FileCode2 size={11} /> 코드 보기
                                 </span>
                               </div>
@@ -460,13 +460,13 @@ export default function ProgressPage() {
               disabled={!subjectId && !stageId}
               onChange={setChapterId}
             />
-            <span style={{ fontSize: '12px', color: '#8A8F98', paddingBottom: 8 }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-sub)', paddingBottom: 8 }}>
               {filteredProblems.length}개 문제
             </span>
           </div>
 
           {groupedChapters.length === 0 ? (
-            <div className="bg-white rounded-xl flex flex-col items-center justify-center py-16" style={{ border: '1px solid #E5E8EC' }}>
+            <div className="bg-card rounded-xl flex flex-col items-center justify-center py-16" style={{ border: '1px solid var(--color-border)' }}>
               <p style={{ fontSize: '14px', color: '#BCC0C7' }}>표시할 문제가 없습니다</p>
             </div>
           ) : (
@@ -474,21 +474,21 @@ export default function ProgressPage() {
               {groupedChapters.map((group) => {
                 const collapsed = collapsedChapters.has(group.chapterId);
                 return (
-                  <div key={group.chapterId} className="bg-white rounded-xl overflow-hidden min-w-0" style={{ border: '1px solid #E5E8EC' }}>
+                  <div key={group.chapterId} className="bg-card rounded-xl overflow-hidden min-w-0" style={{ border: '1px solid var(--color-border)' }}>
                     <button
                       onClick={() => toggleChapter(group.chapterId)}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left"
-                      style={{ backgroundColor: '#F0F7FF', borderBottom: collapsed ? 'none' : '1px solid #E5E8EC' }}
+                      style={{ backgroundColor: 'var(--tint-soft)', borderBottom: collapsed ? 'none' : '1px solid var(--color-border)' }}
                     >
                       {collapsed
-                        ? <ChevronRight size={15} style={{ color: '#5A6270', flexShrink: 0 }} />
-                        : <ChevronDown size={15} style={{ color: '#5A6270', flexShrink: 0 }} />}
-                      <span className="flex items-center justify-center rounded-md shrink-0" style={{ width: 26, height: 26, backgroundColor: '#1B64DA', color: '#fff', fontSize: '12px', fontWeight: 700 }}>
+                        ? <ChevronRight size={15} style={{ color: 'var(--color-sub)', flexShrink: 0 }} />
+                        : <ChevronDown size={15} style={{ color: 'var(--color-sub)', flexShrink: 0 }} />}
+                      <span className="flex items-center justify-center rounded-md shrink-0" style={{ width: 26, height: 26, backgroundColor: 'var(--color-primary)', color: 'white', fontSize: '12px', fontWeight: 700 }}>
                         {group.chapterOrder}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#16181D' }}>{group.chapterTitle}</div>
-                        <div className="truncate" style={{ fontSize: '11px', color: '#8A8F98', marginTop: 1 }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-ink)' }}>{group.chapterTitle}</div>
+                        <div className="truncate" style={{ fontSize: '11px', color: 'var(--color-sub)', marginTop: 1 }}>
                           {group.subjectTitle} / {group.stageTitle} · {group.problems.length}문제
                         </div>
                       </div>
@@ -507,9 +507,9 @@ export default function ProgressPage() {
                             <col style={{ width: 110 }} />
                           </colgroup>
                           <thead>
-                            <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E8EC' }}>
+                            <tr style={{ backgroundColor: 'var(--color-muted)', borderBottom: '1px solid var(--color-border)' }}>
                               {['번호', '문제', '난이도', '응시 학생', '제출 수', '정답률', '평균 소요'].map((col) => (
-                                <th key={col} className="px-3 py-2.5 text-left whitespace-nowrap" style={{ fontSize: '11px', fontWeight: 600, color: '#8A8F98' }}>
+                                <th key={col} className="px-3 py-2.5 text-left whitespace-nowrap" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-sub)' }}>
                                   {col}
                                 </th>
                               ))}
@@ -517,12 +517,12 @@ export default function ProgressPage() {
                           </thead>
                           <tbody>
                             {group.problems.map((p, idx) => (
-                              <tr key={p.id} style={{ borderBottom: idx < group.problems.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 700, color: '#8A8F98', fontFamily: 'monospace' }}>
+                              <tr key={p.id} style={{ borderBottom: idx < group.problems.length - 1 ? '1px solid var(--color-muted)' : 'none' }}>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-sub)', fontFamily: 'monospace' }}>
                                   {p.chapter_order_no}-{p.order_no}
                                 </td>
                                 <td className="px-3 py-3 min-w-0">
-                                  <span className="block truncate" style={{ fontSize: '13px', fontWeight: 500, color: '#16181D' }} title={p.title}>
+                                  <span className="block truncate" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)' }} title={p.title}>
                                     {p.title}
                                   </span>
                                 </td>
@@ -531,24 +531,24 @@ export default function ProgressPage() {
                                     {DIFF_LABEL[p.difficulty]}
                                   </span>
                                 </td>
-                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: '#16181D' }}>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
                                   {p.student_count}명
                                 </td>
-                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: '#16181D' }}>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
                                   {p.submission_count}회
                                 </td>
                                 <td className="px-3 py-3">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className="rounded-full overflow-hidden shrink-0" style={{ width: 56, height: 5, backgroundColor: '#E5E8EC' }}>
+                                    <div className="rounded-full overflow-hidden shrink-0" style={{ width: 56, height: 5, backgroundColor: 'var(--color-border)' }}>
                                       <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${p.pass_rate}%`, backgroundColor: p.pass_rate >= 70 ? '#16A34A' : p.pass_rate >= 40 ? '#1B64DA' : '#DC2626' }}
+                                        style={{ width: `${p.pass_rate}%`, backgroundColor: p.pass_rate >= 70 ? '#16A34A' : p.pass_rate >= 40 ? 'var(--color-primary)' : '#DC2626' }}
                                       />
                                     </div>
-                                    <span className="whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 600, color: '#16181D' }}>{p.pass_rate}%</span>
+                                    <span className="whitespace-nowrap" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink)' }}>{p.pass_rate}%</span>
                                   </div>
                                 </td>
-                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', color: '#8A8F98' }}>
+                                <td className="px-3 py-3 whitespace-nowrap" style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                                   {formatElapsed(p.avg_elapsed_sec)}
                                 </td>
                               </tr>
@@ -567,18 +567,18 @@ export default function ProgressPage() {
 
       {codeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="bg-white rounded-2xl flex flex-col overflow-hidden" style={{ width: '60vw', height: '80vh', maxWidth: 900 }}>
-            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC', flexShrink: 0 }}>
+          <div className="bg-card rounded-2xl flex flex-col overflow-hidden" style={{ width: '60vw', height: '80vh', maxWidth: 900 }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
               <div className="flex items-center gap-3 min-w-0">
-                <FileCode2 size={18} style={{ color: '#1B64DA' }} />
+                <FileCode2 size={18} style={{ color: 'var(--color-primary)' }} />
                 <div className="min-w-0">
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#16181D' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-ink)' }}>
                     {codeModal.sub.problems?.problem_no}. {codeModal.sub.problems?.title}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span style={{ fontSize: '12px', color: '#8A8F98' }}>{codeModal.studentName}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>{codeModal.studentName}</span>
                     <span style={{ fontSize: '11px', color: '#BCC0C7' }}>·</span>
-                    <span style={{ fontSize: '12px', color: '#8A8F98' }}>{formatDate(codeModal.sub.submitted_at)}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>{formatDate(codeModal.sub.submitted_at)}</span>
                     <span style={{ fontSize: '11px', color: '#BCC0C7' }}>·</span>
                     {(() => {
                       const cfg = STATUS_CONFIG[codeModal.sub.status];
@@ -593,8 +593,8 @@ export default function ProgressPage() {
               </div>
               <button
                 onClick={() => setCodeModal(null)}
-                className="flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100 shrink-0"
-                style={{ width: 32, height: 32, color: '#8A8F98' }}
+                className="flex items-center justify-center rounded-lg transition-colors hover:bg-muted shrink-0"
+                style={{ width: 32, height: 32, color: 'var(--color-sub)' }}
               >
                 <X size={16} />
               </button>

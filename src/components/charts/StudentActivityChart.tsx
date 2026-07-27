@@ -21,7 +21,7 @@ export default function StudentActivityChart({ data }: { data: StudentActivityPo
           <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
           <XAxis dataKey="name" tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} tickLine={false} axisLine={false} />
           <YAxis allowDecimals={false} tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} tickLine={false} axisLine={false} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#F6F7F9' }} />
+          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'var(--color-surface)' }} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} />
           <Bar dataKey="submissionCount" name="제출 수" fill={CHART_COLORS.primaryLight} radius={[4, 4, 0, 0]} maxBarSize={24} />
           <Bar dataKey="solvedCount" name="해결 문제" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} maxBarSize={24} />

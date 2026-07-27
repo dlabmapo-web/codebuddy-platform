@@ -16,14 +16,14 @@ export function AiFeedbackPanel({
 }) {
   return (
     <div
-      className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg overflow-hidden"
-      style={{ width: 360, maxHeight: 420, overflowY: 'auto', zIndex: 50, border: '1px solid #E5E8EC' }}
+      className="absolute right-0 top-full mt-1 bg-card rounded-2xl shadow-lg overflow-hidden"
+      style={{ width: 360, maxHeight: 420, overflowY: 'auto', zIndex: 50, border: '1px solid var(--color-border)' }}
     >
       <div
         className="px-4 py-3 flex items-center justify-between"
-        style={{ borderBottom: '1px solid #E5E8EC', position: 'sticky', top: 0, backgroundColor: '#FFFFFF' }}
+        style={{ borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: 'var(--color-card)' }}
       >
-        <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>
+        <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-ink)' }}>
           <Sparkles size={14} style={{ color: ACCENT }} /> AI 피드백
         </span>
         <button onClick={onClose} className="flex items-center justify-center rounded" style={{ width: 24, height: 24, color: '#BCC0C7' }}>
@@ -34,13 +34,13 @@ export function AiFeedbackPanel({
       {loading && (
         <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: feedbacks.length > 0 ? `1px solid ${ACCENT_BG}` : 'none' }}>
           <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: ACCENT, borderTopColor: 'transparent' }} />
-          <span style={{ fontSize: '13px', color: '#5A6270' }}>AI가 코드를 분석하고 있어요...</span>
+          <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>AI가 코드를 분석하고 있어요...</span>
         </div>
       )}
 
       {feedbacks.length === 0 && !loading ? (
         <div className="px-4 py-8 text-center">
-          <p style={{ fontSize: '13px', color: '#8A8F98' }}>아직 AI 피드백이 없습니다.</p>
+          <p style={{ fontSize: '13px', color: 'var(--color-sub)' }}>아직 AI 피드백이 없습니다.</p>
           <p style={{ fontSize: '12px', color: '#BCC0C7', marginTop: 4 }}>오답을 제출하면 AI가 코드를 분석해드려요.</p>
         </div>
       ) : (
@@ -55,7 +55,7 @@ export function AiFeedbackPanel({
                 {new Date(fb.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>
           </div>
         ))
       )}

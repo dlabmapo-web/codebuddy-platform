@@ -14,7 +14,7 @@ type Tab = 'name' | 'password';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#16181D', marginBottom: 6 }}>
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', marginBottom: 6 }}>
       {children}
     </label>
   );
@@ -46,13 +46,13 @@ function TextInput({
         className="w-full px-3 rounded-lg outline-none transition-colors"
         style={{
           height: 40,
-          border: '1px solid #E5E8EC',
+          border: '1px solid var(--color-border)',
           fontSize: '14px',
-          color: '#16181D',
+          color: 'var(--color-ink)',
           paddingRight: suffix ? 40 : 12,
         }}
-        onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-        onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+        onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+        onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
       />
       {suffix && (
         <span className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</span>
@@ -66,7 +66,7 @@ function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) 
     <button
       type="button"
       onClick={onToggle}
-      style={{ color: '#5A6270', lineHeight: 0 }}
+      style={{ color: 'var(--color-sub)', lineHeight: 0 }}
       tabIndex={-1}
     >
       {show ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -173,13 +173,13 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
       onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
     >
       <div
-        className="bg-white w-full max-w-sm mx-4"
+        className="bg-card w-full max-w-sm mx-4"
         style={{ borderRadius: 12, boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
-          <span style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>내 정보 변경</span>
-          <button onClick={onClose} style={{ color: '#5A6270', lineHeight: 0 }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }}>내 정보 변경</span>
+          <button onClick={onClose} style={{ color: 'var(--color-sub)', lineHeight: 0 }}>
             <X size={18} />
           </button>
         </div>
@@ -195,8 +195,8 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
                 height: 34,
                 fontSize: '13px',
                 fontWeight: 600,
-                backgroundColor: tab === t ? '#EAF1FD' : 'transparent',
-                color: tab === t ? '#1B64DA' : '#5A6270',
+                backgroundColor: tab === t ? 'var(--color-primary-light)' : 'transparent',
+                color: tab === t ? 'var(--color-primary)' : 'var(--color-sub)',
               }}
             >
               {t === 'name' ? '이름 변경' : '비밀번호 변경'}
@@ -258,7 +258,7 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
           {error && (
             <div
               className="px-3 py-2 rounded-lg"
-              style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}
+              style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid #FECACA' }}
             >
               <span style={{ fontSize: '13px', color: '#DC2626' }}>{error}</span>
             </div>
@@ -282,8 +282,8 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
                 height: 38,
                 fontSize: '13px',
                 fontWeight: 500,
-                border: '1px solid #E5E8EC',
-                color: '#5A6270',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-sub)',
               }}
             >
               닫기
@@ -296,10 +296,10 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
                 height: 38,
                 fontSize: '13px',
                 fontWeight: 600,
-                backgroundColor: '#1B64DA',
+                backgroundColor: 'var(--color-primary)',
               }}
-              onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+              onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
             >
               {loading ? '저장 중...' : '저장'}
             </button>

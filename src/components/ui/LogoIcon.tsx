@@ -4,7 +4,7 @@ interface LogoIconProps {
   strokeWidth?: number;
 }
 
-export function LogoIcon({ size = 24, color = '#FFFFFF', strokeWidth = 2 }: LogoIconProps) {
+export function LogoIcon({ size = 24, color = 'var(--color-card)', strokeWidth = 2 }: LogoIconProps) {
   return (
     <svg
       width={size}
@@ -49,11 +49,11 @@ export function LogoBadge({ size = 28 }: { size?: number }) {
       style={{
         width: size,
         height: size,
-        backgroundColor: '#1B64DA',
+        backgroundColor: 'var(--color-primary)',
         borderRadius: 7,
       }}
     >
-      <LogoIcon size={Math.round(size * 0.7)} color="#FFFFFF" strokeWidth={2} />
+      <LogoIcon size={Math.round(size * 0.7)} color="var(--color-card)" strokeWidth={2} />
     </span>
   );
 }

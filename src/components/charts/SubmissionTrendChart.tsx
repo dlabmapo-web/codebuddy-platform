@@ -21,7 +21,7 @@ export default function SubmissionTrendChart({ data }: { data: SubmissionTrendPo
           <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
           <XAxis dataKey="label" tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={18} />
           <YAxis allowDecimals={false} tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} tickLine={false} axisLine={false} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#F6F7F9' }} />
+          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'var(--color-surface)' }} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: CHART_COLORS.axis }} />
           <Bar dataKey="pass" name="정답" stackId="submissions" fill={CHART_COLORS.success} radius={[0, 0, 3, 3]} maxBarSize={32} />
           <Bar dataKey="fail" name="오답" stackId="submissions" fill={CHART_COLORS.danger} radius={[3, 3, 0, 0]} maxBarSize={32} />

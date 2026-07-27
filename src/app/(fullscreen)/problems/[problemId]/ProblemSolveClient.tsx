@@ -18,12 +18,13 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
     <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: '#1E1E1E' }}>
-      <span style={{ fontSize: '13px', color: '#5A6270' }}>에디터 로딩 중...</span>
+      <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>에디터 로딩 중...</span>
     </div>
   ),
 });
@@ -56,7 +57,7 @@ const TEACHER_DISPLAY_NAME = '선생님';
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
-  medium: { bg: '#EAF1FD', color: '#1450B5' },
+  medium: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
@@ -164,7 +165,7 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className={`bg-white rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-card rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-center mb-5">
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
             {isPass
@@ -175,34 +176,34 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
         <h2 className="text-center mb-1" style={{ fontSize: '20px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>
           {isPass ? '정답입니다!' : result.status === 'partial' ? '일부 통과' : '오답입니다'}
         </h2>
-        <p className="text-center mb-5" style={{ fontSize: '13px', color: '#5A6270' }}>{result.attemptNo}번째 제출</p>
-        <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
+        <p className="text-center mb-5" style={{ fontSize: '13px', color: 'var(--color-sub)' }}>{result.attemptNo}번째 제출</p>
+        <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           <div className="text-center">
-            <div style={{ fontSize: '11px', color: '#5A6270', marginBottom: 2 }}>채점 결과</div>
+            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>채점 결과</div>
             <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{isPass ? '정답' : '오답'}</div>
           </div>
-          <div style={{ width: 1, backgroundColor: '#E5E8EC' }} />
+          <div style={{ width: 1, backgroundColor: 'var(--color-border)' }} />
           <div className="text-center">
-            <div style={{ fontSize: '11px', color: '#5A6270', marginBottom: 2 }}>풀이 시간</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: '#16181D' }}>{timeLabel}</div>
+            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>풀이 시간</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-ink)' }}>{timeLabel}</div>
           </div>
         </div>
         {!isPass && !showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#FFF5F5', border: '1px solid #FCA5A5' }}>
+          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--tint-danger-line)' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>출력이 정답과 달라요</div>
-            <div style={{ fontSize: '13px', color: '#5A6270' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
+            <div style={{ fontSize: '13px', color: 'var(--color-sub)' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
             <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
           </div>
         )}
         {showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: '#EEF2FF', border: '1px solid #C7D2FE' }}>
+          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-accent)', border: '1px solid var(--tint-accent-line)' }}>
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles size={14} style={{ color: '#4F46E5' }} className="flex-shrink-0" />
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5' }}>AI 피드백</span>
             </div>
             {aiFeedbackContent ? (
               <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{aiFeedbackContent}</p>
+                <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{aiFeedbackContent}</p>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -215,7 +216,7 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
         )}
         {isPass ? (
           <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>닫기</button>
+            <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>닫기</button>
             <Link
               href={nextProblemId
                 ? `/problems/${nextProblemId}`
@@ -223,15 +224,15 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
                   ? `/problems?stage=${stageId}`
                   : '/problems'}
               className="flex-1 rounded-xl text-white flex items-center justify-center"
-              style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+              style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
             >
               {nextProblemId ? '다음 문제 풀기' : '목록으로'}
             </Link>
           </div>
         ) : (
           <div className="flex gap-2">
-            <button onClick={onHint} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>힌트 보기</button>
-            <button onClick={onRetry} className="flex-1 rounded-xl text-white" style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}>다시 풀기</button>
+            <button onClick={onHint} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>힌트 보기</button>
+            <button onClick={onRetry} className="flex-1 rounded-xl text-white" style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}>다시 풀기</button>
           </div>
         )}
       </div>
@@ -966,17 +967,17 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
   if (loadError) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: '#F6F7F9' }}>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>문제를 불러올 수 없습니다</p>
-        <Link href="/problems" style={{ fontSize: '14px', color: '#1B64DA' }}>목록으로 돌아가기</Link>
+      <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: 'var(--color-surface)' }}>
+        <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }}>문제를 불러올 수 없습니다</p>
+        <Link href="/problems" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>목록으로 돌아가기</Link>
       </div>
     );
   }
 
   if (!problem) {
     return (
-      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#F6F7F9' }}>
-        <span style={{ fontSize: '14px', color: '#5A6270' }}>문제 불러오는 중...</span>
+      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'var(--color-surface)' }}>
+        <span style={{ fontSize: '14px', color: 'var(--color-sub)' }}>문제 불러오는 중...</span>
       </div>
     );
   }
@@ -984,32 +985,32 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const sampleCases = problem.test_cases.filter((tc) => tc.is_sample);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#F6F7F9' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-white" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
-        <Link href="/problems" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[#F6F7F9]" style={{ color: '#5A6270', fontSize: '13px' }}>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-surface)' }}>
+      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
+        <Link href="/problems" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 목록
         </Link>
-        <div style={{ width: 1, height: 20, backgroundColor: '#E5E8EC' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 
         <div className="flex items-center gap-2">
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>{problem.problem_no}. {problem.title}</span>
+          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
           <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[problem.difficulty].bg, color: DIFF_STYLE[problem.difficulty].color }}>
             {DIFF_LABEL[problem.difficulty]}
           </span>
         </div>
 
         <div className="flex-1 flex justify-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
-            <Clock size={14} style={{ color: '#5A6270' }} />
-            <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', fontFamily: 'monospace' }}>{timeStr}</span>
+          <div className="flex items-center gap-2 px-3 py-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <Clock size={14} style={{ color: 'var(--color-sub)' }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', fontFamily: 'monospace' }}>{timeStr}</span>
           </div>
           {attemptCount > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg" style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}>
-              <span style={{ fontSize: '12px', color: '#5A6270' }}>제출 {attemptCount}회</span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>제출 {attemptCount}회</span>
             </div>
           )}
           {teacherOnline && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#F5F3FF', border: '1px solid #C4B5FD' }}>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--tint-accent)', border: '1px solid var(--tint-accent-line)' }}>
               <div
                 className="flex items-center justify-center rounded-full text-white font-bold"
                 style={{ width: 22, height: 22, fontSize: 11, backgroundColor: CURSOR_COLORS.teacher, flexShrink: 0 }}
@@ -1030,19 +1031,19 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               <button
                 onClick={() => setFeedbackPanelOpen(o => !o)}
                 className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
-                style={{ height: 32, border: `1px solid ${CURSOR_COLORS.teacher}`, backgroundColor: feedbackPanelOpen ? '#F5F3FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: CURSOR_COLORS.teacher }}
+                style={{ height: 32, border: `1px solid ${CURSOR_COLORS.teacher}`, backgroundColor: feedbackPanelOpen ? 'var(--tint-accent)' : 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: CURSOR_COLORS.teacher }}
               >
                 <MessageSquare size={14} /> 피드백
                 <span className="flex items-center justify-center rounded-full text-white" style={{ width: 18, height: 18, fontSize: 10, backgroundColor: CURSOR_COLORS.teacher }}>{feedbacks.length}</span>
               </button>
               {feedbackPanelOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg overflow-hidden" style={{ width: 340, maxHeight: 400, overflowY: 'auto', zIndex: 50, border: `1px solid #E5E8EC` }}>
-                  <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC', position: 'sticky', top: 0, backgroundColor: '#FFFFFF' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>선생님 피드백</span>
+                <div className="absolute right-0 top-full mt-1 bg-card rounded-2xl shadow-lg overflow-hidden" style={{ width: 340, maxHeight: 400, overflowY: 'auto', zIndex: 50, border: `1px solid var(--color-border)` }}>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: 'var(--color-card)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-ink)' }}>선생님 피드백</span>
                     <button onClick={() => setFeedbackPanelOpen(false)} className="flex items-center justify-center rounded" style={{ width: 24, height: 24, color: '#BCC0C7' }}><X size={14} /></button>
                   </div>
                   {feedbacks.map((fb, i) => (
-                    <div key={i} style={{ padding: '12px 16px', borderBottom: i < feedbacks.length - 1 ? '1px solid #F5F3FF' : 'none' }}>
+                    <div key={i} style={{ padding: '12px 16px', borderBottom: i < feedbacks.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{ width: 22, height: 22, fontSize: 11, backgroundColor: CURSOR_COLORS.teacher }}>
                           {fb.teacherName.charAt(0)}
@@ -1052,7 +1053,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                           {new Date(fb.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>
+                      <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>
                     </div>
                   ))}
                 </div>
@@ -1064,7 +1065,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               <button
                 onClick={() => setAiFeedbackPanelOpen((o) => !o)}
                 className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
-                style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? '#EEF2FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
+                style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? 'var(--tint-accent)' : 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
               >
                 <Sparkles size={14} /> AI 피드백
                 {aiFeedbacks.length > 0 && (
@@ -1077,70 +1078,71 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               )}
             </div>
           )}
-          <button onClick={() => setCode(starterCode)} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[#F6F7F9]" style={{ fontSize: '12px', color: '#5A6270', border: '1px solid #E5E8EC', height: 32 }}>
+          <button onClick={() => setCode(starterCode)} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ fontSize: '12px', color: 'var(--color-sub)', border: '1px solid var(--color-border)', height: 32 }}>
             <RotateCcw size={12} /> 초기화
           </button>
-          <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50" style={{ height: 36, border: '1px solid #E5E8EC', backgroundColor: '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#16181D' }}>
+          <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50" style={{ height: 36, border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
             <Play size={14} /> 실행
           </button>
-          <button onClick={handleSubmit} disabled={isRunning} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:opacity-50" style={{ height: 36, backgroundColor: '#1B64DA', fontSize: '13px', fontWeight: 600 }}
-            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+          <button onClick={handleSubmit} disabled={isRunning} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:opacity-50" style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
           >
             <Send size={14} /> 제출
           </button>
         </div>
+        <ThemeToggle />
       </header>
 
       <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-white overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
+        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
           <div className="p-5">
-            <div className="flex gap-5 mb-5 pb-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
+            <div className="flex gap-5 mb-5 pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <div>
-                <span style={{ fontSize: '11px', color: '#5A6270', display: 'block' }}>실행 제한</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>{problem.time_limit_ms / 1000}초</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>실행 제한</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.time_limit_ms / 1000}초</span>
               </div>
               <div>
-                <span style={{ fontSize: '11px', color: '#5A6270', display: 'block' }}>언어</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>Python 3</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>언어</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>Python 3</span>
               </div>
             </div>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>문제</h3>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
             <div
                 className="tiptap-render"
-                style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, marginBottom: 20 }}
+                style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 20 }}
                 dangerouslySetInnerHTML={{ __html: problem.description }}
               />
 
             {problem.input_format && (
               <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>입력</h3>
-                <p style={{ fontSize: '13px', color: '#5A6270', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력</h3>
+                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
               </>
             )}
             {problem.output_format && (
               <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>출력</h3>
-                <p style={{ fontSize: '13px', color: '#5A6270', marginBottom: 20, lineHeight: 1.6 }}>{problem.output_format}</p>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력</h3>
+                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 20, lineHeight: 1.6 }}>{problem.output_format}</p>
               </>
             )}
 
             {sampleCases.length > 0 && (
               <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 10 }}>예제</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 10 }}>예제</h3>
                 <div className="flex flex-col gap-4 mb-5">
                   {sampleCases.map((tc, i) => (
                     <div key={tc.id} className="flex gap-3">
                       {tc.input && (
                         <div className="flex-1">
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>예제 입력 {i + 1}</div>
-                          <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>{tc.input}</div>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 입력 {i + 1}</div>
+                          <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.input}</div>
                         </div>
                       )}
                       <div className="flex-1">
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>예제 출력 {i + 1}</div>
-                        <div className="p-3 rounded-lg" style={{ backgroundColor: '#1E1E1E', fontFamily: 'monospace', fontSize: '12px', color: '#D4D4D4', whiteSpace: 'pre' }}>{tc.expected_output}</div>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 출력 {i + 1}</div>
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.expected_output}</div>
                       </div>
                     </div>
                   ))}
@@ -1150,12 +1152,12 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
             {problem.constraint_text && (
               <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>제약 조건</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>제약 조건</h3>
                 <ul className="flex flex-col gap-1.5">
                   {problem.constraint_text.split('\n').filter(Boolean).map((c, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <span style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#5A6270', display: 'inline-block', flexShrink: 0, marginTop: 6 }} />
-                      <span style={{ fontSize: '13px', color: '#5A6270', fontFamily: 'monospace' }}>{c.replace(/^[•·\-]\s*/, '')}</span>
+                      <span style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: 'var(--color-sub)', display: 'inline-block', flexShrink: 0, marginTop: 6 }} />
+                      <span style={{ fontSize: '13px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>{c.replace(/^[•·\-]\s*/, '')}</span>
                     </li>
                   ))}
                 </ul>
@@ -1164,7 +1166,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           </div>
         </div>
 
-        <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: '#E5E8EC' }} onMouseDown={handleMouseDown} />
+        <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: 'var(--color-border)' }} onMouseDown={handleMouseDown} />
 
         <div
           ref={editorPaneRef}
@@ -1173,27 +1175,27 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           onMouseLeave={handlePaneMouseLeave}
         >
           <PointerOverlay pointers={remotePointers} />
-          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E8EC' }}>
-            <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
+          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+              <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
                 <button
                   onClick={() => setEditorFontSize(s => Math.max(10, s - 1))}
-                  className="flex items-center justify-center transition-colors hover:bg-[#F6F7F9]"
-                  style={{ width: 28, height: 28, fontSize: '16px', color: '#5A6270', fontWeight: 600 }}
+                  className="flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                  style={{ width: 28, height: 28, fontSize: '16px', color: 'var(--color-sub)', fontWeight: 600 }}
                   title="글자 크기 줄이기"
                 >−</button>
-                <span style={{ fontSize: '12px', color: '#5A6270', minWidth: 28, textAlign: 'center', lineHeight: '28px', borderLeft: '1px solid #E5E8EC', borderRight: '1px solid #E5E8EC' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-sub)', minWidth: 28, textAlign: 'center', lineHeight: '28px', borderLeft: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}>
                   {editorFontSize}
                 </span>
                 <button
                   onClick={() => setEditorFontSize(s => Math.min(24, s + 1))}
-                  className="flex items-center justify-center transition-colors hover:bg-[#F6F7F9]"
-                  style={{ width: 28, height: 28, fontSize: '16px', color: '#5A6270', fontWeight: 600 }}
+                  className="flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                  style={{ width: 28, height: 28, fontSize: '16px', color: 'var(--color-sub)', fontWeight: 600 }}
                   title="글자 크기 키우기"
                 >+</button>
               </div>
-              <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[#F6F7F9]" style={{ height: 32, fontSize: '13px', color: '#5A6270' }}>
+              <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}>
                 <Lightbulb size={14} /> 힌트 보기
               </button>
             </div>
@@ -1235,7 +1237,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                     fontWeight: 600,
                     color: terminalTab === 'terminal' ? '#D4D4D4' : '#8C8C8C',
                     backgroundColor: terminalTab === 'terminal' && terminalOpen ? '#1E1E1E' : 'transparent',
-                    borderBottom: terminalTab === 'terminal' && terminalOpen ? '2px solid #1B64DA' : '2px solid transparent',
+                    borderBottom: terminalTab === 'terminal' && terminalOpen ? '2px solid var(--color-primary)' : '2px solid transparent',
                   }}
                 >
                   터미널

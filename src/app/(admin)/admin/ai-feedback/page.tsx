@@ -23,7 +23,7 @@ const EMPTY_FORM: PatternForm = {
 };
 
 const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
-  for: { bg: '#EAF1FD', color: '#1450B5' },
+  for: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   while: { bg: '#F3E8FF', color: '#7C3AED' },
 };
 
@@ -47,11 +47,11 @@ function Toast({ message, type }: { message: string; type: 'ok' | 'err' }) {
 function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onCancel}>
-      <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>패턴 삭제</h3>
-        <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>이 AI 피드백 기준을 삭제하시겠습니까?</p>
+      <div className="bg-card rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-ink)', marginBottom: 8 }}>패턴 삭제</h3>
+        <p style={{ fontSize: '14px', color: 'var(--color-sub)', marginBottom: 20 }}>이 AI 피드백 기준을 삭제하시겠습니까?</p>
         <div className="flex gap-2">
-          <button onClick={onCancel} className="flex-1 rounded-lg transition-colors" style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+          <button onClick={onCancel} className="flex-1 rounded-lg transition-colors" style={{ height: 40, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>취소</button>
           <button
             onClick={onConfirm}
             className="flex-1 rounded-lg text-white transition-colors"
@@ -81,25 +81,25 @@ function PatternModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
       <div
-        className="bg-white rounded-2xl w-full mx-4 flex flex-col"
+        className="bg-card rounded-2xl w-full mx-4 flex flex-col"
         style={{ maxWidth: 560, maxHeight: '88vh', boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-5 flex-shrink-0" style={{ borderBottom: '1px solid #E5E8EC' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#16181D' }}>
+        <div className="flex items-center justify-between px-6 py-5 flex-shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-ink)' }}>
             {initial ? 'AI 피드백 기준 수정' : '새 AI 피드백 기준'}
           </h3>
-          <button onClick={onClose} className="flex items-center justify-center rounded-xl transition-colors hover:bg-[#F6F7F9]" style={{ width: 32, height: 32 }}>
-            <X size={16} style={{ color: '#5A6270' }} />
+          <button onClick={onClose} className="flex items-center justify-center rounded-xl transition-colors hover:bg-[var(--color-surface)]" style={{ width: 32, height: 32 }}>
+            <X size={16} style={{ color: 'var(--color-sub)' }} />
           </button>
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-4 overflow-auto">
           <div>
-            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>유형 <span style={{ color: '#DC2626' }}>*</span></label>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-sub)' }}>유형 <span style={{ color: '#DC2626' }}>*</span></label>
             <input
               className="w-full px-3 rounded-lg focus:outline-none"
-              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              style={{ height: 42, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
               placeholder="예) for, while, 조건문, 리스트, 함수"
               list="ai-feedback-pattern-types"
               value={form.pattern_type}
@@ -108,14 +108,14 @@ function PatternModal({
             <datalist id="ai-feedback-pattern-types">
               {typeOptions.map((type) => <option key={type} value={type} />)}
             </datalist>
-            <p style={{ fontSize: '12px', color: '#8A8F98', marginTop: 6 }}>기존 유형을 선택하거나 새로운 유형을 직접 입력할 수 있습니다.</p>
+            <p style={{ fontSize: '12px', color: 'var(--color-sub)', marginTop: 6 }}>기존 유형을 선택하거나 새로운 유형을 직접 입력할 수 있습니다.</p>
           </div>
 
           <div>
-            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>오류 분류 <span style={{ color: '#DC2626' }}>*</span></label>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-sub)' }}>오류 분류 <span style={{ color: '#DC2626' }}>*</span></label>
             <input
               className="w-full px-3 rounded-lg focus:outline-none"
-              style={{ height: 42, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
+              style={{ height: 42, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
               placeholder="예) 논리오류(범위), 문법오류, 자료형오류"
               value={form.error_category}
               onChange={(e) => setForm((f) => ({ ...f, error_category: e.target.value }))}
@@ -123,10 +123,10 @@ function PatternModal({
           </div>
 
           <div>
-            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>판단 기준 <span style={{ color: '#DC2626' }}>*</span></label>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-sub)' }}>판단 기준 <span style={{ color: '#DC2626' }}>*</span></label>
             <textarea
               className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-              style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
+              style={{ border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.6 }}
               rows={3}
               placeholder="이 오류로 판단할 코드 패턴을 문제와 무관하게 서술하세요."
               value={form.criteria}
@@ -135,10 +135,10 @@ function PatternModal({
           </div>
 
           <div>
-            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>예시 코드 (선택)</label>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-sub)' }}>예시 코드 (선택)</label>
             <textarea
               className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-              style={{ border: '1px solid #2D2D2D', backgroundColor: '#1E1E1E', color: '#D4D4D4', fontSize: '13px', fontFamily: 'monospace', lineHeight: 1.6 }}
+              style={{ border: '1px solid var(--code-border)', backgroundColor: 'var(--code-bg)', color: 'var(--code-fg)', fontSize: '13px', fontFamily: 'monospace', lineHeight: 1.6 }}
               rows={5}
               placeholder="이 오류를 보여주는 예시 코드"
               value={form.example_code}
@@ -147,10 +147,10 @@ function PatternModal({
           </div>
 
           <div>
-            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#5A6270' }}>튜터 피드백 <span style={{ color: '#DC2626' }}>*</span></label>
+            <label className="block mb-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-sub)' }}>튜터 피드백 <span style={{ color: '#DC2626' }}>*</span></label>
             <textarea
               className="w-full px-3 py-2.5 rounded-lg focus:outline-none resize-none"
-              style={{ border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D', lineHeight: 1.6 }}
+              style={{ border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.6 }}
               rows={3}
               placeholder="이 오류에 해당할 때 학생에게 전달할 피드백 문구"
               value={form.tutor_feedback}
@@ -160,18 +160,18 @@ function PatternModal({
 
           <label className="flex items-center gap-2 cursor-pointer w-fit">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="w-4 h-4 accent-primary" />
-            <span style={{ fontSize: '14px', color: '#16181D' }}>사용 중</span>
-            <span style={{ fontSize: '12px', color: '#8A8F98' }}>(끄면 AI 채점 시 이 기준을 사용하지 않습니다)</span>
+            <span style={{ fontSize: '14px', color: 'var(--color-ink)' }}>사용 중</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>(끄면 AI 채점 시 이 기준을 사용하지 않습니다)</span>
           </label>
         </div>
 
-        <div className="flex gap-2 px-6 py-5 flex-shrink-0" style={{ borderTop: '1px solid #E5E8EC' }}>
-          <button onClick={onClose} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid #E5E8EC', fontSize: '14px', fontWeight: 600, color: '#16181D' }}>취소</button>
+        <div className="flex gap-2 px-6 py-5 flex-shrink-0" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <button onClick={onClose} className="flex-1 rounded-xl transition-colors" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>취소</button>
           <button
             onClick={() => onSave(form)}
             disabled={saving || !canSave}
             className="flex-1 rounded-xl text-white transition-colors disabled:opacity-50"
-            style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
+            style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
           >
             {saving ? '저장 중...' : initial ? '수정' : '추가'}
           </button>
@@ -257,24 +257,24 @@ export default function AdminAiFeedbackPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#16181D' }}>AI 피드백 기준</h1>
-          <p style={{ fontSize: '15px', color: '#5A6270', marginTop: 3 }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-ink)' }}>AI 피드백 기준</h1>
+          <p style={{ fontSize: '15px', color: 'var(--color-sub)', marginTop: 3 }}>
             오답 채점 시 AI가 학생 코드를 판정할 다양한 오류 패턴을 관리하세요. 모든 문제에 공통으로 적용됩니다.
           </p>
         </div>
         <button
           onClick={() => setModal({ mode: 'create', data: EMPTY_FORM })}
           className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
-          style={{ height: 40, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+          style={{ height: 40, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
         >
           <Plus size={16} />
           새 패턴 추가
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-white w-fit" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-card w-fit" style={{ border: '1px solid var(--color-border)' }}>
         {[
           { key: 'all', label: `전체 ${patterns.length}` },
           ...typeOptions.map((type) => ({ key: type, label: `${type} ${patterns.filter((p) => p.pattern_type === type).length}` })),
@@ -287,8 +287,8 @@ export default function AdminAiFeedbackPage() {
               height: 36,
               fontSize: '13px',
               fontWeight: typeFilter === key ? 700 : 500,
-              backgroundColor: typeFilter === key ? '#16181D' : 'transparent',
-              color: typeFilter === key ? '#FFFFFF' : '#5A6270',
+              backgroundColor: typeFilter === key ? 'var(--color-ink)' : 'transparent',
+              color: typeFilter === key ? 'var(--color-surface)' : 'var(--color-sub)',
             }}
           >
             {label}
@@ -299,13 +299,13 @@ export default function AdminAiFeedbackPage() {
       <div className="flex flex-col gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl animate-pulse" style={{ height: 100, border: '1px solid #E5E8EC' }} />
+            <div key={i} className="bg-card rounded-2xl animate-pulse" style={{ height: 100, border: '1px solid var(--color-border)' }} />
           ))
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid #E5E8EC' }}>
-            <Sparkles size={40} style={{ color: '#E5E8EC' }} />
-            <p style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>등록된 기준이 없습니다</p>
-            <p style={{ fontSize: '14px', color: '#5A6270' }}>새 패턴을 추가해 AI 피드백 기준을 만들어보세요</p>
+          <div className="bg-card rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid var(--color-border)' }}>
+            <Sparkles size={40} style={{ color: 'var(--color-border)' }} />
+            <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }}>등록된 기준이 없습니다</p>
+            <p style={{ fontSize: '14px', color: 'var(--color-sub)' }}>새 패턴을 추가해 AI 피드백 기준을 만들어보세요</p>
           </div>
         ) : (
           visible.map((p) => {
@@ -313,21 +313,21 @@ export default function AdminAiFeedbackPage() {
             return (
             <div
               key={p.id}
-              className="bg-white rounded-2xl p-5 flex flex-col gap-3"
-              style={{ border: '1px solid #E5E8EC', opacity: p.is_active ? 1 : 0.6 }}
+              className="bg-card rounded-2xl p-5 flex flex-col gap-3"
+              style={{ border: '1px solid var(--color-border)', opacity: p.is_active ? 1 : 0.6 }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2 py-0.5 rounded-lg" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: typeStyle.bg, color: typeStyle.color }}>
                     {p.pattern_type}
                   </span>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>{p.error_category}</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>{p.error_category}</span>
                   {!p.is_active && (
-                    <span className="px-2 py-0.5 rounded-lg" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#F0F1F3', color: '#8A8F98' }}>미사용</span>
+                    <span className="px-2 py-0.5 rounded-lg" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--color-muted)', color: 'var(--color-sub)' }}>미사용</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => toggleActive(p)} title={p.is_active ? '사용 중지' : '사용 시작'} className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[#F0F1F3]">
+                  <button onClick={() => toggleActive(p)} title={p.is_active ? '사용 중지' : '사용 시작'} className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[var(--color-muted)]">
                     {p.is_active ? <ToggleRight size={18} style={{ color: '#16A34A' }} /> : <ToggleLeft size={18} style={{ color: '#BCC0C7' }} />}
                   </button>
                   <button
@@ -343,30 +343,30 @@ export default function AdminAiFeedbackPage() {
                         is_active: p.is_active,
                       },
                     })}
-                    className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[#EAF1FD]"
+                    className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[var(--color-primary-light)]"
                     title="수정"
                   >
-                    <Pencil size={14} style={{ color: '#1B64DA' }} />
+                    <Pencil size={14} style={{ color: 'var(--color-primary)' }} />
                   </button>
-                  <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[#FEE2E2]" title="삭제">
+                  <button onClick={() => setDeleteTarget(p)} className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[var(--tint-danger)]" title="삭제">
                     <Trash2 size={14} style={{ color: '#DC2626' }} />
                   </button>
                 </div>
               </div>
 
-              <p style={{ fontSize: '13px', color: '#5A6270', lineHeight: 1.6 }}>{p.criteria}</p>
+              <p style={{ fontSize: '13px', color: 'var(--color-sub)', lineHeight: 1.6 }}>{p.criteria}</p>
 
               {p.example_code && (
                 <pre
                   className="rounded-xl p-3 overflow-x-auto"
-                  style={{ backgroundColor: '#1E1E1E', color: '#D4D4D4', fontSize: '12px', fontFamily: 'monospace', lineHeight: 1.6 }}
+                  style={{ backgroundColor: 'var(--code-bg)', color: 'var(--code-fg)', border: '1px solid var(--code-border)', fontSize: '12px', fontFamily: 'monospace', lineHeight: 1.6 }}
                 >
                   {p.example_code}
                 </pre>
               )}
 
-              <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: '#F6F7F9' }}>
-                <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{p.tutor_feedback}</p>
+              <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{p.tutor_feedback}</p>
               </div>
             </div>
             );

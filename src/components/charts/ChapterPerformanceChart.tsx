@@ -42,7 +42,7 @@ export default function ChapterPerformanceChart({ data }: { data: ChapterPerform
               ];
             }}
             labelFormatter={(label) => String(label)}
-            cursor={{ fill: '#F6F7F9' }}
+            cursor={{ fill: 'var(--color-surface)' }}
           />
           <Bar dataKey="solveRate" name="챕터 해결률" fill={CHART_COLORS.primary} radius={[0, 5, 5, 0]} maxBarSize={22} />
         </BarChart>

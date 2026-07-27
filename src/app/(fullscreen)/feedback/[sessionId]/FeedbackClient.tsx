@@ -16,12 +16,13 @@ import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { ProblemDifficulty } from '@/lib/types/db';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
     <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: '#1E1E1E' }}>
-      <span style={{ fontSize: '13px', color: '#5A6270' }}>에디터 로딩 중...</span>
+      <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>에디터 로딩 중...</span>
     </div>
   ),
 });
@@ -51,7 +52,7 @@ type SessionDetail = {
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
-  medium: { bg: '#EAF1FD', color: '#1450B5' },
+  medium: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
@@ -516,17 +517,17 @@ finally:
 
   if (loadError) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: '#F6F7F9' }}>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>세션을 찾을 수 없습니다</p>
-        <Link href="/students" style={{ fontSize: '14px', color: '#1B64DA' }}>학생 현황으로 돌아가기</Link>
+      <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: 'var(--color-surface)' }}>
+        <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }}>세션을 찾을 수 없습니다</p>
+        <Link href="/students" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>학생 현황으로 돌아가기</Link>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#F6F7F9' }}>
-        <span style={{ fontSize: '14px', color: '#5A6270' }}>세션 불러오는 중...</span>
+      <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'var(--color-surface)' }}>
+        <span style={{ fontSize: '14px', color: 'var(--color-sub)' }}>세션 불러오는 중...</span>
       </div>
     );
   }
@@ -536,16 +537,16 @@ finally:
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-white" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
-        <Link href="/students" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[#F6F7F9]" style={{ color: '#5A6270', fontSize: '13px' }}>
+      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
+        <Link href="/students" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 학생 현황
         </Link>
-        <div style={{ width: 1, height: 20, backgroundColor: '#E5E8EC' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 
         {problem && (
           <div className="flex items-center gap-2">
-            <BookOpen size={15} style={{ color: '#5A6270' }} />
-            <span style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>{problem.problem_no}. {problem.title}</span>
+            <BookOpen size={15} style={{ color: 'var(--color-sub)' }} />
+            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
             {diff && (
               <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[diff].bg, color: DIFF_STYLE[diff].color }}>
                 {DIFF_LABEL[diff]}
@@ -555,7 +556,7 @@ finally:
         )}
 
         <div className="flex-1 flex justify-center">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: studentOnline ? '#EFF6FF' : '#F6F7F9', border: `1px solid ${studentOnline ? '#BFDBFE' : '#E5E8EC'}` }}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: studentOnline ? 'var(--tint-soft)' : 'var(--color-surface)', border: `1px solid ${studentOnline ? 'var(--tint-line)' : 'var(--color-border)'}` }}>
             {studentOnline ? (
               <div
                 className="flex items-center justify-center rounded-full text-white font-bold flex-shrink-0"
@@ -578,7 +579,7 @@ finally:
             <button
               onClick={() => setAiFeedbackPanelOpen((o) => !o)}
               className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
-              style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? '#EEF2FF' : '#FFFFFF', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
+              style={{ height: 32, border: '1px solid #4F46E5', backgroundColor: aiFeedbackPanelOpen ? 'var(--tint-accent)' : 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: '#4F46E5' }}
             >
               <Sparkles size={14} /> AI 피드백
               {aiFeedbacks.length > 0 && (
@@ -592,29 +593,30 @@ finally:
           </div>
         )}
 
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#1B64DA' }}>{teacherName} 선생님</span>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}>{teacherName} 선생님</span>
+        <ThemeToggle />
       </header>
 
       <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-white overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
+        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
           {problem ? (
             <div className="p-5">
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>문제</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
               <div
                   className="tiptap-render"
-                  style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, marginBottom: 16 }}
+                  style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 16 }}
                   dangerouslySetInnerHTML={{ __html: problem.description }}
                 />
               {problem.input_format && (
                 <>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>입력</h3>
-                  <p style={{ fontSize: '13px', color: '#5A6270', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
                 </>
               )}
               {problem.output_format && (
                 <>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>출력</h3>
-                  <p style={{ fontSize: '13px', color: '#5A6270', lineHeight: 1.6 }}>{problem.output_format}</p>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--color-sub)', lineHeight: 1.6 }}>{problem.output_format}</p>
                 </>
               )}
             </div>
@@ -635,7 +637,7 @@ finally:
         >
           <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center px-4 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E' }}>
-            <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>
             <span style={{ fontSize: '11px', color: '#6A9955', marginLeft: 12, flex: 1 }}>
               {studentOnline ? `${studentName ?? '학생'}의 코드를 함께 편집 중입니다` : '학생이 접속하면 실시간으로 연동됩니다'}
             </span>
@@ -652,7 +654,7 @@ finally:
               <button
                 onClick={handleTeacherRun}
                 className="flex items-center gap-1.5 px-3 rounded-lg mr-2"
-                style={{ height: 28, backgroundColor: '#1B64DA', color: '#FFFFFF', fontSize: '12px', fontWeight: 600 }}
+                style={{ height: 28, backgroundColor: 'var(--color-primary)', color: 'var(--color-card)', fontSize: '12px', fontWeight: 600 }}
                 title="현재 코드 직접 실행 (채점 없음)"
               >
                 <Play size={12} /> 실행
@@ -705,7 +707,7 @@ finally:
                   <button
                     onClick={() => setActiveTab('teacher')}
                     className="flex items-center gap-1.5 px-4"
-                    style={{ fontSize: '12px', fontWeight: 600, color: activeTab === 'teacher' ? '#D4D4D4' : '#8C8C8C', backgroundColor: activeTab === 'teacher' ? '#1E1E1E' : 'transparent', borderBottom: activeTab === 'teacher' ? '2px solid #1B64DA' : '2px solid transparent' }}
+                    style={{ fontSize: '12px', fontWeight: 600, color: activeTab === 'teacher' ? '#D4D4D4' : '#8C8C8C', backgroundColor: activeTab === 'teacher' ? '#1E1E1E' : 'transparent', borderBottom: activeTab === 'teacher' ? '2px solid var(--color-primary)' : '2px solid transparent' }}
                   >
                     선생님
                     {teacherRunning && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#4ADE80' }} />}
@@ -759,31 +761,31 @@ finally:
             </div>
           )}
 
-          <div className="flex-shrink-0 bg-white" style={{ borderTop: '1px solid #E5E8EC', height: feedbackOpen ? 180 : 44 }}>
-            <button onClick={() => setFeedbackOpen(o => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 44, borderBottom: feedbackOpen ? '1px solid #E5E8EC' : 'none' }}>
-              <Send size={14} style={{ color: '#1B64DA' }} />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>피드백 작성</span>
+          <div className="flex-shrink-0 bg-card" style={{ borderTop: '1px solid var(--color-border)', height: feedbackOpen ? 180 : 44 }}>
+            <button onClick={() => setFeedbackOpen(o => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 44, borderBottom: feedbackOpen ? '1px solid var(--color-border)' : 'none' }}>
+              <Send size={14} style={{ color: 'var(--color-primary)' }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>피드백 작성</span>
               {feedbackSent && <span className="flex items-center gap-1" style={{ fontSize: '12px', color: '#16A34A', marginLeft: 4 }}><Check size={12} /> 저장됨</span>}
-              {feedbackOpen ? <ChevronDown size={13} style={{ color: '#5A6270' }} /> : <ChevronUp size={13} style={{ color: '#5A6270' }} />}
+              {feedbackOpen ? <ChevronDown size={13} style={{ color: 'var(--color-sub)' }} /> : <ChevronUp size={13} style={{ color: 'var(--color-sub)' }} />}
             </button>
             {feedbackOpen && (
               <div className="flex gap-2 px-4 pb-3" style={{ height: 136, paddingTop: 10 }}>
                 <textarea
                   className="flex-1 rounded-xl px-3 py-2 resize-none focus:outline-none"
-                  style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D', lineHeight: 1.6 }}
+                  style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.6 }}
                   placeholder="학생에게 전달할 피드백을 작성하세요..."
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-                  onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+                  onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+                  onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
                 />
                 <button
                   onClick={handleSaveFeedback}
                   disabled={!feedback.trim()}
                   className="flex flex-col items-center justify-center gap-1 rounded-xl px-4 text-white transition-colors disabled:opacity-40"
-                  style={{ backgroundColor: '#1B64DA', fontSize: '12px', fontWeight: 600, minWidth: 72 }}
-                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+                  style={{ backgroundColor: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, minWidth: 72 }}
+                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
                 >
                   <Send size={16} />
                   전달

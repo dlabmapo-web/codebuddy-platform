@@ -76,10 +76,10 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F7F9' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-surface)' }}>
         <div
-          className="w-full max-w-md rounded-xl bg-white p-8 text-center"
-          style={{ border: '1px solid #E5E8EC', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
+          className="w-full max-w-md rounded-xl bg-card p-8 text-center"
+          style={{ border: '1px solid var(--color-border)', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
         >
           <div
             className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -87,35 +87,35 @@ export default function SignupPage() {
           >
             <Check size={28} style={{ color: '#16A34A' }} />
           </div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#16181D' }}>가입이 완료되었습니다</h2>
-          <p style={{ fontSize: '13px', color: '#5A6270', marginTop: 6 }}>잠시 후 로그인 페이지로 이동합니다.</p>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-ink)' }}>가입이 완료되었습니다</h2>
+          <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginTop: 6 }}>잠시 후 로그인 페이지로 이동합니다.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F7F9' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-surface)' }}>
       <div
-        className="w-full max-w-md rounded-xl bg-white p-8"
-        style={{ border: '1px solid #E5E8EC', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
+        className="w-full max-w-md rounded-xl bg-card p-8"
+        style={{ border: '1px solid var(--color-border)', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
       >
         <div className="mb-6">
-          <Link href="/login" className="flex items-center gap-2" style={{ fontSize: '22px', fontWeight: 700, color: '#1B64DA' }}>
+          <Link href="/login" className="flex items-center gap-2" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)' }}>
             <LogoBadge size={28} />
             코브 스튜디오
           </Link>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#16181D', marginTop: 8 }}>회원가입</h2>
-          <p style={{ fontSize: '13px', color: '#5A6270', marginTop: 2 }}>코브 스튜디오 계정을 만들어 시작하세요</p>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-ink)', marginTop: 8 }}>회원가입</h2>
+          <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginTop: 2 }}>코브 스튜디오 계정을 만들어 시작하세요</p>
         </div>
 
         <div className="mb-5">
-          <label style={{ fontSize: '13px', fontWeight: 500, color: '#16181D', display: 'block', marginBottom: 6 }}>
+          <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', display: 'block', marginBottom: 6 }}>
             회원 유형
           </label>
           <div
             className="flex rounded-lg overflow-hidden"
-            style={{ border: '1px solid #E5E8EC', padding: 3, gap: 3 }}
+            style={{ border: '1px solid var(--color-border)', padding: 3, gap: 3 }}
           >
             {(['student', 'teacher'] as UserType[]).map((t) => (
               <button
@@ -127,8 +127,8 @@ export default function SignupPage() {
                   height: 36,
                   fontSize: '13px',
                   fontWeight: 600,
-                  backgroundColor: form.role === t ? '#1B64DA' : 'transparent',
-                  color: form.role === t ? '#FFFFFF' : '#5A6270',
+                  backgroundColor: form.role === t ? 'var(--color-primary)' : 'transparent',
+                  color: form.role === t ? 'white' : 'var(--color-sub)',
                 }}
               >
                 {t === 'student' ? '학생' : '교사'}
@@ -139,7 +139,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#16181D', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', display: 'block', marginBottom: 6 }}>
               이름
             </label>
             <input
@@ -149,14 +149,14 @@ export default function SignupPage() {
               placeholder="실명을 입력하세요"
               autoComplete="name"
               className="w-full px-3 rounded-lg outline-none"
-              style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
-              onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-              onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+              style={{ height: 40, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
+              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+              onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#16181D', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', display: 'block', marginBottom: 6 }}>
               아이디
             </label>
             <input
@@ -166,9 +166,9 @@ export default function SignupPage() {
               placeholder="영문·숫자 조합 5자 이상"
               autoComplete="username"
               className="w-full px-3 rounded-lg outline-none"
-              style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
-              onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-              onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+              style={{ height: 40, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
+              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+              onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
             />
             {form.username.length > 0 && (
               <div className="mt-1 flex flex-col gap-0.5">
@@ -179,7 +179,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#16181D', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', display: 'block', marginBottom: 6 }}>
               비밀번호
             </label>
             <div className="relative">
@@ -190,15 +190,15 @@ export default function SignupPage() {
                 placeholder="영문+숫자 조합 8자 이상"
                 autoComplete="new-password"
                 className="w-full px-3 pr-10 rounded-lg outline-none"
-                style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
-                onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-                onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+                style={{ height: 40, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
               />
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: '#5A6270' }}
+                style={{ color: 'var(--color-sub)' }}
                 tabIndex={-1}
               >
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -210,7 +210,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#16181D', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)', display: 'block', marginBottom: 6 }}>
               비밀번호 확인
             </label>
             <div className="relative">
@@ -221,15 +221,15 @@ export default function SignupPage() {
                 placeholder="비밀번호를 한 번 더 입력하세요"
                 autoComplete="new-password"
                 className="w-full px-3 pr-10 rounded-lg outline-none"
-                style={{ height: 40, border: '1px solid #E5E8EC', fontSize: '14px', color: '#16181D' }}
-                onFocus={(e) => (e.target.style.borderColor = '#1B64DA')}
-                onBlur={(e) => (e.target.style.borderColor = '#E5E8EC')}
+                style={{ height: 40, border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-ink)' }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
               />
               <button
                 type="button"
                 onClick={() => setShowPwConfirm(!showPwConfirm)}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: '#5A6270' }}
+                style={{ color: 'var(--color-sub)' }}
                 tabIndex={-1}
               >
                 {showPwConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -243,7 +243,7 @@ export default function SignupPage() {
           {error && (
             <div
               className="flex items-center gap-2 px-3 py-2 rounded-lg"
-              style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}
+              style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid #FECACA' }}
             >
               <span style={{ fontSize: '13px', color: '#DC2626' }}>{error}</span>
             </div>
@@ -253,22 +253,22 @@ export default function SignupPage() {
             type="submit"
             disabled={!canSubmit || loading}
             className="w-full rounded-lg text-white mt-2 transition-colors disabled:opacity-40"
-            style={{ height: 44, backgroundColor: '#1B64DA', fontSize: '14px', fontWeight: 600 }}
-            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+            style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
           >
             {loading ? '가입 중...' : '가입 완료'}
           </button>
         </form>
 
         <div className="mt-4 text-center">
-          <span style={{ fontSize: '13px', color: '#5A6270' }}>이미 계정이 있으신가요?</span>{' '}
-          <Link href="/login" style={{ fontSize: '13px', color: '#1B64DA', fontWeight: 500 }}>로그인</Link>
+          <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>이미 계정이 있으신가요?</span>{' '}
+          <Link href="/login" style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 500 }}>로그인</Link>
         </div>
 
         <div
           className="mt-6 pt-5 flex flex-col items-center gap-1.5"
-          style={{ borderTop: '1px solid #EEF0F3' }}
+          style={{ borderTop: '1px solid var(--color-muted)' }}
         >
           <img src="/dlab-logo.svg" alt="디랩코딩 D·LAB Coding" style={{ height: 38, width: 'auto' }} />
           <span style={{ fontSize: '11px', fontWeight: 600, color: '#8A929E', letterSpacing: '-0.01em' }}>

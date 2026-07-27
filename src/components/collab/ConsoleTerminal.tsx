@@ -81,7 +81,7 @@ export function ConsoleTerminal({
         onClick={() => { if (awaitingInput && mode === 'interactive') inputRef.current?.focus(); }}
       >
         {lines.length === 0 && !awaitingInput ? (
-          <div style={{ color: '#5A6270' }}>{emptyHint ?? '실행 버튼을 눌러 코드를 실행해보세요.'}</div>
+          <div style={{ color: 'var(--color-sub)' }}>{emptyHint ?? '실행 버튼을 눌러 코드를 실행해보세요.'}</div>
         ) : (
           <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             {lines.map((line, i) => (
@@ -113,7 +113,7 @@ export function ConsoleTerminal({
               </span>
             )}
             {awaitingInput && mode === 'mirror' && (
-              <span style={{ color: '#4EC9B0' }}>❯ <span style={{ color: '#5A6270' }}>입력 대기 중...</span></span>
+              <span style={{ color: '#4EC9B0' }}>❯ <span style={{ color: 'var(--color-sub)' }}>입력 대기 중...</span></span>
             )}
           </div>
         )}

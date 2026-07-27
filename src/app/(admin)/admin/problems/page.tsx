@@ -9,6 +9,7 @@ import {
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { CurriculumExcelImportModal } from '@/components/admin/CurriculumExcelImportModal';
+import { TestCaseEditor, type TestCaseDraft } from '@/components/admin/TestCaseEditor';
 
 const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
   ssr: false,
@@ -35,13 +36,7 @@ type HierarchyRow = {
   child_count?: number;
 };
 
-type TestCaseForm = {
-  input: string;
-  expected_output: string;
-  is_sample: boolean;
-  is_hidden: boolean;
-  order_no: number;
-};
+type TestCaseForm = TestCaseDraft;
 
 type HintForm = {
   hint_text: string;
@@ -78,7 +73,7 @@ const EMPTY_FORM: ProblemForm = {
   starter_code: '',
   is_published: false,
   use_ai_feedback: false,
-  test_cases: [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
+  test_cases: [{ input: '', expected_output: '', is_sample: false, is_hidden: true, order_no: 1 }],
   hints: [],
 };
 
@@ -334,7 +329,7 @@ export default function AdminProblemsPage() {
       use_ai_feedback: problem.use_ai_feedback,
       test_cases: test_cases.length > 0
         ? test_cases.map((tc) => ({ input: tc.input, expected_output: tc.expected_output, is_sample: tc.is_sample, is_hidden: tc.is_hidden, order_no: tc.order_no }))
-        : [{ input: '', expected_output: '', is_sample: true, is_hidden: false, order_no: 1 }],
+        : [{ input: '', expected_output: '', is_sample: false, is_hidden: true, order_no: 1 }],
       hints: hints.map((h) => ({ hint_text: h.hint_text, trigger_pattern: h.trigger_pattern ?? '', order_no: h.order_no })),
     });
     setEditId(id);
@@ -350,8 +345,21 @@ export default function AdminProblemsPage() {
     if (!form.description.trim()) { showToast('문제 내용을 입력해주세요.', 'err'); return; }
 
     setSaving(true);
-    const validTc = form.test_cases.filter((tc) => tc.expected_output.trim());
-    if (validTc.length === 0) { setSaving(false); showToast('정답을 1개 이상 입력해주세요.', 'err'); return; }
+    if (form.test_cases.length === 0) {
+      setSaving(false);
+      setExpandedSection('testcases');
+      showToast('테스트케이스를 1개 이상 추가해주세요.', 'err');
+      return;
+    }
+    const invalidCaseIndex = form.test_cases.findIndex((tc) => (
+      !tc.expected_output.trim() || tc.is_sample === tc.is_hidden
+    ));
+    if (invalidCaseIndex >= 0) {
+      setSaving(false);
+      setExpandedSection('testcases');
+      showToast(`테스트 ${invalidCaseIndex + 1}의 입력 내용을 확인해주세요.`, 'err');
+      return;
+    }
     const body = {
       chapter_id: form.chapter_id,
       title: form.title,
@@ -365,7 +373,7 @@ export default function AdminProblemsPage() {
       memory_limit_mb: 256,
       is_published: form.is_published,
       use_ai_feedback: form.use_ai_feedback,
-      test_cases: validTc,
+      test_cases: form.test_cases,
       hints: form.hints.filter((h) => h.hint_text.trim()),
     };
 
@@ -475,24 +483,6 @@ export default function AdminProblemsPage() {
     ]);
     if (selectedChapter) loadProblems(selectedChapter.id);
   };
-
-  const updateTc = (i: number, field: keyof TestCaseForm, value: unknown) => {
-    setForm((f) => {
-      const tcs = [...f.test_cases];
-      tcs[i] = { ...tcs[i], [field]: value };
-      return { ...f, test_cases: tcs };
-    });
-  };
-
-  const addTc = () => setForm((f) => ({
-    ...f,
-    test_cases: [...f.test_cases, { input: '', expected_output: '', is_sample: false, is_hidden: false, order_no: f.test_cases.length + 1 }],
-  }));
-
-  const removeTc = (i: number) => setForm((f) => ({
-    ...f,
-    test_cases: f.test_cases.filter((_, idx) => idx !== i).map((tc, idx) => ({ ...tc, order_no: idx + 1 })),
-  }));
 
   const addHint = () => setForm((f) => ({
     ...f,
@@ -885,33 +875,14 @@ export default function AdminProblemsPage() {
               </Section>
 
               <Section
-                label={`정답 (${form.test_cases.length}개)`}
+                label={`테스트케이스 (${form.test_cases.length}개)`}
                 expanded={expandedSection === 'testcases'}
                 onToggle={() => setExpandedSection(expandedSection === 'testcases' ? 'starter' : 'testcases')}
               >
-                <div className="flex flex-col gap-3">
-                  {form.test_cases.map((tc, i) => (
-                    <div key={i} className="rounded-xl p-4" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>정답 {i + 1}</span>
-                        {form.test_cases.length > 1 && (
-                          <button onClick={() => removeTc(i)} className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--tint-danger)]"><X size={12} style={{ color: '#DC2626' }} /></button>
-                        )}
-                      </div>
-                      <div className="mb-3">
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>입력값 (input)</div>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none" style={{ border: '1px solid var(--color-border)', fontFamily: 'monospace', fontSize: '13px', backgroundColor: 'var(--color-card)' }} rows={2} value={tc.input} onChange={(e) => updateTc(i, 'input', e.target.value)} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>정답 출력값</div>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg focus:outline-none resize-none" style={{ border: '1px solid var(--color-border)', fontFamily: 'monospace', fontSize: '13px', backgroundColor: 'var(--color-card)', color: 'var(--color-ink)' }} rows={3} value={tc.expected_output} onChange={(e) => updateTc(i, 'expected_output', e.target.value)} />
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={addTc} className="flex items-center gap-2 px-3 rounded-lg" style={{ height: 36, border: '1px dashed #BCC0C7', fontSize: '13px', color: 'var(--color-sub)', width: '100%', justifyContent: 'center' }}>
-                    <Plus size={14} /> 정답 추가
-                  </button>
-                </div>
+                <TestCaseEditor
+                  value={form.test_cases}
+                  onChange={(testCases) => setForm((current) => ({ ...current, test_cases: testCases }))}
+                />
               </Section>
 
               <Section

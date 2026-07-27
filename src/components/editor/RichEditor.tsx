@@ -68,7 +68,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
             maxWidth: '100%',
             borderRadius: 6,
             display: 'block',
-            outline: selected ? '2px solid #1B64DA' : (hovering ? '2px solid #93C5FD' : 'none'),
+            outline: selected ? '2px solid var(--color-primary)' : (hovering ? '2px solid #93C5FD' : 'none'),
             outlineOffset: 2,
           }}
           draggable={false}
@@ -81,7 +81,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
               style={{
                 position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)',
                 width: 12, height: 36, borderRadius: 6,
-                background: '#1B64DA', cursor: 'ew-resize',
+                background: 'var(--color-primary)', cursor: 'ew-resize',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
               }}
@@ -97,7 +97,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
             {width && (
               <span style={{
                 position: 'absolute', bottom: 6, right: 14,
-                background: 'rgba(0,0,0,0.55)', color: '#fff',
+                background: 'rgba(0,0,0,0.55)', color: 'white',
                 fontSize: 10, padding: '1px 5px', borderRadius: 4,
               }}>
                 {width}px
@@ -149,8 +149,8 @@ function ToolBtn({
       className="flex items-center justify-center rounded transition-colors shrink-0"
       style={{
         width: 28, height: 28,
-        backgroundColor: danger ? '#FEF2F2' : active ? '#EFF6FF' : 'transparent',
-        color: danger ? '#DC2626' : active ? '#1B64DA' : '#5A6270',
+        backgroundColor: danger ? 'var(--tint-danger)' : active ? 'var(--tint-soft)' : 'transparent',
+        color: danger ? '#DC2626' : active ? 'var(--color-primary)' : 'var(--color-sub)',
         opacity: disabled ? 0.35 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}
@@ -173,7 +173,7 @@ type Props = {
 };
 
 const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32'];
-const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED', '#DB2777', '#6B7280'];
+const COLORS = ['var(--color-ink)', '#DC2626', '#D97706', '#16A34A', 'var(--color-primary)', '#7C3AED', '#DB2777', '#6B7280'];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -197,7 +197,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
       TableCell,
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer', style: 'color:#1B64DA;text-decoration:underline;' },
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer', style: 'color:var(--color-primary);text-decoration:underline;' },
       }),
       Placeholder.configure({ placeholder }),
     ],
@@ -211,7 +211,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
     },
     editorProps: {
       attributes: {
-        style: 'min-height: 280px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: #16181D;',
+        style: 'min-height: 280px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: var(--color-ink);',
       },
     },
   });
@@ -263,12 +263,12 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
   if (!editor) return null;
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
 
       {/* ── Main Toolbar ─────────────────────────────────────────────────── */}
       <div
-        className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-white"
-        style={{ borderBottom: '1px solid #E5E8EC' }}
+        className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-card"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
       >
         <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소 (Ctrl+Z)"><Undo size={14} /></ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="다시실행 (Ctrl+Y)"><Redo size={14} /></ToolBtn>
@@ -280,7 +280,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
           defaultValue=""
           title="글자 크기"
           className="rounded px-1 text-xs shrink-0"
-          style={{ height: 28, border: '1px solid #E5E8EC', color: '#5A6270', fontSize: 12 }}
+          style={{ height: 28, border: '1px solid var(--color-border)', color: 'var(--color-sub)', fontSize: 12 }}
         >
           <option value="" disabled>크기</option>
           {FONT_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
@@ -301,7 +301,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
               type="button"
               onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setColor(c).run(); }}
               className="rounded-full shrink-0"
-              style={{ width: 15, height: 15, backgroundColor: c, boxShadow: '0 0 0 1.5px #E5E8EC' }}
+              style={{ width: 15, height: 15, backgroundColor: c, boxShadow: '0 0 0 1.5px var(--color-border)' }}
               title={c}
             />
           ))}
@@ -336,10 +336,10 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
       {inTable && (
         <div
           className="flex items-center gap-0.5 px-3 py-1.5 overflow-x-auto"
-          style={{ borderBottom: '1px solid #BFDBFE', background: '#EFF6FF' }}
+          style={{ borderBottom: '1px solid #BFDBFE', background: 'var(--tint-soft)' }}
         >
           {/* label */}
-          <span className="shrink-0 flex items-center gap-1 mr-1" style={{ fontSize: 11, color: '#1B64DA', fontWeight: 700 }}>
+          <span className="shrink-0 flex items-center gap-1 mr-1" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 700 }}>
             <TableIcon size={12} />
             표 편집
           </span>
@@ -394,7 +394,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
 
-      <div className="bg-white">
+      <div className="bg-card">
         <EditorContent editor={editor} />
       </div>
 
@@ -407,17 +407,17 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         .tiptap ul { padding-left: 1.4em; list-style-type: disc; }
         .tiptap ol { padding-left: 1.4em; list-style-type: decimal; }
         .tiptap li { margin: 0.2em 0; }
-        .tiptap blockquote { border-left: 3px solid #E5E8EC; padding-left: 12px; color: #5A6270; margin: 0.6em 0; }
-        .tiptap code { background: #F3F4F6; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-        .tiptap pre { background: #1E1E1E; color: #D4D4D4; padding: 12px 16px; border-radius: 8px; overflow-x: auto; }
+        .tiptap blockquote { border-left: 3px solid var(--color-border); padding-left: 12px; color: var(--color-sub); margin: 0.6em 0; }
+        .tiptap code { background: var(--color-muted); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        .tiptap pre { background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border); padding: 12px 16px; border-radius: 8px; overflow-x: auto; }
         .tiptap pre code { background: none; color: inherit; }
-        .tiptap hr { border: none; border-top: 1px solid #E5E8EC; margin: 1em 0; }
+        .tiptap hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
         .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #BCC0C7; pointer-events: none; float: left; height: 0; }
 
         /* ── table ─────────────────────────────────────── */
         .tiptap table { border-collapse: collapse; width: 100%; margin: 0.8em 0; table-layout: fixed; }
-        .tiptap th { background: #F0F7FF; font-weight: 600; padding: 8px 12px; border: 1px solid #BFDBFE; text-align: left; }
-        .tiptap td { padding: 8px 12px; border: 1px solid #E5E8EC; vertical-align: top; }
+        .tiptap th { background: var(--tint-soft); font-weight: 600; padding: 8px 12px; border: 1px solid #BFDBFE; text-align: left; }
+        .tiptap td { padding: 8px 12px; border: 1px solid var(--color-border); vertical-align: top; }
         .tiptap td, .tiptap th { position: relative; min-width: 40px; }
         .tiptap .selectedCell:after {
           z-index: 2; position: absolute; content: "";
@@ -433,7 +433,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         }
         .tiptap .column-resize-handle:hover,
         .tiptap.resize-cursor .column-resize-handle {
-          background: #1B64DA;
+          background: var(--color-primary);
           opacity: 0.5;
         }
         .tiptap.resize-cursor { cursor: col-resize !important; }

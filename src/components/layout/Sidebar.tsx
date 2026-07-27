@@ -46,7 +46,7 @@ export function Sidebar({ role }: SidebarProps) {
   const items = role === 'teacher' ? teacherNav : role === 'admin' ? adminNav : studentNav;
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-white border-r border-border flex flex-col">
+    <aside className="w-60 flex-shrink-0 bg-card border-r border-border flex flex-col">
       <nav className="flex-1 py-3">
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
@@ -56,8 +56,8 @@ export function Sidebar({ role }: SidebarProps) {
               href={item.href}
               className="relative flex items-center gap-3 px-4 py-2.5 text-[14px] transition-colors"
               style={{
-                backgroundColor: active ? '#EAF1FD' : 'transparent',
-                color: active ? '#1B64DA' : '#5A6270',
+                backgroundColor: active ? 'var(--color-primary-light)' : 'transparent',
+                color: active ? 'var(--color-primary)' : 'var(--color-sub)',
                 fontWeight: active ? 600 : 400,
               }}
             >

@@ -14,7 +14,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
     <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: '#1E1E1E' }}>
-      <span style={{ fontSize: '13px', color: '#5A6270' }}>에디터 로딩 중...</span>
+      <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>에디터 로딩 중...</span>
     </div>
   ),
 });
@@ -62,7 +62,7 @@ const DEMO_HINTS = [
 
 const DIFF_STYLE = {
   쉬움: { bg: '#DCFCE7', color: '#15803D' },
-  보통: { bg: '#EAF1FD', color: '#1450B5' },
+  보통: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   어려움: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
@@ -279,24 +279,24 @@ export default function DemoPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#F6F7F9' }}>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-surface)' }}>
       <header
-        className="flex items-center px-4 gap-3 flex-shrink-0 bg-white"
-        style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}
+        className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
+        style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}
       >
         <Link
           href="/problems"
           className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-surface"
-          style={{ color: '#5A6270', fontSize: '13px' }}
+          style={{ color: 'var(--color-sub)', fontSize: '13px' }}
         >
           <ChevronLeft size={16} />
           목록
         </Link>
 
-        <div style={{ width: 1, height: 20, backgroundColor: '#E5E8EC' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 
         <div className="flex items-center gap-2">
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#16181D' }}>
+          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>
             {PROBLEM.no}. {PROBLEM.title}
           </span>
           <span
@@ -315,10 +315,10 @@ export default function DemoPage() {
         <div className="flex-1 flex justify-center">
           <div
             className="flex items-center gap-2 px-3 py-1 rounded-lg"
-            style={{ backgroundColor: '#F6F7F9', border: '1px solid #E5E8EC' }}
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
           >
-            <Clock size={14} style={{ color: '#5A6270' }} />
-            <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', fontFamily: 'monospace' }}>
+            <Clock size={14} style={{ color: 'var(--color-sub)' }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', fontFamily: 'monospace' }}>
               {timeStr}
             </span>
           </div>
@@ -344,11 +344,11 @@ export default function DemoPage() {
             className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
             style={{
               height: 36,
-              border: '1px solid #E5E8EC',
-              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-card)',
               fontSize: '13px',
               fontWeight: 600,
-              color: '#16181D',
+              color: 'var(--color-ink)',
             }}
           >
             <Play size={14} />
@@ -359,9 +359,9 @@ export default function DemoPage() {
             onClick={handleSubmit}
             disabled={isRunning}
             className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:opacity-50"
-            style={{ height: 36, backgroundColor: '#1B64DA', fontSize: '13px', fontWeight: 600 }}
-            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#1450B5'; }}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+            style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
           >
             <Send size={14} />
             제출
@@ -377,41 +377,41 @@ export default function DemoPage() {
         onMouseLeave={handleMouseUp}
       >
         <div
-          className="flex flex-col bg-white overflow-auto flex-shrink-0"
-          style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}
+          className="flex flex-col bg-card overflow-auto flex-shrink-0"
+          style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}
         >
           <div className="p-5">
             <div
               className="flex gap-5 mb-5 pb-4"
-              style={{ borderBottom: '1px solid #E5E8EC' }}
+              style={{ borderBottom: '1px solid var(--color-border)' }}
             >
               <div>
-                <span style={{ fontSize: '11px', color: '#5A6270', display: 'block' }}>시간 제한</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>{PROBLEM.timeLimit}</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>시간 제한</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>{PROBLEM.timeLimit}</span>
               </div>
               <div>
-                <span style={{ fontSize: '11px', color: '#5A6270', display: 'block' }}>메모리 제한</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>{PROBLEM.memoryLimit}</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>메모리 제한</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>{PROBLEM.memoryLimit}</span>
               </div>
             </div>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>문제</h3>
-            <p style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, whiteSpace: 'pre-line', marginBottom: 20 }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
+            <p style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, whiteSpace: 'pre-line', marginBottom: 20 }}>
               {PROBLEM.description}
             </p>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>입력 형식</h3>
-            <p style={{ fontSize: '13px', color: '#5A6270', marginBottom: 16 }}>{PROBLEM.inputDesc}</p>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력 형식</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16 }}>{PROBLEM.inputDesc}</p>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 6 }}>출력 형식</h3>
-            <p style={{ fontSize: '13px', color: '#5A6270', marginBottom: 20 }}>{PROBLEM.outputDesc}</p>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력 형식</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 20 }}>{PROBLEM.outputDesc}</p>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 10 }}>예제</h3>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 10 }}>예제</h3>
             <div className="flex flex-col gap-4 mb-5">
               {PROBLEM.examples.map((ex, i) => (
                 <div key={i} className="flex gap-3">
                   <div className="flex-1">
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>
                       예제 입력 {i + 1}
                     </div>
                     <div
@@ -428,7 +428,7 @@ export default function DemoPage() {
                     </div>
                   </div>
                   <div className="flex-1">
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#5A6270', marginBottom: 4 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>
                       예제 출력 {i + 1}
                     </div>
                     <div
@@ -448,18 +448,18 @@ export default function DemoPage() {
               ))}
             </div>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>제약 조건</h3>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>제약 조건</h3>
             <ul className="flex flex-col gap-1.5">
               {PROBLEM.constraints.map((c, i) => (
                 <li key={i} className="flex items-center gap-2">
                   <span
                     style={{
                       width: 4, height: 4, borderRadius: 99,
-                      backgroundColor: '#5A6270',
+                      backgroundColor: 'var(--color-sub)',
                       display: 'inline-block', flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontSize: '13px', color: '#5A6270', fontFamily: 'monospace' }}>{c}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>{c}</span>
                 </li>
               ))}
             </ul>
@@ -468,20 +468,20 @@ export default function DemoPage() {
 
         <div
           className="flex-shrink-0 cursor-col-resize"
-          style={{ width: 5, backgroundColor: '#E5E8EC' }}
+          style={{ width: 5, backgroundColor: 'var(--color-border)' }}
           onMouseDown={handleMouseDown}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
           <div
-            className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white"
-            style={{ borderBottom: '1px solid #E5E8EC' }}
+            className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
           >
-            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#5A6270' }}>Python 3</span>
+            <span style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--color-sub)' }}>Python 3</span>
             <button
               onClick={() => setShowHint(true)}
               className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-surface"
-              style={{ height: 32, fontSize: '13px', color: '#5A6270' }}
+              style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}
             >
               <Lightbulb size={14} />
               힌트 보기

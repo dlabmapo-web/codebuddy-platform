@@ -27,7 +27,7 @@ type StudentRow = {
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_COLOR: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#F0FDF4', color: '#15803D' },
-  medium: { bg: '#EFF6FF', color: '#1D4ED8' },
+  medium: { bg: 'var(--tint-soft)', color: '#1D4ED8' },
   hard: { bg: '#FFF1F2', color: '#BE123C' },
 };
 
@@ -108,8 +108,8 @@ export default function StudentsPage() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#16181D' }}>학생 현황</h1>
-          <p style={{ fontSize: '13px', color: '#8A8F98', marginTop: 2 }}>담당 학생의 접속 및 학습 현황을 확인하세요.</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-ink)' }}>학생 현황</h1>
+          <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginTop: 2 }}>담당 학생의 접속 및 학습 현황을 확인하세요.</p>
         </div>
         <button
           onClick={() => load(true)}
@@ -117,10 +117,10 @@ export default function StudentsPage() {
           className="flex items-center gap-1.5 px-3 rounded-lg transition-colors"
           style={{
             height: 34,
-            border: '1px solid #E5E8EC',
+            border: '1px solid var(--color-border)',
             fontSize: '13px',
-            color: refreshing ? '#BCC0C7' : '#5A6270',
-            backgroundColor: '#FFFFFF',
+            color: refreshing ? '#BCC0C7' : 'var(--color-sub)',
+            backgroundColor: 'var(--color-card)',
             cursor: refreshing ? 'not-allowed' : 'pointer',
           }}
         >
@@ -134,30 +134,30 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-6 px-5 py-3 bg-white rounded-xl" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex items-center gap-6 px-5 py-3 bg-card rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
         <div>
-          <span style={{ fontSize: '12px', color: '#8A8F98' }}>전체</span>
-          <span style={{ fontSize: '22px', fontWeight: 700, color: '#16181D', marginLeft: 8 }}>{students.length}</span>
-          <span style={{ fontSize: '13px', color: '#8A8F98' }}>명</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>전체</span>
+          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-ink)', marginLeft: 8 }}>{students.length}</span>
+          <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>명</span>
         </div>
-        <div style={{ width: 1, height: 28, backgroundColor: '#E5E8EC' }} />
+        <div style={{ width: 1, height: 28, backgroundColor: 'var(--color-border)' }} />
         <div className="flex items-center gap-2">
           <Wifi size={14} style={{ color: '#16A34A' }} />
-          <span style={{ fontSize: '12px', color: '#8A8F98' }}>접속 중</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>접속 중</span>
           <span style={{ fontSize: '18px', fontWeight: 700, color: '#16A34A' }}>{onlineCount}</span>
         </div>
-        <div style={{ width: 1, height: 28, backgroundColor: '#E5E8EC' }} />
+        <div style={{ width: 1, height: 28, backgroundColor: 'var(--color-border)' }} />
         <div className="flex items-center gap-2">
-          <BookOpen size={14} style={{ color: '#1B64DA' }} />
-          <span style={{ fontSize: '12px', color: '#8A8F98' }}>풀이 중</span>
-          <span style={{ fontSize: '18px', fontWeight: 700, color: '#1B64DA' }}>{solvingCount}</span>
+          <BookOpen size={14} style={{ color: 'var(--color-primary)' }} />
+          <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>풀이 중</span>
+          <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>{solvingCount}</span>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="bg-card rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="animate-pulse" style={{ height: 64, borderBottom: i < 4 ? '1px solid #F3F4F6' : 'none', margin: '0 20px' }} />
+            <div key={i} className="animate-pulse" style={{ height: 64, borderBottom: i < 4 ? '1px solid var(--color-muted)' : 'none', margin: '0 20px' }} />
           ))
         ) : students.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
@@ -175,8 +175,8 @@ export default function StudentsPage() {
                 className="flex items-center gap-4 px-5"
                 style={{
                   height: 64,
-                  borderBottom: idx < students.length - 1 ? '1px solid #F3F4F6' : 'none',
-                  borderLeft: session ? '3px solid #1B64DA' : online ? '3px solid #16A34A' : '3px solid transparent',
+                  borderBottom: idx < students.length - 1 ? '1px solid var(--color-muted)' : 'none',
+                  borderLeft: session ? '3px solid var(--color-primary)' : online ? '3px solid #16A34A' : '3px solid transparent',
                 }}
               >
                 <div className="relative shrink-0">
@@ -185,8 +185,8 @@ export default function StudentsPage() {
                     style={{
                       width: 36,
                       height: 36,
-                      backgroundColor: online ? '#EFF6FF' : '#F6F7F9',
-                      color: online ? '#1B64DA' : '#BCC0C7',
+                      backgroundColor: online ? 'var(--tint-soft)' : 'var(--color-surface)',
+                      color: online ? 'var(--color-primary)' : '#BCC0C7',
                       fontSize: '14px',
                     }}
                   >
@@ -206,14 +206,14 @@ export default function StudentsPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>{s.name}</span>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>{s.name}</span>
                     <span style={{ fontSize: '12px', color: '#BCC0C7' }}>@{s.username}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {session?.problems ? (
                       <>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#1B64DA' }}>풀이 중</span>
-                        <span style={{ fontSize: '12px', color: '#5A6270' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-primary)' }}>풀이 중</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
                           {session.problems.problem_no}. {session.problems.title}
                         </span>
                         {diff && (
@@ -234,9 +234,9 @@ export default function StudentsPage() {
                   <Link
                     href={`/feedback/${session.id}`}
                     className="flex items-center gap-1.5 px-3 rounded-lg transition-colors shrink-0"
-                    style={{ height: 34, backgroundColor: '#1B64DA', fontSize: '12px', fontWeight: 600, color: '#FFFFFF' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1450B5')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1B64DA')}
+                    style={{ height: 34, backgroundColor: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, color: 'white' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
                   >
                     <MessageSquare size={13} /> 함께 풀기
                   </Link>

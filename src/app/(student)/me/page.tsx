@@ -60,7 +60,7 @@ function curriculumOf(submission: Submission) {
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_COLOR: Record<ProblemDifficulty, { bg: string; color: string }> = {
   easy: { bg: '#DCFCE7', color: '#15803D' },
-  medium: { bg: '#EAF1FD', color: '#1450B5' },
+  medium: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
@@ -88,13 +88,13 @@ function formatDate(iso: string) {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color?: string }) {
   return (
-    <div className="bg-white rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
-      <div className="rounded-2xl flex items-center justify-center shrink-0" style={{ width: 52, height: 52, backgroundColor: '#F6F7F9' }}>
+    <div className="bg-card rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid var(--color-border)' }}>
+      <div className="rounded-2xl flex items-center justify-center shrink-0" style={{ width: 52, height: 52, backgroundColor: 'var(--color-surface)' }}>
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: '13px', color: '#5A6270', marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: '24px', fontWeight: 700, color: color ?? '#16181D' }}>{value}</div>
+        <div style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: '24px', fontWeight: 700, color: color ?? 'var(--color-ink)' }}>{value}</div>
       </div>
     </div>
   );
@@ -102,12 +102,12 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl px-6 py-5 animate-pulse" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="bg-card rounded-2xl px-6 py-5 animate-pulse" style={{ border: '1px solid var(--color-border)' }}>
       <div className="flex items-center gap-4">
-        <div className="rounded-xl" style={{ width: 52, height: 52, backgroundColor: '#F0F1F3' }} />
+        <div className="rounded-xl" style={{ width: 52, height: 52, backgroundColor: 'var(--color-muted)' }} />
         <div className="flex-1 flex flex-col gap-2">
-          <div className="rounded" style={{ height: 16, width: '60%', backgroundColor: '#F0F1F3' }} />
-          <div className="rounded" style={{ height: 13, width: '40%', backgroundColor: '#F0F1F3' }} />
+          <div className="rounded" style={{ height: 16, width: '60%', backgroundColor: 'var(--color-muted)' }} />
+          <div className="rounded" style={{ height: 13, width: '40%', backgroundColor: 'var(--color-muted)' }} />
         </div>
       </div>
     </div>
@@ -184,12 +184,12 @@ export default function MyHistoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#16181D' }}>내 풀이기록</h1>
-        <p style={{ fontSize: '15px', color: '#5A6270', marginTop: 3 }}>지금까지 풀었던 문제들을 확인해보세요.</p>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-ink)' }}>내 풀이기록</h1>
+        <p style={{ fontSize: '15px', color: 'var(--color-sub)', marginTop: 3 }}>지금까지 풀었던 문제들을 확인해보세요.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard icon={<BookOpen size={24} style={{ color: '#1B64DA' }} />} label="총 제출 횟수" value={`${totalAttempts}회`} />
+        <StatCard icon={<BookOpen size={24} style={{ color: 'var(--color-primary)' }} />} label="총 제출 횟수" value={`${totalAttempts}회`} />
         <StatCard icon={<Trophy size={24} style={{ color: '#15803D' }} />} label="해결한 문제" value={`${solvedProblems}개`} color="#15803D" />
         <StatCard icon={<Target size={24} style={{ color: '#D97706' }} />} label="정답률" value={`${correctRate}%`} />
       </div>
@@ -206,9 +206,9 @@ export default function MyHistoryPage() {
                 height: 44,
                 fontSize: '14px',
                 fontWeight: filter === f ? 700 : 500,
-                backgroundColor: filter === f ? '#1B64DA' : '#FFFFFF',
-                color: filter === f ? '#FFFFFF' : '#5A6270',
-                border: `1px solid ${filter === f ? '#1B64DA' : '#E5E8EC'}`,
+                backgroundColor: filter === f ? 'var(--color-primary)' : 'var(--color-card)',
+                color: filter === f ? 'white' : 'var(--color-sub)',
+                border: `1px solid ${filter === f ? 'var(--color-primary)' : 'var(--color-border)'}`,
               }}
             >
               {label}
@@ -220,14 +220,14 @@ export default function MyHistoryPage() {
         )}
       </div>
 
-      <section className="rounded-2xl bg-white p-4" style={{ border: '1px solid #E5E8EC' }}>
+      <section className="rounded-2xl bg-card p-4" style={{ border: '1px solid var(--color-border)' }}>
         <div className="mb-3 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-light text-primary">
             <Layers3 size={16} />
           </div>
           <div>
-            <h2 style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>학습 경로 필터</h2>
-            <p style={{ fontSize: '11px', color: '#8A8F98', marginTop: 1 }}>과목·단계·챕터별 풀이기록을 확인하세요.</p>
+            <h2 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-ink)' }}>학습 경로 필터</h2>
+            <p style={{ fontSize: '11px', color: 'var(--color-sub)', marginTop: 1 }}>과목·단계·챕터별 풀이기록을 확인하세요.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -239,7 +239,7 @@ export default function MyHistoryPage() {
               setChapterId('');
             }}
             className="h-10 rounded-xl px-3 outline-none"
-            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+            style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
           >
             <option value="">전체 과목</option>
             {curriculumOptions.subjects.map((subject) => (
@@ -254,7 +254,7 @@ export default function MyHistoryPage() {
               setChapterId('');
             }}
             className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
-            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+            style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
           >
             <option value="">전체 단계</option>
             {curriculumOptions.stages.map((stage) => (
@@ -266,7 +266,7 @@ export default function MyHistoryPage() {
             disabled={!stageId}
             onChange={(event) => setChapterId(event.target.value)}
             className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
-            style={{ border: '1px solid #E5E8EC', fontSize: '13px', color: '#16181D' }}
+            style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
           >
             <option value="">전체 챕터</option>
             {curriculumOptions.chapters.map((chapter) => (
@@ -280,14 +280,14 @@ export default function MyHistoryPage() {
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl flex flex-col items-center justify-center py-20 gap-3" style={{ border: '1px solid #E5E8EC' }}>
-            <BookOpen size={40} style={{ color: '#E5E8EC' }} />
-            <p style={{ fontSize: '17px', fontWeight: 700, color: '#16181D' }}>아직 제출 기록이 없어요</p>
-            <p style={{ fontSize: '14px', color: '#5A6270' }}>문제를 풀고 제출하면 여기에 기록이 남아요!</p>
+          <div className="bg-card rounded-2xl flex flex-col items-center justify-center py-20 gap-3" style={{ border: '1px solid var(--color-border)' }}>
+            <BookOpen size={40} style={{ color: 'var(--color-border)' }} />
+            <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-ink)' }}>아직 제출 기록이 없어요</p>
+            <p style={{ fontSize: '14px', color: 'var(--color-sub)' }}>문제를 풀고 제출하면 여기에 기록이 남아요!</p>
             <Link
               href="/problems"
               className="mt-2 rounded-2xl text-white px-6 flex items-center"
-              style={{ height: 48, backgroundColor: '#1B64DA', fontSize: '15px', fontWeight: 700 }}
+              style={{ height: 48, backgroundColor: 'var(--color-primary)', fontSize: '15px', fontWeight: 700 }}
             >
               문제 풀러 가기
             </Link>
@@ -303,14 +303,14 @@ export default function MyHistoryPage() {
               <div
                 key={s.id}
                 onClick={() => href && router.push(href)}
-                className="bg-white rounded-2xl flex items-center gap-5 group transition-all"
+                className="bg-card rounded-2xl flex items-center gap-5 group transition-all"
                 style={{
-                  border: '1px solid #E5E8EC',
+                  border: '1px solid var(--color-border)',
                   padding: '18px 24px',
                   cursor: href ? 'pointer' : 'default',
                 }}
-                onMouseEnter={(e) => { if (href) { e.currentTarget.style.borderColor = '#1B64DA'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(27,100,218,0.10)'; } }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E8EC'; e.currentTarget.style.boxShadow = 'none'; }}
+                onMouseEnter={(e) => { if (href) { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(27,100,218,0.10)'; } }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <div
                   className="rounded-2xl flex items-center justify-center shrink-0"
@@ -326,7 +326,7 @@ export default function MyHistoryPage() {
                         <span style={{ fontSize: '13px', color: '#BCC0C7', flexShrink: 0 }}>
                           {chapter ? `${chapter.order_no}-${problem.order_no}` : `${problem.problem_no}번`}
                         </span>
-                        <span style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }} className="truncate group-hover:text-primary transition-colors">
+                        <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }} className="truncate group-hover:text-primary transition-colors">
                           {problem.title}
                         </span>
                       </>
@@ -335,7 +335,7 @@ export default function MyHistoryPage() {
                     )}
                   </div>
                   {subject && stage && chapter && (
-                    <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden" style={{ fontSize: '11px', color: '#8A8F98' }}>
+                    <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden" style={{ fontSize: '11px', color: 'var(--color-sub)' }}>
                       <span className="truncate">{subject.title}</span>
                       <ChevronRight size={10} className="shrink-0" />
                       <span className="truncate">{stage.title}</span>
@@ -351,13 +351,13 @@ export default function MyHistoryPage() {
                     )}
                     <span style={{ fontSize: '13px', fontWeight: 700, color: st.color }}>{st.label}</span>
                     <span style={{ fontSize: '13px', color: '#BCC0C7' }}>·</span>
-                    <span style={{ fontSize: '13px', color: '#5A6270' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--color-sub)' }}>
                       {s.passed_count}/{s.total_count} 케이스 통과
                     </span>
                     {s.elapsed_sec != null && (
                       <>
                         <span style={{ fontSize: '13px', color: '#BCC0C7' }}>·</span>
-                        <span className="flex items-center gap-1" style={{ fontSize: '13px', color: '#5A6270' }}>
+                        <span className="flex items-center gap-1" style={{ fontSize: '13px', color: 'var(--color-sub)' }}>
                           <Clock size={13} /> {formatElapsed(s.elapsed_sec)}
                         </span>
                       </>

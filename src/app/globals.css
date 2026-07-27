@@ -1,7 +1,12 @@
 @import "tailwindcss";
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
+/* Class-based dark mode (Tailwind v4). Enables `dark:` utilities when
+   <html> has the `.dark` class, set by ThemeToggle / the anti-FOUC script. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  /* Light palette (default). Dark overrides live in the .dark block below. */
   --color-primary: #1B64DA;
   --color-primary-hover: #1450B5;
   --color-primary-light: #EAF1FD;
@@ -9,6 +14,8 @@
   --color-sub: #5A6270;
   --color-border: #E5E8EC;
   --color-surface: #F6F7F9;
+  --color-card: #FFFFFF;
+  --color-muted: #F6F7F9;
   --color-success: #16A34A;
   --color-danger: #DC2626;
   --color-warning: #D97706;
@@ -23,13 +30,66 @@
 
 :root {
   color-scheme: light;
+
+  /* Decorative accent tints (light). Theme-aware so gradients/chips that were
+     hardcoded light don't stay light in dark mode. Overridden in .dark below. */
+  --tint-1: #EFF5FF;        /* hero gradient stop 1 (primary) */
+  --tint-2: #F8FAFF;        /* hero gradient stop 2 */
+  --tint-3: #F0FDF4;        /* hero gradient stop 3 (success) */
+  --tint-soft: #F5F9FF;     /* soft primary surface (bars, badges) */
+  --tint-fill: #DBEAFE;     /* filled primary chip */
+  --tint-line: #DCE8FA;     /* primary-tinted border */
+  --tint-decor: #BFD3F5;    /* decorative blob */
+  --tint-accent: #EEF2FF;   /* indigo/purple panel bg */
+  --tint-accent-line: #C7D2FE;
+  --tint-danger: #FFF5F5;   /* danger panel bg */
+  --tint-danger-line: #FCA5A5;
+
+  /* Code/output DISPLAY boxes shown inside description panels (NOT the live
+     Monaco editor or terminal, which stay #1E1E1E to match the editor). Light:
+     a dark terminal-style box on white. Dark: a darker inset well vs the card. */
+  --code-bg: #1E1E1E;
+  --code-border: #1E1E1E;
+  --code-fg: #D4D4D4;
+}
+
+/* Dark palette: a soft blue-charcoal ramp cohesive with the Cove brand blue.
+   Not pure black, off-white text (less halation) — easier on young eyes.
+   Everything using bg-surface / bg-card / text-ink / border-border flips here. */
+.dark {
+  color-scheme: dark;
+  --color-primary: #4E8BEA;
+  --color-primary-hover: #5E9AEF;
+  --color-primary-light: #1E2A42;
+  --color-ink: #E3E7EE;
+  --color-sub: #9BA3B2;
+  --color-border: #2E3542;
+  --color-surface: #14171F;
+  --color-card: #1B1F29;
+  --color-muted: #242935;
+
+  --tint-1: #1B2637;
+  --tint-2: #161A24;
+  --tint-3: #16211B;
+  --tint-soft: #1C2637;
+  --tint-fill: #233152;
+  --tint-line: #2B3A54;
+  --tint-decor: #2E4066;
+  --tint-accent: #1C2136;
+  --tint-accent-line: #343E66;
+  --tint-danger: #2A1A1D;
+  --tint-danger-line: #5A2E32;
+
+  --code-bg: #0E1117;
+  --code-border: #2A313D;
+  --code-fg: #CDD3DC;
 }
 
 body {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   letter-spacing: -0.02em;
-  color: #16181D;
-  background: #F6F7F9;
+  color: var(--color-ink);
+  background: var(--color-surface);
 }
 
 .tiptap-render p { margin: 0.4em 0; }
@@ -43,13 +103,13 @@ body {
 .tiptap-render em { font-style: italic; }
 .tiptap-render u { text-decoration: underline; }
 .tiptap-render s { text-decoration: line-through; }
-.tiptap-render blockquote { border-left: 3px solid #E5E8EC; padding-left: 12px; color: #5A6270; margin: 0.6em 0; }
-.tiptap-render code { background: #F3F4F6; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-.tiptap-render pre { background: #1E1E1E; color: #D4D4D4; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0.6em 0; }
+.tiptap-render blockquote { border-left: 3px solid var(--color-border); padding-left: 12px; color: var(--color-sub); margin: 0.6em 0; }
+.tiptap-render code { background: var(--color-muted); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+.tiptap-render pre { background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border); padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0.6em 0; }
 .tiptap-render pre code { background: none; color: inherit; }
-.tiptap-render hr { border: none; border-top: 1px solid #E5E8EC; margin: 1em 0; }
+.tiptap-render hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
 .tiptap-render img { max-width: 100%; border-radius: 6px; margin: 0.4em 0; }
-.tiptap-render a { color: #1B64DA; text-decoration: underline; }
+.tiptap-render a { color: var(--color-primary); text-decoration: underline; }
 .tiptap-render table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
-.tiptap-render th { background: #F9FAFB; font-weight: 600; padding: 8px 12px; border: 1px solid #E5E8EC; text-align: left; }
-.tiptap-render td { padding: 8px 12px; border: 1px solid #E5E8EC; }
+.tiptap-render th { background: var(--color-muted); font-weight: 600; padding: 8px 12px; border: 1px solid var(--color-border); text-align: left; }
+.tiptap-render td { padding: 8px 12px; border: 1px solid var(--color-border); }

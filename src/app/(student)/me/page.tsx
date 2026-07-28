@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, XCircle, Clock, MinusCircle, BookOpen, Trophy, Target, Layers3, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ProblemDifficulty } from '@/lib/types/db';
+import {
+  currentInternalRoute,
+  withReturnTo,
+} from '@/lib/navigation/returnTo';
+import { routeWithQuery } from '@/lib/navigation/queryState';
 
 type Submission = {
   id: string;
@@ -116,12 +121,25 @@ function SkeletonCard() {
 
 export default function MyHistoryPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pass' | 'fail'>('all');
-  const [subjectId, setSubjectId] = useState('');
-  const [stageId, setStageId] = useState('');
-  const [chapterId, setChapterId] = useState('');
+  const filterParam = searchParams.get('status');
+  const filter: 'all' | 'pass' | 'fail' =
+    filterParam === 'pass' || filterParam === 'fail' ? filterParam : 'all';
+  const subjectId = searchParams.get('subject') ?? '';
+  const stageId = searchParams.get('stage') ?? '';
+  const chapterId = searchParams.get('chapter') ?? '';
+  const returnRoute = currentInternalRoute({
+    pathname,
+    search: searchParams.toString(),
+  });
+  const replaceFilters = (updates: Record<string, string | null>) => {
+    router.replace(routeWithQuery(pathname, searchParams, updates), {
+      scroll: false,
+    });
+  };
 
   useEffect(() => {
     fetch('/api/submissions')
@@ -200,7 +218,9 @@ export default function MyHistoryPage() {
           return (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => replaceFilters({
+                status: f === 'all' ? null : f,
+              })}
               className="rounded-2xl transition-colors px-5"
               style={{
                 height: 44,
@@ -234,9 +254,11 @@ export default function MyHistoryPage() {
           <select
             value={subjectId}
             onChange={(event) => {
-              setSubjectId(event.target.value);
-              setStageId('');
-              setChapterId('');
+              replaceFilters({
+                subject: event.target.value || null,
+                stage: null,
+                chapter: null,
+              });
             }}
             className="h-10 rounded-xl px-3 outline-none"
             style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
@@ -250,8 +272,10 @@ export default function MyHistoryPage() {
             value={stageId}
             disabled={!subjectId}
             onChange={(event) => {
-              setStageId(event.target.value);
-              setChapterId('');
+              replaceFilters({
+                stage: event.target.value || null,
+                chapter: null,
+              });
             }}
             className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
             style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
@@ -264,7 +288,9 @@ export default function MyHistoryPage() {
           <select
             value={chapterId}
             disabled={!stageId}
-            onChange={(event) => setChapterId(event.target.value)}
+            onChange={(event) => replaceFilters({
+              chapter: event.target.value || null,
+            })}
             className="h-10 rounded-xl px-3 outline-none disabled:opacity-50"
             style={{ border: '1px solid var(--color-border)', fontSize: '13px', color: 'var(--color-ink)' }}
           >
@@ -297,7 +323,12 @@ export default function MyHistoryPage() {
             const st = STATUS_INFO[s.status];
             const { problem, chapter, stage, subject } = curriculumOf(s);
             const diff = problem?.difficulty ? DIFF_COLOR[problem.difficulty] : null;
-            const href = problem ? `/problems/${s.problem_id}?sid=${s.id}` : null;
+            const href = problem
+              ? withReturnTo(
+                  `/problems/${s.problem_id}?sid=${encodeURIComponent(s.id)}`,
+                  returnRoute,
+                )
+              : null;
 
             return (
               <div

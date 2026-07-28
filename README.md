@@ -16,6 +16,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Authoritative code judging
+
+Official Python submissions are graded through managed Judge0. The browser
+Pyodide worker is used only for the interactive **Run** action.
+
+Before enabling **Submit**:
+
+1. Run `supabase/migrations/20260727_authoritative_judging.sql` in the Supabase
+   SQL Editor.
+2. Copy the Judge0 values from `.env.example` into local development and the
+   Netlify environment-variable settings.
+3. Set `JUDGE_CALLBACK_BASE_URL` to the public HTTPS origin that Judge0 can
+   reach, without a trailing slash.
+4. Use a Judge0 Python language ID supported by the selected provider instance
+   (`71` is the common Judge0 CE Python 3 ID).
+
+Judge0 credentials must remain server-only and must never use a
+`NEXT_PUBLIC_` prefix.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

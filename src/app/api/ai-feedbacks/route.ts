@@ -65,8 +65,8 @@ export async function POST(req: Request) {
   if (!submission || submission.user_id !== user.id || submission.problem_id !== problem_id) {
     return apiError('제출 내역을 찾을 수 없습니다.', 'NOT_FOUND', 404);
   }
-  if (submission.status === 'pass') {
-    return apiError('정답인 제출에는 AI 피드백을 제공하지 않습니다.', 'ALREADY_PASSED', 400);
+  if (submission.status !== 'fail' && submission.status !== 'partial') {
+    return apiError('오답 또는 일부 통과 제출에만 AI 피드백을 제공합니다.', 'FEEDBACK_NOT_AVAILABLE', 400);
   }
 
   const { data: problem } = await db
@@ -141,6 +141,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
@@ -176,11 +177,11 @@ export async function GET(req: Request) {
 
   if (user.role === 'student') {
     query = query.eq('student_id', user.id);
-  } else if (sessionScope && (user.role === 'teacher' || user.role === 'admin')) {
+  } else if (sessionScope && user.role === 'teacher') {
     query = query.eq('student_id', sessionScope.student_id);
-  } else if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
+  } else if (user.role === 'teacher' && studentId) {
     query = query.eq('student_id', studentId);
-  } else if (user.role !== 'admin') {
+  } else {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 

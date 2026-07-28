@@ -5,7 +5,7 @@ import { apiOk, apiError } from '@/lib/api/response';
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
-  if (user.role !== 'teacher' && user.role !== 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
+  if (user.role !== 'teacher') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const body = await req.json().catch(() => null);
   if (!body) return apiError('잘못된 요청입니다.', 'BAD_REQUEST', 400);
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');

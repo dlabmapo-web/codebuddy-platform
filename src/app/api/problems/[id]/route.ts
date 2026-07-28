@@ -1,6 +1,12 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
+import {
+  resolveProblemNeighbors,
+  type ProblemNavigation,
+  type ProblemNavigationCandidate,
+} from '@/lib/problems/navigation';
+import { getLearningContext } from '@/lib/curriculum/learningContext.server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,35 +39,79 @@ export async function GET(_req: Request, { params }: Params) {
     .eq('problem_id', id)
     .order('order_no', { ascending: true });
 
-  let next_problem_id: string | null = null;
-  let stage_id: string | null = null;
+  let navigation: ProblemNavigation | null = null;
 
   if (problem.chapter_id) {
-    const [{ data: nextProblem }, { data: chapter }] = await Promise.all([
-      db
-        .from('problems')
-        .select('id')
-        .eq('chapter_id', problem.chapter_id)
-        .eq('is_published', true)
-        .gt('order_no', problem.order_no)
-        .order('order_no', { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      db
-        .from('chapters')
-        .select('stage_id')
-        .eq('id', problem.chapter_id)
-        .maybeSingle(),
-    ]);
-    next_problem_id = nextProblem?.id ?? null;
-    stage_id = chapter?.stage_id ?? null;
+    const { data: currentChapter } = await db
+      .from('chapters')
+      .select('id, stage_id, order_no')
+      .eq('id', problem.chapter_id)
+      .eq('is_published', true)
+      .maybeSingle();
+
+    if (currentChapter?.stage_id) {
+      const [{ data: stage }, { data: chapters }] = await Promise.all([
+        db
+          .from('stages')
+          .select('id')
+          .eq('id', currentChapter.stage_id)
+          .eq('is_published', true)
+          .maybeSingle(),
+        db
+          .from('chapters')
+          .select('id, order_no')
+          .eq('stage_id', currentChapter.stage_id)
+          .eq('is_published', true)
+          .order('order_no', { ascending: true }),
+      ]);
+
+      if (stage && chapters?.length) {
+        const chapterOrder = new Map(
+          chapters.map((chapter) => [chapter.id, chapter.order_no]),
+        );
+        const { data: stageProblems } = await db
+          .from('problems')
+          .select('id, problem_no, title, chapter_id, order_no, is_published')
+          .in('chapter_id', chapters.map((chapter) => chapter.id))
+          .eq('is_published', true);
+
+        const candidates: ProblemNavigationCandidate[] = [];
+        for (const stageProblem of stageProblems ?? []) {
+          if (!stageProblem.chapter_id) continue;
+          const chapterOrderNo = chapterOrder.get(stageProblem.chapter_id);
+          if (chapterOrderNo === undefined) continue;
+
+          candidates.push({
+            id: stageProblem.id,
+            problem_no: stageProblem.problem_no,
+            title: stageProblem.title,
+            chapter_id: stageProblem.chapter_id,
+            chapter_order_no: chapterOrderNo,
+            problem_order_no: stageProblem.order_no,
+            is_published: stageProblem.is_published,
+          });
+        }
+
+        navigation = {
+          stage_id: stage.id,
+          ...resolveProblemNeighbors(candidates, problem.id),
+        };
+      }
+    }
   }
+
+  const learning_context = user.role === 'student'
+    ? await getLearningContext({ problemId: problem.id, studentId: user.id })
+    : null;
 
   return apiOk({
     problem,
     test_cases: test_cases ?? [],
     hints: hints ?? [],
-    next_problem_id,
-    stage_id,
+    navigation,
+    learning_context,
+    // Kept during the response-shape transition for existing clients.
+    next_problem_id: navigation?.next?.id ?? null,
+    stage_id: navigation?.stage_id ?? null,
   });
 }

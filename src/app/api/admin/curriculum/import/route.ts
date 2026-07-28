@@ -1,6 +1,7 @@
 import { apiError, apiOk } from '@/lib/api/response';
 import { requireAdmin } from '@/lib/api/requireAdmin';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { validateTestCases } from '@/lib/judge/testCaseValidation';
 
 type ImportTestCase = {
   order_no: number;
@@ -74,6 +75,8 @@ function validateRows(rows: ImportRow[]) {
       errors.push(`${label}: 난이도는 easy, medium, hard 중 하나여야 합니다.`);
     }
     if (!row.test_cases?.length) errors.push(`${label}: 테스트케이스가 1개 이상 필요합니다.`);
+    const testCaseError = validateTestCases(row.test_cases ?? []);
+    if (testCaseError) errors.push(`${label}: ${testCaseError}`);
     row.test_cases?.forEach((testCase, testIndex) => {
       if (!testCase.expected_output?.trim()) {
         errors.push(`${label}: 테스트케이스 ${testIndex + 1}의 정답출력이 없습니다.`);

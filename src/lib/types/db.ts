@@ -119,7 +119,7 @@ export interface DbAssignment {
   created_at: string;
 }
 
-export type SubmissionStatus = 'pass' | 'fail' | 'partial';
+export type SubmissionStatus = 'judging' | 'pass' | 'fail' | 'partial' | 'judge_error';
 
 export interface DbSubmission {
   id: string;

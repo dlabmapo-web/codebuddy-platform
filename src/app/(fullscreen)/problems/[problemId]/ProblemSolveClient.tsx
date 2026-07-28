@@ -1,9 +1,15 @@
 'use client';
 
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type CSSProperties,
+} from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, CheckCircle2, XCircle, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, MessageSquare, X, Square, Sparkles, CircleHelp, LoaderCircle } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
@@ -19,6 +25,44 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/lib/types/db';
 import ThemeToggle from '@/components/ThemeToggle';
+import {
+  SubmissionResultDrawer,
+  type SubmissionResult,
+} from '@/components/judge/SubmissionResultDrawer';
+import { SampleRunControls } from '@/components/judge/SampleRunControls';
+import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
+import {
+  createSampleInputQueue,
+  isSampleOutputMatch,
+} from '@/lib/pyodide/sampleRun';
+import type {
+  ProblemNavigation,
+  ProblemNavigationItem,
+} from '@/lib/problems/navigation';
+import {
+  loadProblemTransitionSnapshot,
+  type ProblemTransitionSnapshot,
+} from '@/lib/problems/transition';
+import {
+  encodeReturnTo,
+  validateReturnTo,
+} from '@/lib/navigation/returnTo';
+import {
+  CURRICULUM_PANEL_DESKTOP_WIDTH,
+  CurriculumNavigator,
+} from '@/components/curriculum/CurriculumNavigator';
+import {
+  updateLearningProgress,
+  type LearningContext,
+  type LearningContextProblem,
+} from '@/lib/curriculum/learningContext';
+import {
+  normalizePointerPosition,
+  resolvePointerSurface,
+  type CollaborationSurface,
+  type StudentPointerLeavePayload,
+  type StudentPointerMovePayload,
+} from '@/lib/collab/pointerSurfaces';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -34,17 +78,12 @@ type ProblemDetail = DbProblem & {
   hints: Pick<DbProblemHint, 'id' | 'hint_text' | 'order_no'>[];
 };
 
-type SubmitResult = {
-  status: 'pass' | 'fail' | 'partial';
-  passedCount: number;
-  totalCount: number;
-  runtimeMs: number;
-  elapsedSec: number;
-  failedCases: number[];
-  attemptNo: number;
-};
-
 type PresenceUser = { userId: string; name: string; role: string };
+type ProblemTransitionDirection = 'previous' | 'next';
+type ProblemNavigationFailure = {
+  destination: ProblemNavigationItem | null;
+  direction: ProblemTransitionDirection | null;
+};
 
 // 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
 // (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
@@ -61,43 +100,8 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
-const ProblemDescription = memo(function ProblemDescription({ html }: { html: string }) {
-  return (
-    <div
-      className="tiptap-render"
-      style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 20 }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-});
-
-// 출력 정규화: 개행 통일 + 각 줄 우측 공백 제거 + 앞뒤 빈 줄 제거
-function normalizeOutput(s: string): string {
-  return s
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map((l) => l.trimEnd())
-    .join('\n')
-    .trim();
-}
-
-// 채점: 전체 출력이 정답과 같거나, 정답이 출력의 마지막 줄(블록)과 일치하면 정답 인정.
-// (학생이 print('입력하세요:') 처럼 안내 문구를 출력해도 실제 정답 부분만 비교)
-function outputMatches(rawStdout: string, expectedOutputs: string[]): boolean {
-  const actual = normalizeOutput(rawStdout);
-  const actualLines = actual.length ? actual.split('\n') : [];
-  return expectedOutputs.some((exp) => {
-    const e = normalizeOutput(exp);
-    if (e === actual) return true;
-    const eLines = e.length ? e.split('\n') : [];
-    if (eLines.length === 0 || eLines.length > actualLines.length) return false;
-    const tail = actualLines.slice(actualLines.length - eLines.length).join('\n');
-    return tail === eLines.join('\n');
-  });
-}
-
 // 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
-async function runFallbackOnce(userCode: string): Promise<{
+async function runFallbackOnce(userCode: string, stdin = ''): Promise<{
   stdout: string;
   stderr: string;
   pythonError: PythonExecutionError | null;
@@ -106,13 +110,14 @@ async function runFallbackOnce(userCode: string): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const py = pyodide as any;
   py.globals.set('_user_code', userCode);
+  py.globals.set('_stdin_text', stdin);
   const result = await py.runPythonAsync(`
 import sys, io, traceback, json, linecache
 _saved_stdout = sys.stdout
 _saved_stdin = sys.stdin
 _captured = io.StringIO()
 sys.stdout = _captured
-sys.stdin = io.StringIO('')
+sys.stdin = io.StringIO(_stdin_text)
 _stderr_msg = ''
 _error = None
 try:
@@ -156,105 +161,23 @@ finally:
   };
 }
 
-function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFeedbackLoading, aiFeedbackContent, nextProblemId, stageId }: {
-  result: SubmitResult;
-  onClose: () => void;
-  onRetry: () => void;
-  onHint: () => void;
-  aiFeedbackEnabled: boolean;
-  aiFeedbackLoading: boolean;
-  aiFeedbackContent: string | null;
-  nextProblemId: string | null;
-  stageId: string | null;
+export default function ProblemSolveClient({
+  problemId,
+  submissionId,
+  returnTo,
+}: {
+  problemId: string;
+  submissionId?: string;
+  returnTo?: string;
 }) {
-  const isPass = result.status === 'pass';
-  const minutes = Math.floor(result.elapsedSec / 60);
-  const secs = result.elapsedSec % 60;
-  const timeLabel = minutes > 0 ? `${minutes}분 ${secs}초` : `${secs}초`;
-  const showAiBox = !isPass && aiFeedbackEnabled;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className={`bg-card rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center mb-5">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
-            {isPass
-              ? <CheckCircle2 size={36} style={{ color: '#16A34A' }} />
-              : <XCircle size={36} style={{ color: '#DC2626' }} />}
-          </div>
-        </div>
-        <h2 className="text-center mb-1" style={{ fontSize: '20px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>
-          {isPass ? '정답입니다!' : result.status === 'partial' ? '일부 통과' : '오답입니다'}
-        </h2>
-        <p className="text-center mb-5" style={{ fontSize: '13px', color: 'var(--color-sub)' }}>{result.attemptNo}번째 제출</p>
-        <div className="flex justify-around rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-          <div className="text-center">
-            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>채점 결과</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: isPass ? '#16A34A' : '#DC2626' }}>{isPass ? '정답' : '오답'}</div>
-          </div>
-          <div style={{ width: 1, backgroundColor: 'var(--color-border)' }} />
-          <div className="text-center">
-            <div style={{ fontSize: '11px', color: 'var(--color-sub)', marginBottom: 2 }}>풀이 시간</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-ink)' }}>{timeLabel}</div>
-          </div>
-        </div>
-        {!isPass && !showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--tint-danger-line)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#DC2626', marginBottom: 4 }}>출력이 정답과 달라요</div>
-            <div style={{ fontSize: '13px', color: 'var(--color-sub)' }}>입력값과 코드를 다시 확인해보세요. 터미널에서 실제 출력을 볼 수 있어요.</div>
-            <div className="mt-1" style={{ fontSize: '11px', color: '#B91C1C' }}>* 정답은 공개되지 않습니다</div>
-          </div>
-        )}
-        {showAiBox && (
-          <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: 'var(--tint-accent)', border: '1px solid var(--tint-accent-line)' }}>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles size={14} style={{ color: '#4F46E5' }} className="flex-shrink-0" />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#4F46E5' }}>AI 피드백</span>
-            </div>
-            {aiFeedbackContent ? (
-              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{aiFeedbackContent}</p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: '#4F46E5', borderTopColor: 'transparent' }} />
-                <span style={{ fontSize: '13px', color: '#4F46E5', fontWeight: 600 }}>AI가 코드를 분석하고 있어요...</span>
-              </div>
-            )}
-            <div className="mt-2" style={{ fontSize: '11px', color: '#4F46E5' }}>* 정답은 직접 알려주지 않는 참고용 피드백입니다</div>
-          </div>
-        )}
-        {isPass ? (
-          <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>닫기</button>
-            <Link
-              href={nextProblemId
-                ? `/problems/${nextProblemId}`
-                : stageId
-                  ? `/problems?stage=${stageId}`
-                  : '/problems'}
-              className="flex-1 rounded-xl text-white flex items-center justify-center"
-              style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
-            >
-              {nextProblemId ? '다음 문제 풀기' : '목록으로'}
-            </Link>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <button onClick={onHint} className="flex-1 rounded-xl" style={{ height: 44, border: '1px solid var(--color-border)', fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>힌트 보기</button>
-            <button onClick={onRetry} className="flex-1 rounded-xl text-white" style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}>다시 풀기</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default function ProblemSolveClient({ problemId, submissionId }: { problemId: string; submissionId?: string }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
-  const [nextProblemId, setNextProblemId] = useState<string | null>(null);
-  const [stageId, setStageId] = useState<string | null>(null);
+  const [navigation, setNavigation] = useState<ProblemNavigation | null>(null);
+  const [learningContext, setLearningContext] = useState<LearningContext | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [isProblemTransitioning, setIsProblemTransitioning] = useState(false);
+  const [lastCatalogReturn, setLastCatalogReturn] = useState<string | null>(null);
+  const [problemTransitionDirection, setProblemTransitionDirection] = useState<ProblemTransitionDirection | null>(null);
+  const [navigationFailure, setNavigationFailure] = useState<ProblemNavigationFailure | null>(null);
   const [code, setCode] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
   const [terminalHeight, setTerminalHeight] = useState(220);
@@ -265,11 +188,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [errorExplainSeen, setErrorExplainSeen] = useState(false);
   const [awaitingInput, setAwaitingInput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [modalResult, setModalResult] = useState<SubmitResult | null>(null);
+  const [activeSampleIndex, setActiveSampleIndex] = useState<number | null>(null);
+  const [modalResult, setModalResult] = useState<SubmissionResult | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   const [leftWidth, setLeftWidth] = useState(46);
+  const [curriculumOpen, setCurriculumOpen] = useState(false);
   const [interactiveSupported, setInteractiveSupported] = useState(true);
   const [starterCode, setStarterCode] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -290,6 +215,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
   const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
+  const manualInputQueueRef = useRef<string[]>([]);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
   const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const myInfoRef = useRef<{ id: string; name: string } | null>(null);
@@ -302,18 +228,24 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const pendingCodeRef = useRef<string | null>(null);
   const lastCursorSentRef = useRef(0);
   const lastPointerSentRef = useRef(0);
+  const lastPointerSurfaceRef = useRef<CollaborationSurface | null>(null);
   // senderId별 "포인터 숨김" 타이머 — pointer:move가 끊기면 3초 뒤 해당 포인터를 제거
   const pointerIdleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
   const codeRef = useRef(code);
+  const problemRef = useRef<ProblemDetail | null>(null);
+  const navigationRef = useRef<ProblemNavigation | null>(null);
+  const problemTransitioningRef = useRef(false);
+  const problemTransitionControllerRef = useRef<AbortController | null>(null);
+  const initialProblemIdRef = useRef(problemId);
+  const initialSubmissionIdRef = useRef(submissionId);
+  const validatedReturnTo = validateReturnTo(returnTo, 'student');
   const sessionIdRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingSyncRef = useRef(false);
   const lastSavedCodeRef = useRef<string | null>(null);
-  // 세션에서 저장된 코드를 복원했는지 표시 → 문제 로드의 starter_code가 덮어쓰지 않도록 보호
-  const codeRestoredRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -321,10 +253,19 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const remoteCursorDecorationsRef = useRef<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remoteCursorWidgetRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (validatedReturnTo) return;
+    setLastCatalogReturn(
+      validateReturnTo(sessionStorage.getItem('cove-last-student-catalog'), 'student'),
+    );
+  }, [validatedReturnTo]);
   // 선생님 커서가 멈추면 일정 시간 뒤 커서 위젯을 숨기는 타이머
   const remoteCursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { codeRef.current = code; }, [code]);
+  useEffect(() => { problemRef.current = problem; }, [problem]);
+  useEffect(() => { navigationRef.current = navigation; }, [navigation]);
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
 
   const updateRemoteCursor = useCallback((name: string, role: string, position: { lineNumber: number; column: number }) => {
@@ -386,137 +327,271 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     });
   }, [myInfo]);
 
-  const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!myInfo || !channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
-    const now = Date.now();
-    if (now - lastPointerSentRef.current < 80) return;
-    lastPointerSentRef.current = now;
-    const rect = editorPaneRef.current.getBoundingClientRect();
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'pointer:move',
-      payload: {
-        senderId: myInfo.id,
-        name: myInfo.name,
-        role: 'student',
-        xPct: (e.clientX - rect.left) / rect.width,
-        yPct: (e.clientY - rect.top) / rect.height,
-      },
-    });
-  }, [myInfo]);
-
-  const handlePaneMouseLeave = useCallback(() => {
-    if (!myInfo || !channelRef.current || !hasPeerRef.current) return;
-    channelRef.current.send({ type: 'broadcast', event: 'pointer:leave', payload: { senderId: myInfo.id } });
-  }, [myInfo]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/auth/me', { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((json) => {
+        if (json?.user) setMyInfo({ id: json.user.id, name: json.user.name });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(json => {
-      if (json.user) setMyInfo({ id: json.user.id, name: json.user.name });
-    });
-  }, []);
+    if (!sessionId || !myInfo || !problem?.id) return;
+
+    const sendLeave = () => {
+      if (!lastPointerSurfaceRef.current) return;
+      lastPointerSurfaceRef.current = null;
+      if (!channelRef.current || !hasPeerRef.current) return;
+
+      const payload: StudentPointerLeavePayload = {
+        senderId: myInfo.id,
+        sessionId,
+        problemId: problem.id,
+        role: 'student',
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'student:pointer:leave',
+        payload,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!channelRef.current || !hasPeerRef.current) {
+        lastPointerSurfaceRef.current = null;
+        return;
+      }
+
+      const resolved = resolvePointerSurface(event.target);
+      if (!resolved) {
+        sendLeave();
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastPointerSentRef.current < 80) return;
+      const position = normalizePointerPosition(
+        event.clientX,
+        event.clientY,
+        resolved.element.getBoundingClientRect()
+      );
+      if (!position) return;
+
+      lastPointerSentRef.current = now;
+      lastPointerSurfaceRef.current = resolved.surface;
+      const payload: StudentPointerMovePayload = {
+        senderId: myInfo.id,
+        sessionId,
+        problemId: problem.id,
+        name: myInfo.name,
+        role: 'student',
+        surface: resolved.surface,
+        ...position,
+        sentAt: now,
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'student:pointer:move',
+        payload,
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) sendLeave();
+    };
+
+    document.addEventListener('pointermove', handlePointerMove, true);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', sendLeave);
+    return () => {
+      sendLeave();
+      document.removeEventListener('pointermove', handlePointerMove, true);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', sendLeave);
+    };
+  }, [myInfo, problem?.id, sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
     let prevCount = -1;
+    let loading = false;
+    const controller = new AbortController();
     setFeedbacks([]);
 
-    const loadFeedbacks = () => {
-      if (document.hidden) return;
-      fetch(`/api/feedbacks?session_id=${sessionId}`)
-        .then(r => r.json())
-        .then(json => {
-          if (!json.feedbacks) return;
-          const list = (json.feedbacks as { users?: { name: string }; content: string; created_at: string }[]).map(fb => ({
-            teacherName: fb.users?.name ?? '선생님',
-            content: fb.content,
-            createdAt: fb.created_at,
-          }));
-          if (prevCount >= 0 && list.length > prevCount) {
-            setFeedbackPanelOpen(true);
-          }
-          prevCount = list.length;
-          setFeedbacks(list);
-        });
+    const loadFeedbacks = async () => {
+      if (document.hidden || loading || controller.signal.aborted) return;
+      loading = true;
+      try {
+        const response = await fetch(
+          `/api/feedbacks?session_id=${sessionId}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const json = await response.json();
+        if (!json.feedbacks) return;
+        const list = (json.feedbacks as { users?: { name: string }; content: string; created_at: string }[]).map(fb => ({
+          teacherName: fb.users?.name ?? '선생님',
+          content: fb.content,
+          createdAt: fb.created_at,
+        }));
+        if (prevCount >= 0 && list.length > prevCount) {
+          setFeedbackPanelOpen(true);
+        }
+        prevCount = list.length;
+        setFeedbacks(list);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      } finally {
+        loading = false;
+      }
     };
 
-    loadFeedbacks();
+    void loadFeedbacks();
     const interval = setInterval(loadFeedbacks, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
+    const controller = new AbortController();
     setAiFeedbacks([]);
-    fetch(`/api/ai-feedbacks?session_id=${sessionId}`)
-      .then((r) => r.json())
-      .then((json) => setAiFeedbacks(json.feedbacks ?? []))
-      .catch(() => {});
+    fetch(`/api/ai-feedbacks?session_id=${sessionId}`, {
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((json) => {
+        if (json) setAiFeedbacks(json.feedbacks ?? []);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
   }, [sessionId]);
 
-  useEffect(() => {
-    setNextProblemId(null);
-    setStageId(null);
-    fetch(`/api/problems/${problemId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!json.problem) { setLoadError(true); return; }
-        setProblem({ ...json.problem, test_cases: json.test_cases ?? [], hints: json.hints ?? [] });
-        setNextProblemId(json.next_problem_id ?? null);
-        setStageId(json.stage_id ?? null);
-        const sc = json.problem.starter_code ?? '';
-        setStarterCode(sc);
-        // 세션에서 저장 코드를 이미 복원했으면 starter_code로 덮어쓰지 않음 (race 방지)
-        if (!submissionId && !codeRestoredRef.current) { setCode(sc); codeRef.current = sc; }
-      })
-      .catch(() => setLoadError(true));
+  const applyProblemSnapshot = useCallback((snapshot: ProblemTransitionSnapshot) => {
+    runnerRef.current?.stop();
+    runFinishRef.current?.(true);
+    runOffRef.current?.();
+    runOffRef.current = null;
+    runFinishRef.current = null;
+    runnerRef.current?.dispose();
+    runnerRef.current = null;
+    manualInputQueueRef.current = [];
+    runStdoutRef.current = '';
+    runStderrRef.current = '';
+    runPythonErrorRef.current = null;
+    pendingCodeRef.current = null;
+    awaitingSyncRef.current = false;
+    hasPeerRef.current = false;
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+    broadcastTimerRef.current = null;
+    if (runOutTimerRef.current) clearTimeout(runOutTimerRef.current);
+    runOutTimerRef.current = null;
+    runOutBufRef.current = [];
 
-    fetch(`/api/submissions?problem_id=${problemId}`)
-      .then((r) => r.json())
-      .then((json) => setAttemptCount(json.submissions?.length ?? 0));
-
-    if (submissionId) {
-      fetch(`/api/submissions/${submissionId}`)
-        .then((r) => r.json())
-        .then((json) => { if (json.submission?.code) setCode(json.submission.code); });
+    const editor = editorRef.current;
+    if (editor) {
+      remoteCursorDecorationsRef.current = editor.deltaDecorations(
+        remoteCursorDecorationsRef.current,
+        [],
+      );
+      if (remoteCursorWidgetRef.current) {
+        editor.removeContentWidget(remoteCursorWidgetRef.current);
+        remoteCursorWidgetRef.current = null;
+      }
     }
-  }, [problemId, submissionId]);
+
+    problemRef.current = snapshot.problem;
+    navigationRef.current = snapshot.navigation;
+    codeRef.current = snapshot.code;
+    sessionIdRef.current = snapshot.sessionId;
+    lastSavedCodeRef.current = snapshot.lastSavedCode;
+
+    setProblem(snapshot.problem);
+    setNavigation(snapshot.navigation);
+    setLearningContext(snapshot.learningContext);
+    setStarterCode(snapshot.starterCode);
+    setCode(snapshot.code);
+    setSessionId(snapshot.sessionId);
+    setAttemptCount(snapshot.attemptCount);
+    setSeconds(0);
+    setTerminalLines([]);
+    setTerminalOpen(true);
+    setLastPythonError(null);
+    setTerminalTab('terminal');
+    setErrorExplainSeen(false);
+    setAwaitingInput(false);
+    setIsRunning(false);
+    setActiveSampleIndex(null);
+    setModalResult(null);
+    setShowHint(false);
+    setFeedbacks([]);
+    setFeedbackPanelOpen(false);
+    setAiFeedbacks([]);
+    setAiFeedbackPanelOpen(false);
+    setAiFeedbackLoading(false);
+    setCurrentAiFeedback(null);
+    setTeacherOnline(false);
+    setRemotePointers({});
+    setLoadError(false);
+    setNavigationFailure(null);
+    setProblemTransitionDirection(null);
+    problemTransitioningRef.current = false;
+    setIsProblemTransitioning(false);
+  }, []);
 
   useEffect(() => {
-    fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_id: problemId }),
+    const controller = new AbortController();
+    problemTransitionControllerRef.current = controller;
+
+    loadProblemTransitionSnapshot({
+      problemId: initialProblemIdRef.current,
+      submissionId: initialSubmissionIdRef.current,
+      previousSessionId: null,
+      signal: controller.signal,
     })
-      .then(r => r.json())
-      .then(json => {
-        if (!json.session?.id) return;
-        setSessionId(json.session.id);
-        // 이전에 작성하던 코드가 있으면 복원 (제출 코드 열람 중이 아닐 때만)
-        if (!submissionId && json.session.final_code) {
-          codeRestoredRef.current = true;
-          setCode(json.session.final_code);
-          codeRef.current = json.session.final_code;
-          lastSavedCodeRef.current = json.session.final_code;
-        }
+      .then((snapshot) => {
+        if (!controller.signal.aborted) applyProblemSnapshot(snapshot);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setLoadError(true);
+        setProblemTransitionDirection(null);
+        problemTransitioningRef.current = false;
+        setIsProblemTransitioning(false);
       });
 
     return () => {
-      const sid = sessionIdRef.current;
-      if (sid) {
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        // codeRef.current가 비어있으면 final_code를 전송하지 않음 (auto-save된 코드 유지)
-        const body: Record<string, unknown> = { status: 'ended' };
-        if (codeRef.current) body.final_code = codeRef.current;
-        fetch(`/api/sessions/${sid}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          keepalive: true,
-        });
+      controller.abort();
+      if (problemTransitionControllerRef.current === controller) {
+        problemTransitionControllerRef.current = null;
       }
     };
-  }, [problemId]);
+  }, [applyProblemSnapshot]);
+
+  useEffect(() => () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    fetch(`/api/sessions/${sid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'ended',
+        final_code: codeRef.current,
+      }),
+      keepalive: true,
+    });
+  }, []);
 
   // 누가 입력했든(로컬/원격) 현재 코드를 디바운스 저장 → 새로고침 시 항상 복원 가능.
   // 혼자 풀 때도(선생님 없이도) 동일하게 동작한다.
@@ -534,6 +609,189 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       }
     }, 1000);
   }, []);
+
+  const saveDraftBeforeNavigation = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const sid = sessionIdRef.current;
+    const currentCode = codeRef.current;
+    if (!sid || currentCode === lastSavedCodeRef.current) return;
+
+    lastSavedCodeRef.current = currentCode;
+    fetch(`/api/sessions/${sid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ final_code: currentCode }),
+      keepalive: true,
+    }).catch(() => {});
+  }, []);
+
+  const transitionToProblem = useCallback(async ({
+    destination,
+    direction,
+    updateHistory,
+  }: {
+    destination: ProblemNavigationItem;
+    direction: ProblemTransitionDirection | null;
+    updateHistory: 'push' | 'none';
+  }) => {
+    const displayedProblem = problemRef.current;
+    if (!displayedProblem || problemTransitioningRef.current) return;
+
+    saveDraftBeforeNavigation();
+    runnerRef.current?.stop();
+    runFinishRef.current?.(true);
+    setIsRunning(false);
+    setActiveSampleIndex(null);
+    setAwaitingInput(false);
+    setNavigationFailure(null);
+    setProblemTransitionDirection(direction);
+    problemTransitioningRef.current = true;
+    setIsProblemTransitioning(true);
+
+    problemTransitionControllerRef.current?.abort();
+    const controller = new AbortController();
+    problemTransitionControllerRef.current = controller;
+    const previousSessionId = sessionIdRef.current;
+    const previousCode = codeRef.current;
+
+    try {
+      const snapshot = await loadProblemTransitionSnapshot({
+        problemId: destination.id,
+        previousSessionId,
+        previousCode,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+
+      applyProblemSnapshot(snapshot);
+      if (updateHistory === 'push') {
+        const returnQuery = validatedReturnTo
+          ? `?returnTo=${encodeReturnTo(validatedReturnTo)}`
+          : '';
+        window.history.pushState(
+          null,
+          '',
+          `/problems/${snapshot.problem.id}${returnQuery}`,
+        );
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+
+      try {
+        const restoreResponse = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ problem_id: displayedProblem.id }),
+          signal: controller.signal,
+        });
+        const restored = restoreResponse.ok
+          ? await restoreResponse.json()
+          : null;
+        const restoredSessionId = restored?.session?.id as string | undefined;
+        if (restoredSessionId) {
+          await fetch(`/api/sessions/${restoredSessionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ final_code: codeRef.current }),
+            signal: controller.signal,
+          });
+          sessionIdRef.current = restoredSessionId;
+          lastSavedCodeRef.current = codeRef.current;
+          setSessionId(restoredSessionId);
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+      }
+
+      if (updateHistory === 'none') {
+        window.history.replaceState(null, '', `/problems/${displayedProblem.id}`);
+      }
+      setNavigationFailure({ destination, direction });
+      setProblemTransitionDirection(null);
+      problemTransitioningRef.current = false;
+      setIsProblemTransitioning(false);
+    } finally {
+      if (problemTransitionControllerRef.current === controller) {
+        problemTransitionControllerRef.current = null;
+      }
+    }
+  }, [applyProblemSnapshot, saveDraftBeforeNavigation, validatedReturnTo]);
+
+  const handleNavigateProblem = useCallback((
+    destination: ProblemNavigationItem | null,
+    direction: ProblemTransitionDirection,
+  ) => {
+    if (!destination || isRunning || problemTransitioningRef.current) return;
+    void transitionToProblem({
+      destination,
+      direction,
+      updateHistory: 'push',
+    });
+  }, [isRunning, transitionToProblem]);
+
+  const handleCurriculumProblemSelect = useCallback((
+    destination: LearningContextProblem,
+  ) => {
+    if (
+      destination.id === problemRef.current?.id
+      || isRunning
+      || problemTransitioningRef.current
+    ) {
+      return;
+    }
+
+    void transitionToProblem({
+      destination: {
+        id: destination.id,
+        problem_no: destination.problemNo,
+        title: destination.title,
+        chapter_id: '',
+        chapter_order_no: 0,
+        problem_order_no: destination.orderNo,
+      },
+      direction: null,
+      updateHistory: 'push',
+    });
+  }, [isRunning, transitionToProblem]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const match = window.location.pathname.match(/^\/problems\/([^/]+)\/?$/);
+      const destinationId = match?.[1] ? decodeURIComponent(match[1]) : null;
+      const displayedProblem = problemRef.current;
+      if (!destinationId || !displayedProblem || destinationId === displayedProblem.id) return;
+
+      const displayedNavigation = navigationRef.current;
+      const destination = displayedNavigation?.next?.id === destinationId
+        ? displayedNavigation.next
+        : displayedNavigation?.previous?.id === destinationId
+          ? displayedNavigation.previous
+          : {
+              id: destinationId,
+              problem_no: 0,
+              title: '',
+              chapter_id: '',
+              chapter_order_no: 0,
+              problem_order_no: 0,
+            };
+      const direction: ProblemTransitionDirection | null =
+        displayedNavigation?.next?.id === destinationId
+          ? 'next'
+          : displayedNavigation?.previous?.id === destinationId
+            ? 'previous'
+            : null;
+
+      void transitionToProblem({
+        destination,
+        direction,
+        updateHistory: 'none',
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [transitionToProblem]);
 
   // 안전장치: 디바운스를 놓치는 경우를 대비해 10초마다 변경분을 추가 저장
   useEffect(() => {
@@ -576,7 +834,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         updateRemoteCursor(payload.name, payload.role, payload.position);
       })
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
-        if (payload.senderId === myInfo.id) return;
+        if (payload.senderId === myInfo.id || payload.role !== 'teacher') return;
         const pointerName = payload.role === 'teacher' ? TEACHER_DISPLAY_NAME : payload.name;
         setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: pointerName, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
         // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
@@ -592,7 +850,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           });
         }, POINTER_IDLE_HIDE_MS);
       })
-      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
+      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string; role?: string } }) => {
+        if (payload.role !== 'teacher') return;
         const timers = pointerIdleTimersRef.current;
         if (timers[payload.senderId]) { clearTimeout(timers[payload.senderId]); delete timers[payload.senderId]; }
         setRemotePointers(prev => {
@@ -663,6 +922,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
 
   const handleCodeChange = useCallback((newCode: string) => {
+    if (isProblemTransitioning) return;
     setCode(newCode);
     codeRef.current = newCode;
     scheduleAutoSave(newCode);
@@ -687,7 +947,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
       broadcastTimerRef.current = setTimeout(flush, 80 - elapsed);
     }
-  }, [myInfo, scheduleAutoSave]);
+  }, [isProblemTransitioning, myInfo, scheduleAutoSave]);
 
   useEffect(() => {
     const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -767,7 +1027,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, []);
 
   // 터미널에서 코드를 대화식으로 실행하고, 프로그램 종료(done) 시 누적 출력을 반환
-  const executeInTerminal = useCallback((sourceCode: string): Promise<{
+  const executeInTerminal = useCallback((sourceCode: string, options?: {
+    sampleInput?: string;
+  }): Promise<{
     stdout: string;
     stderr: string;
     pythonError: PythonExecutionError | null;
@@ -776,6 +1038,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     runStdoutRef.current = '';
     runStderrRef.current = '';
     runPythonErrorRef.current = null;
+    manualInputQueueRef.current = [];
     setLastPythonError(null);
     setTerminalTab('terminal');
     setErrorExplainSeen(false);
@@ -783,7 +1046,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     const runner = ensureRunner();
 
     if (!runner) {
-      return runFallbackOnce(sourceCode)
+      return runFallbackOnce(sourceCode, options?.sampleInput ?? '')
         .then(({ stdout, stderr, pythonError }) => {
           if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
           if (stderr) { appendTerminal(stderr, 'err'); queueRunOut(stderr, 'err'); }
@@ -809,10 +1072,16 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       appendTerminal('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
     }
 
+    const sampleInputQueue = options?.sampleInput === undefined
+      ? null
+      : createSampleInputQueue(options.sampleInput);
+    let inputExhaustedNoticeShown = false;
+
     return new Promise((resolve) => {
       const finish = (stopped: boolean) => {
         if (runOffRef.current) { runOffRef.current(); runOffRef.current = null; }
         runFinishRef.current = null;
+        manualInputQueueRef.current = [];
         setAwaitingInput(false);
         flushRunOut();
         broadcastRun('run:end', {});
@@ -840,9 +1109,26 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           appendTerminal(ev.error.display, 'err');
           queueRunOut(ev.error.display, 'err');
         } else if (ev.type === 'stdin') {
-          setAwaitingInput(true);
           flushRunOut();
-          broadcastRun('run:waiting', {});
+          const inputLine = sampleInputQueue && sampleInputQueue.length > 0
+            ? sampleInputQueue.shift()
+            : manualInputQueueRef.current.shift();
+          if (inputLine !== undefined) {
+            appendTerminal(inputLine + '\n', 'in');
+            broadcastRun('run:stdin', { text: inputLine });
+            setAwaitingInput(false);
+            queueMicrotask(() => runner.provideInput(inputLine));
+          } else {
+            if (sampleInputQueue && !inputExhaustedNoticeShown) {
+              inputExhaustedNoticeShown = true;
+              appendTerminal(
+                '테스트 입력을 모두 사용했습니다. 필요한 입력을 직접 입력해 주세요.\n',
+                'info',
+              );
+            }
+            setAwaitingInput(true);
+            broadcastRun('run:waiting', {});
+          }
         } else if (ev.type === 'done') {
           finish(false);
         } else if (ev.type === 'fatal') {
@@ -858,90 +1144,188 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [ensureRunner, appendTerminal, broadcastRun, queueRunOut, flushRunOut]);
 
   const handleTerminalInput = useCallback((value: string) => {
-    appendTerminal(value + '\n', 'in');
-    broadcastRun('run:stdin', { text: value });
+    const inputLines = value === '' ? [''] : createSampleInputQueue(value);
+    const [firstLine = '', ...remainingLines] = inputLines;
+    manualInputQueueRef.current = remainingLines;
+    appendTerminal(firstLine + '\n', 'in');
+    broadcastRun('run:stdin', { text: firstLine });
     setAwaitingInput(false);
-    runnerRef.current?.provideInput(value);
+    runnerRef.current?.provideInput(firstLine);
   }, [appendTerminal, broadcastRun]);
 
   const handleStop = useCallback(() => {
     runnerRef.current?.stop();
+    manualInputQueueRef.current = [];
     appendTerminal('\n[실행을 중단했습니다]\n', 'meta');
     runFinishRef.current?.(true);
     setAwaitingInput(false);
     setIsRunning(false);
+    setActiveSampleIndex(null);
   }, [appendTerminal]);
 
   const handleRun = useCallback(async () => {
-    if (isRunning || !problem) return;
+    if (isRunning || isProblemTransitioning || !problem) return;
     setIsRunning(true);
+    setActiveSampleIndex(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
-    await executeInTerminal(code);
-    appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
+    const result = await executeInTerminal(code);
+    if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setIsRunning(false);
-  }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
 
-  const handleSubmit = useCallback(async () => {
-    if (isRunning || !problem) return;
+  const handleRunSample = useCallback(async (
+    sampleCase: ProblemDetail['test_cases'][number],
+    sampleIndex: number,
+  ) => {
+    if (isRunning || isProblemTransitioning || !problem) return;
 
-    const res = await fetch(`/api/problems/${problemId}/judge-cases`).catch(() => null);
-    const judgeJson = res?.ok ? await res.json().catch(() => null) : null;
-    const judgeCases: Array<{ input: string; expected_output: string }> = judgeJson?.test_cases ?? problem.test_cases;
+    const sampleNumber = sampleIndex + 1;
+    const queuedLineCount = createSampleInputQueue(sampleCase.input).length;
+    setIsRunning(true);
+    setActiveSampleIndex(sampleIndex);
+    setTerminalOpen(true);
+    setTerminalTab('terminal');
+    setTerminalLines([
+      { text: `$ python solution.py · 테스트 ${sampleNumber}\n`, kind: 'meta' },
+      {
+        text: queuedLineCount > 0
+          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄을 자동으로 사용합니다.\n`
+          : `입력이 없는 테스트 ${sampleNumber}을 실행합니다.\n`,
+        kind: 'info',
+      },
+    ]);
 
-    if (judgeCases.length === 0) {
-      setTerminalOpen(true);
-      setTerminalLines([{ text: '채점할 정답이 없습니다. 관리자에게 문의하세요.\n', kind: 'err' }]);
-      return;
+    const result = await executeInTerminal(code, { sampleInput: sampleCase.input });
+
+    if (!result.stopped && !result.pythonError && !result.stderr) {
+      if (isSampleOutputMatch(result.stdout, sampleCase.expected_output)) {
+        appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
+      } else {
+        appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+        appendTerminal(
+          `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
+          'info',
+        );
+      }
+    } else if (!result.stopped) {
+      appendTerminal('\n실행 오류가 있어 예제 출력 비교를 건너뜁니다.\n', 'info');
     }
 
-    // 등록된 정답(출력값)들 = 허용되는 출력 목록
-    const expectedOutputs = judgeCases
-      .map((tc) => tc.expected_output.trim())
-      .filter((o) => o.length > 0);
+    if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
+    setActiveSampleIndex(null);
+    setIsRunning(false);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
+
+  const handleSubmit = useCallback(async () => {
+    if (isRunning || isProblemTransitioning || !problem) return;
 
     setIsRunning(true);
+    setActiveSampleIndex(null);
+    setModalResult(null);
     setTerminalOpen(true);
-    setTerminalLines([{ text: '$ python solution.py   (제출)\n', kind: 'meta' }]);
+    setTerminalLines([{ text: '$ solution.py 제출\n', kind: 'meta' }, { text: '비공개 테스트를 포함한 서버 채점을 시작합니다...\n', kind: 'info' }]);
     setCurrentAiFeedback(null);
 
-    const t0 = Date.now();
-    const { stdout, stderr, pythonError, stopped } = await executeInTerminal(code);
-    if (stopped) { setIsRunning(false); return; }
-
-    const runtimeMs = Date.now() - t0;
-    const matched = !pythonError && !stderr.trim() && outputMatches(stdout, expectedOutputs);
-    const status: 'pass' | 'fail' = matched ? 'pass' : 'fail';
-    const score = matched ? 100 : 0;
-    const newAttempt = attemptCount + 1;
-
-    appendTerminal(
-      matched
-        ? `\n채점 결과: 정답입니다! (${runtimeMs}ms)\n`
-        : pythonError
-          ? '\n코드에 오류가 있어 채점하지 못했어요. 위의 [해석] 버튼을 눌러 확인해 보세요.\n'
-          : `\n채점 결과: 오답입니다. 출력이 정답과 달라요. (${runtimeMs}ms)\n`,
-      matched ? 'out' : 'err',
-    );
-    setAttemptCount(newAttempt);
+    if (sessionId) {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ final_code: code }),
+      }).catch(() => null);
+    }
 
     const subRes = await fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_id: problemId, language: 'python', code, status, score, passed_count: matched ? 1 : 0, total_count: 1, runtime_ms: runtimeMs, elapsed_sec: seconds }),
-    });
+      body: JSON.stringify({ problem_id: problem.id, language: 'python', code, elapsed_sec: seconds }),
+    }).catch(() => null);
+    if (!subRes) {
+      appendTerminal('\n채점 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.\n', 'err');
+      setIsRunning(false);
+      return;
+    }
     const subJson = await subRes.json().catch(() => null);
+    if (!subRes.ok || !subJson?.submission?.id) {
+      appendTerminal(`\n${subJson?.error?.message ?? '채점을 시작하지 못했습니다.'}\n`, 'err');
+      setIsRunning(false);
+      return;
+    }
 
-    if (!matched && problem.use_ai_feedback && subJson?.submission?.id) {
+    const submissionId = subJson.submission.id as string;
+    const initialTotalCount = Number(subJson.submission.total_count) || 0;
+    setModalResult({
+      status: 'judging',
+      score: 0,
+      passedCount: 0,
+      totalCount: initialTotalCount,
+      runtimeMs: 0,
+      elapsedSec: seconds,
+      attemptNo: attemptCount + 1,
+      cases: [],
+    });
+    let finalSubmission: {
+      status: 'pass' | 'fail' | 'partial' | 'judge_error';
+      score: number;
+      passed_count: number;
+      total_count: number;
+      runtime_ms: number | null;
+      cases?: SubmissionResult['cases'];
+    } | null = null;
+
+    for (let poll = 0; poll < 400; poll += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, poll === 0 ? 500 : 1500));
+      const statusRes = await fetch(`/api/submissions/${submissionId}`, { cache: 'no-store' }).catch(() => null);
+      const statusJson = statusRes?.ok ? await statusRes.json().catch(() => null) : null;
+      const next = statusJson?.submission;
+      if (next && next.status !== 'judging') {
+        finalSubmission = next;
+        break;
+      }
+    }
+
+    if (!finalSubmission) {
+      appendTerminal('\n채점이 계속 진행 중입니다. 제출 기록에서 결과를 다시 확인해주세요.\n', 'info');
+      setIsRunning(false);
+      return;
+    }
+
+    const status = finalSubmission.status;
+    const isStudentFailure = status === 'fail' || status === 'partial';
+    const newAttempt = status === 'judge_error' ? attemptCount : attemptCount + 1;
+    const runtimeMs = finalSubmission.runtime_ms ?? 0;
+    const passedCount = finalSubmission.passed_count;
+    const totalCount = finalSubmission.total_count;
+
+    appendTerminal(
+      status === 'pass'
+        ? `\n채점 결과: 모든 테스트를 통과했습니다! (${runtimeMs}ms)\n`
+        : status === 'judge_error'
+          ? '\n채점 서비스 오류가 발생했습니다. 학생의 오답으로 기록되지 않았습니다.\n'
+          : `\n채점 결과: ${passedCount}/${totalCount}개 테스트를 통과했습니다. (${runtimeMs}ms)\n`,
+      status === 'pass' ? 'out' : 'err',
+    );
+    if (status !== 'judge_error') setAttemptCount(newAttempt);
+    if (status !== 'judge_error') {
+      setLearningContext((current) => current
+        ? updateLearningProgress(
+          current,
+          problem.id,
+          status === 'pass' ? 'passed' : 'attempted'
+        )
+        : current);
+    }
+
+    if (isStudentFailure && problem.use_ai_feedback) {
       setAiFeedbackLoading(true);
       fetch('/api/ai-feedbacks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          submission_id: subJson.submission.id,
-          problem_id: problemId,
+          submission_id: submissionId,
+          problem_id: problem.id,
           code,
-          error_message: pythonError?.display.trim() || undefined,
+          error_message: `${passedCount}/${totalCount} tests passed`,
         }),
       })
         .then((r) => r.json())
@@ -955,17 +1339,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         .finally(() => setAiFeedbackLoading(false));
     }
 
-    if (sessionId) {
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ final_code: code }),
-      });
-    }
-
-    setModalResult({ status, passedCount: matched ? 1 : 0, totalCount: 1, runtimeMs, elapsedSec: seconds, failedCases: matched ? [] : [1], attemptNo: newAttempt });
+    setModalResult({
+      status,
+      score: finalSubmission.score,
+      passedCount,
+      totalCount,
+      runtimeMs,
+      elapsedSec: seconds,
+      attemptNo: newAttempt,
+      cases: finalSubmission.cases ?? [],
+    });
     setIsRunning(false);
-  }, [isRunning, problem, problemId, code, executeInTerminal, appendTerminal, attemptCount, seconds, sessionId]);
+  }, [isProblemTransitioning, isRunning, problem, code, appendTerminal, attemptCount, seconds, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -992,19 +1377,70 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     );
   }
 
-  const sampleCases = problem.test_cases.filter((tc) => tc.is_sample);
+  const sampleCases = problem.test_cases
+    .filter((tc) => tc.is_sample)
+    .sort((a, b) => a.order_no - b.order_no);
+  const listParams = new URLSearchParams();
+  if (navigation?.stage_id) listParams.set('stage', navigation.stage_id);
+  if (problem.chapter_id) listParams.set('chapter', problem.chapter_id);
+  const problemListHref = listParams.size > 0
+    ? `/problems?${listParams.toString()}`
+    : '/problems';
+  const returnHref = validatedReturnTo ?? lastCatalogReturn ?? problemListHref;
+  const returnLabel = returnHref === '/me' || returnHref.startsWith('/me?')
+    ? '풀이 기록'
+    : '목록';
+  const previousProblem = navigation?.previous ?? null;
+  const nextProblem = navigation?.next ?? null;
+  const workspaceActionsDisabled = isRunning || isProblemTransitioning;
+  const failedNavigationLabel = navigationFailure?.direction === 'previous'
+    ? '이전 문제'
+    : navigationFailure?.direction === 'next'
+      ? '다음 문제'
+      : '문제';
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-surface)' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
-        <Link href="/problems" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
-          <ChevronLeft size={16} /> 목록
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      aria-busy={isProblemTransitioning}
+      data-problem-id={problem.id}
+      data-problem-transitioning={isProblemTransitioning ? 'true' : 'false'}
+      style={{ backgroundColor: 'var(--color-surface)' }}
+    >
+      <header
+        data-collaboration-surface="header"
+        className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
+        style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}
+      >
+        <Link
+          href={returnHref}
+          aria-label={`${returnLabel}으로 돌아가기`}
+          className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+          style={{ color: 'var(--color-sub)', fontSize: '13px' }}
+        >
+          <ChevronLeft size={16} /> {returnLabel}
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 
-        <div className="flex items-center gap-2">
-          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
-          <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[problem.difficulty].bg, color: DIFF_STYLE[problem.difficulty].color }}>
+        {learningContext && (
+          <>
+            <CurriculumNavigator
+              mode="student"
+              context={learningContext}
+              displayedProblemId={problem.id}
+              liveProblemId={problem.id}
+              navigationDisabled={workspaceActionsDisabled}
+              allSubjectsHref={returnHref}
+              onOpenChange={setCurriculumOpen}
+              onSelectProblem={handleCurriculumProblemSelect}
+            />
+            <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
+          </>
+        )}
+
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="max-w-64 truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
+          <span className="shrink-0 px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[problem.difficulty].bg, color: DIFF_STYLE[problem.difficulty].color }}>
             {DIFF_LABEL[problem.difficulty]}
           </span>
         </div>
@@ -1036,6 +1472,65 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
 
         <div className="flex items-center gap-2">
+          <nav
+            aria-label="문제 이동"
+            className="flex h-9 shrink-0 items-center overflow-hidden rounded-lg"
+            style={{
+              border: '1px solid var(--tint-accent-line)',
+              backgroundColor: 'var(--color-primary-light)',
+              color: 'var(--color-primary-hover)',
+            }}
+          >
+            <button
+              type="button"
+              data-testid="previous-problem-button"
+              aria-label="이전 문제"
+              aria-busy={isProblemTransitioning && problemTransitionDirection === 'previous'}
+              title={previousProblem ? `이전 문제: ${previousProblem.problem_no}. ${previousProblem.title}` : '이전 문제가 없습니다'}
+              disabled={!previousProblem || workspaceActionsDisabled}
+              onClick={() => handleNavigateProblem(previousProblem, 'previous')}
+              className={`flex h-full items-center justify-center gap-1 px-2.5 transition-colors hover:bg-[var(--tint-fill)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary)] disabled:cursor-not-allowed ${isProblemTransitioning && problemTransitionDirection === 'previous' ? 'bg-[var(--tint-fill)]' : ''}`}
+              style={{
+                fontSize: 12,
+                fontWeight: 650,
+                opacity: isProblemTransitioning && problemTransitionDirection === 'previous'
+                  ? 1
+                  : !previousProblem || workspaceActionsDisabled
+                    ? 0.4
+                    : 1,
+              }}
+            >
+              {isProblemTransitioning && problemTransitionDirection === 'previous'
+                ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />
+                : <ChevronLeft size={14} />}
+              <span className="hidden xl:inline">이전</span>
+            </button>
+            <span aria-hidden="true" className="h-5 w-px shrink-0" style={{ backgroundColor: 'var(--tint-accent-line)' }} />
+            <button
+              type="button"
+              data-testid="next-problem-button"
+              aria-label="다음 문제"
+              aria-busy={isProblemTransitioning && problemTransitionDirection === 'next'}
+              title={nextProblem ? `다음 문제: ${nextProblem.problem_no}. ${nextProblem.title}` : '다음 문제가 없습니다'}
+              disabled={!nextProblem || workspaceActionsDisabled}
+              onClick={() => handleNavigateProblem(nextProblem, 'next')}
+              className={`flex h-full items-center justify-center gap-1 px-2.5 transition-colors hover:bg-[var(--tint-fill)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary)] disabled:cursor-not-allowed ${isProblemTransitioning && problemTransitionDirection === 'next' ? 'bg-[var(--tint-fill)]' : ''}`}
+              style={{
+                fontSize: 12,
+                fontWeight: 650,
+                opacity: isProblemTransitioning && problemTransitionDirection === 'next'
+                  ? 1
+                  : !nextProblem || workspaceActionsDisabled
+                    ? 0.4
+                    : 1,
+              }}
+            >
+              <span className="hidden xl:inline">다음</span>
+              {isProblemTransitioning && problemTransitionDirection === 'next'
+                ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />
+                : <ChevronRight size={14} />}
+            </button>
+          </nav>
           {feedbacks.length > 0 && (
             <div className="relative">
               <button
@@ -1088,13 +1583,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               )}
             </div>
           )}
-          <button onClick={() => setCode(starterCode)} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ fontSize: '12px', color: 'var(--color-sub)', border: '1px solid var(--color-border)', height: 32 }}>
+          <button onClick={() => setCode(starterCode)} disabled={isProblemTransitioning} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50" style={{ fontSize: '12px', color: 'var(--color-sub)', border: '1px solid var(--color-border)', height: 32 }}>
             <RotateCcw size={12} /> 초기화
           </button>
-          <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50" style={{ height: 36, border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+          <button onClick={handleRun} disabled={workspaceActionsDisabled} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 36, border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
             <Play size={14} /> 실행
           </button>
-          <button onClick={handleSubmit} disabled={isRunning} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:opacity-50" style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
+          <button onClick={handleSubmit} disabled={workspaceActionsDisabled} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
             onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
           >
@@ -1104,81 +1599,74 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         <ThemeToggle />
       </header>
 
-      <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
-          <div className="p-5">
-            <div className="flex gap-5 mb-5 pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>실행 제한</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.time_limit_ms / 1000}초</span>
-              </div>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>언어</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>Python 3</span>
-              </div>
-            </div>
+      {navigationFailure && (
+        <div
+          role="alert"
+          className="fixed left-1/2 top-14 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl px-4 py-3 shadow-lg"
+          style={{
+            border: '1px solid var(--tint-danger-line)',
+            backgroundColor: 'var(--color-card)',
+            color: 'var(--color-ink)',
+            fontSize: 13,
+          }}
+        >
+          <span>{failedNavigationLabel}를 불러오지 못했습니다. 다시 시도해주세요.</span>
+          {navigationFailure.destination && navigationFailure.direction && (
+            <button
+              type="button"
+              onClick={() => handleNavigateProblem(
+                navigationFailure.destination,
+                navigationFailure.direction as ProblemTransitionDirection,
+              )}
+              className="shrink-0 rounded-lg px-2.5 py-1.5"
+              style={{
+                backgroundColor: 'var(--color-primary-light)',
+                color: 'var(--color-primary-hover)',
+                fontWeight: 700,
+              }}
+            >
+              다시 시도
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setNavigationFailure(null)}
+            aria-label="오류 메시지 닫기"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-surface)]"
+            style={{ color: 'var(--color-sub)' }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
-            <ProblemDescription html={problem.description} />
-
-            {problem.input_format && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력</h3>
-                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
-              </>
-            )}
-            {problem.output_format && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력</h3>
-                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 20, lineHeight: 1.6 }}>{problem.output_format}</p>
-              </>
-            )}
-
-            {sampleCases.length > 0 && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 10 }}>예제</h3>
-                <div className="flex flex-col gap-4 mb-5">
-                  {sampleCases.map((tc, i) => (
-                    <div key={tc.id} className="flex gap-3">
-                      {tc.input && (
-                        <div className="flex-1">
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 입력 {i + 1}</div>
-                          <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.input}</div>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 출력 {i + 1}</div>
-                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.expected_output}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {problem.constraint_text && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>제약 조건</h3>
-                <ul className="flex flex-col gap-1.5">
-                  {problem.constraint_text.split('\n').filter(Boolean).map((c, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: 'var(--color-sub)', display: 'inline-block', flexShrink: 0, marginTop: 6 }} />
-                      <span style={{ fontSize: '13px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>{c.replace(/^[•·\-]\s*/, '')}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div
+          ref={containerRef}
+          className="flex min-w-0 flex-1 overflow-hidden transition-[margin] duration-200 ease-out xl:ml-[var(--curriculum-offset)]"
+          style={{
+            '--curriculum-offset': curriculumOpen && learningContext
+              ? `${CURRICULUM_PANEL_DESKTOP_WIDTH}px`
+              : '0px',
+          } as CSSProperties}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+        <div
+          data-collaboration-surface="statement"
+          className="flex flex-col bg-card overflow-auto flex-shrink-0"
+          style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}
+        >
+          <PublicProblemStatement problem={problem} samples={sampleCases} />
         </div>
 
         <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: 'var(--color-border)' }} onMouseDown={handleMouseDown} />
 
         <div
           ref={editorPaneRef}
+          data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
-          onMouseMove={handlePaneMouseMove}
-          onMouseLeave={handlePaneMouseLeave}
         >
           <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -1201,7 +1689,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                   title="글자 크기 키우기"
                 >+</button>
               </div>
-              <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}>
+              <button onClick={() => setShowHint(true)} disabled={isProblemTransitioning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}>
                 <Lightbulb size={14} /> 힌트 보기
               </button>
             </div>
@@ -1216,11 +1704,15 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
             />
           </div>
 
-          <div className="flex-shrink-0 relative" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? terminalHeight : 38 }}>
+          <div
+            data-collaboration-surface="terminal"
+            className="flex-shrink-0 relative"
+            style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? terminalHeight : 38 }}
+          >
             {terminalOpen && (
               <div
                 onMouseDown={startTerminalDrag}
@@ -1230,7 +1722,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               />
             )}
             <div className="flex items-center justify-between pr-3" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
-              <div className="flex items-stretch h-full">
+              <div className="flex min-w-0 flex-1 items-stretch h-full">
                 <button
                   type="button"
                   onClick={() => {
@@ -1271,8 +1763,17 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                     오류해석
                   </button>
                 )}
+                <SampleRunControls
+                  sampleCount={Math.min(sampleCases.length, 5)}
+                  activeSampleIndex={activeSampleIndex}
+                  disabled={workspaceActionsDisabled}
+                  onRun={(sampleIndex) => {
+                    const sampleCase = sampleCases[sampleIndex];
+                    if (sampleCase) void handleRunSample(sampleCase, sampleIndex);
+                  }}
+                />
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {terminalOpen && isRunning && (
                   <button onClick={handleStop} className="flex items-center gap-1 px-2 rounded transition-colors" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
                     <Square size={10} /> 정지
@@ -1328,9 +1829,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           </div>
         </div>
       </div>
+      </div>
 
       {modalResult && (
-        <ResultModal
+        <SubmissionResultDrawer
           result={modalResult}
           onClose={() => setModalResult(null)}
           onRetry={() => setModalResult(null)}
@@ -1338,8 +1840,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           aiFeedbackEnabled={problem.use_ai_feedback}
           aiFeedbackLoading={aiFeedbackLoading}
           aiFeedbackContent={currentAiFeedback?.content ?? null}
-          nextProblemId={nextProblemId}
-          stageId={stageId}
+          nextProblem={nextProblem}
+          stageId={navigation?.stage_id ?? null}
+          onNextProblem={() => handleNavigateProblem(nextProblem, 'next')}
         />
       )}
       {showHint && (

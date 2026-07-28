@@ -35,7 +35,7 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
-  if (user.role !== 'teacher' && user.role !== 'admin') {
+  if (user.role !== 'teacher') {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
@@ -67,7 +67,8 @@ export async function GET() {
   const { data: submissions, error: subErr } = await db
     .from('submissions')
     .select('problem_id, status, user_id, elapsed_sec')
-    .in('problem_id', problemIds);
+    .in('problem_id', problemIds)
+    .in('status', ['pass', 'fail', 'partial']);
 
   if (subErr) return apiError('제출 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 

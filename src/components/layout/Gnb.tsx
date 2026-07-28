@@ -8,6 +8,7 @@ import { ProfileModal } from './ProfileModal';
 import { LogoBadge } from '@/components/ui/LogoIcon';
 import ThemeToggle from '@/components/ThemeToggle';
 import type { UserRole } from '@/lib/types/db';
+import { ROLE_HOME } from '@/lib/navigation/capabilities';
 
 const ROLE_LABEL: Record<UserRole, string> = {
   student: '학생',
@@ -26,12 +27,7 @@ export function Gnb({ user }: GnbProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const homeHref =
-    user.role === 'admin'
-      ? '/admin/problems'
-      : user.role === 'teacher'
-      ? '/students'
-      : '/problems';
+  const homeHref = ROLE_HOME[user.role];
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

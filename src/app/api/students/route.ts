@@ -2,11 +2,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
 import { NextRequest } from 'next/server';
+import { resolveTeacherStudentScope } from '@/lib/monitoring/studentScope';
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
-  if (user.role !== 'teacher' && user.role !== 'admin') {
+  if (user.role !== 'teacher') {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
@@ -28,9 +29,11 @@ export async function GET(req: NextRequest) {
       .from('teacher_student')
       .select('student_id')
       .eq('teacher_id', user.id);
-    const studentIds = (mappings ?? []).map((m) => m.student_id);
-    if (studentIds.length > 0) {
-      query = query.in('id', studentIds);
+    const scope = resolveTeacherStudentScope(
+      (mappings ?? []).map((mapping) => mapping.student_id)
+    );
+    if (scope.kind === 'assigned') {
+      query = query.in('id', scope.studentIds);
     }
   }
 

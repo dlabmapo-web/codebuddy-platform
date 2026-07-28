@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiError, apiOk } from '@/lib/api/response';
+import { resolveTeacherStudentScope } from '@/lib/monitoring/studentScope';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type {
   AiErrorCategoryPoint,
@@ -144,10 +145,10 @@ export async function GET(req: Request) {
     .from('teacher_student')
     .select('student_id')
     .eq('teacher_id', user.id);
-
   if (mappingError) return apiError('담당 학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-
-  const mappedIds = (mappings ?? []).map((mapping) => mapping.student_id);
+  const studentScope = resolveTeacherStudentScope(
+    (mappings ?? []).map((mapping) => mapping.student_id)
+  );
   let studentQuery = db
     .from('users')
     .select('id, name, username')
@@ -155,7 +156,9 @@ export async function GET(req: Request) {
     .eq('is_active', true)
     .order('name', { ascending: true });
 
-  if (mappedIds.length > 0) studentQuery = studentQuery.in('id', mappedIds);
+  if (studentScope.kind === 'assigned') {
+    studentQuery = studentQuery.in('id', studentScope.studentIds);
+  }
 
   const { data: studentData, error: studentError } = await studentQuery;
   if (studentError) return apiError('학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
@@ -253,7 +256,8 @@ export async function GET(req: Request) {
   let submissionQuery = db
     .from('submissions')
     .select('user_id, problem_id, status, submitted_at')
-    .in('user_id', studentIds);
+    .in('user_id', studentIds)
+    .in('status', ['pass', 'fail', 'partial']);
   let aiFeedbackQuery = db
     .from('ai_feedbacks')
     .select('ai_feedback_patterns(error_category, pattern_type)')

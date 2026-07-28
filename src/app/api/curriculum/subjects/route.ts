@@ -29,7 +29,8 @@ export async function GET() {
     db
       .from('submissions')
       .select('problem_id, status')
-      .eq('user_id', user.id),
+      .eq('user_id', user.id)
+      .in('status', ['pass', 'fail', 'partial']),
   ]);
 
   if (subjectResult.error || stageResult.error || chapterResult.error || problemResult.error || submissionResult.error) {

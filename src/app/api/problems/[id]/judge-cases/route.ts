@@ -7,6 +7,9 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'student') {
+    return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
+  }
 
   const { id } = await params;
   const db = supabaseAdmin();
@@ -18,10 +21,6 @@ export async function GET(_req: Request, { params }: Params) {
     .single();
 
   if (!problem) return apiError('문제를 찾을 수 없습니다.', 'NOT_FOUND', 404);
-  if (!problem.is_published && user.role === 'student') {
-    return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
-  }
-
   const { data: test_cases, error } = await db
     .from('test_cases')
     .select('id, input, expected_output, is_sample, is_hidden, order_no')

@@ -111,14 +111,23 @@ The button is not rendered for an output-only sample whose input is empty.
 
 ### 7.2 Terminal sample controls
 
-The terminal header displays buttons for visible sample cases:
+The terminal header displays compact blue buttons for visible sample cases:
 
 ```text
-Terminal  [▶ Sample 1] [▶ Sample 2] ... [▶ Sample 5]
+Terminal  [▶ 테스트 1] [▶ 테스트 2] ... [▶ 테스트 5]
 ```
 
 Rules:
 
+- Do not render a separate `예제 실행` or other helper label before the
+  buttons. The blue action styling and play icon make their purpose clear.
+- Each button uses the product's primary blue fill, white text, a small play
+  icon, and a compact terminal-toolbar height.
+- Hover, keyboard-focus, running, and disabled states remain visually
+  distinct. The running state uses a stronger blue outline and must not rely
+  on color alone.
+- Button text uses `테스트 N` to stay clear without making a five-button
+  toolbar too wide.
 - Buttons follow the same order as the sample cases in the problem statement.
 - Only visible sample cases receive buttons.
 - At most five sample buttons are rendered.
@@ -354,7 +363,7 @@ input queue. The copy action is omitted.
 
 - Copy controls are keyboard accessible.
 - Every copy control has a unique accessible name containing its sample number.
-- Every run control has a unique accessible name such as `Run sample 2`.
+- Every run control has a unique accessible name such as `테스트 2 실행`.
 - Running and disabled states are available to assistive technology.
 - Copy and result messages use a polite `aria-live` region.
 - Success and failure are not communicated by color alone.

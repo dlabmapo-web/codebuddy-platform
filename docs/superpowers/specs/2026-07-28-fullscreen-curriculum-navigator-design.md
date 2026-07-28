@@ -2,7 +2,10 @@
 
 ## Summary
 
-Add a shared, collapsible curriculum navigator to the fullscreen student problem-solving page and teacher live-monitoring page. The navigator makes the current Subject → Stage → Chapter → Problem context visible without reducing the problem, editor, terminal, or feedback workspace.
+Add a shared, collapsible curriculum navigator to the fullscreen student problem-solving
+page and teacher live-monitoring page. The navigator makes the current
+Subject → Stage → Chapter → Problem context visible without covering the problem,
+editor, terminal, or feedback workspace.
 
 The feature follows the familiar course-content navigation pattern used by learning platforms such as Elice, while retaining Cove Studio's existing UI and problem/session behavior.
 
@@ -13,7 +16,8 @@ The feature follows the familiar course-content navigation pattern used by learn
 - Let teachers understand the full curriculum context without opening unrelated monitoring sessions.
 - Detect when a monitored student moves to another problem and let the teacher deliberately follow the new live session.
 - Reuse the existing smooth problem transition, code preservation, session lifecycle, and return-navigation behavior.
-- Keep the editor and terminal dimensions stable when the navigator opens.
+- Let the problem and editor adapt smoothly to the remaining desktop width while
+  preserving their existing relative split and usability.
 
 ## Non-goals
 
@@ -34,11 +38,17 @@ Both fullscreen pages show a compact curriculum button and breadcrumb near the e
 
 Long labels truncate with a tooltip containing the complete path. The breadcrumb opens the same navigator as the menu button.
 
-### Overlay drawer
+### Adaptive curriculum panel
 
 - Opens from the left beneath the fullscreen header.
-- Uses a 340px desktop width.
-- Overlays the problem-description pane instead of pushing or resizing the workspace.
+- Uses a responsive 280–320px width.
+- On desktop viewports, occupies a dedicated column and reduces the remaining workspace
+  width. The problem description and editor keep their relative split within the
+  remaining space, so the panel never covers either surface.
+- Applies a short width transition. Monaco uses its existing automatic layout support
+  to fit the resized editor.
+- On viewports too narrow to support three useful columns, falls back to a temporary
+  overlay with a small right margin.
 - Does not dim, blur, disable, or otherwise visually close the problem workspace.
 - Leaves the problem description, editor, terminal, and teacher feedback workspace
   visible and interactive while open.
@@ -47,12 +57,18 @@ Long labels truncate with a tooltip containing the complete path. The breadcrumb
 - Returns keyboard focus to the trigger after closing.
 - Starts closed on a fresh fullscreen entry.
 - Remains open while the student moves between problems through smooth in-page transitions.
-- On narrow screens, uses the available viewport width with a small right margin.
+- Uses identical docking and responsive behavior on student and teacher fullscreen
+  pages.
 
 The drawer is a non-modal navigation surface. It is rendered through a document-level
 portal so the student and teacher fullscreen layouts cannot clip it or place it behind
 their workspace. It has an accessible label and keyboard-operable accordion controls,
 but it does not trap focus because the underlying workspace remains usable.
+
+The subject header and `All subjects` footer remain fixed inside the panel. Only the
+curriculum tree scrolls. Its flex child has an explicit zero minimum height,
+overscroll containment, and stable scrollbar space so long subjects remain navigable
+without moving the panel controls.
 
 ## Curriculum Tree
 
@@ -279,8 +295,8 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 ### Browser E2E
 
 1. Student opens the drawer and sees the correct path and expanded current chapter.
-2. Opening the drawer does not resize, dim, blur, or disable the problem, editor, or
-   terminal.
+2. On desktop, opening the panel creates a dedicated column and does not cover, dim,
+   blur, or disable the problem, editor, or terminal.
 3. Student selects another problem; code is preserved, session changes safely, URL/history update, and the drawer remains open.
 4. Student statuses render correctly after attempted and passed submissions.
 5. Teacher opens the same portal-rendered drawer and sees the monitored student's
@@ -290,7 +306,10 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 8. Teacher follows the student and reaches the new live session.
 9. Closing through the close button, repeated trigger click, and Escape behaves
    correctly; keyboard-initiated closing restores focus to the trigger.
-10. Light and dark themes and narrow viewport behavior are visually verified.
+10. Long student and teacher curriculum trees scroll independently while the panel
+    header and footer remain visible.
+11. Light and dark themes, desktop docking, and narrow viewport fallback behavior are
+    visually verified.
 
 ## Rollout
 

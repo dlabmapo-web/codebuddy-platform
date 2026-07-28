@@ -53,6 +53,10 @@ export function SampleInputCopyButton({
         aria-label={`예제 입력 ${sampleNumber} 복사`}
         className="absolute right-2 top-2 flex items-center gap-1 rounded-md px-2 transition-colors"
         style={{
+          position: 'absolute',
+          right: 8,
+          top: 8,
+          zIndex: 1,
           height: 26,
           border: '1px solid var(--code-border)',
           backgroundColor: copyState === 'copied' ? '#14352C' : '#242424',

@@ -45,6 +45,22 @@ function session(problemId: string, finalCode: string | null) {
   };
 }
 
+function learningContext(problemId: string) {
+  return {
+    path: {
+      subject: { id: 'subject-1', title: 'Algorithms' },
+      stage: { id: 'stage-1', title: 'Week 1' },
+      chapter: { id: 'chapter-1', title: 'Output' },
+      problem: { id: problemId, problemNo: 1, title: 'Problem' },
+    },
+    subject: {
+      id: 'subject-1',
+      title: 'Algorithms',
+      stages: [],
+    },
+  };
+}
+
 function createFetcher({
   problemId = 'problem-2',
   savedDraft = 'print("draft")',
@@ -62,6 +78,7 @@ function createFetcher({
         test_cases: [],
         hints: [],
         navigation: null,
+        learning_context: learningContext(problemId),
       });
     }
     if (input === `/api/submissions?problem_id=${problemId}`) {
@@ -94,6 +111,7 @@ describe('loadProblemTransitionSnapshot', () => {
     expect(snapshot.code).toBe('print("draft")');
     expect(snapshot.lastSavedCode).toBe('print("draft")');
     expect(snapshot.attemptCount).toBe(1);
+    expect(snapshot.learningContext?.path.problem.id).toBe('problem-2');
   });
 
   it('preserves an intentionally empty saved draft', async () => {

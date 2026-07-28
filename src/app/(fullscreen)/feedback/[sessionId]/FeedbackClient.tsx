@@ -1,24 +1,51 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type CSSProperties,
+} from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronLeft, Send, BookOpen, ChevronDown, ChevronUp, Check, Terminal, Play, Square, X, Sparkles, ArrowRight } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
-import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
+import {
+  WholePagePointerOverlay,
+  type WholePagePointerOverlayHandle,
+} from '@/components/collab/WholePagePointerOverlay';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { createSampleInputQueue } from '@/lib/pyodide/sampleRun';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
-import type { ProblemDifficulty } from '@/lib/types/db';
+import type { DbProblem, DbTestCase, ProblemDifficulty } from '@/lib/types/db';
 import ThemeToggle from '@/components/ThemeToggle';
-import { validateReturnTo } from '@/lib/navigation/returnTo';
+import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
+import {
+  encodeReturnTo,
+  validateReturnTo,
+} from '@/lib/navigation/returnTo';
+import {
+  CURRICULUM_PANEL_DESKTOP_WIDTH,
+  CurriculumNavigator,
+} from '@/components/curriculum/CurriculumNavigator';
+import type {
+  LearningContext,
+  LearningContextPath,
+  LearningContextProblem,
+} from '@/lib/curriculum/learningContext';
+import {
+  isStudentPointerLeave,
+  parseStudentPointerMove,
+} from '@/lib/collab/pointerSurfaces';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -45,11 +72,76 @@ type SessionDetail = {
     description: string;
     input_format: string | null;
     output_format: string | null;
+    constraint_text: string | null;
     starter_code: string | null;
+    time_limit_ms: number;
     use_ai_feedback: boolean;
   } | null;
   users: { id: string; name: string; username: string } | null;
+  learning_context: LearningContext | null;
 };
+
+type ActiveStudentContext =
+  | { active: false }
+  | {
+    active: true;
+    session_id: string;
+    problem_id: string;
+    path: LearningContextPath | null;
+  };
+
+type TeacherProblemSnapshot = {
+  problem: DbProblem;
+  test_cases: Pick<
+    DbTestCase,
+    'id' | 'input' | 'expected_output' | 'is_sample' | 'order_no'
+  >[];
+};
+
+async function loadProblemSnapshot(
+  problemId: string,
+  signal?: AbortSignal
+): Promise<TeacherProblemSnapshot> {
+  const response = await fetch(`/api/problems/${problemId}`, {
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) throw new Error('문제를 불러오지 못했습니다.');
+  const json = await response.json();
+  if (!json.problem) throw new Error('문제를 찾을 수 없습니다.');
+  return {
+    problem: json.problem,
+    test_cases: json.test_cases ?? [],
+  };
+}
+
+function findProblemPath(
+  context: LearningContext | null,
+  problemId: string
+): LearningContextPath | null {
+  if (!context) return null;
+  for (const stage of context.subject.stages) {
+    for (const chapter of stage.chapters) {
+      const problem = chapter.problems.find((item) => item.id === problemId);
+      if (problem) {
+        return {
+          subject: {
+            id: context.subject.id,
+            title: context.subject.title,
+          },
+          stage: { id: stage.id, title: stage.title },
+          chapter: { id: chapter.id, title: chapter.title },
+          problem: {
+            id: problem.id,
+            problemNo: problem.problemNo,
+            title: problem.title,
+          },
+        };
+      }
+    }
+  }
+  return null;
+}
 
 const DIFF_LABEL: Record<ProblemDifficulty, string> = { easy: '쉬움', medium: '보통', hard: '어려움' };
 const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
@@ -69,19 +161,28 @@ export default function FeedbackClient({
   teacherName: string;
   returnTo?: string;
 }) {
+  const router = useRouter();
   const returnHref = validateReturnTo(returnTo, 'teacher') ?? '/students';
   const [session, setSession] = useState<SessionDetail | null>(null);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(sessionId);
+  const [liveProblemId, setLiveProblemId] = useState<string | null>(null);
+  const [liveProblemSnapshot, setLiveProblemSnapshot] = useState<TeacherProblemSnapshot | null>(null);
+  const [previewSnapshot, setPreviewSnapshot] = useState<TeacherProblemSnapshot | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [movementPath, setMovementPath] = useState<LearningContextPath | null>(null);
+  const [studentHasActiveSession, setStudentHasActiveSession] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [code, setCode] = useState('');
   const [studentOnline, setStudentOnline] = useState(false);
   const [studentName, setStudentName] = useState<string | null>(null);
   const studentNameRef = useRef<string | null>(null);
   const [leftWidth, setLeftWidth] = useState(42);
+  const [curriculumOpen, setCurriculumOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(true);
   const [editorFontSize, setEditorFontSize] = useState(13);
-  const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
   const [terminalOpen, setTerminalOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('student');
   const [teacherLines, setTeacherLines] = useState<TerminalLine[]>([]);
@@ -102,12 +203,16 @@ export default function FeedbackClient({
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const codeRef = useRef('');
+  const liveCodeRef = useRef('');
+  const previewProblemIdRef = useRef<string | null>(null);
+  const previewRequestRef = useRef<AbortController | null>(null);
   const awaitingSyncRef = useRef(false);
   const lastCursorSentRef = useRef(0);
   const lastCodeSentRef = useRef(0);
   const pendingCodeRef = useRef<string | null>(null);
   const lastPointerSentRef = useRef(0);
   const editorPaneRef = useRef<HTMLDivElement>(null);
+  const wholePagePointerRef = useRef<WholePagePointerOverlayHandle>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
   const isDragging = useRef(false);
@@ -125,11 +230,24 @@ export default function FeedbackClient({
       .then(r => r.json())
       .then(json => {
         if (!json.session) { setLoadError(true); return; }
+        previewRequestRef.current?.abort();
+        previewRequestRef.current = null;
+        previewProblemIdRef.current = null;
+        setPreviewSnapshot(null);
+        setPreviewLoading(false);
+        setPreviewError(null);
         setSession(json.session);
+        setLiveSessionId(json.session.status === 'active' ? json.session.id : null);
+        setLiveProblemId(json.session.status === 'active' ? json.session.problem_id : null);
+        setMovementPath(json.session.learning_context?.path ?? null);
+        setStudentHasActiveSession(json.session.status === 'active');
         const initial = json.session.final_code ?? json.session.problems?.starter_code ?? '';
         setCode(initial);
         codeRef.current = initial;
-        setStudentName(json.session.users?.name ?? null);
+        liveCodeRef.current = initial;
+        const loadedStudentName = json.session.users?.name ?? null;
+        setStudentName(loadedStudentName);
+        studentNameRef.current = loadedStudentName;
 
         fetch(`/api/sessions/${sessionId}`, {
           method: 'PATCH',
@@ -139,6 +257,129 @@ export default function FeedbackClient({
       })
       .catch(() => setLoadError(true));
   }, [sessionId, teacherId]);
+
+  useEffect(() => {
+    if (!session?.problem_id) return;
+    const controller = new AbortController();
+    void loadProblemSnapshot(session.problem_id, controller.signal)
+      .then(setLiveProblemSnapshot)
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
+  }, [session?.problem_id]);
+
+  useEffect(() => () => {
+    previewRequestRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!session?.student_id) return;
+    const controller = new AbortController();
+
+    const loadActiveContext = async () => {
+      if (document.hidden || controller.signal.aborted) return;
+      try {
+        const response = await fetch(
+          `/api/students/${session.student_id}/active-context`,
+          { cache: 'no-store', signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const json = await response.json();
+        const activeContext = json.active_context as ActiveStudentContext | undefined;
+        if (!activeContext || controller.signal.aborted) return;
+
+        if (!activeContext.active) {
+          setStudentHasActiveSession(false);
+          setLiveSessionId(null);
+          setLiveProblemId(null);
+          setMovementPath(null);
+          return;
+        }
+
+        setStudentHasActiveSession(true);
+        setLiveSessionId(activeContext.session_id);
+        setLiveProblemId(activeContext.problem_id);
+        setMovementPath(
+          activeContext.path
+          ?? (activeContext.problem_id === session.problem_id
+            ? session.learning_context?.path ?? null
+            : null)
+        );
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    };
+
+    void loadActiveContext();
+    const interval = window.setInterval(loadActiveContext, 4000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [session]);
+
+  const followLiveSession = useCallback(() => {
+    if (!liveSessionId || liveSessionId === sessionId) return;
+    const returnQuery = `?returnTo=${encodeReturnTo(returnHref)}`;
+    router.push(`/feedback/${liveSessionId}${returnQuery}`);
+  }, [liveSessionId, returnHref, router, sessionId]);
+
+  const returnToLiveProblem = useCallback(() => {
+    previewRequestRef.current?.abort();
+    previewRequestRef.current = null;
+    previewProblemIdRef.current = null;
+    setPreviewSnapshot(null);
+    setPreviewLoading(false);
+    setPreviewError(null);
+    wholePagePointerRef.current?.clear();
+
+    if (liveSessionId && liveSessionId !== sessionId) {
+      followLiveSession();
+      return;
+    }
+
+    setCode(liveCodeRef.current);
+    codeRef.current = liveCodeRef.current;
+  }, [followLiveSession, liveSessionId, sessionId]);
+
+  const handleCurriculumProblemSelect = useCallback((
+    problem: LearningContextProblem
+  ) => {
+    if (problem.id === liveProblemId) {
+      returnToLiveProblem();
+      return;
+    }
+
+    previewRequestRef.current?.abort();
+    const controller = new AbortController();
+    previewRequestRef.current = controller;
+    previewProblemIdRef.current = problem.id;
+    setPreviewSnapshot(null);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    wholePagePointerRef.current?.clear();
+
+    void loadProblemSnapshot(problem.id, controller.signal)
+      .then((snapshot) => {
+        if (previewProblemIdRef.current !== problem.id) return;
+        setPreviewSnapshot(snapshot);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (previewProblemIdRef.current !== problem.id) return;
+        previewProblemIdRef.current = null;
+        setPreviewLoading(false);
+        setPreviewError(error instanceof Error
+          ? error.message
+          : '문제를 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (previewProblemIdRef.current === problem.id) {
+          setPreviewLoading(false);
+        }
+      });
+  }, [liveProblemId, returnToLiveProblem]);
 
   // 학생이 이 문제에서 받은 AI 피드백 이력을 선생님 화면에도 동일하게 표시
   useEffect(() => {
@@ -175,8 +416,10 @@ export default function FeedbackClient({
 
     const supabase = supabaseBrowser();
     const channel = supabase.channel(`session:${sessionId}`, { config: { broadcast: { self: false } } });
+    const pointerOverlay = wholePagePointerRef.current;
 
     const updateRemoteCursor = (name: string, role: string, position: { lineNumber: number; column: number }) => {
+      if (previewProblemIdRef.current) return;
       const editor = editorRef.current;
       const monacoInstance = monacoRef.current;
       if (!editor || !monacoInstance) return;
@@ -208,6 +451,13 @@ export default function FeedbackClient({
     channel
       .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
         if (payload.senderId === teacherId) return;
+        liveCodeRef.current = payload.code;
+        codeRef.current = payload.code;
+        if (previewProblemIdRef.current) {
+          setCode(payload.code);
+          scheduleAutoSave(payload.code);
+          return;
+        }
         if (editorRef.current && monacoRef.current) {
           isApplyingRemoteRef.current = true;
           applyMinimalEdit(editorRef.current, monacoRef.current, payload.code);
@@ -224,16 +474,28 @@ export default function FeedbackClient({
         const displayName = studentNameRef.current ?? payload.name;
         updateRemoteCursor(displayName, payload.role, payload.position);
       })
-      .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
-        if (payload.senderId === teacherId) return;
-        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: payload.name, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
-      })
-      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
-        setRemotePointers(prev => {
-          const next = { ...prev };
-          delete next[payload.senderId];
-          return next;
+      .on('broadcast', { event: 'student:pointer:move' }, ({ payload }: { payload: unknown }) => {
+        if (previewProblemIdRef.current || !session.problem_id) return;
+        const pointer = parseStudentPointerMove(payload, {
+          studentId: session.student_id,
+          sessionId,
+          problemId: session.problem_id,
         });
+        if (!pointer) return;
+        wholePagePointerRef.current?.show({
+          ...pointer,
+          name: studentNameRef.current ?? pointer.name,
+        });
+      })
+      .on('broadcast', { event: 'student:pointer:leave' }, ({ payload }: { payload: unknown }) => {
+        if (!session.problem_id) return;
+        if (isStudentPointerLeave(payload, {
+          studentId: session.student_id,
+          sessionId,
+          problemId: session.problem_id,
+        })) {
+          wholePagePointerRef.current?.clear();
+        }
       })
       // 다른 참가자가 최신 코드를 요청하면 내 현재 코드로 응답
       .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
@@ -251,6 +513,7 @@ export default function FeedbackClient({
         if (typeof payload.code === 'string') {
           setCode(payload.code);
           codeRef.current = payload.code;
+          liveCodeRef.current = payload.code;
         }
       })
       // 학생 실행 결과 미러링 (단방향: 학생 → 선생님) → 학생 탭에 표시
@@ -291,7 +554,7 @@ export default function FeedbackClient({
         }
         if (!student) studentNameRef.current = null;
         if (!student) {
-          setRemotePointers({});
+          wholePagePointerRef.current?.clear();
           const editor = editorRef.current;
           if (editor) {
             remoteCursorDecorationsRef.current = editor.deltaDecorations(remoteCursorDecorationsRef.current, []);
@@ -312,7 +575,11 @@ export default function FeedbackClient({
       });
 
     channelRef.current = channel;
-    return () => { channel.unsubscribe(); channelRef.current = null; };
+    return () => {
+      pointerOverlay?.clear();
+      channel.unsubscribe();
+      channelRef.current = null;
+    };
   }, [session, sessionId, teacherId, teacherName, scheduleAutoSave]);
 
   const handleEditorMount: OnMount = useCallback((editor, monacoInstance) => {
@@ -321,6 +588,7 @@ export default function FeedbackClient({
     injectCursorStyles();
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
+      if (previewProblemIdRef.current) return;
       if (isApplyingRemoteRef.current) return;
       if (!channelRef.current || !hasPeerRef.current) return;
       const now = Date.now();
@@ -335,6 +603,7 @@ export default function FeedbackClient({
   }, [teacherId, teacherName]);
 
   const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
+    if (previewProblemIdRef.current) return;
     if (!channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
     const now = Date.now();
     if (now - lastPointerSentRef.current < 80) return;
@@ -354,13 +623,20 @@ export default function FeedbackClient({
   }, [teacherId, teacherName]);
 
   const handlePaneMouseLeave = useCallback(() => {
+    if (previewProblemIdRef.current) return;
     if (!channelRef.current || !hasPeerRef.current) return;
-    channelRef.current.send({ type: 'broadcast', event: 'pointer:leave', payload: { senderId: teacherId } });
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'pointer:leave',
+      payload: { senderId: teacherId, role: 'teacher' },
+    });
   }, [teacherId]);
 
   const handleCodeChange = useCallback((newCode: string) => {
+    if (previewProblemIdRef.current) return;
     setCode(newCode);
     codeRef.current = newCode;
+    liveCodeRef.current = newCode;
     scheduleAutoSave(newCode);
     if (isApplyingRemoteRef.current) return;
     if (!channelRef.current || !hasPeerRef.current) return;
@@ -385,6 +661,7 @@ export default function FeedbackClient({
   }, [teacherId, scheduleAutoSave]);
 
   const handleSaveFeedback = async () => {
+    if (previewProblemIdRef.current) return;
     if (!feedback.trim() || !session) return;
     const content = feedback.trim();
     await fetch('/api/feedbacks', {
@@ -433,6 +710,7 @@ export default function FeedbackClient({
 
   // 선생님 직접 실행: 채점/전송 없이 순수하게 결과만 확인
   const handleTeacherRun = useCallback(async () => {
+    if (previewProblemIdRef.current) return;
     if (teacherRunning) return;
     teacherInputQueueRef.current = [];
     setTerminalOpen(true);
@@ -561,16 +839,67 @@ finally:
     );
   }
 
-  const problem = session.problems;
+  const currentLiveSnapshot = liveProblemSnapshot?.problem.id === session.problem_id
+    ? liveProblemSnapshot
+    : null;
+  const liveProblem = currentLiveSnapshot?.problem ?? session.problems;
+  const problem = previewSnapshot?.problem ?? liveProblem;
+  const isPreview = previewSnapshot !== null || previewLoading;
+  const displayedProblemId = previewSnapshot?.problem.id
+    ?? session.problem_id
+    ?? '';
+  const displayedPath = findProblemPath(
+    session.learning_context,
+    displayedProblemId
+  ) ?? session.learning_context?.path ?? null;
+  const displayedSamples = previewSnapshot?.test_cases
+    ?? currentLiveSnapshot?.test_cases
+    ?? [];
+  const editorValue = previewSnapshot
+    ? previewSnapshot.problem.starter_code ?? ''
+    : code;
+  const liveProblemLabel = movementPath?.problem
+    ? `${movementPath.problem.problemNo}. ${movementPath.problem.title}`
+    : liveProblem
+      ? `${liveProblem.problem_no}. ${liveProblem.title}`
+      : '현재 문제';
+  const isMonitoringLiveProblem = !isPreview
+    && studentOnline
+    && liveSessionId === sessionId
+    && liveProblemId === session.problem_id;
   const diff = problem?.difficulty;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
+      <WholePagePointerOverlay
+        ref={wholePagePointerRef}
+        enabled={isMonitoringLiveProblem}
+      />
+      <header
+        data-collaboration-surface="header"
+        className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
+        style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}
+      >
         <Link href={returnHref} aria-label="학생 현황으로 돌아가기" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 학생 현황
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
+
+        {session.learning_context && (
+          <>
+            <CurriculumNavigator
+              mode="teacher"
+              context={session.learning_context}
+              displayedPath={displayedPath ?? session.learning_context.path}
+              displayedProblemId={displayedProblemId}
+              liveProblemId={liveProblemId}
+              allSubjectsHref={returnHref}
+              onOpenChange={setCurriculumOpen}
+              onSelectProblem={handleCurriculumProblemSelect}
+            />
+            <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
+          </>
+        )}
 
         {problem && (
           <div className="flex items-center gap-2">
@@ -585,7 +914,11 @@ finally:
         )}
 
         <div className="flex-1 flex justify-center">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: studentOnline ? 'var(--tint-soft)' : 'var(--color-surface)', border: `1px solid ${studentOnline ? 'var(--tint-line)' : 'var(--color-border)'}` }}>
+          <div
+            className="flex min-w-0 max-w-[420px] items-center gap-2 rounded-lg px-3 py-1.5"
+            style={{ backgroundColor: studentOnline ? 'var(--tint-soft)' : 'var(--color-surface)', border: `1px solid ${studentOnline ? 'var(--tint-line)' : 'var(--color-border)'}` }}
+            title={studentOnline ? `${studentName ?? '학생'} 접속 중` : undefined}
+          >
             {studentOnline ? (
               <div
                 className="flex items-center justify-center rounded-full text-white font-bold flex-shrink-0"
@@ -596,14 +929,14 @@ finally:
             ) : (
               <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: '#BCC0C7' }} />
             )}
-            <span style={{ fontSize: '13px', fontWeight: 600, color: studentOnline ? CURSOR_COLORS.student : '#BCC0C7' }}>
+            <span className="min-w-0 truncate" style={{ fontSize: '13px', fontWeight: 600, color: studentOnline ? CURSOR_COLORS.student : '#BCC0C7' }}>
               {studentName ?? '학생'} {studentOnline ? '접속 중' : '미접속'}
             </span>
             {studentOnline && <div className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: CURSOR_COLORS.student }} />}
           </div>
         </div>
 
-        {problem?.use_ai_feedback && (
+        {!isPreview && problem?.use_ai_feedback && (
           <div className="relative">
             <button
               onClick={() => setAiFeedbackPanelOpen((o) => !o)}
@@ -626,29 +959,104 @@ finally:
         <ThemeToggle />
       </header>
 
-      <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
+      {isPreview && problem && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex h-11 shrink-0 items-center gap-3 px-4"
+          style={{
+            backgroundColor: 'var(--color-primary-light)',
+            borderBottom: '1px solid var(--tint-accent-line)',
+            color: 'var(--color-primary-hover)',
+          }}
+          data-testid="teacher-problem-preview-banner"
+        >
+          <BookOpen size={15} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate" style={{ fontSize: 12, fontWeight: 650 }}>
+            미리보기: {problem.problem_no}. {problem.title}
+            <span style={{ color: 'var(--color-sub)', fontWeight: 500 }}>
+              {' '}· 학생 LIVE: {liveProblemLabel}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={returnToLiveProblem}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-white transition-colors hover:brightness-95"
+            style={{ backgroundColor: 'var(--color-primary)', fontSize: 12, fontWeight: 700 }}
+          >
+            LIVE 문제로 돌아가기 <ArrowRight size={13} />
+          </button>
+        </div>
+      )}
+
+      {previewLoading && (
+        <div
+          role="status"
+          className="flex h-9 shrink-0 items-center justify-center px-4"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderBottom: '1px solid var(--color-border)',
+            color: 'var(--color-sub)',
+            fontSize: 12,
+          }}
+        >
+          선택한 문제를 불러오는 중입니다...
+        </div>
+      )}
+
+      {previewError && (
+        <div
+          role="alert"
+          className="flex h-10 shrink-0 items-center gap-3 px-4"
+          style={{
+            backgroundColor: 'var(--tint-danger)',
+            borderBottom: '1px solid var(--tint-danger-line)',
+            color: 'var(--color-danger)',
+            fontSize: 12,
+          }}
+        >
+          <span className="flex-1">{previewError}</span>
+          <button type="button" onClick={() => setPreviewError(null)} aria-label="오류 닫기">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {!studentHasActiveSession && (
+        <div
+          role="status"
+          className="flex h-9 shrink-0 items-center justify-center px-4"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderBottom: '1px solid var(--color-border)',
+            color: 'var(--color-sub)',
+            fontSize: 12,
+          }}
+        >
+          학생이 현재 문제를 풀고 있지 않습니다. 마지막 세션을 검토하고 있습니다.
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div
+          ref={containerRef}
+          className="flex min-w-0 flex-1 overflow-hidden transition-[margin] duration-200 ease-out xl:ml-[var(--curriculum-offset)]"
+          style={{
+            '--curriculum-offset': curriculumOpen && session.learning_context
+              ? `${CURRICULUM_PANEL_DESKTOP_WIDTH}px`
+              : '0px',
+          } as CSSProperties}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+        <div
+          data-collaboration-surface="statement"
+          className="flex flex-col bg-card overflow-auto flex-shrink-0"
+          style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}
+        >
           {problem ? (
-            <div className="p-5">
-              <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
-              <div
-                  className="tiptap-render"
-                  style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 16 }}
-                  dangerouslySetInnerHTML={{ __html: problem.description }}
-                />
-              {problem.input_format && (
-                <>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
-                </>
-              )}
-              {problem.output_format && (
-                <>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--color-sub)', lineHeight: 1.6 }}>{problem.output_format}</p>
-                </>
-              )}
-            </div>
+            <PublicProblemStatement problem={problem} samples={displayedSamples} />
           ) : (
             <div className="flex items-center justify-center h-full">
               <p style={{ fontSize: '14px', color: '#BCC0C7' }}>문제 정보 없음</p>
@@ -660,17 +1068,21 @@ finally:
 
         <div
           ref={editorPaneRef}
+          data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
           onMouseMove={handlePaneMouseMove}
           onMouseLeave={handlePaneMouseLeave}
         >
-          <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center px-4 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E' }}>
             <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>
             <span style={{ fontSize: '11px', color: '#6A9955', marginLeft: 12, flex: 1 }}>
-              {studentOnline ? `${studentName ?? '학생'}의 코드를 함께 편집 중입니다` : '학생이 접속하면 실시간으로 연동됩니다'}
+              {isPreview
+                ? '초기 코드 미리보기 · 읽기 전용'
+                : studentOnline
+                  ? `${studentName ?? '학생'}의 코드를 함께 편집 중입니다`
+                  : '학생이 접속하면 실시간으로 연동됩니다'}
             </span>
-            {teacherRunning ? (
+            {!isPreview && (teacherRunning ? (
               <button
                 onClick={handleTeacherStop}
                 className="flex items-center gap-1.5 px-3 rounded-lg mr-2"
@@ -688,15 +1100,15 @@ finally:
               >
                 <Play size={12} /> 실행
               </button>
-            )}
-            <button
+            ))}
+            {!isPreview && <button
               onClick={() => setTerminalOpen(o => !o)}
               className="flex items-center gap-1.5 px-2.5 rounded-lg mr-2"
               style={{ height: 28, border: '1px solid #3D3D3D', backgroundColor: terminalOpen ? '#2D2D2D' : 'transparent', fontSize: '12px', fontWeight: 600, color: terminalOpen ? '#D4D4D4' : '#8C8C8C' }}
               title="터미널 열기/닫기"
             >
               <Terminal size={13} /> 터미널
-            </button>
+            </button>}
             <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid #3D3D3D' }}>
               <button
                 onClick={() => setEditorFontSize(s => Math.max(10, s - 1))}
@@ -723,14 +1135,18 @@ finally:
               theme="cove-dark"
               beforeMount={registerCoveTheme}
               onMount={handleEditorMount}
-              value={code}
+              value={editorValue}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
+              options={{ readOnly: isPreview, domReadOnly: isPreview, fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4 }}
             />
           </div>
 
-          {terminalOpen && (
-            <div className="flex-shrink-0" style={{ borderTop: '1px solid #2D2D2D', height: 220, backgroundColor: '#1E1E1E' }}>
+          {!isPreview && terminalOpen && (
+            <div
+              data-collaboration-surface="terminal"
+              className="flex-shrink-0"
+              style={{ borderTop: '1px solid #2D2D2D', height: 220, backgroundColor: '#1E1E1E' }}
+            >
               <div className="flex items-center justify-between pr-3" style={{ height: 38, borderBottom: '1px solid #2D2D2D' }}>
                 <div className="flex items-stretch h-full">
                   <button
@@ -790,7 +1206,29 @@ finally:
             </div>
           )}
 
-          <div className="flex-shrink-0 bg-card" style={{ borderTop: '1px solid var(--color-border)', height: feedbackOpen ? 180 : 44 }}>
+          {isPreview ? (
+            <div
+              className="flex h-11 shrink-0 items-center justify-between gap-3 bg-card px-4"
+              style={{ borderTop: '1px solid var(--color-border)' }}
+            >
+              <span style={{ color: 'var(--color-sub)', fontSize: 12 }}>
+                미리보기에서는 실행, 코드 편집, 피드백 전송을 사용할 수 없습니다.
+              </span>
+              <button
+                type="button"
+                onClick={returnToLiveProblem}
+                className="shrink-0 rounded-lg px-3 py-1.5"
+                style={{
+                  backgroundColor: 'var(--color-primary-light)',
+                  color: 'var(--color-primary-hover)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                LIVE 문제로 돌아가기
+              </button>
+            </div>
+          ) : <div className="flex-shrink-0 bg-card" style={{ borderTop: '1px solid var(--color-border)', height: feedbackOpen ? 180 : 44 }}>
             <button onClick={() => setFeedbackOpen(o => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 44, borderBottom: feedbackOpen ? '1px solid var(--color-border)' : 'none' }}>
               <Send size={14} style={{ color: 'var(--color-primary)' }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>피드백 작성</span>
@@ -821,8 +1259,9 @@ finally:
                 </button>
               </div>
             )}
-          </div>
+          </div>}
         </div>
+      </div>
       </div>
     </div>
   );

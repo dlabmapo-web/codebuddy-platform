@@ -121,7 +121,9 @@ Selecting the current problem does nothing. Navigation is disabled while a submi
 The teacher sees the same current-subject tree and the monitored student's progress
 states.
 
-- The student's active problem is highlighted with a `Live` indicator.
+- The problem displayed in the teacher workspace owns the full selected-row treatment.
+  The student's active problem receives only a `Live` indicator when it differs from
+  the displayed problem; live status must not replace the teacher's selection styling.
 - Every published problem row in the current subject is actionable.
 - The header breadcrumb represents the problem currently displayed in the teacher workspace.
 - The drawer's live indicator always represents the student's latest active problem,

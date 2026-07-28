@@ -11,3 +11,10 @@ export function resolveTeacherStudentScope(
     ? { kind: 'assigned', studentIds }
     : { kind: 'all' };
 }
+
+export function canAccessStudent(
+  scope: TeacherStudentScope,
+  studentId: string
+): boolean {
+  return scope.kind === 'all' || scope.studentIds.includes(studentId);
+}

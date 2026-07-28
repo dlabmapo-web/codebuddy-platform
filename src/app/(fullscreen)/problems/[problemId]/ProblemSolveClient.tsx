@@ -1,6 +1,12 @@
 'use client';
 
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type CSSProperties,
+} from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, MessageSquare, X, Square, Sparkles, CircleHelp, LoaderCircle } from 'lucide-react';
@@ -23,8 +29,8 @@ import {
   SubmissionResultDrawer,
   type SubmissionResult,
 } from '@/components/judge/SubmissionResultDrawer';
-import { SampleInputCopyButton } from '@/components/judge/SampleInputCopyButton';
 import { SampleRunControls } from '@/components/judge/SampleRunControls';
+import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
 import {
   createSampleInputQueue,
   isSampleOutputMatch,
@@ -41,6 +47,22 @@ import {
   encodeReturnTo,
   validateReturnTo,
 } from '@/lib/navigation/returnTo';
+import {
+  CURRICULUM_PANEL_DESKTOP_WIDTH,
+  CurriculumNavigator,
+} from '@/components/curriculum/CurriculumNavigator';
+import {
+  updateLearningProgress,
+  type LearningContext,
+  type LearningContextProblem,
+} from '@/lib/curriculum/learningContext';
+import {
+  normalizePointerPosition,
+  resolvePointerSurface,
+  type CollaborationSurface,
+  type StudentPointerLeavePayload,
+  type StudentPointerMovePayload,
+} from '@/lib/collab/pointerSurfaces';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -77,16 +99,6 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   medium: { bg: 'var(--color-primary-light)', color: 'var(--color-primary-hover)' },
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
-
-const ProblemDescription = memo(function ProblemDescription({ html }: { html: string }) {
-  return (
-    <div
-      className="tiptap-render"
-      style={{ fontSize: '14px', color: 'var(--color-ink)', lineHeight: 1.75, marginBottom: 20 }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-});
 
 // 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
 async function runFallbackOnce(userCode: string, stdin = ''): Promise<{
@@ -160,6 +172,7 @@ export default function ProblemSolveClient({
 }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [navigation, setNavigation] = useState<ProblemNavigation | null>(null);
+  const [learningContext, setLearningContext] = useState<LearningContext | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [isProblemTransitioning, setIsProblemTransitioning] = useState(false);
   const [lastCatalogReturn, setLastCatalogReturn] = useState<string | null>(null);
@@ -181,6 +194,7 @@ export default function ProblemSolveClient({
   const [seconds, setSeconds] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   const [leftWidth, setLeftWidth] = useState(46);
+  const [curriculumOpen, setCurriculumOpen] = useState(false);
   const [interactiveSupported, setInteractiveSupported] = useState(true);
   const [starterCode, setStarterCode] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -214,6 +228,7 @@ export default function ProblemSolveClient({
   const pendingCodeRef = useRef<string | null>(null);
   const lastCursorSentRef = useRef(0);
   const lastPointerSentRef = useRef(0);
+  const lastPointerSurfaceRef = useRef<CollaborationSurface | null>(null);
   // senderId별 "포인터 숨김" 타이머 — pointer:move가 끊기면 3초 뒤 해당 포인터를 제거
   const pointerIdleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const editorPaneRef = useRef<HTMLDivElement>(null);
@@ -312,72 +327,153 @@ export default function ProblemSolveClient({
     });
   }, [myInfo]);
 
-  const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!myInfo || !channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
-    const now = Date.now();
-    if (now - lastPointerSentRef.current < 80) return;
-    lastPointerSentRef.current = now;
-    const rect = editorPaneRef.current.getBoundingClientRect();
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'pointer:move',
-      payload: {
-        senderId: myInfo.id,
-        name: myInfo.name,
-        role: 'student',
-        xPct: (e.clientX - rect.left) / rect.width,
-        yPct: (e.clientY - rect.top) / rect.height,
-      },
-    });
-  }, [myInfo]);
-
-  const handlePaneMouseLeave = useCallback(() => {
-    if (!myInfo || !channelRef.current || !hasPeerRef.current) return;
-    channelRef.current.send({ type: 'broadcast', event: 'pointer:leave', payload: { senderId: myInfo.id } });
-  }, [myInfo]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/auth/me', { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((json) => {
+        if (json?.user) setMyInfo({ id: json.user.id, name: json.user.name });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(json => {
-      if (json.user) setMyInfo({ id: json.user.id, name: json.user.name });
-    });
-  }, []);
+    if (!sessionId || !myInfo || !problem?.id) return;
+
+    const sendLeave = () => {
+      if (!lastPointerSurfaceRef.current) return;
+      lastPointerSurfaceRef.current = null;
+      if (!channelRef.current || !hasPeerRef.current) return;
+
+      const payload: StudentPointerLeavePayload = {
+        senderId: myInfo.id,
+        sessionId,
+        problemId: problem.id,
+        role: 'student',
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'student:pointer:leave',
+        payload,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!channelRef.current || !hasPeerRef.current) {
+        lastPointerSurfaceRef.current = null;
+        return;
+      }
+
+      const resolved = resolvePointerSurface(event.target);
+      if (!resolved) {
+        sendLeave();
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastPointerSentRef.current < 80) return;
+      const position = normalizePointerPosition(
+        event.clientX,
+        event.clientY,
+        resolved.element.getBoundingClientRect()
+      );
+      if (!position) return;
+
+      lastPointerSentRef.current = now;
+      lastPointerSurfaceRef.current = resolved.surface;
+      const payload: StudentPointerMovePayload = {
+        senderId: myInfo.id,
+        sessionId,
+        problemId: problem.id,
+        name: myInfo.name,
+        role: 'student',
+        surface: resolved.surface,
+        ...position,
+        sentAt: now,
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'student:pointer:move',
+        payload,
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) sendLeave();
+    };
+
+    document.addEventListener('pointermove', handlePointerMove, true);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', sendLeave);
+    return () => {
+      sendLeave();
+      document.removeEventListener('pointermove', handlePointerMove, true);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', sendLeave);
+    };
+  }, [myInfo, problem?.id, sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
     let prevCount = -1;
+    let loading = false;
+    const controller = new AbortController();
     setFeedbacks([]);
 
-    const loadFeedbacks = () => {
-      if (document.hidden) return;
-      fetch(`/api/feedbacks?session_id=${sessionId}`)
-        .then(r => r.json())
-        .then(json => {
-          if (!json.feedbacks) return;
-          const list = (json.feedbacks as { users?: { name: string }; content: string; created_at: string }[]).map(fb => ({
-            teacherName: fb.users?.name ?? '선생님',
-            content: fb.content,
-            createdAt: fb.created_at,
-          }));
-          if (prevCount >= 0 && list.length > prevCount) {
-            setFeedbackPanelOpen(true);
-          }
-          prevCount = list.length;
-          setFeedbacks(list);
-        });
+    const loadFeedbacks = async () => {
+      if (document.hidden || loading || controller.signal.aborted) return;
+      loading = true;
+      try {
+        const response = await fetch(
+          `/api/feedbacks?session_id=${sessionId}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const json = await response.json();
+        if (!json.feedbacks) return;
+        const list = (json.feedbacks as { users?: { name: string }; content: string; created_at: string }[]).map(fb => ({
+          teacherName: fb.users?.name ?? '선생님',
+          content: fb.content,
+          createdAt: fb.created_at,
+        }));
+        if (prevCount >= 0 && list.length > prevCount) {
+          setFeedbackPanelOpen(true);
+        }
+        prevCount = list.length;
+        setFeedbacks(list);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      } finally {
+        loading = false;
+      }
     };
 
-    loadFeedbacks();
+    void loadFeedbacks();
     const interval = setInterval(loadFeedbacks, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
+    const controller = new AbortController();
     setAiFeedbacks([]);
-    fetch(`/api/ai-feedbacks?session_id=${sessionId}`)
-      .then((r) => r.json())
-      .then((json) => setAiFeedbacks(json.feedbacks ?? []))
-      .catch(() => {});
+    fetch(`/api/ai-feedbacks?session_id=${sessionId}`, {
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((json) => {
+        if (json) setAiFeedbacks(json.feedbacks ?? []);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      });
+    return () => controller.abort();
   }, [sessionId]);
 
   const applyProblemSnapshot = useCallback((snapshot: ProblemTransitionSnapshot) => {
@@ -421,6 +517,7 @@ export default function ProblemSolveClient({
 
     setProblem(snapshot.problem);
     setNavigation(snapshot.navigation);
+    setLearningContext(snapshot.learningContext);
     setStarterCode(snapshot.starterCode);
     setCode(snapshot.code);
     setSessionId(snapshot.sessionId);
@@ -633,6 +730,31 @@ export default function ProblemSolveClient({
     });
   }, [isRunning, transitionToProblem]);
 
+  const handleCurriculumProblemSelect = useCallback((
+    destination: LearningContextProblem,
+  ) => {
+    if (
+      destination.id === problemRef.current?.id
+      || isRunning
+      || problemTransitioningRef.current
+    ) {
+      return;
+    }
+
+    void transitionToProblem({
+      destination: {
+        id: destination.id,
+        problem_no: destination.problemNo,
+        title: destination.title,
+        chapter_id: '',
+        chapter_order_no: 0,
+        problem_order_no: destination.orderNo,
+      },
+      direction: null,
+      updateHistory: 'push',
+    });
+  }, [isRunning, transitionToProblem]);
+
   useEffect(() => {
     const handlePopState = () => {
       const match = window.location.pathname.match(/^\/problems\/([^/]+)\/?$/);
@@ -712,7 +834,7 @@ export default function ProblemSolveClient({
         updateRemoteCursor(payload.name, payload.role, payload.position);
       })
       .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
-        if (payload.senderId === myInfo.id) return;
+        if (payload.senderId === myInfo.id || payload.role !== 'teacher') return;
         const pointerName = payload.role === 'teacher' ? TEACHER_DISPLAY_NAME : payload.name;
         setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: pointerName, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
         // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
@@ -728,7 +850,8 @@ export default function ProblemSolveClient({
           });
         }, POINTER_IDLE_HIDE_MS);
       })
-      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string } }) => {
+      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string; role?: string } }) => {
+        if (payload.role !== 'teacher') return;
         const timers = pointerIdleTimersRef.current;
         if (timers[payload.senderId]) { clearTimeout(timers[payload.senderId]); delete timers[payload.senderId]; }
         setRemotePointers(prev => {
@@ -1115,7 +1238,7 @@ export default function ProblemSolveClient({
     const subRes = await fetch('/api/submissions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_id: problemId, language: 'python', code, elapsed_sec: seconds }),
+      body: JSON.stringify({ problem_id: problem.id, language: 'python', code, elapsed_sec: seconds }),
     }).catch(() => null);
     if (!subRes) {
       appendTerminal('\n채점 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.\n', 'err');
@@ -1183,6 +1306,15 @@ export default function ProblemSolveClient({
       status === 'pass' ? 'out' : 'err',
     );
     if (status !== 'judge_error') setAttemptCount(newAttempt);
+    if (status !== 'judge_error') {
+      setLearningContext((current) => current
+        ? updateLearningProgress(
+          current,
+          problem.id,
+          status === 'pass' ? 'passed' : 'attempted'
+        )
+        : current);
+    }
 
     if (isStudentFailure && problem.use_ai_feedback) {
       setAiFeedbackLoading(true);
@@ -1191,7 +1323,7 @@ export default function ProblemSolveClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           submission_id: submissionId,
-          problem_id: problemId,
+          problem_id: problem.id,
           code,
           error_message: `${passedCount}/${totalCount} tests passed`,
         }),
@@ -1218,7 +1350,7 @@ export default function ProblemSolveClient({
       cases: finalSubmission.cases ?? [],
     });
     setIsRunning(false);
-  }, [isProblemTransitioning, isRunning, problem, problemId, code, appendTerminal, attemptCount, seconds, sessionId]);
+  }, [isProblemTransitioning, isRunning, problem, code, appendTerminal, attemptCount, seconds, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -1275,7 +1407,11 @@ export default function ProblemSolveClient({
       data-problem-transitioning={isProblemTransitioning ? 'true' : 'false'}
       style={{ backgroundColor: 'var(--color-surface)' }}
     >
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
+      <header
+        data-collaboration-surface="header"
+        className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
+        style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}
+      >
         <Link
           href={returnHref}
           aria-label={`${returnLabel}으로 돌아가기`}
@@ -1285,6 +1421,22 @@ export default function ProblemSolveClient({
           <ChevronLeft size={16} /> {returnLabel}
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
+
+        {learningContext && (
+          <>
+            <CurriculumNavigator
+              mode="student"
+              context={learningContext}
+              displayedProblemId={problem.id}
+              liveProblemId={problem.id}
+              navigationDisabled={workspaceActionsDisabled}
+              allSubjectsHref={returnHref}
+              onOpenChange={setCurriculumOpen}
+              onSelectProblem={handleCurriculumProblemSelect}
+            />
+            <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
+          </>
+        )}
 
         <div className="flex min-w-0 items-center gap-2">
           <span className="max-w-64 truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
@@ -1488,92 +1640,33 @@ export default function ProblemSolveClient({
         </div>
       )}
 
-      <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
-          <div className="p-5">
-            <div className="flex gap-5 mb-5 pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>실행 제한</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.time_limit_ms / 1000}초</span>
-              </div>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--color-sub)', display: 'block' }}>언어</span>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>Python 3</span>
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>문제</h3>
-            <ProblemDescription html={problem.description} />
-
-            {problem.input_format && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>입력</h3>
-                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 16, lineHeight: 1.6 }}>{problem.input_format}</p>
-              </>
-            )}
-            {problem.output_format && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 6 }}>출력</h3>
-                <p style={{ fontSize: '13px', color: 'var(--color-sub)', marginBottom: 20, lineHeight: 1.6 }}>{problem.output_format}</p>
-              </>
-            )}
-
-            {sampleCases.length > 0 && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 10 }}>예제</h3>
-                <div className="flex flex-col gap-4 mb-5">
-                  {sampleCases.map((tc, i) => (
-                    <div key={tc.id} className="flex gap-3">
-                      {tc.input && (
-                        <div className="flex-1">
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 입력 {i + 1}</div>
-                          <div
-                            className="relative rounded-lg"
-                            style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)' }}
-                          >
-                            <div
-                              className="overflow-x-auto p-3 pr-24"
-                              style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}
-                            >
-                              {tc.input}
-                            </div>
-                            <SampleInputCopyButton input={tc.input} sampleNumber={i + 1} />
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 출력 {i + 1}</div>
-                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.expected_output}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {problem.constraint_text && (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>제약 조건</h3>
-                <ul className="flex flex-col gap-1.5">
-                  {problem.constraint_text.split('\n').filter(Boolean).map((c, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: 'var(--color-sub)', display: 'inline-block', flexShrink: 0, marginTop: 6 }} />
-                      <span style={{ fontSize: '13px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>{c.replace(/^[•·\-]\s*/, '')}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div
+          ref={containerRef}
+          className="flex min-w-0 flex-1 overflow-hidden transition-[margin] duration-200 ease-out xl:ml-[var(--curriculum-offset)]"
+          style={{
+            '--curriculum-offset': curriculumOpen && learningContext
+              ? `${CURRICULUM_PANEL_DESKTOP_WIDTH}px`
+              : '0px',
+          } as CSSProperties}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+        <div
+          data-collaboration-surface="statement"
+          className="flex flex-col bg-card overflow-auto flex-shrink-0"
+          style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}
+        >
+          <PublicProblemStatement problem={problem} samples={sampleCases} />
         </div>
 
         <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: 'var(--color-border)' }} onMouseDown={handleMouseDown} />
 
         <div
           ref={editorPaneRef}
+          data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
-          onMouseMove={handlePaneMouseMove}
-          onMouseLeave={handlePaneMouseLeave}
         >
           <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -1615,7 +1708,11 @@ export default function ProblemSolveClient({
             />
           </div>
 
-          <div className="flex-shrink-0 relative" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? terminalHeight : 38 }}>
+          <div
+            data-collaboration-surface="terminal"
+            className="flex-shrink-0 relative"
+            style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', height: terminalOpen ? terminalHeight : 38 }}
+          >
             {terminalOpen && (
               <div
                 onMouseDown={startTerminalDrag}
@@ -1731,6 +1828,7 @@ export default function ProblemSolveClient({
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {modalResult && (

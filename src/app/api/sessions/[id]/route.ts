@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
+import { getLearningContext } from '@/lib/curriculum/learningContext.server';
+import { canTeacherMonitorStudent } from '@/lib/monitoring/teacherAccess.server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,7 +24,27 @@ export async function GET(_req: Request, { params }: Params) {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
-  return apiOk({ session: data });
+  if (user.role === 'teacher') {
+    const access = await canTeacherMonitorStudent(user.id, data.student_id);
+    if (!access.allowed) {
+      return apiError(
+        access.reason === 'query_failed'
+          ? '담당 학생 확인 중 오류가 발생했습니다.'
+          : '권한이 없습니다.',
+        access.reason === 'query_failed' ? 'INTERNAL_ERROR' : 'FORBIDDEN',
+        access.reason === 'query_failed' ? 500 : 403
+      );
+    }
+  }
+
+  const learning_context = data.problem_id
+    ? await getLearningContext({
+      problemId: data.problem_id,
+      studentId: data.student_id,
+    })
+    : null;
+
+  return apiOk({ session: { ...data, learning_context } });
 }
 
 export async function PATCH(req: Request, { params }: Params) {

@@ -6,6 +6,7 @@ import type {
   DbTestCase,
 } from '@/lib/types/db';
 import type { ProblemNavigation } from '@/lib/problems/navigation';
+import type { LearningContext } from '@/lib/curriculum/learningContext';
 
 type Fetcher = (
   input: string,
@@ -20,6 +21,7 @@ type ProblemDetailResponse = {
   >[];
   hints?: Pick<DbProblemHint, 'id' | 'hint_text' | 'order_no'>[];
   navigation?: ProblemNavigation | null;
+  learning_context?: LearningContext | null;
 };
 
 type SubmissionListResponse = {
@@ -40,6 +42,7 @@ export type ProblemTransitionSnapshot = {
     hints: NonNullable<ProblemDetailResponse['hints']>;
   };
   navigation: ProblemNavigation | null;
+  learningContext: LearningContext | null;
   starterCode: string;
   code: string;
   lastSavedCode: string | null;
@@ -135,6 +138,7 @@ export async function loadProblemTransitionSnapshot({
       hints: detail.hints ?? [],
     },
     navigation: detail.navigation ?? null,
+    learningContext: detail.learning_context ?? null,
     starterCode,
     code: historicalCode ?? savedDraft ?? starterCode,
     lastSavedCode: savedDraft,

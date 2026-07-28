@@ -6,6 +6,7 @@ import {
   type ProblemNavigation,
   type ProblemNavigationCandidate,
 } from '@/lib/problems/navigation';
+import { getLearningContext } from '@/lib/curriculum/learningContext.server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -99,11 +100,16 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
+  const learning_context = user.role === 'student'
+    ? await getLearningContext({ problemId: problem.id, studentId: user.id })
+    : null;
+
   return apiOk({
     problem,
     test_cases: test_cases ?? [],
     hints: hints ?? [],
     navigation,
+    learning_context,
     // Kept during the response-shape transition for existing clients.
     next_problem_id: navigation?.next?.id ?? null,
     stage_id: navigation?.stage_id ?? null,

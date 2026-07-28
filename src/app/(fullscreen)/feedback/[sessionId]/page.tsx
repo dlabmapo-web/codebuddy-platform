@@ -17,6 +17,7 @@ export default async function FeedbackPage({ params, searchParams }: PageProps) 
   const { returnTo } = await searchParams;
   return (
     <FeedbackClient
+      key={sessionId}
       sessionId={sessionId}
       teacherId={user.id}
       teacherName={user.name}

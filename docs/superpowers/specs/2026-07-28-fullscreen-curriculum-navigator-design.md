@@ -39,14 +39,20 @@ Long labels truncate with a tooltip containing the complete path. The breadcrumb
 - Opens from the left beneath the fullscreen header.
 - Uses a 340px desktop width.
 - Overlays the problem-description pane instead of pushing or resizing the workspace.
+- Does not dim, blur, disable, or otherwise visually close the problem workspace.
+- Leaves the problem description, editor, terminal, and teacher feedback workspace
+  visible and interactive while open.
 - Uses the existing theme tokens and supports light and dark modes.
-- Closes through the close button, outside click, or Escape.
+- Closes through the close button, Escape, or by pressing the header trigger again.
 - Returns keyboard focus to the trigger after closing.
 - Starts closed on a fresh fullscreen entry.
 - Remains open while the student moves between problems through smooth in-page transitions.
 - On narrow screens, uses the available viewport width with a small right margin.
 
-The drawer is a modal navigation surface with an accessible label, initial focus, focus containment, and keyboard-operable accordion controls.
+The drawer is a non-modal navigation surface. It is rendered through a document-level
+portal so the student and teacher fullscreen layouts cannot clip it or place it behind
+their workspace. It has an accessible label and keyboard-operable accordion controls,
+but it does not trap focus because the underlying workspace remains usable.
 
 ## Curriculum Tree
 
@@ -246,7 +252,9 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Disabled teacher rows are not focusable and include a visible explanation.
 - Status is communicated with text and icons, not color alone.
 - Escape closes the drawer.
-- Focus is contained while open and restored on close.
+- Focus is not contained while open, allowing the student or teacher to continue using
+  the underlying workspace.
+- Closing with Escape or the close button restores focus to the trigger.
 - Movement banners use a polite live region and do not steal focus.
 
 ## Testing and Acceptance Criteria
@@ -271,14 +279,17 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 ### Browser E2E
 
 1. Student opens the drawer and sees the correct path and expanded current chapter.
-2. Opening the drawer does not resize the editor or terminal.
+2. Opening the drawer does not resize, dim, blur, or disable the problem, editor, or
+   terminal.
 3. Student selects another problem; code is preserved, session changes safely, URL/history update, and the drawer remains open.
 4. Student statuses render correctly after attempted and passed submissions.
-5. Teacher opens the same drawer and sees the monitored student's curriculum path.
+5. Teacher opens the same portal-rendered drawer and sees the monitored student's
+   curriculum path.
 6. Unrelated teacher rows are disabled.
 7. Student moves to another problem; teacher remains on the current workspace and receives the movement banner.
 8. Teacher follows the student and reaches the new live session.
-9. Closing through the button, outside click, and Escape restores focus correctly.
+9. Closing through the close button, repeated trigger click, and Escape behaves
+   correctly; keyboard-initiated closing restores focus to the trigger.
 10. Light and dark themes and narrow viewport behavior are visually verified.
 
 ## Rollout

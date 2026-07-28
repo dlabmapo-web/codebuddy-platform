@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
 import { NextRequest } from 'next/server';
+import { resolveTeacherStudentScope } from '@/lib/monitoring/studentScope';
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -28,11 +29,11 @@ export async function GET(req: NextRequest) {
       .from('teacher_student')
       .select('student_id')
       .eq('teacher_id', user.id);
-    const studentIds = (mappings ?? []).map((m) => m.student_id);
-    if (studentIds.length > 0) {
-      query = query.in('id', studentIds);
-    } else {
-      query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+    const scope = resolveTeacherStudentScope(
+      (mappings ?? []).map((mapping) => mapping.student_id)
+    );
+    if (scope.kind === 'assigned') {
+      query = query.in('id', scope.studentIds);
     }
   }
 

@@ -18,6 +18,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
 import type { ProblemDifficulty } from '@/lib/types/db';
 import ThemeToggle from '@/components/ThemeToggle';
+import { validateReturnTo } from '@/lib/navigation/returnTo';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -57,7 +58,18 @@ const DIFF_STYLE: Record<ProblemDifficulty, { bg: string; color: string }> = {
   hard: { bg: '#FEE2E2', color: '#B91C1C' },
 };
 
-export default function FeedbackClient({ sessionId, teacherId, teacherName }: { sessionId: string; teacherId: string; teacherName: string }) {
+export default function FeedbackClient({
+  sessionId,
+  teacherId,
+  teacherName,
+  returnTo,
+}: {
+  sessionId: string;
+  teacherId: string;
+  teacherName: string;
+  returnTo?: string;
+}) {
+  const returnHref = validateReturnTo(returnTo, 'teacher') ?? '/students';
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [code, setCode] = useState('');
@@ -536,7 +548,7 @@ finally:
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-3" style={{ backgroundColor: 'var(--color-surface)' }}>
         <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-ink)' }}>세션을 찾을 수 없습니다</p>
-        <Link href="/students" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>학생 현황으로 돌아가기</Link>
+        <Link href={returnHref} style={{ fontSize: '14px', color: 'var(--color-primary)' }}>학생 현황으로 돌아가기</Link>
       </div>
     );
   }
@@ -555,7 +567,7 @@ finally:
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
       <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
-        <Link href="/students" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
+        <Link href={returnHref} aria-label="학생 현황으로 돌아가기" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 학생 현황
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />

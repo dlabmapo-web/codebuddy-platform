@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Sparkles, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Plus, Pencil, Trash2, X, Sparkles, ToggleLeft, ToggleRight } from 'lucide-react';
 import type { DbAiFeedbackPattern, AiFeedbackPatternType } from '@/lib/types/db';
+import { routeWithQuery } from '@/lib/navigation/queryState';
 
 type PatternForm = {
   pattern_type: AiFeedbackPatternType;
@@ -182,10 +184,16 @@ function PatternModal({
 }
 
 export default function AdminAiFeedbackPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const typeFilter = (searchParams.get('type') || 'all') as 'all' | AiFeedbackPatternType;
+  const requestedPatternId = searchParams.get('pattern');
+  const requestedMode = searchParams.get('mode');
   const [patterns, setPatterns] = useState<DbAiFeedbackPattern[]>([]);
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState<'all' | AiFeedbackPatternType>('all');
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; id?: string; data: PatternForm } | null>(null);
+  const openedPanelRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DbAiFeedbackPattern | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'err' } | null>(null);
@@ -206,7 +214,81 @@ export default function AdminAiFeedbackPage() {
   useEffect(() => { fetchPatterns(); }, [fetchPatterns]);
 
   const typeOptions = Array.from(new Set(patterns.map((p) => p.pattern_type))).sort((a, b) => a.localeCompare(b, 'ko'));
-  const visible = patterns.filter((p) => typeFilter === 'all' || p.pattern_type === typeFilter);
+  const normalizedType = typeFilter === 'all' || typeOptions.includes(typeFilter) ? typeFilter : 'all';
+  const visible = patterns.filter((p) => normalizedType === 'all' || p.pattern_type === normalizedType);
+
+  const replaceQuery = useCallback((updates: Record<string, string | null>) => {
+    router.replace(routeWithQuery(pathname, searchParams, updates), { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const closeModal = useCallback(() => {
+    setModal(null);
+    if (openedPanelRef.current) {
+      openedPanelRef.current = false;
+      router.back();
+    } else {
+      replaceQuery({ pattern: null, mode: null });
+    }
+  }, [replaceQuery, router]);
+
+  const openCreate = () => {
+    openedPanelRef.current = true;
+    setModal({ mode: 'create', data: EMPTY_FORM });
+    router.push(routeWithQuery(pathname, searchParams, { pattern: null, mode: 'create' }), { scroll: false });
+  };
+
+  const openEdit = (pattern: DbAiFeedbackPattern) => {
+    openedPanelRef.current = true;
+    setModal({
+      mode: 'edit',
+      id: pattern.id,
+      data: {
+        pattern_type: pattern.pattern_type,
+        error_category: pattern.error_category,
+        criteria: pattern.criteria,
+        example_code: pattern.example_code ?? '',
+        tutor_feedback: pattern.tutor_feedback,
+        is_active: pattern.is_active,
+      },
+    });
+    router.push(routeWithQuery(pathname, searchParams, { pattern: pattern.id, mode: 'edit' }), { scroll: false });
+  };
+
+  useEffect(() => {
+    if (requestedMode === 'create') {
+      setModal({ mode: 'create', data: EMPTY_FORM });
+      return;
+    }
+    if (requestedMode === 'edit' && requestedPatternId) {
+      const pattern = patterns.find((item) => item.id === requestedPatternId);
+      if (pattern) {
+        setModal({
+          mode: 'edit',
+          id: pattern.id,
+          data: {
+            pattern_type: pattern.pattern_type,
+            error_category: pattern.error_category,
+            criteria: pattern.criteria,
+            example_code: pattern.example_code ?? '',
+            tutor_feedback: pattern.tutor_feedback,
+            is_active: pattern.is_active,
+          },
+        });
+      } else if (!loading) {
+        replaceQuery({ pattern: null, mode: null });
+      }
+      return;
+    }
+    if (requestedMode || requestedPatternId) {
+      replaceQuery({ pattern: null, mode: null });
+    }
+    setModal(null);
+  }, [loading, patterns, replaceQuery, requestedMode, requestedPatternId]);
+
+  useEffect(() => {
+    if (loading || typeFilter === normalizedType) return;
+    replaceQuery({ type: null });
+  }, [loading, normalizedType, replaceQuery, typeFilter]);
 
   const handleSave = async (data: PatternForm) => {
     if (!modal) return;
@@ -225,7 +307,7 @@ export default function AdminAiFeedbackPage() {
         : [...current, saved].sort((a, b) => a.order_no - b.order_no)
     ));
     showToast(modal.mode === 'edit' ? '기준이 수정되었습니다.' : '기준이 추가되었습니다.', 'ok');
-    setModal(null);
+    closeModal();
   };
 
   const handleDelete = async (pattern: DbAiFeedbackPattern) => {
@@ -263,7 +345,7 @@ export default function AdminAiFeedbackPage() {
           </p>
         </div>
         <button
-          onClick={() => setModal({ mode: 'create', data: EMPTY_FORM })}
+          onClick={openCreate}
           className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
           style={{ height: 40, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)')}
@@ -281,14 +363,14 @@ export default function AdminAiFeedbackPage() {
         ].map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setTypeFilter(key)}
+            onClick={() => replaceQuery({ type: key === 'all' ? null : key, pattern: null, mode: null })}
             className="rounded-xl px-4 transition-colors"
             style={{
               height: 36,
               fontSize: '13px',
-              fontWeight: typeFilter === key ? 700 : 500,
-              backgroundColor: typeFilter === key ? 'var(--color-ink)' : 'transparent',
-              color: typeFilter === key ? 'var(--color-surface)' : 'var(--color-sub)',
+              fontWeight: normalizedType === key ? 700 : 500,
+              backgroundColor: normalizedType === key ? 'var(--color-ink)' : 'transparent',
+              color: normalizedType === key ? 'var(--color-surface)' : 'var(--color-sub)',
             }}
           >
             {label}
@@ -331,18 +413,7 @@ export default function AdminAiFeedbackPage() {
                     {p.is_active ? <ToggleRight size={18} style={{ color: '#16A34A' }} /> : <ToggleLeft size={18} style={{ color: '#BCC0C7' }} />}
                   </button>
                   <button
-                    onClick={() => setModal({
-                      mode: 'edit',
-                      id: p.id,
-                      data: {
-                        pattern_type: p.pattern_type,
-                        error_category: p.error_category,
-                        criteria: p.criteria,
-                        example_code: p.example_code ?? '',
-                        tutor_feedback: p.tutor_feedback,
-                        is_active: p.is_active,
-                      },
-                    })}
+                    onClick={() => openEdit(p)}
                     className="flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[var(--color-primary-light)]"
                     title="수정"
                   >
@@ -379,7 +450,7 @@ export default function AdminAiFeedbackPage() {
           initial={modal.mode === 'edit' ? modal.data : null}
           typeOptions={typeOptions}
           onSave={handleSave}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           saving={saving}
         />
       )}

@@ -141,6 +141,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
@@ -176,11 +177,11 @@ export async function GET(req: Request) {
 
   if (user.role === 'student') {
     query = query.eq('student_id', user.id);
-  } else if (sessionScope && (user.role === 'teacher' || user.role === 'admin')) {
+  } else if (sessionScope && user.role === 'teacher') {
     query = query.eq('student_id', sessionScope.student_id);
-  } else if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
+  } else if (user.role === 'teacher' && studentId) {
     query = query.eq('student_id', studentId);
-  } else if (user.role !== 'admin') {
+  } else {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 

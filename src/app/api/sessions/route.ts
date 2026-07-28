@@ -5,6 +5,7 @@ import { apiOk, apiError } from '@/lib/api/response';
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const db = supabaseAdmin();
   let query = db

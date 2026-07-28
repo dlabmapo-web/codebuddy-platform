@@ -144,9 +144,7 @@ export async function GET(req: Request) {
     .from('teacher_student')
     .select('student_id')
     .eq('teacher_id', user.id);
-
   if (mappingError) return apiError('담당 학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-
   const mappedIds = (mappings ?? []).map((mapping) => mapping.student_id);
   let studentQuery = db
     .from('users')
@@ -155,7 +153,9 @@ export async function GET(req: Request) {
     .eq('is_active', true)
     .order('name', { ascending: true });
 
-  if (mappedIds.length > 0) studentQuery = studentQuery.in('id', mappedIds);
+  studentQuery = mappedIds.length > 0
+    ? studentQuery.in('id', mappedIds)
+    : studentQuery.eq('id', '00000000-0000-0000-0000-000000000000');
 
   const { data: studentData, error: studentError } = await studentQuery;
   if (studentError) return apiError('학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);

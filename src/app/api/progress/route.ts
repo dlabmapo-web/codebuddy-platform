@@ -35,7 +35,7 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
-  if (user.role !== 'teacher' && user.role !== 'admin') {
+  if (user.role !== 'teacher') {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 

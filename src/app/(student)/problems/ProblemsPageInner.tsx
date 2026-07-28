@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -26,6 +27,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
+import {
+  currentInternalRoute,
+  withReturnTo,
+} from '@/lib/navigation/returnTo';
+import { routeWithQuery } from '@/lib/navigation/queryState';
+import {
+  readScrollPosition,
+  saveScrollPosition,
+  scrollRestorationKey,
+} from '@/lib/navigation/scrollRestoration';
 
 type SolveStatus = 'unsolved' | 'tried' | 'solved';
 
@@ -207,8 +218,10 @@ export default function ProblemsPageInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const requestedSubjectId = searchParams.get('subject') ?? '';
   const stageId = searchParams.get('stage') ?? '';
   const requestedChapterId = searchParams.get('chapter') ?? '';
+  const requestedQuery = searchParams.get('q') ?? '';
 
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [subject, setSubject] = useState<CurriculumMeta | null>(null);
@@ -217,9 +230,43 @@ export default function ProblemsPageInner() {
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<DraftSession[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(requestedQuery);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const queryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const catalogRoute = currentInternalRoute({
+    pathname,
+    search: searchParams.toString(),
+  });
+  const viewIdentity = stageId || 'catalog';
+  const scrollKey = scrollRestorationKey(pathname, viewIdentity);
+  const expandedKey = `cove-expanded:${pathname}:${viewIdentity}`;
+
+  const saveCatalogView = useCallback(() => {
+    const scrollContainer = document.querySelector('main');
+    saveScrollPosition(
+      sessionStorage,
+      scrollKey,
+      scrollContainer?.scrollTop ?? window.scrollY,
+    );
+    sessionStorage.setItem(expandedKey, JSON.stringify([...expandedChapters]));
+    sessionStorage.setItem('cove-last-student-catalog', catalogRoute);
+  }, [catalogRoute, expandedChapters, expandedKey, scrollKey]);
+
+  const problemHref = useCallback((nextProblemId: string) => (
+    withReturnTo(`/problems/${nextProblemId}`, catalogRoute)
+  ), [catalogRoute]);
+
+  const updateQuery = useCallback((value: string) => {
+    setQuery(value);
+    if (queryTimerRef.current) clearTimeout(queryTimerRef.current);
+    queryTimerRef.current = setTimeout(() => {
+      router.replace(
+        routeWithQuery(pathname, searchParams, { q: value.trim() || null }),
+        { scroll: false },
+      );
+    }, 250);
+  }, [pathname, router, searchParams]);
 
   const openStage = useCallback((subjectId: string, nextStageId: string) => {
     const params = new URLSearchParams({ subject: subjectId, stage: nextStageId });
@@ -248,11 +295,40 @@ export default function ProblemsPageInner() {
       .then((json) => {
         if (stageId) {
           const nextChapters = (json.chapters ?? []) as ChapterItem[];
+          const actualSubjectId = (json.subject as CurriculumMeta | null)?.id ?? '';
+          const normalizedUpdates: Record<string, string | null> = {};
+          if (actualSubjectId && requestedSubjectId !== actualSubjectId) {
+            normalizedUpdates.subject = actualSubjectId;
+          }
+          if (
+            requestedChapterId
+            && !nextChapters.some((chapter) => chapter.id === requestedChapterId)
+          ) {
+            normalizedUpdates.chapter = null;
+          }
+          if (Object.keys(normalizedUpdates).length > 0) {
+            router.replace(
+              routeWithQuery(pathname, searchParams, normalizedUpdates),
+              { scroll: false },
+            );
+          }
           setSubject(json.subject ?? null);
           setStage(json.stage ?? null);
           setChapters(nextChapters);
           setSubjects([]);
           setExpandedChapters(() => {
+            const saved = sessionStorage.getItem(expandedKey);
+            if (saved) {
+              try {
+                const ids = JSON.parse(saved) as string[];
+                const validIds = ids.filter((chapterId) => (
+                  nextChapters.some((chapter) => chapter.id === chapterId)
+                ));
+                if (validIds.length > 0) return new Set(validIds);
+              } catch {
+                sessionStorage.removeItem(expandedKey);
+              }
+            }
             if (requestedChapterId && nextChapters.some((chapter) => chapter.id === requestedChapterId)) {
               return new Set([requestedChapterId]);
             }
@@ -275,7 +351,26 @@ export default function ProblemsPageInner() {
       });
 
     return () => controller.abort();
-  }, [stageId, requestedChapterId]);
+  }, [expandedKey, pathname, requestedChapterId, requestedSubjectId, router, searchParams, stageId]);
+
+  useEffect(() => {
+    setQuery(requestedQuery);
+  }, [requestedQuery]);
+
+  useEffect(() => {
+    if (loading) return;
+    const position = readScrollPosition(sessionStorage, scrollKey);
+    if (position == null) return;
+    requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('main');
+      if (scrollContainer) scrollContainer.scrollTop = position;
+      else window.scrollTo({ top: position });
+    });
+  }, [loading, scrollKey]);
+
+  useEffect(() => () => {
+    if (queryTimerRef.current) clearTimeout(queryTimerRef.current);
+  }, []);
 
   useEffect(() => {
     fetch('/api/sessions')
@@ -306,6 +401,7 @@ export default function ProblemsPageInner() {
     setExpandedChapters((current) => {
       const next = new Set(current);
       next.has(chapterId) ? next.delete(chapterId) : next.add(chapterId);
+      sessionStorage.setItem(expandedKey, JSON.stringify([...next]));
       return next;
     });
   };
@@ -419,9 +515,15 @@ export default function ProblemsPageInner() {
                   key={draft.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => router.push(`/problems/${draft.problem_id}`)}
+                  onClick={() => {
+                    saveCatalogView();
+                    router.push(problemHref(draft.problem_id));
+                  }}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') router.push(`/problems/${draft.problem_id}`);
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      saveCatalogView();
+                      router.push(problemHref(draft.problem_id));
+                    }
                   }}
                   className="flex items-center gap-3 bg-card px-4 py-3 text-left transition-colors hover:bg-[var(--color-muted)]"
                 >
@@ -512,13 +614,13 @@ export default function ProblemsPageInner() {
               <Search size={15} style={{ color: '#BCC0C7' }} />
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => updateQuery(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent outline-none"
                 style={{ fontSize: '13px', color: 'var(--color-ink)' }}
                 placeholder="문제 제목 검색"
               />
               {query && (
-                <button onClick={() => setQuery('')} className="text-[#BCC0C7]" aria-label="검색어 지우기">
+                <button onClick={() => updateQuery('')} className="text-[#BCC0C7]" aria-label="검색어 지우기">
                   <X size={13} />
                 </button>
               )}
@@ -595,9 +697,10 @@ export default function ProblemsPageInner() {
                               const hasDraft = draftProblemIds.has(problem.id);
 
                               return (
-                                <button
+                                <Link
                                   key={problem.id}
-                                  onClick={() => router.push(`/problems/${problem.id}`)}
+                                  href={problemHref(problem.id)}
+                                  onClick={saveCatalogView}
                                   className="group flex w-full items-center gap-3 rounded-xl bg-card px-3 py-3 text-left transition-all hover:border-[#9EBDEC] hover:shadow-sm sm:px-4"
                                   style={{ border: hasDraft ? '1px solid #BFDBFE' : '1px solid var(--color-border)' }}
                                 >
@@ -630,7 +733,7 @@ export default function ProblemsPageInner() {
                                     {status.label}
                                   </span>
                                   <ChevronRight size={17} className="shrink-0 text-[#BCC0C7] transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                                </button>
+                                </Link>
                               );
                             })}
                           </div>

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronRight, Clock, FileCode2, X, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
+import { routeWithQuery } from '@/lib/navigation/queryState';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -155,19 +157,32 @@ function FilterSelect({
 }
 
 export default function ProgressPage() {
-  const [tab, setTab] = useState<'student' | 'problem'>('student');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') === 'problem' ? 'problem' : 'student';
+  const requestedStudentId = searchParams.get('student');
+  const subjectId = searchParams.get('subject') ?? '';
+  const stageId = searchParams.get('stage') ?? '';
+  const chapterId = searchParams.get('chapter') ?? '';
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [subjects, setSubjects] = useState<SubjectNode[]>([]);
   const [problemStats, setProblemStats] = useState<ProblemStat[]>([]);
-  const [subjectId, setSubjectId] = useState('');
-  const [stageId, setStageId] = useState('');
-  const [chapterId, setChapterId] = useState('');
+  const [curriculumLoaded, setCurriculumLoaded] = useState(false);
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
   const [expandedProblems, setExpandedProblems] = useState<Set<string>>(new Set());
   const [codeModal, setCodeModal] = useState<{ sub: Submission; studentName: string } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const replaceQuery = useCallback((updates: Record<string, string | null>) => {
+    router.replace(routeWithQuery(pathname, searchParams, updates), { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const pushQuery = (updates: Record<string, string | null>) => {
+    router.push(routeWithQuery(pathname, searchParams, updates), { scroll: false });
+  };
 
   useEffect(() => {
     fetch('/api/students').then(r => r.json()).then(json => {
@@ -178,8 +193,43 @@ export default function ProgressPage() {
     fetch('/api/progress').then(r => r.json()).then(json => {
       setSubjects(json.subjects ?? []);
       setProblemStats(json.problems ?? []);
+      setCurriculumLoaded(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (students.length === 0) return;
+    if (!requestedStudentId) {
+      setSelectedStudent((current) => current ?? students[0]);
+      return;
+    }
+    const selected = students.find((student) => student.id === requestedStudentId);
+    if (selected) setSelectedStudent(selected);
+    else replaceQuery({ student: null });
+  }, [replaceQuery, requestedStudentId, students]);
+
+  useEffect(() => {
+    if (!curriculumLoaded) return;
+    const subject = subjectId
+      ? subjects.find((item) => item.id === subjectId)
+      : null;
+    if (subjectId && !subject) {
+      replaceQuery({ subject: null, stage: null, chapter: null });
+      return;
+    }
+    const stages = subject?.stages ?? [];
+    const stage = stageId ? stages.find((item) => item.id === stageId) : null;
+    if (stageId && !stage) {
+      replaceQuery({ stage: null, chapter: null });
+      return;
+    }
+    const availableChapters = stage
+      ? stage.chapters
+      : stages.flatMap((item) => item.chapters);
+    if (chapterId && !availableChapters.some((item) => item.id === chapterId)) {
+      replaceQuery({ chapter: null });
+    }
+  }, [chapterId, curriculumLoaded, replaceQuery, stageId, subjectId, subjects]);
 
   const loadStudentSubmissions = useCallback(async (studentId: string) => {
     setLoading(true);
@@ -297,7 +347,7 @@ export default function ProgressPage() {
         {(['student', 'problem'] as const).map(t => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => pushQuery({ tab: t === 'student' ? null : t })}
             style={{
               height: 34, padding: '0 16px', borderRadius: 8,
               fontSize: '13px', fontWeight: 600,
@@ -322,7 +372,10 @@ export default function ProgressPage() {
               students.map(s => (
                 <button
                   key={s.id}
-                  onClick={() => setSelectedStudent(s)}
+                  onClick={() => {
+                    setSelectedStudent(s);
+                    pushQuery({ tab: null, student: s.id });
+                  }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
                   style={{
                     borderLeft: selectedStudent?.id === s.id ? '3px solid var(--color-primary)' : '3px solid transparent',
@@ -471,9 +524,7 @@ export default function ProgressPage() {
               value={subjectId}
               options={subjectOptions}
               onChange={(value) => {
-                setSubjectId(value);
-                setStageId('');
-                setChapterId('');
+                replaceQuery({ subject: value || null, stage: null, chapter: null });
               }}
             />
             <FilterSelect
@@ -482,8 +533,7 @@ export default function ProgressPage() {
               options={stageOptions}
               disabled={!subjectId}
               onChange={(value) => {
-                setStageId(value);
-                setChapterId('');
+                replaceQuery({ stage: value || null, chapter: null });
               }}
             />
             <FilterSelect
@@ -491,7 +541,7 @@ export default function ProgressPage() {
               value={chapterId}
               options={chapterOptions}
               disabled={!subjectId && !stageId}
-              onChange={setChapterId}
+              onChange={(value) => replaceQuery({ chapter: value || null })}
             />
             <span style={{ fontSize: '12px', color: 'var(--color-sub)', paddingBottom: 8 }}>
               {filteredProblems.length}개 문제

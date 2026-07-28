@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus, Pencil, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, ChevronRight,
   X, Check, HelpCircle, FolderPlus, ArrowUp, ArrowDown, Layers, Sparkles, FileSpreadsheet,
@@ -10,6 +11,7 @@ import type { DbProblem, DbTestCase, DbProblemHint, ProblemDifficulty } from '@/
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { CurriculumExcelImportModal } from '@/components/admin/CurriculumExcelImportModal';
 import { TestCaseEditor, type TestCaseDraft } from '@/components/admin/TestCaseEditor';
+import { routeWithQuery } from '@/lib/navigation/queryState';
 
 const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
   ssr: false,
@@ -229,11 +231,22 @@ function HierarchyModal({
 }
 
 export default function AdminProblemsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requestedSubjectId = searchParams.get('subject');
+  const requestedStageId = searchParams.get('stage');
+  const requestedChapterId = searchParams.get('chapter');
+  const requestedProblemId = searchParams.get('problem');
+  const requestedMode = searchParams.get('mode');
   const [level, setLevel] = useState<NavLevel>('subjects');
   const [subjects, setSubjects] = useState<HierarchyRow[]>([]);
   const [stages, setStages] = useState<HierarchyRow[]>([]);
   const [chapters, setChapters] = useState<HierarchyRow[]>([]);
   const [problems, setProblems] = useState<ProblemRow[]>([]);
+  const [stagesParentId, setStagesParentId] = useState<string | null>(null);
+  const [chaptersParentId, setChaptersParentId] = useState<string | null>(null);
+  const [problemsParentId, setProblemsParentId] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<HierarchyRow | null>(null);
   const [selectedStage, setSelectedStage] = useState<HierarchyRow | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<HierarchyRow | null>(null);
@@ -259,6 +272,20 @@ export default function AdminProblemsPage() {
   const [hierSaving, setHierSaving] = useState(false);
   const [deleteHierTarget, setDeleteHierTarget] = useState<{ kind: HierarchyKind; row: HierarchyRow } | null>(null);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
+  const openedPanelRef = useRef(false);
+
+  const hierarchyHref = useCallback((updates: Record<string, string | null>) => (
+    routeWithQuery(pathname, searchParams, updates)
+  ), [pathname, searchParams]);
+
+  const replaceHierarchy = useCallback((updates: Record<string, string | null>) => {
+    router.replace(hierarchyHref(updates), { scroll: false });
+  }, [hierarchyHref, router]);
+
+  const resetPanel = useCallback(() => {
+    setPanelMode('closed');
+    setEditId(null);
+  }, []);
 
   const showToast = (message: string, type: 'ok' | 'err') => {
     setToast({ message, type });
@@ -281,6 +308,7 @@ export default function AdminProblemsPage() {
       ...s,
       child_count: s.chapter_count ?? 0,
     })));
+    setStagesParentId(subjectId);
   }, []);
 
   const loadChapters = useCallback(async (stageId: string) => {
@@ -290,6 +318,7 @@ export default function AdminProblemsPage() {
       ...c,
       child_count: c.problem_count ?? 0,
     })));
+    setChaptersParentId(stageId);
   }, []);
 
   const loadProblems = useCallback(async (chapterId: string) => {
@@ -297,21 +326,97 @@ export default function AdminProblemsPage() {
     const json = await res.json();
     const chapterProblems: ProblemRow[] = json.problems ?? [];
     setProblems(chapterProblems.sort((a, b) => a.order_no - b.order_no));
+    setProblemsParentId(chapterId);
   }, []);
 
   useEffect(() => {
     loadSubjects().finally(() => setLoading(false));
   }, [loadSubjects]);
 
-  const openCreate = () => {
+  useEffect(() => {
+    if (loading) return;
+    if (!requestedSubjectId) {
+      if (requestedStageId || requestedChapterId || requestedProblemId || requestedMode) {
+        replaceHierarchy({ stage: null, chapter: null, problem: null, mode: null });
+      }
+      setSelectedSubject(null);
+      setSelectedStage(null);
+      setSelectedChapter(null);
+      setLevel('subjects');
+      resetPanel();
+      return;
+    }
+    const subject = subjects.find((item) => item.id === requestedSubjectId);
+    if (!subject) {
+      replaceHierarchy({ subject: null, stage: null, chapter: null, problem: null, mode: null });
+      return;
+    }
+    if (selectedSubject?.id !== subject.id) {
+      setSelectedSubject(subject);
+      setSelectedStage(null);
+      setSelectedChapter(null);
+      loadStages(subject.id);
+    }
+    if (!requestedStageId) {
+      if (requestedChapterId || requestedProblemId || requestedMode) {
+        replaceHierarchy({ chapter: null, problem: null, mode: null });
+      }
+      setSelectedStage(null);
+      setSelectedChapter(null);
+      setLevel('stages');
+      resetPanel();
+    }
+  }, [loading, loadStages, replaceHierarchy, requestedChapterId, requestedMode, requestedProblemId, requestedStageId, requestedSubjectId, resetPanel, selectedSubject?.id, subjects]);
+
+  useEffect(() => {
+    if (!requestedSubjectId || !requestedStageId || stagesParentId !== requestedSubjectId) return;
+    const stage = stages.find((item) => item.id === requestedStageId);
+    if (!stage) {
+      replaceHierarchy({ stage: null, chapter: null, problem: null, mode: null });
+      return;
+    }
+    if (selectedStage?.id !== stage.id) {
+      setSelectedStage(stage);
+      setSelectedChapter(null);
+      loadChapters(stage.id);
+    }
+    if (!requestedChapterId) {
+      if (requestedProblemId || requestedMode) {
+        replaceHierarchy({ problem: null, mode: null });
+      }
+      setSelectedChapter(null);
+      setLevel('chapters');
+      resetPanel();
+    }
+  }, [loadChapters, replaceHierarchy, requestedChapterId, requestedMode, requestedProblemId, requestedStageId, requestedSubjectId, resetPanel, selectedStage?.id, stages, stagesParentId]);
+
+  useEffect(() => {
+    if (!requestedStageId || !requestedChapterId || chaptersParentId !== requestedStageId) return;
+    const chapter = chapters.find((item) => item.id === requestedChapterId);
+    if (!chapter) {
+      replaceHierarchy({ chapter: null, problem: null, mode: null });
+      return;
+    }
+    if (selectedChapter?.id !== chapter.id) {
+      setSelectedChapter(chapter);
+      loadProblems(chapter.id);
+    }
+    setLevel('problems');
+  }, [chapters, chaptersParentId, loadProblems, replaceHierarchy, requestedChapterId, requestedStageId, selectedChapter?.id]);
+
+  const openCreate = (writeHistory = true) => {
     if (!selectedChapter) { showToast('챕터를 먼저 선택해주세요.', 'err'); return; }
     setForm({ ...EMPTY_FORM, chapter_id: selectedChapter.id });
     setEditId(null);
     setPanelMode('create');
     setExpandedSection('basic');
+    if (writeHistory) {
+      openedPanelRef.current = true;
+      router.push(hierarchyHref({ problem: null, mode: 'create' }), { scroll: false });
+    }
   };
 
-  const openEdit = async (id: string) => {
+  const openEdit = async (id: string, writeHistory = true) => {
     const res = await fetch(`/api/admin/problems/${id}`);
     const json = await res.json();
     if (!json.problem) { showToast('문제를 불러올 수 없습니다.', 'err'); return; }
@@ -335,9 +440,43 @@ export default function AdminProblemsPage() {
     setEditId(id);
     setPanelMode('edit');
     setExpandedSection('basic');
+    if (writeHistory) {
+      openedPanelRef.current = true;
+      router.push(hierarchyHref({ problem: id, mode: 'edit' }), { scroll: false });
+    }
   };
 
-  const closePanel = () => { setPanelMode('closed'); setEditId(null); };
+  useEffect(() => {
+    if (!requestedChapterId || problemsParentId !== requestedChapterId) return;
+    if (requestedMode === 'create') {
+      if (panelMode !== 'create') openCreate(false);
+      return;
+    }
+    if (requestedMode === 'edit' && requestedProblemId) {
+      if (!problems.some((problem) => problem.id === requestedProblemId)) {
+        replaceHierarchy({ problem: null, mode: null });
+        return;
+      }
+      if (panelMode !== 'edit' || editId !== requestedProblemId) void openEdit(requestedProblemId, false);
+      return;
+    }
+    if (requestedMode || requestedProblemId) {
+      replaceHierarchy({ problem: null, mode: null });
+    }
+    resetPanel();
+  // openCreate/openEdit intentionally read the current selected chapter and form state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, panelMode, problems, problemsParentId, replaceHierarchy, requestedChapterId, requestedMode, requestedProblemId, resetPanel]);
+
+  const closePanel = () => {
+    resetPanel();
+    if (openedPanelRef.current) {
+      openedPanelRef.current = false;
+      router.back();
+    } else {
+      replaceHierarchy({ problem: null, mode: null });
+    }
+  };
 
   const handleSave = async () => {
     if (!form.chapter_id) { showToast('챕터를 선택해주세요.', 'err'); return; }
@@ -499,42 +638,48 @@ export default function AdminProblemsPage() {
     setSelectedStage(null);
     setSelectedChapter(null);
     setLevel('stages');
-    closePanel();
+    resetPanel();
     loadStages(row.id);
+    router.push(hierarchyHref({ subject: row.id, stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
   };
 
   const enterStage = (row: HierarchyRow) => {
     setSelectedStage(row);
     setSelectedChapter(null);
     setLevel('chapters');
-    closePanel();
+    resetPanel();
     loadChapters(row.id);
+    router.push(hierarchyHref({ stage: row.id, chapter: null, problem: null, mode: null }), { scroll: false });
   };
 
   const enterChapter = (row: HierarchyRow) => {
     setSelectedChapter(row);
     setLevel('problems');
-    closePanel();
+    resetPanel();
     loadProblems(row.id);
+    router.push(hierarchyHref({ chapter: row.id, problem: null, mode: null }), { scroll: false });
   };
 
   const goTo = (target: NavLevel) => {
-    closePanel();
+    resetPanel();
     if (target === 'subjects') {
       setLevel('subjects');
       setSelectedSubject(null);
       setSelectedStage(null);
       setSelectedChapter(null);
       loadSubjects();
+      router.push(hierarchyHref({ subject: null, stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
     } else if (target === 'stages' && selectedSubject) {
       setLevel('stages');
       setSelectedStage(null);
       setSelectedChapter(null);
       loadStages(selectedSubject.id);
+      router.push(hierarchyHref({ stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
     } else if (target === 'chapters' && selectedStage) {
       setLevel('chapters');
       setSelectedChapter(null);
       loadChapters(selectedStage.id);
+      router.push(hierarchyHref({ chapter: null, problem: null, mode: null }), { scroll: false });
     }
   };
 
@@ -612,7 +757,7 @@ export default function AdminProblemsPage() {
           )}
           {level === 'problems' && (
             <button
-              onClick={openCreate}
+              onClick={() => openCreate()}
               className="flex items-center gap-2 px-4 rounded-xl text-white transition-colors"
               style={{ height: 40, backgroundColor: 'var(--color-primary)', fontSize: '14px', fontWeight: 600 }}
             >
@@ -683,7 +828,7 @@ export default function AdminProblemsPage() {
               {problems.length === 0 ? (
                 <div className="px-4 py-10 text-center" style={{ fontSize: '13px', color: '#BCC0C7' }}>
                   아직 문제가 없습니다.
-                  <button onClick={openCreate} className="block mx-auto mt-3 text-primary" style={{ fontSize: '13px', fontWeight: 600 }}>
+                  <button onClick={() => openCreate()} className="block mx-auto mt-3 text-primary" style={{ fontSize: '13px', fontWeight: 600 }}>
                     + 문제 추가
                   </button>
                 </div>

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Search, UserCheck, UserX, Users, GraduationCap, BookOpen, Pencil, KeyRound, X, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Search, UserCheck, UserX, Users, GraduationCap, BookOpen, Pencil, X, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import type { UserRole } from '@/lib/types/db';
+import { routeWithQuery } from '@/lib/navigation/queryState';
 
 type UserRow = {
   id: string;
@@ -228,13 +230,23 @@ function EditModal({
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get('q') ?? '';
+  const roleFilter = (['student', 'teacher'].includes(searchParams.get('role') ?? '')
+    ? searchParams.get('role')
+    : 'all') as 'all' | 'student' | 'teacher';
+  const statusFilter = (['active', 'inactive'].includes(searchParams.get('status') ?? '')
+    ? searchParams.get('status')
+    : 'all') as 'all' | 'active' | 'inactive';
+  const selectedUserId = searchParams.get('user');
   const [users, setUsers] = useState<UserRow[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, studentCount: 0, teacherCount: 0, activeCount: 0 });
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'teacher'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [q, setQ] = useState(urlQuery);
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'err' } | null>(null);
 
   const showToast = (message: string, type: 'ok' | 'err') => {
@@ -242,10 +254,44 @@ export default function AdminUsersPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const replaceQuery = useCallback((updates: Record<string, string | null>) => {
+    router.replace(routeWithQuery(pathname, searchParams, updates), { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const closeEdit = useCallback(() => {
+    setEditTarget(null);
+    replaceQuery({ user: null });
+  }, [replaceQuery]);
+
+  const openEdit = (user: UserRow) => {
+    setEditTarget(user);
+    router.push(routeWithQuery(pathname, searchParams, { user: user.id }), { scroll: false });
+  };
+
+  useEffect(() => {
+    setQ(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => () => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const rawRole = searchParams.get('role');
+    const rawStatus = searchParams.get('status');
+    if (rawRole && !['student', 'teacher'].includes(rawRole)) {
+      replaceQuery({ role: null });
+      return;
+    }
+    if (rawStatus && !['active', 'inactive'].includes(rawStatus)) {
+      replaceQuery({ status: null });
+    }
+  }, [replaceQuery, searchParams]);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (q) params.set('q', q);
+    if (urlQuery) params.set('q', urlQuery);
     if (roleFilter !== 'all') params.set('role', roleFilter);
     if (statusFilter !== 'all') params.set('status', statusFilter);
     const res = await fetch(`/api/admin/users?${params.toString()}`);
@@ -253,9 +299,19 @@ export default function AdminUsersPage() {
     setUsers(json.users ?? []);
     if (json.stats) setStats(json.stats);
     setLoading(false);
-  }, [q, roleFilter, statusFilter]);
+  }, [urlQuery, roleFilter, statusFilter]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  useEffect(() => {
+    if (!selectedUserId) {
+      setEditTarget(null);
+      return;
+    }
+    const selected = users.find((user) => user.id === selectedUserId);
+    if (selected) setEditTarget(selected);
+    else if (!loading) replaceQuery({ user: null });
+  }, [loading, replaceQuery, selectedUserId, users]);
 
   const handleToggleActive = async (user: UserRow) => {
     const res = await fetch(`/api/admin/users/${user.id}`, {
@@ -273,7 +329,7 @@ export default function AdminUsersPage() {
 
   const handleSaved = (updated: UserRow) => {
     setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));
-    setEditTarget(null);
+    closeEdit();
     showToast(`${updated.name} 정보를 수정했습니다.`, 'ok');
     fetchUsers();
   };
@@ -313,7 +369,12 @@ export default function AdminUsersPage() {
               style={{ fontSize: '14px', color: 'var(--color-ink)' }}
               placeholder="이름 또는 아이디 검색"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setQ(value);
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                searchTimerRef.current = setTimeout(() => replaceQuery({ q: value || null, user: null }), 250);
+              }}
             />
           </div>
         </form>
@@ -322,7 +383,7 @@ export default function AdminUsersPage() {
           {ROLE_TABS.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setRoleFilter(key)}
+              onClick={() => replaceQuery({ role: key === 'all' ? null : key, user: null })}
               className="rounded-xl px-4 transition-colors"
               style={{
                 height: 36,
@@ -341,7 +402,7 @@ export default function AdminUsersPage() {
           {STATUS_TABS.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setStatusFilter(key)}
+              onClick={() => replaceQuery({ status: key === 'all' ? null : key, user: null })}
               className="rounded-xl px-4 transition-colors"
               style={{
                 height: 36,
@@ -450,7 +511,7 @@ export default function AdminUsersPage() {
                     {u.is_active ? '비활성화' : '활성화'}
                   </button>
                   <button
-                    onClick={() => setEditTarget(u)}
+                    onClick={() => openEdit(u)}
                     title="정보 수정"
                     className="flex items-center gap-1.5 rounded-xl px-3 transition-colors hover:bg-[var(--color-surface)]"
                     style={{ height: 38, border: '1px solid var(--color-border)', fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)' }}
@@ -464,7 +525,7 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {editTarget && <EditModal user={editTarget} onClose={() => setEditTarget(null)} onSaved={handleSaved} />}
+      {editTarget && <EditModal user={editTarget} onClose={closeEdit} onSaved={handleSaved} />}
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );

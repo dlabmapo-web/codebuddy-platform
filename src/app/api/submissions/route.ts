@@ -11,6 +11,7 @@ import {
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
+  if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const { searchParams } = new URL(req.url);
   const problemId = searchParams.get('problem_id');
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const db = supabaseAdmin();
 
-  if ((user.role === 'teacher' || user.role === 'admin') && studentId) {
+  if (user.role === 'teacher' && studentId) {
     let query = db
       .from('submissions')
       .select(`

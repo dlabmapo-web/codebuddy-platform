@@ -2,8 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { BookOpen, MessageSquare, RefreshCw, Circle, Wifi } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { BookOpen, MessageSquare, RefreshCw, Circle, Search, Wifi, X } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
+import {
+  currentInternalRoute,
+  withReturnTo,
+} from '@/lib/navigation/returnTo';
+import { routeWithQuery } from '@/lib/navigation/queryState';
+import {
+  readScrollPosition,
+  saveScrollPosition,
+  scrollRestorationKey,
+} from '@/lib/navigation/scrollRestoration';
 
 type StudentSession = {
   id: string;
@@ -48,11 +59,47 @@ function formatRelative(iso: string | null) {
 }
 
 export default function StudentsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requestedQuery = searchParams.get('q') ?? '';
+  const requestedStatus = searchParams.get('status');
+  const status = requestedStatus === 'online'
+    || requestedStatus === 'solving'
+    || requestedStatus === 'offline'
+    ? requestedStatus
+    : 'all';
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [query, setQuery] = useState(requestedQuery);
   const initializedRef = useRef(false);
+  const queryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const returnRoute = currentInternalRoute({
+    pathname,
+    search: searchParams.toString(),
+  });
+  const scrollKey = scrollRestorationKey(pathname, returnRoute);
+
+  const saveView = () => {
+    const scrollContainer = document.querySelector('main');
+    saveScrollPosition(sessionStorage, scrollKey, scrollContainer?.scrollTop ?? window.scrollY);
+  };
+
+  const replaceQuery = useCallback((updates: Record<string, string | null>) => {
+    router.replace(routeWithQuery(pathname, searchParams, updates), {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
+
+  const updateSearch = useCallback((value: string) => {
+    setQuery(value);
+    if (queryTimerRef.current) clearTimeout(queryTimerRef.current);
+    queryTimerRef.current = setTimeout(() => {
+      replaceQuery({ q: value.trim() || null });
+    }, 250);
+  }, [replaceQuery]);
 
   const load = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -100,9 +147,34 @@ export default function StudentsPage() {
     const interval = setInterval(() => load(false), 15000);
     return () => clearInterval(interval);
   }, [load]);
+  useEffect(() => setQuery(requestedQuery), [requestedQuery]);
+  useEffect(() => () => {
+    if (queryTimerRef.current) clearTimeout(queryTimerRef.current);
+  }, []);
+  useEffect(() => {
+    if (loading) return;
+    const position = readScrollPosition(sessionStorage, scrollKey);
+    if (position == null) return;
+    requestAnimationFrame(() => {
+      const scrollContainer = document.querySelector('main');
+      if (scrollContainer) scrollContainer.scrollTop = position;
+      else window.scrollTo({ top: position });
+    });
+  }, [loading, scrollKey]);
 
   const onlineCount = students.filter(s => isOnline(s.last_active_at)).length;
   const solvingCount = students.filter(s => s.activeSession && isOnline(s.last_active_at)).length;
+  const normalizedQuery = query.trim().toLocaleLowerCase('ko-KR');
+  const visibleStudents = students.filter((student) => {
+    const online = isOnline(student.last_active_at);
+    const solving = online && Boolean(student.activeSession);
+    if (status === 'online' && !online) return false;
+    if (status === 'solving' && !solving) return false;
+    if (status === 'offline' && online) return false;
+    if (!normalizedQuery) return true;
+    return student.name.toLocaleLowerCase('ko-KR').includes(normalizedQuery)
+      || student.username.toLocaleLowerCase('ko-KR').includes(normalizedQuery);
+  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -154,17 +226,60 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 rounded-xl bg-card p-3 sm:flex-row sm:items-center sm:justify-between" style={{ border: '1px solid var(--color-border)' }}>
+        <div className="flex flex-wrap gap-1.5">
+          {([
+            ['all', '전체'],
+            ['online', '접속 중'],
+            ['solving', '풀이 중'],
+            ['offline', '오프라인'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => replaceQuery({
+                status: value === 'all' ? null : value,
+              })}
+              className="rounded-lg px-3 py-2"
+              style={{
+                backgroundColor: status === value ? 'var(--color-primary-light)' : 'transparent',
+                color: status === value ? 'var(--color-primary)' : 'var(--color-sub)',
+                fontSize: 12,
+                fontWeight: status === value ? 700 : 500,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex h-9 w-full items-center gap-2 rounded-lg px-3 sm:w-64" style={{ border: '1px solid var(--color-border)' }}>
+          <Search size={14} style={{ color: 'var(--color-sub)' }} />
+          <input
+            value={query}
+            onChange={(event) => updateSearch(event.target.value)}
+            placeholder="학생 이름 또는 아이디"
+            className="min-w-0 flex-1 bg-transparent outline-none"
+            style={{ fontSize: 12, color: 'var(--color-ink)' }}
+          />
+          {query && (
+            <button type="button" onClick={() => updateSearch('')} aria-label="검색어 지우기">
+              <X size={13} style={{ color: 'var(--color-sub)' }} />
+            </button>
+          )}
+        </label>
+      </div>
+
       <div className="bg-card rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="animate-pulse" style={{ height: 64, borderBottom: i < 4 ? '1px solid var(--color-muted)' : 'none', margin: '0 20px' }} />
           ))
-        ) : students.length === 0 ? (
+        ) : visibleStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p style={{ fontSize: '14px', color: '#BCC0C7' }}>등록된 학생이 없습니다</p>
           </div>
         ) : (
-          students.map((s, idx) => {
+          visibleStudents.map((s, idx) => {
             const online = isOnline(s.last_active_at);
             const session = online ? s.activeSession : null;
             const diff = session?.problems?.difficulty;
@@ -175,7 +290,7 @@ export default function StudentsPage() {
                 className="flex items-center gap-4 px-5"
                 style={{
                   height: 64,
-                  borderBottom: idx < students.length - 1 ? '1px solid var(--color-muted)' : 'none',
+                  borderBottom: idx < visibleStudents.length - 1 ? '1px solid var(--color-muted)' : 'none',
                   borderLeft: session ? '3px solid var(--color-primary)' : online ? '3px solid #16A34A' : '3px solid transparent',
                 }}
               >
@@ -232,7 +347,8 @@ export default function StudentsPage() {
 
                 {session && (
                   <Link
-                    href={`/feedback/${session.id}`}
+                    href={withReturnTo(`/feedback/${session.id}`, returnRoute)}
+                    onClick={saveView}
                     className="flex items-center gap-1.5 px-3 rounded-lg transition-colors shrink-0"
                     style={{ height: 34, backgroundColor: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, color: 'white' }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)')}

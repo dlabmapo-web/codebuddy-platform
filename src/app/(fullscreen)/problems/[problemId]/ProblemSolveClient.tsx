@@ -37,6 +37,10 @@ import {
   loadProblemTransitionSnapshot,
   type ProblemTransitionSnapshot,
 } from '@/lib/problems/transition';
+import {
+  encodeReturnTo,
+  validateReturnTo,
+} from '@/lib/navigation/returnTo';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -145,11 +149,20 @@ finally:
   };
 }
 
-export default function ProblemSolveClient({ problemId, submissionId }: { problemId: string; submissionId?: string }) {
+export default function ProblemSolveClient({
+  problemId,
+  submissionId,
+  returnTo,
+}: {
+  problemId: string;
+  submissionId?: string;
+  returnTo?: string;
+}) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [navigation, setNavigation] = useState<ProblemNavigation | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [isProblemTransitioning, setIsProblemTransitioning] = useState(false);
+  const [lastCatalogReturn, setLastCatalogReturn] = useState<string | null>(null);
   const [problemTransitionDirection, setProblemTransitionDirection] = useState<ProblemTransitionDirection | null>(null);
   const [navigationFailure, setNavigationFailure] = useState<ProblemNavigationFailure | null>(null);
   const [code, setCode] = useState('');
@@ -213,6 +226,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const problemTransitionControllerRef = useRef<AbortController | null>(null);
   const initialProblemIdRef = useRef(problemId);
   const initialSubmissionIdRef = useRef(submissionId);
+  const validatedReturnTo = validateReturnTo(returnTo, 'student');
   const sessionIdRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingSyncRef = useRef(false);
@@ -224,6 +238,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const remoteCursorDecorationsRef = useRef<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remoteCursorWidgetRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (validatedReturnTo) return;
+    setLastCatalogReturn(
+      validateReturnTo(sessionStorage.getItem('cove-last-student-catalog'), 'student'),
+    );
+  }, [validatedReturnTo]);
   // 선생님 커서가 멈추면 일정 시간 뒤 커서 위젯을 숨기는 타이머
   const remoteCursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -547,7 +568,14 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
       applyProblemSnapshot(snapshot);
       if (updateHistory === 'push') {
-        window.history.pushState(null, '', `/problems/${snapshot.problem.id}`);
+        const returnQuery = validatedReturnTo
+          ? `?returnTo=${encodeReturnTo(validatedReturnTo)}`
+          : '';
+        window.history.pushState(
+          null,
+          '',
+          `/problems/${snapshot.problem.id}${returnQuery}`,
+        );
       }
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -591,7 +619,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         problemTransitionControllerRef.current = null;
       }
     }
-  }, [applyProblemSnapshot, saveDraftBeforeNavigation]);
+  }, [applyProblemSnapshot, saveDraftBeforeNavigation, validatedReturnTo]);
 
   const handleNavigateProblem = useCallback((
     destination: ProblemNavigationItem | null,
@@ -1226,6 +1254,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const problemListHref = listParams.size > 0
     ? `/problems?${listParams.toString()}`
     : '/problems';
+  const returnHref = validatedReturnTo ?? lastCatalogReturn ?? problemListHref;
+  const returnLabel = returnHref === '/me' || returnHref.startsWith('/me?')
+    ? '풀이 기록'
+    : '목록';
   const previousProblem = navigation?.previous ?? null;
   const nextProblem = navigation?.next ?? null;
   const workspaceActionsDisabled = isRunning || isProblemTransitioning;
@@ -1244,8 +1276,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       style={{ backgroundColor: 'var(--color-surface)' }}
     >
       <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
-        <Link href={problemListHref} className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
-          <ChevronLeft size={16} /> 목록
+        <Link
+          href={returnHref}
+          aria-label={`${returnLabel}으로 돌아가기`}
+          className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+          style={{ color: 'var(--color-sub)', fontSize: '13px' }}
+        >
+          <ChevronLeft size={16} /> {returnLabel}
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 

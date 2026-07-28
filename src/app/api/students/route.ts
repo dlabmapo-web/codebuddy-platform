@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
-  if (user.role !== 'teacher' && user.role !== 'admin') {
+  if (user.role !== 'teacher') {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     const studentIds = (mappings ?? []).map((m) => m.student_id);
     if (studentIds.length > 0) {
       query = query.in('id', studentIds);
+    } else {
+      query = query.eq('id', '00000000-0000-0000-0000-000000000000');
     }
   }
 

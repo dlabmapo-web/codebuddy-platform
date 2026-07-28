@@ -126,6 +126,8 @@ states.
 - The header breadcrumb represents the problem currently displayed in the teacher workspace.
 - The drawer's live indicator always represents the student's latest active problem,
   which may differ from the problem the teacher is previewing.
+- Student movement never replaces the teacher's displayed problem, selected preview,
+  open tree position, editor, or unsent feedback. Only the live-status metadata changes.
 
 ### Teacher live and preview modes
 
@@ -162,8 +164,9 @@ The teacher workspace has two explicit modes:
   session.
 
 Student movement continues to update the `Live` marker while the teacher previews
-another problem. If the student changes sessions, returning to live follows the latest
-authorized live session rather than a stale one.
+another problem. The teacher changes sessions only by explicitly selecting the live
+row or choosing `Return to live problem`; that action follows the latest authorized
+live session rather than a stale one.
 
 ### Student movement
 
@@ -172,13 +175,13 @@ The teacher page checks the monitored student's authenticated active-session con
 When the active session changes:
 
 1. Keep the teacher on the current code and preserve unsent feedback.
-2. Update the drawer's live problem and curriculum path.
-3. Show a persistent, non-blocking banner:
-
-   `The student moved to {problem number}. {problem title}` — `Follow student`
-
-4. The `Follow student` action opens the new live feedback session while retaining the teacher's monitoring return location.
-5. Dismissing the banner does not end monitoring; it returns if the active session changes again.
+2. Keep the teacher's displayed breadcrumb and expanded curriculum structure fixed.
+3. Move only the drawer's `Live` marker to the student's latest problem when that
+   problem exists in the displayed subject.
+4. Update the compact header status to identify the student's latest live problem.
+5. Do not show a second movement banner and do not navigate automatically.
+6. Selecting the live row is the explicit action that opens the latest live feedback
+   session while retaining the teacher's monitoring return location.
 
 If the student has no active session, show `Student is not currently solving a problem` and keep the last displayed session available for review.
 
@@ -261,9 +264,9 @@ to retrieve the normalized curriculum context for a newly detected live session
 without changing the displayed editor session.
 
 When the active problem changes, the teacher client fetches the new session's
-learning context once from that endpoint. It may render that new context in the
-drawer while the displayed editor remains on the previous session. Regular
-monitoring checks do not repeatedly download the full tree.
+learning context once only to resolve current live-status metadata. It does not replace
+the drawer's displayed subject tree or current breadcrumb. Regular monitoring checks
+do not repeatedly download the full tree.
 
 The endpoint follows the platform's current teacher visibility rule: assigned students are scoped to their teacher; when no explicit mappings exist, active academy students remain visible as in the current MVP.
 
@@ -294,6 +297,22 @@ navigator reports clicks for every published problem in the current subject.
 The controller keeps live code and preview initial code in separate state. Realtime
 student updates write only to live state while Preview mode is active.
 
+The controller also keeps displayed navigation state separate from student live state:
+polling may update the live problem ID and label, but only an explicit teacher action
+may replace the displayed session or preview.
+
+### Copy control and responsive statement layout
+
+The shared sample-input copy control uses explicit positioning inside the input code
+box so its placement is identical in student and teacher views. Copy feedback remains
+the short `Copied`/`복사됨` state.
+
+On desktop, opening the navigator applies one responsive workspace offset rather than
+placing a second spacer beside an intrinsically sized workspace. The statement and
+editor reflow within the remaining width, and sample input/output pairs wrap when
+necessary. The drawer must not cover, clip, or horizontally displace statement
+content.
+
 ### Shared public problem statement
 
 Extract the student problem statement presentation into a shared component used by
@@ -315,7 +334,7 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Teacher preview failure leaves Live mode or the previous valid preview intact and
   shows a recoverable error without affecting the student session.
 - A deleted or unpublished destination is removed after context refresh and cannot be opened.
-- Stale `Follow student` actions validate that the target session is still active before navigating.
+- Selecting a stale live row validates that the target session is still active before navigating.
 - Aborted requests during problem transitions or page exit are ignored rather than logged as unhandled rejections.
 
 ## Performance

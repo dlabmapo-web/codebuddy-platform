@@ -1,7 +1,7 @@
 # Student Problem Previous and Next Navigation Design
 
 **Date:** 2026-07-28  
-**Status:** Implemented; header placement revision approved
+**Status:** Implemented; smooth transition revision approved
 **Scope:** Student problem detail page and its public problem-detail API
 
 ## 1. Summary
@@ -253,36 +253,93 @@ If draft saving fails, navigation still proceeds. The existing earlier
 autosave remains available, and navigation must not trap the student on the
 page without a recovery action.
 
-## 10. Problem-to-Problem State Reset
+## 10. Smooth Problem Transition
 
-Navigating between two values of the same dynamic route may reuse the client
-component. The implementation must explicitly reset problem-scoped state when
-`problemId` changes.
+Problem navigation uses a persistent workspace instead of remounting the
+entire problem screen. This follows the useful interaction principle from
+42.uz: keep the learning shell stable and replace only the route-specific
+content when the destination is ready.
 
-Reset before loading the new problem:
+### 10.1 Transition Start
 
-- Problem data and load error.
-- Navigation data.
-- Starter code and editor code until the new starter/draft is resolved.
-- `codeRestoredRef`.
-- `lastSavedCodeRef`.
-- Session ID and session refs.
+When the student chooses Previous or Next:
+
+1. Preserve the current draft as described in Section 9.
+2. Record which destination and direction were selected.
+3. Show a small spinner in the clicked navigation half.
+4. Disable Previous, Next, editor input, Reset, Run, sample runs and Submit.
+5. Start client-side navigation immediately.
+
+The current problem description, code and terminal remain visible during this
+period. They are read-only and visually unchanged; no full-screen loading
+screen or workspace skeleton replaces them.
+
+### 10.2 Background Load
+
+The dynamic route must preserve the same `ProblemSolveClient` instance when
+`problemId` changes. Remove the `key={problemId}` remount behavior.
+
+For the destination problem, load the following transition snapshot:
+
+- Published problem detail and structured navigation.
+- Sample cases and hints.
 - Submission attempt count.
-- Timer.
-- Terminal lines, open result drawer, Python error and awaiting-input state.
+- Destination problem session and saved draft.
+- A requested historical submission when `sid` is explicitly present.
+
+Choose destination editor code in this order:
+
+1. Requested historical submission code.
+2. Saved destination-session draft, including an intentionally empty draft.
+3. Destination starter code.
+
+The loading request uses an `AbortController` or equivalent request identity.
+If another navigation begins before it finishes, abort or ignore every result
+from the older request.
+
+### 10.3 Atomic Swap
+
+Do not partially apply destination data. Once the snapshot is ready, update
+the problem workspace together:
+
+- Problem, navigation, samples and hints.
+- Starter code and editor code.
+- Session ID and autosave refs.
+- Submission attempt count and timer.
+- Terminal output, Python error and awaiting-input state.
 - Active sample and manual input queues.
-- Hint and AI feedback state associated with the previous problem.
+- Result drawer, hints, teacher feedback and AI feedback.
 
-Dispose or stop any previous local runner activity before accepting input for
-the new problem.
+Dispose the previous local runner before accepting input for the destination.
+React may batch the state updates, but the implementation must ensure the new
+title never appears with old code and old problem code never becomes the new
+problem's draft.
 
-The new problem then follows the existing priority:
+After the swap, clear the navigation spinner and restore editor and action
+availability.
 
-1. A requested historical submission code, when a submission ID is present.
-2. A saved draft from the new problem's session.
-3. The new problem's starter code.
+### 10.4 Direct and Browser Navigation
 
-Old problem code must never flash in or become the draft for the new problem.
+Direct URL entry and the first page load may use the existing full-screen
+initial loading state because no previous workspace exists.
+
+Browser Back/Forward between problem routes uses the same background-load and
+atomic-swap path. Historical `sid` parameters do not carry into Previous or
+Next navigation.
+
+### 10.5 Failure Recovery
+
+If destination loading fails:
+
+- Keep the current problem, code and terminal intact.
+- Clear the navigation spinner and restore controls.
+- Replace the browser URL with the currently displayed problem URL.
+- Show a compact retryable message such as
+  `다음 문제를 불러오지 못했습니다. 다시 시도해주세요.`
+
+Do not show the full-screen not-found/error state over a valid problem that is
+already open. The full-screen error state remains appropriate only when the
+initial problem cannot load.
 
 ## 11. Routing
 
@@ -391,6 +448,12 @@ detail request solely because two sibling records share an order number.
 - Disable both controls while `isRunning`.
 - Use destination problem titles in accessible descriptions.
 - Preserve responsive accessible names when text is visually hidden.
+- Keep the current workspace visible while a destination snapshot loads.
+- Show progress only in the navigation control that started the transition.
+- Disable editing and execution actions during the transition.
+- Apply destination problem and code together after loading.
+- Ignore a stale destination response after a newer navigation starts.
+- Keep the current workspace and restore its URL when loading fails.
 
 ### End-to-end tests
 
@@ -404,6 +467,12 @@ detail request solely because two sibling records share an order number.
 8. Verify the final stage problem has a disabled Next control.
 9. Pass a problem and verify the result drawer uses the same Next destination.
 10. Use List and verify the current stage and chapter context is restored.
+11. Verify navigation never replaces the workspace with a full-screen loader.
+12. Throttle the network and verify the current workspace remains visible and
+    read-only until the destination is ready.
+13. Simulate a failed destination request and verify the current code remains
+    intact and the URL rolls back.
+14. Trigger Back/Forward and verify the same smooth transition behavior.
 
 ## 17. Acceptance Criteria
 
@@ -415,6 +484,9 @@ detail request solely because two sibling records share an order number.
 - First/last boundary controls are visible and disabled.
 - Draft code is preserved when navigating.
 - Problem-specific UI state is reset correctly.
+- The workspace remains mounted and visible while a neighbor loads.
+- Destination problem data and editor code appear atomically.
+- Failed and stale navigation cannot overwrite the current workspace.
 - The header and result drawer use one server-authoritative navigation result.
 - Unpublished curriculum records and private data are never exposed.
 - Manual Run, sample runs, Submit and grading behavior remain unchanged.

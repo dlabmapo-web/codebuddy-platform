@@ -19,7 +19,7 @@ structure. It does not perform a full nested-route rewrite. It introduces:
 - predictable browser history behavior for admin problem management;
 - one capability model shared by middleware, layouts, navigation, pages, and
   APIs;
-- a unified admin navigation shell that includes monitoring and management;
+- a focused admin navigation shell containing management tools only;
 - a supported pre-hydration theme script that does not trigger React's
   executable-script warning during client navigation; and
 - end-to-end coverage for the critical navigation journeys.
@@ -69,10 +69,9 @@ refresh/history limitation.
 The current route layers disagree about admin access:
 
 - middleware permits admins to access Dashboard, Students, and Progress;
-- the related APIs permit teacher and admin access;
-- the feedback page permits teacher and admin access;
-- the teacher layout rejects every non-teacher; and
-- middleware restricts `/feedback` to teachers.
+- some related APIs permit teacher and admin access;
+- the feedback page permits teacher and admin access; and
+- the product decision assigns all monitoring work exclusively to teachers.
 
 This disagreement can create redirect chains and surprising Back behavior.
 
@@ -90,7 +89,7 @@ components are not executed.
 - Make meaningful route state refreshable, shareable, and testable.
 - Keep transient presentation state out of the URL.
 - Preserve the smooth, mounted student coding workspace during Previous/Next.
-- Provide admins with intentional access to monitoring and management tools.
+- Keep monitoring teacher-only and management admin-only.
 - Define route authorization once and enforce it consistently at every layer.
 - Remove the React script warning without reintroducing a theme flash.
 - Deliver the change incrementally within the existing MVP architecture.
@@ -308,8 +307,8 @@ Opening a live session creates:
 
 ### 9.3 Feedback workspace
 
-The header Back control returns to the validated teacher/admin monitoring
-route. Its fallback is `/students`.
+The header Back control returns to the validated teacher monitoring route. Its
+fallback is `/students`.
 
 The feedback workspace remains fullscreen because the editor benefits from
 maximum horizontal space. Leaving it stops local execution and releases
@@ -336,24 +335,17 @@ removed with replace navigation and an inline empty/error state.
 
 ## 10. Admin Experience
 
-### 10.1 Unified admin shell
+### 10.1 Focused admin shell
 
-Admin navigation contains two labeled groups:
-
-**Monitoring**
-
-- Dashboard
-- Students
-- Progress
-
-**Management**
+Admin navigation contains only management tools:
 
 - Problem Management
 - AI Feedback Standards
 - User Management
 
-The same admin identity and shell remain mounted across both groups. Admins do
-not pass through a teacher-only layout or bounce through `/login`.
+Admins cannot access Dashboard, Students, Progress, or the live Feedback
+workspace. Direct navigation to those teacher-only routes goes to
+`/admin/problems` without passing through `/login`.
 
 ### 10.2 Problem management URL
 
@@ -418,10 +410,10 @@ entries.
 | --- | ---: | ---: | ---: |
 | View student catalog and own history | Yes | No | No |
 | Solve student problems | Yes | No | No |
-| View teacher dashboard | No | Yes | Yes |
-| View student monitoring | No | Yes | Yes |
-| View progress analytics | No | Yes | Yes |
-| Open live feedback workspace | No | Yes | Yes |
+| View teacher dashboard | No | Yes | No |
+| View student monitoring | No | Yes | No |
+| View progress analytics | No | Yes | No |
+| Open live feedback workspace | No | Yes | No |
 | Manage curriculum and problems | No | No | Yes |
 | Manage AI feedback standards | No | No | Yes |
 | Manage users | No | No | Yes |
@@ -583,9 +575,8 @@ These utilities must be framework-light and unit-testable.
 1. Enter subject, stage, chapter, and problem edit mode.
 2. Press browser Back repeatedly and verify each hierarchy step.
 3. Open the same edit URL directly and close to the correct parent.
-4. Navigate between Monitoring and Management without redirecting through
-   login.
-5. Open live feedback as admin and return to monitoring.
+4. Directly request each teacher-only route and verify navigation returns to
+   `/admin/problems` without passing through login.
 
 **Cross-role and browser**
 
@@ -608,7 +599,7 @@ Implement in dependency order:
    propagation.
 5. Add URL-backed teacher Students/Progress state and feedback return
    propagation.
-6. Add the unified admin shell and URL-backed problem hierarchy/edit state.
+6. Add the focused admin shell and URL-backed problem hierarchy/edit state.
 7. Add URL-backed Admin Users and AI Feedback filters/panels.
 8. Add scroll restoration and cross-browser E2E coverage.
 
@@ -624,8 +615,8 @@ Back/Forward working before moving to the next role surface.
 - Teacher filters, tabs, and selected entities survive refresh.
 - Admin browser Back reverses edit and hierarchy navigation before leaving
   Problem Management.
-- Admin can intentionally access Dashboard, Students, Progress, and Feedback
-  from the unified admin shell.
+- Admin sees only Problem Management, AI Feedback Standards, and User
+  Management and cannot directly access teacher monitoring routes.
 - Student and teacher cannot access admin management capabilities.
 - Middleware, layouts, pages, navigation, and APIs agree on role access.
 - Forbidden direct routes do not create login/role-home redirect loops.

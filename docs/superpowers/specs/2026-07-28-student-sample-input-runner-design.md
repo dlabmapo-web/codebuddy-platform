@@ -219,7 +219,12 @@ the official submission result remains authoritative.
 The main **Run** button:
 
 - Starts the current interactive runner.
-- Lets the student type or paste input in the terminal.
+- Lets the student type or paste input in a multiline terminal textarea.
+- Preserves pasted line breaks instead of collapsing them into spaces.
+- Submitting a pasted block queues its lines in order; each Python `input()`
+  request consumes one queued line.
+- Enter submits the current block. Shift+Enter inserts another line before
+  submission.
 - Does not automatically use a sample.
 - Does not compare against a sample expected output.
 - Does not create a score.

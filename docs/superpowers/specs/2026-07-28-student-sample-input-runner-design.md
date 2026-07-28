@@ -121,8 +121,12 @@ Rules:
 
 - Do not render a separate `예제 실행` or other helper label before the
   buttons. The blue action styling and play icon make their purpose clear.
-- Each button uses the product's primary blue fill, white text, a small play
-  icon, and a compact terminal-toolbar height.
+- Each button uses the quieter medium blue `#1B64DA` from the approved
+  companion mockup, white text, a small play icon, and a compact
+  terminal-toolbar height. It must not switch to the brighter dark-theme
+  primary blue.
+- The play icon and `테스트 N` text are centered together as one unit, using a
+  fixed compact minimum width so every numbered button aligns consistently.
 - Hover, keyboard-focus, running, and disabled states remain visually
   distinct. The running state uses a stronger blue outline and must not rely
   on color alone.

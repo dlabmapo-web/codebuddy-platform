@@ -37,7 +37,7 @@ export function ConsoleTerminal({
 }) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -88,26 +88,34 @@ export function ConsoleTerminal({
               <span key={i} style={{ color: KIND_COLOR[line.kind] }}>{line.text}</span>
             ))}
             {awaitingInput && mode === 'interactive' && (
-              <span className="inline-flex items-baseline" style={{ color: '#9CDCFE' }}>
+              <span className="inline-flex max-w-full items-start" style={{ color: '#9CDCFE' }}>
                 <span style={{ color: '#4EC9B0', marginRight: 4 }}>❯</span>
-                <input
+                <textarea
                   ref={inputRef}
                   value={input}
+                  rows={Math.min(6, Math.max(1, input.split(/\r\n?|\n/).length))}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      submit();
+                    }
                   }}
+                  aria-label="터미널 입력"
                   spellCheck={false}
                   autoComplete="off"
-                  className="focus:outline-none"
+                  className="max-w-full resize-none focus:outline-none"
                   style={{
                     background: 'transparent',
                     border: 'none',
                     color: '#9CDCFE',
                     fontFamily: "'Fira Code', Consolas, monospace",
                     fontSize: '12.5px',
+                    lineHeight: 1.65,
                     caretColor: '#9CDCFE',
                     minWidth: 240,
+                    padding: 0,
+                    overflowY: input.split(/\r\n?|\n/).length > 6 ? 'auto' : 'hidden',
                   }}
                 />
               </span>

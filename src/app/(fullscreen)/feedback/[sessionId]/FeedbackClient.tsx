@@ -12,6 +12,7 @@ import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerO
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
+import { createSampleInputQueue } from '@/lib/pyodide/sampleRun';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -84,6 +85,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   const runnerRef = useRef<InteractiveRunner | null>(null);
   const runOffRef = useRef<(() => void) | null>(null);
   const runFinishRef = useRef<(() => void) | null>(null);
+  const teacherInputQueueRef = useRef<string[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -420,6 +422,7 @@ export default function FeedbackClient({ sessionId, teacherId, teacherName }: { 
   // 선생님 직접 실행: 채점/전송 없이 순수하게 결과만 확인
   const handleTeacherRun = useCallback(async () => {
     if (teacherRunning) return;
+    teacherInputQueueRef.current = [];
     setTerminalOpen(true);
     setActiveTab('teacher');
     setTeacherLines([{ text: '$ python solution.py   (선생님 실행)\n', kind: 'meta' }]);
@@ -482,6 +485,7 @@ finally:
       const finish = () => {
         if (runOffRef.current) { runOffRef.current(); runOffRef.current = null; }
         runFinishRef.current = null;
+        teacherInputQueueRef.current = [];
         setTeacherAwaiting(false);
         resolve();
       };
@@ -490,7 +494,16 @@ finally:
         if (ev.type === 'stdout') appendTeacher(ev.text, 'out');
         else if (ev.type === 'stderr') appendTeacher(ev.text, 'err');
         else if (ev.type === 'pythonError') appendTeacher(ev.error.display, 'err');
-        else if (ev.type === 'stdin') setTeacherAwaiting(true);
+        else if (ev.type === 'stdin') {
+          const inputLine = teacherInputQueueRef.current.shift();
+          if (inputLine !== undefined) {
+            appendTeacher(inputLine + '\n', 'in');
+            setTeacherAwaiting(false);
+            queueMicrotask(() => runner.provideInput(inputLine));
+          } else {
+            setTeacherAwaiting(true);
+          }
+        }
         else if (ev.type === 'done') finish();
         else if (ev.type === 'fatal') { appendTeacher((ev.text || '실행 오류') + '\n', 'err'); finish(); }
       });
@@ -502,13 +515,17 @@ finally:
   }, [teacherRunning, ensureRunner, appendTeacher]);
 
   const handleTeacherInput = useCallback((value: string) => {
-    appendTeacher(value + '\n', 'in');
+    const inputLines = value === '' ? [''] : createSampleInputQueue(value);
+    const [firstLine = '', ...remainingLines] = inputLines;
+    teacherInputQueueRef.current = remainingLines;
+    appendTeacher(firstLine + '\n', 'in');
     setTeacherAwaiting(false);
-    runnerRef.current?.provideInput(value);
+    runnerRef.current?.provideInput(firstLine);
   }, [appendTeacher]);
 
   const handleTeacherStop = useCallback(() => {
     runnerRef.current?.stop();
+    teacherInputQueueRef.current = [];
     appendTeacher('\n[실행을 중단했습니다]\n', 'meta');
     runFinishRef.current?.();
     setTeacherAwaiting(false);

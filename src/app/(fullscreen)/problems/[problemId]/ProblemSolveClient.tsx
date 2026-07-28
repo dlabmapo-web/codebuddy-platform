@@ -23,6 +23,12 @@ import {
   SubmissionResultDrawer,
   type SubmissionResult,
 } from '@/components/judge/SubmissionResultDrawer';
+import { SampleInputCopyButton } from '@/components/judge/SampleInputCopyButton';
+import { SampleRunControls } from '@/components/judge/SampleRunControls';
+import {
+  createSampleInputQueue,
+  isSampleOutputMatch,
+} from '@/lib/pyodide/sampleRun';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -66,7 +72,7 @@ const ProblemDescription = memo(function ProblemDescription({ html }: { html: st
 });
 
 // 비지원 브라우저(cross-origin isolated 아님) 폴백: 메인 스레드에서 단발 실행 (대화식 입력 없음)
-async function runFallbackOnce(userCode: string): Promise<{
+async function runFallbackOnce(userCode: string, stdin = ''): Promise<{
   stdout: string;
   stderr: string;
   pythonError: PythonExecutionError | null;
@@ -75,13 +81,14 @@ async function runFallbackOnce(userCode: string): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const py = pyodide as any;
   py.globals.set('_user_code', userCode);
+  py.globals.set('_stdin_text', stdin);
   const result = await py.runPythonAsync(`
 import sys, io, traceback, json, linecache
 _saved_stdout = sys.stdout
 _saved_stdin = sys.stdin
 _captured = io.StringIO()
 sys.stdout = _captured
-sys.stdin = io.StringIO('')
+sys.stdin = io.StringIO(_stdin_text)
 _stderr_msg = ''
 _error = None
 try:
@@ -140,6 +147,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const [errorExplainSeen, setErrorExplainSeen] = useState(false);
   const [awaitingInput, setAwaitingInput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [activeSampleIndex, setActiveSampleIndex] = useState<number | null>(null);
   const [modalResult, setModalResult] = useState<SubmissionResult | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -165,6 +173,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
   const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
+  const manualInputQueueRef = useRef<string[]>([]);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
   const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const myInfoRef = useRef<{ id: string; name: string } | null>(null);
@@ -642,7 +651,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, []);
 
   // 터미널에서 코드를 대화식으로 실행하고, 프로그램 종료(done) 시 누적 출력을 반환
-  const executeInTerminal = useCallback((sourceCode: string): Promise<{
+  const executeInTerminal = useCallback((sourceCode: string, options?: {
+    sampleInput?: string;
+  }): Promise<{
     stdout: string;
     stderr: string;
     pythonError: PythonExecutionError | null;
@@ -651,6 +662,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     runStdoutRef.current = '';
     runStderrRef.current = '';
     runPythonErrorRef.current = null;
+    manualInputQueueRef.current = [];
     setLastPythonError(null);
     setTerminalTab('terminal');
     setErrorExplainSeen(false);
@@ -658,7 +670,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     const runner = ensureRunner();
 
     if (!runner) {
-      return runFallbackOnce(sourceCode)
+      return runFallbackOnce(sourceCode, options?.sampleInput ?? '')
         .then(({ stdout, stderr, pythonError }) => {
           if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
           if (stderr) { appendTerminal(stderr, 'err'); queueRunOut(stderr, 'err'); }
@@ -684,10 +696,16 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       appendTerminal('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
     }
 
+    const sampleInputQueue = options?.sampleInput === undefined
+      ? null
+      : createSampleInputQueue(options.sampleInput);
+    let inputExhaustedNoticeShown = false;
+
     return new Promise((resolve) => {
       const finish = (stopped: boolean) => {
         if (runOffRef.current) { runOffRef.current(); runOffRef.current = null; }
         runFinishRef.current = null;
+        manualInputQueueRef.current = [];
         setAwaitingInput(false);
         flushRunOut();
         broadcastRun('run:end', {});
@@ -715,9 +733,26 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           appendTerminal(ev.error.display, 'err');
           queueRunOut(ev.error.display, 'err');
         } else if (ev.type === 'stdin') {
-          setAwaitingInput(true);
           flushRunOut();
-          broadcastRun('run:waiting', {});
+          const inputLine = sampleInputQueue && sampleInputQueue.length > 0
+            ? sampleInputQueue.shift()
+            : manualInputQueueRef.current.shift();
+          if (inputLine !== undefined) {
+            appendTerminal(inputLine + '\n', 'in');
+            broadcastRun('run:stdin', { text: inputLine });
+            setAwaitingInput(false);
+            queueMicrotask(() => runner.provideInput(inputLine));
+          } else {
+            if (sampleInputQueue && !inputExhaustedNoticeShown) {
+              inputExhaustedNoticeShown = true;
+              appendTerminal(
+                '테스트 입력을 모두 사용했습니다. 필요한 입력을 직접 입력해 주세요.\n',
+                'info',
+              );
+            }
+            setAwaitingInput(true);
+            broadcastRun('run:waiting', {});
+          }
         } else if (ev.type === 'done') {
           finish(false);
         } else if (ev.type === 'fatal') {
@@ -733,23 +768,29 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [ensureRunner, appendTerminal, broadcastRun, queueRunOut, flushRunOut]);
 
   const handleTerminalInput = useCallback((value: string) => {
-    appendTerminal(value + '\n', 'in');
-    broadcastRun('run:stdin', { text: value });
+    const inputLines = value === '' ? [''] : createSampleInputQueue(value);
+    const [firstLine = '', ...remainingLines] = inputLines;
+    manualInputQueueRef.current = remainingLines;
+    appendTerminal(firstLine + '\n', 'in');
+    broadcastRun('run:stdin', { text: firstLine });
     setAwaitingInput(false);
-    runnerRef.current?.provideInput(value);
+    runnerRef.current?.provideInput(firstLine);
   }, [appendTerminal, broadcastRun]);
 
   const handleStop = useCallback(() => {
     runnerRef.current?.stop();
+    manualInputQueueRef.current = [];
     appendTerminal('\n[실행을 중단했습니다]\n', 'meta');
     runFinishRef.current?.(true);
     setAwaitingInput(false);
     setIsRunning(false);
+    setActiveSampleIndex(null);
   }, [appendTerminal]);
 
   const handleRun = useCallback(async () => {
     if (isRunning || !problem) return;
     setIsRunning(true);
+    setActiveSampleIndex(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
     await executeInTerminal(code);
@@ -757,10 +798,54 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     setIsRunning(false);
   }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
 
+  const handleRunSample = useCallback(async (
+    sampleCase: ProblemDetail['test_cases'][number],
+    sampleIndex: number,
+  ) => {
+    if (isRunning || !problem) return;
+
+    const sampleNumber = sampleIndex + 1;
+    const queuedLineCount = createSampleInputQueue(sampleCase.input).length;
+    setIsRunning(true);
+    setActiveSampleIndex(sampleIndex);
+    setTerminalOpen(true);
+    setTerminalTab('terminal');
+    setTerminalLines([
+      { text: `$ python solution.py · 테스트 ${sampleNumber}\n`, kind: 'meta' },
+      {
+        text: queuedLineCount > 0
+          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄을 자동으로 사용합니다.\n`
+          : `입력이 없는 테스트 ${sampleNumber}을 실행합니다.\n`,
+        kind: 'info',
+      },
+    ]);
+
+    const result = await executeInTerminal(code, { sampleInput: sampleCase.input });
+
+    if (!result.stopped && !result.pythonError && !result.stderr) {
+      if (isSampleOutputMatch(result.stdout, sampleCase.expected_output)) {
+        appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
+      } else {
+        appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+        appendTerminal(
+          `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
+          'info',
+        );
+      }
+    } else if (!result.stopped) {
+      appendTerminal('\n실행 오류가 있어 예제 출력 비교를 건너뜁니다.\n', 'info');
+    }
+
+    if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
+    setActiveSampleIndex(null);
+    setIsRunning(false);
+  }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
+
   const handleSubmit = useCallback(async () => {
     if (isRunning || !problem) return;
 
     setIsRunning(true);
+    setActiveSampleIndex(null);
     setModalResult(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ solution.py 제출\n', kind: 'meta' }, { text: '비공개 테스트를 포함한 서버 채점을 시작합니다...\n', kind: 'info' }]);
@@ -907,7 +992,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     );
   }
 
-  const sampleCases = problem.test_cases.filter((tc) => tc.is_sample);
+  const sampleCases = problem.test_cases
+    .filter((tc) => tc.is_sample)
+    .sort((a, b) => a.order_no - b.order_no);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-surface)' }}>
@@ -1058,7 +1145,18 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                       {tc.input && (
                         <div className="flex-1">
                           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', marginBottom: 4 }}>예제 입력 {i + 1}</div>
-                          <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)', fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}>{tc.input}</div>
+                          <div
+                            className="relative rounded-lg"
+                            style={{ backgroundColor: 'var(--code-bg)', border: '1px solid var(--code-border)' }}
+                          >
+                            <div
+                              className="overflow-x-auto p-3 pr-24"
+                              style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--code-fg)', whiteSpace: 'pre' }}
+                            >
+                              {tc.input}
+                            </div>
+                            <SampleInputCopyButton input={tc.input} sampleNumber={i + 1} />
+                          </div>
                         </div>
                       )}
                       <div className="flex-1">
@@ -1145,7 +1243,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               />
             )}
             <div className="flex items-center justify-between pr-3" style={{ height: 38, borderBottom: terminalOpen ? '1px solid #2D2D2D' : 'none' }}>
-              <div className="flex items-stretch h-full">
+              <div className="flex min-w-0 flex-1 items-stretch h-full">
                 <button
                   type="button"
                   onClick={() => {
@@ -1186,8 +1284,17 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                     오류해석
                   </button>
                 )}
+                <SampleRunControls
+                  sampleCount={Math.min(sampleCases.length, 5)}
+                  activeSampleIndex={activeSampleIndex}
+                  disabled={isRunning}
+                  onRun={(sampleIndex) => {
+                    const sampleCase = sampleCases[sampleIndex];
+                    if (sampleCase) void handleRunSample(sampleCase, sampleIndex);
+                  }}
+                />
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {terminalOpen && isRunning && (
                   <button onClick={handleStop} className="flex items-center gap-1 px-2 rounded transition-colors" style={{ height: 24, backgroundColor: '#3A2020', color: '#F87171', fontSize: '11px', fontWeight: 600 }} title="실행 정지">
                     <Square size={10} /> 정지

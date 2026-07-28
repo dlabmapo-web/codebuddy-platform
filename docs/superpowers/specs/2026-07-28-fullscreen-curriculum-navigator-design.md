@@ -41,10 +41,14 @@ Long labels truncate with a tooltip containing the complete path. The breadcrumb
 ### Adaptive curriculum panel
 
 - Opens from the left beneath the fullscreen header.
-- Uses a responsive 280–320px width.
+- Uses one shared 320px desktop width and one shared 48px header offset on both
+  fullscreen pages.
 - On desktop viewports, occupies a dedicated column and reduces the remaining workspace
   width. The problem description and editor keep their relative split within the
   remaining space, so the panel never covers either surface.
+- The visible panel and reserved workspace column consume the same shared geometry
+  values rather than repeating page-specific responsive classes. This prevents the
+  teacher panel from becoming narrower or vertically offset from the student panel.
 - Applies a short width transition. Monaco uses its existing automatic layout support
   to fit the resized editor.
 - On viewports too narrow to support three useful columns, falls back to a temporary
@@ -57,8 +61,9 @@ Long labels truncate with a tooltip containing the complete path. The breadcrumb
 - Returns keyboard focus to the trigger after closing.
 - Starts closed on a fresh fullscreen entry.
 - Remains open while the student moves between problems through smooth in-page transitions.
-- Uses identical docking and responsive behavior on student and teacher fullscreen
-  pages.
+- Uses identical dimensions, docking, scrolling, header, and footer behavior on
+  student and teacher fullscreen pages. Teacher mode differs only in selection
+  permissions and live-state presentation.
 
 The drawer is a non-modal navigation surface. It is rendered through a document-level
 portal so the student and teacher fullscreen layouts cannot clip it or place it behind
@@ -308,7 +313,9 @@ Database hierarchy and progress aggregation live outside route handlers so both 
    correctly; keyboard-initiated closing restores focus to the trigger.
 10. Long student and teacher curriculum trees scroll independently while the panel
     header and footer remain visible.
-11. Light and dark themes, desktop docking, and narrow viewport fallback behavior are
+11. Student and teacher panels have the same 320px desktop width, 48px top offset,
+    header, scroll region, and footer geometry.
+12. Light and dark themes, desktop docking, and narrow viewport fallback behavior are
     visually verified.
 
 ## Rollout

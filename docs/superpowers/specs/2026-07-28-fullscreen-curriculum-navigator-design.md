@@ -13,7 +13,8 @@ The feature follows the familiar course-content navigation pattern used by learn
 
 - Make the student's exact curriculum location clear to both students and teachers.
 - Let students move directly to another published problem in the current subject.
-- Let teachers understand the full curriculum context without opening unrelated monitoring sessions.
+- Let teachers inspect other published problems in the current subject without leaving
+  or corrupting the monitored live session.
 - Detect when a monitored student moves to another problem and let the teacher deliberately follow the new live session.
 - Reuse the existing smooth problem transition, code preservation, session lifecycle, and return-navigation behavior.
 - Let the problem and editor adapt smoothly to the remaining desktop width while
@@ -23,7 +24,8 @@ The feature follows the familiar course-content navigation pattern used by learn
 
 - Replacing the main problem catalog.
 - Showing every subject in the academy inside the fullscreen drawer.
-- Letting a teacher open or edit a problem the student is not currently solving.
+- Letting a teacher edit, run, submit, or persist code while previewing a problem the
+  student is not currently solving.
 - Automatically moving the teacher away from code or unsent feedback.
 - Adding drag-to-resize behavior.
 - Migrating monitoring updates to private Supabase Realtime channels in this feature.
@@ -116,13 +118,52 @@ Selecting the current problem does nothing. Navigation is disabled while a submi
 
 ## Teacher Behavior
 
-The teacher sees the same subject tree and the monitored student's progress states, but it is contextual rather than a free problem navigator.
+The teacher sees the same current-subject tree and the monitored student's progress
+states.
 
 - The student's active problem is highlighted with a `Live` indicator.
-- Only the student's active problem row is actionable.
-- Other problem rows are visible but disabled and explain that monitoring is available only for the live problem.
+- Every published problem row in the current subject is actionable.
 - The header breadcrumb represents the problem currently displayed in the teacher workspace.
-- The drawer's live indicator represents the student's latest active problem, which may temporarily differ from the displayed problem.
+- The drawer's live indicator always represents the student's latest active problem,
+  which may differ from the problem the teacher is previewing.
+
+### Teacher live and preview modes
+
+The teacher workspace has two explicit modes:
+
+**Live mode**
+
+- The displayed problem is the student's active problem.
+- The editor and terminal show the student's synchronized live session.
+- The teacher may collaborate, run code, and send feedback using the existing behavior.
+
+**Preview mode**
+
+- Selecting a non-live problem fetches that published problem's public detail snapshot.
+- The left pane shows the same public statement content as the student page: execution
+  limit, language, description, input/output formats, public sample inputs and outputs,
+  and constraints.
+- The right editor shows that problem's initial code read-only.
+- Hidden test cases, expected hidden outputs, judge configuration, and private scoring
+  data are never returned or rendered.
+- Preview code cannot be edited, executed, submitted, persisted, broadcast, or mistaken
+  for the student's live code.
+- Live session updates continue in the background without overwriting the preview.
+- Terminal collaboration controls and feedback submission are unavailable in Preview
+  mode.
+- A persistent banner states:
+
+  `Previewing {preview problem} · Student is LIVE on {live problem}`
+
+  and provides `Return to live problem`.
+- Selecting the live problem row or the banner action exits Preview mode and restores
+  the latest synchronized student code, terminal, and feedback workspace.
+- Preview state is local to the teacher page and does not create or end a collaboration
+  session.
+
+Student movement continues to update the `Live` marker while the teacher previews
+another problem. If the student changes sessions, returning to live follows the latest
+authorized live session rather than a stale one.
 
 ### Student movement
 
@@ -198,6 +239,11 @@ Extend the existing problem-detail response with `learning_context`. This avoids
 
 The existing `navigation.previous` and `navigation.next` fields remain for header controls.
 
+The authenticated problem-detail endpoint is also the source for teacher previews. For
+a teacher request it returns only the same published problem fields, public sample
+cases, and hints already available to students; it never returns hidden judge cases.
+Teacher preview does not request a second student's progress context.
+
 ### Teacher session response
 
 Extend the session-detail response with `learning_context` resolved for that session's student and problem.
@@ -241,7 +287,19 @@ It receives normalized context, mode, displayed problem ID, live problem ID, loa
 
 ### Teacher controller
 
-`FeedbackClient` owns active-context polling, movement detection, banner state, and following a new session. The navigator only reports a click on the current live problem.
+`FeedbackClient` owns active-context polling, movement detection, live-session state,
+teacher preview state, preview loading, and returning to the latest live session. The
+navigator reports clicks for every published problem in the current subject.
+
+The controller keeps live code and preview initial code in separate state. Realtime
+student updates write only to live state while Preview mode is active.
+
+### Shared public problem statement
+
+Extract the student problem statement presentation into a shared component used by
+both `ProblemSolveClient` and teacher Preview mode. This prevents the teacher page from
+silently omitting execution limits, public samples, or constraints as it currently
+does.
 
 ### Server curriculum service
 
@@ -252,6 +310,10 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Initial curriculum failure does not block solving or monitoring; show a compact retry state inside the drawer.
 - Student destination failure preserves the current problem, code, URL, and session.
 - Teacher active-context failure keeps the existing workspace and retries on the next monitoring interval.
+- Teacher preview loading keeps the live session connected and shows a compact loading
+  state only in the preview surfaces.
+- Teacher preview failure leaves Live mode or the previous valid preview intact and
+  shows a recoverable error without affecting the student session.
 - A deleted or unpublished destination is removed after context refresh and cannot be opened.
 - Stale `Follow student` actions validate that the target session is still active before navigating.
 - Aborted requests during problem transitions or page exit are ignored rather than logged as unhandled rejections.
@@ -270,7 +332,7 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Drawer trigger has `aria-expanded` and `aria-controls`.
 - Accordion buttons expose expanded state.
 - Current problem uses `aria-current`.
-- Disabled teacher rows are not focusable and include a visible explanation.
+- Teacher rows expose whether they open Live mode or Preview mode.
 - Status is communicated with text and icons, not color alone.
 - Escape closes the drawer.
 - Focus is not contained while open, allowing the student or teacher to continue using
@@ -286,6 +348,8 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Progress-status resolution.
 - Student versus teacher problem-row permissions.
 - Current/live problem distinction.
+- Teacher live-versus-preview mode selection.
+- Preview code isolation from incoming live-code updates.
 - Active-session change detection.
 - Stale and missing active-session handling.
 
@@ -296,6 +360,8 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 - Admin and unrelated users cannot access teacher active context.
 - No-assignment teacher fallback remains consistent with the current MVP.
 - Active-context response excludes code, hidden tests, and private judging data.
+- Teacher preview responses contain only published problem fields, public sample cases,
+  and permitted hints.
 
 ### Browser E2E
 
@@ -306,16 +372,21 @@ Database hierarchy and progress aggregation live outside route handlers so both 
 4. Student statuses render correctly after attempted and passed submissions.
 5. Teacher opens the same portal-rendered drawer and sees the monitored student's
    curriculum path.
-6. Unrelated teacher rows are disabled.
-7. Student moves to another problem; teacher remains on the current workspace and receives the movement banner.
-8. Teacher follows the student and reaches the new live session.
-9. Closing through the close button, repeated trigger click, and Escape behaves
+6. Teacher selects a non-live row and sees the complete public statement plus read-only
+   initial code while the live marker remains on the student's problem.
+7. Incoming student code does not overwrite the teacher's preview editor.
+8. Preview mode cannot run, submit, broadcast, or send feedback.
+9. Teacher returns to live and sees the latest synchronized student code.
+10. Student moves to another problem while Preview mode remains safe and the live marker
+    updates.
+11. Teacher follows the student and reaches the latest live session.
+12. Closing through the close button, repeated trigger click, and Escape behaves
    correctly; keyboard-initiated closing restores focus to the trigger.
-10. Long student and teacher curriculum trees scroll independently while the panel
+13. Long student and teacher curriculum trees scroll independently while the panel
     header and footer remain visible.
-11. Student and teacher panels have the same 320px desktop width, 48px top offset,
+14. Student and teacher panels have the same 320px desktop width, 48px top offset,
     header, scroll region, and footer geometry.
-12. Light and dark themes, desktop docking, and narrow viewport fallback behavior are
+15. Light and dark themes, desktop docking, and narrow viewport fallback behavior are
     visually verified.
 
 ## Rollout

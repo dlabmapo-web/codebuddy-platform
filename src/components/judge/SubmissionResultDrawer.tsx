@@ -16,6 +16,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import type { ProblemNavigationItem } from '@/lib/problems/navigation';
 
 export type SubmissionCaseResult = {
   case_no: number;
@@ -49,8 +50,9 @@ type Props = {
   aiFeedbackEnabled: boolean;
   aiFeedbackLoading: boolean;
   aiFeedbackContent: string | null;
-  nextProblemId: string | null;
+  nextProblem: ProblemNavigationItem | null;
   stageId: string | null;
+  onNextProblem: () => void;
 };
 
 const OUTCOME = {
@@ -116,8 +118,9 @@ export function SubmissionResultDrawer({
   aiFeedbackEnabled,
   aiFeedbackLoading,
   aiFeedbackContent,
-  nextProblemId,
+  nextProblem,
   stageId,
+  onNextProblem,
 }: Props) {
   const copy = statusCopy(result);
   const isJudging = result.status === 'judging';
@@ -299,13 +302,25 @@ export function SubmissionResultDrawer({
             <button type="button" onClick={onClose} className="rounded-xl" style={{ height: 44, border: '1px solid #394153', color: '#CBD5E1', fontSize: 13, fontWeight: 700 }}>
               결과 닫기
             </button>
-            <Link
-              href={nextProblemId ? `/problems/${nextProblemId}` : stageId ? `/problems?stage=${stageId}` : '/problems'}
-              className="flex items-center justify-center gap-1 rounded-xl text-white"
-              style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: 13, fontWeight: 750 }}
-            >
-              {nextProblemId ? '다음 문제' : '문제 목록'} <ChevronRight size={14} />
-            </Link>
+            {nextProblem ? (
+              <button
+                type="button"
+                onClick={onNextProblem}
+                aria-label={`다음 문제: ${nextProblem.problem_no}. ${nextProblem.title}`}
+                className="flex items-center justify-center gap-1 rounded-xl text-white"
+                style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: 13, fontWeight: 750 }}
+              >
+                다음 문제 <ChevronRight size={14} />
+              </button>
+            ) : (
+              <Link
+                href={stageId ? `/problems?stage=${stageId}` : '/problems'}
+                className="flex items-center justify-center gap-1 rounded-xl text-white"
+                style={{ height: 44, backgroundColor: 'var(--color-primary)', fontSize: 13, fontWeight: 750 }}
+              >
+                문제 목록 <ChevronRight size={14} />
+              </Link>
+            )}
           </>
         ) : (
           <>

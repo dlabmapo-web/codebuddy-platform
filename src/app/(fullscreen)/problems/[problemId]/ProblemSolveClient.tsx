@@ -3,7 +3,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, MessageSquare, X, Square, Sparkles, CircleHelp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Send, ChevronDown, ChevronUp, Lightbulb, Clock, RotateCcw, MessageSquare, X, Square, Sparkles, CircleHelp, LoaderCircle } from 'lucide-react';
 import { HintPanel } from '@/components/demo/HintPanel';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
@@ -29,6 +29,14 @@ import {
   createSampleInputQueue,
   isSampleOutputMatch,
 } from '@/lib/pyodide/sampleRun';
+import type {
+  ProblemNavigation,
+  ProblemNavigationItem,
+} from '@/lib/problems/navigation';
+import {
+  loadProblemTransitionSnapshot,
+  type ProblemTransitionSnapshot,
+} from '@/lib/problems/transition';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -45,6 +53,11 @@ type ProblemDetail = DbProblem & {
 };
 
 type PresenceUser = { userId: string; name: string; role: string };
+type ProblemTransitionDirection = 'previous' | 'next';
+type ProblemNavigationFailure = {
+  destination: ProblemNavigationItem | null;
+  direction: ProblemTransitionDirection | null;
+};
 
 // 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
 // (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
@@ -134,9 +147,11 @@ finally:
 
 export default function ProblemSolveClient({ problemId, submissionId }: { problemId: string; submissionId?: string }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
-  const [nextProblemId, setNextProblemId] = useState<string | null>(null);
-  const [stageId, setStageId] = useState<string | null>(null);
+  const [navigation, setNavigation] = useState<ProblemNavigation | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [isProblemTransitioning, setIsProblemTransitioning] = useState(false);
+  const [problemTransitionDirection, setProblemTransitionDirection] = useState<ProblemTransitionDirection | null>(null);
+  const [navigationFailure, setNavigationFailure] = useState<ProblemNavigationFailure | null>(null);
   const [code, setCode] = useState('');
   const [terminalOpen, setTerminalOpen] = useState(true);
   const [terminalHeight, setTerminalHeight] = useState(220);
@@ -192,12 +207,16 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
   const codeRef = useRef(code);
+  const problemRef = useRef<ProblemDetail | null>(null);
+  const navigationRef = useRef<ProblemNavigation | null>(null);
+  const problemTransitioningRef = useRef(false);
+  const problemTransitionControllerRef = useRef<AbortController | null>(null);
+  const initialProblemIdRef = useRef(problemId);
+  const initialSubmissionIdRef = useRef(submissionId);
   const sessionIdRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingSyncRef = useRef(false);
   const lastSavedCodeRef = useRef<string | null>(null);
-  // 세션에서 저장된 코드를 복원했는지 표시 → 문제 로드의 starter_code가 덮어쓰지 않도록 보호
-  const codeRestoredRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,6 +228,8 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const remoteCursorIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { codeRef.current = code; }, [code]);
+  useEffect(() => { problemRef.current = problem; }, [problem]);
+  useEffect(() => { navigationRef.current = navigation; }, [navigation]);
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
 
   const updateRemoteCursor = useCallback((name: string, role: string, position: { lineNumber: number; column: number }) => {
@@ -338,69 +359,121 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       .catch(() => {});
   }, [sessionId]);
 
-  useEffect(() => {
-    setNextProblemId(null);
-    setStageId(null);
-    fetch(`/api/problems/${problemId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!json.problem) { setLoadError(true); return; }
-        setProblem({ ...json.problem, test_cases: json.test_cases ?? [], hints: json.hints ?? [] });
-        setNextProblemId(json.next_problem_id ?? null);
-        setStageId(json.stage_id ?? null);
-        const sc = json.problem.starter_code ?? '';
-        setStarterCode(sc);
-        // 세션에서 저장 코드를 이미 복원했으면 starter_code로 덮어쓰지 않음 (race 방지)
-        if (!submissionId && !codeRestoredRef.current) { setCode(sc); codeRef.current = sc; }
-      })
-      .catch(() => setLoadError(true));
+  const applyProblemSnapshot = useCallback((snapshot: ProblemTransitionSnapshot) => {
+    runnerRef.current?.stop();
+    runFinishRef.current?.(true);
+    runOffRef.current?.();
+    runOffRef.current = null;
+    runFinishRef.current = null;
+    runnerRef.current?.dispose();
+    runnerRef.current = null;
+    manualInputQueueRef.current = [];
+    runStdoutRef.current = '';
+    runStderrRef.current = '';
+    runPythonErrorRef.current = null;
+    pendingCodeRef.current = null;
+    awaitingSyncRef.current = false;
+    hasPeerRef.current = false;
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+    broadcastTimerRef.current = null;
+    if (runOutTimerRef.current) clearTimeout(runOutTimerRef.current);
+    runOutTimerRef.current = null;
+    runOutBufRef.current = [];
 
-    fetch(`/api/submissions?problem_id=${problemId}`)
-      .then((r) => r.json())
-      .then((json) => setAttemptCount(json.submissions?.length ?? 0));
-
-    if (submissionId) {
-      fetch(`/api/submissions/${submissionId}`)
-        .then((r) => r.json())
-        .then((json) => { if (json.submission?.code) setCode(json.submission.code); });
+    const editor = editorRef.current;
+    if (editor) {
+      remoteCursorDecorationsRef.current = editor.deltaDecorations(
+        remoteCursorDecorationsRef.current,
+        [],
+      );
+      if (remoteCursorWidgetRef.current) {
+        editor.removeContentWidget(remoteCursorWidgetRef.current);
+        remoteCursorWidgetRef.current = null;
+      }
     }
-  }, [problemId, submissionId]);
+
+    problemRef.current = snapshot.problem;
+    navigationRef.current = snapshot.navigation;
+    codeRef.current = snapshot.code;
+    sessionIdRef.current = snapshot.sessionId;
+    lastSavedCodeRef.current = snapshot.lastSavedCode;
+
+    setProblem(snapshot.problem);
+    setNavigation(snapshot.navigation);
+    setStarterCode(snapshot.starterCode);
+    setCode(snapshot.code);
+    setSessionId(snapshot.sessionId);
+    setAttemptCount(snapshot.attemptCount);
+    setSeconds(0);
+    setTerminalLines([]);
+    setTerminalOpen(true);
+    setLastPythonError(null);
+    setTerminalTab('terminal');
+    setErrorExplainSeen(false);
+    setAwaitingInput(false);
+    setIsRunning(false);
+    setActiveSampleIndex(null);
+    setModalResult(null);
+    setShowHint(false);
+    setFeedbacks([]);
+    setFeedbackPanelOpen(false);
+    setAiFeedbacks([]);
+    setAiFeedbackPanelOpen(false);
+    setAiFeedbackLoading(false);
+    setCurrentAiFeedback(null);
+    setTeacherOnline(false);
+    setRemotePointers({});
+    setLoadError(false);
+    setNavigationFailure(null);
+    setProblemTransitionDirection(null);
+    problemTransitioningRef.current = false;
+    setIsProblemTransitioning(false);
+  }, []);
 
   useEffect(() => {
-    fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_id: problemId }),
+    const controller = new AbortController();
+    problemTransitionControllerRef.current = controller;
+
+    loadProblemTransitionSnapshot({
+      problemId: initialProblemIdRef.current,
+      submissionId: initialSubmissionIdRef.current,
+      previousSessionId: null,
+      signal: controller.signal,
     })
-      .then(r => r.json())
-      .then(json => {
-        if (!json.session?.id) return;
-        setSessionId(json.session.id);
-        // 이전에 작성하던 코드가 있으면 복원 (제출 코드 열람 중이 아닐 때만)
-        if (!submissionId && json.session.final_code) {
-          codeRestoredRef.current = true;
-          setCode(json.session.final_code);
-          codeRef.current = json.session.final_code;
-          lastSavedCodeRef.current = json.session.final_code;
-        }
+      .then((snapshot) => {
+        if (!controller.signal.aborted) applyProblemSnapshot(snapshot);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setLoadError(true);
+        setProblemTransitionDirection(null);
+        problemTransitioningRef.current = false;
+        setIsProblemTransitioning(false);
       });
 
     return () => {
-      const sid = sessionIdRef.current;
-      if (sid) {
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        // codeRef.current가 비어있으면 final_code를 전송하지 않음 (auto-save된 코드 유지)
-        const body: Record<string, unknown> = { status: 'ended' };
-        if (codeRef.current) body.final_code = codeRef.current;
-        fetch(`/api/sessions/${sid}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          keepalive: true,
-        });
+      controller.abort();
+      if (problemTransitionControllerRef.current === controller) {
+        problemTransitionControllerRef.current = null;
       }
     };
-  }, [problemId]);
+  }, [applyProblemSnapshot]);
+
+  useEffect(() => () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    fetch(`/api/sessions/${sid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'ended',
+        final_code: codeRef.current,
+      }),
+      keepalive: true,
+    });
+  }, []);
 
   // 누가 입력했든(로컬/원격) 현재 코드를 디바운스 저장 → 새로고침 시 항상 복원 가능.
   // 혼자 풀 때도(선생님 없이도) 동일하게 동작한다.
@@ -418,6 +491,157 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       }
     }, 1000);
   }, []);
+
+  const saveDraftBeforeNavigation = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const sid = sessionIdRef.current;
+    const currentCode = codeRef.current;
+    if (!sid || currentCode === lastSavedCodeRef.current) return;
+
+    lastSavedCodeRef.current = currentCode;
+    fetch(`/api/sessions/${sid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ final_code: currentCode }),
+      keepalive: true,
+    }).catch(() => {});
+  }, []);
+
+  const transitionToProblem = useCallback(async ({
+    destination,
+    direction,
+    updateHistory,
+  }: {
+    destination: ProblemNavigationItem;
+    direction: ProblemTransitionDirection | null;
+    updateHistory: 'push' | 'none';
+  }) => {
+    const displayedProblem = problemRef.current;
+    if (!displayedProblem || problemTransitioningRef.current) return;
+
+    saveDraftBeforeNavigation();
+    runnerRef.current?.stop();
+    runFinishRef.current?.(true);
+    setIsRunning(false);
+    setActiveSampleIndex(null);
+    setAwaitingInput(false);
+    setNavigationFailure(null);
+    setProblemTransitionDirection(direction);
+    problemTransitioningRef.current = true;
+    setIsProblemTransitioning(true);
+
+    problemTransitionControllerRef.current?.abort();
+    const controller = new AbortController();
+    problemTransitionControllerRef.current = controller;
+    const previousSessionId = sessionIdRef.current;
+    const previousCode = codeRef.current;
+
+    try {
+      const snapshot = await loadProblemTransitionSnapshot({
+        problemId: destination.id,
+        previousSessionId,
+        previousCode,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+
+      applyProblemSnapshot(snapshot);
+      if (updateHistory === 'push') {
+        window.history.pushState(null, '', `/problems/${snapshot.problem.id}`);
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+
+      try {
+        const restoreResponse = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ problem_id: displayedProblem.id }),
+          signal: controller.signal,
+        });
+        const restored = restoreResponse.ok
+          ? await restoreResponse.json()
+          : null;
+        const restoredSessionId = restored?.session?.id as string | undefined;
+        if (restoredSessionId) {
+          await fetch(`/api/sessions/${restoredSessionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ final_code: codeRef.current }),
+            signal: controller.signal,
+          });
+          sessionIdRef.current = restoredSessionId;
+          lastSavedCodeRef.current = codeRef.current;
+          setSessionId(restoredSessionId);
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+      }
+
+      if (updateHistory === 'none') {
+        window.history.replaceState(null, '', `/problems/${displayedProblem.id}`);
+      }
+      setNavigationFailure({ destination, direction });
+      setProblemTransitionDirection(null);
+      problemTransitioningRef.current = false;
+      setIsProblemTransitioning(false);
+    } finally {
+      if (problemTransitionControllerRef.current === controller) {
+        problemTransitionControllerRef.current = null;
+      }
+    }
+  }, [applyProblemSnapshot, saveDraftBeforeNavigation]);
+
+  const handleNavigateProblem = useCallback((
+    destination: ProblemNavigationItem | null,
+    direction: ProblemTransitionDirection,
+  ) => {
+    if (!destination || isRunning || problemTransitioningRef.current) return;
+    void transitionToProblem({
+      destination,
+      direction,
+      updateHistory: 'push',
+    });
+  }, [isRunning, transitionToProblem]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const match = window.location.pathname.match(/^\/problems\/([^/]+)\/?$/);
+      const destinationId = match?.[1] ? decodeURIComponent(match[1]) : null;
+      const displayedProblem = problemRef.current;
+      if (!destinationId || !displayedProblem || destinationId === displayedProblem.id) return;
+
+      const displayedNavigation = navigationRef.current;
+      const destination = displayedNavigation?.next?.id === destinationId
+        ? displayedNavigation.next
+        : displayedNavigation?.previous?.id === destinationId
+          ? displayedNavigation.previous
+          : {
+              id: destinationId,
+              problem_no: 0,
+              title: '',
+              chapter_id: '',
+              chapter_order_no: 0,
+              problem_order_no: 0,
+            };
+      const direction: ProblemTransitionDirection | null =
+        displayedNavigation?.next?.id === destinationId
+          ? 'next'
+          : displayedNavigation?.previous?.id === destinationId
+            ? 'previous'
+            : null;
+
+      void transitionToProblem({
+        destination,
+        direction,
+        updateHistory: 'none',
+      });
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [transitionToProblem]);
 
   // 안전장치: 디바운스를 놓치는 경우를 대비해 10초마다 변경분을 추가 저장
   useEffect(() => {
@@ -547,6 +771,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
 
   const handleCodeChange = useCallback((newCode: string) => {
+    if (isProblemTransitioning) return;
     setCode(newCode);
     codeRef.current = newCode;
     scheduleAutoSave(newCode);
@@ -571,7 +796,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
       broadcastTimerRef.current = setTimeout(flush, 80 - elapsed);
     }
-  }, [myInfo, scheduleAutoSave]);
+  }, [isProblemTransitioning, myInfo, scheduleAutoSave]);
 
   useEffect(() => {
     const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -788,21 +1013,21 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   }, [appendTerminal]);
 
   const handleRun = useCallback(async () => {
-    if (isRunning || !problem) return;
+    if (isRunning || isProblemTransitioning || !problem) return;
     setIsRunning(true);
     setActiveSampleIndex(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
-    await executeInTerminal(code);
-    appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
+    const result = await executeInTerminal(code);
+    if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setIsRunning(false);
-  }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
 
   const handleRunSample = useCallback(async (
     sampleCase: ProblemDetail['test_cases'][number],
     sampleIndex: number,
   ) => {
-    if (isRunning || !problem) return;
+    if (isRunning || isProblemTransitioning || !problem) return;
 
     const sampleNumber = sampleIndex + 1;
     const queuedLineCount = createSampleInputQueue(sampleCase.input).length;
@@ -839,10 +1064,10 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setActiveSampleIndex(null);
     setIsRunning(false);
-  }, [isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
 
   const handleSubmit = useCallback(async () => {
-    if (isRunning || !problem) return;
+    if (isRunning || isProblemTransitioning || !problem) return;
 
     setIsRunning(true);
     setActiveSampleIndex(null);
@@ -965,7 +1190,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       cases: finalSubmission.cases ?? [],
     });
     setIsRunning(false);
-  }, [isRunning, problem, problemId, code, appendTerminal, attemptCount, seconds, sessionId]);
+  }, [isProblemTransitioning, isRunning, problem, problemId, code, appendTerminal, attemptCount, seconds, sessionId]);
 
   const handleMouseDown = () => { isDragging.current = true; };
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -995,18 +1220,38 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
   const sampleCases = problem.test_cases
     .filter((tc) => tc.is_sample)
     .sort((a, b) => a.order_no - b.order_no);
+  const listParams = new URLSearchParams();
+  if (navigation?.stage_id) listParams.set('stage', navigation.stage_id);
+  if (problem.chapter_id) listParams.set('chapter', problem.chapter_id);
+  const problemListHref = listParams.size > 0
+    ? `/problems?${listParams.toString()}`
+    : '/problems';
+  const previousProblem = navigation?.previous ?? null;
+  const nextProblem = navigation?.next ?? null;
+  const workspaceActionsDisabled = isRunning || isProblemTransitioning;
+  const failedNavigationLabel = navigationFailure?.direction === 'previous'
+    ? '이전 문제'
+    : navigationFailure?.direction === 'next'
+      ? '다음 문제'
+      : '문제';
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-surface)' }}>
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      aria-busy={isProblemTransitioning}
+      data-problem-id={problem.id}
+      data-problem-transitioning={isProblemTransitioning ? 'true' : 'false'}
+      style={{ backgroundColor: 'var(--color-surface)' }}
+    >
       <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid var(--color-border)', zIndex: 10 }}>
-        <Link href="/problems" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
+        <Link href={problemListHref} className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-sub)', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 목록
         </Link>
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--color-border)' }} />
 
-        <div className="flex items-center gap-2">
-          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
-          <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[problem.difficulty].bg, color: DIFF_STYLE[problem.difficulty].color }}>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="max-w-64 truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>{problem.problem_no}. {problem.title}</span>
+          <span className="shrink-0 px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: DIFF_STYLE[problem.difficulty].bg, color: DIFF_STYLE[problem.difficulty].color }}>
             {DIFF_LABEL[problem.difficulty]}
           </span>
         </div>
@@ -1038,6 +1283,65 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
 
         <div className="flex items-center gap-2">
+          <nav
+            aria-label="문제 이동"
+            className="flex h-9 shrink-0 items-center overflow-hidden rounded-lg"
+            style={{
+              border: '1px solid var(--tint-accent-line)',
+              backgroundColor: 'var(--color-primary-light)',
+              color: 'var(--color-primary-hover)',
+            }}
+          >
+            <button
+              type="button"
+              data-testid="previous-problem-button"
+              aria-label="이전 문제"
+              aria-busy={isProblemTransitioning && problemTransitionDirection === 'previous'}
+              title={previousProblem ? `이전 문제: ${previousProblem.problem_no}. ${previousProblem.title}` : '이전 문제가 없습니다'}
+              disabled={!previousProblem || workspaceActionsDisabled}
+              onClick={() => handleNavigateProblem(previousProblem, 'previous')}
+              className={`flex h-full items-center justify-center gap-1 px-2.5 transition-colors hover:bg-[var(--tint-fill)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary)] disabled:cursor-not-allowed ${isProblemTransitioning && problemTransitionDirection === 'previous' ? 'bg-[var(--tint-fill)]' : ''}`}
+              style={{
+                fontSize: 12,
+                fontWeight: 650,
+                opacity: isProblemTransitioning && problemTransitionDirection === 'previous'
+                  ? 1
+                  : !previousProblem || workspaceActionsDisabled
+                    ? 0.4
+                    : 1,
+              }}
+            >
+              {isProblemTransitioning && problemTransitionDirection === 'previous'
+                ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />
+                : <ChevronLeft size={14} />}
+              <span className="hidden xl:inline">이전</span>
+            </button>
+            <span aria-hidden="true" className="h-5 w-px shrink-0" style={{ backgroundColor: 'var(--tint-accent-line)' }} />
+            <button
+              type="button"
+              data-testid="next-problem-button"
+              aria-label="다음 문제"
+              aria-busy={isProblemTransitioning && problemTransitionDirection === 'next'}
+              title={nextProblem ? `다음 문제: ${nextProblem.problem_no}. ${nextProblem.title}` : '다음 문제가 없습니다'}
+              disabled={!nextProblem || workspaceActionsDisabled}
+              onClick={() => handleNavigateProblem(nextProblem, 'next')}
+              className={`flex h-full items-center justify-center gap-1 px-2.5 transition-colors hover:bg-[var(--tint-fill)] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary)] disabled:cursor-not-allowed ${isProblemTransitioning && problemTransitionDirection === 'next' ? 'bg-[var(--tint-fill)]' : ''}`}
+              style={{
+                fontSize: 12,
+                fontWeight: 650,
+                opacity: isProblemTransitioning && problemTransitionDirection === 'next'
+                  ? 1
+                  : !nextProblem || workspaceActionsDisabled
+                    ? 0.4
+                    : 1,
+              }}
+            >
+              <span className="hidden xl:inline">다음</span>
+              {isProblemTransitioning && problemTransitionDirection === 'next'
+                ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />
+                : <ChevronRight size={14} />}
+            </button>
+          </nav>
           {feedbacks.length > 0 && (
             <div className="relative">
               <button
@@ -1090,13 +1394,13 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               )}
             </div>
           )}
-          <button onClick={() => setCode(starterCode)} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ fontSize: '12px', color: 'var(--color-sub)', border: '1px solid var(--color-border)', height: 32 }}>
+          <button onClick={() => setCode(starterCode)} disabled={isProblemTransitioning} title="코드 초기화" className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50" style={{ fontSize: '12px', color: 'var(--color-sub)', border: '1px solid var(--color-border)', height: 32 }}>
             <RotateCcw size={12} /> 초기화
           </button>
-          <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:opacity-50" style={{ height: 36, border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+          <button onClick={handleRun} disabled={workspaceActionsDisabled} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 36, border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
             <Play size={14} /> 실행
           </button>
-          <button onClick={handleSubmit} disabled={isRunning} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:opacity-50" style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
+          <button onClick={handleSubmit} disabled={workspaceActionsDisabled} className="flex items-center gap-1.5 px-4 rounded-lg text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 36, backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
             onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'; }}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')}
           >
@@ -1105,6 +1409,47 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
         </div>
         <ThemeToggle />
       </header>
+
+      {navigationFailure && (
+        <div
+          role="alert"
+          className="fixed left-1/2 top-14 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl px-4 py-3 shadow-lg"
+          style={{
+            border: '1px solid var(--tint-danger-line)',
+            backgroundColor: 'var(--color-card)',
+            color: 'var(--color-ink)',
+            fontSize: 13,
+          }}
+        >
+          <span>{failedNavigationLabel}를 불러오지 못했습니다. 다시 시도해주세요.</span>
+          {navigationFailure.destination && navigationFailure.direction && (
+            <button
+              type="button"
+              onClick={() => handleNavigateProblem(
+                navigationFailure.destination,
+                navigationFailure.direction as ProblemTransitionDirection,
+              )}
+              className="shrink-0 rounded-lg px-2.5 py-1.5"
+              style={{
+                backgroundColor: 'var(--color-primary-light)',
+                color: 'var(--color-primary-hover)',
+                fontWeight: 700,
+              }}
+            >
+              다시 시도
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setNavigationFailure(null)}
+            aria-label="오류 메시지 닫기"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-surface)]"
+            style={{ color: 'var(--color-sub)' }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
         <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid var(--color-border)' }}>
@@ -1214,7 +1559,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                   title="글자 크기 키우기"
                 >+</button>
               </div>
-              <button onClick={() => setShowHint(true)} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[var(--color-surface)]" style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}>
+              <button onClick={() => setShowHint(true)} disabled={isProblemTransitioning} className="flex items-center gap-1.5 px-3 rounded-lg transition-colors hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50" style={{ height: 32, fontSize: '13px', color: 'var(--color-sub)' }}>
                 <Lightbulb size={14} /> 힌트 보기
               </button>
             </div>
@@ -1229,7 +1574,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false }}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
             />
           </div>
 
@@ -1287,7 +1632,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                 <SampleRunControls
                   sampleCount={Math.min(sampleCases.length, 5)}
                   activeSampleIndex={activeSampleIndex}
-                  disabled={isRunning}
+                  disabled={workspaceActionsDisabled}
                   onRun={(sampleIndex) => {
                     const sampleCase = sampleCases[sampleIndex];
                     if (sampleCase) void handleRunSample(sampleCase, sampleIndex);
@@ -1360,8 +1705,9 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           aiFeedbackEnabled={problem.use_ai_feedback}
           aiFeedbackLoading={aiFeedbackLoading}
           aiFeedbackContent={currentAiFeedback?.content ?? null}
-          nextProblemId={nextProblemId}
-          stageId={stageId}
+          nextProblem={nextProblem}
+          stageId={navigation?.stage_id ?? null}
+          onNextProblem={() => handleNavigateProblem(nextProblem, 'next')}
         />
       )}
       {showHint && (

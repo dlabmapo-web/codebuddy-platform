@@ -268,7 +268,7 @@ When the student chooses Previous or Next:
 2. Record which destination and direction were selected.
 3. Show a small spinner in the clicked navigation half.
 4. Disable Previous, Next, editor input, Reset, Run, sample runs and Submit.
-5. Start client-side navigation immediately.
+5. Start loading the destination snapshot inside the mounted workspace.
 
 The current problem description, code and terminal remain visible during this
 period. They are read-only and visually unchanged; no full-screen loading
@@ -276,8 +276,10 @@ screen or workspace skeleton replaces them.
 
 ### 10.2 Background Load
 
-The dynamic route must preserve the same `ProblemSolveClient` instance when
-`problemId` changes. Remove the `key={problemId}` remount behavior.
+Previous and Next must not start an App Router route transition because the
+dynamic route segment may remove and recreate the client workspace while its
+server-component payload is loading. `ProblemSolveClient` owns the active
+problem after its initial mount and loads neighboring problems directly.
 
 For the destination problem, load the following transition snapshot:
 
@@ -316,16 +318,25 @@ title never appears with old code and old problem code never becomes the new
 problem's draft.
 
 After the swap, clear the navigation spinner and restore editor and action
-availability.
+availability. Then update the address bar with the Next.js-supported native
+History API:
+
+```ts
+window.history.pushState(null, '', `/problems/${problemId}`)
+```
+
+The URL update occurs only after the destination snapshot is ready. It adds a
+normal history entry without triggering a route-segment remount.
 
 ### 10.4 Direct and Browser Navigation
 
 Direct URL entry and the first page load may use the existing full-screen
 initial loading state because no previous workspace exists.
 
-Browser Back/Forward between problem routes uses the same background-load and
-atomic-swap path. Historical `sid` parameters do not carry into Previous or
-Next navigation.
+Browser Back/Forward listens for `popstate`, reads the destination problem ID
+from the URL, and uses the same background-load and atomic-swap path without
+adding another history entry. Historical `sid` parameters do not carry into
+Previous or Next navigation.
 
 ### 10.5 Failure Recovery
 
@@ -343,14 +354,16 @@ initial problem cannot load.
 
 ## 11. Routing
 
-Neighbor links use:
+Neighbor navigation produces:
 
 ```text
 /problems/{problemId}
 ```
 
 Historical submission query parameters such as `sid` must not carry into
-normal Previous/Next navigation.
+normal Previous/Next navigation. The URL is written with `history.pushState`
+after a successful atomic swap rather than with `router.push`, so the mounted
+coding workspace is not replaced by the dynamic route segment.
 
 The header's List action should return to:
 

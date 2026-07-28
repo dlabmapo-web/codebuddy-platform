@@ -101,11 +101,14 @@ When activated:
 
 1. The complete stored sample input is written to the clipboard.
 2. All internal line breaks and blank lines are preserved.
-3. A non-blocking confirmation appears:
+3. A compact non-blocking confirmation appears. The visible button text stays
+   short:
 
 ```text
-Sample input 1 copied
+복사됨
 ```
+
+The polite screen-reader announcement retains the sample number.
 
 The button is not rendered for an output-only sample whose input is empty.
 
@@ -127,6 +130,8 @@ Rules:
   primary blue.
 - The play icon and `테스트 N` text are centered together as one unit, using a
   fixed compact minimum width so every numbered button aligns consistently.
+- Keep `8px` between adjacent test buttons so a row of buttons remains visually
+  separated without wasting terminal-toolbar width.
 - Hover, keyboard-focus, running, and disabled states remain visually
   distinct. The running state uses a stronger blue outline and must not rely
   on color alone.

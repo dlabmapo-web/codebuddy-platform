@@ -1,7 +1,7 @@
 # Student Problem Previous and Next Navigation Design
 
 **Date:** 2026-07-28  
-**Status:** Approved design, pending implementation  
+**Status:** Implemented; header placement revision approved
 **Scope:** Student problem detail page and its public problem-detail API
 
 ## 1. Summary
@@ -174,23 +174,30 @@ stage curriculum merely to calculate two IDs.
 
 ### 7.1 Placement
 
-Place a compact navigation group in the problem header near the current title
-and difficulty:
+Place the navigation group in the right-side action area, immediately before
+Run and Submit. Keep the problem title and difficulty on the left:
 
 ```text
-[목록] | [← 이전]  442. Matrix Row Sums  [쉬움]  [다음 →]
+[목록] | 442. Matrix Row Sums [쉬움]     [timer]     [← 이전 | 다음 →] [실행] [제출]
 ```
 
-The existing timer and Run/Submit controls keep their current roles.
+The existing timer and Run/Submit controls keep their current roles. Moving
+curriculum navigation beside the actions keeps the title area readable and
+makes the navigation available where students already look for page actions.
 
 ### 7.2 Button Content
 
+- Previous and Next share one rounded navigation capsule.
 - Previous button: left arrow and `이전`.
 - Next button: `다음` and right arrow.
+- A divider separates the two halves.
+- The capsule uses a subtle cool-blue tinted background and border derived
+  from the existing theme. The active halves use blue-gray text, with a
+  slightly lighter surface on hover.
+- The capsule must remain visually quieter than the primary Submit button.
 - Each button has a tooltip or accessible description containing the
   destination problem number and title when a destination exists.
-- The controls use the existing neutral header-button style. Next must not
-  visually compete with the primary Submit action.
+- The group height aligns with the existing Run and Submit controls.
 
 ### 7.3 Boundary States
 

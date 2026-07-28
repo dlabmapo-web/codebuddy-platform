@@ -46,3 +46,6 @@ project/
 .gitmessage.txt
 
 docs
+
+# local design companion artifacts
+.superpowers/

@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth/session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { apiOk, apiError } from '@/lib/api/response';
+import { resolveTeacherStudentScope } from '@/lib/monitoring/studentScope';
 
 type SubjectEmbed = { id: string; title: string; order_no: number };
 type StageEmbed = {
@@ -39,7 +40,18 @@ export async function GET() {
     return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
   }
 
+  const startedAt = Date.now();
   const db = supabaseAdmin();
+  const { data: mappings, error: mappingError } = await db
+    .from('teacher_student')
+    .select('student_id')
+    .eq('teacher_id', user.id);
+  if (mappingError) {
+    return apiError('담당 학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
+  const studentScope = resolveTeacherStudentScope(
+    (mappings ?? []).map((mapping) => mapping.student_id),
+  );
 
   const { data: problems, error: probErr } = await db
     .from('problems')
@@ -56,7 +68,14 @@ export async function GET() {
     .eq('is_published', true)
     .order('order_no', { ascending: true });
 
-  if (probErr) return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  if (probErr) {
+    console.error('Teacher progress problem query failed', {
+      teacherId: user.id,
+      code: probErr.code,
+      message: probErr.message,
+    });
+    return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
 
   const list = (problems ?? []) as unknown as ProblemRow[];
   const problemIds = list.map((p) => p.id);
@@ -64,13 +83,25 @@ export async function GET() {
     return apiOk({ subjects: [], problems: [] });
   }
 
-  const { data: submissions, error: subErr } = await db
+  let submissionQuery = db
     .from('submissions')
     .select('problem_id, status, user_id, elapsed_sec')
-    .in('problem_id', problemIds)
     .in('status', ['pass', 'fail', 'partial']);
+  if (studentScope.kind === 'assigned') {
+    submissionQuery = submissionQuery.in('user_id', studentScope.studentIds);
+  }
+  const { data: submissions, error: subErr } = await submissionQuery;
 
-  if (subErr) return apiError('제출 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  if (subErr) {
+    console.error('Teacher progress submission query failed', {
+      teacherId: user.id,
+      code: subErr.code,
+      message: subErr.message,
+      problemCount: problemIds.length,
+      scope: studentScope.kind,
+    });
+    return apiError('제출 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
 
   const statsMap: Record<string, { total: number; passed: number; students: Set<string>; totalElapsed: number; elapsedCount: number }> = {};
   for (const s of submissions ?? []) {
@@ -199,5 +230,14 @@ export async function GET() {
     chapter.problems.push(p);
   }
 
+  const durationMs = Date.now() - startedAt;
+  if (durationMs >= 1500) {
+    console.warn('Slow teacher progress request', {
+      teacherId: user.id,
+      durationMs,
+      problemCount: flat.length,
+      scope: studentScope.kind,
+    });
+  }
   return apiOk({ subjects, problems: flat });
 }

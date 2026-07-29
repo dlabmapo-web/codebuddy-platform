@@ -21,7 +21,7 @@ export function finalizeCaseResults(
 
   const totalCount = cases.length;
   const runtimeMs = cases.reduce(
-    (sum, item) => sum + Math.max(0, item.runtimeMs ?? 0),
+    (maximum, item) => Math.max(maximum, item.runtimeMs ?? 0),
     0,
   );
 

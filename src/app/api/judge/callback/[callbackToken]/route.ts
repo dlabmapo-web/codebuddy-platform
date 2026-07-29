@@ -32,7 +32,7 @@ function isJudgeResult(value: unknown): value is Judge0Result {
   );
 }
 
-export async function POST(req: Request, { params }: Params) {
+async function handleCallback(req: Request, { params }: Params) {
   const contentLength = Number.parseInt(req.headers.get('content-length') ?? '0', 10);
   if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
     return apiError('요청 본문이 너무 큽니다.', 'PAYLOAD_TOO_LARGE', 413);
@@ -77,3 +77,8 @@ export async function POST(req: Request, { params }: Params) {
   }
   return apiOk({ received: true });
 }
+
+export {
+  handleCallback as POST,
+  handleCallback as PUT,
+};

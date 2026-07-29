@@ -10,7 +10,7 @@ import { getLearningContext } from '@/lib/curriculum/learningContext.server';
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
 
@@ -100,7 +100,8 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
-  const learning_context = user.role === 'student'
+  const includeLearningContext = new URL(req.url).searchParams.get('view') !== 'transition';
+  const learning_context = user.role === 'student' && includeLearningContext
     ? await getLearningContext({ problemId: problem.id, studentId: user.id })
     : null;
 

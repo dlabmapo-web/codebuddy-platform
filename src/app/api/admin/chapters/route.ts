@@ -10,20 +10,20 @@ export async function GET(req: NextRequest) {
   const stageId = req.nextUrl.searchParams.get('stage_id')?.trim() ?? '';
   const db = supabaseAdmin();
 
-  let query = db.from('chapters').select('*').order('order_no', { ascending: true });
+  let query = db
+    .from('chapters')
+    .select('*, problems(count)')
+    .order('order_no', { ascending: true });
   if (stageId) query = query.eq('stage_id', stageId);
 
   const { data: chapters, error } = await query;
   if (error) return apiError('챕터 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
-  const { data: problems } = await db.from('problems').select('id, chapter_id');
-  const countMap: Record<string, number> = {};
-  for (const p of problems ?? []) {
-    if (p.chapter_id) countMap[p.chapter_id] = (countMap[p.chapter_id] ?? 0) + 1;
-  }
-
   return apiOk({
-    chapters: (chapters ?? []).map((c) => ({ ...c, problem_count: countMap[c.id] ?? 0 })),
+    chapters: (chapters ?? []).map(({ problems, ...chapter }) => ({
+      ...chapter,
+      problem_count: problems?.[0]?.count ?? 0,
+    })),
   });
 }
 

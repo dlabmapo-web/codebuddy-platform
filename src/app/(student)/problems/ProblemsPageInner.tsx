@@ -373,7 +373,7 @@ export default function ProblemsPageInner() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/sessions')
+    fetch('/api/sessions?view=drafts')
       .then((response) => response.json())
       .then((json) => {
         const sessions = (json.sessions ?? []) as DraftSession[];

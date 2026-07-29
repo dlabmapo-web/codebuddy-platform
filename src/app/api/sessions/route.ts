@@ -1,13 +1,28 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { apiOk, apiError } from '@/lib/api/response';
+import { resolveTeacherStudentScope } from '@/lib/monitoring/studentScope';
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
   if (user.role === 'admin') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
   const db = supabaseAdmin();
+  const view = new URL(req.url).searchParams.get('view');
+  if (user.role === 'student' && view === 'drafts') {
+    const { data, error } = await db
+      .from('collaboration_sessions')
+      .select('id, problem_id, final_code, started_at, problems(problem_no, title, difficulty)')
+      .eq('student_id', user.id)
+      .not('final_code', 'is', null)
+      .order('started_at', { ascending: false });
+    if (error) {
+      return apiError('임시 저장 목록 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+    }
+    return apiOk({ sessions: data ?? [] });
+  }
+
   let query = db
     .from('collaboration_sessions')
     .select('*, problems(problem_no, title, difficulty), users!collaboration_sessions_student_id_fkey(id, name, username)')
@@ -17,6 +32,19 @@ export async function GET() {
     query = query.eq('student_id', user.id);
   } else if (user.role === 'teacher') {
     query = query.eq('status', 'active');
+    const { data: mappings, error: mappingError } = await db
+      .from('teacher_student')
+      .select('student_id')
+      .eq('teacher_id', user.id);
+    if (mappingError) {
+      return apiError('담당 학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+    }
+    const scope = resolveTeacherStudentScope(
+      (mappings ?? []).map((mapping) => mapping.student_id)
+    );
+    if (scope.kind === 'assigned') {
+      query = query.in('student_id', scope.studentIds);
+    }
   }
 
   const { data, error } = await query;

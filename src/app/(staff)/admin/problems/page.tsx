@@ -12,6 +12,7 @@ import { registerCoveTheme } from '@/lib/monaco/theme';
 import { CurriculumExcelImportModal } from '@/components/admin/CurriculumExcelImportModal';
 import { TestCaseEditor, type TestCaseDraft } from '@/components/admin/TestCaseEditor';
 import { routeWithQuery } from '@/lib/navigation/queryState';
+import { createRequestCache } from '@/lib/admin/requestCache';
 
 const RichEditor = dynamic(() => import('@/components/editor/RichEditor').then(m => ({ default: m.RichEditor })), {
   ssr: false,
@@ -39,6 +40,12 @@ type HierarchyRow = {
 };
 
 type TestCaseForm = TestCaseDraft;
+
+type ProblemDetailPayload = {
+  problem: DbProblem;
+  test_cases: DbTestCase[];
+  hints: DbProblemHint[];
+};
 
 type HintForm = {
   hint_text: string;
@@ -273,14 +280,26 @@ export default function AdminProblemsPage() {
   const [deleteHierTarget, setDeleteHierTarget] = useState<{ kind: HierarchyKind; row: HierarchyRow } | null>(null);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
   const openedPanelRef = useRef(false);
+  const subjectsCacheRef = useRef(createRequestCache<string, HierarchyRow[]>());
+  const stagesCacheRef = useRef(createRequestCache<string, HierarchyRow[]>());
+  const chaptersCacheRef = useRef(createRequestCache<string, HierarchyRow[]>());
+  const problemsCacheRef = useRef(createRequestCache<string, ProblemRow[]>());
+  const problemDetailCacheRef = useRef(createRequestCache<string, ProblemDetailPayload>());
+  const latestStagesParentRef = useRef<string | null>(null);
+  const latestChaptersParentRef = useRef<string | null>(null);
+  const latestProblemsParentRef = useRef<string | null>(null);
 
   const hierarchyHref = useCallback((updates: Record<string, string | null>) => (
     routeWithQuery(pathname, searchParams, updates)
   ), [pathname, searchParams]);
 
+  const pushHierarchy = useCallback((updates: Record<string, string | null>) => {
+    window.history.pushState(null, '', hierarchyHref(updates));
+  }, [hierarchyHref]);
+
   const replaceHierarchy = useCallback((updates: Record<string, string | null>) => {
-    router.replace(hierarchyHref(updates), { scroll: false });
-  }, [hierarchyHref, router]);
+    window.history.replaceState(null, '', hierarchyHref(updates));
+  }, [hierarchyHref]);
 
   const resetPanel = useCallback(() => {
     setPanelMode('closed');
@@ -292,40 +311,58 @@ export default function AdminProblemsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadSubjects = useCallback(async () => {
-    const res = await fetch('/api/admin/subjects');
-    const json = await res.json();
-    setSubjects((json.subjects ?? []).map((s: HierarchyRow & { stage_count?: number }) => ({
-      ...s,
-      child_count: s.stage_count ?? 0,
-    })));
+  const loadSubjects = useCallback(async (force = false) => {
+    const rows = await subjectsCacheRef.current.get('subjects', async () => {
+      const res = await fetch('/api/admin/subjects');
+      const json = await res.json();
+      return (json.subjects ?? []).map((s: HierarchyRow & { stage_count?: number }) => ({
+        ...s,
+        child_count: s.stage_count ?? 0,
+      }));
+    }, { force });
+    setSubjects(rows);
   }, []);
 
-  const loadStages = useCallback(async (subjectId: string) => {
-    const res = await fetch(`/api/admin/stages?subject_id=${subjectId}`);
-    const json = await res.json();
-    setStages((json.stages ?? []).map((s: HierarchyRow & { chapter_count?: number }) => ({
-      ...s,
-      child_count: s.chapter_count ?? 0,
-    })));
+  const loadStages = useCallback(async (subjectId: string, force = false) => {
+    latestStagesParentRef.current = subjectId;
+    const rows = await stagesCacheRef.current.get(subjectId, async () => {
+      const res = await fetch(`/api/admin/stages?subject_id=${subjectId}`);
+      const json = await res.json();
+      return (json.stages ?? []).map((s: HierarchyRow & { chapter_count?: number }) => ({
+        ...s,
+        child_count: s.chapter_count ?? 0,
+      }));
+    }, { force });
+    if (latestStagesParentRef.current !== subjectId) return;
+    setStages(rows);
     setStagesParentId(subjectId);
   }, []);
 
-  const loadChapters = useCallback(async (stageId: string) => {
-    const res = await fetch(`/api/admin/chapters?stage_id=${stageId}`);
-    const json = await res.json();
-    setChapters((json.chapters ?? []).map((c: HierarchyRow & { problem_count?: number }) => ({
-      ...c,
-      child_count: c.problem_count ?? 0,
-    })));
+  const loadChapters = useCallback(async (stageId: string, force = false) => {
+    latestChaptersParentRef.current = stageId;
+    const rows = await chaptersCacheRef.current.get(stageId, async () => {
+      const res = await fetch(`/api/admin/chapters?stage_id=${stageId}`);
+      const json = await res.json();
+      return (json.chapters ?? []).map((c: HierarchyRow & { problem_count?: number }) => ({
+        ...c,
+        child_count: c.problem_count ?? 0,
+      }));
+    }, { force });
+    if (latestChaptersParentRef.current !== stageId) return;
+    setChapters(rows);
     setChaptersParentId(stageId);
   }, []);
 
-  const loadProblems = useCallback(async (chapterId: string) => {
-    const res = await fetch(`/api/admin/problems?chapter_id=${chapterId}`);
-    const json = await res.json();
-    const chapterProblems: ProblemRow[] = json.problems ?? [];
-    setProblems(chapterProblems.sort((a, b) => a.order_no - b.order_no));
+  const loadProblems = useCallback(async (chapterId: string, force = false) => {
+    latestProblemsParentRef.current = chapterId;
+    const rows = await problemsCacheRef.current.get(chapterId, async () => {
+      const res = await fetch(`/api/admin/problems?chapter_id=${chapterId}`);
+      const json = await res.json();
+      const chapterProblems: ProblemRow[] = json.problems ?? [];
+      return [...chapterProblems].sort((a, b) => a.order_no - b.order_no);
+    }, { force });
+    if (latestProblemsParentRef.current !== chapterId) return;
+    setProblems(rows);
     setProblemsParentId(chapterId);
   }, []);
 
@@ -412,15 +449,17 @@ export default function AdminProblemsPage() {
     setExpandedSection('basic');
     if (writeHistory) {
       openedPanelRef.current = true;
-      router.push(hierarchyHref({ problem: null, mode: 'create' }), { scroll: false });
+      pushHierarchy({ problem: null, mode: 'create' });
     }
   };
 
   const openEdit = async (id: string, writeHistory = true) => {
-    const res = await fetch(`/api/admin/problems/${id}`);
-    const json = await res.json();
+    const json = await problemDetailCacheRef.current.get(id, async () => {
+      const res = await fetch(`/api/admin/problems/${id}`);
+      return res.json() as Promise<ProblemDetailPayload>;
+    });
     if (!json.problem) { showToast('문제를 불러올 수 없습니다.', 'err'); return; }
-    const { problem, test_cases, hints } = json as { problem: DbProblem; test_cases: DbTestCase[]; hints: DbProblemHint[] };
+    const { problem, test_cases, hints } = json;
     setForm({
       chapter_id: problem.chapter_id ?? selectedChapter?.id ?? '',
       title: problem.title,
@@ -442,7 +481,7 @@ export default function AdminProblemsPage() {
     setExpandedSection('basic');
     if (writeHistory) {
       openedPanelRef.current = true;
-      router.push(hierarchyHref({ problem: id, mode: 'edit' }), { scroll: false });
+      pushHierarchy({ problem: id, mode: 'edit' });
     }
   };
 
@@ -524,8 +563,9 @@ export default function AdminProblemsPage() {
 
     if (!res.ok) { showToast(json.error?.message ?? '저장 중 오류가 발생했습니다.', 'err'); return; }
     showToast(panelMode === 'edit' ? '문제가 수정되었습니다.' : '문제가 등록되었습니다.', 'ok');
+    if (editId) problemDetailCacheRef.current.invalidate(editId);
     closePanel();
-    if (selectedChapter) loadProblems(selectedChapter.id);
+    if (selectedChapter) loadProblems(selectedChapter.id, true);
   };
 
   const handleDelete = async (problem: ProblemRow) => {
@@ -533,7 +573,8 @@ export default function AdminProblemsPage() {
     setDeleteTarget(null);
     if (!res.ok) { showToast('삭제 중 오류가 발생했습니다.', 'err'); return; }
     showToast('문제가 삭제되었습니다.', 'ok');
-    if (selectedChapter) loadProblems(selectedChapter.id);
+    problemDetailCacheRef.current.invalidate(problem.id);
+    if (selectedChapter) loadProblems(selectedChapter.id, true);
   };
 
   const togglePublish = async (problem: ProblemRow) => {
@@ -542,7 +583,8 @@ export default function AdminProblemsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_published: !problem.is_published }),
     });
-    if (selectedChapter) loadProblems(selectedChapter.id);
+    problemDetailCacheRef.current.invalidate(problem.id);
+    if (selectedChapter) loadProblems(selectedChapter.id, true);
   };
 
   const apiBase = (kind: HierarchyKind) =>
@@ -567,9 +609,9 @@ export default function AdminProblemsPage() {
     }
     showToast(hierModal.mode === 'edit' ? `${KIND_LABEL[hierModal.kind]}가 수정되었습니다.` : `${KIND_LABEL[hierModal.kind]}가 추가되었습니다.`, 'ok');
     setHierModal(null);
-    if (hierModal.kind === 'subject') loadSubjects();
-    else if (hierModal.kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
-    else if (hierModal.kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+    if (hierModal.kind === 'subject') loadSubjects(true);
+    else if (hierModal.kind === 'stage' && selectedSubject) loadStages(selectedSubject.id, true);
+    else if (hierModal.kind === 'chapter' && selectedStage) loadChapters(selectedStage.id, true);
   };
 
   const toggleHierPublish = async (kind: HierarchyKind, row: HierarchyRow) => {
@@ -578,9 +620,9 @@ export default function AdminProblemsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_published: !row.is_published }),
     });
-    if (kind === 'subject') loadSubjects();
-    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
-    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+    if (kind === 'subject') loadSubjects(true);
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id, true);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id, true);
   };
 
   const handleDeleteHierarchy = async () => {
@@ -591,9 +633,9 @@ export default function AdminProblemsPage() {
     setDeleteHierTarget(null);
     if (!res.ok) { showToast(json.error?.message ?? '삭제 중 오류가 발생했습니다.', 'err'); return; }
     showToast(`${KIND_LABEL[kind]}가 삭제되었습니다.`, 'ok');
-    if (kind === 'subject') loadSubjects();
-    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
-    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+    if (kind === 'subject') loadSubjects(true);
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id, true);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id, true);
   };
 
   const moveHierarchy = async (kind: HierarchyKind, row: HierarchyRow, siblings: HierarchyRow[], dir: -1 | 1) => {
@@ -606,9 +648,9 @@ export default function AdminProblemsPage() {
       fetch(`${apiBase(kind)}/${row.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
       fetch(`${apiBase(kind)}/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: row.order_no }) }),
     ]);
-    if (kind === 'subject') loadSubjects();
-    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id);
-    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id);
+    if (kind === 'subject') loadSubjects(true);
+    else if (kind === 'stage' && selectedSubject) loadStages(selectedSubject.id, true);
+    else if (kind === 'chapter' && selectedStage) loadChapters(selectedStage.id, true);
   };
 
   const moveProblem = async (p: ProblemRow, siblings: ProblemRow[], dir: -1 | 1) => {
@@ -620,7 +662,7 @@ export default function AdminProblemsPage() {
       fetch(`/api/admin/problems/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: other.order_no }) }),
       fetch(`/api/admin/problems/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_no: p.order_no }) }),
     ]);
-    if (selectedChapter) loadProblems(selectedChapter.id);
+    if (selectedChapter) loadProblems(selectedChapter.id, true);
   };
 
   const addHint = () => setForm((f) => ({
@@ -640,7 +682,7 @@ export default function AdminProblemsPage() {
     setLevel('stages');
     resetPanel();
     loadStages(row.id);
-    router.push(hierarchyHref({ subject: row.id, stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
+    pushHierarchy({ subject: row.id, stage: null, chapter: null, problem: null, mode: null });
   };
 
   const enterStage = (row: HierarchyRow) => {
@@ -649,7 +691,7 @@ export default function AdminProblemsPage() {
     setLevel('chapters');
     resetPanel();
     loadChapters(row.id);
-    router.push(hierarchyHref({ stage: row.id, chapter: null, problem: null, mode: null }), { scroll: false });
+    pushHierarchy({ stage: row.id, chapter: null, problem: null, mode: null });
   };
 
   const enterChapter = (row: HierarchyRow) => {
@@ -657,7 +699,7 @@ export default function AdminProblemsPage() {
     setLevel('problems');
     resetPanel();
     loadProblems(row.id);
-    router.push(hierarchyHref({ chapter: row.id, problem: null, mode: null }), { scroll: false });
+    pushHierarchy({ chapter: row.id, problem: null, mode: null });
   };
 
   const goTo = (target: NavLevel) => {
@@ -668,18 +710,18 @@ export default function AdminProblemsPage() {
       setSelectedStage(null);
       setSelectedChapter(null);
       loadSubjects();
-      router.push(hierarchyHref({ subject: null, stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
+      pushHierarchy({ subject: null, stage: null, chapter: null, problem: null, mode: null });
     } else if (target === 'stages' && selectedSubject) {
       setLevel('stages');
       setSelectedStage(null);
       setSelectedChapter(null);
       loadStages(selectedSubject.id);
-      router.push(hierarchyHref({ stage: null, chapter: null, problem: null, mode: null }), { scroll: false });
+      pushHierarchy({ stage: null, chapter: null, problem: null, mode: null });
     } else if (target === 'chapters' && selectedStage) {
       setLevel('chapters');
       setSelectedChapter(null);
       loadChapters(selectedStage.id);
-      router.push(hierarchyHref({ chapter: null, problem: null, mode: null }), { scroll: false });
+      pushHierarchy({ chapter: null, problem: null, mode: null });
     }
   };
 
@@ -1078,10 +1120,10 @@ export default function AdminProblemsPage() {
           onImported={(message) => {
             setExcelImportOpen(false);
             showToast(message, 'ok');
-            loadSubjects();
-            if (selectedSubject) loadStages(selectedSubject.id);
-            if (selectedStage) loadChapters(selectedStage.id);
-            if (selectedChapter) loadProblems(selectedChapter.id);
+            loadSubjects(true);
+            if (selectedSubject) loadStages(selectedSubject.id, true);
+            if (selectedStage) loadChapters(selectedStage.id, true);
+            if (selectedChapter) loadProblems(selectedChapter.id, true);
           }}
         />
       )}

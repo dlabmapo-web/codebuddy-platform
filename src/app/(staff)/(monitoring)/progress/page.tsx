@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronRight, Clock, FileCode2, X, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
 import { routeWithQuery } from '@/lib/navigation/queryState';
@@ -14,7 +14,7 @@ type Student = { id: string; name: string; username: string };
 type Submission = {
   id: string;
   problem_id: string;
-  code: string;
+  code?: string;
   status: 'pass' | 'fail' | 'partial';
   score: number;
   passed_count: number;
@@ -157,7 +157,6 @@ function FilterSelect({
 }
 
 export default function ProgressPage() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') === 'problem' ? 'problem' : 'student';
@@ -166,7 +165,6 @@ export default function ProgressPage() {
   const stageId = searchParams.get('stage') ?? '';
   const chapterId = searchParams.get('chapter') ?? '';
   const [students, setStudents] = useState<Student[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [subjects, setSubjects] = useState<SubjectNode[]>([]);
   const [problemStats, setProblemStats] = useState<ProblemStat[]>([]);
@@ -174,39 +172,50 @@ export default function ProgressPage() {
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
   const [expandedProblems, setExpandedProblems] = useState<Set<string>>(new Set());
   const [codeModal, setCodeModal] = useState<{ sub: Submission; studentName: string } | null>(null);
+  const [submissionSummary, setSubmissionSummary] = useState({ total: 0, passed: 0 });
+  const [nextSubmissionOffset, setNextSubmissionOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   const replaceQuery = useCallback((updates: Record<string, string | null>) => {
-    router.replace(routeWithQuery(pathname, searchParams, updates), { scroll: false });
-  }, [pathname, router, searchParams]);
+    window.history.replaceState(
+      null,
+      '',
+      routeWithQuery(pathname, searchParams, updates),
+    );
+  }, [pathname, searchParams]);
 
   const pushQuery = (updates: Record<string, string | null>) => {
-    router.push(routeWithQuery(pathname, searchParams, updates), { scroll: false });
+    window.history.pushState(
+      null,
+      '',
+      routeWithQuery(pathname, searchParams, updates),
+    );
   };
 
   useEffect(() => {
     fetch('/api/students').then(r => r.json()).then(json => {
       const list: Student[] = json.users ?? [];
       setStudents(list);
-      if (list.length > 0) setSelectedStudent(list[0]);
-    });
-    fetch('/api/progress').then(r => r.json()).then(json => {
-      setSubjects(json.subjects ?? []);
-      setProblemStats(json.problems ?? []);
-      setCurriculumLoaded(true);
     });
   }, []);
 
   useEffect(() => {
-    if (students.length === 0) return;
-    if (!requestedStudentId) {
-      setSelectedStudent((current) => current ?? students[0]);
-      return;
-    }
-    const selected = students.find((student) => student.id === requestedStudentId);
-    if (selected) setSelectedStudent(selected);
-    else replaceQuery({ student: null });
-  }, [replaceQuery, requestedStudentId, students]);
+    if (tab !== 'problem' || curriculumLoaded) return;
+    fetch('/api/progress', { cache: 'no-store' }).then(r => r.json()).then(json => {
+      setSubjects(json.subjects ?? []);
+      setProblemStats(json.problems ?? []);
+      setCollapsedChapters(new Set(
+        (json.problems ?? []).map((problem: ProblemStat) => problem.chapter_id),
+      ));
+      setCurriculumLoaded(true);
+    });
+  }, [curriculumLoaded, tab]);
+
+  const selectedStudent = useMemo(() => (
+    students.find((student) => student.id === requestedStudentId)
+    ?? students[0]
+    ?? null
+  ), [requestedStudentId, students]);
 
   useEffect(() => {
     if (!curriculumLoaded) return;
@@ -231,17 +240,29 @@ export default function ProgressPage() {
     }
   }, [chapterId, curriculumLoaded, replaceQuery, stageId, subjectId, subjects]);
 
-  const loadStudentSubmissions = useCallback(async (studentId: string) => {
+  const loadStudentSubmissions = useCallback(async (
+    studentId: string,
+    offset = 0,
+  ) => {
     setLoading(true);
-    const res = await fetch(`/api/submissions?student_id=${studentId}`);
+    const res = await fetch(
+      `/api/submissions?student_id=${studentId}&view=teacher-summary&limit=20&offset=${offset}`,
+      { cache: 'no-store' },
+    );
     const json = await res.json();
-    setSubmissions(json.submissions ?? []);
-    setExpandedProblems(new Set());
+    setSubmissions((current) => offset === 0
+      ? json.submissions ?? []
+      : [...current, ...(json.submissions ?? [])]);
+    setSubmissionSummary(json.summary ?? { total: 0, passed: 0 });
+    setNextSubmissionOffset(json.next_offset ?? null);
+    if (offset === 0) setExpandedProblems(new Set());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (selectedStudent) loadStudentSubmissions(selectedStudent.id);
+    if (!selectedStudent) return;
+    const studentId = selectedStudent.id;
+    queueMicrotask(() => void loadStudentSubmissions(studentId));
   }, [selectedStudent, loadStudentSubmissions]);
 
   const subjectOptions = useMemo(
@@ -323,7 +344,8 @@ export default function ProgressPage() {
   const toggleExpand = (problemId: string) => {
     setExpandedProblems(prev => {
       const next = new Set(prev);
-      next.has(problemId) ? next.delete(problemId) : next.add(problemId);
+      if (next.has(problemId)) next.delete(problemId);
+      else next.add(problemId);
       return next;
     });
   };
@@ -331,10 +353,28 @@ export default function ProgressPage() {
   const toggleChapter = (chapterIdKey: string) => {
     setCollapsedChapters((prev) => {
       const next = new Set(prev);
-      next.has(chapterIdKey) ? next.delete(chapterIdKey) : next.add(chapterIdKey);
+      if (next.has(chapterIdKey)) next.delete(chapterIdKey);
+      else next.add(chapterIdKey);
       return next;
     });
   };
+
+  const openSubmissionCode = useCallback(async (
+    submission: Submission,
+    studentName: string,
+  ) => {
+    if (typeof submission.code === 'string') {
+      setCodeModal({ sub: submission, studentName });
+      return;
+    }
+    const response = await fetch(`/api/submissions/${submission.id}`, {
+      cache: 'no-store',
+    });
+    const json = response.ok ? await response.json() : null;
+    if (json?.submission) {
+      setCodeModal({ sub: json.submission, studentName });
+    }
+  }, []);
 
   return (
     <div className="flex flex-col gap-5 min-w-0">
@@ -373,7 +413,6 @@ export default function ProgressPage() {
                 <button
                   key={s.id}
                   onClick={() => {
-                    setSelectedStudent(s);
                     pushQuery({ tab: null, student: s.id });
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
@@ -403,7 +442,7 @@ export default function ProgressPage() {
               </span>
               {selectedStudent && (
                 <span style={{ fontSize: '12px', color: 'var(--color-sub)' }}>
-                  총 {submissions.length}회 제출 · 정답 {submissions.filter(s => s.status === 'pass').length}회
+                  총 {submissionSummary.total}회 제출 · 정답 {submissionSummary.passed}회
                 </span>
               )}
             </div>
@@ -479,7 +518,10 @@ export default function ProgressPage() {
                                 key={sub.id}
                                 className="flex items-center gap-4 px-10 py-3 cursor-pointer hover:bg-blue-50 transition-colors"
                                 style={{ borderBottom: idx < subs.length - 1 ? '1px solid var(--color-muted)' : 'none' }}
-                                onClick={() => setCodeModal({ sub, studentName: selectedStudent?.name ?? '' })}
+                                onClick={() => void openSubmissionCode(
+                                  sub,
+                                  selectedStudent?.name ?? '',
+                                )}
                               >
                                 <cfg.Icon size={14} style={{ color: cfg.color, flexShrink: 0 }} />
                                 <span style={{ fontSize: '13px', fontWeight: 600, color: cfg.color, width: 72 }}>{cfg.label}</span>
@@ -512,6 +554,20 @@ export default function ProgressPage() {
                     </div>
                   );
                 })}
+                {nextSubmissionOffset !== null && selectedStudent && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void loadStudentSubmissions(
+                      selectedStudent.id,
+                      nextSubmissionOffset,
+                    )}
+                    className="w-full px-5 py-3 text-center disabled:opacity-50"
+                    style={{ color: 'var(--color-primary)', fontSize: 13, fontWeight: 600 }}
+                  >
+                    더 보기
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -691,7 +747,7 @@ export default function ProgressPage() {
                 height="100%"
                 language="python"
                 theme="vs-dark"
-                value={codeModal.sub.code}
+                value={codeModal.sub.code ?? ''}
                 options={{
                   readOnly: true,
                   fontSize: 13,

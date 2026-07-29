@@ -6,8 +6,8 @@
 
 ## 1. Objective
 
-Improve the production response time of the student learning flow without
-removing or weakening current behavior.
+Improve the production response time of the student, administrator, and
+teacher workflows without removing or weakening current behavior.
 
 The first release focuses on the measured bottlenecks:
 
@@ -17,7 +17,11 @@ The first release focuses on the measured bottlenecks:
 - Previous and Next problem transitions;
 - student submission history;
 - authoritative grading status polling;
-- administrator problem-hierarchy navigation.
+- administrator problem-hierarchy navigation;
+- teacher student monitoring;
+- teacher dashboard analytics and filters;
+- teacher student-history navigation;
+- teacher problem-level progress analytics.
 
 The implementation must be incremental and reversible. Existing API behavior
 remains available until the optimized path has passed regression and production
@@ -64,8 +68,44 @@ and Chapter loads all problems, solely to calculate displayed counts.
 
 The administrator hierarchy fix is included in this MVP because it is
 additive, does not change stored data, and can be verified without mutating
-production records. Teacher progress aggregation, monitoring polling, and
-administrator user pagination remain follow-up work.
+production records.
+
+An authenticated production teacher audit observed:
+
+| Teacher surface | Warm production observation |
+| --- | --- |
+| Students useful content | About 2.54 seconds |
+| Dashboard analytics | About 3.48 seconds |
+| Dashboard date filter | About 3.21 seconds |
+| Progress student view | About 1.52 seconds |
+| Selecting and loading a student's history | About 1.61 seconds |
+| Progress problem view, 398 problems | About 2.75 seconds |
+
+The teacher code paths explain the measured delays:
+
+- Students requests the student list and full active collaboration-session
+  records every 15 seconds.
+- Dashboard filter changes repeat student-scope, curriculum, problem,
+  submission, and AI-feedback work.
+- Progress preloads problem analytics even while the teacher is using the
+  student view.
+- Student history downloads unpaginated submissions including source code and
+  deeply nested curriculum data.
+- Problem analytics downloads all published problems and matching submissions,
+  aggregates them in application code, and may render 398 rows.
+
+The audit also found authorization-scope inconsistencies that must be corrected
+before performance optimizations are enabled: teacher session monitoring,
+teacher-selected student history, and problem analytics do not consistently
+use the shared resolved teacher-student scope.
+
+The production browser was automatically translating the Korean interface and
+reported React hydration text mismatches. This may add visible delay and
+produce incorrect translated counters. It must be reproduced with browser
+translation disabled before attributing it to application code.
+
+Administrator user pagination remains follow-up work because the measured
+28-user page is currently fast.
 
 ## 3. Constraints
 
@@ -92,9 +132,15 @@ The MVP fast path targets:
 - grading-status reads in under 500 milliseconds excluding a Netlify cold
   start;
 - each warm administrator hierarchy transition in under 1.5 seconds;
+- teacher Students useful content in under 1.5 seconds;
+- teacher Dashboard useful analytics in under 2 seconds;
+- teacher Dashboard filter updates in under 1.5 seconds;
+- teacher Progress student view in under 1.5 seconds;
+- a teacher-selected student's first history page in under 1.5 seconds;
+- teacher problem analytics for an expanded chapter in under 1.5 seconds;
 - no regression in saved drafts, session ownership, progress, grading results,
-  AI feedback eligibility, curriculum order, administrator deep links, or
-  browser Back and Forward behavior.
+  AI feedback eligibility, curriculum order, administrator deep links,
+  teacher assignment boundaries, or browser Back and Forward behavior.
 
 These are application budgets, not guarantees for every network condition.
 Measurements must record the browser-observed duration and server duration
@@ -113,17 +159,23 @@ The release is divided into independently testable changes:
 4. make normal grading polls read-only and retain delayed reconciliation;
 5. prefetch only the immediately adjacent problem;
 6. remove duplicate administrator hierarchy work and scope its count queries;
-7. add lightweight server timing and structured duration logs.
+7. enforce teacher assignment scope before returning monitoring or progress
+   data;
+8. add focused teacher monitoring, history, problem-progress, and dashboard
+   requests;
+9. add lightweight server timing and structured duration logs.
 
-The optimized client path is selected by the non-secret build variable
+The optimized student client path is selected by the non-secret build variable
 `NEXT_PUBLIC_STUDENT_PERFORMANCE_FAST_PATH`. Missing or `false` uses the current
 client requests. `true` uses the focused requests described below. Turning the
 variable off and redeploying is the primary fast rollback; a Netlify deployment
 rollback is the secondary rollback.
 
-The first release does not add PostgreSQL RPC functions. Database-side
-aggregation and transactional session switching remain a later optimization
-after the lower-risk request reductions are measured.
+Teacher and administrator changes remain isolated commits and endpoint views
+so they can be rolled back independently from the student flag. The first
+release does not add PostgreSQL RPC functions. Database-side aggregation and
+transactional session switching remain later optimizations after the
+lower-risk request reductions are measured.
 
 ## 6. Problem Loading and Navigation
 
@@ -425,21 +477,175 @@ release.
 AI Feedback is also acceptable at the current 41-pattern size. Pagination is
 deferred until production measurement shows a material delay.
 
-## 12. Teacher Follow-Up
+## 12. Teacher Monitoring and Analytics
 
-The following work is explicitly deferred:
+Teacher performance work is divided into independently deployable changes.
+Authorization scope is corrected first because request reduction must never
+cache or accelerate data that the teacher is not allowed to access.
 
-- database aggregation for teacher progress and dashboard analytics;
-- pagination for administrator users;
-- restricting teacher session polling to active sessions and assigned
-  students;
-- caching published curriculum metadata for teacher analytics;
-- optimizing teacher feedback session bootstrap.
+### 12.1 Assigned-student boundary
 
-These deferred items require additional production timing or a safe
-role-specific environment before implementation. They must be planned
-separately so the approved student and administrator hierarchy changes stay
-small and reversible.
+Every teacher monitoring and analytics endpoint must use the shared
+teacher-student scope helper. The existing MVP rule remains unchanged: a
+teacher with explicit mappings receives the assigned scope, while a teacher
+with no mappings receives the `all` scope for active students.
+
+The following rules are mandatory:
+
+- active collaboration sessions are limited to the resolved scope;
+- `student_id` history requests reject a student outside the resolved scope
+  with `403`;
+- submission-detail requests verify the submission belongs to a student in the
+  resolved scope;
+- problem and dashboard analytics include only students in the resolved scope;
+- an empty mapping set preserves the existing intentional `all` scope;
+- administrators do not inherit teacher endpoints unless the existing route
+  explicitly supports them.
+
+Assignment checks occur on the server. Client filtering is never treated as
+authorization. No teacher response may include source code, session drafts,
+identities, or aggregate contributions from outside the resolved scope.
+
+### 12.2 Student monitoring
+
+The Students page replaces its separate full student and session requests with
+an additive focused request:
+
+```text
+GET /api/students?view=monitoring
+```
+
+It returns only active students in the resolved scope and the fields required
+by the page:
+
+- student ID, name, username, `is_active`, and `last_active_at`;
+- active session ID, student ID, problem ID, problem number, and problem title;
+- no `final_code`, feedback messages, session history, or unrelated students.
+
+The existing `/api/students` and `/api/sessions` default contracts remain
+available during rollout. Monitoring polling keeps the current 15-second
+freshness target but:
+
+- does not start a new request while the previous poll is pending;
+- pauses while the page is hidden;
+- aborts stale requests on navigation;
+- preserves the last successful rows if a refresh fails;
+- uses the same focused request for manual refresh.
+
+If the focused endpoint remains above the target after scoping and column
+reduction, the interval may move to 30 seconds. Realtime monitoring is not
+introduced in this MVP.
+
+### 12.3 Student progress history
+
+The Progress student tab does not request global problem analytics. It loads
+only the resolved-scope student list and the selected student's first summary
+page.
+
+The focused history request is:
+
+```text
+GET /api/submissions?student_id=[id]&view=teacher-summary&limit=20&cursor=[cursor]
+```
+
+It returns:
+
+- final `pass`, `fail`, and `partial` submissions only;
+- the existing status, score, case counts, runtime, elapsed time, and timestamp;
+- minimal curriculum IDs, labels, and ordering fields required by the list;
+- summary totals for the selected in-scope student;
+- a cursor for the next page;
+- no source code.
+
+Opening "View code" requests the selected submission from the existing
+submission-detail route after its teacher-assignment check. Changing students
+aborts the previous request, clears stale expanded rows, and uses a bounded
+in-memory cache keyed by teacher and student. Failed or partial pages remain
+retryable and do not erase already displayed records.
+
+### 12.4 Problem-level progress
+
+Problem analytics are requested only after the teacher opens the Problem tab.
+The default response contains curriculum group metadata and total problem
+counts, but not every problem row and every submission.
+
+The focused request accepts server-side curriculum filters:
+
+```text
+GET /api/progress?view=teacher-summary&subject_id=[id]&stage_id=[id]&chapter_id=[id]
+```
+
+Without a chapter selection, the UI renders collapsed chapter summaries.
+Expanding a chapter requests that chapter's problem statistics. At most one
+chapter's rows are expanded initially, so the page does not render all 398
+problem rows.
+
+The endpoint:
+
+- restricts submissions to student IDs in the resolved scope;
+- restricts problem and submission queries to the requested curriculum;
+- selects no submission code;
+- preserves the existing applicant, submission-count, pass-rate, and
+  average-time semantics;
+- returns empty results immediately for an empty student or problem scope.
+
+Successful curriculum and chapter responses are cached for the lifetime of the
+mounted Progress page. Concurrent requests for the same filter key are
+coalesced, and stale filter responses cannot overwrite a newer selection.
+Database RPC aggregation remains a later option only if focused requests do not
+meet the target.
+
+### 12.5 Dashboard analytics
+
+Dashboard curriculum metadata is separated from user-specific analytics.
+Published subject, stage, and chapter options may use a short shared server
+cache because they contain no student data. Teacher-specific analytics are
+never stored in a shared cache.
+
+For each range and curriculum filter, the analytics handler:
+
+- resolves the teacher-student scope once;
+- filters problems in the database instead of downloading all published
+  problems and filtering in application code;
+- restricts submission and AI-feedback queries to students in the resolved
+  scope and the requested period;
+- starts independent curriculum and analytics queries in parallel where
+  dependency ordering allows;
+- selects only fields used by the aggregations;
+- keeps the existing summary and chart response shapes.
+
+The client retains the last successful curriculum options while analytics
+reload, aborts superseded filter requests, and keeps a bounded in-memory cache
+keyed by range, subject, stage, and chapter. A cached filter restores
+immediately; a background refresh may update it without blanking the charts.
+
+Database-side grouped aggregation is deferred until the focused and parallel
+query path is measured. It may be introduced later behind the same response
+contract without changing the dashboard UI.
+
+### 12.6 Rendering and translation observation
+
+Large teacher result sets use incremental rendering:
+
+- student history shows 20 records initially and provides "load more";
+- problem chapters are collapsed until selected;
+- switching filters keeps previous content visible under a loading indicator;
+- no page renders hundreds of hidden detail rows.
+
+The React hydration errors observed while browser translation was active are
+tracked separately. Verification must compare the same production page with
+translation enabled and disabled. Application translation code is changed only
+if the error reproduces without the browser translator or a supported
+translation-safe rendering fix is identified.
+
+### 12.7 Deferred teacher work
+
+The following remains outside this release:
+
+- PostgreSQL RPC aggregation for dashboard and problem statistics;
+- realtime replacement of monitoring polling;
+- long-lived cross-instance application caches;
+- redesigning charts or teacher information architecture.
 
 ## 13. Observability
 
@@ -465,7 +671,12 @@ The before-and-after checklist records:
 - administrator Subject to Stage;
 - administrator Stage to Chapter;
 - administrator Chapter to Problems;
-- administrator problem editor opening.
+- administrator problem editor opening;
+- teacher Students initial and manual refresh;
+- teacher Dashboard initial analytics and each filter update;
+- teacher Progress student-list readiness;
+- teacher student-history first page and additional page;
+- teacher Problem-tab shell and expanded-chapter statistics.
 
 ## 14. Rollout and Rollback
 
@@ -477,15 +688,20 @@ The before-and-after checklist records:
 6. Perform read-only preview smoke tests.
 7. Enable the student fast path in production.
 8. Deploy the administrator hierarchy optimization independently.
-9. Re-run read-only production measurements.
+9. Deploy teacher assignment-scope corrections before teacher fast consumers.
+10. Deploy focused teacher monitoring and progress consumers.
+11. Deploy focused teacher Dashboard requests.
+12. Re-run authenticated read-only production measurements for every role.
 
 Rollback is an application deployment rollback or disabling the fast-path
 consumer. Because existing endpoints and database schema remain compatible,
 rollback does not require reversing data migrations.
 
 No destructive migration or existing-column change is allowed in this release.
-The administrator hierarchy change must be isolated so it can be reverted
-without disabling the student fast path.
+The administrator and teacher changes must be isolated so either can be
+reverted without disabling the student fast path. Authorization-scope
+corrections are security fixes and must not be rolled back merely to recover
+broader legacy data visibility.
 
 ## 15. Error Handling
 
@@ -500,6 +716,15 @@ without disabling the student fast path.
   student attempt to a wrong answer.
 - Administrator hierarchy failure preserves the selected breadcrumb, does not
   cache the failure, and exposes retry.
+- Teacher monitoring refresh failure preserves the last successful student
+  rows and exposes manual retry.
+- Teacher history pagination failure preserves already loaded submissions.
+- Teacher problem-progress failure preserves curriculum filters and collapsed
+  chapter summaries.
+- Teacher Dashboard filter failure preserves the last successful charts,
+  identifies the failed filter, and exposes retry.
+- A teacher resource outside an assigned scope returns `403`; the client does
+  not retry it as a transient failure.
 
 Fallbacks must be bounded. The client must not enter retry loops that multiply
 traffic during an outage.
@@ -525,7 +750,20 @@ traffic during an outage.
 - concurrent requests for the same administrator hierarchy key are coalesced;
 - stale hierarchy responses cannot replace a newer selection;
 - count endpoints query children only for parents in the current response;
-- count endpoint response fields remain backward compatible.
+- count endpoint response fields remain backward compatible;
+- every teacher session, history, detail, progress, and Dashboard query uses
+  the same resolved teacher-student scope;
+- zero mappings preserve the intentional all-active-students scope;
+- a `student_id` or submission detail outside an assigned scope returns `403`;
+- monitoring summaries exclude session drafts and source code;
+- teacher history summaries exclude source code and paginate deterministically;
+- teacher code detail is fetched only after an authorized explicit request;
+- the Progress student tab never requests problem analytics;
+- problem summary filters restrict both problem and submission queries;
+- stale teacher history, Progress, or Dashboard requests cannot overwrite a
+  newer selection;
+- teacher Dashboard response shapes and existing metric semantics remain
+  compatible.
 
 ### Regression checks
 
@@ -542,7 +780,17 @@ traffic during an outage.
 - administrator problem create, edit, reorder, publish, and delete behavior is
   unchanged;
 - the rich-text problem editor renders saved content and retains its toolbar
-  behavior after the Tiptap cleanup.
+  behavior after the Tiptap cleanup;
+- teacher Students online and solving classifications remain unchanged;
+- manual refresh and background monitoring show only students in the resolved
+  scope;
+- teacher history totals, grouping, ordering, scores, and elapsed times match
+  the legacy view;
+- "View code" opens the correct in-scope student's submission;
+- problem applicant counts, submission counts, pass rates, and average times
+  match the legacy resolved-scope calculation;
+- Dashboard summaries and charts match the legacy resolved-scope calculation;
+- teacher filter URLs and browser Back and Forward behavior remain intact.
 
 ### Required verification
 
@@ -553,7 +801,12 @@ traffic during an outage.
 - read-only preview smoke test;
 - read-only production timing comparison;
 - authenticated local administrator timing comparison;
-- authenticated read-only administrator preview smoke test.
+- authenticated read-only administrator preview smoke test;
+- authenticated local teacher timing comparison;
+- authenticated read-only teacher preview smoke test;
+- teacher scope-boundary tests using assigned, outside-scope, and
+  zero-mapping/all-scope fixtures;
+- production comparison with browser translation enabled and disabled.
 
 ## 17. Non-Goals
 
@@ -563,7 +816,9 @@ traffic during an outage.
 - Rewriting collaboration or realtime messaging.
 - Changing curriculum structure.
 - Changing grading rules, scoring, hidden-case security, or Judge0 provider.
-- Optimizing every teacher or administrator page in the same release.
 - Adding administrator Users or AI Feedback pagination before measurement
   requires it.
+- Adding PostgreSQL analytics RPC functions before focused-query measurements.
+- Replacing teacher monitoring polling with realtime subscriptions.
+- Redesigning teacher charts or navigation.
 - Deleting legacy endpoints before production verification.

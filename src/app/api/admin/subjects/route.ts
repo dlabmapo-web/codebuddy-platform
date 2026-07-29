@@ -9,19 +9,16 @@ export async function GET() {
   const db = supabaseAdmin();
   const { data: subjects, error } = await db
     .from('subjects')
-    .select('*')
+    .select('*, stages(count)')
     .order('order_no', { ascending: true });
 
   if (error) return apiError('과목 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
 
-  const { data: stages } = await db.from('stages').select('id, subject_id');
-  const countMap: Record<string, number> = {};
-  for (const s of stages ?? []) {
-    countMap[s.subject_id] = (countMap[s.subject_id] ?? 0) + 1;
-  }
-
   return apiOk({
-    subjects: (subjects ?? []).map((s) => ({ ...s, stage_count: countMap[s.id] ?? 0 })),
+    subjects: (subjects ?? []).map(({ stages, ...subject }) => ({
+      ...subject,
+      stage_count: stages?.[0]?.count ?? 0,
+    })),
   });
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { BookOpen, MessageSquare, RefreshCw, Circle, Search, Wifi, X } from 'lucide-react';
 import type { ProblemDifficulty } from '@/lib/types/db';
 import {
@@ -59,7 +59,6 @@ function formatRelative(iso: string | null) {
 }
 
 export default function StudentsPage() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedQuery = searchParams.get('q') ?? '';
@@ -76,6 +75,8 @@ export default function StudentsPage() {
   const [query, setQuery] = useState(requestedQuery);
   const initializedRef = useRef(false);
   const queryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadControllerRef = useRef<AbortController | null>(null);
+  const loadPendingRef = useRef(false);
   const returnRoute = currentInternalRoute({
     pathname,
     search: searchParams.toString(),
@@ -88,10 +89,12 @@ export default function StudentsPage() {
   };
 
   const replaceQuery = useCallback((updates: Record<string, string | null>) => {
-    router.replace(routeWithQuery(pathname, searchParams, updates), {
-      scroll: false,
-    });
-  }, [pathname, router, searchParams]);
+    window.history.replaceState(
+      null,
+      '',
+      routeWithQuery(pathname, searchParams, updates),
+    );
+  }, [pathname, searchParams]);
 
   const updateSearch = useCallback((value: string) => {
     setQuery(value);
@@ -102,54 +105,67 @@ export default function StudentsPage() {
   }, [replaceQuery]);
 
   const load = useCallback(async (isManual = false) => {
+    if (loadPendingRef.current) return;
+    loadPendingRef.current = true;
     if (isManual) setRefreshing(true);
-    const [usersRes, sessionsRes] = await Promise.all([
-      fetch('/api/students'),
-      fetch('/api/sessions'),
-    ]);
-    const usersJson = await usersRes.json();
-    const sessionsJson = await sessionsRes.json();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
 
-    const activeSessions: StudentSession[] = (sessionsJson.sessions ?? []).filter(
-      (s: StudentSession) => s.status === 'active'
-    );
-    const sessionMap: Record<string, StudentSession> = {};
-    for (const s of activeSessions) sessionMap[s.student_id] = s;
+    try {
+      const response = await fetch('/api/students?view=monitoring', {
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+      const json = await response.json();
+      const rows: StudentRow[] = json.users ?? [];
 
-    const rows: StudentRow[] = (usersJson.users ?? []).map((u: { id: string; username: string; name: string; is_active: boolean; last_active_at: string | null }) => ({
-      ...u,
-      activeSession: sessionMap[u.id] ?? null,
-    }));
+      rows.sort((a, b) => {
+        const aOnline = isOnline(a.last_active_at);
+        const bOnline = isOnline(b.last_active_at);
+        const aSolving = aOnline && !!a.activeSession;
+        const bSolving = bOnline && !!b.activeSession;
+        if (aSolving && !bSolving) return -1;
+        if (!aSolving && bSolving) return 1;
+        if (aOnline && !bOnline) return -1;
+        if (!aOnline && bOnline) return 1;
+        return 0;
+      });
 
-    rows.sort((a, b) => {
-      const aOnline = isOnline(a.last_active_at);
-      const bOnline = isOnline(b.last_active_at);
-      const aSolving = aOnline && !!a.activeSession;
-      const bSolving = bOnline && !!b.activeSession;
-      if (aSolving && !bSolving) return -1;
-      if (!aSolving && bSolving) return 1;
-      if (aOnline && !bOnline) return -1;
-      if (!aOnline && bOnline) return 1;
-      return 0;
-    });
-
-    setStudents(rows);
-    setLastUpdated(new Date());
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      setLoading(false);
+      setStudents(rows);
+      setLastUpdated(new Date());
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        // Preserve the last successful monitoring snapshot.
+      }
+    } finally {
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+        setLoading(false);
+      }
+      if (loadControllerRef.current === controller) {
+        loadControllerRef.current = null;
+      }
+      loadPendingRef.current = false;
+      setRefreshing(false);
     }
-    setRefreshing(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const interval = setInterval(() => load(false), 15000);
+    queueMicrotask(() => void load());
+  }, [load]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') void load(false);
+    }, 15000);
     return () => clearInterval(interval);
   }, [load]);
-  useEffect(() => setQuery(requestedQuery), [requestedQuery]);
+  useEffect(() => {
+    queueMicrotask(() => setQuery(requestedQuery));
+  }, [requestedQuery]);
   useEffect(() => () => {
     if (queryTimerRef.current) clearTimeout(queryTimerRef.current);
+    loadControllerRef.current?.abort();
   }, []);
   useEffect(() => {
     if (loading) return;

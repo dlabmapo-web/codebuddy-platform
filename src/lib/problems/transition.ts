@@ -24,6 +24,10 @@ type ProblemDetailResponse = {
   learning_context?: LearningContext | null;
 };
 
+type SubmissionCountResponse = {
+  count?: number;
+};
+
 type SubmissionListResponse = {
   submissions?: DbSubmission[];
 };
@@ -50,6 +54,23 @@ export type ProblemTransitionSnapshot = {
   attemptCount: number;
 };
 
+export async function loadProblemLearningContext({
+  problemId,
+  signal,
+  fetcher = fetch,
+}: {
+  problemId: string;
+  signal: AbortSignal;
+  fetcher?: Fetcher;
+}): Promise<LearningContext | null> {
+  const response = await requestJson<Pick<ProblemDetailResponse, 'learning_context'>>(
+    fetcher,
+    `/api/problems/${problemId}/learning-context`,
+    { signal, cache: 'no-store' },
+  );
+  return response.learning_context ?? null;
+}
+
 async function requestJson<T>(
   fetcher: Fetcher,
   input: string,
@@ -60,6 +81,55 @@ async function requestJson<T>(
     throw new Error(`Request failed: ${response.status}`);
   }
   return response.json() as Promise<T>;
+}
+
+function shouldTryLegacy(error: unknown, signal: AbortSignal) {
+  return !signal.aborted
+    && !(error instanceof DOMException && error.name === 'AbortError');
+}
+
+async function requestTransitionDetail(
+  fetcher: Fetcher,
+  problemId: string,
+  signal: AbortSignal,
+) {
+  try {
+    return await requestJson<ProblemDetailResponse>(
+      fetcher,
+      `/api/problems/${problemId}?view=transition`,
+      { signal },
+    );
+  } catch (error) {
+    if (!shouldTryLegacy(error, signal)) throw error;
+    return requestJson<ProblemDetailResponse>(
+      fetcher,
+      `/api/problems/${problemId}`,
+      { signal },
+    );
+  }
+}
+
+async function requestSubmissionCount(
+  fetcher: Fetcher,
+  problemId: string,
+  signal: AbortSignal,
+) {
+  try {
+    const response = await requestJson<SubmissionCountResponse>(
+      fetcher,
+      `/api/submissions?problem_id=${problemId}&view=count`,
+      { signal },
+    );
+    return response.count ?? 0;
+  } catch (error) {
+    if (!shouldTryLegacy(error, signal)) throw error;
+    const legacy = await requestJson<SubmissionListResponse>(
+      fetcher,
+      `/api/submissions?problem_id=${problemId}`,
+      { signal },
+    );
+    return legacy.submissions?.length ?? 0;
+  }
 }
 
 export async function loadProblemTransitionSnapshot({
@@ -78,17 +148,9 @@ export async function loadProblemTransitionSnapshot({
   fetcher?: Fetcher;
 }): Promise<ProblemTransitionSnapshot> {
   const requestInit = { signal };
-  const [detail, submissionList, historicalSubmission] = await Promise.all([
-    requestJson<ProblemDetailResponse>(
-      fetcher,
-      `/api/problems/${problemId}`,
-      requestInit,
-    ),
-    requestJson<SubmissionListResponse>(
-      fetcher,
-      `/api/submissions?problem_id=${problemId}`,
-      requestInit,
-    ),
+  const [detail, attemptCount, historicalSubmission] = await Promise.all([
+    requestTransitionDetail(fetcher, problemId, signal),
+    requestSubmissionCount(fetcher, problemId, signal),
     submissionId
       ? requestJson<SubmissionDetailResponse>(
           fetcher,
@@ -143,6 +205,6 @@ export async function loadProblemTransitionSnapshot({
     code: historicalCode ?? savedDraft ?? starterCode,
     lastSavedCode: savedDraft,
     sessionId: session.id,
-    attemptCount: submissionList.submissions?.length ?? 0,
+    attemptCount,
   };
 }

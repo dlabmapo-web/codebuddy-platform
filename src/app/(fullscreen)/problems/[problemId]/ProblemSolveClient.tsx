@@ -29,6 +29,7 @@ import {
   SubmissionResultDrawer,
   type SubmissionResult,
 } from '@/components/judge/SubmissionResultDrawer';
+import { shouldReconcileSubmission } from '@/lib/judge/reconciliationPolicy';
 import { SampleRunControls } from '@/components/judge/SampleRunControls';
 import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
 import {
@@ -40,6 +41,7 @@ import type {
   ProblemNavigationItem,
 } from '@/lib/problems/navigation';
 import {
+  loadProblemLearningContext,
   loadProblemTransitionSnapshot,
   type ProblemTransitionSnapshot,
 } from '@/lib/problems/transition';
@@ -548,6 +550,21 @@ export default function ProblemSolveClient({
     setIsProblemTransitioning(false);
   }, []);
 
+  const loadDeferredLearningContext = useCallback((
+    problemId: string,
+    signal: AbortSignal,
+  ) => {
+    void loadProblemLearningContext({ problemId, signal })
+      .then((context) => {
+        if (!signal.aborted && problemRef.current?.id === problemId) {
+          setLearningContext(context);
+        }
+      })
+      .catch(() => {
+        // Curriculum context is supplementary; the editor remains usable.
+      });
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     problemTransitionControllerRef.current = controller;
@@ -559,7 +576,10 @@ export default function ProblemSolveClient({
       signal: controller.signal,
     })
       .then((snapshot) => {
-        if (!controller.signal.aborted) applyProblemSnapshot(snapshot);
+        if (!controller.signal.aborted) {
+          applyProblemSnapshot(snapshot);
+          loadDeferredLearningContext(snapshot.problem.id, controller.signal);
+        }
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
@@ -576,7 +596,7 @@ export default function ProblemSolveClient({
         problemTransitionControllerRef.current = null;
       }
     };
-  }, [applyProblemSnapshot]);
+  }, [applyProblemSnapshot, loadDeferredLearningContext]);
 
   useEffect(() => () => {
     const sid = sessionIdRef.current;
@@ -664,6 +684,7 @@ export default function ProblemSolveClient({
       if (controller.signal.aborted) return;
 
       applyProblemSnapshot(snapshot);
+      loadDeferredLearningContext(snapshot.problem.id, controller.signal);
       if (updateHistory === 'push') {
         const returnQuery = validatedReturnTo
           ? `?returnTo=${encodeReturnTo(validatedReturnTo)}`
@@ -716,7 +737,12 @@ export default function ProblemSolveClient({
         problemTransitionControllerRef.current = null;
       }
     }
-  }, [applyProblemSnapshot, saveDraftBeforeNavigation, validatedReturnTo]);
+  }, [
+    applyProblemSnapshot,
+    loadDeferredLearningContext,
+    saveDraftBeforeNavigation,
+    validatedReturnTo,
+  ]);
 
   const handleNavigateProblem = useCallback((
     destination: ProblemNavigationItem | null,
@@ -1273,13 +1299,33 @@ export default function ProblemSolveClient({
       cases?: SubmissionResult['cases'];
     } | null = null;
 
+    const pollingStartedAt = Date.now();
+    let reconciliationAttempted = false;
     for (let poll = 0; poll < 400; poll += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, poll === 0 ? 500 : 1500));
-      const statusRes = await fetch(`/api/submissions/${submissionId}`, { cache: 'no-store' }).catch(() => null);
+      const shouldReconcile = shouldReconcileSubmission({
+        elapsedMs: Date.now() - pollingStartedAt,
+        attempted: reconciliationAttempted,
+      });
+      if (shouldReconcile) reconciliationAttempted = true;
+      const statusUrl = shouldReconcile
+        ? `/api/submissions/${submissionId}`
+        : `/api/submissions/${submissionId}?mode=status`;
+      const statusRes = await fetch(statusUrl, { cache: 'no-store' }).catch(() => null);
       const statusJson = statusRes?.ok ? await statusRes.json().catch(() => null) : null;
       const next = statusJson?.submission;
       if (next && next.status !== 'judging') {
-        finalSubmission = next;
+        if (shouldReconcile || next.status === 'judge_error') {
+          finalSubmission = next;
+        } else {
+          const detailRes = await fetch(`/api/submissions/${submissionId}`, {
+            cache: 'no-store',
+          }).catch(() => null);
+          const detailJson = detailRes?.ok
+            ? await detailRes.json().catch(() => null)
+            : null;
+          finalSubmission = detailJson?.submission ?? next;
+        }
         break;
       }
     }

@@ -13,25 +13,29 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const db = supabaseAdmin();
 
-  const { data: problem, error } = await db
-    .from('problems')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const [
+    { data: problem, error },
+    { data: test_cases },
+    { data: hints },
+  ] = await Promise.all([
+    db
+      .from('problems')
+      .select('*')
+      .eq('id', id)
+      .single(),
+    db
+      .from('test_cases')
+      .select('*')
+      .eq('problem_id', id)
+      .order('order_no', { ascending: true }),
+    db
+      .from('problem_hints')
+      .select('*')
+      .eq('problem_id', id)
+      .order('order_no', { ascending: true }),
+  ]);
 
   if (error || !problem) return apiError('문제를 찾을 수 없습니다.', 'NOT_FOUND', 404);
-
-  const { data: test_cases } = await db
-    .from('test_cases')
-    .select('*')
-    .eq('problem_id', id)
-    .order('order_no', { ascending: true });
-
-  const { data: hints } = await db
-    .from('problem_hints')
-    .select('*')
-    .eq('problem_id', id)
-    .order('order_no', { ascending: true });
 
   return apiOk({ problem, test_cases: test_cases ?? [], hints: hints ?? [] });
 }

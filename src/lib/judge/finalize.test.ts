@@ -30,7 +30,7 @@ describe('finalizeCaseResults', () => {
       score: 100,
       passedCount: 2,
       totalCount: 2,
-      runtimeMs: 22,
+      runtimeMs: 12,
     });
   });
 
@@ -44,8 +44,16 @@ describe('finalizeCaseResults', () => {
       score: 33,
       passedCount: 1,
       totalCount: 3,
-      runtimeMs: 22,
+      runtimeMs: 12,
     });
+  });
+
+  it('uses the slowest case runtime instead of adding batch runtimes', () => {
+    expect(finalizeCaseResults([
+      { outcome: 'accepted', runtimeMs: 1239 },
+      { outcome: 'accepted', runtimeMs: 1224 },
+      { outcome: 'accepted', runtimeMs: null },
+    ])?.runtimeMs).toBe(1239);
   });
 
   it('fails when no case passes', () => {

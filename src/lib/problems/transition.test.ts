@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadProblemTransitionSnapshot } from './transition';
+import {
+  loadProblemLearningContext,
+  loadProblemTransitionSnapshot,
+} from './transition';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -72,17 +75,17 @@ function createFetcher({
 } = {}) {
   return vi.fn(async (input: string, init?: RequestInit) => {
     void init;
-    if (input === `/api/problems/${problemId}`) {
+    if (input === `/api/problems/${problemId}?view=transition`) {
       return jsonResponse({
         problem: problem(problemId),
         test_cases: [],
         hints: [],
         navigation: null,
-        learning_context: learningContext(problemId),
+        learning_context: null,
       });
     }
-    if (input === `/api/submissions?problem_id=${problemId}`) {
-      return jsonResponse({ submissions: [{ id: 'attempt-1' }] });
+    if (input === `/api/submissions?problem_id=${problemId}&view=count`) {
+      return jsonResponse({ count: 1 });
     }
     if (input === '/api/submissions/submission-1') {
       return jsonResponse({
@@ -111,7 +114,7 @@ describe('loadProblemTransitionSnapshot', () => {
     expect(snapshot.code).toBe('print("draft")');
     expect(snapshot.lastSavedCode).toBe('print("draft")');
     expect(snapshot.attemptCount).toBe(1);
-    expect(snapshot.learningContext?.path.problem.id).toBe('problem-2');
+    expect(snapshot.learningContext).toBeNull();
   });
 
   it('preserves an intentionally empty saved draft', async () => {
@@ -224,5 +227,64 @@ describe('loadProblemTransitionSnapshot', () => {
       previous_session_id: 'session-problem-1',
       previous_final_code: 'print("leaving problem 1")',
     });
+  });
+
+  it('loads curriculum context separately from the editor fast path', async () => {
+    const fetcher = vi.fn(async (input: string) => {
+      if (input === '/api/problems/problem-2/learning-context') {
+        return jsonResponse({ learning_context: learningContext('problem-2') });
+      }
+      return jsonResponse({}, 404);
+    });
+
+    const context = await loadProblemLearningContext({
+      problemId: 'problem-2',
+      signal: new AbortController().signal,
+      fetcher,
+    });
+
+    expect(context?.path.problem.id).toBe('problem-2');
+  });
+
+  it('falls back once when focused transition endpoints are unavailable', async () => {
+    const fetcher = vi.fn(async (input: string) => {
+      if (input === '/api/problems/problem-2?view=transition') {
+        return jsonResponse({}, 404);
+      }
+      if (input === '/api/problems/problem-2') {
+        return jsonResponse({
+          problem: problem('problem-2'),
+          test_cases: [],
+          hints: [],
+          navigation: null,
+        });
+      }
+      if (input === '/api/submissions?problem_id=problem-2&view=count') {
+        return jsonResponse({}, 404);
+      }
+      if (input === '/api/submissions?problem_id=problem-2') {
+        return jsonResponse({ submissions: [{ id: 'attempt-1' }] });
+      }
+      if (input === '/api/sessions') {
+        return jsonResponse({ session: session('problem-2', null) }, 201);
+      }
+      return jsonResponse({}, 404);
+    });
+
+    const snapshot = await loadProblemTransitionSnapshot({
+      problemId: 'problem-2',
+      signal: new AbortController().signal,
+      fetcher,
+    });
+
+    expect(snapshot.attemptCount).toBe(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/problems/problem-2',
+      expect.anything(),
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/submissions?problem_id=problem-2',
+      expect.anything(),
+    );
   });
 });

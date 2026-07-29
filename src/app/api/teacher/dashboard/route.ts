@@ -132,6 +132,7 @@ export async function GET(req: Request) {
   if (!user) return apiError('인증이 필요합니다.', 'UNAUTHORIZED', 401);
   if (user.role !== 'teacher') return apiError('권한이 없습니다.', 'FORBIDDEN', 403);
 
+  const startedAt = Date.now();
   const url = new URL(req.url);
   const range = parseRange(url.searchParams.get('range'));
   const filterSubjectId = url.searchParams.get('subject_id')?.trim() || null;
@@ -160,13 +161,7 @@ export async function GET(req: Request) {
     studentQuery = studentQuery.in('id', studentScope.studentIds);
   }
 
-  const { data: studentData, error: studentError } = await studentQuery;
-  if (studentError) return apiError('학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-
-  const students = (studentData ?? []) as StudentRow[];
-  const studentIds = students.map((student) => student.id);
-
-  const { data: subjectRows } = await db
+  const subjectQuery = db
     .from('subjects')
     .select('id, title, order_no')
     .eq('is_published', true)
@@ -179,30 +174,71 @@ export async function GET(req: Request) {
     .order('order_no', { ascending: true });
   if (filterSubjectId) stageQuery = stageQuery.eq('subject_id', filterSubjectId);
 
-  const { data: stageRows } = await stageQuery;
-
-  let chapterQuery = db
+  const chapterQuery = db
     .from('chapters')
     .select('id, title, order_no, stage_id')
     .eq('is_published', true)
     .order('order_no', { ascending: true });
-  if (filterStageId) {
-    chapterQuery = chapterQuery.eq('stage_id', filterStageId);
-  } else if (filterSubjectId) {
-    const stageIds = (stageRows ?? []).map((s) => s.id);
-    if (stageIds.length === 0) {
-      chapterQuery = chapterQuery.eq('stage_id', '00000000-0000-0000-0000-000000000000');
-    } else {
-      chapterQuery = chapterQuery.in('stage_id', stageIds);
-    }
+
+  const problemQuery = db
+    .from('problems')
+    .select(`
+      id, problem_no, title, order_no, chapter_id,
+      chapters (
+        id, title, order_no, stage_id,
+        stages (
+          id, title, order_no, subject_id,
+          subjects ( id, title, order_no )
+        )
+      )
+    `)
+    .eq('is_published', true);
+
+  const [
+    studentResult,
+    subjectResult,
+    stageResult,
+    chapterResult,
+    problemResult,
+  ] = await Promise.all([
+    studentQuery,
+    subjectQuery,
+    stageQuery,
+    chapterQuery,
+    problemQuery,
+  ]);
+  if (studentResult.error) {
+    console.error('Teacher dashboard student query failed', {
+      teacherId: user.id,
+      code: studentResult.error.code,
+      message: studentResult.error.message,
+    });
+    return apiError('학생 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
+  if (problemResult.error) {
+    console.error('Teacher dashboard problem query failed', {
+      teacherId: user.id,
+      code: problemResult.error.code,
+      message: problemResult.error.message,
+    });
+    return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
   }
 
-  const { data: chapterRows } = await chapterQuery;
+  const students = (studentResult.data ?? []) as StudentRow[];
+  const studentIds = students.map((student) => student.id);
+  const subjectRows = subjectResult.data ?? [];
+  const stageRows = stageResult.data ?? [];
+  const allowedStageIds = new Set(stageRows.map((stage) => stage.id));
+  const chapterRows = (chapterResult.data ?? []).filter((chapter) => (
+    filterStageId
+      ? chapter.stage_id === filterStageId
+      : !filterSubjectId || allowedStageIds.has(chapter.stage_id)
+  ));
 
   const curriculum = {
-    subjects: (subjectRows ?? []) as CurriculumFilterOption[],
-    stages: (stageRows ?? []) as CurriculumFilterOption[],
-    chapters: (chapterRows ?? []) as CurriculumFilterOption[],
+    subjects: subjectRows as CurriculumFilterOption[],
+    stages: stageRows as CurriculumFilterOption[],
+    chapters: chapterRows as CurriculumFilterOption[],
   };
 
   const empty: TeacherDashboardData = {
@@ -226,23 +262,7 @@ export async function GET(req: Request) {
 
   if (studentIds.length === 0) return apiOk({ ...empty });
 
-  const { data: problemData, error: problemError } = await db
-    .from('problems')
-    .select(`
-      id, problem_no, title, order_no, chapter_id,
-      chapters (
-        id, title, order_no, stage_id,
-        stages (
-          id, title, order_no, subject_id,
-          subjects ( id, title, order_no )
-        )
-      )
-    `)
-    .eq('is_published', true);
-
-  if (problemError) return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-
-  const allProblems = (problemData ?? []) as unknown as ProblemRow[];
+  const allProblems = (problemResult.data ?? []) as unknown as ProblemRow[];
   const filteredProblems = allProblems.filter((problem) => {
     const cur = curriculumOf(problem);
     if (!cur) return false;
@@ -252,12 +272,19 @@ export async function GET(req: Request) {
     return true;
   });
   const filteredProblemIds = new Set(filteredProblems.map((p) => p.id));
+  if (filteredProblemIds.size === 0) return apiOk({ ...empty });
 
   let submissionQuery = db
     .from('submissions')
     .select('user_id, problem_id, status, submitted_at')
     .in('user_id', studentIds)
     .in('status', ['pass', 'fail', 'partial']);
+  if (filteredProblemIds.size <= 100) {
+    submissionQuery = submissionQuery.in(
+      'problem_id',
+      Array.from(filteredProblemIds),
+    );
+  }
   let aiFeedbackQuery = db
     .from('ai_feedbacks')
     .select('ai_feedback_patterns(error_category, pattern_type)')
@@ -270,11 +297,28 @@ export async function GET(req: Request) {
 
   const [submissionResult, aiFeedbackResult] = await Promise.all([submissionQuery, aiFeedbackQuery]);
 
-  if (submissionResult.error) return apiError('제출 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
-  if (aiFeedbackResult.error) return apiError('AI 피드백 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  if (submissionResult.error) {
+    console.error('Teacher dashboard submission query failed', {
+      teacherId: user.id,
+      code: submissionResult.error.code,
+      message: submissionResult.error.message,
+      studentCount: studentIds.length,
+      problemCount: filteredProblemIds.size,
+    });
+    return apiError('제출 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
+  if (aiFeedbackResult.error) {
+    console.error('Teacher dashboard AI feedback query failed', {
+      teacherId: user.id,
+      code: aiFeedbackResult.error.code,
+      message: aiFeedbackResult.error.message,
+      studentCount: studentIds.length,
+    });
+    return apiError('AI 피드백 통계 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+  }
 
   const submissions = ((submissionResult.data ?? []) as SubmissionRow[])
-    .filter((s) => filteredProblemIds.has(s.problem_id));
+    .filter((submission) => filteredProblemIds.has(submission.problem_id));
   const problems = filteredProblems;
   const aiFeedbacks = (aiFeedbackResult.data ?? []) as AiFeedbackRow[];
   const studentMap = new Map(students.map((student) => [student.id, student]));
@@ -496,5 +540,15 @@ export async function GET(req: Request) {
     studentsNeedingHelp,
   };
 
+  const durationMs = Date.now() - startedAt;
+  if (durationMs >= 1500) {
+    console.warn('Slow teacher dashboard request', {
+      teacherId: user.id,
+      durationMs,
+      range,
+      studentCount: students.length,
+      problemCount: problems.length,
+    });
+  }
   return apiOk({ ...response });
 }

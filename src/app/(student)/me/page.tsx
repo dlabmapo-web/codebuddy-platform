@@ -48,6 +48,11 @@ type ProblemRef = {
   chapters: ChapterRef | ChapterRef[] | null;
 };
 type CurriculumOption = { id: string; title: string; order_no: number };
+type CurriculumData = {
+  subjects: CurriculumOption[];
+  stages: Array<CurriculumOption & { subject_id: string }>;
+  chapters: Array<CurriculumOption & { stage_id: string }>;
+};
 
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -124,6 +129,13 @@ export default function MyHistoryPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [summary, setSummary] = useState({ total: 0, passed: 0, solved: 0 });
+  const [curriculum, setCurriculum] = useState<CurriculumData>({
+    subjects: [],
+    stages: [],
+    chapters: [],
+  });
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const filterParam = searchParams.get('status');
   const filter: 'all' | 'pass' | 'fail' =
@@ -136,68 +148,86 @@ export default function MyHistoryPage() {
     search: searchParams.toString(),
   });
   const replaceFilters = (updates: Record<string, string | null>) => {
-    router.replace(routeWithQuery(pathname, searchParams, updates), {
-      scroll: false,
-    });
+    window.history.replaceState(
+      null,
+      '',
+      routeWithQuery(pathname, searchParams, updates),
+    );
   };
 
   useEffect(() => {
-    fetch('/api/submissions')
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      view: 'history',
+      limit: '20',
+      offset: '0',
+    });
+    if (filter !== 'all') params.set('status', filter);
+    if (subjectId) params.set('subject', subjectId);
+    if (stageId) params.set('stage', stageId);
+    if (chapterId) params.set('chapter', chapterId);
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) setLoading(true);
+    });
+    fetch(`/api/submissions?${params}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
       .then((r) => r.json())
-      .then((json) => setSubmissions(json.submissions ?? []))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((json) => {
+        setSubmissions(json.submissions ?? []);
+        setSummary(json.summary ?? { total: 0, passed: 0, solved: 0 });
+        setCurriculum(json.curriculum ?? {
+          subjects: [],
+          stages: [],
+          chapters: [],
+        });
+        setNextOffset(json.next_offset ?? null);
+      })
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          setSubmissions([]);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [chapterId, filter, stageId, subjectId]);
 
   const curriculumOptions = useMemo(() => {
-    const subjects = new Map<string, CurriculumOption>();
-    const stages = new Map<string, CurriculumOption & { subject_id: string }>();
-    const chapters = new Map<string, CurriculumOption & { stage_id: string }>();
-
-    for (const submission of submissions) {
-      const curriculum = curriculumOf(submission);
-      if (curriculum.subject) subjects.set(curriculum.subject.id, curriculum.subject);
-      if (curriculum.stage) {
-        stages.set(curriculum.stage.id, {
-          id: curriculum.stage.id,
-          title: curriculum.stage.title,
-          order_no: curriculum.stage.order_no,
-          subject_id: curriculum.stage.subject_id,
-        });
-      }
-      if (curriculum.chapter) {
-        chapters.set(curriculum.chapter.id, {
-          id: curriculum.chapter.id,
-          title: curriculum.chapter.title,
-          order_no: curriculum.chapter.order_no,
-          stage_id: curriculum.chapter.stage_id,
-        });
-      }
-    }
-
     return {
-      subjects: Array.from(subjects.values()).sort((a, b) => a.order_no - b.order_no),
-      stages: Array.from(stages.values())
+      subjects: curriculum.subjects,
+      stages: curriculum.stages
         .filter((stage) => !subjectId || stage.subject_id === subjectId)
         .sort((a, b) => a.order_no - b.order_no),
-      chapters: Array.from(chapters.values())
+      chapters: curriculum.chapters
         .filter((chapter) => !stageId || chapter.stage_id === stageId)
         .sort((a, b) => a.order_no - b.order_no),
     };
-  }, [submissions, subjectId, stageId]);
+  }, [curriculum, subjectId, stageId]);
 
-  const filtered = useMemo(() => submissions.filter((submission) => {
-    if (filter === 'pass' && submission.status !== 'pass') return false;
-    if (filter === 'fail' && submission.status === 'pass') return false;
-    const curriculum = curriculumOf(submission);
-    if (subjectId && curriculum.subject?.id !== subjectId) return false;
-    if (stageId && curriculum.stage?.id !== stageId) return false;
-    if (chapterId && curriculum.chapter?.id !== chapterId) return false;
-    return true;
-  }), [submissions, filter, subjectId, stageId, chapterId]);
+  const filtered = submissions;
+  const totalAttempts = summary.total;
+  const solvedProblems = summary.solved;
+  const correctRate = totalAttempts > 0 ? Math.round((summary.passed / totalAttempts) * 100) : 0;
 
-  const totalAttempts = submissions.length;
-  const solvedProblems = new Set(submissions.filter((s) => s.status === 'pass').map((s) => s.problem_id)).size;
-  const correctRate = totalAttempts > 0 ? Math.round((submissions.filter((s) => s.status === 'pass').length / totalAttempts) * 100) : 0;
+  const loadMore = async () => {
+    if (nextOffset === null) return;
+    const params = new URLSearchParams({
+      view: 'history',
+      limit: '20',
+      offset: String(nextOffset),
+    });
+    if (filter !== 'all') params.set('status', filter);
+    if (subjectId) params.set('subject', subjectId);
+    if (stageId) params.set('stage', stageId);
+    if (chapterId) params.set('chapter', chapterId);
+    const response = await fetch(`/api/submissions?${params}`, { cache: 'no-store' });
+    const json = await response.json();
+    setSubmissions((current) => [...current, ...(json.submissions ?? [])]);
+    setNextOffset(json.next_offset ?? null);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -236,7 +266,7 @@ export default function MyHistoryPage() {
           );
         })}
         {filtered.length > 0 && (
-          <span style={{ fontSize: '13px', color: '#BCC0C7', marginLeft: 4 }}>{filtered.length}개</span>
+          <span style={{ fontSize: '13px', color: '#BCC0C7', marginLeft: 4 }}>{filtered.length}개 표시</span>
         )}
       </div>
 
@@ -405,6 +435,16 @@ export default function MyHistoryPage() {
               </div>
             );
           })
+        )}
+        {!loading && nextOffset !== null && (
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            className="rounded-xl py-3"
+            style={{ color: 'var(--color-primary)', fontSize: 14, fontWeight: 700 }}
+          >
+            더 보기
+          </button>
         )}
       </div>
     </div>

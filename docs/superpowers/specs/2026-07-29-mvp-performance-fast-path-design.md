@@ -372,8 +372,8 @@ and compare-and-set finalization remain unchanged.
 
 Reconciliation is retained as a recovery path:
 
-- do not reconcile during the first 10 seconds after submission creation;
-- after 10 seconds, allow at most one reconciliation attempt per submission
+- do not reconcile during the first 3 seconds after submission creation;
+- after 3 seconds, allow at most one reconciliation attempt per submission
   from that browser page;
 - subsequent normal polls remain read-only;
 - the existing stale-submission safety behavior remains available;
@@ -381,7 +381,11 @@ Reconciliation is retained as a recovery path:
   stale threshold is reached.
 
 This preserves resilience when provider callbacks are delayed while removing
-Judge0 and multi-row database work from the common polling path.
+Judge0 and multi-row database work from the common polling path. The
+three-second threshold is intentionally longer than the configured problem
+execution limit and short enough to avoid the approximately fifteen-second
+visible delay observed when an external Judge0 service cannot reach a localhost
+callback URL.
 
 ## 10. Public Demo and Editor Loading
 
@@ -743,6 +747,7 @@ traffic during an outage.
 - history summary excludes `judging` and `judge_error`;
 - normal status reads never invoke Judge0 reconciliation;
 - delayed fallback invokes reconciliation at most once;
+- delayed fallback does not run before the three-second threshold;
 - final grading response remains identical to the current public result;
 - hidden cases and Judge0 credentials never enter student responses;
 - one administrator hierarchy transition produces at most one API request for

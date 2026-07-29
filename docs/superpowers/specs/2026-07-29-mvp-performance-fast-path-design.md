@@ -16,7 +16,8 @@ The first release focuses on the measured bottlenecks:
 - initial problem load;
 - Previous and Next problem transitions;
 - student submission history;
-- authoritative grading status polling.
+- authoritative grading status polling;
+- administrator problem-hierarchy navigation.
 
 The implementation must be incremental and reversible. Existing API behavior
 remains available until the optimized path has passed regression and production
@@ -40,11 +41,31 @@ The authenticated production audit observed:
 | Student history records | About 4.5 seconds for 42 records |
 | Grading | Status polls perform reconciliation work instead of a cheap read |
 
-The current browser account is a student. Teacher and administrator pages were
-reviewed from their code paths but were not timed with production role access.
-The code review found growth risks in teacher progress aggregation, monitoring
-polling, and unpaginated administrator user lists. Those areas are documented
-as follow-up work and are not part of the first student fast-path release.
+The production measurements above used a student account. A separate
+authenticated administrator audit was performed against the warm local
+development application:
+
+| Administrator surface | Warm local observation |
+| --- | --- |
+| Problem Management initial content | About 1.04 seconds |
+| Subject to Stage | About 3.18 seconds |
+| Stage to Chapter | About 3.11 seconds |
+| Chapter to Problems | About 3.16 seconds |
+| Problem editor opening | About 1.04 seconds |
+| Users, 28 records | About 0.59 seconds |
+| AI Feedback, 41 patterns | About 0.64 seconds |
+
+Local development timings are not production performance guarantees, but the
+consistent hierarchy delay is supported by the code path: the click handlers
+load data while also initiating a same-page Next.js route transition, and URL
+rehydration effects can request the same hierarchy level again. The hierarchy
+count endpoints also download unrelated child rows: Stage loads all chapters,
+and Chapter loads all problems, solely to calculate displayed counts.
+
+The administrator hierarchy fix is included in this MVP because it is
+additive, does not change stored data, and can be verified without mutating
+production records. Teacher progress aggregation, monitoring polling, and
+administrator user pagination remain follow-up work.
 
 ## 3. Constraints
 
@@ -70,8 +91,10 @@ The MVP fast path targets:
 - history's first page in under 1.5 seconds on a warm request;
 - grading-status reads in under 500 milliseconds excluding a Netlify cold
   start;
+- each warm administrator hierarchy transition in under 1.5 seconds;
 - no regression in saved drafts, session ownership, progress, grading results,
-  AI feedback eligibility, or curriculum order.
+  AI feedback eligibility, curriculum order, administrator deep links, or
+  browser Back and Forward behavior.
 
 These are application budgets, not guarantees for every network condition.
 Measurements must record the browser-observed duration and server duration
@@ -89,7 +112,8 @@ The release is divided into independently testable changes:
 3. paginate detailed submission history;
 4. make normal grading polls read-only and retain delayed reconciliation;
 5. prefetch only the immediately adjacent problem;
-6. add lightweight server timing and structured duration logs.
+6. remove duplicate administrator hierarchy work and scope its count queries;
+7. add lightweight server timing and structured duration logs.
 
 The optimized client path is selected by the non-secret build variable
 `NEXT_PUBLIC_STUDENT_PERFORMANCE_FAST_PATH`. Missing or `false` uses the current
@@ -319,7 +343,89 @@ idle preloading is proven not to harm slower connections.
 
 The demo must not become part of the critical student fast-path scope.
 
-## 11. Teacher and Administrator Follow-Up
+## 11. Administrator Problem Hierarchy
+
+The administrator fast path applies only to the Subject, Stage, Chapter, and
+Problem drill-down in Problem Management. Creating, editing, reordering,
+publishing, and deleting curriculum records retain their current authoritative
+API behavior.
+
+### 11.1 One request owner per hierarchy transition
+
+The URL remains the durable representation of the selected subject, stage,
+chapter, problem, and panel mode. Direct links and browser Back and Forward
+must continue to restore the correct hierarchy.
+
+Same-page hierarchy changes must not initiate both a direct load and a second
+load from URL synchronization. The implementation uses one transition path:
+
+1. update the visible selection and URL;
+2. let the URL synchronization path request only missing hierarchy data;
+3. coalesce in-flight requests by hierarchy level and parent ID;
+4. cache successful responses for the lifetime of the mounted admin page.
+
+Before implementation, the applicable Next.js 16 documentation in the
+installed package must be checked for the supported same-page search-parameter
+history API. The chosen API must avoid a needless server route refresh while
+remaining integrated with `useSearchParams` and browser history.
+
+A failed request is not cached. It leaves the current breadcrumb intact,
+displays the existing recoverable error state, and permits a retry. Rapid
+repeated clicks for the same destination reuse the in-flight promise and do
+not create parallel API calls. A late response for an older destination cannot
+replace the currently selected level.
+
+### 11.2 Scoped child counts
+
+The existing endpoint response shapes and count fields remain unchanged:
+
+- Subjects returns `stage_count`;
+- Stages returns `chapter_count`;
+- Chapters returns `problem_count`.
+
+For the MVP, each endpoint may still calculate counts in application code, but
+it must fetch child IDs only for the parent IDs in the current response:
+
+- Subjects restricts Stage rows to the returned subject IDs;
+- Stages restricts Chapter rows to the returned stage IDs;
+- Chapters restricts Problem rows to the returned chapter IDs.
+
+An empty parent result skips the child query. This prevents hierarchy latency
+from growing with unrelated curriculum records while avoiding a database RPC
+or schema migration. Database-side grouped counts can be reconsidered only if
+the scoped queries remain material after measurement.
+
+### 11.3 Rendering and interaction
+
+The current full problem list remains unchanged for the MVP because the
+measured chapter contains 35 problems and editor opening is acceptable.
+Pagination or virtualization is deferred until a measured chapter size makes
+rendering material.
+
+While a hierarchy request is pending:
+
+- the destination level displays a lightweight loading state;
+- repeated activation of the same destination is disabled;
+- breadcrumbs and previously cached levels remain interactive;
+- no create, update, reorder, publish, or delete request is issued.
+
+The problem editor keeps its current lazy detail request. Duplicate Tiptap
+`link` and `underline` extension registration and repeated
+`immediatelyRender` warnings should be corrected as an isolated editor cleanup,
+with editor content and toolbar behavior covered by regression checks.
+
+### 11.4 Administrator growth follow-up
+
+The Users page is acceptable at the current 28-user MVP size, but its API
+returns every matching user and related teacher-student rows. Server-side
+pagination, paginated statistics, and bounded relationship loading are
+required before the account count becomes large; they are not included in this
+release.
+
+AI Feedback is also acceptable at the current 41-pattern size. Pagination is
+deferred until production measurement shows a material delay.
+
+## 12. Teacher Follow-Up
 
 The following work is explicitly deferred:
 
@@ -330,11 +436,12 @@ The following work is explicitly deferred:
 - caching published curriculum metadata for teacher analytics;
 - optimizing teacher feedback session bootstrap.
 
-These require teacher/admin production timing or a safe role-specific
-environment before implementation. They must be planned separately so the
-student release stays small and reversible.
+These deferred items require additional production timing or a safe
+role-specific environment before implementation. They must be planned
+separately so the approved student and administrator hierarchy changes stay
+small and reversible.
 
-## 12. Observability
+## 13. Observability
 
 Optimized endpoints should report:
 
@@ -354,9 +461,13 @@ The before-and-after checklist records:
 - prefetched and non-prefetched Previous/Next;
 - first history page;
 - normal grading poll;
-- delayed reconciliation poll.
+- delayed reconciliation poll;
+- administrator Subject to Stage;
+- administrator Stage to Chapter;
+- administrator Chapter to Problems;
+- administrator problem editor opening.
 
-## 13. Rollout and Rollback
+## 14. Rollout and Rollback
 
 1. Add contract and regression tests before switching consumers.
 2. Implement focused fast-path requests without deleting old behavior.
@@ -364,16 +475,19 @@ The before-and-after checklist records:
 4. Build and run the complete automated test suite.
 5. Deploy a preview, remembering it currently points to production data.
 6. Perform read-only preview smoke tests.
-7. Enable the fast path in production.
-8. Re-run read-only production measurements.
+7. Enable the student fast path in production.
+8. Deploy the administrator hierarchy optimization independently.
+9. Re-run read-only production measurements.
 
 Rollback is an application deployment rollback or disabling the fast-path
 consumer. Because existing endpoints and database schema remain compatible,
 rollback does not require reversing data migrations.
 
 No destructive migration or existing-column change is allowed in this release.
+The administrator hierarchy change must be isolated so it can be reverted
+without disabling the student fast path.
 
-## 14. Error Handling
+## 15. Error Handling
 
 - Focused request failure falls back once to the existing request path.
 - Deferred context failure does not disable the editor or navigation.
@@ -384,11 +498,13 @@ No destructive migration or existing-column change is allowed in this release.
   existing bounded polling interval.
 - Delayed reconciliation failure is logged safely and does not convert a
   student attempt to a wrong answer.
+- Administrator hierarchy failure preserves the selected breadcrumb, does not
+  cache the failure, and exposes retry.
 
 Fallbacks must be bounded. The client must not enter retry loops that multiply
 traffic during an outage.
 
-## 15. Testing
+## 16. Testing
 
 ### Automated tests
 
@@ -403,7 +519,13 @@ traffic during an outage.
 - normal status reads never invoke Judge0 reconciliation;
 - delayed fallback invokes reconciliation at most once;
 - final grading response remains identical to the current public result;
-- hidden cases and Judge0 credentials never enter student responses.
+- hidden cases and Judge0 credentials never enter student responses;
+- one administrator hierarchy transition produces at most one API request for
+  its destination;
+- concurrent requests for the same administrator hierarchy key are coalesced;
+- stale hierarchy responses cannot replace a newer selection;
+- count endpoints query children only for parents in the current response;
+- count endpoint response fields remain backward compatible.
 
 ### Regression checks
 
@@ -414,7 +536,13 @@ traffic during an outage.
 - failed and partial submissions still trigger eligible AI feedback;
 - teacher collaboration session ownership is unchanged;
 - browser Back and Forward still restore the correct problem;
-- submission result drawer still displays scored case results.
+- submission result drawer still displays scored case results;
+- administrator deep links restore every selected hierarchy level;
+- administrator Back and Forward restore cached or freshly loaded levels;
+- administrator problem create, edit, reorder, publish, and delete behavior is
+  unchanged;
+- the rich-text problem editor renders saved content and retains its toolbar
+  behavior after the Tiptap cleanup.
 
 ### Required verification
 
@@ -423,9 +551,11 @@ traffic during an outage.
 - ESLint;
 - production build;
 - read-only preview smoke test;
-- read-only production timing comparison.
+- read-only production timing comparison;
+- authenticated local administrator timing comparison;
+- authenticated read-only administrator preview smoke test.
 
-## 16. Non-Goals
+## 17. Non-Goals
 
 - Replacing Netlify or Supabase.
 - Creating a general caching platform.
@@ -433,5 +563,7 @@ traffic during an outage.
 - Rewriting collaboration or realtime messaging.
 - Changing curriculum structure.
 - Changing grading rules, scoring, hidden-case security, or Judge0 provider.
-- Optimizing every teacher and administrator page in the same release.
+- Optimizing every teacher or administrator page in the same release.
+- Adding administrator Users or AI Feedback pagination before measurement
+  requires it.
 - Deleting legacy endpoints before production verification.

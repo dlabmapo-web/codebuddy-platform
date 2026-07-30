@@ -2,9 +2,23 @@
   "title": "Membership applications",
   "loading": "Loading applications…",
   "forbidden": "You cannot view this academy's applications.",
-  "empty": "No pending applications.",
+  "empty": "No applications.",
   "reason_placeholder": "Optional approval note; required for rejection",
   "approve": "Approve",
   "reject": "Reject",
-  "review_failed": "The application could not be reviewed."
+  "review_failed": "The application could not be reviewed.",
+  "column": {
+    "applicant": "Applicant",
+    "message": "Message",
+    "status": "Status",
+    "applied": "Applied",
+    "actions": "Actions"
+  },
+  "search_placeholder": "Search by name or email",
+  "no_message": "No message",
+  "review": "Review",
+  "role_label": "Role to grant",
+  "reason_label": "Note",
+  "reason_hint": "(required to reject)",
+  "reject_needs_reason": "Enter a reason to reject."
 }

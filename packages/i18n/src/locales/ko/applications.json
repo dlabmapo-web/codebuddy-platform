@@ -2,9 +2,23 @@
   "title": "가입 신청",
   "loading": "가입 신청을 불러오는 중…",
   "forbidden": "이 학원의 가입 신청을 볼 수 없습니다.",
-  "empty": "대기 중인 가입 신청이 없습니다.",
+  "empty": "신청이 없습니다.",
   "reason_placeholder": "승인 메모(선택), 거절 시에는 필수",
   "approve": "승인",
   "reject": "거절",
-  "review_failed": "가입 신청을 처리하지 못했습니다."
+  "review_failed": "가입 신청을 처리하지 못했습니다.",
+  "column": {
+    "applicant": "신청자",
+    "message": "신청 메시지",
+    "status": "상태",
+    "applied": "신청일",
+    "actions": "작업"
+  },
+  "search_placeholder": "이름 또는 이메일 검색",
+  "no_message": "메시지 없음",
+  "review": "검토",
+  "role_label": "승인할 역할",
+  "reason_label": "메모",
+  "reason_hint": "(거절하려면 필수)",
+  "reject_needs_reason": "거절하려면 사유를 입력하세요."
 }

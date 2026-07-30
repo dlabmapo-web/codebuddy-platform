@@ -5,6 +5,14 @@ export type CourseModule = CourseTree['modules'][number];
 export type CourseLecture = CourseModule['lectures'][number];
 export type MoveDirection = -1 | 1;
 
+/**
+ * Shared so saving a problem can invalidate the exact tree the builder reads.
+ * Without this the builder would serve its cached copy for a full staleTime.
+ */
+export function courseVersionQueryKey(academyId: string, versionId: string) {
+  return ['academy', academyId, 'course-version', versionId] as const;
+}
+
 export function swap(
   ids: string[],
   from: number,

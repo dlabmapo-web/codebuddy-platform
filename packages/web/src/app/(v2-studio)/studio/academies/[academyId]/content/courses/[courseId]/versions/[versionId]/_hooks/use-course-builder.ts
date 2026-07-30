@@ -10,6 +10,7 @@ import { orpc } from '@/lib/orpc';
 import {
   countIssuesByModule,
   countLectures,
+  courseVersionQueryKey,
   swap,
   type CourseTree,
   type MoveDirection,
@@ -35,7 +36,7 @@ export function useCourseBuilder({
   const { academyId, courseId, versionId } = target;
   const queryClient = useQueryClient();
   const router = useRouter();
-  const queryKey = ['academy', academyId, 'course-version', versionId];
+  const queryKey = courseVersionQueryKey(academyId, versionId);
   const [moduleTitle, setModuleTitle] = useState('');
   const [lectureModuleId, setLectureModuleId] = useState<string | null>(null);
   const [lectureTitle, setLectureTitle] = useState('');
@@ -70,8 +71,11 @@ export function useCourseBuilder({
     },
   });
   const updateModuleMutation = useMutation({
-    mutationFn: (input: { moduleId: string; title: string }) =>
-      orpc.academyCourses.updateModule({ ...target, ...input }),
+    mutationFn: (input: {
+      moduleId: string;
+      title?: string;
+      isPublished?: boolean;
+    }) => orpc.academyCourses.updateModule({ ...target, ...input }),
     onSuccess: applyTree,
   });
   const deleteModuleMutation = useMutation({
@@ -99,8 +103,19 @@ export function useCourseBuilder({
     },
   });
   const updateLectureMutation = useMutation({
-    mutationFn: (input: { lectureId: string; title: string }) =>
-      orpc.academyCourses.updateLecture({ ...target, ...input }),
+    mutationFn: (input: {
+      lectureId: string;
+      title?: string;
+      isPublished?: boolean;
+    }) => orpc.academyCourses.updateLecture({ ...target, ...input }),
+    onSuccess: applyTree,
+  });
+  const setExerciseVisibilityMutation = useMutation({
+    mutationFn: (input: {
+      lectureId: string;
+      materialId: string;
+      isPublished: boolean;
+    }) => orpc.academyCourses.setExerciseVisibility({ ...target, ...input }),
     onSuccess: applyTree,
   });
   const deleteLectureMutation = useMutation({
@@ -123,27 +138,15 @@ export function useCourseBuilder({
       orpc.academyCourses.reorderExercises({ ...target, ...input }),
     onSuccess: applyTree,
   });
-  const validateMutation = useMutation({
-    mutationFn: () => orpc.academyCourses.validateVersion(target),
-    onSuccess: (result) => setIssues(result.issues),
-  });
-  const publishMutation = useMutation({
-    mutationFn: () => orpc.academyCourses.publishVersion(target),
-    onSuccess: () => {
-      router.push(`/studio/academies/${academyId}/content/courses`);
-      router.refresh();
-    },
-  });
-  const startNextDraftMutation = useMutation({
-    mutationFn: () => orpc.academyCourses.createDraft({ academyId, courseId }),
-    onSuccess: (course) => {
-      if (course.draftVersion) {
-        router.push(
-          `/studio/academies/${academyId}/content/courses/${courseId}/versions/${course.draftVersion.id}`,
-        );
-      }
-    },
-  });
+  // Collapsed ids only, so anything newly added starts open.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const outlineIds = tree.modules.flatMap((courseModule) => [
+    courseModule.id,
+    ...courseModule.lectures.map((lecture) => lecture.id),
+  ]);
+  const anyExpanded = outlineIds.some((id) => !collapsed.has(id));
 
   const structuralError = [
     createModuleMutation,
@@ -156,6 +159,7 @@ export function useCourseBuilder({
     reorderLecturesMutation,
     deleteExerciseMutation,
     reorderExercisesMutation,
+    setExerciseVisibilityMutation,
   ].find((mutation) => mutation.isError)?.error;
 
   const moduleIds = tree.modules.map((item) => item.id);
@@ -173,12 +177,19 @@ export function useCourseBuilder({
     issuesByModule: countIssuesByModule(issues),
     lectureCount: countLectures(tree),
     structuralError,
+    isCollapsed: (id: string) => collapsed.has(id),
+    toggleCollapsed: (id: string) =>
+      setCollapsed((current) => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    anyExpanded,
+    toggleAll: () =>
+      setCollapsed(anyExpanded ? new Set(outlineIds) : new Set()),
     createModulePending: createModuleMutation.isPending,
     createLecturePending: createLectureMutation.isPending,
-    validatePending: validateMutation.isPending,
-    publishPending: publishMutation.isPending,
-    publishError: publishMutation.error,
-    startNextDraftPending: startNextDraftMutation.isPending,
     createModule: () => createModuleMutation.mutate(),
     startLecture: (moduleId: string) => {
       setLectureModuleId(moduleId);
@@ -188,40 +199,27 @@ export function useCourseBuilder({
     createLecture: () => createLectureMutation.mutate(),
     renameModule: (moduleId: string, title: string) =>
       updateModuleMutation.mutate({ moduleId, title }),
+    setModuleVisible: (moduleId: string, isPublished: boolean) =>
+      updateModuleMutation.mutate({ moduleId, isPublished }),
     deleteModule: (moduleId: string) => deleteModuleMutation.mutate(moduleId),
-    moveModule: (index: number, direction: MoveDirection) =>
-      reorderModulesMutation.mutate(
-        swap(moduleIds, index, index + direction),
-      ),
     renameLecture: (lectureId: string, title: string) =>
       updateLectureMutation.mutate({ lectureId, title }),
+    setLectureVisible: (lectureId: string, isPublished: boolean) =>
+      updateLectureMutation.mutate({ lectureId, isPublished }),
     deleteLecture: (lectureId: string) =>
       deleteLectureMutation.mutate(lectureId),
-    moveLecture: (
-      moduleId: string,
-      lectureIds: string[],
-      index: number,
-      direction: MoveDirection,
-    ) =>
-      reorderLecturesMutation.mutate({
-        moduleId,
-        orderedLectureIds: swap(lectureIds, index, index + direction),
-      }),
     deleteExercise: (lectureId: string, materialId: string) =>
       deleteExerciseMutation.mutate({ lectureId, materialId }),
-    moveExercise: (
+    setExerciseVisible: (
       lectureId: string,
-      materialIds: string[],
-      index: number,
-      direction: MoveDirection,
+      materialId: string,
+      isPublished: boolean,
     ) =>
-      reorderExercisesMutation.mutate({
+      setExerciseVisibilityMutation.mutate({
         lectureId,
-        orderedMaterialIds: swap(materialIds, index, index + direction),
+        materialId,
+        isPublished,
       }),
-    validate: () => validateMutation.mutate(),
-    publish: () => publishMutation.mutate(),
-    startNextDraft: () => startNextDraftMutation.mutate(),
   };
 }
 

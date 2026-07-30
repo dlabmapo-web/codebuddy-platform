@@ -8,14 +8,12 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { useCourseBuilder } from '../_hooks/use-course-builder';
 import { BuilderHeader } from './builder-header';
-import { BuilderSidebar } from './builder-sidebar';
 import { ModuleCard } from './module-card';
 
 export function CourseBuilder({
   academyId,
   canEditCurriculum,
   canEditExercises,
-  canPublish,
   courseId,
   versionId,
   initialTree,
@@ -23,7 +21,6 @@ export function CourseBuilder({
   academyId: string;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
-  canPublish: boolean;
   courseId: string;
   versionId: string;
   initialTree: CourseDraftTree;
@@ -40,28 +37,23 @@ export function CourseBuilder({
 
   return (
     <div className="space-y-5">
-      <BuilderHeader
-        academyId={academyId}
-        builder={builder}
-        canEditCurriculum={canEditCurriculum}
-      />
+      <BuilderHeader academyId={academyId} builder={builder} />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div>
         <section className="space-y-3">
           {builder.tree.modules.length === 0 ? (
             <div className="rounded-card border border-dashed border-border bg-white px-6 py-12 text-center">
-              <h3 className="text-[15.5px] font-bold">{t('empty.heading')}</h3>
-              <p className="mx-auto mt-2 max-w-sm text-[13.5px] leading-[1.55] text-sub">
+              <h3 className="text-[17px] font-bold">{t('empty.heading')}</h3>
+              <p className="mx-auto mt-2 max-w-md text-[14.5px] leading-[1.6] text-sub">
                 {t('empty.body')}
               </p>
             </div>
           ) : (
-            builder.tree.modules.map((courseModule, index) => (
+            builder.tree.modules.map((courseModule) => (
               <ModuleCard
                 builder={builder}
                 courseModule={courseModule}
                 exerciseBasePath={exerciseBasePath}
-                index={index}
                 key={courseModule.id}
               />
             ))
@@ -76,14 +68,14 @@ export function CourseBuilder({
               }}
             >
               <input
-                className="h-10 min-w-48 flex-1 rounded-lg border border-border bg-white px-3 text-[14px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="h-11 min-w-48 flex-1 rounded-lg border border-border bg-white px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
                 maxLength={200}
                 onChange={(event) => builder.setModuleTitle(event.target.value)}
                 placeholder={t('module.title_placeholder')}
                 value={builder.moduleTitle}
               />
               <button
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-brand px-4 text-[14px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+                className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-brand px-5 text-[15px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
                 disabled={
                   builder.createModulePending || !builder.moduleTitle.trim()
                 }
@@ -98,7 +90,7 @@ export function CourseBuilder({
           ) : null}
 
           {builder.structuralError ? (
-            <p className="text-[13px] font-semibold text-danger">
+            <p className="text-[14px] font-semibold text-danger">
               {errorText(
                 builder.structuralError,
                 t('builder.structural_error'),
@@ -106,8 +98,6 @@ export function CourseBuilder({
             </p>
           ) : null}
         </section>
-
-        <BuilderSidebar builder={builder} canPublish={canPublish} />
       </div>
     </div>
   );

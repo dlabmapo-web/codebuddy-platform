@@ -1,3 +1,4 @@
+import { academyRoles, membershipStatuses } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
 
@@ -44,13 +45,18 @@ export function MembersTable({
         id: 'status',
         accessorFn: (member) => member.status,
         header: t('column.status'),
+        filterFn: 'arrIncludesSome',
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: 'role',
         accessorFn: (member) => member.role,
         header: t('column.role'),
-        enableSorting: false,
+        filterFn: 'arrIncludesSome',
+        // Seniority, not alphabet: managers first, students last.
+        sortingFn: (a, b) =>
+          academyRoles.indexOf(b.original.role) -
+          academyRoles.indexOf(a.original.role),
         cell: ({ row }) => {
           const member = row.original;
           return (
@@ -107,11 +113,34 @@ export function MembersTable({
     [manager, t],
   );
 
+  const facets = useMemo(
+    () => [
+      {
+        columnId: 'status',
+        title: t('column.status'),
+        options: membershipStatuses.map((status) => ({
+          label: t(`common:membership_status.${status}`),
+          value: status,
+        })),
+      },
+      {
+        columnId: 'role',
+        title: t('column.role'),
+        options: academyRoles.map((role) => ({
+          label: t(`common:role.${role}`),
+          value: role,
+        })),
+      },
+    ],
+    [t],
+  );
+
   return (
     <DataTable
       columns={columns}
       data={manager.members}
       emptyMessage={t('empty')}
+      facets={facets}
       pageSize={15}
       searchPlaceholder={t('search_placeholder')}
     />

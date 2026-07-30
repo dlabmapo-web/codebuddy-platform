@@ -142,8 +142,9 @@ export function DataTable<TData, TValue>({
     <div className={cn('space-y-3', className)}>
       {showToolbar ? (
         <div className="flex flex-wrap items-center gap-2">
+          {/* Fixed width: a growing search box crowds out the filters. */}
           {searchPlaceholder ? (
-            <div className="relative min-w-56 flex-1 sm:max-w-xs">
+            <div className="relative w-full sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub" />
               <input
                 aria-label={searchPlaceholder}

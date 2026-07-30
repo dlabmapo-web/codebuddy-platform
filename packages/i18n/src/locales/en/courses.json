@@ -25,22 +25,32 @@
     "description_placeholder": "Variables, loops, and functions through 40 problems",
     "submit": "Create and open",
     "submitting": "Creating…",
-    "title_conflict": "Another active course already uses this title. Pick a different one."
+    "title_conflict": "Another active course already uses this title. Pick a different one.",
+    "next_step": "You go straight to the curriculum, where you add modules and lectures."
   },
   "column": {
     "course": "Course",
-    "versions": "Versions",
-    "updated": "Last change"
+    "updated": "Last change",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "exercises": "Problems",
+    "actions": "Actions",
+    "status": "Status"
   },
-  "archived": "Archived",
   "no_description": "No description yet.",
-  "live_since": "Live since {{date}}",
-  "never_published": "Never published",
-  "continue_draft": "Continue draft",
-  "review_published": "Review published",
-  "start_next_draft": "Start next draft",
-  "starting": "Starting…",
   "empty": "No courses yet. Start with the one you teach most often.",
   "search_placeholder": "Search courses",
-  "draft_start_failed": "A new draft could not be started. This course may already have one open."
+  "archive_course": "Archive",
+  "row_menu_aria": "Actions for “{{title}}”",
+  "edit": "Edit",
+  "open": "Open",
+  "restore_course": "Restore",
+  "status_active": "Active",
+  "status_archived": "Archived",
+  "status_change_failed": "Could not change the status. Try again in a moment.",
+  "edit_modal": {
+    "heading": "Edit course details",
+    "body": "Change the name and description. The curriculum stays as it is.",
+    "submit": "Save"
+  }
 }

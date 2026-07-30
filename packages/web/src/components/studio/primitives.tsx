@@ -147,8 +147,58 @@ function SheetContent({
   );
 }
 
+/* ------------------------------------------------------------------ modal */
+
+const Modal = DialogPrimitive.Root;
+
+/**
+ * A centered dialog for focused edits — naming a course, renaming a lecture,
+ * confirming a delete. Distinct from `Sheet`, which docks to a screen edge.
+ */
+function ModalContent({
+  className,
+  children,
+  title,
+  description,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="cove-overlay fixed inset-0 z-50 bg-ink/45" />
+      <DialogPrimitive.Content
+        className={cn(
+          'cove-pop fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-modal bg-white shadow-2xl',
+          className,
+        )}
+        {...props}
+      >
+        <div className="border-b border-border px-6 py-5">
+          <DialogPrimitive.Title className="text-[17px] font-extrabold tracking-[-0.02em]">
+            {title}
+          </DialogPrimitive.Title>
+          {description ? (
+            <DialogPrimitive.Description className="mt-1.5 text-[14px] leading-[1.55] text-sub">
+              {description}
+            </DialogPrimitive.Description>
+          ) : (
+            <DialogPrimitive.Description className="sr-only">
+              {title}
+            </DialogPrimitive.Description>
+          )}
+        </div>
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
+
 export {
   Input,
+  Modal,
+  ModalContent,
   Separator,
   Sheet,
   SheetContent,

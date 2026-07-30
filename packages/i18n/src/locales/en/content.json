@@ -7,17 +7,16 @@
   },
   "builder": {
     "fallback_title": "Course builder",
-    "draft_description": "Arrange modules and lectures. Nothing reaches classes until you publish.",
-    "published_description": "A published version is a fixed record of what classes are teaching.",
+    "draft_description": "Arrange modules and lectures, and add problems.",
     "unavailable_title": "This course version is not available",
     "unavailable_body": "It belongs to another academy, or your membership cannot open it.",
     "back_to_courses": "Back to courses",
     "all_courses": "All courses",
-    "locked_heading": "Version {{version}} is read-only",
-    "locked_body": "Published versions are fixed. Managers can also review drafts, while Team Leads own curriculum changes.",
     "start_next_draft": "Start next draft",
-    "starting": "Starting…",
-    "structural_error": "That change did not save. Reload the page to see the current draft."
+    "load_failed_title": "Could not load this course",
+    "load_failed_body": "This is not a permissions problem. Something went wrong on the server — try again, and check the server logs if it persists.",
+    "summary": "{{modules}} modules · {{lectures}} lectures",
+    "structural_error": "Could not save that change. Try again."
   },
   "empty": {
     "heading": "Start with a module",
@@ -28,27 +27,17 @@
     "add": "Add module",
     "adding": "Adding…",
     "lecture_count_one": "{{count}} lecture",
-    "lecture_count_other": "{{count}} lectures",
-    "issue_count": "· {{count}} to fix",
-    "move_up": "Move module up",
-    "move_down": "Move module down",
-    "delete_aria": "Delete module “{{title}}” and its lectures"
+    "lecture_count_other": "{{count}} lectures"
   },
   "lecture": {
     "title_placeholder": "Lecture title",
     "add": "Add lecture",
     "no_exercises": "No exercises",
     "exercise_count_one": "{{count}} exercise",
-    "exercise_count_other": "{{count}} exercises",
-    "move_up": "Move lecture up",
-    "move_down": "Move lecture down",
-    "delete_aria": "Delete lecture “{{title}}”"
+    "exercise_count_other": "{{count}} exercises"
   },
   "exercise": {
     "add": "Add coding problem",
-    "move_up": "Move problem up",
-    "move_down": "Move problem down",
-    "delete_aria": "Delete problem “{{title}}”",
     "back": "Back to course builder",
     "create_title": "Create coding problem",
     "edit_title": "Coding problem",
@@ -56,19 +45,13 @@
     "saving": "Saving…",
     "save_failed": "Save failed",
     "conflict": "Changed in another session — reload before saving",
-    "unsaved": "Unsaved changes",
     "saved": "All changes saved",
     "preview": "Preview",
-    "save_draft": "Save draft",
     "save_failed_detail": "The problem could not be saved. Check the required fields and try again.",
     "unsaved_confirm": "You have unsaved changes. Leave without saving?",
-    "completeness": "Required to save",
-    "ready": "Ready to save",
-    "completeness_hint": "Constraints, starter code, hints, and AI feedback are optional.",
     "required_mark": "Required",
     "preview_untitled": "Untitled problem",
     "preview_close": "Close preview",
-    "preview_hidden_notice": "Hidden test cases are intentionally excluded from this preview.",
     "section": {
       "basics": "Basic information",
       "tests": "Answers",
@@ -81,7 +64,7 @@
       "title": "Problem title",
       "difficulty": "Difficulty",
       "description": "Problem description",
-      "test": "One expected output"
+      "test": "One sample answer"
     },
     "field": {
       "title": "Problem title",
@@ -91,11 +74,17 @@
       "ai_feedback_hint": "This stores the preference. Feedback-rule management is a later migration step.",
       "description": "Problem description",
       "constraints": "Conditions and constraints (optional)",
-      "starter_code": "Initial code (editor default)"
+      "starter_code": "Initial code (editor default)",
+      "input_format": "Input format (optional)",
+      "output_format": "Output format (optional)",
+      "is_published": "Visible to students",
+      "is_published_hint": "Turn this off to hide just this exercise, even once the course is published."
     },
     "placeholder": {
       "title": "e.g. Sum two numbers",
-      "description": "Explain the task, examples, and important details."
+      "description": "Explain the task, examples, and important details.",
+      "input_format": "e.g. The first line contains an integer N.",
+      "output_format": "e.g. Print the sum on a single line."
     },
     "difficulty": {
       "EASY": "Easy",
@@ -104,13 +93,15 @@
     },
     "test": {
       "add": "Add answer",
-      "help": "The first answer is shown to students as the sample. The rest stay hidden and are used for grading.",
+      "help": "Choose per answer whether students see it as a sample or it stays hidden for grading. At least one sample is required.",
       "label": "Answer {{number}}",
       "input": "Input",
       "expected": "Expected output",
       "remove": "Remove answer {{number}}",
       "sample_badge": "Shown to students",
-      "hidden_badge": "Hidden"
+      "hidden_badge": "Hidden",
+      "toggle_visibility": "Toggle visibility",
+      "last_sample_locked": "The last sample answer cannot be hidden or removed."
     },
     "hint": {
       "add": "Add hint",
@@ -119,26 +110,74 @@
       "label": "Hint {{number}}",
       "content": "Hint content",
       "remove": "Remove hint {{number}}"
-    }
+    },
+    "badge": {
+      "ai": "AI",
+      "hidden": "Hidden"
+    },
+    "preview_student_note": "This is what students see. Only sample answers and hints appear here.",
+    "preview_problem": "Problem",
+    "preview_no_description": "No problem description yet.",
+    "preview_input": "Input format",
+    "preview_output": "Output format",
+    "preview_examples": "Examples",
+    "preview_constraints": "Constraints",
+    "preview_hidden_count_one": "{{count}} hidden grading case is not shown to students.",
+    "preview_hidden_count_other": "{{count}} hidden grading cases are not shown to students.",
+    "create": "Create problem",
+    "save_changes": "Save changes",
+    "still_needed": "Still needed: {{fields}}",
+    "error": {
+      "title": "Enter a problem title.",
+      "difficulty": "Pick a difficulty.",
+      "description": "Write the problem description.",
+      "test": "Add at least one sample answer students can see."
+    },
+    "location": "Problem location",
+    "preview_format": "Input and output format",
+    "preview_example_n": "Example {{number}}",
+    "preview_stdin": "Input",
+    "preview_stdout": "Expected output",
+    "preview_starter": "Starter code"
   },
-  "rename": "Rename",
-  "sidebar": {
-    "heading": "This version",
-    "modules": "Modules",
-    "lectures": "Lectures",
-    "check": "Check before publishing",
-    "checking": "Checking…",
-    "publish": "Publish v{{version}}",
-    "publishing": "Publishing…",
-    "hint_unchecked": "Run the check to unlock publishing.",
-    "hint_ready": "Publishing freezes this version and makes it the one classes use.",
-    "hint_blocked": "Fix the items below, then check again.",
-    "publish_refused": "Publishing was refused. Run the check again for the current blockers.",
-    "roadmap": "Excel import is a later migration step. Problems created here remain attached to this version."
+  "rename": {
+    "module_title": "Edit module name",
+    "lecture_title": "Edit lecture name",
+    "module_body": "The module name students see.",
+    "lecture_body": "The lecture name students see.",
+    "module_label": "Module name",
+    "lecture_label": "Lecture name",
+    "save": "Save"
   },
-  "issues": {
-    "ready": "Ready to publish",
-    "count_one": "{{count}} item to fix",
-    "count_other": "{{count}} items to fix"
+  "row": {
+    "menu_aria": "Actions for {{kind}} “{{title}}”",
+    "kind_module": "Module",
+    "kind_lecture": "Lecture",
+    "kind_exercise": "Problem",
+    "rename": "Edit name",
+    "hide": "Hide from students",
+    "show": "Show to students",
+    "delete": "Delete",
+    "hidden_badge": "Hidden"
+  },
+  "delete": {
+    "module_title": "Delete this module?",
+    "lecture_title": "Delete this lecture?",
+    "exercise_title": "Delete this problem?",
+    "module_confirm": "Delete module",
+    "lecture_confirm": "Delete lecture",
+    "exercise_confirm": "Delete problem",
+    "body": "This deletes “{{title}}”.",
+    "cascade_heading": "Everything inside goes with it",
+    "cascade_lectures_one": "{{count}} lecture",
+    "cascade_lectures_other": "{{count}} lectures",
+    "cascade_exercises_one": "{{count}} problem",
+    "cascade_exercises_other": "{{count}} problems",
+    "irreversible": "This cannot be undone."
+  },
+  "outline": {
+    "toggle": "Expand or collapse “{{title}}”",
+    "collapse_all": "Collapse all",
+    "expand_all": "Expand all"
   }
 }

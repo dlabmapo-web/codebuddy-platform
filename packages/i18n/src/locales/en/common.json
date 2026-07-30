@@ -27,7 +27,11 @@
   "pagination": {
     "label": "Page {{current}} of {{total}}",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "first": "First page",
+    "last": "Last page",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows"
   },
   "language": {
     "label": "Language",
@@ -64,5 +68,21 @@
   },
   "fallback": {
     "user": "Cove user"
+  },
+  "sort": {
+    "asc": "Ascending",
+    "desc": "Descending",
+    "clear": "Clear sort",
+    "hide": "Hide column"
+  },
+  "columns": {
+    "label": "Columns",
+    "heading": "Visible columns"
+  },
+  "filter": {
+    "selected": "{{count}} selected",
+    "clear": "Clear filter",
+    "reset": "Reset",
+    "no_results": "No results found."
   }
 }

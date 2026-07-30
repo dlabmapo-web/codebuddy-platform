@@ -103,8 +103,21 @@ h1, h2, h3, h4 {
 .cove-pop[data-state="open"] { animation: cove-pop-in 140ms ease-out; }
 .cove-pop[data-state="closed"] { animation: cove-pop-out 110ms ease-in; }
 
+/* Radix reports the natural height, so the outline can slide open. */
+@keyframes cove-collapse-open {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+@keyframes cove-collapse-close {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+.cove-collapse { overflow: hidden; }
+.cove-collapse[data-state="open"] { animation: cove-collapse-open 180ms cubic-bezier(0.32, 0.72, 0, 1); }
+.cove-collapse[data-state="closed"] { animation: cove-collapse-close 150ms cubic-bezier(0.32, 0.72, 0, 1); }
+
 @media (prefers-reduced-motion: reduce) {
-  .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop { animation: none !important; }
+  .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse { animation: none !important; }
 }
 
 .tiptap-render p { margin: 0.4em 0; }

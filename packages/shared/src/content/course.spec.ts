@@ -15,6 +15,7 @@ const validExercise = {
   constraints: "",
   starterCode: "",
   aiFeedbackEnabled: false,
+  isPublished: true,
   testCases: [{
     input: "1 2",
     expectedOutput: "3",
@@ -34,6 +35,53 @@ describe("manual programming exercise schemas", () => {
       ...validExercise,
       timeLimitMs: 60_000,
       memoryLimitMb: 4_096,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts author-chosen visibility in any order", () => {
+    const result = createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      testCases: [
+        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const },
+        { input: "4 5", expectedOutput: "9", visibility: "SAMPLE" as const },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an exercise whose cases are all hidden from students", () => {
+    const result = createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      testCases: [
+        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a sample case with no expected output to show", () => {
+    const result = createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      testCases: [
+        { input: "1 2", expectedOutput: "  ", visibility: "SAMPLE" as const },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects more than fifty test cases", () => {
+    const result = createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      testCases: Array.from({ length: 51 }, () => ({
+        input: "1 2",
+        expectedOutput: "3",
+        visibility: "SAMPLE" as const,
+      })),
     });
 
     expect(result.success).toBe(false);

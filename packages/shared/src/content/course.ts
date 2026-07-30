@@ -40,6 +40,14 @@ export const courseVersionSummarySchema = z.object({
   updatedAt: z.iso.datetime(),
 });
 
+/** What the curriculum currently holds, for the course list. */
+export const courseContentCountsSchema = z.object({
+  modules: z.number().int().nonnegative(),
+  lectures: z.number().int().nonnegative(),
+  exercises: z.number().int().nonnegative(),
+});
+export type CourseContentCounts = z.infer<typeof courseContentCountsSchema>;
+
 export const courseSummarySchema = z.object({
   id: z.uuid(),
   academyId: z.uuid(),
@@ -48,6 +56,7 @@ export const courseSummarySchema = z.object({
   status: courseStatusSchema,
   draftVersion: courseVersionSummarySchema.nullable(),
   publishedVersion: courseVersionSummarySchema.nullable(),
+  content: courseContentCountsSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -93,6 +102,7 @@ export const materialSchema = z.object({
   title: titleSchema,
   position: positionSchema,
   isRequired: z.boolean(),
+  isPublished: z.boolean(),
   programmingExercise: programmingExerciseSchema.nullable(),
 });
 
@@ -101,6 +111,7 @@ export const lectureSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   position: positionSchema,
+  isPublished: z.boolean(),
   materials: z.array(materialSchema),
 });
 
@@ -109,6 +120,7 @@ export const courseModuleSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   position: positionSchema,
+  isPublished: z.boolean(),
   lectures: z.array(lectureSchema),
 });
 
@@ -158,6 +170,7 @@ export const updateCourseModuleSchema = courseVersionInputSchema.extend({
   moduleId: z.uuid(),
   title: titleSchema.optional(),
   description: descriptionSchema.optional(),
+  isPublished: z.boolean().optional(),
 });
 
 export const deleteCourseModuleSchema = courseVersionInputSchema.extend({
@@ -172,6 +185,7 @@ export const updateLectureSchema = courseVersionInputSchema.extend({
   lectureId: z.uuid(),
   title: titleSchema.optional(),
   description: descriptionSchema.optional(),
+  isPublished: z.boolean().optional(),
 });
 
 export const deleteLectureSchema = courseVersionInputSchema.extend({
@@ -205,27 +219,59 @@ export const exerciseDraftFieldsSchema = z.object({
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
   aiFeedbackEnabled: z.boolean(),
-  testCases: z.array(exerciseTestCaseDraftSchema).min(1),
+  isPublished: z.boolean(),
+  testCases: z.array(exerciseTestCaseDraftSchema).min(1).max(50),
   hints: z.array(exerciseHintDraftSchema),
 });
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
+
+/**
+ * Students need at least one worked example, so a saveable exercise always
+ * keeps one SAMPLE case. Authors choose which cases those are per case.
+ */
+export function hasSampleTestCase(
+  testCases: Array<{ visibility: TestCaseVisibility; expectedOutput: string }>,
+) {
+  return testCases.some(
+    (testCase) =>
+      testCase.visibility === "SAMPLE" &&
+      testCase.expectedOutput.trim().length > 0,
+  );
+}
+
+const sampleTestCaseRefinement = {
+  error: "At least one visible sample test case is required.",
+  path: ["testCases"],
+};
 
 export const exerciseParentInputSchema = courseVersionInputSchema.extend({
   lectureId: z.uuid(),
 });
 
-export const createProgrammingExerciseSchema =
-  exerciseParentInputSchema.extend(exerciseDraftFieldsSchema.shape).strict();
+export const createProgrammingExerciseSchema = exerciseParentInputSchema
+  .extend(exerciseDraftFieldsSchema.shape)
+  .strict()
+  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
 
 export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
   materialId: z.uuid(),
 });
 
-export const updateProgrammingExerciseSchema =
-  exerciseMaterialInputSchema.extend({
+/**
+ * Toggling a problem's visibility from the curriculum tree, without loading and
+ * resubmitting the whole exercise draft.
+ */
+export const setExerciseVisibilitySchema = exerciseMaterialInputSchema.extend({
+  isPublished: z.boolean(),
+});
+
+export const updateProgrammingExerciseSchema = exerciseMaterialInputSchema
+  .extend({
     ...exerciseDraftFieldsSchema.shape,
     expectedUpdatedAt: z.iso.datetime(),
-  }).strict();
+  })
+  .strict()
+  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
 
 export const deleteProgrammingExerciseSchema = exerciseMaterialInputSchema;
 

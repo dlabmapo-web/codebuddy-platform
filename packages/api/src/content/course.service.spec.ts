@@ -4,7 +4,11 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { AuditService } from "../academies/audit.service.js";
-import { collectPublishIssues, CourseService } from "./course.service.js";
+import {
+  collectPublishIssues,
+  CourseService,
+  toCourseSummary,
+} from "./course.service.js";
 
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
@@ -171,6 +175,7 @@ const exerciseInput = {
   constraints: "",
   starterCode: "",
   aiFeedbackEnabled: false,
+  isPublished: true,
   testCases: [{
     input: "1 2",
     expectedOutput: "3",
@@ -187,6 +192,7 @@ function createExerciseRecord() {
     title: exerciseInput.title,
     position: 1,
     isRequired: true,
+    isPublished: true,
     createdAt: now,
     updatedAt: now,
     lecture: {
@@ -387,6 +393,131 @@ describe("CourseService exercise authoring", () => {
   });
 });
 
+describe("restore", () => {
+  function buildService(status: "ACTIVE" | "ARCHIVED") {
+    const course = { ...createCourseRecord(), status };
+    const transaction = {
+      course: {
+        update: vi.fn().mockResolvedValue({ ...course, status: "ACTIVE" }),
+      },
+      auditLog: { create: vi.fn() },
+    };
+    const prisma = {
+      course: {
+        findFirst: vi.fn().mockResolvedValue(course),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(course),
+      },
+      $transaction: vi.fn(async (
+        callback: (tx: typeof transaction) => Promise<unknown>,
+      ) => callback(transaction)),
+    } as unknown as PrismaService;
+    const access = {
+      requirePermission: vi.fn().mockResolvedValue({
+        userId: actorUserId,
+        academyId,
+        role: "TEAM_LEAD",
+      }),
+    } as unknown as AcademyAccessService;
+    const audit = {
+      write: vi.fn().mockResolvedValue({ id: "audit-id" }),
+    } as unknown as AuditService;
+    return {
+      service: new CourseService(prisma, access, audit),
+      transaction,
+      audit,
+    };
+  }
+
+  it("brings an archived course back to active", async () => {
+    const { service, transaction, audit } = buildService("ARCHIVED");
+
+    const summary = await service.restore(identity, { academyId, courseId });
+
+    expect(transaction.course.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "ACTIVE" } }),
+    );
+    expect(audit.write).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({ action: "content.course.restored" }),
+    );
+    expect(summary.status).toBe("ACTIVE");
+  });
+
+  it("leaves an already active course untouched", async () => {
+    const { service, transaction } = buildService("ACTIVE");
+
+    await service.restore(identity, { academyId, courseId });
+
+    expect(transaction.course.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("toCourseSummary content counts", () => {
+  const base = {
+    id: courseId,
+    academyId,
+    title: "Python",
+    description: "",
+    status: "ACTIVE" as const,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const version = (
+    status: "DRAFT" | "PUBLISHED",
+    versionNumber: number,
+    materialCounts: number[][],
+  ) => ({
+    id: `${versionId}${versionNumber}`.slice(-36),
+    versionNumber,
+    status,
+    publishedAt: null,
+    updatedAt: now,
+    modules: materialCounts.map((lectures, index) => ({
+      id: `module-${index}`,
+      lectures: lectures.map((materials, lectureIndex) => ({
+        id: `lecture-${index}-${lectureIndex}`,
+        _count: { materials },
+      })),
+    })),
+  });
+
+  it("counts modules, lectures, and exercises across the tree", () => {
+    const summary = toCourseSummary({
+      ...base,
+      versions: [version("DRAFT", 2, [[2, 1], [3]])],
+    });
+
+    expect(summary.content).toEqual({
+      modules: 2,
+      lectures: 3,
+      exercises: 6,
+    });
+  });
+
+  it("counts the draft an author would open, not the published version", () => {
+    const summary = toCourseSummary({
+      ...base,
+      versions: [version("DRAFT", 2, [[1]]), version("PUBLISHED", 1, [[9, 9]])],
+    });
+
+    expect(summary.content).toEqual({
+      modules: 1,
+      lectures: 1,
+      exercises: 1,
+    });
+  });
+
+  it("reports zeros when no version carries a tree", () => {
+    const summary = toCourseSummary({ ...base, versions: [] });
+
+    expect(summary.content).toEqual({
+      modules: 0,
+      lectures: 0,
+      exercises: 0,
+    });
+  });
+});
+
 type PublishTree = Parameters<typeof collectPublishIssues>[0];
 
 function createTree(modules: PublishTree["modules"]): PublishTree {
@@ -396,6 +527,7 @@ function createTree(modules: PublishTree["modules"]): PublishTree {
       ...course,
       draftVersion: null,
       publishedVersion: null,
+      content: { modules: 0, lectures: 0, exercises: 0 },
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     },
@@ -413,7 +545,10 @@ function createTree(modules: PublishTree["modules"]): PublishTree {
 function createExerciseMaterial(
   overrides: Partial<{
     description: string;
-    testCases: Array<{ expectedOutput: string }>;
+    testCases: Array<{
+      expectedOutput: string;
+      visibility?: "SAMPLE" | "HIDDEN";
+    }>;
   }> = {},
 ) {
   return {
@@ -422,6 +557,7 @@ function createExerciseMaterial(
     title: "Sum two numbers",
     position: 1,
     isRequired: true,
+    isPublished: true,
     programmingExercise: {
       materialId: "60000000-0000-4000-8000-000000000001",
       externalKey: "sum-two",
@@ -443,7 +579,7 @@ function createExerciseMaterial(
           position: index + 1,
           input: "1 2",
           expectedOutput: testCase.expectedOutput,
-          visibility: "SAMPLE" as const,
+          visibility: testCase.visibility ?? ("SAMPLE" as const),
         }),
       ),
       hints: [],
@@ -457,6 +593,7 @@ function createModule(lectures: PublishTree["modules"][number]["lectures"]) {
     title: "Basics",
     description: "",
     position: 1,
+    isPublished: true,
     lectures,
   };
 }
@@ -467,6 +604,7 @@ function createLecture(materials: PublishTree["modules"][number]["lectures"][num
     title: "Reading input",
     description: "",
     position: 1,
+    isPublished: true,
     materials,
   };
 }
@@ -516,6 +654,30 @@ describe("collectPublishIssues", () => {
     );
 
     expect(issues).toMatchObject([{ code: "TEST_CASE_REQUIRED" }]);
+  });
+
+  it("blocks an exercise whose cases are all hidden from students", () => {
+    const issues = collectPublishIssues(
+      createTree([
+        createModule([
+          createLecture([
+            createExerciseMaterial({
+              testCases: [
+                { expectedOutput: "3", visibility: "HIDDEN" },
+                { expectedOutput: "7", visibility: "HIDDEN" },
+              ],
+            }),
+          ]),
+        ]),
+      ]),
+    );
+
+    expect(issues).toMatchObject([
+      {
+        code: "SAMPLE_TEST_CASE_REQUIRED",
+        materialId: "60000000-0000-4000-8000-000000000001",
+      },
+    ]);
   });
 
   it("treats empty rich-text markup as an empty description", () => {

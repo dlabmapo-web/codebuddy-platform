@@ -36,6 +36,13 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      restore: os.academyCourses.restore
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.restore(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
       createDraft: os.academyCourses.createDraft
         .use(access.authenticated)
         .handler(({ context, input }) =>
@@ -134,6 +141,13 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .use(access.authenticated)
         .handler(({ context, input }) =>
           deps.courseService.reorderExercises(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
+      setExerciseVisibility: os.academyCourses.setExerciseVisibility
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.setExerciseVisibility(context.identity, input, {
             requestId: requestId(context.req),
           })
         ),

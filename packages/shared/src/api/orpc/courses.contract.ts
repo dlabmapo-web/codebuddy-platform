@@ -20,6 +20,7 @@ import {
   reorderCourseModulesSchema,
   reorderLecturesSchema,
   reorderProgrammingExercisesSchema,
+  setExerciseVisibilitySchema,
   updateCourseModuleSchema,
   updateCourseSchema,
   updateLectureSchema,
@@ -33,6 +34,7 @@ export const academyCoursesContract = {
   create: oc.input(createCourseSchema).output(courseSummarySchema),
   update: oc.input(updateCourseSchema).output(courseSummarySchema),
   archive: oc.input(courseIdInputSchema).output(courseSummarySchema),
+  restore: oc.input(courseIdInputSchema).output(courseSummarySchema),
   createDraft: oc.input(courseIdInputSchema).output(courseSummarySchema),
   getDraftTree: oc
     .input(courseVersionInputSchema)
@@ -69,6 +71,9 @@ export const academyCoursesContract = {
     .output(courseDraftTreeSchema),
   reorderExercises: oc
     .input(reorderProgrammingExercisesSchema)
+    .output(courseDraftTreeSchema),
+  setExerciseVisibility: oc
+    .input(setExerciseVisibilitySchema)
     .output(courseDraftTreeSchema),
   validateVersion: oc
     .input(courseVersionInputSchema)

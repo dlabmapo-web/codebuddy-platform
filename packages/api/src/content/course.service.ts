@@ -1,6 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
+import { hasSampleTestCase } from "@cove/shared";
+
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
@@ -22,7 +24,19 @@ const courseSummaryInclude = {
   versions: {
     where: { status: { in: ["DRAFT", "PUBLISHED"] } },
     orderBy: { versionNumber: "desc" },
-    select: courseVersionSelect,
+    select: {
+      ...courseVersionSelect,
+      // Shallow tree: enough to count what a course holds for the list, without
+      // loading exercise bodies.
+      modules: {
+        select: {
+          id: true,
+          lectures: {
+            select: { id: true, _count: { select: { materials: true } } },
+          },
+        },
+      },
+    },
   },
 } as const satisfies Prisma.CourseInclude;
 
@@ -94,6 +108,7 @@ type ExerciseWriteInput = {
   constraints: string;
   starterCode: string;
   aiFeedbackEnabled: boolean;
+  isPublished: boolean;
   testCases: Array<{
     input: string;
     expectedOutput: string;
@@ -281,6 +296,45 @@ export class CourseService {
     });
   }
 
+  /** Archiving is reversible: a course can always come back to the list. */
+  async restore(
+    identity: SupabaseIdentity,
+    input: { academyId: string; courseId: string },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.manage",
+    );
+    const current = await this.requireCourse(input.academyId, input.courseId);
+    if (current.status === "ACTIVE") {
+      const active = await this.prisma.course.findUniqueOrThrow({
+        where: { id: current.id },
+        include: courseSummaryInclude,
+      });
+      return toCourseSummary(active);
+    }
+    return this.prisma.$transaction(async (transaction) => {
+      const restored = await transaction.course.update({
+        where: { id: current.id },
+        data: { status: "ACTIVE" },
+        include: courseSummaryInclude,
+      });
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.restored",
+        targetType: "Course",
+        targetId: current.id,
+        requestId: context.requestId,
+        before: { status: current.status },
+        after: { status: restored.status },
+      });
+      return toCourseSummary(restored);
+    });
+  }
+
   /**
    * A published version is immutable, so "editing" it means branching a new
    * draft that starts as a deep copy of the published tree.
@@ -458,6 +512,7 @@ export class CourseService {
       moduleId: string;
       title?: string;
       description?: string;
+      isPublished?: boolean;
     },
     context: ContentRequestContext = {},
   ) {
@@ -471,6 +526,9 @@ export class CourseService {
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
+          ...(input.isPublished === undefined
+            ? {}
+            : { isPublished: input.isPublished }),
         },
       });
       await this.audit.write(transaction, {
@@ -480,8 +538,16 @@ export class CourseService {
         targetType: "CourseModule",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, description: current.description },
-        after: { title: updated.title, description: updated.description },
+        before: {
+          title: current.title,
+          description: current.description,
+          isPublished: current.isPublished,
+        },
+        after: {
+          title: updated.title,
+          description: updated.description,
+          isPublished: updated.isPublished,
+        },
       });
     });
     return this.getDraftTree(identity, input);
@@ -568,6 +634,7 @@ export class CourseService {
       lectureId: string;
       title?: string;
       description?: string;
+      isPublished?: boolean;
     },
     context: ContentRequestContext = {},
   ) {
@@ -581,6 +648,9 @@ export class CourseService {
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
+          ...(input.isPublished === undefined
+            ? {}
+            : { isPublished: input.isPublished }),
         },
       });
       await this.audit.write(transaction, {
@@ -590,8 +660,16 @@ export class CourseService {
         targetType: "Lecture",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, description: current.description },
-        after: { title: updated.title, description: updated.description },
+        before: {
+          title: current.title,
+          description: current.description,
+          isPublished: current.isPublished,
+        },
+        after: {
+          title: updated.title,
+          description: updated.description,
+          isPublished: updated.isPublished,
+        },
       });
     });
     return this.getDraftTree(identity, input);
@@ -712,6 +790,7 @@ export class CourseService {
           title: input.title.trim(),
           position,
           isRequired: true,
+          isPublished: input.isPublished,
           programmingExercise: {
             create: {
               courseVersionId: input.versionId,
@@ -811,7 +890,7 @@ export class CourseService {
 
       await transaction.material.update({
         where: { id: input.materialId },
-        data: { title: input.title.trim() },
+        data: { title: input.title.trim(), isPublished: input.isPublished },
       });
       await transaction.exerciseTestCase.deleteMany({
         where: { exerciseMaterialId: input.materialId },
@@ -851,6 +930,44 @@ export class CourseService {
     });
 
     return this.getExercise(identity, input);
+  }
+
+  async setExerciseVisibility(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      versionId: string;
+      lectureId: string;
+      materialId: string;
+      isPublished: boolean;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "exercises.manage",
+    );
+    await this.requireEditableVersion(input);
+    const current = await this.requireExercise(input);
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.material.update({
+        where: { id: input.materialId },
+        data: { isPublished: input.isPublished },
+      });
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.visibility_changed",
+        targetType: "Material",
+        targetId: input.materialId,
+        requestId: context.requestId,
+        before: { isPublished: current.isPublished },
+        after: { isPublished: input.isPublished },
+      });
+    });
+    return this.getDraftTree(identity, input);
   }
 
   async deleteExercise(
@@ -1223,10 +1340,9 @@ function assertSameMembers(existingIds: string[], submittedIds: string[]) {
 
 function assertExerciseComplete(input: ExerciseWriteInput) {
   const hasDescription = richTextToPlainText(input.description).length > 0;
-  const hasUsableTest = input.testCases.some(
-    (testCase) => testCase.expectedOutput.trim().length > 0,
-  );
-  if (!hasDescription || !hasUsableTest) {
+  // Authors pick visibility per case, so the sample students see must exist.
+  const hasUsableSample = hasSampleTestCase(input.testCases);
+  if (!hasDescription || !hasUsableSample) {
     throw new AppException(
       "EXERCISE_VALIDATION_FAILED",
       HttpStatus.UNPROCESSABLE_ENTITY,
@@ -1257,7 +1373,11 @@ function exerciseAuditSnapshot(input: ExerciseWriteInput, position: number) {
     timeLimitMs: 3000,
     memoryLimitMb: 256,
     aiFeedbackEnabled: input.aiFeedbackEnabled,
+    isPublished: input.isPublished,
     testCaseCount: input.testCases.length,
+    sampleTestCaseCount: input.testCases.filter(
+      (testCase) => testCase.visibility === "SAMPLE",
+    ).length,
     hintCount: input.hints.length,
   };
 }
@@ -1272,7 +1392,11 @@ function exerciseRecordAuditSnapshot(record: ExerciseRecord) {
     timeLimitMs: exercise.timeLimitMs,
     memoryLimitMb: exercise.memoryLimitMb,
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+    isPublished: record.isPublished,
     testCaseCount: exercise.testCases.length,
+    sampleTestCaseCount: exercise.testCases.filter(
+      (testCase) => testCase.visibility === "SAMPLE",
+    ).length,
     hintCount: exercise.hints.length,
   };
 }
@@ -1309,6 +1433,7 @@ async function copyVersionContent(
         title: courseModule.title,
         description: courseModule.description,
         position: courseModule.position,
+        isPublished: courseModule.isPublished,
       },
     });
     for (const lecture of courseModule.lectures) {
@@ -1318,6 +1443,7 @@ async function copyVersionContent(
           title: lecture.title,
           description: lecture.description,
           position: lecture.position,
+          isPublished: lecture.isPublished,
         },
       });
       for (const material of lecture.materials) {
@@ -1328,6 +1454,7 @@ async function copyVersionContent(
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
+            isPublished: material.isPublished,
           },
         });
         const exercise = material.programmingExercise;
@@ -1458,6 +1585,18 @@ export function collectPublishIssues(
             lectureId: lecture.id,
             materialId: material.id,
           });
+        } else if (!hasSampleTestCase(exercise.testCases)) {
+          // Legacy imports can carry hidden-only cases; students would see
+          // no worked example, so block the publish until one is visible.
+          issues.push({
+            path: `${path}.testCases`,
+            code: "SAMPLE_TEST_CASE_REQUIRED",
+            message:
+              `“${material.title}” needs at least one sample test case students can see.`,
+            moduleId: courseModule.id,
+            lectureId: lecture.id,
+            materialId: material.id,
+          });
         }
       });
     });
@@ -1485,10 +1624,16 @@ export function toCourseSummary(course: {
     status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
     publishedAt: Date | null;
     updatedAt: Date;
+    modules?: Array<{
+      id: string;
+      lectures: Array<{ id: string; _count: { materials: number } }>;
+    }>;
   }>;
 }) {
   const toVersion = (version: (typeof course.versions)[number]) => ({
-    ...version,
+    id: version.id,
+    versionNumber: version.versionNumber,
+    status: version.status,
     publishedAt: version.publishedAt?.toISOString() ?? null,
     updatedAt: version.updatedAt.toISOString(),
   });
@@ -1504,9 +1649,26 @@ export function toCourseSummary(course: {
     status: course.status,
     draftVersion: draft ? toVersion(draft) : null,
     publishedVersion: published ? toVersion(published) : null,
+    // Counts describe the version an author would open next.
+    content: countVersionContent((draft ?? published)?.modules),
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
+}
+
+function countVersionContent(
+  modules?: Array<{ lectures: Array<{ _count: { materials: number } }> }>,
+) {
+  if (!modules) return { modules: 0, lectures: 0, exercises: 0 };
+  let lectures = 0;
+  let exercises = 0;
+  for (const courseModule of modules) {
+    lectures += courseModule.lectures.length;
+    for (const lecture of courseModule.lectures) {
+      exercises += lecture._count.materials;
+    }
+  }
+  return { modules: modules.length, lectures, exercises };
 }
 
 function toDraftTree(
@@ -1526,17 +1688,20 @@ function toDraftTree(
       title: courseModule.title,
       description: courseModule.description,
       position: courseModule.position,
+      isPublished: courseModule.isPublished,
       lectures: courseModule.lectures.map((lecture) => ({
         id: lecture.id,
         title: lecture.title,
         description: lecture.description,
         position: lecture.position,
+        isPublished: lecture.isPublished,
         materials: lecture.materials.map((material) => ({
           id: material.id,
           type: material.type,
           title: material.title,
           position: material.position,
           isRequired: material.isRequired,
+          isPublished: material.isPublished,
           programmingExercise: material.programmingExercise
             ? {
                 materialId: material.programmingExercise.materialId,
@@ -1608,6 +1773,7 @@ function toExerciseAuthoringContext(record: ExerciseRecord) {
       title: record.title,
       position: record.position,
       isRequired: record.isRequired,
+      isPublished: record.isPublished,
       programmingExercise: {
         materialId: exercise.materialId,
         externalKey: exercise.externalKey,

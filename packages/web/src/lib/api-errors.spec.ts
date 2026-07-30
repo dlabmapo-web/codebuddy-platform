@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractAppErrorCode,
   extractIssues,
+  isAccessDeniedError,
   toApiError,
 } from './api-errors';
 
@@ -26,6 +27,48 @@ describe('API error normalization', () => {
       'PERMISSION_DENIED',
     );
     expect(extractAppErrorCode('BAD_REQUEST', {})).toBeNull();
+  });
+
+  it('treats access denial as denial and anything else as a real fault', () => {
+    expect(
+      isAccessDeniedError(
+        new ORPCError('FORBIDDEN', {
+          status: 403,
+          data: { code: 'PERMISSION_DENIED' },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isAccessDeniedError(
+        new ORPCError('NOT_FOUND', {
+          status: 404,
+          data: { code: 'COURSE_VERSION_NOT_FOUND' },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not disguise a server fault as a permissions problem', () => {
+    // A missing column surfaces as an untyped 500 — the case that reported
+    // "belongs to another academy" while the real cause was schema drift.
+    expect(
+      isAccessDeniedError(
+        new Error('column materials.is_published does not exist'),
+      ),
+    ).toBe(false);
+    expect(
+      isAccessDeniedError(
+        new ORPCError('INTERNAL_SERVER_ERROR', { status: 500 }),
+      ),
+    ).toBe(false);
+    expect(
+      isAccessDeniedError(
+        new ORPCError('CONFLICT', {
+          status: 409,
+          data: { code: 'CONTENT_EDIT_CONFLICT' },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('keeps only well-formed validation issues', () => {

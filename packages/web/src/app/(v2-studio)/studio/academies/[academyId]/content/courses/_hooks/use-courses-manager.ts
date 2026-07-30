@@ -16,7 +16,8 @@ export function useCoursesManager({
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const [showCreate, setShowCreate] = useState(initialCourses.length === 0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const queryKey = ['academy', academyId, 'courses'];
@@ -50,31 +51,70 @@ export function useCoursesManager({
     },
   });
 
-  const startDraftMutation = useMutation({
-    mutationFn: (courseId: string) =>
-      orpc.academyCourses.createDraft({ academyId, courseId }),
-    onSuccess: async (course) => {
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      orpc.academyCourses.update({
+        academyId,
+        courseId: editingId!,
+        title,
+        description,
+      }),
+    onSuccess: async () => {
+      setEditingId(null);
+      setTitle('');
+      setDescription('');
       await queryClient.invalidateQueries({ queryKey });
-      openDraft(course);
     },
   });
+
+  const archiveMutation = useMutation({
+    mutationFn: (courseId: string) =>
+      orpc.academyCourses.archive({ academyId, courseId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (courseId: string) =>
+      orpc.academyCourses.restore({ academyId, courseId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const closeForm = () => {
+    setShowCreate(false);
+    setEditingId(null);
+    setTitle('');
+    setDescription('');
+  };
 
   return {
     courses: coursesQuery.data.courses,
     showCreate,
-    toggleCreate: () => setShowCreate((value) => !value),
+    editingId,
+    formOpen: showCreate || editingId !== null,
+    openCreate: () => {
+      setEditingId(null);
+      setTitle('');
+      setDescription('');
+      setShowCreate(true);
+    },
+    openEdit: (course: CourseSummary) => {
+      setShowCreate(false);
+      setEditingId(course.id);
+      setTitle(course.title);
+      setDescription(course.description);
+    },
+    closeForm,
     title,
     setTitle,
     description,
     setDescription,
-    create: () => createMutation.mutate(),
-    createPending: createMutation.isPending,
-    createError: createMutation.error,
-    startDraft: (courseId: string) => startDraftMutation.mutate(courseId),
-    startingCourseId: startDraftMutation.isPending
-      ? startDraftMutation.variables
-      : undefined,
-    startDraftError: startDraftMutation.error,
+    submit: () =>
+      editingId ? updateMutation.mutate() : createMutation.mutate(),
+    submitPending: createMutation.isPending || updateMutation.isPending,
+    submitError: createMutation.error ?? updateMutation.error,
+    archive: (courseId: string) => archiveMutation.mutate(courseId),
+    restore: (courseId: string) => restoreMutation.mutate(courseId),
+    statusError: archiveMutation.error ?? restoreMutation.error,
   };
 }
 

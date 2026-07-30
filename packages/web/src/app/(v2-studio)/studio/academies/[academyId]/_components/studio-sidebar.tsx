@@ -37,6 +37,7 @@ import {
   useSidebar,
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation, type TranslationKey } from '@/i18n';
+import { activeNavHref } from '@/lib/nav-active';
 import { cn } from '@/lib/utils';
 
 export type StudioAcademy = SelectorItem & { role: AcademyRole };
@@ -69,11 +70,18 @@ export function StudioSidebar({
   canManageContent: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
+  const pathname = usePathname();
   const groups = studioNavGroups({
     academyId,
     canManageAcademy,
     canManageContent,
   });
+  // Decided across every group: the Overview link prefixes all the others, so
+  // only the most specific match can be the active one.
+  const activeHref = activeNavHref(
+    pathname,
+    groups.flatMap((group) => group.items.map((item) => item.href)),
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -83,7 +91,7 @@ export function StudioSidebar({
       <SidebarSeparator />
       <SidebarContent>
         {groups.map((group) => (
-          <NavSection group={group} key={group.id} />
+          <NavSection activeHref={activeHref} group={group} key={group.id} />
         ))}
       </SidebarContent>
       <SidebarFooter>
@@ -106,9 +114,14 @@ export function StudioSidebar({
   );
 }
 
-function NavSection({ group }: { group: NavGroup }) {
+function NavSection({
+  activeHref,
+  group,
+}: {
+  activeHref: string | null;
+  group: NavGroup;
+}) {
   const { t } = useLayoutTranslation(['nav', 'common']);
-  const pathname = usePathname();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === 'collapsed' && !isMobile;
 
@@ -117,8 +130,7 @@ function NavSection({ group }: { group: NavGroup }) {
       <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel>
       <SidebarMenu>
         {group.items.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = item.href === activeHref;
           const label = t(item.labelKey);
           return (
             <SidebarMenuItem key={item.href}>

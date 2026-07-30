@@ -36,6 +36,33 @@ export function toApiError(error: unknown): ApiError {
   );
 }
 
+/**
+ * Codes that mean "this identity may not open this thing". Anything else is a
+ * real fault (schema drift, connection loss, a bug) and must not be reported to
+ * the user as a permission or ownership problem.
+ */
+const accessDeniedCodes = new Set<AppErrorCode>([
+  'AUTHENTICATION_REQUIRED',
+  'TOKEN_INVALID',
+  'PROFILE_INCOMPLETE',
+  'USER_SUSPENDED',
+  'ACADEMY_NOT_FOUND',
+  'ACADEMY_MEMBERSHIP_REQUIRED',
+  'ACADEMY_MEMBERSHIP_SUSPENDED',
+  'PERMISSION_DENIED',
+  'COURSE_NOT_FOUND',
+  'COURSE_VERSION_NOT_FOUND',
+  'EXERCISE_NOT_FOUND',
+  'CONTENT_PARENT_MISMATCH',
+]);
+
+export function isAccessDeniedError(error: unknown): boolean {
+  const { code, status } = toApiError(error);
+  if (code) return accessDeniedCodes.has(code);
+  // An untyped transport error only counts when the status itself says so.
+  return status === 401 || status === 403 || status === 404;
+}
+
 export function extractAppErrorCode(
   transportCode: unknown,
   data: unknown,

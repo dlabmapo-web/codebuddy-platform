@@ -93,6 +93,7 @@ except BaseException as _cove_exc:
     _cove_type = type(_cove_exc).__name__
     _cove_message = str(_cove_exc)
     _cove_line = getattr(_cove_exc, 'lineno', None)
+    _cove_offset = getattr(_cove_exc, 'offset', None)
 
     if isinstance(_cove_exc, SyntaxError):
         _cove_display = ''.join(
@@ -115,6 +116,7 @@ except BaseException as _cove_exc:
         'type': _cove_type,
         'message': _cove_message,
         'line': _cove_line,
+        'offset': _cove_offset,
         'display': _cove_display,
     }, ensure_ascii=False)
 

@@ -41,7 +41,7 @@ export function AiFeedbackPanel({
       {feedbacks.length === 0 && !loading ? (
         <div className="px-4 py-8 text-center">
           <p style={{ fontSize: '13px', color: 'var(--color-sub)' }}>아직 AI 피드백이 없습니다.</p>
-          <p style={{ fontSize: '12px', color: '#BCC0C7', marginTop: 4 }}>오답을 제출하면 AI가 코드를 분석해드려요.</p>
+          <p style={{ fontSize: '12px', color: '#BCC0C7', marginTop: 4 }}>문법 오류가 반복되면 오류 코치에서 추가 설명을 요청할 수 있어요.</p>
         </div>
       ) : (
         feedbacks.map((fb, i) => (
@@ -61,7 +61,7 @@ export function AiFeedbackPanel({
       )}
 
       <div className="px-4 py-3" style={{ backgroundColor: ACCENT_BG }}>
-        <p style={{ fontSize: '11px', color: ACCENT, lineHeight: 1.6 }}>AI가 자동으로 분석한 피드백이며, 정답을 직접 알려주지는 않습니다.</p>
+        <p style={{ fontSize: '11px', color: ACCENT, lineHeight: 1.6 }}>학생이 요청한 문법 설명이며, 완성된 정답 코드는 알려주지 않습니다.</p>
       </div>
     </div>
   );

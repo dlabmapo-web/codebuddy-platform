@@ -24,3 +24,13 @@ Editor에서 `20260727_authoritative_judging.sql`을 실행하세요.
 - 한 학생·문제당 동시 채점 1건 제한
 - 분산 Netlify Functions용 제출 속도 제한 버킷/RPC 생성
 - 예제/비공개 테스트케이스 플래그 일관성 제약 추가
+
+## 파이썬 문법 오류 코치 (`20260730_python_syntax_error_coach.sql`)
+
+AI 문법 설명 기능을 배포하기 전에 Supabase Dashboard → SQL Editor에서
+`20260730_python_syntax_error_coach.sql` 내용을 실행하세요.
+
+이관 내용:
+- 실행 제출 없이도 문법 설명을 저장할 수 있도록 `submission_id`를 nullable로 변경
+- 동일 코드·오류 설명 캐시용 `error_category` / `code_hash` 추가
+- 학생별 일일 AI 사용량 조회 인덱스 추가

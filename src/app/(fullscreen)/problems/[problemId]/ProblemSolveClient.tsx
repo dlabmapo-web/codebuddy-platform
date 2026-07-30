@@ -17,9 +17,21 @@ import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
+import { SyntaxErrorCoach } from '@/components/collab/SyntaxErrorCoach';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
-import { explainPythonError, type PythonExecutionError } from '@/lib/pyodide/pythonError';
+import {
+  createSyntaxLesson,
+  explainPythonError,
+  isSyntaxExecutionError,
+  type PythonExecutionError,
+  type SyntaxLesson,
+} from '@/lib/pyodide/pythonError';
+import {
+  canAskAiForSyntaxHelp,
+  recordSyntaxAttempt,
+  type SyntaxAttemptState,
+} from '@/lib/pyodide/syntaxCoach';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -86,6 +98,12 @@ type ProblemNavigationFailure = {
   destination: ProblemNavigationItem | null;
   direction: ProblemTransitionDirection | null;
 };
+type ActiveSyntaxCoach = {
+  error: PythonExecutionError;
+  lesson: SyntaxLesson;
+  code: string;
+  attemptCount: number;
+};
 
 // 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
 // (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
@@ -134,6 +152,7 @@ except BaseException as exc:
     error_type = type(exc).__name__
     error_message = str(exc)
     error_line = getattr(exc, 'lineno', None)
+    error_offset = getattr(exc, 'offset', None)
     if isinstance(exc, SyntaxError):
         error_display = ''.join(traceback.format_exception_only(type(exc), exc))
     else:
@@ -149,6 +168,7 @@ except BaseException as exc:
         'type': error_type,
         'message': error_message,
         'line': error_line,
+        'offset': error_offset,
         'display': error_display,
     }, ensure_ascii=False)
 finally:
@@ -208,7 +228,9 @@ export default function ProblemSolveClient({
   const [aiFeedbacks, setAiFeedbacks] = useState<AiFeedbackItem[]>([]);
   const [aiFeedbackPanelOpen, setAiFeedbackPanelOpen] = useState(false);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
-  const [currentAiFeedback, setCurrentAiFeedback] = useState<AiFeedbackItem | null>(null);
+  const [syntaxCoach, setSyntaxCoach] = useState<ActiveSyntaxCoach | null>(null);
+  const [syntaxAiExplanation, setSyntaxAiExplanation] = useState<string | null>(null);
+  const [syntaxAiError, setSyntaxAiError] = useState<string | null>(null);
   const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
 
   const runnerRef = useRef<InteractiveRunner | null>(null);
@@ -217,6 +239,7 @@ export default function ProblemSolveClient({
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
   const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
+  const syntaxAttemptRef = useRef<SyntaxAttemptState | null>(null);
   const manualInputQueueRef = useRef<string[]>([]);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
   const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -253,6 +276,7 @@ export default function ProblemSolveClient({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
   const remoteCursorDecorationsRef = useRef<string[]>([]);
+  const syntaxErrorDecorationsRef = useRef<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remoteCursorWidgetRef = useRef<any>(null);
 
@@ -314,6 +338,25 @@ export default function ProblemSolveClient({
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
     injectCursorStyles();
+    if (!document.getElementById('cove-syntax-error-styles')) {
+      const style = document.createElement('style');
+      style.id = 'cove-syntax-error-styles';
+      style.textContent = `
+        .cove-syntax-error-line {
+          background: rgba(239, 68, 68, 0.16);
+          border-left: 3px solid #F87171;
+        }
+        .cove-syntax-error-glyph {
+          background: #F87171;
+          border-radius: 999px;
+          height: 8px !important;
+          margin-left: 5px;
+          margin-top: 5px;
+          width: 8px !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       if (isApplyingRemoteRef.current) return;
@@ -505,6 +548,10 @@ export default function ProblemSolveClient({
         remoteCursorDecorationsRef.current,
         [],
       );
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations(
+        syntaxErrorDecorationsRef.current,
+        [],
+      );
       if (remoteCursorWidgetRef.current) {
         editor.removeContentWidget(remoteCursorWidgetRef.current);
         remoteCursorWidgetRef.current = null;
@@ -540,7 +587,10 @@ export default function ProblemSolveClient({
     setAiFeedbacks([]);
     setAiFeedbackPanelOpen(false);
     setAiFeedbackLoading(false);
-    setCurrentAiFeedback(null);
+    setSyntaxCoach(null);
+    setSyntaxAiExplanation(null);
+    setSyntaxAiError(null);
+    syntaxAttemptRef.current = null;
     setTeacherOnline(false);
     setRemotePointers({});
     setLoadError(false);
@@ -1189,6 +1239,65 @@ export default function ProblemSolveClient({
     setActiveSampleIndex(null);
   }, [appendTerminal]);
 
+  const updateSyntaxCoaching = useCallback((
+    pythonError: PythonExecutionError | null,
+    executedCode: string,
+  ) => {
+    const editor = editorRef.current;
+    if (editor) {
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations(
+        syntaxErrorDecorationsRef.current,
+        [],
+      );
+    }
+
+    setSyntaxAiExplanation(null);
+    setSyntaxAiError(null);
+
+    if (!isSyntaxExecutionError(pythonError)) {
+      syntaxAttemptRef.current = null;
+      setSyntaxCoach(null);
+      return;
+    }
+
+    const lesson = createSyntaxLesson(pythonError);
+    if (!lesson) return;
+
+    const nextAttempt = recordSyntaxAttempt(
+      syntaxAttemptRef.current,
+      lesson.category,
+      executedCode,
+    );
+    syntaxAttemptRef.current = nextAttempt;
+    setSyntaxCoach({
+      error: pythonError,
+      lesson,
+      code: executedCode,
+      attemptCount: nextAttempt.count,
+    });
+    setTerminalOpen(true);
+    setTerminalTab('error');
+    setErrorExplainSeen(true);
+
+    if (editor && monacoRef.current && pythonError.line) {
+      const model = editor.getModel();
+      const line = Math.min(
+        Math.max(pythonError.line, 1),
+        model?.getLineCount() ?? pythonError.line,
+      );
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations([], [{
+        range: new monacoRef.current.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: 'cove-syntax-error-line',
+          glyphMarginClassName: 'cove-syntax-error-glyph',
+          hoverMessage: { value: lesson.title },
+        },
+      }]);
+      editor.revealLineInCenterIfOutsideViewport(line);
+    }
+  }, []);
+
   const handleRun = useCallback(async () => {
     if (isRunning || isProblemTransitioning || !problem) return;
     setIsRunning(true);
@@ -1196,9 +1305,10 @@ export default function ProblemSolveClient({
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
     const result = await executeInTerminal(code);
+    if (!result.stopped) updateSyntaxCoaching(result.pythonError, code);
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setIsRunning(false);
-  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, updateSyntaxCoaching, appendTerminal]);
 
   const handleRunSample = useCallback(async (
     sampleCase: ProblemDetail['test_cases'][number],
@@ -1223,6 +1333,7 @@ export default function ProblemSolveClient({
     ]);
 
     const result = await executeInTerminal(code, { sampleInput: sampleCase.input });
+    if (!result.stopped) updateSyntaxCoaching(result.pythonError, code);
 
     if (!result.stopped && !result.pythonError && !result.stderr) {
       if (isSampleOutputMatch(result.stdout, sampleCase.expected_output)) {
@@ -1241,7 +1352,56 @@ export default function ProblemSolveClient({
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setActiveSampleIndex(null);
     setIsRunning(false);
-  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, updateSyntaxCoaching, appendTerminal]);
+
+  const handleAskSyntaxAi = useCallback(async () => {
+    if (
+      !problem?.use_ai_feedback
+      || !syntaxCoach
+      || !canAskAiForSyntaxHelp(syntaxAttemptRef.current)
+      || aiFeedbackLoading
+    ) return;
+
+    setAiFeedbackLoading(true);
+    setSyntaxAiError(null);
+    try {
+      const response = await fetch('/api/ai-feedbacks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_id: problem.id,
+          code: syntaxCoach.code,
+          error: syntaxCoach.error,
+          category: syntaxCoach.lesson.category,
+          local_explanation: syntaxCoach.lesson.whatHappened,
+        }),
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        setSyntaxAiError(
+          json?.error?.message
+          ?? 'AI 설명을 불러오지 못했어요. 위의 오류 코치를 참고해 다시 시도해 보세요.',
+        );
+        return;
+      }
+
+      const feedback = json?.feedback as AiFeedbackItem | undefined;
+      if (!feedback?.content) {
+        setSyntaxAiError('AI 설명을 불러오지 못했어요. 잠시 후 다시 시도해 보세요.');
+        return;
+      }
+      setSyntaxAiExplanation(feedback.content);
+      setAiFeedbacks((previous) => (
+        previous.some((item) => item.id === feedback.id)
+          ? previous
+          : [feedback, ...previous]
+      ));
+    } catch {
+      setSyntaxAiError('AI 서버에 연결하지 못했어요. 위의 오류 코치는 계속 사용할 수 있어요.');
+    } finally {
+      setAiFeedbackLoading(false);
+    }
+  }, [aiFeedbackLoading, problem, syntaxCoach]);
 
   const handleSubmit = useCallback(async () => {
     if (isRunning || isProblemTransitioning || !problem) return;
@@ -1251,7 +1411,6 @@ export default function ProblemSolveClient({
     setModalResult(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ solution.py 제출\n', kind: 'meta' }, { text: '비공개 테스트를 포함한 서버 채점을 시작합니다...\n', kind: 'info' }]);
-    setCurrentAiFeedback(null);
 
     if (sessionId) {
       await fetch(`/api/sessions/${sessionId}`, {
@@ -1337,7 +1496,6 @@ export default function ProblemSolveClient({
     }
 
     const status = finalSubmission.status;
-    const isStudentFailure = status === 'fail' || status === 'partial';
     const newAttempt = status === 'judge_error' ? attemptCount : attemptCount + 1;
     const runtimeMs = finalSubmission.runtime_ms ?? 0;
     const passedCount = finalSubmission.passed_count;
@@ -1360,29 +1518,6 @@ export default function ProblemSolveClient({
           status === 'pass' ? 'passed' : 'attempted'
         )
         : current);
-    }
-
-    if (isStudentFailure && problem.use_ai_feedback) {
-      setAiFeedbackLoading(true);
-      fetch('/api/ai-feedbacks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          submission_id: submissionId,
-          problem_id: problem.id,
-          code,
-          error_message: `${passedCount}/${totalCount} tests passed`,
-        }),
-      })
-        .then((r) => r.json())
-        .then((json) => {
-          if (json.feedback) {
-            setAiFeedbacks((prev) => [json.feedback, ...prev]);
-            setCurrentAiFeedback(json.feedback);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setAiFeedbackLoading(false));
     }
 
     setModalResult({
@@ -1750,7 +1885,7 @@ export default function ProblemSolveClient({
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', glyphMargin: true, padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
             />
           </div>
 
@@ -1844,23 +1979,35 @@ export default function ProblemSolveClient({
                   className="overflow-auto px-4 py-3"
                   style={{ height: terminalHeight - 38, backgroundColor: '#1E1E1E' }}
                 >
-                  <div
-                    className="rounded-xl px-4 py-3"
-                    style={{ backgroundColor: '#172033', border: '1px solid #334155', color: '#E2E8F0', fontFamily: 'Pretendard, sans-serif', fontSize: '13px', lineHeight: 1.7 }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <CircleHelp size={14} style={{ color: '#93C5FD' }} />
-                      <strong style={{ color: '#93C5FD', fontSize: '13px' }}>
-                        {lastPythonError.type}를 쉽게 설명하면
-                      </strong>
+                  {syntaxCoach ? (
+                    <SyntaxErrorCoach
+                      lesson={syntaxCoach.lesson}
+                      attemptCount={syntaxCoach.attemptCount}
+                      aiEnabled={problem.use_ai_feedback}
+                      aiLoading={aiFeedbackLoading}
+                      aiExplanation={syntaxAiExplanation}
+                      aiError={syntaxAiError}
+                      onAskAi={() => void handleAskSyntaxAi()}
+                    />
+                  ) : (
+                    <div
+                      className="rounded-xl px-4 py-3"
+                      style={{ backgroundColor: '#172033', border: '1px solid #334155', color: '#E2E8F0', fontFamily: 'Pretendard, sans-serif', fontSize: '13px', lineHeight: 1.7 }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <CircleHelp size={14} style={{ color: '#93C5FD' }} />
+                        <strong style={{ color: '#93C5FD', fontSize: '13px' }}>
+                          {lastPythonError.type}를 쉽게 설명하면
+                        </strong>
+                      </div>
+                      <p style={{ margin: 0 }}>{explainPythonError(lastPythonError)}</p>
+                      {lastPythonError.line && (
+                        <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                          에디터 {lastPythonError.line}번째 줄을 확인해 보세요.
+                        </p>
+                      )}
                     </div>
-                    <p style={{ margin: 0 }}>{explainPythonError(lastPythonError)}</p>
-                    {lastPythonError.line && (
-                      <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-                        에디터 {lastPythonError.line}번째 줄을 확인해 보세요.
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
               ) : (
                 <ConsoleTerminal
@@ -1883,9 +2030,9 @@ export default function ProblemSolveClient({
           onClose={() => setModalResult(null)}
           onRetry={() => setModalResult(null)}
           onHint={() => { setModalResult(null); setShowHint(true); }}
-          aiFeedbackEnabled={problem.use_ai_feedback}
-          aiFeedbackLoading={aiFeedbackLoading}
-          aiFeedbackContent={currentAiFeedback?.content ?? null}
+          aiFeedbackEnabled={false}
+          aiFeedbackLoading={false}
+          aiFeedbackContent={null}
           nextProblem={nextProblem}
           stageId={navigation?.stage_id ?? null}
           onNextProblem={() => handleNavigateProblem(nextProblem, 'next')}

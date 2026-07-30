@@ -1,7 +1,7 @@
 'use client';
 
 import type { ExerciseAuthoringContext } from '@cove/shared';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
@@ -9,6 +9,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 
+import { courseVersionQueryKey } from '../../../../_lib/course-tree';
 import {
   contextToDraft,
   draftToPayload,
@@ -35,6 +36,7 @@ export function useExerciseAuthoring({
 }) {
   const { t } = useLayoutTranslation('content');
   const router = useRouter();
+  const queryClient = useQueryClient();
   const initialDraft = React.useMemo(
     () => contextToDraft(initialContext),
     [initialContext],
@@ -51,11 +53,24 @@ export function useExerciseAuthoring({
     serializeDraft(initialDraft),
   );
 
+  // A field only shows its error once the author has actually touched it, so a
+  // fresh form isn't covered in red before anything has been typed.
+  const [touched, setTouched] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
   const dirty = serializeDraft(draft) !== savedSnapshot;
   const editable = canEdit && initialContext.version.status === 'DRAFT';
   const completeness = exerciseCompleteness(draft);
   const completeCount = completeness.filter((item) => item.complete).length;
   const saveReady = completeCount === completeness.length;
+  const missing = completeness
+    .filter((item) => !item.complete)
+    .map((item) => item.id);
+
+  const builderPath =
+    `/studio/academies/${target.academyId}/content/courses/${target.courseId}` +
+    `/versions/${target.versionId}`;
 
   React.useEffect(() => {
     if (!dirty) return;
@@ -79,16 +94,22 @@ export function useExerciseAuthoring({
       }
       return orpc.academyCourses.createExercise({ ...target, ...payload });
     },
-    onSuccess: (context) => {
+    onSuccess: async (context) => {
       const material = context.material!;
       setSavedMaterialId(material.id);
       setExpectedUpdatedAt(material.programmingExercise!.updatedAt);
       setSavedSnapshot(serializeDraft(draft));
-      if (!initialContext.material) {
-        router.replace(
-          `/studio/academies/${target.academyId}/content/courses/${target.courseId}/versions/${target.versionId}/lectures/${target.lectureId}/exercises/${material.id}`,
-        );
-      }
+
+      /*
+       * The builder caches its tree, so without this the curriculum would show
+       * the pre-save title and badges until the cache went stale on its own.
+       * `refresh` re-runs the server component that seeds that cache.
+       */
+      await queryClient.invalidateQueries({
+        queryKey: courseVersionQueryKey(target.academyId, target.versionId),
+      });
+      router.push(builderPath);
+      router.refresh();
     },
   });
 
@@ -96,14 +117,22 @@ export function useExerciseAuthoring({
     key: K,
     value: ExerciseDraft[K],
   ) {
-    if (editable) setDraft((current) => ({ ...current, [key]: value }));
+    if (!editable) return;
+    setTouched((current) => new Set(current).add(key));
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  /** Errors surface per field, next to the input that needs fixing. */
+  function errorFor(field: 'title' | 'difficulty' | 'description' | 'test') {
+    if (!editable) return null;
+    const key = field === 'test' ? 'testCases' : field;
+    if (!touched.has(key)) return null;
+    return missing.includes(field) ? t(`exercise.error.${field}`) : null;
   }
 
   function leave() {
     if (dirty && !window.confirm(t('exercise.unsaved_confirm'))) return;
-    router.push(
-      `/studio/academies/${target.academyId}/content/courses/${target.courseId}/versions/${target.versionId}`,
-    );
+    router.push(builderPath);
   }
 
   return {
@@ -114,6 +143,9 @@ export function useExerciseAuthoring({
     completeness,
     completeCount,
     saveReady,
+    missing,
+    errorFor,
+    isNew: !initialContext.material,
     savedMaterialId,
     previewOpen,
     openPreview: () => setPreviewOpen(true),

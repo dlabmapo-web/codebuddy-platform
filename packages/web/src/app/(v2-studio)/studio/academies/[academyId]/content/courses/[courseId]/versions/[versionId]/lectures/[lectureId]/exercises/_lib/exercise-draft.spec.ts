@@ -17,6 +17,7 @@ function draft(overrides: Partial<ExerciseDraft> = {}): ExerciseDraft {
     constraints: '',
     starterCode: '',
     aiFeedbackEnabled: false,
+    isPublished: true,
     testCases: [
       {
         key: 'sample',
@@ -80,6 +81,32 @@ describe('exercise draft helpers', () => {
     );
   });
 
+  it('keeps the visibility the author chose per case, not the position', () => {
+    expect(
+      draftToPayload(
+        draft({
+          testCases: [
+            {
+              key: 'hidden-first',
+              input: '1 2',
+              expectedOutput: '3',
+              visibility: 'HIDDEN',
+            },
+            {
+              key: 'sample-second',
+              input: '4 5',
+              expectedOutput: '9',
+              visibility: 'SAMPLE',
+            },
+          ],
+        }),
+      ).testCases,
+    ).toEqual([
+      { input: '1 2', expectedOutput: '3', visibility: 'HIDDEN' },
+      { input: '4 5', expectedOutput: '9', visibility: 'SAMPLE' },
+    ]);
+  });
+
   it('reports the four save requirements', () => {
     expect(exerciseCompleteness(draft()).every((item) => item.complete)).toBe(
       true,
@@ -88,6 +115,23 @@ describe('exercise draft helpers', () => {
       exerciseCompleteness(draft({ description: '<p>&nbsp;</p>' })).find(
         (item) => item.id === 'description',
       )?.complete,
+    ).toBe(false);
+  });
+
+  it('needs a sample case, not just any expected output, to be saveable', () => {
+    expect(
+      exerciseCompleteness(
+        draft({
+          testCases: [
+            {
+              key: 'hidden-only',
+              input: '1 2',
+              expectedOutput: '3',
+              visibility: 'HIDDEN',
+            },
+          ],
+        }),
+      ).find((item) => item.id === 'test')?.complete,
     ).toBe(false);
   });
 });

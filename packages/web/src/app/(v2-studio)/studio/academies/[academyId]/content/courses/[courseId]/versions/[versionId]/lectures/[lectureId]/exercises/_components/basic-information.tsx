@@ -4,13 +4,19 @@ import dynamic from 'next/dynamic';
 
 import { useLayoutTranslation } from '@/i18n';
 
+import type { ExerciseAuthoring } from '../_hooks/use-exercise-authoring';
 import {
-  previewDocument,
   type ExerciseDraft,
   type ExerciseDraftUpdate,
 } from '../_lib/exercise-draft';
 import { DifficultyPicker } from './difficulty-picker';
-import { Field, inputClass, SectionCard } from './authoring-fields';
+import {
+  Field,
+  inputClass,
+  invalidClass,
+  SectionCard,
+} from './authoring-fields';
+import { RichTextFrame } from './rich-text-frame';
 
 const RichEditor = dynamic(
   () =>
@@ -21,15 +27,19 @@ const RichEditor = dynamic(
 );
 
 export function BasicInformation({
+  authoring,
   draft,
   editable,
   update,
 }: {
+  authoring: ExerciseAuthoring;
   draft: ExerciseDraft;
   editable: boolean;
   update: ExerciseDraftUpdate;
 }) {
   const { t } = useLayoutTranslation('content');
+  const titleError = authoring.errorFor('title');
+  const descriptionError = authoring.errorFor('description');
 
   return (
     <SectionCard
@@ -37,9 +47,10 @@ export function BasicInformation({
       icon={BookOpen}
       title={t('exercise.section.basics')}
     >
-      <Field label={t('exercise.field.title')} required>
+      <Field error={titleError} label={t('exercise.field.title')} required>
         <input
-          className={inputClass}
+          aria-invalid={Boolean(titleError)}
+          className={`${inputClass} ${invalidClass(titleError)}`}
           disabled={!editable}
           maxLength={200}
           onChange={(event) => update('title', event.target.value)}
@@ -57,9 +68,17 @@ export function BasicInformation({
         />
       </Field>
 
-      <Field label={t('exercise.field.description')} required>
+      <Field
+        error={descriptionError}
+        label={t('exercise.field.description')}
+        required
+      >
         {editable ? (
-          <div className="overflow-hidden rounded-lg border border-border">
+          <div
+            className={`overflow-hidden rounded-lg border ${
+              descriptionError ? 'border-danger' : 'border-border'
+            }`}
+          >
             <RichEditor
               onChange={(description) => update('description', description)}
               placeholder={t('exercise.placeholder.description')}
@@ -67,14 +86,38 @@ export function BasicInformation({
             />
           </div>
         ) : (
-          <iframe
-            className="min-h-72 w-full rounded-lg border border-border bg-white"
-            sandbox=""
-            srcDoc={previewDocument(draft.description)}
-            title={t('exercise.field.description')}
-          />
+          <div className="overflow-hidden rounded-lg border border-border bg-white">
+            <RichTextFrame
+              content={draft.description}
+              minHeight={120}
+              title={t('exercise.field.description')}
+            />
+          </div>
         )}
       </Field>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label={t('exercise.field.input_format')}>
+          <textarea
+            className={`${inputClass} min-h-24 resize-y py-2.5`}
+            disabled={!editable}
+            maxLength={10_000}
+            onChange={(event) => update('inputFormat', event.target.value)}
+            placeholder={t('exercise.placeholder.input_format')}
+            value={draft.inputFormat}
+          />
+        </Field>
+        <Field label={t('exercise.field.output_format')}>
+          <textarea
+            className={`${inputClass} min-h-24 resize-y py-2.5`}
+            disabled={!editable}
+            maxLength={10_000}
+            onChange={(event) => update('outputFormat', event.target.value)}
+            placeholder={t('exercise.placeholder.output_format')}
+            value={draft.outputFormat}
+          />
+        </Field>
+      </div>
 
       <Field label={t('exercise.field.constraints')}>
         <textarea
@@ -85,6 +128,24 @@ export function BasicInformation({
           value={draft.constraints}
         />
       </Field>
+
+      <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
+        <input
+          checked={draft.isPublished}
+          className="mt-0.5 size-4 accent-brand"
+          disabled={!editable}
+          onChange={(event) => update('isPublished', event.target.checked)}
+          type="checkbox"
+        />
+        <span>
+          <span className="block text-[13.5px] font-bold">
+            {t('exercise.field.is_published')}
+          </span>
+          <span className="mt-0.5 block text-[12.5px] leading-5 text-sub">
+            {t('exercise.field.is_published_hint')}
+          </span>
+        </span>
+      </label>
 
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input

@@ -38,7 +38,7 @@ export function DifficultyPicker({
           <button
             aria-checked={active}
             className={cn(
-              'inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-[13px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-60',
+              'inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-[14px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-60',
               active
                 ? 'bg-white text-ink shadow-sm'
                 : 'text-sub hover:text-ink',

@@ -54,7 +54,7 @@ export function HintsEditor({
       {hints.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <Lightbulb className="mx-auto size-6 text-sub" />
-          <p className="mt-2 text-[13px] text-sub">
+          <p className="mt-2 text-[14px] text-sub">
             {t('exercise.hint.empty')}
           </p>
         </div>
@@ -66,7 +66,7 @@ export function HintsEditor({
               key={hint.key}
             >
               <header className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-[13.5px] font-extrabold">
+                <h3 className="text-[14.5px] font-extrabold">
                   {t('exercise.hint.label', { number: index + 1 })}
                 </h3>
                 {editable ? (

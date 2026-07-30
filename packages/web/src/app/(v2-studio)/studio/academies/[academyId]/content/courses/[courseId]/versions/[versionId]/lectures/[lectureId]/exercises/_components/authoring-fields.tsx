@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import { useLayoutTranslation } from '@/i18n';
 
 export const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-white px-3 text-[14px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-canvas disabled:text-sub';
+  'h-11 w-full rounded-lg border border-border bg-white px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-canvas disabled:text-sub';
 
 export const secondaryButtonClass =
-  'inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-[13px] font-bold text-brand hover:border-brand hover:text-brand-deep';
+  'inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-3.5 text-[14px] font-bold text-brand hover:border-brand hover:text-brand-deep';
 
 export function SectionCard({
   title,
@@ -32,9 +32,9 @@ export function SectionCard({
             </span>
           ) : null}
           <div className="min-w-0">
-            <h2 className="text-[15px] font-bold tracking-[-0.01em]">{title}</h2>
+            <h2 className="text-[16.5px] font-bold tracking-[-0.01em]">{title}</h2>
             {description ? (
-              <p className="mt-1 max-w-2xl text-[13px] leading-[1.5] text-sub">
+              <p className="mt-1 max-w-2xl text-[14px] leading-[1.55] text-sub">
                 {description}
               </p>
             ) : null}
@@ -50,24 +50,34 @@ export function SectionCard({
 export function Field({
   label,
   required,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
+  error?: string | null;
   children: ReactNode;
 }) {
   const { t } = useLayoutTranslation('content');
   return (
     <label className="grid gap-1.5">
-      <span className="text-[13px] font-bold">
+      <span className="text-[14px] font-bold">
         {label}
         {required ? (
           <span className="ml-1 text-danger">{t('exercise.required_mark')}</span>
         ) : null}
       </span>
       {children}
+      {error ? (
+        <span className="text-[13.5px] font-semibold text-danger">{error}</span>
+      ) : null}
     </label>
   );
+}
+
+/** Red ring on the offending input, so the error and its cause read together. */
+export function invalidClass(error?: string | null) {
+  return error ? 'border-danger focus:border-danger focus:ring-danger/20' : '';
 }
 
 export function TextAreaField({
@@ -86,7 +96,7 @@ export function TextAreaField({
   return (
     <Field label={label}>
       <textarea
-        className={`min-h-28 w-full resize-y rounded-lg border px-3 py-2.5 font-mono text-[13px] outline-none transition-colors disabled:opacity-60 ${
+        className={`min-h-28 w-full resize-y rounded-lg border px-3 py-2.5 font-mono text-[14px] outline-none transition-colors disabled:opacity-60 ${
           dark
             ? 'border-[#2d2d2d] bg-[#1e1e1e] text-[#d4d4d4] focus:border-brand'
             : 'border-border bg-white text-ink focus:border-brand focus:ring-2 focus:ring-brand/20'

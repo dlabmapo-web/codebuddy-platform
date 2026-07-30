@@ -14,6 +14,8 @@ The first version handles syntax-related execution failures only:
 
 It does not explain logical errors, failed test cases, runtime exceptions, or provide a complete corrected solution.
 
+All student-facing Error Coach lessons, AI explanations, loading states, quota messages, fallbacks, and errors are written in natural Korean. Internal rule identifiers and developer diagnostics may remain in English.
+
 ## Student Experience
 
 1. The student clicks **Run**.
@@ -101,6 +103,7 @@ The server validates that the error is syntax-related and checks for an existing
 
 The model is instructed to:
 
+- respond only in natural, age-appropriate Korean;
 - teach the syntax concept in two or three short sentences;
 - refer to the relevant line;
 - suggest what to inspect;

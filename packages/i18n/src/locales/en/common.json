@@ -15,7 +15,8 @@
     "search": "Search",
     "select": "Select",
     "sign_out": "Sign out",
-    "try_again": "Try again"
+    "try_again": "Try again",
+    "close": "Close"
   },
   "state": {
     "loading": "Loading…",

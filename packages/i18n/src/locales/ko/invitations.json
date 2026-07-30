@@ -6,7 +6,20 @@
   "link_notice": "이 링크는 한 번만 표시됩니다. 지금 복사하세요.",
   "loading": "초대 목록을 불러오는 중…",
   "load_failed": "초대 목록을 불러오지 못했습니다.",
-  "meta": "{{role}} · {{status}} · 만료 {{date}}",
   "revoke": "초대 취소",
-  "revoke_failed": "초대를 취소하지 못했습니다."
+  "revoke_failed": "초대를 취소하지 못했습니다.",
+  "column": {
+    "email": "이메일",
+    "status": "상태",
+    "role": "역할",
+    "expires": "만료일",
+    "actions": "작업"
+  },
+  "search_placeholder": "이메일 검색",
+  "empty": "초대가 없습니다.",
+  "creating": "보내는 중…",
+  "create_heading": "새 초대",
+  "create_body": "이메일과 역할을 정하면 초대 링크가 만들어집니다.",
+  "email_label": "이메일",
+  "role_label": "역할"
 }

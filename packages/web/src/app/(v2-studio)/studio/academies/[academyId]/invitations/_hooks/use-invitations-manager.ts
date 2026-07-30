@@ -15,6 +15,7 @@ export function useInvitationsManager(academyId: string) {
   const queryKey = ['academy', academyId, 'invitations'];
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<AcademyRole>('STUDENT');
+  const [formOpen, setFormOpen] = useState(false);
   const [invitationLink, setInvitationLink] = useState<string>();
   const invitationsQuery = useQuery({
     queryKey,
@@ -44,6 +45,9 @@ export function useInvitationsManager(academyId: string) {
     email,
     setEmail,
     role,
+    formOpen,
+    openForm: () => setFormOpen(true),
+    closeForm: () => setFormOpen(false),
     setRole,
     invitationLink,
     copyInvitationLink: () =>

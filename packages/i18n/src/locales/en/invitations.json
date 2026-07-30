@@ -6,7 +6,20 @@
   "link_notice": "Copy this link now—it is shown only once.",
   "loading": "Loading invitations…",
   "load_failed": "The invitations could not be loaded.",
-  "meta": "{{role}} · {{status}} · expires {{date}}",
   "revoke": "Revoke",
-  "revoke_failed": "The invitation could not be revoked."
+  "revoke_failed": "The invitation could not be revoked.",
+  "column": {
+    "email": "Email",
+    "status": "Status",
+    "role": "Role",
+    "expires": "Expires",
+    "actions": "Actions"
+  },
+  "search_placeholder": "Search by email",
+  "empty": "No invitations yet.",
+  "creating": "Creating…",
+  "create_heading": "New invitation",
+  "create_body": "Choose an email and a role, and a join link is created.",
+  "email_label": "Email",
+  "role_label": "Role"
 }

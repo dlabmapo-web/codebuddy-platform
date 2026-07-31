@@ -16,6 +16,7 @@ export const layoutNamespaces = [
   "invitations",
   "courses",
   "content",
+  "learn",
   "errors",
   "validation",
 ] as const;

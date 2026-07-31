@@ -1,0 +1,82 @@
+{
+  "catalog": {
+    "title": "내 코스",
+    "description": "학원에 공개된 코스입니다. 코스를 열어 문제를 확인하세요.",
+    "empty_title": "아직 공개된 코스가 없습니다",
+    "empty_body": "학원에서 공개한 코스가 없습니다. 팀 리드가 코스를 공개하면 여기에 표시됩니다.",
+    "forbidden_title": "학습 화면을 볼 수 없습니다",
+    "forbidden_body": "학습하려면 활성 상태의 학원 멤버십이 필요합니다. 학원 관리자에게 계정 확인을 요청하세요.",
+    "counts": "모듈 {{modules}} · 강의 {{lectures}} · 문제 {{exercises}}",
+    "progress_started_other": "문제 {{count}}개 진행 중",
+    "progress_none": "아직 시작하지 않음",
+    "open": "코스 열기"
+  },
+  "continue": {
+    "title": "이어서 풀기",
+    "subtitle_other": "저장된 코드 {{count}}개",
+    "lines_other": "코드 {{count}}줄 저장됨",
+    "empty_lines": "빈 코드",
+    "discard": "저장된 코드 삭제",
+    "discarding": "삭제 중…"
+  },
+  "outline": {
+    "back": "전체 코스",
+    "search_placeholder": "문제 검색",
+    "search_clear": "검색어 지우기",
+    "no_results": "검색 결과가 없습니다.",
+    "empty_title": "아직 문제가 없습니다",
+    "empty_body": "공개된 버전에 표시할 문제가 없습니다.",
+    "module_label": "모듈 {{position}}",
+    "lecture_label": "강의 {{position}}",
+    "lecture_empty": "이 강의에는 아직 문제가 없습니다.",
+    "progress": "{{total}}문제 중 {{solved}}문제 완료",
+    "expand": "모듈 펼치기",
+    "collapse": "모듈 접기",
+    "version": "버전 {{number}}"
+  },
+  "status": {
+    "NOT_STARTED": "미시작",
+    "IN_PROGRESS": "진행 중",
+    "SOLVED": "완료"
+  },
+  "workspace": {
+    "problem": "문제",
+    "format": "형식",
+    "input": "입력",
+    "output": "출력",
+    "examples": "예제",
+    "constraints": "제약 조건",
+    "hints": "힌트",
+    "example_n": "예제 {{number}}",
+    "stdin": "입력",
+    "stdout": "예상 출력",
+    "reveal_hint_other": "힌트 보기 ({{remaining}}개 남음)",
+    "hidden_count_other": "제출하면 비공개 테스트 {{count}}개도 함께 실행됩니다.",
+    "back": "코스로 돌아가기",
+    "previous": "이전 문제",
+    "next": "다음 문제",
+    "terminal": "터미널",
+    "terminal_hint": "코드를 실행하면 결과가 여기에 표시됩니다.",
+    "stdin_prompt": "프로그램 입력",
+    "interactive_unsupported": "이 브라우저에서는 대화식 입력을 사용할 수 없습니다. 코드는 실행되지만 input()이 입력을 요청하지 않습니다.",
+    "editor_loading": "에디터 로딩 중…",
+    "run": "실행",
+    "stop": "중지",
+    "preparing": "준비 중…",
+    "sample_n": "예 {{number}}",
+    "run_sample_n": "예제 {{number}} 실행",
+    "sample_match": "예제 {{number}} 결과가 예상 출력과 일치합니다.",
+    "sample_mismatch": "예제 {{number}} 결과가 예상 출력과 다릅니다.",
+    "sample_skipped": "프로그램이 끝나지 않아 예제 비교를 건너뜁니다.",
+    "expected": "예상 출력:",
+    "tab_problem": "문제",
+    "tab_code": "코드",
+    "save_state": {
+      "local": "기기에 저장됨",
+      "saving": "저장 중…",
+      "saved": "저장됨",
+      "error": "동기화 안 됨"
+    },
+    "resize_terminal": "터미널 크기 조절"
+  }
+}

@@ -12,6 +12,7 @@ import type content from '@cove/i18n/locales/en/content.json';
 import type courses from '@cove/i18n/locales/en/courses.json';
 import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
+import type learn from '@cove/i18n/locales/en/learn.json';
 import type members from '@cove/i18n/locales/en/members.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
 import type validation from '@cove/i18n/locales/en/validation.json';
@@ -28,6 +29,7 @@ declare module 'i18next' {
       courses: typeof courses;
       errors: typeof errors;
       invitations: typeof invitations;
+      learn: typeof learn;
       members: typeof members;
       nav: typeof nav;
       validation: typeof validation;

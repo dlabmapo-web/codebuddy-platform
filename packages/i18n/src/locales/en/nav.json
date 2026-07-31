@@ -6,14 +6,16 @@
   "group": {
     "overview": "Academy",
     "content": "Curriculum",
-    "people": "People"
+    "people": "People",
+    "learning": "Learning"
   },
   "link": {
     "overview": "Overview",
     "courses": "Courses",
     "members": "Members",
     "applications": "Applications",
-    "invitations": "Invitations"
+    "invitations": "Invitations",
+    "my_courses": "My courses"
   },
   "academy_switcher": {
     "select": "Select academy",

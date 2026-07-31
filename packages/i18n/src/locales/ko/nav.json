@@ -6,14 +6,16 @@
   "group": {
     "overview": "학원",
     "content": "커리큘럼",
-    "people": "구성원"
+    "people": "구성원",
+    "learning": "학습"
   },
   "link": {
     "overview": "개요",
     "courses": "코스",
     "members": "멤버",
     "applications": "가입 신청",
-    "invitations": "초대"
+    "invitations": "초대",
+    "my_courses": "내 코스"
   },
   "academy_switcher": {
     "select": "학원 선택",

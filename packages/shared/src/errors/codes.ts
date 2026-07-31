@@ -37,6 +37,9 @@ export const appErrorCodes = [
   "EXERCISE_NOT_FOUND",
   "EXERCISE_VALIDATION_FAILED",
   "CONTENT_EDIT_CONFLICT",
+  "COURSE_NOT_PUBLISHED",
+  "EXERCISE_NOT_AVAILABLE",
+  "DRAFT_TOO_LARGE",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -86,4 +89,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   EXERCISE_NOT_FOUND: "The selected programming problem was not found.",
   EXERCISE_VALIDATION_FAILED: "Complete the required problem fields and try again.",
   CONTENT_EDIT_CONFLICT: "This problem changed in another session. Reload it before saving again.",
+  COURSE_NOT_PUBLISHED: "This course has no published version yet.",
+  EXERCISE_NOT_AVAILABLE: "This problem is not available.",
+  DRAFT_TOO_LARGE: "Your code is too large to save.",
 };

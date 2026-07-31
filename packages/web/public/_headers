@@ -3,15 +3,19 @@
 # SharedArrayBuffer(cross-origin isolated)를 위해 워커/Pyodide 정적 자산에도
 # 동일한 COOP/COEP/CORP 헤더를 명시한다.
 
+# Pyodide 자산(약 13 MB)은 체크인된 릴리스에 고정되어 있어 내용이 바뀌면 경로/쿼리가
+# 바뀐다. 따라서 immutable 로 캐시하여 학생이 세션마다가 아니라 최초 1회만 내려받게 한다.
 /pyodide-worker.js
   Cross-Origin-Embedder-Policy: credentialless
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: public, max-age=31536000, immutable
 
 /pyodide/*
   Cross-Origin-Embedder-Policy: credentialless
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
+  Cache-Control: public, max-age=31536000, immutable
 
 # 페이지가 어디서 진입하든 격리가 유지되도록 전역 기본값도 명시 (SSR 라우트는
 # next.config.ts 에서도 적용되지만, 정적으로 서빙될 수 있는 경로까지 이중 보장)

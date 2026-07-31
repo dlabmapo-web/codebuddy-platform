@@ -6,8 +6,14 @@ const crossOriginIsolationHeaders = [
 ];
 
 // 워커/파이오다이드 자원(같은 출처 하위 리소스)에 CORP 부여 (COEP 는 전역 규칙에서 적용)
+//
+// Pyodide ships ~13 MB of assets (a 10 MB wasm, a 2.4 MB stdlib zip). They are
+// pinned to a checked-in release and change only when that release is upgraded,
+// so they are cached immutably: a student pays the download once, not once per
+// session. The worker is versioned by the `?v=` query its loader appends.
 const workerAssetHeaders = [
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
 ];
 
 const nextConfig: NextConfig = {

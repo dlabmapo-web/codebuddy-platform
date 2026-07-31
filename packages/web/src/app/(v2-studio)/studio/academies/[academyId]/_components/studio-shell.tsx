@@ -7,6 +7,7 @@ import {
   SidebarTrigger,
 } from '@/components/studio/sidebar';
 import {
+  canLearn,
   canManageAcademy,
   canReviewContent,
 } from '@/lib/academy-access-state';
@@ -54,6 +55,7 @@ export async function StudioShell({
       <StudioSidebar
         academies={academies}
         academyId={academyId}
+        canLearn={canLearn(role)}
         canManageAcademy={canManageAcademy(role)}
         canManageContent={canReviewContent(role)}
       />

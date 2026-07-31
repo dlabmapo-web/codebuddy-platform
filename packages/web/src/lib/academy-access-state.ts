@@ -67,7 +67,12 @@ export function resolveAcademyAccessState(
 export function authDestination(account: AuthMeResponse): string {
   const state = resolveAcademyAccessState(account);
   if (state.kind === 'active') {
-    return `/studio/academies/${state.membership.academy.id}`;
+    const { academy, role } = state.membership;
+    // A Student has no management surface, so the academy overview would be an
+    // empty page for them. Send them where their work is.
+    return role === 'STUDENT'
+      ? `/studio/academies/${academy.id}/learn/courses`
+      : `/studio/academies/${academy.id}`;
   }
   if (state.kind === 'welcome') {
     return '/auth/welcome';
@@ -147,6 +152,16 @@ export function pendingStateView(
 
 export function canManageAcademy(role: AcademyRole | null | undefined): boolean {
   return role === 'MANAGER';
+}
+
+/**
+ * Every role holds `curriculum.read`, so the Learning group is always shown —
+ * a Team Lead can walk their own curriculum exactly as a student sees it. A
+ * Student holds nothing else, so the People and Content gates below already
+ * hide those groups without any role check specific to students.
+ */
+export function canLearn(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'curriculum.read') : false;
 }
 
 export function canManageContent(role: AcademyRole | null | undefined): boolean {

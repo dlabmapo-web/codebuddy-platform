@@ -4,6 +4,7 @@ import type { AcademyRole } from '@cove/shared';
 import {
   BookOpen,
   ChevronsUpDown,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -61,11 +62,13 @@ type NavGroup = {
 export function StudioSidebar({
   academies,
   academyId,
+  canLearn,
   canManageAcademy,
   canManageContent,
 }: {
   academies: StudioAcademy[];
   academyId: string;
+  canLearn: boolean;
   canManageAcademy: boolean;
   canManageContent: boolean;
 }) {
@@ -73,6 +76,7 @@ export function StudioSidebar({
   const pathname = usePathname();
   const groups = studioNavGroups({
     academyId,
+    canLearn,
     canManageAcademy,
     canManageContent,
   });
@@ -233,10 +237,12 @@ function AcademySwitcher({
 
 function studioNavGroups({
   academyId,
+  canLearn,
   canManageAcademy,
   canManageContent,
 }: {
   academyId: string;
+  canLearn: boolean;
   canManageAcademy: boolean;
   canManageContent: boolean;
 }): NavGroup[] {
@@ -248,6 +254,20 @@ function studioNavGroups({
       items: [{ href: base, labelKey: 'link.overview', icon: LayoutDashboard }],
     },
   ];
+
+  if (canLearn) {
+    groups.push({
+      id: 'learning',
+      labelKey: 'group.learning',
+      items: [
+        {
+          href: `${base}/learn/courses`,
+          labelKey: 'link.my_courses',
+          icon: GraduationCap,
+        },
+      ],
+    });
+  }
 
   if (canManageContent) {
     groups.push({

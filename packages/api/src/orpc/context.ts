@@ -14,6 +14,7 @@ import type { AcademyMembershipService } from "../academies/academy-membership.s
 import type { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import type { RateLimitService } from "../academies/rate-limit.service.js";
 import type { CourseService } from "../content/course.service.js";
+import type { LearnService } from "../learn/learn.service.js";
 
 export type ORPCContext = { req: Request };
 export type ORPCImplementer = ReturnType<
@@ -31,6 +32,7 @@ export type ORPCDeps = {
   academyOnboardingService: AcademyOnboardingService;
   rateLimitService: RateLimitService;
   courseService: CourseService;
+  learnService: LearnService;
 };
 
 export function requestAddress(req: Request): string {

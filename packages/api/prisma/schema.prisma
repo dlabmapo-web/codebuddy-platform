@@ -123,6 +123,7 @@ model User {
   coursesCreated          Course[]             @relation("CourseCreator")
   courseVersionsCreated   CourseVersion[]      @relation("CourseVersionCreator")
   courseVersionsPublished CourseVersion[]      @relation("CourseVersionPublisher")
+  exerciseDrafts          ExerciseDraft[]
 
   @@index([status])
   @@map("users")
@@ -368,6 +369,7 @@ model Material {
 
   lecture             Lecture              @relation(fields: [lectureId], references: [id], onDelete: Cascade)
   programmingExercise ProgrammingExercise?
+  drafts              ExerciseDraft[]
 
   @@unique([lectureId, position])
   @@index([lectureId])
@@ -416,6 +418,29 @@ model ExerciseTestCase {
 
   @@unique([exerciseMaterialId, position])
   @@map("exercise_test_cases")
+}
+
+/// A student's work in progress on one exercise.
+///
+/// Deliberately separate from any submission or collaboration record: v1 stored
+/// drafts in `collaboration_sessions.final_code`, which tangled "what I am
+/// typing" together with "who is watching me" and cleared a student's working
+/// solution once it passed. One row per student per exercise, kept even after a
+/// correct answer.
+model ExerciseDraft {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  materialId String   @map("material_id") @db.Uuid
+  code       String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("exercise_drafts")
 }
 
 model ExerciseHint {

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Prisma needs these to generate a client. They point at nothing: no step in
+  # this workflow connects to a database.
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # @cove/shared and @cove/i18n are consumed as built packages, so they
+      # compile before anything type-checks against them.
+      - name: Build shared packages
+        run: pnpm --filter @cove/shared --filter @cove/i18n build
+
+      - name: Generate Prisma client
+        run: pnpm --filter @cove/api db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm --filter @cove/api db:validate
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm -r build

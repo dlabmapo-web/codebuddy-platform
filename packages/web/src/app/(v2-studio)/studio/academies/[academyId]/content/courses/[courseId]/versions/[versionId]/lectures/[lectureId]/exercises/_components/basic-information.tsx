@@ -16,7 +16,7 @@ import {
   invalidClass,
   SectionCard,
 } from './authoring-fields';
-import { RichTextFrame } from './rich-text-frame';
+import { RichTextFrame } from '@/components/studio/rich-text-frame';
 
 const RichEditor = dynamic(
   () =>

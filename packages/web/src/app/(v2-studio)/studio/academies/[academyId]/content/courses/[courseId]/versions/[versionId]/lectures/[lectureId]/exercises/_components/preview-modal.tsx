@@ -6,7 +6,7 @@ import * as React from 'react';
 import { useLayoutTranslation } from '@/i18n';
 
 import { type ExerciseDraft } from '../_lib/exercise-draft';
-import { RichTextFrame } from './rich-text-frame';
+import { RichTextFrame } from '@/components/studio/rich-text-frame';
 
 /** Same green → amber → red scale the course builder uses for difficulty. */
 const difficultyStyles = {

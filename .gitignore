@@ -55,3 +55,5 @@ supabase/.temp/
 docs/*
 !docs/design/
 !docs/design/**
+test-results/
+playwright-report/

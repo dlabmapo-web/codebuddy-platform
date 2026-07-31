@@ -19,7 +19,8 @@
     "db:seed": "tsx prisma/seed/seed.ts",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:seed:e2e": "tsx prisma/seed/e2e-content.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

@@ -5,6 +5,7 @@ import {
   BookOpen,
   ChevronsUpDown,
   GraduationCap,
+  Presentation,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -64,12 +65,14 @@ export function StudioSidebar({
   academyId,
   canLearn,
   canManageAcademy,
+  canManageClasses,
   canManageContent,
 }: {
   academies: StudioAcademy[];
   academyId: string;
   canLearn: boolean;
   canManageAcademy: boolean;
+  canManageClasses: boolean;
   canManageContent: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
@@ -78,6 +81,7 @@ export function StudioSidebar({
     academyId,
     canLearn,
     canManageAcademy,
+    canManageClasses,
     canManageContent,
   });
   // Decided across every group: the Overview link prefixes all the others, so
@@ -239,11 +243,13 @@ function studioNavGroups({
   academyId,
   canLearn,
   canManageAcademy,
+  canManageClasses,
   canManageContent,
 }: {
   academyId: string;
   canLearn: boolean;
   canManageAcademy: boolean;
+  canManageClasses: boolean;
   canManageContent: boolean;
 }): NavGroup[] {
   const base = `/studio/academies/${academyId}`;
@@ -278,6 +284,23 @@ function studioNavGroups({
           href: `${base}/content/courses`,
           labelKey: 'link.courses',
           icon: BookOpen,
+        },
+      ],
+    });
+  }
+
+  // Its own group, gated on class management rather than curriculum or
+  // membership rights: a Team Lead sees it without academy administration,
+  // and a Teacher does not see it at all in this phase.
+  if (canManageClasses) {
+    groups.push({
+      id: 'teaching',
+      labelKey: 'group.teaching',
+      items: [
+        {
+          href: `${base}/classes`,
+          labelKey: 'link.classes',
+          icon: Presentation,
         },
       ],
     });

@@ -9,6 +9,7 @@ import {
 import {
   canLearn,
   canManageAcademy,
+  canManageClasses,
   canReviewContent,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -20,6 +21,7 @@ export async function StudioShell({
   description,
   actions,
   bleed = false,
+  showPageHeading = true,
   children,
 }: {
   academyId: string;
@@ -28,6 +30,8 @@ export async function StudioShell({
   actions?: React.ReactNode;
   /** Skip the white content card so a page can lay out its own panels. */
   bleed?: boolean;
+  /** Hide the shell heading when the page owns a live, interactive heading. */
+  showPageHeading?: boolean;
   children: React.ReactNode;
 }) {
   let academies: StudioAcademy[] = [];
@@ -57,6 +61,7 @@ export async function StudioShell({
         academyId={academyId}
         canLearn={canLearn(role)}
         canManageAcademy={canManageAcademy(role)}
+        canManageClasses={canManageClasses(role)}
         canManageContent={canReviewContent(role)}
       />
       <SidebarInset>
@@ -68,19 +73,21 @@ export async function StudioShell({
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-[1.7rem] font-extrabold leading-tight">
-                {title}
-              </h1>
-              {description ? (
-                <p className="mt-2 max-w-2xl text-[15px] leading-[1.65] text-sub">
-                  {description}
-                </p>
-              ) : null}
+          {showPageHeading ? (
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className="text-[1.7rem] font-extrabold leading-tight">
+                  {title}
+                </h1>
+                {description ? (
+                  <p className="mt-2 max-w-2xl text-[15px] leading-[1.65] text-sub">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+              {actions ? <div className="flex gap-2">{actions}</div> : null}
             </div>
-            {actions ? <div className="flex gap-2">{actions}</div> : null}
-          </div>
+          ) : null}
 
           {bleed ? (
             children

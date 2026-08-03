@@ -172,6 +172,21 @@ export function canReviewContent(role: AcademyRole | null | undefined): boolean 
   return role ? roleHasPermission(role, 'curriculum.review') : false;
 }
 
+/**
+ * Class structure and enrollment are deliberately separate gates: a Team Lead
+ * arranges what a class learns, but only a Manager decides who sits in it,
+ * because that changes a student's access.
+ */
+export function canManageClasses(role: AcademyRole | null | undefined): boolean {
+  return role ? roleHasPermission(role, 'classes.manage') : false;
+}
+
+export function canManageEnrollment(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role ? roleHasPermission(role, 'class-enrollments.manage') : false;
+}
+
 export function canManageExercises(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'exercises.manage') : false;
 }

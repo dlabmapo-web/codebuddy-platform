@@ -6,6 +6,8 @@ import {
   academyRoleFor,
   canManageContent,
   canManageAcademy,
+  canManageClasses,
+  canManageEnrollment,
   canManageExercises,
   canPublishContent,
   canReviewContent,
@@ -126,6 +128,25 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageContent('TEACHER')).toBe(false);
     expect(canManageContent('STUDENT')).toBe(false);
     expect(canManageContent(null)).toBe(false);
+  });
+
+  it('shows the Teaching group to team leads and managers only', () => {
+    expect(canManageClasses('TEAM_LEAD')).toBe(true);
+    expect(canManageClasses('MANAGER')).toBe(true);
+    expect(canManageClasses('TEACHER')).toBe(false);
+    expect(canManageClasses('STUDENT')).toBe(false);
+    expect(canManageClasses(null)).toBe(false);
+  });
+
+  it('shows enrollment controls to managers alone', () => {
+    expect(canManageEnrollment('MANAGER')).toBe(true);
+    // A Team Lead reaches the class page and reads the roster, but the add
+    // and remove controls stay hidden.
+    expect(canManageClasses('TEAM_LEAD')).toBe(true);
+    expect(canManageEnrollment('TEAM_LEAD')).toBe(false);
+    expect(canManageEnrollment('TEACHER')).toBe(false);
+    expect(canManageEnrollment('STUDENT')).toBe(false);
+    expect(canManageEnrollment(null)).toBe(false);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

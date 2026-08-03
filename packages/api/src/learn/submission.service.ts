@@ -198,6 +198,7 @@ export class SubmissionService {
       status: submission.status,
       passedCount: submission.passedCount,
       totalCount: submission.totalCount,
+      score: submission.score,
       runtimeMs: submission.runtimeMs,
       failureReason: submission.failureReason,
       elapsedSec: Math.max(

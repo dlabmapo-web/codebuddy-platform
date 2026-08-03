@@ -153,8 +153,8 @@ export class LearnService {
                     title: material.title,
                     position: material.position,
                     difficulty: material.programmingExercise.difficulty,
-                    status:
-                      statuses.get(material.id) ?? "NOT_STARTED",
+                    status: statuses.get(material.id)?.status ?? "NOT_STARTED",
+                    bestScore: statuses.get(material.id)?.bestScore ?? 0,
                   },
                 ]
               : [],
@@ -480,8 +480,11 @@ export class LearnService {
   private async statusByMaterial(
     userId: string,
     materialIds: string[],
-  ): Promise<Map<string, ExerciseProgressStatus>> {
-    const statuses = new Map<string, ExerciseProgressStatus>();
+  ): Promise<Map<string, { status: ExerciseProgressStatus; bestScore: number }>> {
+    const statuses = new Map<
+      string,
+      { status: ExerciseProgressStatus; bestScore: number }
+    >();
     if (materialIds.length === 0) return statuses;
 
     const [drafts, progress] = await Promise.all([
@@ -491,16 +494,22 @@ export class LearnService {
       }),
       this.prisma.studentExerciseProgress.findMany({
         where: { userId, materialId: { in: materialIds } },
-        select: { materialId: true, status: true },
+        select: { materialId: true, status: true, bestScore: true },
       }),
     ]);
 
     for (const draft of drafts) {
-      statuses.set(draft.materialId, progressStatusFromDraft(true));
+      statuses.set(draft.materialId, {
+        status: progressStatusFromDraft(true),
+        bestScore: 0,
+      });
     }
     for (const record of progress) {
       if (record.status === "NOT_STARTED") continue;
-      statuses.set(record.materialId, record.status);
+      statuses.set(record.materialId, {
+        status: record.status,
+        bestScore: record.bestScore,
+      });
     }
     return statuses;
   }
@@ -508,12 +517,12 @@ export class LearnService {
 
 function countProgress(
   materialIds: string[],
-  statuses: Map<string, ExerciseProgressStatus>,
+  statuses: Map<string, { status: ExerciseProgressStatus; bestScore: number }>,
 ) {
   let started = 0;
   let solved = 0;
   for (const id of materialIds) {
-    const status = statuses.get(id);
+    const status = statuses.get(id)?.status;
     if (status === "SOLVED") solved += 1;
     else if (status === "IN_PROGRESS") started += 1;
   }

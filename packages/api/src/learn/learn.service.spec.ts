@@ -287,6 +287,33 @@ describe("LearnService.getExerciseWorkspace", () => {
 });
 
 describe("LearnService.getCourseOutline", () => {
+  it("exposes the highest score for each exercise", async () => {
+    const version = createMaterialRecord().lecture.courseModule.courseVersion;
+    const { service } = createService({
+      course: {
+        id: courseId,
+        title: "Python",
+        description: "",
+        versions: [version],
+      },
+      progressRows: [
+        {
+          materialId,
+          status: "IN_PROGRESS",
+          bestScore: 67,
+        },
+      ],
+    });
+
+    const outline = await service.getCourseOutline(identity, {
+      academyId,
+      courseId,
+    });
+
+    expect(outline.modules[0]?.lectures[0]?.exercises[0]?.bestScore).toBe(67);
+    expect(outline.modules[0]?.lectures[0]?.exercises[1]?.bestScore).toBe(0);
+  });
+
   it("reports COURSE_NOT_FOUND for a course outside the academy", async () => {
     const { service } = createService({ course: null });
 

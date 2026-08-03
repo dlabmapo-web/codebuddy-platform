@@ -60,6 +60,7 @@ function createService(options?: {
     status: "FAILED",
     passedCount: 1,
     totalCount: 2,
+    score: 50,
     runtimeMs: 12,
     failureReason: null,
     createdAt: new Date("2026-07-31T00:00:00Z"),
@@ -150,6 +151,13 @@ describe("SubmissionService.submit", () => {
 });
 
 describe("SubmissionService result disclosure and ownership", () => {
+  it("returns the persisted score", async () => {
+    const { service } = createService();
+    const result = await service.get(identity, { academyId, submissionId });
+
+    expect(result.score).toBe(50);
+  });
+
   it("never returns hidden input, expectation, or actual output", async () => {
     const { service } = createService();
     const result = await service.get(identity, { academyId, submissionId });

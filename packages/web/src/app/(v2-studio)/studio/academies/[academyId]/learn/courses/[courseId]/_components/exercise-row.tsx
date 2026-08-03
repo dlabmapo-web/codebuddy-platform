@@ -55,6 +55,11 @@ export function ExerciseRow({
         >
           {t(`content:exercise.difficulty.${exercise.difficulty}`)}
         </span>
+        {exercise.bestScore > 0 ? (
+          <span className="shrink-0 font-mono text-[11.5px] font-bold text-sub">
+            {t('learn:outline.score', { score: exercise.bestScore })}
+          </span>
+        ) : null}
         <span
           className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${status.className}`}
         >

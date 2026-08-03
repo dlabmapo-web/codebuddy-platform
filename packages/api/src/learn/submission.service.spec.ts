@@ -127,7 +127,11 @@ function createService(options?: {
     ),
   } as unknown as PrismaService;
   const access = {
-    requirePermission: vi.fn().mockResolvedValue({ userId, academyId }),
+    requirePermission: vi.fn().mockResolvedValue({
+      userId,
+      academyId,
+      role: "STUDENT",
+    }),
   } as unknown as AcademyAccessService;
   const queue = {
     consumeSubmissionToken: vi.fn().mockResolvedValue(options?.allowed ?? true),
@@ -206,12 +210,40 @@ describe("SubmissionService.submit", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: materialId,
-          isVisible: true,
-          lecture: expect.objectContaining({ isVisible: true }),
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              isVisible: true,
+              lecture: expect.objectContaining({ isVisible: true }),
+            }),
+          ]),
         }),
       }),
     );
     expect(prisma.material.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("also requires an active class assignment before grading", async () => {
+    const { service, transaction } = createService();
+
+    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+
+    expect(transaction.material.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              lecture: {
+                courseModule: {
+                  course: expect.objectContaining({
+                    classAssignments: expect.anything(),
+                  }),
+                },
+              },
+            },
+          ]),
+        }),
+      }),
+    );
   });
 });
 

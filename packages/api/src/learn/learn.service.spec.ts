@@ -1,3 +1,4 @@
+import type { AcademyRole } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -152,6 +153,7 @@ function createService(options?: {
   material?: ReturnType<typeof workspaceMaterial> | null;
   draft?: { code: string; updatedAt: Date } | null;
   progress?: { status: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED"; gradingRevision: number } | null;
+  role?: AcademyRole;
 }) {
   const course = options?.course === undefined ? visibleCourse() : options.course;
   const material =
@@ -176,7 +178,11 @@ function createService(options?: {
     },
   } as unknown as PrismaService;
   const access = {
-    requirePermission: vi.fn().mockResolvedValue({ userId, academyId }),
+    requirePermission: vi.fn().mockResolvedValue({
+      userId,
+      academyId,
+      role: options?.role ?? "STUDENT",
+    }),
   } as unknown as AcademyAccessService;
   return { prisma, access, service: new LearnService(prisma, access) };
 }
@@ -192,7 +198,9 @@ describe("LearnService visible curriculum", () => {
       counts: { modules: 1, lectures: 1, exercises: 2 },
     });
     expect(prisma.course.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { academyId, isVisible: true } }),
+      expect.objectContaining({
+        where: expect.objectContaining({ academyId, isVisible: true }),
+      }),
     );
   });
 
@@ -213,14 +221,18 @@ describe("LearnService visible curriculum", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: materialId,
-          isVisible: true,
-          lecture: expect.objectContaining({
-            isVisible: true,
-            courseModule: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
               isVisible: true,
-              course: { academyId, isVisible: true },
+              lecture: expect.objectContaining({
+                isVisible: true,
+                courseModule: expect.objectContaining({
+                  isVisible: true,
+                  course: { academyId, isVisible: true },
+                }),
+              }),
             }),
-          }),
+          ]),
         }),
       }),
     );
@@ -292,6 +304,91 @@ describe("LearnService visible curriculum", () => {
           courseId,
         }),
       }),
+    );
+  });
+});
+
+/**
+ * Filtering the catalog alone would leave every direct URL open, so these
+ * assert the class predicate reaches each entry point rather than only the
+ * list a student is shown.
+ */
+describe("LearnService class-assigned access", () => {
+  const activeAssignment = {
+    classAssignments: {
+      some: {
+        class: expect.objectContaining({
+          academyId,
+          status: "ACTIVE",
+          enrollments: {
+            some: {
+              membership: { academyId, userId, status: "ACTIVE", role: "STUDENT" },
+            },
+          },
+        }),
+      },
+    },
+  };
+
+  it("limits a student's catalog to courses their active classes assign", async () => {
+    const { service, prisma } = createService();
+
+    await service.listCourses(identity, academyId);
+
+    expect(prisma.course.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining(activeAssignment),
+      }),
+    );
+  });
+
+  it("gates a course outline read on the same assignment", async () => {
+    const { service, prisma } = createService();
+
+    await service.getCourseOutline(identity, { academyId, courseId });
+
+    expect(prisma.course.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining(activeAssignment),
+      }),
+    );
+  });
+
+  it("reports an unassigned course as not found, revealing no title", async () => {
+    const { service } = createService({ course: null });
+
+    await expect(
+      service.getCourseOutline(identity, { academyId, courseId }),
+    ).rejects.toMatchObject({ code: "COURSE_NOT_FOUND" });
+  });
+
+  it("gates the workspace, draft save, and draft discard by direct URL", async () => {
+    const { service, prisma } = createService();
+
+    await service.getExerciseWorkspace(identity, { academyId, materialId });
+    await service.saveDraft(identity, { academyId, materialId, code: "x" });
+    await service.discardDraft(identity, { academyId, materialId });
+
+    const scoped = {
+      lecture: { courseModule: { course: expect.objectContaining(activeAssignment) } },
+    };
+    for (const call of vi.mocked(prisma.material.findFirst).mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({ AND: expect.arrayContaining([scoped]) }),
+        }),
+      );
+    }
+    expect(prisma.material.findFirst).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not make staff enroll in a class to preview their own curriculum", async () => {
+    const { service, prisma } = createService({ role: "TEAM_LEAD" });
+
+    await service.listCourses(identity, academyId);
+
+    expect(prisma.course.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { academyId, isVisible: true } }),
     );
   });
 });

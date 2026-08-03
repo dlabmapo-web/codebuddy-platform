@@ -4,11 +4,12 @@ import type { SubmissionResult, SubmissionSummary } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import { learningScopeFor } from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
-import { effectivelyVisibleMaterialWhere } from "./curriculum-visibility.js";
+import { reachableMaterialWhere } from "./curriculum-visibility.js";
 
 @Injectable()
 export class SubmissionService {
@@ -28,11 +29,13 @@ export class SubmissionService {
     identity: SupabaseIdentity,
     input: { academyId: string; materialId: string; code: string },
   ): Promise<{ submissionId: string; totalCount: number }> {
-    const { userId } = await this.access.requirePermission(
+    const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
       "submissions.own.create",
     );
+    const { userId } = actor;
+    const scope = learningScopeFor(input.academyId, actor);
     if (!this.queue) {
       throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -47,7 +50,7 @@ export class SubmissionService {
         const material = await tx.material.findFirst({
           where: {
             id: input.materialId,
-            ...effectivelyVisibleMaterialWhere(input.academyId),
+            ...reachableMaterialWhere(input.academyId, scope),
           },
           include: {
             programmingExercise: {
@@ -113,18 +116,20 @@ export class SubmissionService {
     identity: SupabaseIdentity,
     input: { academyId: string; submissionId: string },
   ): Promise<SubmissionResult> {
-    const { userId } = await this.access.requirePermission(
+    const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
       "curriculum.read",
     );
+    const { userId } = actor;
+    const scope = learningScopeFor(input.academyId, actor);
     const submission = await this.prisma.submission.findFirst({
       where: {
         id: input.submissionId,
         userId,
         course: { academyId: input.academyId },
         material: {
-          is: effectivelyVisibleMaterialWhere(input.academyId),
+          is: reachableMaterialWhere(input.academyId, scope),
         },
       },
       include: {
@@ -192,18 +197,20 @@ export class SubmissionService {
     identity: SupabaseIdentity,
     input: { academyId: string; materialId: string },
   ): Promise<{ submissions: SubmissionSummary[] }> {
-    const { userId } = await this.access.requirePermission(
+    const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
       "curriculum.read",
     );
+    const { userId } = actor;
+    const scope = learningScopeFor(input.academyId, actor);
     const submissions = await this.prisma.submission.findMany({
       where: {
         userId,
         materialId: input.materialId,
         course: { academyId: input.academyId },
         material: {
-          is: effectivelyVisibleMaterialWhere(input.academyId),
+          is: reachableMaterialWhere(input.academyId, scope),
         },
       },
       orderBy: { createdAt: "desc" },
@@ -234,17 +241,19 @@ export class SubmissionService {
     academyId: string,
     submissionId: string,
   ): Promise<void> {
-    const { userId } = await this.access.requirePermission(
+    const actor = await this.access.requirePermission(
       authUserId,
       academyId,
       "curriculum.read",
     );
+    const { userId } = actor;
+    const scope = learningScopeFor(academyId, actor);
     const owned = await this.prisma.submission.findFirst({
       where: {
         id: submissionId,
         userId,
         course: { academyId },
-        material: { is: effectivelyVisibleMaterialWhere(academyId) },
+        material: { is: reachableMaterialWhere(academyId, scope) },
       },
       select: { id: true },
     });

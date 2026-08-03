@@ -12,10 +12,14 @@ import {
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import {
+  learningScopeFor,
+  type LearningScope,
+} from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import { effectivelyVisibleMaterialWhere } from "./curriculum-visibility.js";
+import { reachableMaterialWhere } from "./curriculum-visibility.js";
 
 /** The one student-visible hierarchy. Every read applies all ancestor flags. */
 const visibleCurriculumInclude = {
@@ -53,9 +57,9 @@ export class LearnService {
     identity: SupabaseIdentity,
     academyId: string,
   ): Promise<{ courses: LearnCourseSummary[] }> {
-    const { userId } = await this.requireLearner(identity, academyId);
+    const { userId, scope } = await this.requireLearner(identity, academyId);
     const courses = await this.prisma.course.findMany({
-      where: { academyId, isVisible: true },
+      where: { ...scope.course, isVisible: true },
       include: visibleCurriculumInclude,
       orderBy: [{ title: "asc" }, { id: "asc" }],
     });
@@ -89,8 +93,8 @@ export class LearnService {
     identity: SupabaseIdentity,
     input: { academyId: string; courseId: string },
   ): Promise<LearnCourseOutline> {
-    const { userId } = await this.requireLearner(identity, input.academyId);
-    const course = await this.requireVisibleCourse(input);
+    const { userId, scope } = await this.requireLearner(identity, input.academyId);
+    const course = await this.requireVisibleCourse(input, scope);
     const modules = nonemptyModules(course);
     const materialIds = exerciseMaterialIds({ ...course, modules });
     const statuses = await this.statusByMaterial(userId, materialIds);
@@ -129,11 +133,11 @@ export class LearnService {
     identity: SupabaseIdentity,
     input: { academyId: string; materialId: string },
   ): Promise<LearnExerciseWorkspace> {
-    const { userId } = await this.requireLearner(identity, input.academyId);
+    const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const material = await this.prisma.material.findFirst({
       where: {
         id: input.materialId,
-        ...effectivelyVisibleMaterialWhere(input.academyId),
+        ...reachableMaterialWhere(input.academyId, scope),
       },
       include: {
         programmingExercise: {
@@ -230,11 +234,11 @@ export class LearnService {
   }
 
   async listDrafts(identity: SupabaseIdentity, academyId: string) {
-    const { userId } = await this.requireLearner(identity, academyId);
+    const { userId, scope } = await this.requireLearner(identity, academyId);
     const drafts = await this.prisma.exerciseDraft.findMany({
       where: {
         userId,
-        material: { is: effectivelyVisibleMaterialWhere(academyId) },
+        material: { is: reachableMaterialWhere(academyId, scope) },
       },
       orderBy: { updatedAt: "desc" },
       take: 20,
@@ -266,10 +270,11 @@ export class LearnService {
     identity: SupabaseIdentity,
     input: { academyId: string; materialId: string; code: string },
   ) {
-    const { userId } = await this.requireLearner(identity, input.academyId);
+    const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const material = await this.requireVisibleMaterial(
       input.academyId,
       input.materialId,
+      scope,
     );
     const draft = await this.prisma.exerciseDraft.upsert({
       where: { userId_materialId: { userId, materialId: input.materialId } },
@@ -290,39 +295,52 @@ export class LearnService {
     identity: SupabaseIdentity,
     input: { academyId: string; materialId: string },
   ) {
-    const { userId } = await this.requireLearner(identity, input.academyId);
-    await this.requireVisibleMaterial(input.academyId, input.materialId);
+    const { userId, scope } = await this.requireLearner(identity, input.academyId);
+    await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
     const { count } = await this.prisma.exerciseDraft.deleteMany({
       where: { userId, materialId: input.materialId },
     });
     return { discarded: count > 0 };
   }
 
-  private requireLearner(identity: SupabaseIdentity, academyId: string) {
-    return this.access.requirePermission(
+  /**
+   * The single entry gate for every learning read: it resolves the actor and,
+   * in the same step, the scope their role may reach. Returning them together
+   * is deliberate — a method cannot obtain a `userId` here without also
+   * receiving the predicate it has to apply.
+   */
+  private async requireLearner(identity: SupabaseIdentity, academyId: string) {
+    const actor = await this.access.requirePermission(
       identity.authUserId,
       academyId,
       "curriculum.read",
     );
+    return { ...actor, scope: learningScopeFor(academyId, actor) };
   }
 
-  private async requireVisibleCourse(input: {
-    academyId: string;
-    courseId: string;
-  }) {
+  private async requireVisibleCourse(
+    input: { academyId: string; courseId: string },
+    scope: LearningScope,
+  ) {
     const course = await this.prisma.course.findFirst({
-      where: { id: input.courseId, academyId: input.academyId, isVisible: true },
+      where: { ...scope.course, id: input.courseId, isVisible: true },
       include: visibleCurriculumInclude,
     });
     if (!course) {
+      // Deliberately the same response as a hidden or nonexistent course: an
+      // unassigned course must not be distinguishable by its error.
       throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
     return course;
   }
 
-  private async requireVisibleMaterial(academyId: string, materialId: string) {
+  private async requireVisibleMaterial(
+    academyId: string,
+    materialId: string,
+    scope: LearningScope,
+  ) {
     const material = await this.prisma.material.findFirst({
-      where: { id: materialId, ...effectivelyVisibleMaterialWhere(academyId) },
+      where: { id: materialId, ...reachableMaterialWhere(academyId, scope) },
       include: { lecture: { include: { courseModule: true } } },
     });
     if (!material) {

@@ -66,6 +66,11 @@ enum OAuthOnboardingIntentStatus {
   EXPIRED
 }
 
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum MaterialType {
   PROGRAMMING_EXERCISE
 }
@@ -136,6 +141,9 @@ model User {
   membershipApprovals   AcademyMembership[]       @relation("MembershipApprover")
   auditLogs             AuditLog[]                @relation("AuditActor")
   coursesCreated        Course[]                  @relation("CourseCreator")
+  classesCreated        Class[]                   @relation("ClassCreator")
+  classCoursesAssigned  ClassCourse[]             @relation("ClassCourseAssigner")
+  classEnrollmentsMade  ClassEnrollment[]         @relation("ClassEnroller")
   exerciseDrafts        ExerciseDraft[]
   submissions           Submission[]
   exerciseProgress      StudentExerciseProgress[]
@@ -173,6 +181,7 @@ model Academy {
   oauthOnboardingIntents OAuthOnboardingIntent[]
   auditLogs              AuditLog[]
   courses                Course[]
+  classes                Class[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -211,10 +220,11 @@ model AcademyMembership {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy    Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invitedBy  User?   @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
-  approvedBy User?   @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  academy          Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy        User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  approvedBy       User?             @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  classEnrollments ClassEnrollment[]
 
   @@unique([academyId, userId])
   @@index([userId, status])
@@ -302,14 +312,82 @@ model Course {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy        Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy      User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  modules        CourseModule[]
-  exerciseDrafts ExerciseDraft[]
-  submissions    Submission[]
+  academy          Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy        User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  modules          CourseModule[]
+  exerciseDrafts   ExerciseDraft[]
+  submissions      Submission[]
+  classAssignments ClassCourse[]
 
   @@index([academyId, isVisible, updatedAt])
   @@map("courses")
+}
+
+/// The delivery boundary between reusable curriculum and learners: a class
+/// learns many courses, a course is taught to many classes, and a student may
+/// sit in several classes of the same academy.
+///
+/// Names are intentionally not unique — an academy reuses "Level 1" every
+/// term — so the UUID is the identity and the UI shows status for context.
+model Class {
+  id              String      @id @default(uuid()) @db.Uuid
+  academyId       String      @map("academy_id") @db.Uuid
+  name            String
+  description     String      @default("")
+  status          ClassStatus @default(ACTIVE)
+  createdByUserId String      @map("created_by_user_id") @db.Uuid
+  archivedAt      DateTime?   @map("archived_at") @db.Timestamptz(6)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Touched by course and roster changes too, so the management list reports
+  /// the most recent change of any kind rather than only the last rename.
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy           Academy           @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy         User              @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  courseAssignments ClassCourse[]
+  enrollments       ClassEnrollment[]
+
+  @@index([academyId, status, updatedAt(sort: Desc)])
+  @@index([academyId, name])
+  @@map("classes")
+}
+
+/// One course taught to one class. Removing the row revokes access and never
+/// touches drafts, submissions, or progress.
+model ClassCourse {
+  classId          String   @map("class_id") @db.Uuid
+  courseId         String   @map("course_id") @db.Uuid
+  assignedByUserId String   @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  class      Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignedBy User   @relation("ClassCourseAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([classId, courseId])
+  @@index([courseId, classId])
+  @@map("class_courses")
+}
+
+/// One student's seat in one class.
+///
+/// References the academy membership rather than the user: it makes academy
+/// scope explicit and lets one person hold different roles in two academies.
+/// A suspended or promoted membership stops granting access even while the
+/// row remains, so a Manager can still see and clear a stale seat.
+model ClassEnrollment {
+  classId          String   @map("class_id") @db.Uuid
+  membershipId     String   @map("membership_id") @db.Uuid
+  enrolledByUserId String   @map("enrolled_by_user_id") @db.Uuid
+  enrolledAt       DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+
+  class      Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  enrolledBy User              @relation("ClassEnroller", fields: [enrolledByUserId], references: [id], onDelete: Restrict)
+
+  @@id([classId, membershipId])
+  @@index([membershipId, classId])
+  @@map("class_enrollments")
 }
 
 model CourseModule {

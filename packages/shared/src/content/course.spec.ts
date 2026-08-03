@@ -5,7 +5,6 @@ import { createProgrammingExerciseSchema } from "./course.js";
 const validExercise = {
   academyId: "20000000-0000-4000-8000-000000000001",
   courseId: "40000000-0000-4000-8000-000000000001",
-  versionId: "50000000-0000-4000-8000-000000000001",
   lectureId: "90000000-0000-4000-8000-000000000001",
   title: "Sum two numbers",
   difficulty: "EASY" as const,
@@ -15,7 +14,7 @@ const validExercise = {
   constraints: "",
   starterCode: "",
   aiFeedbackEnabled: false,
-  isPublished: true,
+  isVisible: true,
   testCases: [{
     input: "1 2",
     expectedOutput: "3",

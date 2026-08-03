@@ -128,6 +128,7 @@ export class GradingService {
 
     const summary = summarizeRun(
       results.filter((item) => item.outcome !== "SKIPPED"),
+      exercise.testCases.length,
     );
 
     // One transaction: a verdict and the progress it implies must never be
@@ -138,6 +139,7 @@ export class GradingService {
         data: {
           status: summary.status,
           passedCount: summary.passedCount,
+          score: summary.score,
           runtimeMs: summary.runtimeMs,
           gradedAt: new Date(),
         },
@@ -167,6 +169,7 @@ export class GradingService {
         previous,
         status: summary.status,
         passedCount: summary.passedCount,
+        score: summary.score,
       });
 
       await tx.studentExerciseProgress.upsert({
@@ -182,6 +185,7 @@ export class GradingService {
           status: progress.status,
           attemptCount: progress.attemptCount,
           bestPassed: progress.bestPassed,
+          bestScore: progress.bestScore,
           firstSolvedAt: progress.solvedNow ? new Date() : null,
           lastAttemptAt: new Date(),
         },
@@ -189,6 +193,7 @@ export class GradingService {
           status: progress.status,
           attemptCount: progress.attemptCount,
           bestPassed: progress.bestPassed,
+          bestScore: progress.bestScore,
           ...(progress.solvedNow ? { firstSolvedAt: new Date() } : {}),
           lastAttemptAt: new Date(),
         },

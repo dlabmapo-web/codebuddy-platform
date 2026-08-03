@@ -97,6 +97,17 @@ describe("GradingService.grade", () => {
     expect(report).toHaveBeenCalledWith(
       expect.objectContaining({ position: 1, isSample: true }),
     );
+    expect(tx.submission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ passedCount: 0, score: 0 }),
+      }),
+    );
+    expect(tx.studentExerciseProgress.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ bestScore: 0 }),
+        update: expect.objectContaining({ bestScore: 0 }),
+      }),
+    );
   });
 
   it("does nothing on duplicate delivery after the conditional claim loses", async () => {

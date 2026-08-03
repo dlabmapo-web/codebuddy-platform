@@ -46,18 +46,43 @@ export function submissionStatusFor(
   return outcomes.every((outcome) => outcome === "PASSED") ? "PASSED" : "FAILED";
 }
 
+/**
+ * Every problem is worth 100, whatever its case count.
+ *
+ * Case count is an authoring detail: a student must not score differently on
+ * the same work because an author split one case into two. `round`, not
+ * `floor`, so 2 of 3 reads 67 rather than 66 — and both ends stay exact, which
+ * is what a student actually notices.
+ *
+ * Skipped cases count toward the denominator. Failing case 1 of 5 scores 0 out
+ * of 100: grading stopped early, but the problem still had five cases.
+ */
+export function scoreRun(input: {
+  passedCount: number;
+  totalCount: number;
+}): number {
+  if (input.totalCount <= 0) return 0;
+  return Math.round((input.passedCount / input.totalCount) * 100);
+}
+
 export type GradeSummary = {
   status: SubmissionStatus;
   passedCount: number;
+  score: number;
   runtimeMs: number;
 };
 
 export function summarizeRun(
   cases: ReadonlyArray<{ outcome: CaseOutcome; runtimeMs: number }>,
+  /** Includes cases skipped after an early exit — the denominator is the
+   *  exercise's case count, not the number actually executed. */
+  totalCount: number = cases.length,
 ): GradeSummary {
+  const passedCount = cases.filter((item) => item.outcome === "PASSED").length;
   return {
     status: submissionStatusFor(cases.map((item) => item.outcome)),
-    passedCount: cases.filter((item) => item.outcome === "PASSED").length,
+    passedCount,
+    score: scoreRun({ passedCount, totalCount }),
     // The slowest case, not the total: it is what the time limit applies to.
     runtimeMs: cases.reduce((slowest, item) => Math.max(slowest, item.runtimeMs), 0),
   };
@@ -71,13 +96,20 @@ export function summarizeRun(
  * solved must not demote it.
  */
 export function nextProgress(input: {
-  previous: { status: string; attemptCount: number; bestPassed: number } | null;
+  previous: {
+    status: string;
+    attemptCount: number;
+    bestPassed: number;
+    bestScore: number;
+  } | null;
   status: SubmissionStatus;
   passedCount: number;
+  score: number;
 }): {
   status: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED";
   attemptCount: number;
   bestPassed: number;
+  bestScore: number;
   solvedNow: boolean;
 } {
   const previous = input.previous;
@@ -88,6 +120,7 @@ export function nextProgress(input: {
       status: wasSolved ? "SOLVED" : (previous?.status as never) ?? "IN_PROGRESS",
       attemptCount: previous?.attemptCount ?? 0,
       bestPassed: previous?.bestPassed ?? 0,
+      bestScore: previous?.bestScore ?? 0,
       solvedNow: false,
     };
   }
@@ -97,6 +130,9 @@ export function nextProgress(input: {
     status: solved ? "SOLVED" : "IN_PROGRESS",
     attemptCount: (previous?.attemptCount ?? 0) + 1,
     bestPassed: Math.max(previous?.bestPassed ?? 0, input.passedCount),
+    // Never reduced by a later worse attempt, for the same reason SOLVED is
+    // permanent: experimenting after succeeding must not cost anything.
+    bestScore: Math.max(previous?.bestScore ?? 0, input.score),
     solvedNow: !wasSolved && input.status === "PASSED",
   };
 }

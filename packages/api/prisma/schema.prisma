@@ -96,6 +96,32 @@ enum TestCaseVisibility {
   HIDDEN
 }
 
+enum SubmissionStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  /// Judge fault. Never counted against the student's attempts.
+  ERRORED
+  CANCELLED
+}
+
+enum CaseOutcome {
+  PASSED
+  WRONG_OUTPUT
+  RUNTIME_ERROR
+  TIME_LIMIT
+  MEMORY_LIMIT
+  /// Not run, because an earlier case already failed.
+  SKIPPED
+}
+
+enum ExerciseProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SOLVED
+}
+
 model User {
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
@@ -124,6 +150,8 @@ model User {
   courseVersionsCreated   CourseVersion[]      @relation("CourseVersionCreator")
   courseVersionsPublished CourseVersion[]      @relation("CourseVersionPublisher")
   exerciseDrafts          ExerciseDraft[]
+  submissions             Submission[]
+  exerciseProgress        StudentExerciseProgress[]
 
   @@index([status])
   @@map("users")
@@ -370,6 +398,8 @@ model Material {
   lecture             Lecture              @relation(fields: [lectureId], references: [id], onDelete: Cascade)
   programmingExercise ProgrammingExercise?
   drafts              ExerciseDraft[]
+  submissions         Submission[]
+  progress            StudentExerciseProgress[]
 
   @@unique([lectureId, position])
   @@index([lectureId])
@@ -441,6 +471,73 @@ model ExerciseDraft {
   @@unique([userId, materialId])
   @@index([userId, updatedAt(sort: Desc)])
   @@map("exercise_drafts")
+}
+
+/// One graded attempt at an exercise.
+model Submission {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  materialId      String           @map("material_id") @db.Uuid
+  courseVersionId String           @map("course_version_id") @db.Uuid
+  code            String
+  status          SubmissionStatus @default(QUEUED)
+  passedCount     Int              @default(0) @map("passed_count")
+  totalCount      Int              @map("total_count")
+  runtimeMs       Int?             @map("runtime_ms")
+  /// Which runtime produced the verdict, so a future upgrade stays auditable.
+  engineVersion   String           @map("engine_version")
+  failureReason   String?          @map("failure_reason")
+  /// Server-owned. v1 accepted a client-reported elapsed time.
+  startedAt       DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
+  gradedAt        DateTime?        @map("graded_at") @db.Timestamptz(6)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material         @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  cases    SubmissionCase[]
+
+  @@index([userId, materialId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("submissions")
+}
+
+model SubmissionCase {
+  id           String      @id @default(uuid()) @db.Uuid
+  submissionId String      @map("submission_id") @db.Uuid
+  position     Int
+  isSample     Boolean     @map("is_sample")
+  outcome      CaseOutcome
+  runtimeMs    Int?        @map("runtime_ms")
+  /// Populated only for SAMPLE cases. A hidden case records an outcome and
+  /// nothing else — otherwise a student could reconstruct hidden expectations
+  /// by submitting probes.
+  actualOutput String?     @map("actual_output")
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, position])
+  @@map("submission_cases")
+}
+
+/// Written in the same transaction as a submission result. Never aggregated on
+/// read: v1's teacher progress endpoint scans every submission per request and
+/// is already slow.
+model StudentExerciseProgress {
+  id            String                 @id @default(uuid()) @db.Uuid
+  userId        String                 @map("user_id") @db.Uuid
+  materialId    String                 @map("material_id") @db.Uuid
+  status        ExerciseProgressStatus @default(NOT_STARTED)
+  attemptCount  Int                    @default(0) @map("attempt_count")
+  bestPassed    Int                    @default(0) @map("best_passed")
+  firstSolvedAt DateTime?              @map("first_solved_at") @db.Timestamptz(6)
+  lastAttemptAt DateTime?              @map("last_attempt_at") @db.Timestamptz(6)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+  @@index([userId, status])
+  @@map("student_exercise_progress")
 }
 
 model ExerciseHint {

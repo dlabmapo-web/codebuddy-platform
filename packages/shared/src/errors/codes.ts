@@ -40,6 +40,10 @@ export const appErrorCodes = [
   "COURSE_NOT_PUBLISHED",
   "EXERCISE_NOT_AVAILABLE",
   "DRAFT_TOO_LARGE",
+  "SUBMISSION_IN_FLIGHT",
+  "SUBMISSION_RATE_LIMITED",
+  "SUBMISSION_NOT_FOUND",
+  "GRADING_UNAVAILABLE",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -92,4 +96,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   COURSE_NOT_PUBLISHED: "This course has no published version yet.",
   EXERCISE_NOT_AVAILABLE: "This problem is not available.",
   DRAFT_TOO_LARGE: "Your code is too large to save.",
+  SUBMISSION_IN_FLIGHT: "This problem is already being graded. Wait for the result.",
+  SUBMISSION_RATE_LIMITED: "Too many submissions. Wait a moment and try again.",
+  SUBMISSION_NOT_FOUND: "That submission was not found.",
+  GRADING_UNAVAILABLE: "Grading is temporarily unavailable. Your code is saved.",
 };

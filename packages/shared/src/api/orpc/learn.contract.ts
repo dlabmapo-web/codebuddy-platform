@@ -2,6 +2,13 @@ import { oc } from "@orpc/contract";
 import { z } from "zod";
 
 import {
+  submissionAcceptedSchema,
+  submissionInputSchema,
+  submissionResultSchema,
+  submissionSummarySchema,
+  submitExerciseSchema,
+} from "../../content/submission.js";
+import {
   learnAcademyInputSchema,
   learnCourseInputSchema,
   learnCourseOutlineSchema,
@@ -40,4 +47,9 @@ export const learnContract = {
   discardDraft: oc
     .input(learnMaterialInputSchema)
     .output(z.object({ discarded: z.boolean() })),
+  submit: oc.input(submitExerciseSchema).output(submissionAcceptedSchema),
+  getSubmission: oc.input(submissionInputSchema).output(submissionResultSchema),
+  listSubmissions: oc
+    .input(learnMaterialInputSchema)
+    .output(z.object({ submissions: z.array(submissionSummarySchema) })),
 };

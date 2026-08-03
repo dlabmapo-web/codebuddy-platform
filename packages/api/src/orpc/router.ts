@@ -15,6 +15,8 @@ import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { createAuthRouter } from "../auth/auth.router.js";
+import { ClassesService } from "../classes/classes.service.js";
+import { createClassesRouters } from "../classes/classes.router.js";
 import { CourseService } from "../content/course.service.js";
 import { createContentRouters } from "../content/content.router.js";
 import { LearnService } from "../learn/learn.service.js";
@@ -45,6 +47,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     }),
     rateLimitService: app.get(RateLimitService, { strict: false }),
     courseService: app.get(CourseService, { strict: false }),
+    classesService: app.get(ClassesService, { strict: false }),
     learnService: app.get(LearnService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
   });
@@ -76,10 +79,12 @@ function createORPCRouter(deps: ORPCDeps) {
   const os = implement<typeof appContract, ORPCContext>(appContract);
   const academyRouters = createAcademiesRouters(os, deps);
   const contentRouters = createContentRouters(os, deps);
+  const classesRouters = createClassesRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     ...academyRouters,
     ...contentRouters,
+    ...classesRouters,
     learn: createLearnRouter(os, deps),
   });
 }

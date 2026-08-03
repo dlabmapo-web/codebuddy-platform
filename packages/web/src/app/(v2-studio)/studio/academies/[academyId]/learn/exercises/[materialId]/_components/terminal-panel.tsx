@@ -20,13 +20,11 @@ export function TerminalPanel({
   awaitingInput,
   onSubmitInput,
   supported,
-  actions,
 }: {
   lines: TerminalLine[];
   awaitingInput: boolean;
   onSubmitInput: (value: string) => void;
   supported: boolean;
-  actions: React.ReactNode;
 }) {
   const { t } = useLayoutTranslation('learn');
   const [value, setValue] = React.useState('');
@@ -52,14 +50,7 @@ export function TerminalPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-col bg-editor-bg">
-      <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
-        <span className="font-mono text-[11.5px] text-[#a5a5a5]">
-          {t('workspace.terminal')}
-        </span>
-        <div className="ml-auto flex items-center gap-1.5">{actions}</div>
-      </header>
-
+    <div className="flex min-h-0 flex-col">
       {!supported ? (
         <p className="flex items-start gap-2 border-b border-white/10 bg-warning/10 px-3 py-2 text-[12px] leading-5 text-warning">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />

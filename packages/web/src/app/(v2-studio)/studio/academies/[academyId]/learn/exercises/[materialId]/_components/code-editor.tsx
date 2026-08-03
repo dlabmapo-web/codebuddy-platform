@@ -26,10 +26,12 @@ function EditorFallback() {
 
 export function CodeEditor({
   code,
+  fontSize,
   onChange,
   onMount,
 }: {
   code: string;
+  fontSize: number;
   onChange: (value: string) => void;
   onMount?: OnMount;
 }) {
@@ -44,7 +46,7 @@ export function CodeEditor({
         options={{
           automaticLayout: true,
           fontFamily: "'Fira Code', Consolas, monospace",
-          fontSize: 13.5,
+          fontSize,
           lineNumbers: 'on',
           minimap: { enabled: false },
           padding: { bottom: 12, top: 12 },

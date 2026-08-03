@@ -26,11 +26,16 @@ export function useSplitPane({
 }) {
   const [size, setSize] = React.useState(initial);
   const [dragging, setDragging] = React.useState(false);
+  // Pointer movement can arrive before React commits the visual dragging
+  // state. A ref becomes true synchronously on pointer-down, so the first few
+  // pixels of a quick drag are never discarded.
+  const draggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const onPointerDown = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.currentTarget.setPointerCapture(event.pointerId);
+      draggingRef.current = true;
       setDragging(true);
     },
     [],
@@ -38,7 +43,7 @@ export function useSplitPane({
 
   const onPointerMove = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragging) return;
+      if (!draggingRef.current) return;
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
@@ -59,21 +64,35 @@ export function useSplitPane({
 
       setSize(Math.max(min, Math.min(ceiling, next)));
     },
-    [axis, dragging, max, min],
+    [axis, max, min],
   );
 
-  const onPointerUp = React.useCallback(
+  const finishDragging = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      draggingRef.current = false;
       setDragging(false);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
     },
     [],
   );
+
+  const onLostPointerCapture = React.useCallback(() => {
+    draggingRef.current = false;
+    setDragging(false);
+  }, []);
 
   return {
     size,
     dragging,
     containerRef,
-    dividerProps: { onPointerDown, onPointerMove, onPointerUp },
+    dividerProps: {
+      onLostPointerCapture,
+      onPointerCancel: finishDragging,
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: finishDragging,
+    },
   };
 }

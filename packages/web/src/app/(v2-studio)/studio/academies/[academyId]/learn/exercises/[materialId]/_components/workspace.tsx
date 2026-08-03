@@ -11,11 +11,8 @@ import { usePythonRunner } from '../_hooks/use-python-runner';
 import { useSubmission } from '../_hooks/use-submission';
 import { useSplitPane } from '../_hooks/use-split-pane';
 import { resolveSampleVerdict } from '../_lib/sample-run';
-import { CodeEditor } from './code-editor';
+import { EditorPane, type OutputTab } from './editor-pane';
 import { ProblemStatement } from './problem-statement';
-import { RunControls } from './run-controls';
-import { SubmitPanel } from './submit-panel';
-import { TerminalPanel } from './terminal-panel';
 import { WorkspaceHeader } from './workspace-header';
 
 export function Workspace({
@@ -28,6 +25,11 @@ export function Workspace({
   const { t } = useLayoutTranslation('learn');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
+  const [outputTab, setOutputTab] = React.useState<OutputTab>('terminal');
+  const [lastReadSubmissionId, setLastReadSubmissionId] = React.useState<
+    string | null
+  >(null);
+  const [revealedHints, setRevealedHints] = React.useState(0);
 
   const runner = usePythonRunner();
   const { workspace, navigating, navigate } = useExerciseNavigation({
@@ -56,24 +58,11 @@ export function Workspace({
     containerRef: paneContainerRef,
     dividerProps: statementDividerProps,
   } = useSplitPane({ axis: 'horizontal', initial: 46, min: 28, max: 68 });
-  const {
-    size: terminalHeight,
-    dragging: draggingTerminal,
-    containerRef: editorPaneRef,
-    dividerProps: terminalDividerProps,
-  } = useSplitPane({ axis: 'vertical', initial: 220, min: 80, max: 1_200 });
-
-  const handleRun = React.useCallback(() => {
-    setActiveSample(null);
-    void runner.run(draft.code, {
-      banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
-    });
-  }, [draft.code, runner]);
-
   const handleRunSample = React.useCallback(
     async (index: number) => {
       const sample = exercise.sampleTestCases[index];
       if (!sample) return;
+      setOutputTab('terminal');
       setActiveSample(index);
 
       const outcome = await runner.run(draft.code, {
@@ -116,30 +105,31 @@ export function Workspace({
     [draft.code, exercise.sampleTestCases, runner, t],
   );
 
-  const runControls = (
-    <RunControls
-      activeSample={activeSample}
-      onRun={handleRun}
-      onRunSample={(index) => void handleRunSample(index)}
-      onStop={runner.stop}
-      ready={runner.ready}
-      running={runner.running}
-      onSubmit={() => {
-        // The submitted code is the draft, so it is persisted before grading
-        // starts rather than relying on the idle timer having fired.
-        draft.flushNow();
-        void submission.submit(draft.code);
-      }}
-      sampleTestCases={exercise.sampleTestCases}
-      submitting={submission.submitting}
-    />
-  );
+  const handleSubmit = React.useCallback(() => {
+    // The submitted code is the draft, so it is persisted before grading
+    // starts rather than relying on the idle timer having fired.
+    draft.flushNow();
+    setOutputTab('result');
+    setLastReadSubmissionId(null);
+    void submission.submit(draft.code);
+  }, [draft, submission]);
+
+  const handleOutputTabChange = React.useCallback((tab: OutputTab) => {
+    if (outputTab === 'result' && submission.result) {
+      setLastReadSubmissionId(submission.result.submissionId);
+    }
+    setOutputTab(tab);
+    if (tab === 'result' && submission.result) {
+      setLastReadSubmissionId(submission.result.submissionId);
+    }
+  }, [outputTab, submission.result]);
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
       <WorkspaceHeader
         academyId={academyId}
         navigating={navigating}
+        hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}
         onNavigate={(materialId) => {
           // Pending work is settled here rather than inside the hook: the draft
           // is derived from the workspace the hook owns, so passing a teardown
@@ -148,9 +138,24 @@ export function Workspace({
           runner.stop();
           runner.clear();
           submission.reset();
+          setRevealedHints(0);
+          setOutputTab('terminal');
+          setLastReadSubmissionId(null);
           void navigate(materialId);
         }}
+        onReset={() => {
+          if (draft.code === exercise.starterCode) return;
+          if (!window.confirm(t('workspace.reset_confirm'))) return;
+          draft.resetTo(exercise.starterCode);
+        }}
+        onRevealHint={() =>
+          setRevealedHints((current) =>
+            Math.min(exercise.hints.length, current + 1),
+          )
+        }
+        onSubmit={handleSubmit}
         saveState={draft.saveState}
+        submitting={submission.submitting}
         workspace={workspace}
       />
 
@@ -186,7 +191,7 @@ export function Workspace({
             mobileTab === 'problem' ? 'flex-1' : 'hidden'
           }`}
         >
-          <ProblemStatement exercise={exercise} />
+          <ProblemStatement exercise={exercise} revealedHints={revealedHints} />
         </section>
 
         <div
@@ -201,33 +206,23 @@ export function Workspace({
           className={`min-w-0 flex-1 flex-col ${
             mobileTab === 'code' ? 'flex' : 'hidden'
           } md:flex`}
-          // The terminal's height is measured from this pane's bottom edge, so
-          // the drag needs its box. Without the ref the divider silently does
-          // nothing.
-          ref={editorPaneRef}
         >
-          <CodeEditor code={draft.code} onChange={draft.setCode} />
-
-          <div
-            aria-label={t('workspace.resize_terminal')}
-            className={`h-1.5 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-brand/40 ${
-              draggingTerminal ? 'bg-brand/60' : ''
-            }`}
-            role="separator"
-            {...terminalDividerProps}
+          <EditorPane
+            activeSample={activeSample}
+            code={draft.code}
+            onCodeChange={draft.setCode}
+            onRunSample={(index) => void handleRunSample(index)}
+            onTabChange={handleOutputTabChange}
+            runner={runner}
+            sampleTestCases={exercise.sampleTestCases}
+            submission={submission}
+            tab={outputTab}
+            unreadResult={
+              outputTab !== 'result' &&
+              submission.result !== null &&
+              submission.result.submissionId !== lastReadSubmissionId
+            }
           />
-
-          <div className="shrink-0" style={{ height: terminalHeight }}>
-            <TerminalPanel
-              actions={runControls}
-              awaitingInput={runner.awaitingInput}
-              lines={runner.lines}
-              onSubmitInput={runner.submitInput}
-              supported={runner.supported}
-            />
-          </div>
-
-          <SubmitPanel submission={submission} />
         </section>
       </div>
     </div>

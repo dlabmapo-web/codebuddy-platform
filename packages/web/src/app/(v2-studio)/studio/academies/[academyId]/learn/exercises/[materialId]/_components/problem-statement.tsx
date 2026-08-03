@@ -1,11 +1,13 @@
 'use client';
 
 import type { LearnExercise } from '@cove/shared';
-import { EyeOff, Lightbulb } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
 import * as React from 'react';
 
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
 import { useLayoutTranslation } from '@/i18n';
+
+import { ExampleCard } from './example-card';
 
 function Section({
   children,
@@ -24,23 +26,15 @@ function Section({
   );
 }
 
-/** Literal values a student can copy: dark, monospaced, unmistakably data. */
-function ValueBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1.5 font-mono text-[11.5px] font-bold uppercase tracking-wider text-sub">
-        {label}
-      </div>
-      <pre className="overflow-x-auto rounded-lg bg-[#0f172a] px-3 py-2.5 font-mono text-[13px] leading-[1.6] text-[#e2e8f0]">
-        {value || ' '}
-      </pre>
-    </div>
-  );
-}
-
-export function ProblemStatement({ exercise }: { exercise: LearnExercise }) {
+export function ProblemStatement({
+  exercise,
+  revealedHints,
+}: {
+  exercise: LearnExercise;
+  /** Owned by the workspace: the reveal control lives in the header. */
+  revealedHints: number;
+}) {
   const { t } = useLayoutTranslation(['learn', 'content']);
-  const [revealed, setRevealed] = React.useState(0);
 
   const constraintLines = exercise.constraints
     .split('\n')
@@ -97,24 +91,11 @@ export function ProblemStatement({ exercise }: { exercise: LearnExercise }) {
         <Section title={t('learn:workspace.examples')}>
           <div className="space-y-4">
             {exercise.sampleTestCases.map((testCase, index) => (
-              <article
-                className="rounded-lg border border-border p-4"
+              <ExampleCard
+                index={index}
                 key={testCase.position}
-              >
-                <h4 className="mb-3 text-[13.5px] font-bold">
-                  {t('learn:workspace.example_n', { number: index + 1 })}
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ValueBlock
-                    label={t('learn:workspace.stdin')}
-                    value={testCase.input}
-                  />
-                  <ValueBlock
-                    label={t('learn:workspace.stdout')}
-                    value={testCase.expectedOutput}
-                  />
-                </div>
-              </article>
+                testCase={testCase}
+              />
             ))}
           </div>
         </Section>
@@ -133,10 +114,10 @@ export function ProblemStatement({ exercise }: { exercise: LearnExercise }) {
         </Section>
       ) : null}
 
-      {exercise.hints.length > 0 ? (
+      {revealedHints > 0 ? (
         <Section title={t('learn:workspace.hints')}>
           <ol className="space-y-2">
-            {exercise.hints.slice(0, revealed).map((hint, index) => (
+            {exercise.hints.slice(0, revealedHints).map((hint, index) => (
               <li
                 className="flex items-start gap-2.5 rounded-lg border border-border bg-canvas px-3.5 py-3"
                 key={hint.position}
@@ -150,20 +131,6 @@ export function ProblemStatement({ exercise }: { exercise: LearnExercise }) {
               </li>
             ))}
           </ol>
-          {revealed < exercise.hints.length ? (
-            // One at a time: a student who reads every hint at once has been
-            // handed the answer rather than helped toward it.
-            <button
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[13px] font-semibold text-sub transition-colors hover:border-brand/40 hover:text-brand"
-              onClick={() => setRevealed((count) => count + 1)}
-              type="button"
-            >
-              <Lightbulb className="size-3.5" />
-              {t('learn:workspace.reveal_hint', {
-                remaining: exercise.hints.length - revealed,
-              })}
-            </button>
-          ) : null}
         </Section>
       ) : null}
 

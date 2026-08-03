@@ -7,29 +7,11 @@ import { useMemo, useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
 
-/**
- * Filtering runs over the outline already in memory. The whole published tree
- * arrives in one response, so searching is a local operation and must not cost
- * a request per keystroke.
- */
-function filterModules(outline: LearnCourseOutline, query: string) {
-  const needle = query.trim().toLocaleLowerCase();
-  if (!needle) return outline.modules;
-
-  return outline.modules
-    .map((module) => ({
-      ...module,
-      lectures: module.lectures
-        .map((lecture) => ({
-          ...lecture,
-          exercises: lecture.exercises.filter((exercise) =>
-            exercise.title.toLocaleLowerCase().includes(needle),
-          ),
-        }))
-        .filter((lecture) => lecture.exercises.length > 0),
-    }))
-    .filter((module) => module.lectures.length > 0);
-}
+import {
+  filterCourseModules,
+  isOutlineItemExpanded,
+  toggleCollapsedId,
+} from '../_lib/course-outline';
 
 export function useCourseOutline({
   academyId,
@@ -43,6 +25,9 @@ export function useCourseOutline({
   const searchParams = useSearchParams();
   const requestedLectureId = searchParams.get('lecture');
   const [query, setQuery] = useState('');
+  const [collapsedLectureIds, setCollapsedLectureIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const outlineQuery = useQuery({
     queryKey: ['learn', academyId, 'outline', courseId],
@@ -70,7 +55,9 @@ export function useCourseOutline({
   });
 
   const modules = useMemo(
-    () => filterModules(outline, query),
+    // The whole visible tree is already in memory, so searching must not cost
+    // a request per keystroke.
+    () => filterCourseModules(outline, query),
     [outline, query],
   );
 
@@ -78,7 +65,6 @@ export function useCourseOutline({
 
   return {
     course: outline.course,
-    version: outline.version,
     progress: outline.progress,
     modules,
     query,
@@ -87,14 +73,24 @@ export function useCourseOutline({
     requestedLectureId,
     // A search result is useless behind a collapsed header, so filtering
     // overrides the collapsed set rather than fighting it.
-    isExpanded: (moduleId: string) => searching || !collapsedIds.has(moduleId),
-    toggleModule: (moduleId: string) =>
-      setCollapsedIds((current) => {
-        const next = new Set(current);
-        if (next.has(moduleId)) next.delete(moduleId);
-        else next.add(moduleId);
-        return next;
+    isExpanded: (moduleId: string) =>
+      isOutlineItemExpanded({
+        collapsedIds,
+        forceExpanded: searching,
+        id: moduleId,
       }),
+    toggleModule: (moduleId: string) =>
+      setCollapsedIds((current) => toggleCollapsedId(current, moduleId)),
+    isLectureExpanded: (lectureId: string) =>
+      isOutlineItemExpanded({
+        collapsedIds: collapsedLectureIds,
+        forceExpanded: searching || lectureId === requestedLectureId,
+        id: lectureId,
+      }),
+    toggleLecture: (lectureId: string) =>
+      setCollapsedLectureIds((current) =>
+        toggleCollapsedId(current, lectureId),
+      ),
   };
 }
 

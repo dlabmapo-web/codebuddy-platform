@@ -1,7 +1,6 @@
 import type { LearnCourseOutline } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
-import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { StudioShell } from '../../../_components/studio-shell';
@@ -13,8 +12,6 @@ export default async function LearnCoursePage({
   params: Promise<{ academyId: string; courseId: string }>;
 }) {
   const { academyId, courseId } = await params;
-  const { t } = await getServerTranslation(['learn']);
-
   let outline: LearnCourseOutline | null = null;
   try {
     outline = await createServerORPCClient().learn.getCourseOutline({
@@ -22,7 +19,7 @@ export default async function LearnCoursePage({
       courseId,
     });
   } catch {
-    // An unpublished, missing, or out-of-academy course is indistinguishable to
+    // A hidden, missing, or out-of-academy course is indistinguishable to
     // a student, and should be: all three are simply "not here".
     notFound();
   }
@@ -39,9 +36,6 @@ export default async function LearnCoursePage({
         academyId={academyId}
         courseId={courseId}
         initialOutline={outline}
-        versionLabel={t('outline.version', {
-          number: outline.version.versionNumber,
-        })}
       />
     </StudioShell>
   );

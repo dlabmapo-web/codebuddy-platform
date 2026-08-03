@@ -15,12 +15,10 @@ export function CourseOutline({
   academyId,
   courseId,
   initialOutline,
-  versionLabel,
 }: {
   academyId: string;
   courseId: string;
   initialOutline: LearnCourseOutline;
-  versionLabel: string;
 }) {
   const { t } = useLayoutTranslation('learn');
   const outline = useCourseOutline({ academyId, courseId, initialOutline });
@@ -50,9 +48,6 @@ export function CourseOutline({
             <ArrowLeft className="size-3.5" />
             {t('outline.back')}
           </Link>
-          <span className="rounded-full bg-canvas px-2 py-0.5 text-[11.5px] font-bold text-sub">
-            {versionLabel}
-          </span>
           <span className="text-[12.5px] text-sub">
             {t('outline.progress', {
               solved: outline.progress.solved,
@@ -109,6 +104,8 @@ export function CourseOutline({
               key={module.id}
               module={module}
               onToggle={() => outline.toggleModule(module.id)}
+              isLectureExpanded={outline.isLectureExpanded}
+              onToggleLecture={outline.toggleLecture}
               requestedLectureId={outline.requestedLectureId}
             />
           ))}

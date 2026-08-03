@@ -29,6 +29,8 @@
     "module_label": "모듈 {{position}}",
     "lecture_label": "강의 {{position}}",
     "lecture_empty": "이 강의에는 아직 문제가 없습니다.",
+    "toggle_lecture": "{{title}} 펼치기 또는 접기",
+    "problem_count_other": "문제 {{count}}개",
     "progress": "{{total}}문제 중 {{solved}}문제 완료",
     "expand": "모듈 펼치기",
     "collapse": "모듈 접기",

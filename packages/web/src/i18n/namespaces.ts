@@ -15,6 +15,7 @@ export const layoutNamespaces = [
   "applications",
   "invitations",
   "courses",
+  "classes",
   "content",
   "learn",
   "errors",

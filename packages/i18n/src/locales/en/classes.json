@@ -1,0 +1,165 @@
+{
+  "title": "Classes",
+  "description": "A class connects curriculum to learners. Assign the courses a class studies, then enroll the students who take them.",
+  "forbidden_title": "Classes are not available to you",
+  "forbidden_body": "Managing classes needs an active Team Lead or Manager membership. Ask an academy manager to change your role.",
+  "unavailable_title": "Classes could not be loaded",
+  "unavailable_body": "The server did not answer. Refresh the page, and tell your administrator if it keeps failing.",
+  "class_count_one": "<0>{{count}}</0> class in this academy",
+  "class_count_other": "<0>{{count}}</0> classes in this academy",
+  "new_class": "New class",
+  "search_placeholder": "Search classes",
+  "empty": "No classes yet. Create one for the group you teach next.",
+  "empty_filtered": "No class matches this filter. Clear the filter to see the rest.",
+  "no_description": "No description yet.",
+  "open": "Open",
+  "edit": "Edit",
+  "archive": "Archive",
+  "restore": "Restore",
+  "row_menu_aria": "Actions for “{{name}}”",
+  "status": {
+    "ACTIVE": "Active",
+    "ARCHIVED": "Archived"
+  },
+  "column": {
+    "class": "Class",
+    "status": "Status",
+    "courses": "Assigned courses",
+    "students": "Students",
+    "updated": "Last change",
+    "actions": "Actions"
+  },
+  "courses_cell": {
+    "none": "None yet",
+    "more": "+{{count}}",
+    "aria_one": "1 assigned course: {{titles}}",
+    "aria_other": "{{count}} assigned courses: {{titles}}"
+  },
+  "create": {
+    "heading": "Name the class",
+    "body": "Give the class a name your staff will recognize. You assign courses and enroll students on the next screen.",
+    "name_label": "Class name",
+    "name_placeholder": "Level 1 Evening",
+    "description_label": "Who this class is for",
+    "description_optional": "(optional)",
+    "description_placeholder": "Weekday evening beginners, spring term",
+    "submit": "Create and open",
+    "submitting": "Creating…",
+    "next_step": "You go straight to the class, where you assign courses and enroll students.",
+    "failed": "Could not create the class. Check the name and try again."
+  },
+  "edit_modal": {
+    "heading": "Edit class details",
+    "body": "Change the name and description. Assigned courses and enrolled students stay as they are.",
+    "submit": "Save changes",
+    "failed": "Could not save the class. Reload it and try again."
+  },
+  "detail": {
+    "back": "All classes",
+    "not_found_title": "This class is not available",
+    "not_found_body": "It may have been removed, or it belongs to another academy. Go back to the class list.",
+    "archived_notice": "This class is archived. Its students cannot open its courses until you restore it.",
+    "overview": {
+      "courses": "Courses",
+      "courses_none": "Nothing to learn yet",
+      "courses_all_visible_one": "Open to students",
+      "courses_all_visible_other": "All open to students",
+      "courses_some_hidden_one": "1 hidden, so students cannot open it",
+      "courses_some_hidden_other": "{{count}} hidden, so students cannot open them",
+      "students": "Students",
+      "students_none": "Nobody enrolled yet",
+      "students_all_learning_one": "Learning now",
+      "students_all_learning_other": "All learning now",
+      "students_some_inactive_one": "1 seat grants no access",
+      "students_some_inactive_other": "{{count}} seats grant no access",
+      "teacher": "Teacher",
+      "teacher_placeholder": "Sample data for now",
+      "last_change": "Last change",
+      "last_change_note": "Any edit, course, or roster change"
+    },
+    "courses_panel": {
+      "heading": "Courses",
+      "body": "Students in this class can open every visible course assigned here.",
+      "assign": "Assign courses",
+      "empty": "No courses assigned yet. Assign the first one to give this class something to learn.",
+      "empty_readonly": "No courses assigned yet.",
+      "hidden_note": "Assigned, but hidden. Students cannot open it until the course is visible.",
+      "row_menu_aria": "Actions for “{{title}}”",
+      "remove": "Remove from class"
+    },
+    "students_panel": {
+      "heading": "Students",
+      "body": "Enrolled students see this class's visible courses in their own course list.",
+      "add": "Add students",
+      "empty": "No students enrolled yet. Add the students who take these courses.",
+      "empty_readonly": "No students enrolled yet.",
+      "empty_filtered": "No student matches this search.",
+      "search_placeholder": "Search by name or email",
+      "column": {
+        "student": "Student",
+        "email": "Email",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "manager_only": "Only a Manager can change who is enrolled.",
+      "no_name": "Name not set",
+      "no_email": "No email",
+      "enrolled_on": "Enrolled {{date}}",
+      "inactive": "Not learning",
+      "inactive_suspended": "This membership is suspended, so the seat grants no access.",
+      "inactive_role": "This member is no longer a student, so the seat grants no access.",
+      "row_menu_aria": "Actions for {{name}}",
+      "remove": "Remove from class"
+    }
+  },
+  "assign_dialog": {
+    "heading": "Assign courses",
+    "body": "Pick every course this class studies. Clearing a course removes access to it.",
+    "trigger_label": "Select courses",
+    "search": "Search courses",
+    "empty": "No course matches that search.",
+    "no_courses": "This academy has no courses yet. Create a course first.",
+    "selected_one": "1 course selected",
+    "selected_other": "{{count}} courses selected",
+    "hidden_hint": "Hidden courses can be assigned now and open for students once you make them visible.",
+    "submit": "Save assignments",
+    "submitting": "Saving…",
+    "failed": "Could not save the assignments. Reload the class and try again."
+  },
+  "enroll_dialog": {
+    "heading": "Add students",
+    "body": "Only active students of this academy appear here. Students already in this class are hidden.",
+    "trigger_label": "Select students",
+    "search": "Search by name or email",
+    "empty": "No student matches that search.",
+    "none_eligible": "Every active student is already enrolled in this class.",
+    "selected_one": "1 student selected",
+    "selected_other": "{{count}} students selected",
+    "submit": "Add to class",
+    "submitting": "Adding…",
+    "failed": "Could not add the students. Reload the class and try again."
+  },
+  "remove_course": {
+    "heading": "Remove this course?",
+    "body": "Students in “{{className}}” lose access to “{{courseTitle}}” right away. Their drafts, submissions, and progress stay saved, and reassigning the course brings all of it back.",
+    "confirm": "Remove course",
+    "submitting": "Removing…"
+  },
+  "remove_student": {
+    "heading": "Remove this student?",
+    "body": "{{name}} loses access to this class's courses right away. Their drafts, submissions, and progress stay saved, and re-enrolling brings all of it back.",
+    "confirm": "Remove student",
+    "submitting": "Removing…"
+  },
+  "archive_dialog": {
+    "heading": "Archive this class?",
+    "body": "Archiving stops this class from granting access. It keeps its courses and students, and restoring it puts everything back.",
+    "affected_courses": "Assigned courses",
+    "affected_students": "Enrolled students",
+    "preserved": "Drafts, submissions, and progress stay saved. Restoring the class brings every access path back.",
+    "confirm": "Archive class",
+    "submitting": "Archiving…",
+    "failed": "Could not archive the class. Try again in a moment."
+  },
+  "load_failed": "Could not load the latest classes. This is the last version that loaded."
+}

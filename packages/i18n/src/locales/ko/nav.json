@@ -6,12 +6,14 @@
   "group": {
     "overview": "학원",
     "content": "커리큘럼",
+    "teaching": "수업 운영",
     "people": "구성원",
     "learning": "학습"
   },
   "link": {
     "overview": "개요",
     "courses": "코스",
+    "classes": "반",
     "members": "멤버",
     "applications": "가입 신청",
     "invitations": "초대",

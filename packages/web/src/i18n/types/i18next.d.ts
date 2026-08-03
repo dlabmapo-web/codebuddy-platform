@@ -7,6 +7,7 @@
 import type academy from '@cove/i18n/locales/en/academy.json';
 import type applications from '@cove/i18n/locales/en/applications.json';
 import type auth from '@cove/i18n/locales/en/auth.json';
+import type classes from '@cove/i18n/locales/en/classes.json';
 import type common from '@cove/i18n/locales/en/common.json';
 import type content from '@cove/i18n/locales/en/content.json';
 import type courses from '@cove/i18n/locales/en/courses.json';
@@ -24,6 +25,7 @@ declare module 'i18next' {
       academy: typeof academy;
       applications: typeof applications;
       auth: typeof auth;
+      classes: typeof classes;
       common: typeof common;
       content: typeof content;
       courses: typeof courses;

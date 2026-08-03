@@ -6,12 +6,14 @@
   "group": {
     "overview": "Academy",
     "content": "Curriculum",
+    "teaching": "Teaching",
     "people": "People",
     "learning": "Learning"
   },
   "link": {
     "overview": "Overview",
     "courses": "Courses",
+    "classes": "Classes",
     "members": "Members",
     "applications": "Applications",
     "invitations": "Invitations",

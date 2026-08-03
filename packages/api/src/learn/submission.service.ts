@@ -1,9 +1,6 @@
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type {
-  SubmissionResult,
-  SubmissionSummary,
-} from "@cove/shared";
+import type { SubmissionResult, SubmissionSummary } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -11,14 +8,8 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
+import { effectivelyVisibleMaterialWhere } from "./curriculum-visibility.js";
 
-/**
- * The submit side of the student experience.
- *
- * This process never executes student code — it records the submission and
- * hands it to the judge. Reading the code path here should make it obvious that
- * nothing untrusted runs in a request handler.
- */
 @Injectable()
 export class SubmissionService {
   private readonly logger = new Logger(SubmissionService.name);
@@ -42,14 +33,229 @@ export class SubmissionService {
       input.academyId,
       "submissions.own.create",
     );
-
     if (!this.queue) {
-      // Reading and solving keep working; only the verdict is unavailable.
       throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     }
+    await this.consumeRateLimit(userId);
 
+    let createdSubmission: { id: string; totalCount: number };
     try {
-      const allowed = await this.queue.consumeSubmissionToken(
+      createdSubmission = await this.prisma.$transaction(async (tx) => {
+        // Visibility and grading inputs are read in the same transaction that
+        // owns the snapshot. A concurrent hide or test edit therefore cannot
+        // create a submission from a mixed curriculum state.
+        const material = await tx.material.findFirst({
+          where: {
+            id: input.materialId,
+            ...effectivelyVisibleMaterialWhere(input.academyId),
+          },
+          include: {
+            programmingExercise: {
+              include: {
+                testCases: {
+                  orderBy: [{ position: "asc" }, { id: "asc" }],
+                },
+              },
+            },
+            lecture: { include: { courseModule: true } },
+          },
+        });
+        const exercise = material?.programmingExercise;
+        if (!material || !exercise || exercise.testCases.length === 0) {
+          throw new AppException(
+            "EXERCISE_NOT_AVAILABLE",
+            HttpStatus.NOT_FOUND,
+          );
+        }
+        const created = await tx.submission.create({
+          data: {
+            userId,
+            materialId: material.id,
+            sourceMaterialId: material.id,
+            courseId: material.lecture.courseModule.courseId,
+            gradingRevision: exercise.gradingRevision,
+            language: exercise.language,
+            timeLimitMs: exercise.timeLimitMs,
+            memoryLimitMb: exercise.memoryLimitMb,
+            code: input.code,
+            totalCount: exercise.testCases.length,
+            engineVersion: this.config.get("PYODIDE_VERSION", { infer: true }),
+            gradingCases: {
+              create: exercise.testCases.map((testCase, index) => ({
+                position: index + 1,
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                isSample: testCase.visibility === "SAMPLE",
+              })),
+            },
+          },
+          select: { id: true },
+        });
+        return { id: created.id, totalCount: exercise.testCases.length };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new AppException("SUBMISSION_IN_FLIGHT", HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
+
+    const submissionId = createdSubmission.id;
+    try {
+      await this.queue.enqueue(submissionId);
+    } catch (error) {
+      this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`);
+    }
+    return { submissionId, totalCount: createdSubmission.totalCount };
+  }
+
+  async get(
+    identity: SupabaseIdentity,
+    input: { academyId: string; submissionId: string },
+  ): Promise<SubmissionResult> {
+    const { userId } = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.read",
+    );
+    const submission = await this.prisma.submission.findFirst({
+      where: {
+        id: input.submissionId,
+        userId,
+        course: { academyId: input.academyId },
+        material: {
+          is: effectivelyVisibleMaterialWhere(input.academyId),
+        },
+      },
+      include: {
+        cases: { orderBy: { position: "asc" } },
+        gradingCases: { orderBy: { position: "asc" } },
+      },
+    });
+    if (!submission) {
+      throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    const progress = submission.materialId
+      ? await this.prisma.studentExerciseProgress.findUnique({
+          where: {
+            userId_materialId: { userId, materialId: submission.materialId },
+          },
+          select: { attemptCount: true, gradingRevision: true },
+        })
+      : null;
+    const sampleByPosition = new Map(
+      submission.gradingCases
+        .filter((testCase) => testCase.isSample)
+        .map((testCase) => [testCase.position, testCase]),
+    );
+
+    return {
+      submissionId: submission.id,
+      materialId: submission.sourceMaterialId,
+      status: submission.status,
+      passedCount: submission.passedCount,
+      totalCount: submission.totalCount,
+      score: submission.score,
+      runtimeMs: submission.runtimeMs,
+      failureReason: submission.failureReason,
+      elapsedSec: Math.max(
+        0,
+        Math.round(
+          ((submission.gradedAt ?? new Date()).getTime() -
+            submission.createdAt.getTime()) / 1000,
+        ),
+      ),
+      attemptCount:
+        progress?.gradingRevision === submission.gradingRevision
+          ? progress.attemptCount
+          : 0,
+      createdAt: submission.createdAt.toISOString(),
+      gradedAt: submission.gradedAt?.toISOString() ?? null,
+      cases: submission.cases.map((item) => {
+        const sample = item.isSample
+          ? sampleByPosition.get(item.position)
+          : undefined;
+        return {
+          position: item.position,
+          isSample: item.isSample,
+          outcome: item.outcome,
+          runtimeMs: item.runtimeMs,
+          input: sample?.input ?? null,
+          expectedOutput: sample?.expectedOutput ?? null,
+          actualOutput: item.isSample ? item.actualOutput : null,
+        };
+      }),
+    };
+  }
+
+  async list(
+    identity: SupabaseIdentity,
+    input: { academyId: string; materialId: string },
+  ): Promise<{ submissions: SubmissionSummary[] }> {
+    const { userId } = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.read",
+    );
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        userId,
+        materialId: input.materialId,
+        course: { academyId: input.academyId },
+        material: {
+          is: effectivelyVisibleMaterialWhere(input.academyId),
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        status: true,
+        passedCount: true,
+        totalCount: true,
+        runtimeMs: true,
+        createdAt: true,
+      },
+    });
+    return {
+      submissions: submissions.map((item) => ({
+        submissionId: item.id,
+        status: item.status,
+        passedCount: item.passedCount,
+        totalCount: item.totalCount,
+        runtimeMs: item.runtimeMs,
+        createdAt: item.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async assertOwnership(
+    authUserId: string,
+    academyId: string,
+    submissionId: string,
+  ): Promise<void> {
+    const { userId } = await this.access.requirePermission(
+      authUserId,
+      academyId,
+      "curriculum.read",
+    );
+    const owned = await this.prisma.submission.findFirst({
+      where: {
+        id: submissionId,
+        userId,
+        course: { academyId },
+        material: { is: effectivelyVisibleMaterialWhere(academyId) },
+      },
+      select: { id: true },
+    });
+    if (!owned) {
+      throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+  }
+
+  private async consumeRateLimit(userId: string) {
+    try {
+      const allowed = await this.queue!.consumeSubmissionToken(
         userId,
         this.rateLimit,
         60_000,
@@ -68,251 +274,12 @@ export class SubmissionService {
         throw error;
       }
       this.logger.error(`submission limiter unavailable: ${String(error)}`);
-      throw new AppException(
-        "GRADING_UNAVAILABLE",
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
-
-    const material = await this.prisma.material.findFirst({
-      where: {
-        id: input.materialId,
-        isPublished: true,
-        lecture: {
-          isPublished: true,
-          courseModule: {
-            isPublished: true,
-            courseVersion: {
-              status: "PUBLISHED",
-              course: { academyId: input.academyId, status: "ACTIVE" },
-            },
-          },
-        },
-      },
-      include: {
-        programmingExercise: { include: { testCases: true } },
-        lecture: {
-          include: { courseModule: { select: { courseVersionId: true } } },
-        },
-      },
-    });
-
-    const exercise = material?.programmingExercise;
-    if (!material || !exercise || exercise.testCases.length === 0) {
-      throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
-    }
-
-    let submissionId: string;
-    try {
-      // Written to Postgres before the job is enqueued: if Redis is
-      // unreachable the record still exists and the sweeper can recover it.
-      const created = await this.prisma.submission.create({
-        data: {
-          userId,
-          materialId: material.id,
-          courseVersionId: material.lecture.courseModule.courseVersionId,
-          code: input.code,
-          totalCount: exercise.testCases.length,
-          engineVersion: this.config.get("PYODIDE_VERSION", { infer: true }),
-        },
-        select: { id: true },
-      });
-      submissionId = created.id;
-    } catch (error) {
-      // The partial unique index rejects a second in-flight submission for the
-      // same problem. A database constraint, not a read-then-write check that
-      // two concurrent submits could race past.
-      if (isUniqueViolation(error)) {
-        throw new AppException("SUBMISSION_IN_FLIGHT", HttpStatus.CONFLICT);
-      }
-      throw error;
-    }
-
-    try {
-      await this.queue.enqueue(submissionId);
-    } catch (error) {
-      this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`);
-      // Left QUEUED on purpose: a sweeper re-enqueues rather than losing it.
-    }
-
-    return { submissionId, totalCount: exercise.testCases.length };
-  }
-
-  async get(
-    identity: SupabaseIdentity,
-    input: { academyId: string; submissionId: string },
-  ): Promise<SubmissionResult> {
-    const { userId } = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.read",
-    );
-
-    const submission = await this.prisma.submission.findFirst({
-      // Scoped by userId, so a guessed id reveals nothing about another
-      // student's attempt.
-      where: {
-        id: input.submissionId,
-        userId,
-        material: {
-          lecture: {
-            courseModule: {
-              courseVersion: { course: { academyId: input.academyId } },
-            },
-          },
-        },
-      },
-      include: {
-        cases: { orderBy: { position: "asc" } },
-        material: {
-          include: {
-            programmingExercise: {
-              include: {
-                testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!submission) {
-      throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
-    }
-
-    const progress = await this.prisma.studentExerciseProgress.findUnique({
-      where: {
-        userId_materialId: { userId, materialId: submission.materialId },
-      },
-      select: { attemptCount: true },
-    });
-
-    const sampleByPosition = new Map(
-      (submission.material.programmingExercise?.testCases ?? [])
-        .map((testCase, index) => [index + 1, testCase] as const)
-        .filter(([, testCase]) => testCase.visibility === "SAMPLE"),
-    );
-
-    return {
-      submissionId: submission.id,
-      materialId: submission.materialId,
-      status: submission.status,
-      passedCount: submission.passedCount,
-      totalCount: submission.totalCount,
-      score: submission.score,
-      runtimeMs: submission.runtimeMs,
-      failureReason: submission.failureReason,
-      elapsedSec: Math.max(
-        0,
-        Math.round(
-          ((submission.gradedAt ?? new Date()).getTime() -
-            submission.createdAt.getTime()) /
-            1000,
-        ),
-      ),
-      attemptCount: progress?.attemptCount ?? 0,
-      createdAt: submission.createdAt.toISOString(),
-      gradedAt: submission.gradedAt?.toISOString() ?? null,
-      cases: submission.cases.map((item) => {
-        const sample = item.isSample
-          ? sampleByPosition.get(item.position)
-          : undefined;
-        return {
-          position: item.position,
-          isSample: item.isSample,
-          outcome: item.outcome,
-          runtimeMs: item.runtimeMs,
-          // A hidden case discloses position and outcome only — otherwise a
-          // student reconstructs hidden expectations by submitting probes.
-          input: sample?.input ?? null,
-          expectedOutput: sample?.expectedOutput ?? null,
-          actualOutput: item.isSample ? item.actualOutput : null,
-        };
-      }),
-    };
-  }
-
-  async list(
-    identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string },
-  ): Promise<{ submissions: SubmissionSummary[] }> {
-    const { userId } = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.read",
-    );
-
-    const submissions = await this.prisma.submission.findMany({
-      where: {
-        userId,
-        materialId: input.materialId,
-        material: {
-          lecture: {
-            courseModule: {
-              courseVersion: { course: { academyId: input.academyId } },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: {
-        id: true,
-        status: true,
-        passedCount: true,
-        totalCount: true,
-        runtimeMs: true,
-        createdAt: true,
-      },
-    });
-
-    return {
-      submissions: submissions.map((item) => ({
-        submissionId: item.id,
-        status: item.status,
-        passedCount: item.passedCount,
-        totalCount: item.totalCount,
-        runtimeMs: item.runtimeMs,
-        createdAt: item.createdAt.toISOString(),
-      })),
-    };
-  }
-
-  /** Used by the SSE stream to authorise a subscriber before attaching. */
-  async assertOwnership(
-    authUserId: string,
-    academyId: string,
-    submissionId: string,
-  ): Promise<void> {
-    const { userId } = await this.access.requirePermission(
-      authUserId,
-      academyId,
-      "curriculum.read",
-    );
-    const owned = await this.prisma.submission.findFirst({
-      where: {
-        id: submissionId,
-        userId,
-        material: {
-          lecture: {
-            courseModule: {
-              courseVersion: { course: { academyId } },
-            },
-          },
-        },
-      },
-      select: { id: true },
-    });
-    if (!owned) {
-      throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
+      throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2002"
-  );
+  return typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: string }).code === "P2002";
 }

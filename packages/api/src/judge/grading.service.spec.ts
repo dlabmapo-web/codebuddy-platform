@@ -6,30 +6,32 @@ import { GradingService } from "./grading.service.js";
 
 const submissionId = "50000000-0000-4000-8000-000000000001";
 
-function createService(options?: { claimed?: number }) {
+function createService(options?: { claimed?: number; currentRevision?: number }) {
   const submission = {
     id: submissionId,
     userId: "10000000-0000-4000-8000-000000000001",
     materialId: "20000000-0000-4000-8000-000000000001",
+    gradingRevision: 1,
+    timeLimitMs: 1_000,
+    memoryLimitMb: 256,
     code: "print(input())",
+    gradingCases: [
+      {
+        position: 1,
+        isSample: true,
+        input: "one",
+        expectedOutput: "wrong",
+      },
+      {
+        position: 2,
+        isSample: false,
+        input: "secret",
+        expectedOutput: "secret",
+      },
+    ],
     material: {
       programmingExercise: {
-        timeLimitMs: 1_000,
-        memoryLimitMb: 256,
-        testCases: [
-          {
-            position: 1,
-            visibility: "SAMPLE",
-            input: "one",
-            expectedOutput: "wrong",
-          },
-          {
-            position: 2,
-            visibility: "HIDDEN",
-            input: "secret",
-            expectedOutput: "secret",
-          },
-        ],
+        gradingRevision: options?.currentRevision ?? 1,
       },
     },
   };
@@ -117,5 +119,16 @@ describe("GradingService.grade", () => {
 
     expect(prisma.submission.findUnique).not.toHaveBeenCalled();
     expect(engine.run).not.toHaveBeenCalled();
+  });
+
+  it("completes a stale revision without overwriting current progress", async () => {
+    const { service, tx } = createService({ currentRevision: 2 });
+
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+
+    expect(tx.submission.updateMany).toHaveBeenCalled();
+    expect(tx.submissionCase.createMany).toHaveBeenCalled();
+    expect(tx.studentExerciseProgress.findUnique).not.toHaveBeenCalled();
+    expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
   });
 });

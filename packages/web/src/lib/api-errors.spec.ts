@@ -42,7 +42,7 @@ describe('API error normalization', () => {
       isAccessDeniedError(
         new ORPCError('NOT_FOUND', {
           status: 404,
-          data: { code: 'COURSE_VERSION_NOT_FOUND' },
+          data: { code: 'COURSE_NOT_FOUND' },
         }),
       ),
     ).toBe(true);
@@ -53,7 +53,7 @@ describe('API error normalization', () => {
     // "belongs to another academy" while the real cause was schema drift.
     expect(
       isAccessDeniedError(
-        new Error('column materials.is_published does not exist'),
+        new Error('column course_modules.course_id does not exist'),
       ),
     ).toBe(false);
     expect(

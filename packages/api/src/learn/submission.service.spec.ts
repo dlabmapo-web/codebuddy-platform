@@ -31,6 +31,10 @@ function createService(options?: {
   const material = (options?.material ?? {
     id: materialId,
     programmingExercise: {
+      gradingRevision: 3,
+      language: "PYTHON",
+      timeLimitMs: 1_000,
+      memoryLimitMb: 256,
       testCases: [
         { position: 1, visibility: "SAMPLE", input: "1", expectedOutput: "1" },
         {
@@ -41,10 +45,14 @@ function createService(options?: {
         },
       ],
     },
-    lecture: { courseModule: { courseVersionId: "60000000-0000-4000-8000-000000000001" } },
+    lecture: { courseModule: { courseId: "60000000-0000-4000-8000-000000000001" } },
   }) as {
     id: string;
     programmingExercise: {
+      gradingRevision: number;
+      language: "PYTHON";
+      timeLimitMs: number;
+      memoryLimitMb: number;
       testCases: Array<{
         position: number;
         visibility: string;
@@ -52,11 +60,13 @@ function createService(options?: {
         expectedOutput: string;
       }>;
     };
-    lecture: { courseModule: { courseVersionId: string } };
+    lecture: { courseModule: { courseId: string } };
   };
   const submission = {
     id: submissionId,
     materialId,
+    sourceMaterialId: materialId,
+    gradingRevision: 3,
     status: "FAILED",
     passedCount: 1,
     totalCount: 2,
@@ -81,20 +91,40 @@ function createService(options?: {
         actualOutput: null,
       },
     ],
-    material: { programmingExercise: material.programmingExercise },
+    gradingCases: [
+      { position: 1, isSample: true, input: "1", expectedOutput: "1" },
+      {
+        position: 2,
+        isSample: false,
+        input: `${SECRET}_INPUT`,
+        expectedOutput: `${SECRET}_OUTPUT`,
+      },
+    ],
+  };
+  const submissionCreate = options?.createError
+    ? vi.fn().mockRejectedValue(options.createError)
+    : vi.fn().mockResolvedValue({ id: submissionId });
+  const transaction = {
+    material: { findFirst: vi.fn().mockResolvedValue(material) },
+    submission: { create: submissionCreate },
   };
   const prisma = {
     material: { findFirst: vi.fn().mockResolvedValue(material) },
     submission: {
-      create: options?.createError
-        ? vi.fn().mockRejectedValue(options.createError)
-        : vi.fn().mockResolvedValue({ id: submissionId }),
+      create: submissionCreate,
       findFirst: vi.fn().mockResolvedValue(submission),
       findMany: vi.fn().mockResolvedValue([]),
     },
     studentExerciseProgress: {
-      findUnique: vi.fn().mockResolvedValue({ attemptCount: 1 }),
+      findUnique: vi.fn().mockResolvedValue({
+        attemptCount: 1,
+        gradingRevision: 3,
+      }),
     },
+    $transaction: vi.fn(
+      async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+    ),
   } as unknown as PrismaService;
   const access = {
     requirePermission: vi.fn().mockResolvedValue({ userId, academyId }),
@@ -111,6 +141,7 @@ function createService(options?: {
     prisma,
     access,
     queue,
+    transaction,
     service: new SubmissionService(prisma, access, config, queue),
   };
 }
@@ -143,10 +174,44 @@ describe("SubmissionService.submit", () => {
     ).resolves.toEqual({ submissionId, totalCount: 2 });
 
     expect(prisma.submission.create).toHaveBeenCalled();
+    expect(prisma.submission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceMaterialId: materialId,
+          gradingRevision: 3,
+          language: "PYTHON",
+          timeLimitMs: 1_000,
+          memoryLimitMb: 256,
+          gradingCases: {
+            create: [
+              expect.objectContaining({ position: 1, isSample: true }),
+              expect.objectContaining({ position: 2, isSample: false }),
+            ],
+          },
+        }),
+      }),
+    );
     expect(queue.enqueue).toHaveBeenCalledWith(submissionId);
     expect(
       vi.mocked(prisma.submission.create).mock.invocationCallOrder[0],
     ).toBeLessThan(vi.mocked(queue.enqueue).mock.invocationCallOrder[0]!);
+  });
+
+  it("checks the complete visibility chain inside the snapshot transaction", async () => {
+    const { service, prisma, transaction } = createService();
+
+    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+
+    expect(transaction.material.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: materialId,
+          isVisible: true,
+          lecture: expect.objectContaining({ isVisible: true }),
+        }),
+      }),
+    );
+    expect(prisma.material.findFirst).not.toHaveBeenCalled();
   });
 });
 

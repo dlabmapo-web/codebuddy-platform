@@ -44,20 +44,14 @@ export class GradingService {
     const submission = await this.prisma.submission.findUnique({
       where: { id: submissionId },
       include: {
+        gradingCases: { orderBy: { position: "asc" } },
         material: {
-          include: {
-            programmingExercise: {
-              include: {
-                testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-              },
-            },
-          },
+          include: { programmingExercise: true },
         },
       },
     });
 
-    const exercise = submission?.material.programmingExercise;
-    if (!submission || !exercise || exercise.testCases.length === 0) {
+    if (!submission || submission.gradingCases.length === 0) {
       await this.fail(submissionId, "EXERCISE_UNAVAILABLE");
       return;
     }
@@ -72,9 +66,9 @@ export class GradingService {
 
     try {
       let stopped = false;
-      for (const [index, testCase] of exercise.testCases.entries()) {
-        const position = index + 1;
-        const isSample = testCase.visibility === "SAMPLE";
+      for (const testCase of submission.gradingCases) {
+        const position = testCase.position;
+        const isSample = testCase.isSample;
 
         if (stopped) {
           results.push({
@@ -90,8 +84,8 @@ export class GradingService {
         const run = await this.engine.run({
           code: submission.code,
           stdin: testCase.input,
-          timeLimitMs: exercise.timeLimitMs,
-          memoryLimitMb: exercise.memoryLimitMb,
+          timeLimitMs: submission.timeLimitMs,
+          memoryLimitMb: submission.memoryLimitMb,
         });
         const outcome = caseOutcomeFor({
           engineOutcome: run.outcome,
@@ -113,7 +107,7 @@ export class GradingService {
         await report({
           submissionId,
           position,
-          of: exercise.testCases.length,
+          of: submission.gradingCases.length,
           outcome,
           isSample,
         });
@@ -128,7 +122,7 @@ export class GradingService {
 
     const summary = summarizeRun(
       results.filter((item) => item.outcome !== "SKIPPED"),
-      exercise.testCases.length,
+      submission.gradingCases.length,
     );
 
     // One transaction: a verdict and the progress it implies must never be
@@ -157,11 +151,22 @@ export class GradingService {
         })),
       });
 
+      const materialId = submission.materialId;
+      const currentRevision = submission.material?.programmingExercise
+        ?.gradingRevision;
+      if (
+        !materialId ||
+        currentRevision === undefined ||
+        currentRevision !== submission.gradingRevision
+      ) {
+        return;
+      }
+
       const previous = await tx.studentExerciseProgress.findUnique({
         where: {
           userId_materialId: {
             userId: submission.userId,
-            materialId: submission.materialId,
+            materialId,
           },
         },
       });
@@ -176,16 +181,17 @@ export class GradingService {
         where: {
           userId_materialId: {
             userId: submission.userId,
-            materialId: submission.materialId,
+            materialId,
           },
         },
         create: {
           userId: submission.userId,
-          materialId: submission.materialId,
+          materialId,
           status: progress.status,
           attemptCount: progress.attemptCount,
           bestPassed: progress.bestPassed,
           bestScore: progress.bestScore,
+          gradingRevision: submission.gradingRevision,
           firstSolvedAt: progress.solvedNow ? new Date() : null,
           lastAttemptAt: new Date(),
         },
@@ -194,6 +200,7 @@ export class GradingService {
           attemptCount: progress.attemptCount,
           bestPassed: progress.bestPassed,
           bestScore: progress.bestScore,
+          gradingRevision: submission.gradingRevision,
           ...(progress.solvedNow ? { firstSolvedAt: new Date() } : {}),
           lastAttemptAt: new Date(),
         },

@@ -35,5 +35,20 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.learnService.discardDraft(context.identity, input)
       ),
+    submit: os.learn.submit
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.submissionService.submit(context.identity, input)
+      ),
+    getSubmission: os.learn.getSubmission
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.submissionService.get(context.identity, input)
+      ),
+    listSubmissions: os.learn.listSubmissions
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.submissionService.list(context.identity, input)
+      ),
   };
 }

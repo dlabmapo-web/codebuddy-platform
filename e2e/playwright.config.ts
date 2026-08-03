@@ -39,7 +39,14 @@ export default defineConfig({
           stdout: 'ignore',
         },
         {
-          command: 'pnpm --filter @cove/web dev',
+          command: 'JUDGE_HEALTH_PORT=4101 pnpm --filter @cove/judge-worker dev',
+          url: 'http://127.0.0.1:4101/health',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+          stdout: 'ignore',
+        },
+        {
+          command: `pnpm --filter @cove/web exec next dev -p ${webPort}`,
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

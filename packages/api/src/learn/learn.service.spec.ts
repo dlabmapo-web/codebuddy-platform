@@ -116,6 +116,8 @@ function createService(overrides?: {
   drafts?: unknown[];
   courses?: unknown[];
   course?: unknown;
+  progress?: unknown;
+  progressRows?: unknown[];
 }) {
   const prisma = {
     course: {
@@ -128,6 +130,10 @@ function createService(overrides?: {
           ? createMaterialRecord()
           : overrides.material,
       ),
+    },
+    studentExerciseProgress: {
+      findUnique: vi.fn().mockResolvedValue(overrides?.progress ?? null),
+      findMany: vi.fn().mockResolvedValue(overrides?.progressRows ?? []),
     },
     exerciseDraft: {
       findUnique: vi.fn().mockResolvedValue(overrides?.draft ?? null),
@@ -372,5 +378,75 @@ describe("LearnService draft mutations", () => {
     await expect(
       service.discardDraft(identity, { academyId, materialId }),
     ).resolves.toEqual({ discarded: false });
+  });
+});
+
+
+describe("LearnService progress reporting", () => {
+  /*
+   * Regression guard. The outline derived status from draft presence alone,
+   * which was correct before grading existed but left SOLVED unreachable once
+   * it did — a student could pass a problem and see no change anywhere. The
+   * verdict moving visible progress is the entire point of grading.
+   */
+  it("reports SOLVED in the workspace from recorded progress", async () => {
+    const { service } = createService({ progress: { status: "SOLVED" } });
+    const workspace = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(workspace.status).toBe("SOLVED");
+  });
+
+  it("keeps SOLVED even when a draft is still present", async () => {
+    // Code left in the editor after passing must not demote the problem.
+    const { service } = createService({
+      progress: { status: "SOLVED" },
+      draft: { code: "print(1)", updatedAt: now },
+    });
+    const workspace = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(workspace.status).toBe("SOLVED");
+  });
+
+  it("falls back to the draft when nothing has been submitted", async () => {
+    const { service } = createService({
+      progress: null,
+      draft: { code: "print(1)", updatedAt: now },
+    });
+    const workspace = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(workspace.status).toBe("IN_PROGRESS");
+  });
+
+  it("ignores a NOT_STARTED progress row in favour of the draft", async () => {
+    const { service } = createService({
+      progress: { status: "NOT_STARTED" },
+      draft: { code: "print(1)", updatedAt: now },
+    });
+    const workspace = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(workspace.status).toBe("IN_PROGRESS");
+  });
+
+  it("queries progress scoped to the requesting user", async () => {
+    const { service, prisma } = createService();
+    await service.getExerciseWorkspace(identity, { academyId, materialId });
+
+    expect(prisma.studentExerciseProgress.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_materialId: { userId, materialId } },
+      }),
+    );
   });
 });

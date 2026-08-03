@@ -3,6 +3,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   flattenOutlineExercises,
   progressStatusFromDraft,
+  type ExerciseProgressStatus,
   resolveExerciseNeighbors,
   type LearnCourseOutline,
   type LearnCourseSummary,
@@ -82,7 +83,7 @@ export class LearnService {
     const materialIds = courses.flatMap((course) =>
       course.versions[0] ? exerciseMaterialIds(course.versions[0]) : [],
     );
-    const startedIds = await this.startedMaterialIds(userId, materialIds);
+    const statuses = await this.statusByMaterial(userId, materialIds);
 
     return {
       courses: courses.flatMap((course) => {
@@ -105,13 +106,7 @@ export class LearnService {
               ),
               exercises: exercises.length,
             },
-            progress: {
-              total: exercises.length,
-              started: exercises.filter((id) => startedIds.has(id)).length,
-              // Unreachable until grading lands; the field exists so the client
-              // renders its final shape from the start.
-              solved: 0,
-            },
+            progress: countProgress(exercises, statuses),
           },
         ];
       }),
@@ -126,7 +121,7 @@ export class LearnService {
     const { course, version } = await this.requirePublishedCourse(input);
 
     const materialIds = exerciseMaterialIds(version);
-    const startedIds = await this.startedMaterialIds(userId, materialIds);
+    const statuses = await this.statusByMaterial(userId, materialIds);
 
     return {
       course: {
@@ -139,11 +134,7 @@ export class LearnService {
         versionNumber: version.versionNumber,
         publishedAt: version.publishedAt?.toISOString() ?? null,
       },
-      progress: {
-        total: materialIds.length,
-        started: materialIds.filter((id) => startedIds.has(id)).length,
-        solved: 0,
-      },
+      progress: countProgress(materialIds, statuses),
       modules: version.modules.map((module) => ({
         id: module.id,
         title: module.title,
@@ -162,7 +153,8 @@ export class LearnService {
                     title: material.title,
                     position: material.position,
                     difficulty: material.programmingExercise.difficulty,
-                    status: progressStatusFromDraft(startedIds.has(material.id)),
+                    status:
+                      statuses.get(material.id) ?? "NOT_STARTED",
                   },
                 ]
               : [],
@@ -228,10 +220,16 @@ export class LearnService {
     const { courseModule } = material.lecture;
     const { courseVersion } = courseModule;
 
-    const draft = await this.prisma.exerciseDraft.findUnique({
-      where: { userId_materialId: { userId, materialId: material.id } },
-      select: { code: true, updatedAt: true },
-    });
+    const [draft, progress] = await Promise.all([
+      this.prisma.exerciseDraft.findUnique({
+        where: { userId_materialId: { userId, materialId: material.id } },
+        select: { code: true, updatedAt: true },
+      }),
+      this.prisma.studentExerciseProgress.findUnique({
+        where: { userId_materialId: { userId, materialId: material.id } },
+        select: { status: true },
+      }),
+    ]);
 
     const ordered = flattenOutlineExercises(
       courseVersion.modules.map((module) => ({
@@ -298,7 +296,10 @@ export class LearnService {
       draft: draft
         ? { code: draft.code, updatedAt: draft.updatedAt.toISOString() }
         : null,
-      status: progressStatusFromDraft(draft !== null),
+      status:
+        progress && progress.status !== "NOT_STARTED"
+          ? progress.status
+          : progressStatusFromDraft(draft !== null),
     };
   }
 
@@ -468,17 +469,56 @@ export class LearnService {
   }
 
   /** One query for every course on the page, rather than one per exercise. */
-  private async startedMaterialIds(
+  /**
+   * Per-exercise status for a whole page in two queries, not one per exercise.
+   *
+   * Recorded progress wins over draft presence: a solved problem stays solved
+   * whether or not the student still has code sitting in the editor. Falling
+   * back to the draft keeps `IN_PROGRESS` meaningful for a problem that has
+   * been opened but never submitted.
+   */
+  private async statusByMaterial(
     userId: string,
     materialIds: string[],
-  ): Promise<Set<string>> {
-    if (materialIds.length === 0) return new Set();
-    const drafts = await this.prisma.exerciseDraft.findMany({
-      where: { userId, materialId: { in: materialIds } },
-      select: { materialId: true },
-    });
-    return new Set(drafts.map((draft) => draft.materialId));
+  ): Promise<Map<string, ExerciseProgressStatus>> {
+    const statuses = new Map<string, ExerciseProgressStatus>();
+    if (materialIds.length === 0) return statuses;
+
+    const [drafts, progress] = await Promise.all([
+      this.prisma.exerciseDraft.findMany({
+        where: { userId, materialId: { in: materialIds } },
+        select: { materialId: true },
+      }),
+      this.prisma.studentExerciseProgress.findMany({
+        where: { userId, materialId: { in: materialIds } },
+        select: { materialId: true, status: true },
+      }),
+    ]);
+
+    for (const draft of drafts) {
+      statuses.set(draft.materialId, progressStatusFromDraft(true));
+    }
+    for (const record of progress) {
+      if (record.status === "NOT_STARTED") continue;
+      statuses.set(record.materialId, record.status);
+    }
+    return statuses;
   }
+}
+
+function countProgress(
+  materialIds: string[],
+  statuses: Map<string, ExerciseProgressStatus>,
+) {
+  let started = 0;
+  let solved = 0;
+  for (const id of materialIds) {
+    const status = statuses.get(id);
+    if (status === "SOLVED") solved += 1;
+    else if (status === "IN_PROGRESS") started += 1;
+  }
+  // A solved problem was necessarily started, so it counts toward both.
+  return { total: materialIds.length, started: started + solved, solved };
 }
 
 function exerciseMaterialIds(version: PublishedVersion): string[] {

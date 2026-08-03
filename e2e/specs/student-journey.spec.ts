@@ -160,6 +160,28 @@ test('running a sample compares output locally', async ({ page }) => {
     .toBeVisible({ timeout: 60_000 });
 });
 
+test('submit streams a trusted verdict without revealing hidden cases', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const bodies: string[] = [];
+  page.on('response', async (response) => {
+    if (!response.url().includes('/api/')) return;
+    bodies.push(await response.text().catch(() => ''));
+  });
+
+  await page.goto(await exerciseUrl(page, ECHO_TITLE));
+  await typeIntoEditor(page, 'print(input())');
+  await page.getByRole('button', { name: /^submit$|^제출$/i }).click();
+
+  await expect(page.getByText(/^Accepted$|^정답$/)).toBeVisible({
+    timeout: 90_000,
+  });
+  await expect(page.getByText(/2 of 2 cases passed|2개 중 2개 통과/i)).toBeVisible();
+  expect(await page.content()).not.toContain(HIDDEN_SENTINEL);
+  expect(bodies.join('\n')).not.toContain(HIDDEN_SENTINEL);
+});
+
 test('a draft survives a reload and appears in continue-solving', async ({
   page,
 }) => {

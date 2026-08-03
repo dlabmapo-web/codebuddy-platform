@@ -43,6 +43,25 @@ describe("roleHasPermission", () => {
     }
   });
 
+  it("gives class structure to team leads and managers only", () => {
+    expect(roleHasPermission("TEAM_LEAD", "classes.manage")).toBe(true);
+    expect(roleHasPermission("MANAGER", "classes.manage")).toBe(true);
+    expect(roleHasPermission("TEACHER", "classes.manage")).toBe(false);
+    expect(roleHasPermission("STUDENT", "classes.manage")).toBe(false);
+  });
+
+  it("keeps student enrollment with managers alone", () => {
+    expect(roleHasPermission("MANAGER", "class-enrollments.manage")).toBe(true);
+    for (const role of ["TEAM_LEAD", "TEACHER", "STUDENT"] as const) {
+      expect(roleHasPermission(role, "class-enrollments.manage")).toBe(false);
+    }
+  });
+
+  it("keeps the reserved teacher assignment permission out of class CRUD", () => {
+    expect(roleHasPermission("TEACHER", "classes.assigned.manage")).toBe(true);
+    expect(roleHasPermission("TEACHER", "classes.manage")).toBe(false);
+  });
+
   it("does not allow teachers or students to manage or import content", () => {
     for (const role of ["TEACHER", "STUDENT"] as const) {
       expect(roleHasPermission(role, "exercises.manage")).toBe(false);

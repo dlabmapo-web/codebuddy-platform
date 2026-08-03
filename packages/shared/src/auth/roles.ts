@@ -27,6 +27,13 @@ export const academyPermissions = [
   "exercises.manage",
   "content.import",
   "ai-feedback-rules.manage",
+  /** Create, edit, archive, restore a class and assign courses to it. */
+  "classes.manage",
+  /** Enroll and remove students. Kept apart because enrollment changes a
+   * student's learning access and belongs with membership administration. */
+  "class-enrollments.manage",
+  /** Reserved for the later teacher-assignment and monitoring design. It does
+   * not authorize class CRUD. */
   "classes.assigned.manage",
   "submissions.own.create",
   "submissions.assigned.review",
@@ -56,6 +63,7 @@ export const academyRolePermissions = {
     "exercises.manage",
     "content.import",
     "ai-feedback-rules.manage",
+    "classes.manage",
     "classes.assigned.manage",
     "submissions.assigned.review",
   ],
@@ -67,6 +75,8 @@ export const academyRolePermissions = {
     "academy.analytics.read",
     "curriculum.read",
     "curriculum.review",
+    "classes.manage",
+    "class-enrollments.manage",
   ],
 } as const satisfies Record<AcademyRole, readonly AcademyPermission[]>;
 

@@ -1,5 +1,6 @@
 export * from "./api/index.js";
 export * from "./auth/index.js";
+export * from "./classes/index.js";
 export * from "./content/index.js";
 export * from "./errors/index.js";
 export * from "./health.js";

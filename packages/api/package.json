@@ -8,7 +8,7 @@
     "dev": "nest start --watch",
     "prebuild": "pnpm db:generate",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node dist/src/main.js",
     "pretypecheck": "pnpm db:generate",
     "typecheck": "tsc --noEmit",
     "pretest": "pnpm --filter @cove/shared build && pnpm db:generate",
@@ -20,10 +20,13 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed:e2e": "tsx prisma/seed/e2e-content.ts"
+    "db:seed:e2e": "tsx prisma/seed/e2e-content.ts",
+    "start:judge": "node dist/src/judge/judge.main.js",
+    "dev:judge": "tsx watch src/judge/judge.main.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.6",
@@ -32,8 +35,11 @@
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
     "@supabase/supabase-js": "^2.108.2",
+    "bullmq": "^5.81.3",
     "dotenv": "^17.4.2",
+    "ioredis": "^5.11.1",
     "pg": "^8.22.0",
+    "pyodide": "0.27.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.1.13"

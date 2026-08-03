@@ -1,0 +1,32 @@
+{
+  "name": "@cove/judge-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @cove/api db:generate && tsc",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/judge-worker/src/main.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cove/shared": "workspace:*",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.4",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "bullmq": "^5.81.3",
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.11.1",
+    "pg": "^8.22.0",
+    "pyodide": "0.27.5",
+    "reflect-metadata": "^0.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cove/api": "workspace:*",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

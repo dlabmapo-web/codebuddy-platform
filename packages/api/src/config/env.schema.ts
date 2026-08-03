@@ -41,6 +41,21 @@ export const apiEnvironmentSchema = z.object({
   BFF_SHARED_SECRET: z.string().min(32).optional(),
   DATABASE_URL: postgresUrlSchema,
   DIRECT_URL: postgresUrlSchema,
+  /**
+   * Grading queue. Optional so the API still boots without it — reading and
+   * solving keep working when grading is unavailable; only submitting fails.
+   */
+  REDIS_URL: z
+    .string()
+    .refine((value) => usesProtocol(value, ["redis:", "rediss:"]), {
+      message: "must be a redis:// or rediss:// URL",
+    })
+    .optional(),
+  /** CPU-bound work, so this tracks cores rather than being set high. */
+  JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  /** Pinned, and shared with the browser so run and submit agree. */
+  PYODIDE_VERSION: z.string().default("0.27.5"),
+  SUBMISSION_RATE_LIMIT: z.coerce.number().int().min(1).max(120).default(10),
 }).superRefine((environment, context) => {
   if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {
     context.addIssue({

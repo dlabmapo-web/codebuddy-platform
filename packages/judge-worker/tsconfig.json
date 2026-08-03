@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "sourceMap": true,
+    "target": "ES2023"
+  },
+  "include": [
+    "src/**/*.ts",
+    "../api/src/judge/pyodide-thread.ts"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

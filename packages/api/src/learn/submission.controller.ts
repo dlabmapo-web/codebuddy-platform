@@ -34,7 +34,11 @@ const MAX_STREAM_MS = 5 * 60_000;
  * lives here. Replaces v1's polling loop, which ran up to 400 status queries
  * per submission and still left the student waiting after the result existed.
  */
-@Controller("api/submissions")
+// `main.ts` sets a global `api` prefix, so this must not repeat it — the route
+// resolved to `/api/api/submissions/...`, the stream 404'd on every submit, and
+// the client fell back to its single delayed poll. Grading took under a second
+// while students waited fifteen. `AppController` uses the same bare form.
+@Controller("submissions")
 export class SubmissionController {
   constructor(
     private readonly submissions: SubmissionService,

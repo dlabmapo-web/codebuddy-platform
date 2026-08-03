@@ -22,7 +22,8 @@
     "db:studio": "prisma studio",
     "db:seed:e2e": "tsx prisma/seed/e2e-content.ts",
     "start:judge": "node dist/src/judge/judge.main.js",
-    "dev:judge": "tsx watch src/judge/judge.main.ts"
+    "dev:judge": "tsx watch src/judge/judge.main.ts",
+    "db:seed:sandbox": "tsx prisma/seed/manual-sandbox.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

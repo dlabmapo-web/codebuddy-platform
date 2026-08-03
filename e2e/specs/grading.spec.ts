@@ -25,6 +25,17 @@ const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
 const ECHO_ID = 'e0000000-0000-4000-8000-000000000030';
 const SUM_ID = 'e0000000-0000-4000-8000-000000000031';
 
+/**
+ * Submit to verdict, for a problem that grades in well under a second.
+ *
+ * Generous against the ~1.5s a pushed verdict actually takes, but far below the
+ * client's 15s fallback poll. The SSE route once 404'd and every verdict
+ * arrived on that fallback instead — grading was fast while students waited
+ * fifteen seconds, and a suite that only asserted "a verdict eventually
+ * appears" passed throughout.
+ */
+const VERDICT_BUDGET_MS = 8_000;
+
 let academyId = '';
 
 async function signIn(page: Page) {
@@ -189,6 +200,30 @@ test('passing a problem marks it solved in the outline and catalog', async ({
     .filter({ has: page.getByRole('link', { name: /Echo the input/i }) })
     .first();
   await expect(row.getByText(/^Solved$|^완료$/)).toBeVisible({ timeout: 30_000 });
+});
+
+test('a verdict is pushed, not waited for', async ({ page }) => {
+  test.setTimeout(120_000);
+  const streams: number[] = [];
+  page.on('response', (response) => {
+    if (response.url().includes('/stream')) streams.push(response.status());
+  });
+
+  await openExercise(page, ECHO_ID);
+  await typeIntoEditor(page, 'print(input())');
+
+  const startedAt = Date.now();
+  await submitButton(page).click();
+  await expect(page.getByText(/^Accepted$|^Not accepted$/)).toBeVisible({
+    timeout: 60_000,
+  });
+  const elapsed = Date.now() - startedAt;
+
+  console.log(`submit -> verdict: ${elapsed}ms`);
+  // A 404 here is invisible to the user beyond the delay, so the status is
+  // asserted directly rather than inferred from timing alone.
+  expect(streams).toContain(200);
+  expect(elapsed).toBeLessThan(VERDICT_BUDGET_MS);
 });
 
 test('typing issues no network request', async ({ page }) => {

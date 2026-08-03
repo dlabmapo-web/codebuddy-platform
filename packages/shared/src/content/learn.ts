@@ -85,11 +85,8 @@ export type LearnCourseProgress = z.infer<typeof learnCourseProgressSchema>;
 
 export const learnCourseSummarySchema = z.object({
   courseId: z.uuid(),
-  courseVersionId: z.uuid(),
-  versionNumber: z.number().int().positive(),
   title: titleSchema,
   description: descriptionSchema,
-  publishedAt: z.iso.datetime().nullable(),
   counts: z.object({
     modules: z.number().int().nonnegative(),
     lectures: z.number().int().nonnegative(),
@@ -104,11 +101,6 @@ export const learnCourseOutlineSchema = z.object({
     id: z.uuid(),
     title: titleSchema,
     description: descriptionSchema,
-  }),
-  version: z.object({
-    id: z.uuid(),
-    versionNumber: z.number().int().positive(),
-    publishedAt: z.iso.datetime().nullable(),
   }),
   progress: learnCourseProgressSchema,
   modules: z.array(learnModuleSchema),
@@ -125,7 +117,6 @@ export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
   materialId: z.uuid(),
-  courseVersionId: z.uuid(),
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
   language: exerciseLanguageSchema,

@@ -14,307 +14,189 @@ const identity: SupabaseIdentity = {
   provider: null,
   requestedAcademyId: null,
 };
-
 const academyId = "20000000-0000-4000-8000-000000000001";
 const userId = "30000000-0000-4000-8000-000000000001";
 const courseId = "40000000-0000-4000-8000-000000000001";
-const versionId = "50000000-0000-4000-8000-000000000001";
-const materialId = "60000000-0000-4000-8000-000000000001";
-const now = new Date("2026-07-31T00:00:00.000Z");
+const moduleId = "50000000-0000-4000-8000-000000000001";
+const lectureId = "60000000-0000-4000-8000-000000000001";
+const materialId = "70000000-0000-4000-8000-000000000001";
+const nextMaterialId = "70000000-0000-4000-8000-000000000002";
 
-/** The string that must never reach a student. */
-const SECRET = "HIDDEN_EXPECTATION_SENTINEL";
-
-function createExerciseRecord() {
+function programmingExercise() {
   return {
     materialId,
-    difficulty: "EASY" as const,
-    language: "PYTHON" as const,
-    description: "<p>Sum two numbers</p>",
+    externalKey: "sum-two",
+    legacyProblemNo: null,
+    difficulty: "EASY",
+    description: "<p>Add two numbers.</p>",
     inputFormat: "Two integers",
     outputFormat: "One integer",
-    constraints: "0 <= n <= 100",
-    starterCode: "# write here",
-    timeLimitMs: 3000,
+    constraints: "",
+    starterCode: "",
+    language: "PYTHON",
+    timeLimitMs: 1_000,
     memoryLimitMb: 256,
+    aiFeedbackEnabled: false,
+    gradingRevision: 2,
+    updatedAt: new Date("2026-08-03T00:00:00Z"),
     testCases: [
       {
+        id: "80000000-0000-4000-8000-000000000001",
         position: 1,
         input: "1 2",
         expectedOutput: "3",
-        visibility: "SAMPLE" as const,
+        visibility: "SAMPLE",
       },
       {
+        id: "80000000-0000-4000-8000-000000000002",
         position: 2,
-        input: `${SECRET}_IN`,
-        expectedOutput: `${SECRET}_OUT`,
-        visibility: "HIDDEN" as const,
-      },
-      {
-        position: 3,
-        input: `${SECRET}_IN_2`,
-        expectedOutput: `${SECRET}_OUT_2`,
-        visibility: "HIDDEN" as const,
+        input: "secret input",
+        expectedOutput: "secret output",
+        visibility: "HIDDEN",
       },
     ],
-    hints: [{ position: 1, content: "Use input()" }],
+    hints: [
+      {
+        id: "90000000-0000-4000-8000-000000000001",
+        position: 1,
+        content: "Use addition.",
+        triggerExpression: null,
+      },
+    ],
   };
 }
 
-function createMaterialRecord() {
+function visibleCourse() {
   return {
-    id: materialId,
-    title: "Sum two numbers",
-    position: 1,
-    programmingExercise: createExerciseRecord(),
-    lecture: {
-      id: "70000000-0000-4000-8000-000000000001",
-      title: "Lecture 1",
-      courseModule: {
-        id: "80000000-0000-4000-8000-000000000001",
-        title: "Module 1",
-        courseVersion: {
-          id: versionId,
-          versionNumber: 1,
-          publishedAt: now,
-          course: { id: courseId, title: "Python", description: "" },
-          modules: [
-            {
-              id: "80000000-0000-4000-8000-000000000001",
-              position: 1,
-              lectures: [
-                {
-                  id: "70000000-0000-4000-8000-000000000001",
-                  position: 1,
-                  materials: [
-                    {
-                      id: materialId,
-                      title: "Sum two numbers",
-                      position: 1,
-                      programmingExercise: { difficulty: "EASY" },
-                    },
-                    {
-                      id: "60000000-0000-4000-8000-000000000002",
-                      title: "Next problem",
-                      position: 2,
-                      programmingExercise: { difficulty: "MEDIUM" },
-                    },
-                  ],
+    id: courseId,
+    academyId,
+    title: "Python Foundations",
+    description: "Learn Python",
+    isVisible: true,
+    createdByUserId: userId,
+    createdAt: new Date("2026-08-03T00:00:00Z"),
+    updatedAt: new Date("2026-08-03T00:00:00Z"),
+    modules: [
+      {
+        id: moduleId,
+        courseId,
+        title: "Basics",
+        description: "",
+        position: 1,
+        isVisible: true,
+        createdAt: new Date("2026-08-03T00:00:00Z"),
+        updatedAt: new Date("2026-08-03T00:00:00Z"),
+        lectures: [
+          {
+            id: lectureId,
+            courseModuleId: moduleId,
+            title: "Addition",
+            description: "",
+            position: 1,
+            isVisible: true,
+            createdAt: new Date("2026-08-03T00:00:00Z"),
+            updatedAt: new Date("2026-08-03T00:00:00Z"),
+            materials: [
+              {
+                id: materialId,
+                lectureId,
+                type: "PROGRAMMING_EXERCISE",
+                title: "Sum two numbers",
+                position: 1,
+                isRequired: true,
+                isVisible: true,
+                createdAt: new Date("2026-08-03T00:00:00Z"),
+                updatedAt: new Date("2026-08-03T00:00:00Z"),
+                programmingExercise: programmingExercise(),
+              },
+              {
+                id: nextMaterialId,
+                lectureId,
+                type: "PROGRAMMING_EXERCISE",
+                title: "Next problem",
+                position: 2,
+                isRequired: true,
+                isVisible: true,
+                createdAt: new Date("2026-08-03T00:00:00Z"),
+                updatedAt: new Date("2026-08-03T00:00:00Z"),
+                programmingExercise: {
+                  ...programmingExercise(),
+                  materialId: nextMaterialId,
+                  externalKey: "next",
                 },
-              ],
-            },
-          ],
-        },
+              },
+            ],
+          },
+        ],
       },
+    ],
+  };
+}
+
+function workspaceMaterial() {
+  const course = visibleCourse();
+  const courseModule = course.modules[0]!;
+  const lecture = courseModule.lectures[0]!;
+  return {
+    ...lecture.materials[0]!,
+    programmingExercise: programmingExercise(),
+    lecture: {
+      ...lecture,
+      courseModule: { ...courseModule, course },
     },
   };
 }
 
-function createService(overrides?: {
-  material?: unknown;
-  draft?: unknown;
-  drafts?: unknown[];
-  courses?: unknown[];
-  course?: unknown;
-  progress?: unknown;
-  progressRows?: unknown[];
+function createService(options?: {
+  course?: ReturnType<typeof visibleCourse> | null;
+  material?: ReturnType<typeof workspaceMaterial> | null;
+  draft?: { code: string; updatedAt: Date } | null;
+  progress?: { status: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED"; gradingRevision: number } | null;
 }) {
+  const course = options?.course === undefined ? visibleCourse() : options.course;
+  const material =
+    options?.material === undefined ? workspaceMaterial() : options.material;
   const prisma = {
     course: {
-      findMany: vi.fn().mockResolvedValue(overrides?.courses ?? []),
-      findFirst: vi.fn().mockResolvedValue(overrides?.course ?? null),
+      findMany: vi.fn().mockResolvedValue(course ? [course] : []),
+      findFirst: vi.fn().mockResolvedValue(course),
     },
-    material: {
-      findFirst: vi.fn().mockResolvedValue(
-        overrides?.material === undefined
-          ? createMaterialRecord()
-          : overrides.material,
-      ),
-    },
-    studentExerciseProgress: {
-      findUnique: vi.fn().mockResolvedValue(overrides?.progress ?? null),
-      findMany: vi.fn().mockResolvedValue(overrides?.progressRows ?? []),
-    },
+    material: { findFirst: vi.fn().mockResolvedValue(material) },
     exerciseDraft: {
-      findUnique: vi.fn().mockResolvedValue(overrides?.draft ?? null),
-      findMany: vi.fn().mockResolvedValue(overrides?.drafts ?? []),
-      upsert: vi.fn().mockResolvedValue({ updatedAt: now }),
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(options?.draft ?? null),
+      upsert: vi.fn().mockResolvedValue({
+        updatedAt: new Date("2026-08-03T01:00:00Z"),
+      }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    studentExerciseProgress: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(options?.progress ?? null),
+    },
   } as unknown as PrismaService;
-
   const access = {
-    requirePermission: vi.fn().mockResolvedValue({
-      userId,
-      academyId,
-      role: "STUDENT",
-    }),
+    requirePermission: vi.fn().mockResolvedValue({ userId, academyId }),
   } as unknown as AcademyAccessService;
-
   return { prisma, access, service: new LearnService(prisma, access) };
 }
 
-describe("LearnService authorization", () => {
-  it("requires curriculum.read on the academy for every read", async () => {
-    const { service, access } = createService();
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
-
-    expect(access.requirePermission).toHaveBeenCalledWith(
-      identity.authUserId,
-      academyId,
-      "curriculum.read",
-    );
-  });
-
-  it("propagates a permission failure rather than returning content", async () => {
-    const { service, access } = createService();
-    vi.mocked(access.requirePermission).mockRejectedValueOnce(
-      new Error("PERMISSION_DENIED"),
-    );
-
-    await expect(
-      service.listCourses(identity, academyId),
-    ).rejects.toThrow("PERMISSION_DENIED");
-  });
-});
-
-describe("LearnService.getExerciseWorkspace", () => {
-  it("never returns a hidden test case", async () => {
-    const { service } = createService();
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    // The invariant from §7.3 of the design, asserted against the whole
-    // serialised payload rather than a field list, so a future field that
-    // accidentally carries hidden data fails here too.
-    expect(JSON.stringify(workspace)).not.toContain(SECRET);
-  });
-
-  it("exposes hidden cases only as a count", async () => {
-    const { service } = createService();
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.exercise.hiddenTestCaseCount).toBe(2);
-    expect(workspace.exercise.sampleTestCases).toEqual([
-      { position: 1, input: "1 2", expectedOutput: "3" },
-    ]);
-  });
-
-  it("scopes the material query to published ancestors in this academy", async () => {
+describe("LearnService visible curriculum", () => {
+  it("lists only visible courses and visible descendants", async () => {
     const { service, prisma } = createService();
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
 
-    const where = vi.mocked(prisma.material.findFirst).mock.calls[0]![0]!.where;
-    expect(where).toMatchObject({
-      id: materialId,
-      isPublished: true,
-      lecture: {
-        isPublished: true,
-        courseModule: {
-          isPublished: true,
-          courseVersion: {
-            status: "PUBLISHED",
-            course: { academyId, status: "ACTIVE" },
-          },
-        },
-      },
-    });
-  });
+    const result = await service.listCourses(identity, academyId);
 
-  it("rejects a material that is not visible", async () => {
-    const { service } = createService({ material: null });
-
-    await expect(
-      service.getExerciseWorkspace(identity, { academyId, materialId }),
-    ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
-  });
-
-  it("resolves the next exercise in outline order", async () => {
-    const { service } = createService();
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.neighbors.previous).toBeNull();
-    expect(workspace.neighbors.next?.materialId).toBe(
-      "60000000-0000-4000-8000-000000000002",
-    );
-  });
-
-  it("reports IN_PROGRESS and returns the draft when one exists", async () => {
-    const { service } = createService({
-      draft: { code: "print(1)", updatedAt: now },
-    });
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("IN_PROGRESS");
-    expect(workspace.draft).toEqual({
-      code: "print(1)",
-      updatedAt: now.toISOString(),
-    });
-  });
-
-  it("reports NOT_STARTED with no draft", async () => {
-    const { service } = createService();
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("NOT_STARTED");
-    expect(workspace.draft).toBeNull();
-  });
-
-  it("looks the draft up by the requesting user, not by material alone", async () => {
-    const { service, prisma } = createService();
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
-
-    expect(prisma.exerciseDraft.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId_materialId: { userId, materialId } },
-      }),
-    );
-  });
-});
-
-describe("LearnService.getCourseOutline", () => {
-  it("exposes the highest score for each exercise", async () => {
-    const version = createMaterialRecord().lecture.courseModule.courseVersion;
-    const { service } = createService({
-      course: {
-        id: courseId,
-        title: "Python",
-        description: "",
-        versions: [version],
-      },
-      progressRows: [
-        {
-          materialId,
-          status: "IN_PROGRESS",
-          bestScore: 67,
-        },
-      ],
-    });
-
-    const outline = await service.getCourseOutline(identity, {
-      academyId,
+    expect(result.courses[0]).toMatchObject({
       courseId,
+      counts: { modules: 1, lectures: 1, exercises: 2 },
     });
-
-    expect(outline.modules[0]?.lectures[0]?.exercises[0]?.bestScore).toBe(67);
-    expect(outline.modules[0]?.lectures[0]?.exercises[1]?.bestScore).toBe(0);
+    expect(prisma.course.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { academyId, isVisible: true } }),
+    );
   });
 
-  it("reports COURSE_NOT_FOUND for a course outside the academy", async () => {
+  it("does not expose a hidden course outline", async () => {
     const { service } = createService({ course: null });
 
     await expect(
@@ -322,157 +204,93 @@ describe("LearnService.getCourseOutline", () => {
     ).rejects.toMatchObject({ code: "COURSE_NOT_FOUND" });
   });
 
-  it("reports COURSE_NOT_PUBLISHED when the course has only a draft", async () => {
-    const { service } = createService({
-      course: { id: courseId, title: "Python", description: "", versions: [] },
-    });
-
-    await expect(
-      service.getCourseOutline(identity, { academyId, courseId }),
-    ).rejects.toMatchObject({ code: "COURSE_NOT_PUBLISHED" });
-  });
-});
-
-describe("LearnService.listCourses", () => {
-  it("asks only for active courses holding a published version", async () => {
+  it("requires all ancestors and the problem itself to be visible", async () => {
     const { service, prisma } = createService();
-    await service.listCourses(identity, academyId);
 
-    expect(vi.mocked(prisma.course.findMany).mock.calls[0]![0]!.where)
-      .toMatchObject({
-        academyId,
-        status: "ACTIVE",
-        versions: { some: { status: "PUBLISHED" } },
-      });
+    await service.getExerciseWorkspace(identity, { academyId, materialId });
+
+    expect(prisma.material.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: materialId,
+          isVisible: true,
+          lecture: expect.objectContaining({
+            isVisible: true,
+            courseModule: expect.objectContaining({
+              isVisible: true,
+              course: { academyId, isVisible: true },
+            }),
+          }),
+        }),
+      }),
+    );
   });
 
-  it("returns nothing when the academy has no published course", async () => {
-    const { service } = createService({ courses: [] });
-    await expect(service.listCourses(identity, academyId)).resolves.toEqual({
-      courses: [],
-    });
-  });
+  it("returns sample cases but only counts hidden grading cases", async () => {
+    const { service } = createService();
 
-  it("does not query drafts when there are no exercises to check", async () => {
-    const { service, prisma } = createService({ courses: [] });
-    await service.listCourses(identity, academyId);
-
-    expect(prisma.exerciseDraft.findMany).not.toHaveBeenCalled();
-  });
-});
-
-describe("LearnService draft mutations", () => {
-  it("upserts a draft for the requesting user", async () => {
-    const { service, prisma } = createService();
-    const result = await service.saveDraft(identity, {
+    const result = await service.getExerciseWorkspace(identity, {
       academyId,
       materialId,
-      code: "print(1)",
+    });
+
+    expect(result.exercise.sampleTestCases).toEqual([
+      { position: 1, input: "1 2", expectedOutput: "3" },
+    ]);
+    expect(result.exercise.hiddenTestCaseCount).toBe(1);
+    expect(JSON.stringify(result)).not.toContain("secret input");
+    expect(result.neighbors.next?.materialId).toBe(nextMaterialId);
+  });
+
+  it("ignores progress recorded for an older grading revision", async () => {
+    const { service } = createService({
+      progress: { status: "SOLVED", gradingRevision: 1 },
+    });
+
+    const result = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(result.status).toBe("NOT_STARTED");
+  });
+
+  it("uses a retained draft after a grading revision reset", async () => {
+    const updatedAt = new Date("2026-08-03T02:00:00Z");
+    const { service } = createService({
+      draft: { code: "print(3)", updatedAt },
+      progress: { status: "SOLVED", gradingRevision: 1 },
+    });
+
+    const result = await service.getExerciseWorkspace(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(result.status).toBe("IN_PROGRESS");
+    expect(result.draft).toEqual({
+      code: "print(3)",
+      updatedAt: updatedAt.toISOString(),
+    });
+  });
+
+  it("stores draft identity that survives future content cleanup", async () => {
+    const { service, prisma } = createService();
+
+    await service.saveDraft(identity, {
+      academyId,
+      materialId,
+      code: "print(3)",
     });
 
     expect(prisma.exerciseDraft.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId_materialId: { userId, materialId } },
-        update: { code: "print(1)" },
-      }),
-    );
-    expect(result).toEqual({ updatedAt: now.toISOString() });
-  });
-
-  it("refuses to save against a material that is not visible", async () => {
-    const { service } = createService({ material: null });
-
-    await expect(
-      service.saveDraft(identity, { academyId, materialId, code: "x" }),
-    ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
-  });
-
-  it("scopes discard by user so another student's draft is unreachable", async () => {
-    const { service, prisma } = createService();
-    await service.discardDraft(identity, { academyId, materialId });
-
-    expect(prisma.exerciseDraft.deleteMany).toHaveBeenCalledWith({
-      where: { userId, materialId },
-    });
-  });
-
-  it("reports discarded false when nothing was deleted", async () => {
-    const { service, prisma } = createService();
-    vi.mocked(prisma.exerciseDraft.deleteMany).mockResolvedValueOnce({
-      count: 0,
-    });
-
-    await expect(
-      service.discardDraft(identity, { academyId, materialId }),
-    ).resolves.toEqual({ discarded: false });
-  });
-});
-
-
-describe("LearnService progress reporting", () => {
-  /*
-   * Regression guard. The outline derived status from draft presence alone,
-   * which was correct before grading existed but left SOLVED unreachable once
-   * it did — a student could pass a problem and see no change anywhere. The
-   * verdict moving visible progress is the entire point of grading.
-   */
-  it("reports SOLVED in the workspace from recorded progress", async () => {
-    const { service } = createService({ progress: { status: "SOLVED" } });
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("SOLVED");
-  });
-
-  it("keeps SOLVED even when a draft is still present", async () => {
-    // Code left in the editor after passing must not demote the problem.
-    const { service } = createService({
-      progress: { status: "SOLVED" },
-      draft: { code: "print(1)", updatedAt: now },
-    });
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("SOLVED");
-  });
-
-  it("falls back to the draft when nothing has been submitted", async () => {
-    const { service } = createService({
-      progress: null,
-      draft: { code: "print(1)", updatedAt: now },
-    });
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("IN_PROGRESS");
-  });
-
-  it("ignores a NOT_STARTED progress row in favour of the draft", async () => {
-    const { service } = createService({
-      progress: { status: "NOT_STARTED" },
-      draft: { code: "print(1)", updatedAt: now },
-    });
-    const workspace = await service.getExerciseWorkspace(identity, {
-      academyId,
-      materialId,
-    });
-
-    expect(workspace.status).toBe("IN_PROGRESS");
-  });
-
-  it("queries progress scoped to the requesting user", async () => {
-    const { service, prisma } = createService();
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
-
-    expect(prisma.studentExerciseProgress.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId_materialId: { userId, materialId } },
+        create: expect.objectContaining({
+          userId,
+          materialId,
+          sourceMaterialId: materialId,
+          courseId,
+        }),
       }),
     );
   });

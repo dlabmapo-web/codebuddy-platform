@@ -181,7 +181,6 @@ describe("learnExerciseWorkspaceSchema", () => {
       },
       exercise: {
         materialId: "44444444-4444-4444-8444-444444444444",
-        courseVersionId: "55555555-5555-4555-8555-555555555555",
         title: "Sum",
         difficulty: "EASY",
         language: "PYTHON",

@@ -110,11 +110,33 @@ test('a wrong answer on a hidden case reveals no diff for it', async ({
   await typeIntoEditor(page, 'input()\nprint("hello")');
   await submitButton(page).click();
 
-  await expect(page.getByText(/^Not accepted$/)).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText(/1 of 2 cases passed/i)).toBeVisible();
+  await expect(page.getByText(/^Not accepted$|^오답$/)).toBeVisible({
+    timeout: 90_000,
+  });
+  const resultPanel = page.locator('#workspace-result-panel');
+  await expect(resultPanel.getByTestId('result-passed')).toContainText('1 / 2');
+  await expect(resultPanel.getByTestId('result-score')).toContainText('50 / 100');
+  await expect(resultPanel.getByText(/compare the expected format/i)).toHaveCount(0);
 
   expect(await page.content()).not.toContain(HIDDEN_SENTINEL);
   expect(bodies.join('\n')).not.toContain(HIDDEN_SENTINEL);
+});
+
+test('a visible wrong answer opens a guided expected-versus-actual diagnostic', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await openExercise(page, SUM_ID);
+  await typeIntoEditor(page, 'print(0)');
+  await submitButton(page).click();
+
+  const resultPanel = page.locator('#workspace-result-panel');
+  await expect(
+    resultPanel.getByRole('heading', { name: /Check your output/i }),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(resultPanel.getByText(/^Expected$/)).toBeVisible();
+  await expect(resultPanel.getByText(/^Actual$/)).toBeVisible();
+  await expect(resultPanel.getByText(/Compare the expected format/i)).toBeVisible();
 });
 
 test('an infinite loop is cut off as a time limit, not a hang', async ({
@@ -127,9 +149,13 @@ test('an infinite loop is cut off as a time limit, not a hang', async ({
   await typeIntoEditor(page, 'while True:\n    pass');
   await submitButton(page).click();
 
-  await expect(page.getByText(/^Not accepted$/)).toBeVisible({ timeout: 90_000 });
   await expect(
-    page.locator('[title="Time limit exceeded"]').first(),
+    page
+      .getByTestId('result-hero')
+      .getByText(/^Time limit exceeded$|^시간 초과$/),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.getByRole('listitem', { name: /Time limit exceeded/i }).first(),
   ).toBeVisible();
 
   // The API must still be serving: a runaway program cannot take request
@@ -148,7 +174,9 @@ test('a runtime error is reported as such, not as a wrong answer', async ({
 
   await expect(page.getByText(/^Not accepted$/)).toBeVisible({ timeout: 90_000 });
   // Pointing a student at a logic bug when they have a crash wastes their time.
-  await expect(page.locator('[title="Runtime error"]').first()).toBeVisible();
+  await expect(
+    page.getByRole('listitem', { name: /Runtime error/i }).first(),
+  ).toBeVisible();
 });
 
 test('a second submit while one is in flight is rejected', async ({
@@ -177,9 +205,13 @@ test('a second submit while one is in flight is rejected', async ({
   ).toBeVisible({ timeout: 30_000 });
   await secondTab.close();
 
-  await expect(page.getByText(/^Accepted$|^Not accepted$/)).toBeVisible({
-    timeout: 90_000,
-  });
+  await expect(
+    page
+      .getByTestId('result-hero')
+      .getByText(
+        /^Accepted$|^Not accepted$|^Time limit exceeded$|^정답$|^오답$|^시간 초과$/,
+      ),
+  ).toBeVisible({ timeout: 90_000 });
 });
 
 test('passing a problem marks it solved in the outline and catalog', async ({
@@ -190,6 +222,7 @@ test('passing a problem marks it solved in the outline and catalog', async ({
   await typeIntoEditor(page, 'print(input())');
   await submitButton(page).click();
   await expect(page.getByText(/^Accepted$/)).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId('result-score')).toContainText('100 / 100');
 
   // The loop closing is the whole point of grading: a verdict has to move the
   // student's visible progress, not just render a panel.
@@ -200,6 +233,7 @@ test('passing a problem marks it solved in the outline and catalog', async ({
     .filter({ has: page.getByRole('link', { name: /Echo the input/i }) })
     .first();
   await expect(row.getByText(/^Solved$|^완료$/)).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByText(/^100 \/ 100$/)).toBeVisible();
 });
 
 test('a verdict is pushed, not waited for', async ({ page }) => {

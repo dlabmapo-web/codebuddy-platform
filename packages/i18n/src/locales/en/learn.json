@@ -35,7 +35,8 @@
     "progress": "{{solved}} of {{total}} solved",
     "expand": "Expand module",
     "collapse": "Collapse module",
-    "version": "Version {{number}}"
+    "version": "Version {{number}}",
+    "score": "{{score}} / 100"
   },
   "status": {
     "NOT_STARTED": "Not started",
@@ -58,9 +59,10 @@
     "hidden_count_one": "{{count}} hidden test also runs when you submit.",
     "hidden_count_other": "{{count}} hidden tests also run when you submit.",
     "back": "Back to the course",
-    "previous": "Previous problem",
-    "next": "Next problem",
+    "previous": "Previous",
+    "next": "Next",
     "terminal": "Terminal",
+    "result": "Result",
     "terminal_hint": "Run your code to see output here.",
     "stdin_prompt": "Program input",
     "interactive_unsupported": "This browser cannot run interactive input. Your code still runs, but input() will not prompt.",
@@ -68,14 +70,24 @@
     "run": "Run",
     "stop": "Stop",
     "preparing": "Preparing…",
-    "sample_n": "Ex {{number}}",
-    "run_sample_n": "Run example {{number}}",
-    "sample_match": "Example {{number}} matches the expected output.",
-    "sample_mismatch": "Example {{number}} does not match the expected output.",
+    "sample_n": "Test {{number}}",
+    "run_sample_n": "Run test {{number}}",
+    "sample_match": "Test {{number}} matches the expected output.",
+    "sample_mismatch": "Test {{number}} does not match the expected output.",
     "sample_skipped": "Skipped the comparison because the program did not finish.",
     "expected": "Expected output:",
     "tab_problem": "Problem",
     "tab_code": "Code",
+    "tab_terminal": "Terminal",
+    "tab_result": "Result",
+    "language_python": "Python 3",
+    "font_smaller": "Decrease editor font size",
+    "font_larger": "Increase editor font size",
+    "copy_input": "Copy",
+    "copied": "Copied",
+    "hint": "Hint",
+    "reset": "Reset",
+    "reset_confirm": "Replace your code with the starting code? Your current code is not saved anywhere else.",
     "save_state": {
       "local": "Saved locally",
       "saving": "Saving…",
@@ -87,17 +99,84 @@
     "elapsed_time": "Time on this problem"
   },
   "submit": {
+    "empty": "Submit your code to see the judge result here.",
     "running": "Grading…",
     "judge_error": "The judge could not grade this submission",
+    "judge_error_detail": "This does not count as an attempt.",
     "passed": "Accepted",
     "failed": "Not accepted",
+    "score": "{{score}} / 100",
+    "metric_score": "Score",
+    "metric_passed": "Passed",
+    "metric_runtime": "Runtime",
+    "test_results": "Test results",
+    "sample_case": "Sample",
+    "compare_output": "Compare the expected format with what your program printed.",
+    "case_n": "Case {{number}}",
     "case_summary": "{{passed}} of {{total}} cases passed",
     "runtime": "{{ms}} ms",
     "outcome_pending": "Waiting",
     "stopped_early": "{{count}} remaining cases were skipped after the first failure.",
     "expected": "Expected",
     "actual": "Actual",
-    "hidden_note": "Hidden cases show only their position and outcome.",
+    "hidden_note_one": "{{count}} hidden case shows a result only.",
+    "hidden_note_other": "{{count}} hidden cases show a result only.",
+    "presentation": {
+      "grading": {
+        "eyebrow": "Judge running",
+        "headline": "Checking your solution",
+        "guidance": "Test results will appear here as the judge checks each case."
+      },
+      "accepted": {
+        "eyebrow": "Accepted",
+        "headline": "Everything passed",
+        "guidance": "Your program produced the expected result for every test case."
+      },
+      "wrong_output": {
+        "eyebrow": "Not accepted",
+        "headline": "Check your output",
+        "guidance": "Compare the output content and formatting, then run your code again."
+      },
+      "runtime_error": {
+        "eyebrow": "Not accepted",
+        "headline": "Fix the runtime error",
+        "guidance": "Your program stopped while running. Check the failing operation and input handling."
+      },
+      "time_limit": {
+        "eyebrow": "Time limit exceeded",
+        "headline": "Make it finish sooner",
+        "guidance": "Check for loops that do not end and reduce repeated work in your algorithm."
+      },
+      "memory_limit": {
+        "eyebrow": "Memory limit exceeded",
+        "headline": "Reduce memory use",
+        "guidance": "Keep only the data your solution needs and avoid unnecessary allocations."
+      },
+      "not_accepted": {
+        "eyebrow": "Not accepted",
+        "headline": "Review your solution",
+        "guidance": "Inspect the test results below, update your code, and try again."
+      },
+      "judge_error": {
+        "eyebrow": "Grading unavailable",
+        "headline": "The judge could not grade this",
+        "guidance": "This was a system problem and did not count as an attempt. Please submit again."
+      },
+      "transport_error": {
+        "eyebrow": "Connection problem",
+        "headline": "The result could not be loaded",
+        "guidance": "Check your connection and submit again when the service is available."
+      }
+    },
+    "outcome_detail": {
+      "PENDING": "Waiting for the judge.",
+      "PASSED": "Your output matched.",
+      "WRONG_OUTPUT": "Your output did not match the expected result.",
+      "RUNTIME_ERROR": "Your program stopped with an error.",
+      "TIME_LIMIT": "Your program did not finish in time.",
+      "MEMORY_LIMIT": "Your program used too much memory.",
+      "SKIPPED": "Skipped after the first failed case."
+    },
     "outcome": {
       "PASSED": "Passed",
       "WRONG_OUTPUT": "Wrong output",

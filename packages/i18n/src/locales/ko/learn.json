@@ -32,7 +32,8 @@
     "progress": "{{total}}문제 중 {{solved}}문제 완료",
     "expand": "모듈 펼치기",
     "collapse": "모듈 접기",
-    "version": "버전 {{number}}"
+    "version": "버전 {{number}}",
+    "score": "{{score}} / 100"
   },
   "status": {
     "NOT_STARTED": "미시작",
@@ -53,9 +54,10 @@
     "reveal_hint_other": "힌트 보기 ({{remaining}}개 남음)",
     "hidden_count_other": "제출하면 비공개 테스트 {{count}}개도 함께 실행됩니다.",
     "back": "코스로 돌아가기",
-    "previous": "이전 문제",
-    "next": "다음 문제",
+    "previous": "이전",
+    "next": "다음",
     "terminal": "터미널",
+    "result": "결과",
     "terminal_hint": "코드를 실행하면 결과가 여기에 표시됩니다.",
     "stdin_prompt": "프로그램 입력",
     "interactive_unsupported": "이 브라우저에서는 대화식 입력을 사용할 수 없습니다. 코드는 실행되지만 input()이 입력을 요청하지 않습니다.",
@@ -63,14 +65,24 @@
     "run": "실행",
     "stop": "중지",
     "preparing": "준비 중…",
-    "sample_n": "예 {{number}}",
-    "run_sample_n": "예제 {{number}} 실행",
-    "sample_match": "예제 {{number}} 결과가 예상 출력과 일치합니다.",
-    "sample_mismatch": "예제 {{number}} 결과가 예상 출력과 다릅니다.",
+    "sample_n": "테스트 {{number}}",
+    "run_sample_n": "테스트 {{number}} 실행",
+    "sample_match": "테스트 {{number}} 결과가 예상 출력과 일치합니다.",
+    "sample_mismatch": "테스트 {{number}} 결과가 예상 출력과 다릅니다.",
     "sample_skipped": "프로그램이 끝나지 않아 예제 비교를 건너뜁니다.",
     "expected": "예상 출력:",
     "tab_problem": "문제",
     "tab_code": "코드",
+    "tab_terminal": "터미널",
+    "tab_result": "결과",
+    "language_python": "Python 3",
+    "font_smaller": "에디터 글꼴 크기 줄이기",
+    "font_larger": "에디터 글꼴 크기 늘리기",
+    "copy_input": "복사",
+    "copied": "복사됨",
+    "hint": "힌트",
+    "reset": "초기화",
+    "reset_confirm": "코드를 시작 코드로 바꾸시겠습니까? 현재 코드는 다른 곳에 저장되지 않습니다.",
     "save_state": {
       "local": "기기에 저장됨",
       "saving": "저장 중…",
@@ -82,17 +94,83 @@
     "elapsed_time": "이 문제를 푼 시간"
   },
   "submit": {
+    "empty": "코드를 제출하면 채점 결과가 여기에 표시됩니다.",
     "running": "채점 중…",
     "judge_error": "채점기가 이 제출을 처리하지 못했습니다",
+    "judge_error_detail": "이 제출은 시도 횟수에 포함되지 않습니다.",
     "passed": "정답",
     "failed": "오답",
+    "score": "{{score}} / 100",
+    "metric_score": "점수",
+    "metric_passed": "통과",
+    "metric_runtime": "실행 시간",
+    "test_results": "테스트별 결과",
+    "sample_case": "예제",
+    "compare_output": "예상 형식과 프로그램이 실제로 출력한 내용을 비교해 보세요.",
+    "case_n": "테스트 {{number}}",
     "case_summary": "{{total}}개 중 {{passed}}개 통과",
     "runtime": "{{ms}}ms",
     "outcome_pending": "대기 중",
     "stopped_early": "첫 실패 후 남은 테스트 {{count}}개를 건너뛰었습니다.",
     "expected": "예상 출력",
     "actual": "실제 출력",
-    "hidden_note": "비공개 테스트는 위치와 결과만 표시됩니다.",
+    "hidden_note_other": "비공개 테스트 {{count}}개는 결과만 표시됩니다.",
+    "presentation": {
+      "grading": {
+        "eyebrow": "채점 중",
+        "headline": "풀이를 확인하고 있어요",
+        "guidance": "채점기가 각 테스트를 확인하면 결과가 여기에 표시됩니다."
+      },
+      "accepted": {
+        "eyebrow": "정답",
+        "headline": "모든 테스트를 통과했어요",
+        "guidance": "프로그램이 모든 테스트에서 예상한 결과를 출력했습니다."
+      },
+      "wrong_output": {
+        "eyebrow": "오답",
+        "headline": "출력을 다시 확인해 보세요",
+        "guidance": "출력 내용과 형식을 비교한 뒤 코드를 다시 실행해 보세요."
+      },
+      "runtime_error": {
+        "eyebrow": "오답",
+        "headline": "실행 오류를 해결해 보세요",
+        "guidance": "프로그램 실행이 중단되었습니다. 오류가 난 연산과 입력 처리를 확인해 보세요."
+      },
+      "time_limit": {
+        "eyebrow": "시간 초과",
+        "headline": "더 빠르게 끝나도록 바꿔 보세요",
+        "guidance": "끝나지 않는 반복문이 없는지 확인하고 반복 작업을 줄여 보세요."
+      },
+      "memory_limit": {
+        "eyebrow": "메모리 초과",
+        "headline": "메모리 사용을 줄여 보세요",
+        "guidance": "풀이에 필요한 데이터만 유지하고 불필요한 할당을 줄여 보세요."
+      },
+      "not_accepted": {
+        "eyebrow": "오답",
+        "headline": "풀이를 다시 확인해 보세요",
+        "guidance": "아래 테스트 결과를 확인하고 코드를 수정한 뒤 다시 시도해 보세요."
+      },
+      "judge_error": {
+        "eyebrow": "채점 불가",
+        "headline": "채점기가 풀이를 확인하지 못했어요",
+        "guidance": "시스템 문제이며 제출 횟수에 포함되지 않습니다. 다시 제출해 주세요."
+      },
+      "transport_error": {
+        "eyebrow": "연결 문제",
+        "headline": "채점 결과를 불러오지 못했어요",
+        "guidance": "연결 상태를 확인하고 서비스를 사용할 수 있을 때 다시 제출해 주세요."
+      }
+    },
+    "outcome_detail": {
+      "PENDING": "채점을 기다리고 있어요.",
+      "PASSED": "출력이 일치합니다.",
+      "WRONG_OUTPUT": "출력이 예상 결과와 다릅니다.",
+      "RUNTIME_ERROR": "프로그램 실행 중 오류가 발생했습니다.",
+      "TIME_LIMIT": "제한 시간 안에 끝나지 않았습니다.",
+      "MEMORY_LIMIT": "메모리를 너무 많이 사용했습니다.",
+      "SKIPPED": "첫 실패 이후 실행하지 않았습니다."
+    },
     "outcome": {
       "PASSED": "통과",
       "WRONG_OUTPUT": "출력 불일치",

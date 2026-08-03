@@ -144,17 +144,54 @@ test('the workspace shows samples, a hidden count, and starter code', async ({
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
 });
 
+test('an example copies its input without duplicating the run control', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(await exerciseUrl(page, SUM_TITLE));
+
+  await page.getByRole('button', { name: /^copy$|^복사$/i }).first().click();
+  await expect(
+    page.getByRole('button', { name: /^copied$|^복사됨$/i }).first(),
+  ).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe('1\n2\n');
+});
+
+test('reset restores the starter code after naming what will be lost', async ({
+  page,
+}) => {
+  await page.goto(await exerciseUrl(page, SUM_TITLE));
+  await typeIntoEditor(page, 'print("changed")');
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toMatch(/starting code|시작 코드/i);
+    await dialog.accept();
+  });
+  await page.getByRole('button', { name: /^reset$|^초기화$/i }).click();
+
+  await expect.poll(() => page.evaluate(() => {
+    const monaco = (window as unknown as {
+      monaco?: { editor: { getModels(): { getValue(): string }[] } };
+    }).monaco;
+    return monaco?.editor.getModels()[0]?.getValue().replace(/\r\n/g, '\n');
+  })).toBe('a = int(input())\nb = int(input())\n');
+});
+
 test('running a sample compares output locally', async ({ page }) => {
   await page.goto(await exerciseUrl(page, ECHO_TITLE));
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
 
   // Pyodide is ~13 MB on a cold cache, so the Run control stays disabled until
   // the worker reports ready.
-  const runButton = page.getByRole('button', { name: /^run$|^실행$/i });
-  await expect(runButton).toBeEnabled({ timeout: 90_000 });
+  const testButton = page.getByRole('button', {
+    name: /^Test 1$|^테스트 1$/,
+  });
+  await expect(testButton).toBeEnabled({ timeout: 90_000 });
 
   await typeIntoEditor(page, 'print(input())');
-  await page.getByRole('button', { name: /^Ex 1$|^예 1$/ }).click();
+  await testButton.click();
 
   await expect(page.getByText(/matches the expected output|일치합니다/i))
     .toBeVisible({ timeout: 60_000 });
@@ -177,7 +214,8 @@ test('submit streams a trusted verdict without revealing hidden cases', async ({
   await expect(page.getByText(/^Accepted$|^정답$/)).toBeVisible({
     timeout: 90_000,
   });
-  await expect(page.getByText(/2 of 2 cases passed|2개 중 2개 통과/i)).toBeVisible();
+  await expect(page.getByTestId('result-passed')).toContainText('2 / 2');
+  await expect(page.getByTestId('result-score')).toContainText('100 / 100');
   expect(await page.content()).not.toContain(HIDDEN_SENTINEL);
   expect(bodies.join('\n')).not.toContain(HIDDEN_SENTINEL);
 });
@@ -215,10 +253,10 @@ test('previous and next move between exercises across lectures', async ({
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
 
   // Echo ends module 1; Sum opens module 2. Neighbours must cross that gap.
-  await page.getByRole('button', { name: /next problem|다음 문제/i }).click();
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
   await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
 
-  await page.getByRole('button', { name: /previous problem|이전 문제/i }).click();
+  await page.getByRole('button', { name: /^previous$|^이전$/i }).click();
   await expect(page.getByRole('heading', { name: ECHO_TITLE })).toBeVisible();
 });
 

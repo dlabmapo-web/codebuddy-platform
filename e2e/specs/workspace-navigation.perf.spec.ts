@@ -43,9 +43,9 @@ async function openEcho(page: Page) {
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
   // Wait for the runtime to be ready so the measurement starts from a warm
   // workspace, which is the state a student actually navigates from.
-  await expect(page.getByRole('button', { name: /^run$|^실행$/i })).toBeEnabled({
-    timeout: 90_000,
-  });
+  await expect(
+    page.getByRole('button', { name: /^run$|^실행$/i }),
+  ).toBeEnabled({ timeout: 90_000 });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -55,7 +55,7 @@ test.beforeEach(async ({ page }) => {
 
 test('next lands within the interaction budget', async ({ page }) => {
   const started = Date.now();
-  await page.getByRole('button', { name: /next problem|다음 문제/i }).click();
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
   await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
   const elapsed = Date.now() - started;
 
@@ -73,7 +73,7 @@ test('navigation keeps the editor and Python runtime alive', async ({ page }) =>
     document.querySelector('.monaco-editor')?.setAttribute('data-e2e-generation', '1');
   });
 
-  await page.getByRole('button', { name: /next problem|다음 문제/i }).click();
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
   await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
 
   await expect(page.locator('.monaco-editor[data-e2e-generation="1"]')).toHaveCount(
@@ -81,9 +81,9 @@ test('navigation keeps the editor and Python runtime alive', async ({ page }) =>
   );
 
   // Run must be usable immediately, without waiting for Pyodide again.
-  await expect(page.getByRole('button', { name: /^run$|^실행$/i })).toBeEnabled({
-    timeout: 3_000,
-  });
+  await expect(
+    page.getByRole('button', { name: /^run$|^실행$/i }),
+  ).toBeEnabled({ timeout: 3_000 });
 });
 
 test('navigation issues no duplicate workspace fetches', async ({ page }) => {
@@ -95,7 +95,7 @@ test('navigation issues no duplicate workspace fetches', async ({ page }) => {
     }
   });
 
-  await page.getByRole('button', { name: /next problem|다음 문제/i }).click();
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
   await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
 
   console.log(`workspace fetches during navigation: ${calls.length}`);
@@ -109,18 +109,49 @@ test('the terminal divider resizes the terminal', async ({ page }) => {
   const divider = page.getByRole('separator').last();
   await expect(divider).toBeVisible();
 
-  const panel = page.getByText(/^terminal$|^터미널$/i).locator('xpath=ancestor::div[1]/..');
+  const panel = page.getByRole('tabpanel').locator('..');
   const before = (await panel.boundingBox())?.height ?? 0;
   expect(before).toBeGreaterThan(0);
 
   const box = (await divider.boundingBox())!;
+  // The visible rule stays quiet, but the mouse target must be large enough
+  // to acquire without pixel hunting.
+  expect(box.height).toBeGreaterThanOrEqual(10);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   // Drag upward: the terminal grows as its top edge rises.
   await page.mouse.move(box.x + box.width / 2, box.y - 120, { steps: 12 });
   await page.mouse.up();
 
-  const after = (await panel.boundingBox())?.height ?? 0;
-  console.log(`terminal height: ${Math.round(before)} -> ${Math.round(after)}`);
-  expect(after).toBeGreaterThan(before + 80);
+  const afterUp = (await panel.boundingBox())?.height ?? 0;
+  expect(afterUp).toBeGreaterThan(before + 80);
+  const panelAfterUp = (await panel.boundingBox())!;
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  // A long problem statement must not make the editor pane use an off-screen
+  // bottom edge. That feedback loop let the output grow past the viewport and
+  // made every later upward drag appear stuck at its maximum.
+  expect(panelAfterUp.y + panelAfterUp.height).toBeLessThanOrEqual(
+    viewportHeight + 1,
+  );
+
+  const movedBox = (await divider.boundingBox())!;
+  await page.mouse.move(
+    movedBox.x + movedBox.width / 2,
+    movedBox.y + movedBox.height / 2,
+  );
+  await page.mouse.down();
+  // Drag back down as a separate gesture: shrinking must be as reliable as
+  // growing, including after pointer capture has been released once.
+  await page.mouse.move(
+    movedBox.x + movedBox.width / 2,
+    movedBox.y + movedBox.height / 2 + 100,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+
+  const afterDown = (await panel.boundingBox())?.height ?? 0;
+  console.log(
+    `terminal height: ${Math.round(before)} -> ${Math.round(afterUp)} -> ${Math.round(afterDown)}`,
+  );
+  expect(afterDown).toBeLessThan(afterUp - 70);
 });

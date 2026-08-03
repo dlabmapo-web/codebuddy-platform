@@ -1,15 +1,14 @@
 import type { CourseSummary } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
-  Archive,
   ArrowRight,
-  CircleDot,
+  Eye,
+  EyeOff,
   MoreHorizontal,
   Pencil,
-  RotateCcw,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { DataTable } from '@/components/studio/data-table';
 import {
@@ -23,37 +22,30 @@ import {
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CoursesManagerState } from '../_hooks/use-courses-manager';
-import { useContentDate } from '../../_components/version-marks';
+import { useContentDate } from '../../_components/content-date';
+import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
 
-/** The version an author works in. Every course has one. */
 function curriculumPath(academyId: string, course: CourseSummary) {
-  const version = course.draftVersion ?? course.publishedVersion;
-  if (!version) return null;
-  return `/studio/academies/${academyId}/content/courses/${course.id}/versions/${version.id}`;
+  return `/studio/academies/${academyId}/content/courses/${course.id}`;
 }
 
-/** Active courses lead; archived ones settle at the bottom. */
-function statusRank(status: CourseSummary['status']) {
-  return status === 'ACTIVE' ? 0 : 1;
-}
-
-function StatusBadge({ status }: { status: CourseSummary['status'] }) {
+function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
   const { t } = useLayoutTranslation('courses');
-  const active = status === 'ACTIVE';
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-bold ${
-        active
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-bold ${
+        isVisible
           ? 'bg-success/10 text-success'
           : 'bg-retired-soft text-retired'
       }`}
     >
       <span
+        aria-hidden
         className={`size-1.5 rounded-full ${
-          active ? 'bg-success' : 'bg-retired'
+          isVisible ? 'bg-success' : 'bg-retired'
         }`}
       />
-      {active ? t('status_active') : t('status_archived')}
+      {isVisible ? t('visible') : t('hidden')}
     </span>
   );
 }
@@ -83,6 +75,7 @@ export function CoursesTable({
 }) {
   const { t } = useLayoutTranslation('courses');
   const contentDate = useContentDate();
+  const [courseToHide, setCourseToHide] = useState<CourseSummary | null>(null);
 
   const columns = useMemo<ColumnDef<CourseSummary>[]>(
     () => [
@@ -103,13 +96,13 @@ export function CoursesTable({
         },
       },
       {
-        id: 'status',
-        accessorFn: (course) => course.status,
-        header: t('column.status'),
+        id: 'visibility',
+        accessorFn: (course) => String(course.isVisible),
+        header: t('column.visibility'),
         filterFn: 'arrIncludesSome',
-        sortingFn: (a, b) =>
-          statusRank(a.original.status) - statusRank(b.original.status),
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        cell: ({ row }) => (
+          <VisibilityIndicator isVisible={row.original.isVisible} />
+        ),
       },
       {
         id: 'modules',
@@ -146,8 +139,6 @@ export function CoursesTable({
         cell: ({ row }) => {
           const course = row.original;
           const href = curriculumPath(academyId, course);
-          if (!href) return null;
-
           return (
             <div className="flex items-center justify-end gap-1">
               <Link
@@ -180,21 +171,23 @@ export function CoursesTable({
                       <Pencil className="text-sub" />
                       {t('edit')}
                     </DropdownMenuItem>
-                    {course.status === 'ACTIVE' ? (
-                      <DropdownMenuItem
-                        onSelect={() => manager.archive(course.id)}
-                      >
-                        <Archive className="text-sub" />
-                        {t('archive_course')}
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onSelect={() => manager.restore(course.id)}
-                      >
-                        <RotateCcw className="text-sub" />
-                        {t('restore_course')}
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        const next = !course.isVisible;
+                        if (!next) {
+                          setCourseToHide(course);
+                          return;
+                        }
+                        manager.setVisible(course.id, next);
+                      }}
+                    >
+                      {course.isVisible ? (
+                        <EyeOff className="text-sub" />
+                      ) : (
+                        <Eye className="text-sub" />
+                      )}
+                      {course.isVisible ? t('hide') : t('show')}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
@@ -207,23 +200,48 @@ export function CoursesTable({
   );
 
   return (
-    <DataTable
-      columns={columns}
-      data={manager.courses}
-      emptyMessage={t('empty')}
-      facets={[
-        {
-          columnId: 'status',
-          title: t('column.status'),
-          options: [
-            { label: t('status_active'), value: 'ACTIVE', icon: CircleDot },
-            { label: t('status_archived'), value: 'ARCHIVED', icon: Archive },
-          ],
-        },
-      ]}
-      pageSize={10}
-      searchPlaceholder={t('search_placeholder')}
-      toolbarActions={toolbarActions}
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={manager.courses}
+        emptyMessage={t('empty')}
+        facets={[
+          {
+            columnId: 'visibility',
+            title: t('column.visibility'),
+            options: [
+              { label: t('visible'), value: 'true', icon: Eye },
+              { label: t('hidden'), value: 'false', icon: EyeOff },
+            ],
+          },
+        ]}
+        pageSize={10}
+        searchPlaceholder={t('search_placeholder')}
+        toolbarActions={toolbarActions}
+      />
+      {courseToHide ? (
+        <VisibilityConfirmModal
+          affected={[
+            { label: t('column.modules'), value: courseToHide.content.modules },
+            {
+              label: t('column.lectures'),
+              value: courseToHide.content.lectures,
+            },
+            {
+              label: t('column.exercises'),
+              value: courseToHide.content.exercises,
+            },
+          ]}
+          itemTitle={courseToHide.title}
+          kindLabel={t('kind_course')}
+          onCancel={() => setCourseToHide(null)}
+          onConfirm={() => {
+            manager.setVisible(courseToHide.id, false);
+            setCourseToHide(null);
+          }}
+          open
+        />
+      ) : null}
+    </>
   );
 }

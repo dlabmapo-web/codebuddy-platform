@@ -29,11 +29,10 @@ export function useCoursesManager({
     retry: false,
   });
 
-  const openDraft = useCallback(
+  const openCourse = useCallback(
     (course: CourseSummary) => {
-      if (!course.draftVersion) return;
       router.push(
-        `/studio/academies/${academyId}/content/courses/${course.id}/versions/${course.draftVersion.id}`,
+        `/studio/academies/${academyId}/content/courses/${course.id}`,
       );
     },
     [academyId, router],
@@ -47,7 +46,7 @@ export function useCoursesManager({
       setDescription('');
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey });
-      openDraft(course);
+      openCourse(course);
     },
   });
 
@@ -67,15 +66,9 @@ export function useCoursesManager({
     },
   });
 
-  const archiveMutation = useMutation({
-    mutationFn: (courseId: string) =>
-      orpc.academyCourses.archive({ academyId, courseId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
-  });
-
-  const restoreMutation = useMutation({
-    mutationFn: (courseId: string) =>
-      orpc.academyCourses.restore({ academyId, courseId }),
+  const visibilityMutation = useMutation({
+    mutationFn: ({ courseId, isVisible }: { courseId: string; isVisible: boolean }) =>
+      orpc.academyCourses.setVisibility({ academyId, courseId, isVisible }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
@@ -112,9 +105,9 @@ export function useCoursesManager({
       editingId ? updateMutation.mutate() : createMutation.mutate(),
     submitPending: createMutation.isPending || updateMutation.isPending,
     submitError: createMutation.error ?? updateMutation.error,
-    archive: (courseId: string) => archiveMutation.mutate(courseId),
-    restore: (courseId: string) => restoreMutation.mutate(courseId),
-    statusError: archiveMutation.error ?? restoreMutation.error,
+    setVisible: (courseId: string, isVisible: boolean) =>
+      visibilityMutation.mutate({ courseId, isVisible }),
+    visibilityError: visibilityMutation.error,
   };
 }
 

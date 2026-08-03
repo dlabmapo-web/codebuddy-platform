@@ -3,21 +3,12 @@
   "description": "A course is curriculum you write once and teach in many classes.",
   "forbidden_title": "Courses are not available to you",
   "forbidden_body": "Managing academy curriculum needs an active Team Lead or Manager membership. Ask an academy manager to change your role.",
-  "lifecycle": {
-    "heading": "How a course goes live",
-    "draft_title": "Write a draft",
-    "draft_body": "Only content editors see a draft. Add modules, lectures, and exercises in any order.",
-    "check_title": "Check what blocks publishing",
-    "check_body": "Cove lists every empty module or missing test case, and links each one to the item to fix.",
-    "publish_title": "Publish a version",
-    "publish_body": "The draft freezes and becomes the version classes use. Editing it later starts the next draft."
-  },
   "course_count_one": "<0>{{count}}</0> course in this academy",
   "course_count_other": "<0>{{count}}</0> courses in this academy",
   "new_course": "New course",
   "create": {
     "heading": "Name the course",
-    "body": "Cove opens Draft v1 straight away. Nothing is visible to teachers or students until you publish it.",
+    "body": "The new course starts hidden. You can build and edit it freely, then show it to students when ready.",
     "title_label": "Course title",
     "title_placeholder": "Python Foundations",
     "description_label": "What students learn",
@@ -25,7 +16,7 @@
     "description_placeholder": "Variables, loops, and functions through 40 problems",
     "submit": "Create and open",
     "submitting": "Creating…",
-    "title_conflict": "Another active course already uses this title. Pick a different one.",
+    "title_conflict": "Another course already uses this title. Pick a different one.",
     "next_step": "You go straight to the curriculum, where you add modules and lectures."
   },
   "column": {
@@ -35,19 +26,20 @@
     "lectures": "Lectures",
     "exercises": "Problems",
     "actions": "Actions",
-    "status": "Status"
+    "visibility": "Visibility"
   },
   "no_description": "No description yet.",
   "empty": "No courses yet. Start with the one you teach most often.",
   "search_placeholder": "Search courses",
-  "archive_course": "Archive",
   "row_menu_aria": "Actions for “{{title}}”",
   "edit": "Edit",
   "open": "Open",
-  "restore_course": "Restore",
-  "status_active": "Active",
-  "status_archived": "Archived",
-  "status_change_failed": "Could not change the status. Try again in a moment.",
+  "visible": "Visible",
+  "hidden": "Hidden",
+  "kind_course": "course",
+  "show": "Show to students",
+  "hide": "Hide from students",
+  "visibility_change_failed": "Could not change visibility. Try again in a moment.",
   "edit_modal": {
     "heading": "Edit course details",
     "body": "Change the name and description. The curriculum stays as it is.",

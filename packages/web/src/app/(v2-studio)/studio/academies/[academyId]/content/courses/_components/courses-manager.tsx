@@ -51,9 +51,9 @@ export function CoursesManager({
         }
       />
 
-      {manager.statusError ? (
+      {manager.visibilityError ? (
         <p className="text-[14px] font-semibold text-danger">
-          {errorText(manager.statusError, t('status_change_failed'))}
+          {errorText(manager.visibilityError, t('visibility_change_failed'))}
         </p>
       ) : null}
     </div>

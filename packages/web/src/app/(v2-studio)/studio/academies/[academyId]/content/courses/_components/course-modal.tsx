@@ -8,8 +8,7 @@ import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 
 /**
  * Mirrors the old platform's 과목 dialog: a name, an optional description, and
- * a single confirm. Course ordering and per-course visibility have no field
- * here because the v2 model does not carry them.
+ * a single confirm. Visibility stays in the course's Actions menu.
  */
 export function CourseModal({ manager }: { manager: CoursesManagerState }) {
   const { t } = useLayoutTranslation(['courses', 'common']);

@@ -9,7 +9,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 
-import { courseVersionQueryKey } from '../../../../_lib/course-tree';
+import { courseTreeQueryKey } from '../../../../_lib/course-tree';
 import {
   contextToDraft,
   draftToPayload,
@@ -21,7 +21,6 @@ import {
 type AuthoringTarget = {
   academyId: string;
   courseId: string;
-  versionId: string;
   lectureId: string;
 };
 
@@ -60,7 +59,7 @@ export function useExerciseAuthoring({
   );
 
   const dirty = serializeDraft(draft) !== savedSnapshot;
-  const editable = canEdit && initialContext.version.status === 'DRAFT';
+  const editable = canEdit;
   const completeness = exerciseCompleteness(draft);
   const completeCount = completeness.filter((item) => item.complete).length;
   const saveReady = completeCount === completeness.length;
@@ -68,9 +67,7 @@ export function useExerciseAuthoring({
     .filter((item) => !item.complete)
     .map((item) => item.id);
 
-  const builderPath =
-    `/studio/academies/${target.academyId}/content/courses/${target.courseId}` +
-    `/versions/${target.versionId}`;
+  const builderPath = `/studio/academies/${target.academyId}/content/courses/${target.courseId}`;
 
   React.useEffect(() => {
     if (!dirty) return;
@@ -106,7 +103,7 @@ export function useExerciseAuthoring({
        * `refresh` re-runs the server component that seeds that cache.
        */
       await queryClient.invalidateQueries({
-        queryKey: courseVersionQueryKey(target.academyId, target.versionId),
+        queryKey: courseTreeQueryKey(target.academyId, target.courseId),
       });
       router.push(builderPath);
       router.refresh();

@@ -14,20 +14,18 @@ import { StarterCodeEditor } from './starter-code-editor';
 export function ExerciseWorkspace({
   academyId,
   courseId,
-  versionId,
   lectureId,
   initialContext,
   canEdit,
 }: {
   academyId: string;
   courseId: string;
-  versionId: string;
   lectureId: string;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
 }) {
   const authoring = useExerciseAuthoring({
-    target: { academyId, courseId, versionId, lectureId },
+    target: { academyId, courseId, lectureId },
     initialContext,
     canEdit,
   });

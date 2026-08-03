@@ -1,9 +1,14 @@
-import { ArrowLeft, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronsDownUp,
+  ChevronsUpDown,
+} from 'lucide-react';
 import Link from 'next/link';
 
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
+import { VisibilityIndicator } from './builder-controls';
 
 export function BuilderHeader({
   academyId,
@@ -30,6 +35,10 @@ export function BuilderHeader({
             lectures: builder.lectureCount,
           })}
         </p>
+        <VisibilityIndicator
+          effectivelyVisible={builder.tree.course.isVisible}
+          isVisible={builder.tree.course.isVisible}
+        />
         {builder.tree.modules.length > 0 ? (
           <button
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"

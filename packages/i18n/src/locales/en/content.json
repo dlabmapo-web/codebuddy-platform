@@ -1,18 +1,11 @@
 {
-  "version": {
-    "draft": "Draft",
-    "published": "Published",
-    "retired": "Retired",
-    "none": "No versions"
-  },
   "builder": {
     "fallback_title": "Course builder",
-    "draft_description": "Arrange modules and lectures, and add problems.",
-    "unavailable_title": "This course version is not available",
+    "description": "Arrange modules and lectures, add problems, and control what students can see.",
+    "unavailable_title": "This course is not available",
     "unavailable_body": "It belongs to another academy, or your membership cannot open it.",
     "back_to_courses": "Back to courses",
     "all_courses": "All courses",
-    "start_next_draft": "Start next draft",
     "load_failed_title": "Could not load this course",
     "load_failed_body": "This is not a permissions problem. Something went wrong on the server — try again, and check the server logs if it persists.",
     "summary": "{{modules}} modules · {{lectures}} lectures",
@@ -77,8 +70,8 @@
       "starter_code": "Initial code (editor default)",
       "input_format": "Input format (optional)",
       "output_format": "Output format (optional)",
-      "is_published": "Visible to students",
-      "is_published_hint": "Turn this off to hide just this exercise, even once the course is published."
+      "is_visible": "Visible to students",
+      "is_visible_hint": "Turn this off to hide only this problem. Its content remains editable."
     },
     "placeholder": {
       "title": "e.g. Sum two numbers",
@@ -154,11 +147,24 @@
     "kind_module": "Module",
     "kind_lecture": "Lecture",
     "kind_exercise": "Problem",
+    "kind_course": "Course",
     "rename": "Edit name",
     "hide": "Hide from students",
     "show": "Show to students",
     "delete": "Delete",
-    "hidden_badge": "Hidden"
+    "visible_tooltip": "Visible to students",
+    "hidden_tooltip": "Hidden from students",
+    "hidden_by_parent_tooltip": "Set to visible, but hidden because a parent is hidden"
+  },
+  "visibility_confirm": {
+    "title": "Hide this {{kind}}?",
+    "description": "Review what students will lose access to before hiding it.",
+    "student_impact": "Students will no longer see or open this content.",
+    "also_hidden": "Also hidden with it",
+    "preserved": "Visibility choices inside it stay saved. Showing this item again restores the previous visibility of its content.",
+    "confirm": "Hide from students",
+    "lectures": "lectures",
+    "problems": "problems"
   },
   "delete": {
     "module_title": "Delete this module?",

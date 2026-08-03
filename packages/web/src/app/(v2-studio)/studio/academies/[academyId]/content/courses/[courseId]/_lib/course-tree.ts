@@ -1,6 +1,6 @@
-import type { CourseDraftTree, ContentValidationIssue } from '@cove/shared';
+import type { CourseTree as SharedCourseTree } from '@cove/shared';
 
-export type CourseTree = CourseDraftTree;
+export type CourseTree = SharedCourseTree;
 export type CourseModule = CourseTree['modules'][number];
 export type CourseLecture = CourseModule['lectures'][number];
 export type MoveDirection = -1 | 1;
@@ -9,8 +9,8 @@ export type MoveDirection = -1 | 1;
  * Shared so saving a problem can invalidate the exact tree the builder reads.
  * Without this the builder would serve its cached copy for a full staleTime.
  */
-export function courseVersionQueryKey(academyId: string, versionId: string) {
-  return ['academy', academyId, 'course-version', versionId] as const;
+export function courseTreeQueryKey(academyId: string, courseId: string) {
+  return ['academy', academyId, 'course', courseId] as const;
 }
 
 export function swap(
@@ -28,15 +28,4 @@ export function countLectures(tree: CourseTree) {
     (total, courseModule) => total + courseModule.lectures.length,
     0,
   );
-}
-
-export function countIssuesByModule(
-  issues: ContentValidationIssue[] | null,
-) {
-  const counts = new Map<string, number>();
-  for (const issue of issues ?? []) {
-    if (!issue.moduleId) continue;
-    counts.set(issue.moduleId, (counts.get(issue.moduleId) ?? 0) + 1);
-  }
-  return counts;
 }

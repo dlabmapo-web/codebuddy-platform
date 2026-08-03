@@ -27,7 +27,7 @@ export type ExerciseDraft = {
   constraints: string;
   starterCode: string;
   aiFeedbackEnabled: boolean;
-  isPublished: boolean;
+  isVisible: boolean;
   testCases: TestCaseDraft[];
   hints: HintDraft[];
 };
@@ -52,7 +52,7 @@ export function contextToDraft(
       constraints: '',
       starterCode: '',
       aiFeedbackEnabled: false,
-      isPublished: true,
+      isVisible: false,
       testCases: [
         {
           key: 'new-sample',
@@ -74,7 +74,7 @@ export function contextToDraft(
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
-    isPublished: context.material!.isPublished,
+    isVisible: context.material!.isVisible,
     testCases: exercise.testCases.map((testCase) => ({
       key: testCase.id,
       input: testCase.input,
@@ -99,7 +99,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     constraints: draft.constraints,
     starterCode: draft.starterCode,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
-    isPublished: draft.isPublished,
+    isVisible: draft.isVisible,
     testCases: draft.testCases
       .filter((testCase) => testCase.expectedOutput.trim().length > 0)
       .map((testCase) => ({

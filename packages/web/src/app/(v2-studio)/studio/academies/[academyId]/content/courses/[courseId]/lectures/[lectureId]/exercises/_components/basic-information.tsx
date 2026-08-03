@@ -131,18 +131,18 @@ export function BasicInformation({
 
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input
-          checked={draft.isPublished}
+          checked={draft.isVisible}
           className="mt-0.5 size-4 accent-brand"
           disabled={!editable}
-          onChange={(event) => update('isPublished', event.target.checked)}
+          onChange={(event) => update('isVisible', event.target.checked)}
           type="checkbox"
         />
         <span>
           <span className="block text-[13.5px] font-bold">
-            {t('exercise.field.is_published')}
+          {t('exercise.field.is_visible')}
           </span>
           <span className="mt-0.5 block text-[12.5px] leading-5 text-sub">
-            {t('exercise.field.is_published_hint')}
+          {t('exercise.field.is_visible_hint')}
           </span>
         </span>
       </label>

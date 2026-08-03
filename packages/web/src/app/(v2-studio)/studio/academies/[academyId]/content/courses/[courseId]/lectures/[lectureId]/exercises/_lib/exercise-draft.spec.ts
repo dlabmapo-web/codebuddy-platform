@@ -17,7 +17,7 @@ function draft(overrides: Partial<ExerciseDraft> = {}): ExerciseDraft {
     constraints: '',
     starterCode: '',
     aiFeedbackEnabled: false,
-    isPublished: true,
+    isVisible: true,
     testCases: [
       {
         key: 'sample',

@@ -1,25 +1,19 @@
 'use client';
 
-import type { ContentValidationIssue } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
 
 import {
-  countIssuesByModule,
   countLectures,
-  courseVersionQueryKey,
-  swap,
+  courseTreeQueryKey,
   type CourseTree,
-  type MoveDirection,
 } from '../_lib/course-tree';
 
 type BuilderTarget = {
   academyId: string;
   courseId: string;
-  versionId: string;
 };
 
 export function useCourseBuilder({
@@ -33,30 +27,32 @@ export function useCourseBuilder({
   canEditCurriculum: boolean;
   canEditExercises: boolean;
 }) {
-  const { academyId, courseId, versionId } = target;
+  const { academyId, courseId } = target;
   const queryClient = useQueryClient();
-  const router = useRouter();
-  const queryKey = courseVersionQueryKey(academyId, versionId);
+  const queryKey = courseTreeQueryKey(academyId, courseId);
   const [moduleTitle, setModuleTitle] = useState('');
   const [lectureModuleId, setLectureModuleId] = useState<string | null>(null);
   const [lectureTitle, setLectureTitle] = useState('');
-  const [issues, setIssues] = useState<ContentValidationIssue[] | null>(null);
 
   const treeQuery = useQuery({
     queryKey,
-    queryFn: () => orpc.academyCourses.getDraftTree(target),
+    queryFn: () => orpc.academyCourses.getTree(target),
     initialData: initialTree,
     retry: false,
   });
   const tree = treeQuery.data;
-  const editable = tree.version.status === 'DRAFT' && canEditCurriculum;
-  const exerciseEditable =
-    tree.version.status === 'DRAFT' && canEditExercises;
+  const editable = canEditCurriculum;
+  const exerciseEditable = canEditExercises;
 
   function applyTree(next: CourseTree) {
     queryClient.setQueryData(queryKey, next);
-    setIssues(null);
   }
+
+  const setCourseVisibilityMutation = useMutation({
+    mutationFn: (isVisible: boolean) =>
+      orpc.academyCourses.setVisibility({ academyId, courseId, isVisible }),
+    onSuccess: (course) => applyTree({ ...tree, course }),
+  });
 
   const createModuleMutation = useMutation({
     mutationFn: () =>
@@ -74,7 +70,7 @@ export function useCourseBuilder({
     mutationFn: (input: {
       moduleId: string;
       title?: string;
-      isPublished?: boolean;
+      isVisible?: boolean;
     }) => orpc.academyCourses.updateModule({ ...target, ...input }),
     onSuccess: applyTree,
   });
@@ -106,7 +102,7 @@ export function useCourseBuilder({
     mutationFn: (input: {
       lectureId: string;
       title?: string;
-      isPublished?: boolean;
+      isVisible?: boolean;
     }) => orpc.academyCourses.updateLecture({ ...target, ...input }),
     onSuccess: applyTree,
   });
@@ -114,7 +110,7 @@ export function useCourseBuilder({
     mutationFn: (input: {
       lectureId: string;
       materialId: string;
-      isPublished: boolean;
+      isVisible: boolean;
     }) => orpc.academyCourses.setExerciseVisibility({ ...target, ...input }),
     onSuccess: applyTree,
   });
@@ -160,9 +156,8 @@ export function useCourseBuilder({
     deleteExerciseMutation,
     reorderExercisesMutation,
     setExerciseVisibilityMutation,
+    setCourseVisibilityMutation,
   ].find((mutation) => mutation.isError)?.error;
-
-  const moduleIds = tree.modules.map((item) => item.id);
 
   return {
     tree,
@@ -173,8 +168,6 @@ export function useCourseBuilder({
     lectureModuleId,
     lectureTitle,
     setLectureTitle,
-    issues,
-    issuesByModule: countIssuesByModule(issues),
     lectureCount: countLectures(tree),
     structuralError,
     isCollapsed: (id: string) => collapsed.has(id),
@@ -199,13 +192,15 @@ export function useCourseBuilder({
     createLecture: () => createLectureMutation.mutate(),
     renameModule: (moduleId: string, title: string) =>
       updateModuleMutation.mutate({ moduleId, title }),
-    setModuleVisible: (moduleId: string, isPublished: boolean) =>
-      updateModuleMutation.mutate({ moduleId, isPublished }),
+    setCourseVisible: (isVisible: boolean) =>
+      setCourseVisibilityMutation.mutate(isVisible),
+    setModuleVisible: (moduleId: string, isVisible: boolean) =>
+      updateModuleMutation.mutate({ moduleId, isVisible }),
     deleteModule: (moduleId: string) => deleteModuleMutation.mutate(moduleId),
     renameLecture: (lectureId: string, title: string) =>
       updateLectureMutation.mutate({ lectureId, title }),
-    setLectureVisible: (lectureId: string, isPublished: boolean) =>
-      updateLectureMutation.mutate({ lectureId, isPublished }),
+    setLectureVisible: (lectureId: string, isVisible: boolean) =>
+      updateLectureMutation.mutate({ lectureId, isVisible }),
     deleteLecture: (lectureId: string) =>
       deleteLectureMutation.mutate(lectureId),
     deleteExercise: (lectureId: string, materialId: string) =>
@@ -213,12 +208,12 @@ export function useCourseBuilder({
     setExerciseVisible: (
       lectureId: string,
       materialId: string,
-      isPublished: boolean,
+      isVisible: boolean,
     ) =>
       setExerciseVisibilityMutation.mutate({
         lectureId,
         materialId,
-        isPublished,
+        isVisible,
       }),
   };
 }

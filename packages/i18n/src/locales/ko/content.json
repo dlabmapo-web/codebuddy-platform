@@ -1,18 +1,11 @@
 {
-  "version": {
-    "draft": "초안",
-    "published": "게시됨",
-    "retired": "폐기됨",
-    "none": "버전 없음"
-  },
   "builder": {
     "fallback_title": "코스 빌더",
-    "draft_description": "모듈과 강의를 구성하고 문제를 추가하세요.",
-    "unavailable_title": "이 코스 버전을 이용할 수 없습니다",
+    "description": "모듈과 강의를 구성하고 문제를 추가하며 학생에게 보일 내용을 관리하세요.",
+    "unavailable_title": "이 코스를 이용할 수 없습니다",
     "unavailable_body": "다른 학원의 코스이거나, 현재 소속 권한으로는 열 수 없습니다.",
     "back_to_courses": "코스 목록으로",
     "all_courses": "전체 코스",
-    "start_next_draft": "다음 초안 시작",
     "load_failed_title": "코스를 불러오지 못했습니다",
     "load_failed_body": "권한 문제가 아닙니다. 일시적인 오류이거나 서버 설정 문제일 수 있습니다. 잠시 후 다시 시도하고, 계속되면 서버 로그를 확인하세요.",
     "summary": "모듈 {{modules}}개 · 강의 {{lectures}}개",
@@ -75,8 +68,8 @@
       "starter_code": "초기 코드 (에디터 기본값)",
       "input_format": "입력 형식 (선택)",
       "output_format": "출력 형식 (선택)",
-      "is_published": "학생에게 공개",
-      "is_published_hint": "끄면 코스를 발행해도 이 문제만 학생에게 숨겨집니다."
+      "is_visible": "학생에게 공개",
+      "is_visible_hint": "끄면 이 문제만 학생에게 숨겨집니다. 문제 내용은 계속 수정할 수 있습니다."
     },
     "placeholder": {
       "title": "예: 두 수의 합",
@@ -152,11 +145,24 @@
     "kind_module": "모듈",
     "kind_lecture": "강의",
     "kind_exercise": "문제",
+    "kind_course": "코스",
     "rename": "이름 수정",
     "hide": "학생에게 숨기기",
     "show": "학생에게 보이기",
     "delete": "삭제",
-    "hidden_badge": "숨김"
+    "visible_tooltip": "학생에게 보임",
+    "hidden_tooltip": "학생에게 숨김",
+    "hidden_by_parent_tooltip": "공개로 설정되어 있지만 상위 항목이 숨겨져 있어 학생에게 보이지 않음"
+  },
+  "visibility_confirm": {
+    "title": "이 {{kind}}을(를) 숨길까요?",
+    "description": "숨기기 전에 학생이 접근할 수 없게 되는 내용을 확인하세요.",
+    "student_impact": "학생은 이 콘텐츠를 더 이상 보거나 열 수 없습니다.",
+    "also_hidden": "함께 숨겨지는 콘텐츠",
+    "preserved": "내부 공개 설정은 그대로 저장됩니다. 다시 공개하면 이전 공개 상태가 복원됩니다.",
+    "confirm": "학생에게 숨기기",
+    "lectures": "강의",
+    "problems": "문제"
   },
   "delete": {
     "module_title": "모듈을 삭제할까요?",

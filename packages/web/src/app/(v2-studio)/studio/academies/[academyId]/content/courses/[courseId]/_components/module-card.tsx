@@ -3,10 +3,11 @@ import { ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
+import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseModule } from '../_lib/course-tree';
-import { HiddenBadge } from './builder-controls';
+import { VisibilityIndicator } from './builder-controls';
 import { DeleteModal } from './delete-modal';
 import { LectureRow } from './lecture-row';
 import { RenameModal } from './rename-modal';
@@ -24,8 +25,10 @@ export function ModuleCard({
   const { t } = useLayoutTranslation(['content', 'common']);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [hiding, setHiding] = useState(false);
   const addingLecture = builder.lectureModuleId === courseModule.id;
-  const hidden = !courseModule.isPublished;
+  const effectivelyVisible =
+    builder.tree.course.isVisible && courseModule.isVisible;
   const exerciseCount = courseModule.lectures.reduce(
     (total, lecture) => total + lecture.materials.length,
     0,
@@ -59,12 +62,13 @@ export function ModuleCard({
         <span className="grid size-8 shrink-0 place-items-center rounded-md bg-brand font-mono text-[14px] font-bold tabular-nums text-white">
           {courseModule.position}
         </span>
-        <div className={`min-w-0 flex-1 ${hidden ? 'opacity-55' : ''}`}>
+        <div
+          className={`min-w-0 flex-1 ${effectivelyVisible ? '' : 'opacity-55'}`}
+        >
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-[16.5px] font-bold tracking-[-0.01em]">
               {courseModule.title}
             </p>
-            {hidden ? <HiddenBadge /> : null}
           </div>
           <p className="text-[13px] text-sub">
             {t('module.lecture_count', {
@@ -78,16 +82,24 @@ export function ModuleCard({
             ) : null}
           </p>
         </div>
+        <VisibilityIndicator
+          effectivelyVisible={effectivelyVisible}
+          isVisible={courseModule.isVisible}
+        />
         {builder.editable ? (
           <RowMenu
-            isPublished={courseModule.isPublished}
+            isVisible={courseModule.isVisible}
             kindLabel={t('row.kind_module')}
             label={courseModule.title}
             onDelete={() => setDeleting(true)}
             onRename={() => setRenaming(true)}
-            onToggleVisible={(next) =>
-              builder.setModuleVisible(courseModule.id, next)
-            }
+            onToggleVisible={(next) => {
+              if (!next) {
+                setHiding(true);
+                return;
+              }
+              builder.setModuleVisible(courseModule.id, next);
+            }}
             tone="strong"
           />
         ) : null}
@@ -102,6 +114,7 @@ export function ModuleCard({
             key={lecture.id}
             lecture={lecture}
             moduleNumber={courseModule.position}
+            parentEffectivelyVisible={effectivelyVisible}
           />
         ))}
       </ul>
@@ -178,6 +191,26 @@ export function ModuleCard({
           builder.deleteModule(courseModule.id);
         }}
         open={deleting}
+      />
+      <VisibilityConfirmModal
+        affected={[
+          {
+            label: t('visibility_confirm.lectures'),
+            value: courseModule.lectures.length,
+          },
+          {
+            label: t('visibility_confirm.problems'),
+            value: exerciseCount,
+          },
+        ]}
+        itemTitle={courseModule.title}
+        kindLabel={t('row.kind_module')}
+        onCancel={() => setHiding(false)}
+        onConfirm={() => {
+          setHiding(false);
+          builder.setModuleVisible(courseModule.id, false);
+        }}
+        open={hiding}
       />
     </article>
     </Collapsible.Root>

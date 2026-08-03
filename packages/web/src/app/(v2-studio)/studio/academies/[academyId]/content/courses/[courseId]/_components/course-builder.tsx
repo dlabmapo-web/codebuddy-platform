@@ -1,6 +1,6 @@
 'use client';
 
-import type { CourseDraftTree } from '@cove/shared';
+import type { CourseTree } from '@cove/shared';
 import { Plus } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -15,25 +15,23 @@ export function CourseBuilder({
   canEditCurriculum,
   canEditExercises,
   courseId,
-  versionId,
   initialTree,
 }: {
   academyId: string;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
   courseId: string;
-  versionId: string;
-  initialTree: CourseDraftTree;
+  initialTree: CourseTree;
 }) {
   const { t } = useLayoutTranslation('content');
   const errorText = useErrorText();
   const builder = useCourseBuilder({
-    target: { academyId, courseId, versionId },
+    target: { academyId, courseId },
     initialTree,
     canEditCurriculum,
     canEditExercises,
   });
-  const exerciseBasePath = `/studio/academies/${academyId}/content/courses/${courseId}/versions/${versionId}/lectures`;
+  const exerciseBasePath = `/studio/academies/${academyId}/content/courses/${courseId}/lectures`;
 
   return (
     <div className="space-y-5">

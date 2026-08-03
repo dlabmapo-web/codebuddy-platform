@@ -18,7 +18,7 @@ import { useLayoutTranslation } from '@/i18n';
  * mistaken for one opened on a problem inside it.
  */
 export function RowMenu({
-  isPublished,
+  isVisible,
   kindLabel,
   label,
   onDelete,
@@ -26,7 +26,7 @@ export function RowMenu({
   onToggleVisible,
   tone = 'default',
 }: {
-  isPublished: boolean;
+  isVisible: boolean;
   /** "Lecture", "Problem" — shown above the actions. */
   kindLabel: string;
   label: string;
@@ -63,13 +63,13 @@ export function RowMenu({
           <Pencil className="text-sub" />
           {t('row.rename')}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onToggleVisible(!isPublished)}>
-          {isPublished ? (
+        <DropdownMenuItem onSelect={() => onToggleVisible(!isVisible)}>
+          {isVisible ? (
             <EyeOff className="text-sub" />
           ) : (
             <Eye className="text-sub" />
           )}
-          {isPublished ? t('row.hide') : t('row.show')}
+          {isVisible ? t('row.hide') : t('row.show')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

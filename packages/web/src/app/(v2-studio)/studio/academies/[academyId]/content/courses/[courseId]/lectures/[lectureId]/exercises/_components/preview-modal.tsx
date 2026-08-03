@@ -106,7 +106,7 @@ export function PreviewModal({
               <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-sub">
                 {t('exercise.language_python')}
               </span>
-              {draft.isPublished ? null : (
+              {draft.isVisible ? null : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-retired-soft px-2 py-0.5 text-[11px] font-bold text-retired">
                   <EyeOff className="size-2.5" />
                   {t('exercise.badge.hidden')}

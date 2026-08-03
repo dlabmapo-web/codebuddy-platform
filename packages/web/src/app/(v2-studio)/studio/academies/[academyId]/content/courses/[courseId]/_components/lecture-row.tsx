@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
+import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseLecture } from '../_lib/course-tree';
-import { HiddenBadge } from './builder-controls';
+import { VisibilityIndicator } from './builder-controls';
 import { DeleteModal } from './delete-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
@@ -51,32 +52,38 @@ function ExerciseRow({
   lectureId,
   material,
   outlineNumber,
+  parentEffectivelyVisible,
 }: {
   builder: CourseBuilderState;
   exerciseBasePath: string;
   lectureId: string;
   material: CourseMaterial;
   outlineNumber: string;
+  parentEffectivelyVisible: boolean;
 }) {
   const { t } = useLayoutTranslation('content');
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const href = `${exerciseBasePath}/${lectureId}/exercises/${material.id}`;
   const exercise = material.programmingExercise;
+  const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
 
   return (
     <li className="flex items-center gap-2.5 px-3 py-2">
       <OutlineNumber>{outlineNumber}</OutlineNumber>
       <Link
         className={`min-w-0 flex-1 truncate text-[14.5px] font-semibold text-brand hover:text-brand-deep hover:underline ${
-          material.isPublished ? '' : 'opacity-55'
+          effectivelyVisible ? '' : 'opacity-55'
         }`}
         href={href}
       >
         {material.title}
       </Link>
       <div className="flex shrink-0 items-center gap-1">
-        {material.isPublished ? null : <HiddenBadge />}
+        <VisibilityIndicator
+          effectivelyVisible={effectivelyVisible}
+          isVisible={material.isVisible}
+        />
         {exercise?.aiFeedbackEnabled ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11.5px] font-bold text-brand">
             <Sparkles className="size-2.5" />
@@ -95,7 +102,7 @@ function ExerciseRow({
       </div>
       {builder.exerciseEditable ? (
         <RowMenu
-          isPublished={material.isPublished}
+          isVisible={material.isVisible}
           kindLabel={t('row.kind_exercise')}
           label={material.title}
           onDelete={() => setDeleting(true)}
@@ -126,16 +133,19 @@ export function LectureRow({
   exerciseBasePath,
   lecture,
   moduleNumber,
+  parentEffectivelyVisible,
 }: {
   builder: CourseBuilderState;
   exerciseBasePath: string;
   lecture: CourseLecture;
   moduleNumber: number;
+  parentEffectivelyVisible: boolean;
 }) {
   const { t } = useLayoutTranslation('content');
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const hidden = !lecture.isPublished;
+  const [hiding, setHiding] = useState(false);
+  const effectivelyVisible = parentEffectivelyVisible && lecture.isVisible;
   const lectureNumber = `${moduleNumber}-${lecture.position}`;
   const open = !builder.isCollapsed(lecture.id);
   const hasExercises = lecture.materials.length > 0;
@@ -167,7 +177,7 @@ export function LectureRow({
           <OutlineNumber tone="strong">{lectureNumber}</OutlineNumber>
           <div
             className={`flex min-w-0 flex-1 items-center gap-2 ${
-              hidden ? 'opacity-55' : ''
+              effectivelyVisible ? '' : 'opacity-55'
             }`}
           >
             <p className="truncate text-[15.5px] font-semibold">
@@ -181,18 +191,25 @@ export function LectureRow({
                   })
                 : t('lecture.no_exercises')}
             </span>
-            {hidden ? <HiddenBadge /> : null}
           </div>
+          <VisibilityIndicator
+            effectivelyVisible={effectivelyVisible}
+            isVisible={lecture.isVisible}
+          />
           {builder.editable ? (
             <RowMenu
-              isPublished={lecture.isPublished}
+              isVisible={lecture.isVisible}
               kindLabel={t('row.kind_lecture')}
               label={lecture.title}
               onDelete={() => setDeleting(true)}
               onRename={() => setRenaming(true)}
-              onToggleVisible={(next) =>
-                builder.setLectureVisible(lecture.id, next)
-              }
+              onToggleVisible={(next) => {
+                if (!next) {
+                  setHiding(true);
+                  return;
+                }
+                builder.setLectureVisible(lecture.id, next);
+              }}
             />
           ) : null}
         </div>
@@ -210,6 +227,7 @@ export function LectureRow({
                   lectureId={lecture.id}
                   material={material}
                   outlineNumber={`${lectureNumber}-${material.position}`}
+                  parentEffectivelyVisible={effectivelyVisible}
                 />
               ))}
             </ol>
@@ -248,6 +266,22 @@ export function LectureRow({
             builder.deleteLecture(lecture.id);
           }}
           open={deleting}
+        />
+        <VisibilityConfirmModal
+          affected={[
+            {
+              label: t('visibility_confirm.problems'),
+              value: lecture.materials.length,
+            },
+          ]}
+          itemTitle={lecture.title}
+          kindLabel={t('row.kind_lecture')}
+          onCancel={() => setHiding(false)}
+          onConfirm={() => {
+            setHiding(false);
+            builder.setLectureVisible(lecture.id, false);
+          }}
+          open={hiding}
         />
       </li>
     </Collapsible.Root>

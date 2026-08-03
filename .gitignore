@@ -52,11 +52,11 @@ supabase/.temp/
 기능정의서.md
 .gitmessage.txt
 
-docs/*
-!docs/design/
-!docs/design/**
-test-results/
-playwright-report/
+# docs/*
+# !docs/design/
+# !docs/design/**
+# test-results/
+# playwright-report/
 
 # Local Superpowers design-preview sessions
 .superpowers/

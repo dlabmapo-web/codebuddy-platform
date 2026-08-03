@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 import { validateEnvironment } from "../../src/config/env.schema.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
+import { seedClassFixture } from "./class-fixtures.js";
 import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 
@@ -27,7 +28,9 @@ const sandbox = {
   moduleId: "a1000000-0000-4000-8000-000000000010",
   lectureId: "a1000000-0000-4000-8000-000000000020",
   materialId: "a1000000-0000-4000-8000-000000000030",
+  classId: "a1000000-0000-4000-8000-000000000040",
   courseTitle: "Manual Testing Sandbox",
+  className: "Manual Testing Class",
   exerciseTitle: "FizzBuzz for one number",
 } as const;
 
@@ -149,6 +152,19 @@ async function main(): Promise<void> {
     })),
   });
 
+  // The sandbox course is unreachable until a class assigns it to a student.
+  const { enrolled } = await seedClassFixture(prisma, {
+    classId: sandbox.classId,
+    academyId: academy.id,
+    name: sandbox.className,
+    description: "Grants the development student access to the sandbox course.",
+    createdByUserId: teamLead.id,
+    courseIds: [sandbox.courseId],
+    studentEmails: developmentUsers
+      .filter((user) => user.academyRole === "STUDENT")
+      .map((user) => user.email),
+  });
+
   const student = await prisma.user.findFirst({
     where: { email: "student@cove.test" },
     select: { id: true },
@@ -169,6 +185,7 @@ async function main(): Promise<void> {
 
   console.log(`🌱 "${sandbox.exerciseTitle}" ready in ${academy.name}`);
   console.log(`   course:   ${sandbox.courseTitle}`);
+  console.log(`   class:    ${sandbox.className} (${enrolled} enrolled)`);
   console.log(`   material: ${sandbox.materialId}`);
   console.log(`   cases:    2 sample, 3 hidden`);
   await prisma.$disconnect();

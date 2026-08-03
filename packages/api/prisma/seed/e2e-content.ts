@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 import { validateEnvironment } from "../../src/config/env.schema.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
+import { seedClassFixture } from "./class-fixtures.js";
 import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 
@@ -18,6 +19,8 @@ import { developmentUsers } from "./data/users.js";
  */
 export const e2eContent = {
   courseId: "e0000000-0000-4000-8000-000000000001",
+  classId: "e0000000-0000-4000-8000-000000000040",
+  className: "E2E Cohort",
   moduleOneId: "e0000000-0000-4000-8000-000000000010",
   moduleTwoId: "e0000000-0000-4000-8000-000000000011",
   lectureOneId: "e0000000-0000-4000-8000-000000000020",
@@ -172,7 +175,21 @@ export async function seedE2eContent(prisma: PrismaClient) {
     });
   }
 
-  return { academyId: academy.id };
+  // Without this the Playwright student is enrolled nowhere and the whole
+  // journey sees an empty catalog, however visible the curriculum is.
+  const { enrolled } = await seedClassFixture(prisma, {
+    classId: e2eContent.classId,
+    academyId: academy.id,
+    name: e2eContent.className,
+    description: "Fixture class that grants the Playwright student access.",
+    createdByUserId: teamLead.id,
+    courseIds: [e2eContent.courseId],
+    studentEmails: developmentUsers
+      .filter((user) => user.academyRole === "STUDENT")
+      .map((user) => user.email),
+  });
+
+  return { academyId: academy.id, enrolled };
 }
 
 if (process.argv[1]?.endsWith("e2e-content.ts")) {
@@ -181,7 +198,10 @@ if (process.argv[1]?.endsWith("e2e-content.ts")) {
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
   seedE2eContent(prisma)
-    .then(({ academyId }) => console.log(`🌱 E2E content seeded for academy ${academyId}`))
+    .then(({ academyId, enrolled }) => {
+      console.log(`🌱 E2E content seeded for academy ${academyId}`);
+      console.log(`   class:    ${e2eContent.className} (${enrolled} enrolled)`);
+    })
     .catch((error: unknown) => {
       console.error(error);
       process.exitCode = 1;

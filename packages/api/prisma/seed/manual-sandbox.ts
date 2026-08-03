@@ -8,7 +8,7 @@ import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 
 /**
- * A published problem for manual exploration.
+ * A visible problem for manual exploration.
  *
  * Kept in its own course, separate from the Playwright fixture, so
  * `db:seed:e2e` never disturbs it and manual submissions never interfere with
@@ -24,7 +24,6 @@ import { developmentUsers } from "./data/users.js";
  */
 const sandbox = {
   courseId: "a1000000-0000-4000-8000-000000000001",
-  versionId: "a1000000-0000-4000-8000-000000000002",
   moduleId: "a1000000-0000-4000-8000-000000000010",
   lectureId: "a1000000-0000-4000-8000-000000000020",
   materialId: "a1000000-0000-4000-8000-000000000030",
@@ -65,38 +64,23 @@ async function main(): Promise<void> {
       academyId: academy.id,
       title: sandbox.courseTitle,
       description: "A published problem for trying the student flow by hand.",
-      status: "ACTIVE",
+      isVisible: true,
       createdByUserId: teamLead.id,
     },
-    update: { title: sandbox.courseTitle, status: "ACTIVE" },
-  });
-
-  await prisma.courseVersion.upsert({
-    where: { id: sandbox.versionId },
-    create: {
-      id: sandbox.versionId,
-      courseId: sandbox.courseId,
-      versionNumber: 1,
-      // Students only ever see a PUBLISHED version.
-      status: "PUBLISHED",
-      createdByUserId: teamLead.id,
-      publishedByUserId: teamLead.id,
-      publishedAt: new Date(),
-    },
-    update: { status: "PUBLISHED" },
+    update: { title: sandbox.courseTitle, isVisible: true },
   });
 
   await prisma.courseModule.upsert({
     where: { id: sandbox.moduleId },
     create: {
       id: sandbox.moduleId,
-      courseVersionId: sandbox.versionId,
+      courseId: sandbox.courseId,
       title: "Conditionals",
       description: "",
       position: 1,
-      isPublished: true,
+      isVisible: true,
     },
-    update: { isPublished: true },
+    update: { isVisible: true },
   });
 
   await prisma.lecture.upsert({
@@ -107,9 +91,9 @@ async function main(): Promise<void> {
       title: "Branching on remainders",
       description: "",
       position: 1,
-      isPublished: true,
+      isVisible: true,
     },
-    update: { isPublished: true },
+    update: { isVisible: true },
   });
 
   await prisma.material.upsert({
@@ -120,16 +104,15 @@ async function main(): Promise<void> {
       type: "PROGRAMMING_EXERCISE",
       title: sandbox.exerciseTitle,
       position: 1,
-      isPublished: true,
+      isVisible: true,
     },
-    update: { title: sandbox.exerciseTitle, isPublished: true },
+    update: { title: sandbox.exerciseTitle, isVisible: true },
   });
 
   await prisma.programmingExercise.upsert({
     where: { materialId: sandbox.materialId },
     create: {
       materialId: sandbox.materialId,
-      courseVersionId: sandbox.versionId,
       externalKey: "manual-fizzbuzz",
       difficulty: "EASY",
       description,

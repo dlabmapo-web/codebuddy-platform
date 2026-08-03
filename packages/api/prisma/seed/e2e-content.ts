@@ -8,17 +8,16 @@ import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 
 /**
- * A published course for end-to-end tests.
+ * A visible course for end-to-end tests.
  *
  * Fixed ids make it idempotent: rerunning updates in place rather than piling
  * up near-duplicate courses in the shared development database. The content is
  * deliberately small but covers the shapes the student pages branch on — two
- * modules, a multi-lecture module, an unpublished lecture, and an exercise with
+ * modules, a multi-lecture module, a hidden lecture, and an exercise with
  * both sample and hidden test cases.
  */
 export const e2eContent = {
   courseId: "e0000000-0000-4000-8000-000000000001",
-  versionId: "e0000000-0000-4000-8000-000000000002",
   moduleOneId: "e0000000-0000-4000-8000-000000000010",
   moduleTwoId: "e0000000-0000-4000-8000-000000000011",
   lectureOneId: "e0000000-0000-4000-8000-000000000020",
@@ -50,43 +49,29 @@ export async function seedE2eContent(prisma: PrismaClient) {
       academyId: academy.id,
       title: e2eContent.courseTitle,
       description: "Fixture course used by the Playwright student journey.",
-      status: "ACTIVE",
+      isVisible: true,
       createdByUserId: teamLead.id,
     },
-    update: { title: e2eContent.courseTitle, status: "ACTIVE" },
-  });
-
-  await prisma.courseVersion.upsert({
-    where: { id: e2eContent.versionId },
-    create: {
-      id: e2eContent.versionId,
-      courseId: e2eContent.courseId,
-      versionNumber: 1,
-      status: "PUBLISHED",
-      createdByUserId: teamLead.id,
-      publishedByUserId: teamLead.id,
-      publishedAt: new Date("2026-07-31T00:00:00.000Z"),
-    },
-    update: { status: "PUBLISHED" },
+    update: { title: e2eContent.courseTitle, isVisible: true },
   });
 
   const modules = [
-    { id: e2eContent.moduleOneId, title: "Getting started", position: 1, isPublished: true },
-    { id: e2eContent.moduleTwoId, title: "Doing arithmetic", position: 2, isPublished: true },
+    { id: e2eContent.moduleOneId, title: "Getting started", position: 1, isVisible: true },
+    { id: e2eContent.moduleTwoId, title: "Doing arithmetic", position: 2, isVisible: true },
   ];
   for (const module of modules) {
     await prisma.courseModule.upsert({
       where: { id: module.id },
-      create: { ...module, courseVersionId: e2eContent.versionId, description: "" },
-      update: { title: module.title, position: module.position },
+      create: { ...module, courseId: e2eContent.courseId, description: "" },
+      update: { title: module.title, position: module.position, isVisible: module.isVisible },
     });
   }
 
   const lectures = [
-    { id: e2eContent.lectureOneId, moduleId: e2eContent.moduleOneId, title: "Reading input", position: 1, isPublished: true },
-    { id: e2eContent.lectureTwoId, moduleId: e2eContent.moduleTwoId, title: "Adding numbers", position: 1, isPublished: true },
+    { id: e2eContent.lectureOneId, moduleId: e2eContent.moduleOneId, title: "Reading input", position: 1, isVisible: true },
+    { id: e2eContent.lectureTwoId, moduleId: e2eContent.moduleTwoId, title: "Adding numbers", position: 1, isVisible: true },
     // Present in the version, invisible to students. Proves the filter.
-    { id: e2eContent.hiddenLectureId, moduleId: e2eContent.moduleTwoId, title: "Draft lecture", position: 2, isPublished: false },
+    { id: e2eContent.hiddenLectureId, moduleId: e2eContent.moduleTwoId, title: "Hidden lecture", position: 2, isVisible: false },
   ];
   for (const lecture of lectures) {
     await prisma.lecture.upsert({
@@ -97,9 +82,9 @@ export async function seedE2eContent(prisma: PrismaClient) {
         title: lecture.title,
         description: "",
         position: lecture.position,
-        isPublished: lecture.isPublished,
+        isVisible: lecture.isVisible,
       },
-      update: { title: lecture.title, isPublished: lecture.isPublished },
+      update: { title: lecture.title, isVisible: lecture.isVisible },
     });
   }
 
@@ -109,7 +94,7 @@ export async function seedE2eContent(prisma: PrismaClient) {
       lectureId: e2eContent.lectureOneId,
       title: e2eContent.echoTitle,
       position: 1,
-      isPublished: true,
+      isVisible: true,
       externalKey: "e2e-echo",
       starterCode: "value = input()\n",
       difficulty: "EASY" as const,
@@ -123,7 +108,7 @@ export async function seedE2eContent(prisma: PrismaClient) {
       lectureId: e2eContent.lectureTwoId,
       title: e2eContent.sumTitle,
       position: 1,
-      isPublished: true,
+      isVisible: true,
       externalKey: "e2e-sum",
       starterCode: "a = int(input())\nb = int(input())\n",
       difficulty: "MEDIUM" as const,
@@ -137,7 +122,7 @@ export async function seedE2eContent(prisma: PrismaClient) {
       lectureId: e2eContent.lectureOneId,
       title: e2eContent.hiddenExerciseTitle,
       position: 2,
-      isPublished: false,
+      isVisible: false,
       externalKey: "e2e-hidden",
       starterCode: "",
       difficulty: "HARD" as const,
@@ -156,16 +141,15 @@ export async function seedE2eContent(prisma: PrismaClient) {
         type: "PROGRAMMING_EXERCISE",
         title: exercise.title,
         position: exercise.position,
-        isPublished: exercise.isPublished,
+        isVisible: exercise.isVisible,
       },
-      update: { title: exercise.title, isPublished: exercise.isPublished },
+      update: { title: exercise.title, isVisible: exercise.isVisible },
     });
 
     await prisma.programmingExercise.upsert({
       where: { materialId: exercise.materialId },
       create: {
         materialId: exercise.materialId,
-        courseVersionId: e2eContent.versionId,
         externalKey: exercise.externalKey,
         difficulty: exercise.difficulty,
         description: `<p>${exercise.title}</p>`,

@@ -62,6 +62,8 @@ export const submissionResultSchema = z.object({
   status: submissionStatusSchema,
   passedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
+  /** 0-100. Every problem is worth the same, whatever its case count. */
+  score: z.number().int().min(0).max(100),
   runtimeMs: z.number().int().nonnegative().nullable(),
   failureReason: z.string().nullable(),
   elapsedSec: z.number().int().nonnegative(),

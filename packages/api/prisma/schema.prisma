@@ -483,6 +483,10 @@ model Submission {
   status          SubmissionStatus @default(QUEUED)
   passedCount     Int              @default(0) @map("passed_count")
   totalCount      Int              @map("total_count")
+  /// 0-100. Every problem is worth the same, whatever its case count: a
+  /// student must not score differently because an author split one case in
+  /// two. Derived from cases passed, never stored per case.
+  score           Int              @default(0)
   runtimeMs       Int?             @map("runtime_ms")
   /// Which runtime produced the verdict, so a future upgrade stays auditable.
   engineVersion   String           @map("engine_version")
@@ -529,6 +533,10 @@ model StudentExerciseProgress {
   status        ExerciseProgressStatus @default(NOT_STARTED)
   attemptCount  Int                    @default(0) @map("attempt_count")
   bestPassed    Int                    @default(0) @map("best_passed")
+  /// Highest ever earned, never reduced by a later worse attempt. A summable
+  /// column, so a future leaderboard is one GROUP BY rather than a walk over
+  /// every submission.
+  bestScore     Int                    @default(0) @map("best_score")
   firstSolvedAt DateTime?              @map("first_solved_at") @db.Timestamptz(6)
   lastAttemptAt DateTime?              @map("last_attempt_at") @db.Timestamptz(6)
 

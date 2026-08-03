@@ -55,6 +55,8 @@ export const learnExerciseSummarySchema = z.object({
   position: positionSchema,
   difficulty: exerciseDifficultySchema,
   status: exerciseProgressStatusSchema,
+  /** Highest ever earned, 0-100. A student stuck at 60 can find it again. */
+  bestScore: z.number().int().min(0).max(100),
 });
 export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 

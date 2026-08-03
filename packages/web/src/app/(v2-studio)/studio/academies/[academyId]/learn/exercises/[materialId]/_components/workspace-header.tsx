@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { DraftSaveState } from '../_lib/draft-store';
+import { ExerciseTimer } from './exercise-timer';
 
 const difficultyStyles = {
   EASY: 'bg-success/10 text-success',
@@ -74,6 +75,8 @@ export function WorkspaceHeader({
           {t(`learn:workspace.save_state.${saveState}`)}
         </span>
       )}
+
+      <ExerciseTimer key={exercise.materialId} />
 
       <div className="flex shrink-0 items-center gap-1">
         <button

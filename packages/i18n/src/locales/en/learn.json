@@ -82,6 +82,29 @@
       "saved": "Saved",
       "error": "Not synced"
     },
-    "resize_terminal": "Resize terminal"
+    "resize_terminal": "Resize terminal",
+    "submit": "Submit",
+    "elapsed_time": "Time on this problem"
+  },
+  "submit": {
+    "running": "Grading…",
+    "judge_error": "The judge could not grade this submission",
+    "passed": "Accepted",
+    "failed": "Not accepted",
+    "case_summary": "{{passed}} of {{total}} cases passed",
+    "runtime": "{{ms}} ms",
+    "outcome_pending": "Waiting",
+    "stopped_early": "{{count}} remaining cases were skipped after the first failure.",
+    "expected": "Expected",
+    "actual": "Actual",
+    "hidden_note": "Hidden cases show only their position and outcome.",
+    "outcome": {
+      "PASSED": "Passed",
+      "WRONG_OUTPUT": "Wrong output",
+      "RUNTIME_ERROR": "Runtime error",
+      "TIME_LIMIT": "Time limit exceeded",
+      "MEMORY_LIMIT": "Memory limit exceeded",
+      "SKIPPED": "Skipped"
+    }
   }
 }

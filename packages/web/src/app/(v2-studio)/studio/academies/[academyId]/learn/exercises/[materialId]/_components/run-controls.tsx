@@ -1,7 +1,7 @@
 'use client';
 
 import type { LearnSampleTestCase } from '@cove/shared';
-import { LoaderCircle, Play, Square } from 'lucide-react';
+import { LoaderCircle, Play, Send, Square } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
@@ -13,6 +13,8 @@ export function RunControls({
   onRun,
   onRunSample,
   onStop,
+  onSubmit,
+  submitting,
 }: {
   running: boolean;
   ready: boolean;
@@ -21,6 +23,8 @@ export function RunControls({
   onRun: () => void;
   onRunSample: (index: number) => void;
   onStop: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
 
@@ -69,6 +73,19 @@ export function RunControls({
           <LoaderCircle className="size-3 animate-spin" />
         )}
         {ready ? t('workspace.run') : t('workspace.preparing')}
+      </button>
+      <button
+        className="inline-flex items-center gap-1.5 rounded-md bg-success px-2.5 py-1 text-[12px] font-bold text-white transition-colors hover:brightness-110 disabled:opacity-50"
+        disabled={submitting}
+        onClick={onSubmit}
+        type="button"
+      >
+        {submitting ? (
+          <LoaderCircle className="size-3 animate-spin" />
+        ) : (
+          <Send className="size-3" />
+        )}
+        {t('workspace.submit')}
       </button>
     </>
   );

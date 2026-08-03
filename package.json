@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @cove/shared --filter @cove/i18n build && pnpm --parallel --filter @cove/api --filter @cove/web dev",
+    "dev": "pnpm --filter @cove/shared --filter @cove/i18n build && pnpm --parallel --filter @cove/api --filter @cove/web --filter @cove/judge-worker dev",
     "dev:web": "pnpm --filter @cove/web dev",
     "dev:api": "pnpm --filter @cove/shared build && pnpm --filter @cove/api dev",
     "build": "pnpm -r build",

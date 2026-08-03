@@ -1,29 +1,22 @@
 'use client';
 
 import type { LearnExerciseWorkspace } from '@cove/shared';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
-import { orpc } from '@/lib/orpc';
 
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
+import { useExerciseNavigation } from '../_hooks/use-exercise-navigation';
 import { usePythonRunner } from '../_hooks/use-python-runner';
+import { useSubmission } from '../_hooks/use-submission';
 import { useSplitPane } from '../_hooks/use-split-pane';
 import { resolveSampleVerdict } from '../_lib/sample-run';
 import { CodeEditor } from './code-editor';
 import { ProblemStatement } from './problem-statement';
 import { RunControls } from './run-controls';
+import { SubmitPanel } from './submit-panel';
 import { TerminalPanel } from './terminal-panel';
 import { WorkspaceHeader } from './workspace-header';
-
-function workspaceKey(academyId: string, materialId: string) {
-  return ['learn', academyId, 'workspace', materialId];
-}
-
-/** Long enough that walking a lecture never refetches a neighbour twice. */
-const WORKSPACE_STALE_MS = 60_000;
 
 export function Workspace({
   academyId,
@@ -33,31 +26,20 @@ export function Workspace({
   workspace: LearnExerciseWorkspace;
 }) {
   const { t } = useLayoutTranslation('learn');
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
-  const [navigating, setNavigating] = React.useState(false);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
 
-  /**
-   * Previous/Next swaps this in place instead of routing.
-   *
-   * A `router.push` re-renders the server page and remounts this component,
-   * which tears down the Pyodide worker and forces the runtime to reload — the
-   * exact cost that made v1 slow in production. Holding the workspace in state
-   * keeps the editor and the worker alive across problems.
-   */
-  const [workspace, setWorkspace] = React.useState(initialWorkspace);
-  const [trackedInitial, setTrackedInitial] = React.useState(initialWorkspace);
-  if (trackedInitial !== initialWorkspace) {
-    // A real navigation happened (deep link, reload, back/forward): adopt the
-    // server's payload rather than keeping stale in-memory state.
-    setTrackedInitial(initialWorkspace);
-    setWorkspace(initialWorkspace);
-  }
+  const runner = usePythonRunner();
+  const { workspace, navigating, navigate } = useExerciseNavigation({
+    academyId,
+    initialWorkspace,
+  });
 
   const { exercise } = workspace;
-  const runner = usePythonRunner();
+  const submission = useSubmission({
+    academyId,
+    materialId: exercise.materialId,
+  });
   const draft = useDraftAutosave({
     academyId,
     materialId: exercise.materialId,
@@ -134,87 +116,6 @@ export function Workspace({
     [draft.code, exercise.sampleTestCases, runner, t],
   );
 
-  const handleNavigate = React.useCallback(
-    async (materialId: string) => {
-      setNavigating(true);
-      // The pending draft is flushed before leaving, so the swap cannot race
-      // ahead of this problem's last edit.
-      draft.flushNow();
-      runner.stop();
-
-      try {
-        // Resolves from cache when the neighbour was prefetched, so the common
-        // case costs no request at all.
-        const next = await queryClient.fetchQuery({
-          queryKey: workspaceKey(academyId, materialId),
-          queryFn: () =>
-            orpc.learn.getExerciseWorkspace({ academyId, materialId }),
-          staleTime: WORKSPACE_STALE_MS,
-        });
-        setWorkspace(next);
-        runner.clear();
-        window.history.pushState(
-          null,
-          '',
-          `/studio/academies/${academyId}/learn/exercises/${materialId}`,
-        );
-      } catch {
-        // A failed swap falls back to a real navigation, which surfaces the
-        // error page rather than stranding the student on the old problem.
-        router.push(
-          `/studio/academies/${academyId}/learn/exercises/${materialId}`,
-        );
-      } finally {
-        setNavigating(false);
-        void queryClient.invalidateQueries({
-          queryKey: ['learn', academyId, 'drafts'],
-        });
-      }
-    },
-    [academyId, draft, queryClient, router, runner],
-  );
-
-  React.useEffect(() => {
-    // Prefetched into the same cache `handleNavigate` reads, so Next lands with
-    // the payload already in hand.
-    for (const neighbor of [workspace.neighbors.previous, workspace.neighbors.next]) {
-      if (!neighbor) continue;
-      void queryClient.prefetchQuery({
-        queryKey: workspaceKey(academyId, neighbor.materialId),
-        queryFn: () =>
-          orpc.learn.getExerciseWorkspace({
-            academyId,
-            materialId: neighbor.materialId,
-          }),
-        staleTime: WORKSPACE_STALE_MS,
-      });
-    }
-  }, [academyId, queryClient, workspace.neighbors]);
-
-  React.useEffect(() => {
-    // `pushState` above means back/forward no longer re-render the page, so the
-    // popped URL has to be reconciled by hand.
-    const onPopState = () => {
-      const popped = window.location.pathname.split('/').pop();
-      if (!popped || popped === workspace.exercise.materialId) return;
-      void queryClient
-        .fetchQuery({
-          queryKey: workspaceKey(academyId, popped),
-          queryFn: () =>
-            orpc.learn.getExerciseWorkspace({
-              academyId,
-              materialId: popped,
-            }),
-          staleTime: WORKSPACE_STALE_MS,
-        })
-        .then(setWorkspace)
-        .catch(() => router.refresh());
-    };
-
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [academyId, queryClient, router, workspace.exercise.materialId]);
-
   const runControls = (
     <RunControls
       activeSample={activeSample}
@@ -223,7 +124,14 @@ export function Workspace({
       onStop={runner.stop}
       ready={runner.ready}
       running={runner.running}
+      onSubmit={() => {
+        // The submitted code is the draft, so it is persisted before grading
+        // starts rather than relying on the idle timer having fired.
+        draft.flushNow();
+        void submission.submit(draft.code);
+      }}
       sampleTestCases={exercise.sampleTestCases}
+      submitting={submission.submitting}
     />
   );
 
@@ -232,7 +140,16 @@ export function Workspace({
       <WorkspaceHeader
         academyId={academyId}
         navigating={navigating}
-        onNavigate={(id) => void handleNavigate(id)}
+        onNavigate={(materialId) => {
+          // Pending work is settled here rather than inside the hook: the draft
+          // is derived from the workspace the hook owns, so passing a teardown
+          // callback into it would be circular.
+          draft.flushNow();
+          runner.stop();
+          runner.clear();
+          submission.reset();
+          void navigate(materialId);
+        }}
         saveState={draft.saveState}
         workspace={workspace}
       />
@@ -309,6 +226,8 @@ export function Workspace({
               supported={runner.supported}
             />
           </div>
+
+          <SubmitPanel submission={submission} />
         </section>
       </div>
     </div>

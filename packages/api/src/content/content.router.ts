@@ -29,31 +29,17 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
-      archive: os.academyCourses.archive
+      setVisibility: os.academyCourses.setVisibility
         .use(access.authenticated)
         .handler(({ context, input }) =>
-          deps.courseService.archive(context.identity, input, {
+          deps.courseService.setVisibility(context.identity, input, {
             requestId: requestId(context.req),
           })
         ),
-      restore: os.academyCourses.restore
+      getTree: os.academyCourses.getTree
         .use(access.authenticated)
         .handler(({ context, input }) =>
-          deps.courseService.restore(context.identity, input, {
-            requestId: requestId(context.req),
-          })
-        ),
-      createDraft: os.academyCourses.createDraft
-        .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.courseService.createDraft(context.identity, input, {
-            requestId: requestId(context.req),
-          })
-        ),
-      getDraftTree: os.academyCourses.getDraftTree
-        .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.courseService.getDraftTree(context.identity, input)
+          deps.courseService.getTree(context.identity, input)
         ),
       createModule: os.academyCourses.createModule
         .use(access.authenticated)
@@ -148,18 +134,6 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .use(access.authenticated)
         .handler(({ context, input }) =>
           deps.courseService.setExerciseVisibility(context.identity, input, {
-            requestId: requestId(context.req),
-          })
-        ),
-      validateVersion: os.academyCourses.validateVersion
-        .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.courseService.validateVersion(context.identity, input)
-        ),
-      publishVersion: os.academyCourses.publishVersion
-        .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.courseService.publishVersion(context.identity, input, {
             requestId: requestId(context.req),
           })
         ),

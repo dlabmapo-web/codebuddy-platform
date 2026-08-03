@@ -1,8 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
-import { hasSampleTestCase } from "@cove/shared";
-
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
@@ -12,36 +10,18 @@ import { AuditService } from "../academies/audit.service.js";
 
 type ContentRequestContext = { requestId?: string };
 
-const courseVersionSelect = {
-  id: true,
-  versionNumber: true,
-  status: true,
-  publishedAt: true,
-  updatedAt: true,
-} as const;
-
 const courseSummaryInclude = {
-  versions: {
-    where: { status: { in: ["DRAFT", "PUBLISHED"] } },
-    orderBy: { versionNumber: "desc" },
+  modules: {
     select: {
-      ...courseVersionSelect,
-      // Shallow tree: enough to count what a course holds for the list, without
-      // loading exercise bodies.
-      modules: {
-        select: {
-          id: true,
-          lectures: {
-            select: { id: true, _count: { select: { materials: true } } },
-          },
-        },
+      id: true,
+      lectures: {
+        select: { id: true, _count: { select: { materials: true } } },
       },
     },
   },
 } as const satisfies Prisma.CourseInclude;
 
-const draftTreeInclude = {
-  course: { include: courseSummaryInclude },
+const treeInclude = {
   modules: {
     orderBy: [{ position: "asc" }, { id: "asc" }],
     include: {
@@ -67,30 +47,23 @@ const draftTreeInclude = {
       },
     },
   },
-} as const satisfies Prisma.CourseVersionInclude;
+} as const satisfies Prisma.CourseInclude;
 
 const exerciseAuthoringInclude = {
   lecture: {
     include: {
-      courseModule: {
-        include: {
-          courseVersion: { include: { course: true } },
-        },
-      },
+      courseModule: { include: { course: true } },
     },
   },
   programmingExercise: {
     include: {
-      testCases: {
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-      },
-      hints: {
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-      },
+      testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+      hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
     },
   },
 } as const satisfies Prisma.MaterialInclude;
 
+type CourseRecord = Prisma.CourseGetPayload<{ include: typeof treeInclude }>;
 type ExerciseRecord = Prisma.MaterialGetPayload<{
   include: typeof exerciseAuthoringInclude;
 }>;
@@ -98,7 +71,6 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 type ExerciseWriteInput = {
   academyId: string;
   courseId: string;
-  versionId: string;
   lectureId: string;
   title: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
@@ -108,16 +80,13 @@ type ExerciseWriteInput = {
   constraints: string;
   starterCode: string;
   aiFeedbackEnabled: boolean;
-  isPublished: boolean;
+  isVisible: boolean;
   testCases: Array<{
     input: string;
     expectedOutput: string;
     visibility: "SAMPLE" | "HIDDEN";
   }>;
-  hints: Array<{
-    content: string;
-    triggerExpression: string | null;
-  }>;
+  hints: Array<{ content: string; triggerExpression: string | null }>;
 };
 
 @Injectable()
@@ -137,7 +106,7 @@ export class CourseService {
     const courses = await this.prisma.course.findMany({
       where: { academyId },
       include: courseSummaryInclude,
-      orderBy: [{ status: "asc" }, { updatedAt: "desc" }, { id: "asc" }],
+      orderBy: [{ isVisible: "desc" }, { updatedAt: "desc" }, { id: "asc" }],
     });
     return { courses: courses.map(toCourseSummary) };
   }
@@ -147,54 +116,32 @@ export class CourseService {
     input: { academyId: string; title: string; description: string },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
     const title = input.title.trim();
     await this.assertTitleAvailable(input.academyId, title);
-
-    try {
-      const course = await this.prisma.$transaction(async (transaction) => {
-        const created = await transaction.course.create({
-          data: {
-            academyId: input.academyId,
-            title,
-            description: input.description.trim(),
-            createdByUserId: actor.userId,
-            versions: {
-              create: {
-                versionNumber: 1,
-                createdByUserId: actor.userId,
-              },
-            },
-          },
-          include: courseSummaryInclude,
-        });
-        await this.audit.write(transaction, {
-          actorUserId: actor.userId,
+    const course = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.course.create({
+        data: {
           academyId: input.academyId,
-          action: "content.course.created",
-          targetType: "Course",
-          targetId: created.id,
-          requestId: context.requestId,
-          after: {
-            title: created.title,
-            description: created.description,
-            status: created.status,
-            draftVersionNumber: 1,
-          },
-        });
-        return created;
+          title,
+          description: input.description.trim(),
+          isVisible: false,
+          createdByUserId: actor.userId,
+        },
+        include: courseSummaryInclude,
       });
-      return toCourseSummary(course);
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        throw new AppException("COURSE_TITLE_CONFLICT", HttpStatus.CONFLICT);
-      }
-      throw error;
-    }
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.created",
+        targetType: "Course",
+        targetId: created.id,
+        requestId: context.requestId,
+        after: { title: created.title, isVisible: false },
+      });
+      return created;
+    });
+    return toCourseSummary(course);
   }
 
   async update(
@@ -207,204 +154,84 @@ export class CourseService {
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
     const current = await this.requireCourse(input.academyId, input.courseId);
     const title = input.title?.trim();
     if (title && title.toLocaleLowerCase() !== current.title.toLocaleLowerCase()) {
       await this.assertTitleAvailable(input.academyId, title, current.id);
     }
-
-    try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const updated = await transaction.course.update({
-          where: { id: current.id },
-          data: {
-            ...(title === undefined ? {} : { title }),
-            ...(input.description === undefined
-              ? {}
-              : { description: input.description.trim() }),
-          },
-          include: courseSummaryInclude,
-        });
-        await this.audit.write(transaction, {
-          actorUserId: actor.userId,
-          academyId: input.academyId,
-          action: "content.course.updated",
-          targetType: "Course",
-          targetId: current.id,
-          requestId: context.requestId,
-          before: {
-            title: current.title,
-            description: current.description,
-            status: current.status,
-          },
-          after: {
-            title: updated.title,
-            description: updated.description,
-            status: updated.status,
-          },
-        });
-        return toCourseSummary(updated);
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        throw new AppException("COURSE_TITLE_CONFLICT", HttpStatus.CONFLICT);
-      }
-      throw error;
-    }
-  }
-
-  async archive(
-    identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string },
-    context: ContentRequestContext = {},
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
-    const current = await this.requireCourse(input.academyId, input.courseId);
-    if (current.status === "ARCHIVED") {
-      const archived = await this.prisma.course.findUniqueOrThrow({
+    const course = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.course.update({
         where: { id: current.id },
-        include: courseSummaryInclude,
-      });
-      return toCourseSummary(archived);
-    }
-    return this.prisma.$transaction(async (transaction) => {
-      const archived = await transaction.course.update({
-        where: { id: current.id },
-        data: { status: "ARCHIVED" },
-        include: courseSummaryInclude,
-      });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: input.academyId,
-        action: "content.course.archived",
-        targetType: "Course",
-        targetId: current.id,
-        requestId: context.requestId,
-        before: { status: current.status },
-        after: { status: archived.status },
-      });
-      return toCourseSummary(archived);
-    });
-  }
-
-  /** Archiving is reversible: a course can always come back to the list. */
-  async restore(
-    identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string },
-    context: ContentRequestContext = {},
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
-    const current = await this.requireCourse(input.academyId, input.courseId);
-    if (current.status === "ACTIVE") {
-      const active = await this.prisma.course.findUniqueOrThrow({
-        where: { id: current.id },
-        include: courseSummaryInclude,
-      });
-      return toCourseSummary(active);
-    }
-    return this.prisma.$transaction(async (transaction) => {
-      const restored = await transaction.course.update({
-        where: { id: current.id },
-        data: { status: "ACTIVE" },
-        include: courseSummaryInclude,
-      });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: input.academyId,
-        action: "content.course.restored",
-        targetType: "Course",
-        targetId: current.id,
-        requestId: context.requestId,
-        before: { status: current.status },
-        after: { status: restored.status },
-      });
-      return toCourseSummary(restored);
-    });
-  }
-
-  /**
-   * A published version is immutable, so "editing" it means branching a new
-   * draft that starts as a deep copy of the published tree.
-   */
-  async createDraft(
-    identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string },
-    context: ContentRequestContext = {},
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
-    await this.requireCourse(input.academyId, input.courseId);
-    const versions = await this.prisma.courseVersion.findMany({
-      where: { courseId: input.courseId },
-      orderBy: { versionNumber: "desc" },
-      select: { id: true, versionNumber: true, status: true },
-    });
-    if (versions.some((version) => version.status === "DRAFT")) {
-      throw new AppException(
-        "COURSE_DRAFT_ALREADY_EXISTS",
-        HttpStatus.CONFLICT,
-      );
-    }
-    const source = versions.find((version) => version.status === "PUBLISHED")
-      ?? versions[0];
-    const versionNumber = (versions[0]?.versionNumber ?? 0) + 1;
-
-    const course = await this.prisma.$transaction(async (transaction) => {
-      const draft = await transaction.courseVersion.create({
         data: {
-          courseId: input.courseId,
-          versionNumber,
-          createdByUserId: actor.userId,
+          ...(title === undefined ? {} : { title }),
+          ...(input.description === undefined
+            ? {}
+            : { description: input.description.trim() }),
         },
-      });
-      if (source) {
-        await copyVersionContent(transaction, source.id, draft.id);
-      }
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: input.academyId,
-        action: "content.course_version.draft_created",
-        targetType: "CourseVersion",
-        targetId: draft.id,
-        requestId: context.requestId,
-        before: source ? { copiedFromVersionId: source.id } : undefined,
-        after: { versionNumber, status: draft.status },
-      });
-      return transaction.course.findUniqueOrThrow({
-        where: { id: input.courseId },
         include: courseSummaryInclude,
       });
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.updated",
+        targetType: "Course",
+        targetId: current.id,
+        requestId: context.requestId,
+        before: { title: current.title, description: current.description },
+        after: { title: updated.title, description: updated.description },
+      });
+      return updated;
     });
     return toCourseSummary(course);
   }
 
-  async getDraftTree(
+  async setVisibility(
     identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; versionId: string },
+    input: { academyId: string; courseId: string; isVisible: boolean },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const current = await this.requireCourse(input.academyId, input.courseId);
+    if (input.isVisible) {
+      await this.assertTitleAvailable(
+        input.academyId,
+        current.title,
+        current.id,
+        true,
+      );
+    }
+    const course = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.course.update({
+        where: { id: current.id },
+        data: { isVisible: input.isVisible },
+        include: courseSummaryInclude,
+      });
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.visibility_changed",
+        targetType: "Course",
+        targetId: current.id,
+        requestId: context.requestId,
+        before: { isVisible: current.isVisible },
+        after: { isVisible: updated.isVisible },
+      });
+      return updated;
+    });
+    return toCourseSummary(course);
+  }
+
+  async getTree(
+    identity: SupabaseIdentity,
+    input: { academyId: string; courseId: string },
   ) {
     await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
       "curriculum.review",
     );
-    const version = await this.findVersion(input);
-    return toDraftTree(version);
+    return toCourseTree(await this.findCourseTree(input));
   }
 
   async createModule(
@@ -412,95 +239,36 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       title: string;
       description: string;
       position?: number;
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
-    await this.requireEditableVersion(input);
-    await this.prisma.$transaction(async (transaction) => {
-      const position = input.position ?? await nextModulePosition(
-        transaction,
-        input.versionId,
-      );
-      const module = await transaction.courseModule.create({
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    await this.requireCourse(input.academyId, input.courseId);
+    await this.prisma.$transaction(async (tx) => {
+      const position = input.position ?? await nextModulePosition(tx, input.courseId);
+      const created = await tx.courseModule.create({
         data: {
-          courseVersionId: input.versionId,
+          courseId: input.courseId,
           title: input.title.trim(),
           description: input.description.trim(),
           position,
+          isVisible: false,
         },
       });
-      await this.audit.write(transaction, {
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.course_module.created",
         targetType: "CourseModule",
-        targetId: module.id,
+        targetId: created.id,
         requestId: context.requestId,
-        after: { courseVersionId: input.versionId, title: module.title, position },
+        after: { title: created.title, position, isVisible: false },
       });
     });
-    return this.getDraftTree(identity, input);
-  }
-
-  async createLecture(
-    identity: SupabaseIdentity,
-    input: {
-      academyId: string;
-      courseId: string;
-      versionId: string;
-      moduleId: string;
-      title: string;
-      description: string;
-      position?: number;
-    },
-    context: ContentRequestContext = {},
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.manage",
-    );
-    await this.requireEditableVersion(input);
-    const courseModule = await this.prisma.courseModule.findFirst({
-      where: { id: input.moduleId, courseVersionId: input.versionId },
-      select: { id: true },
-    });
-    if (!courseModule) {
-      throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
-    }
-    await this.prisma.$transaction(async (transaction) => {
-      const position = input.position ?? await nextLecturePosition(
-        transaction,
-        input.moduleId,
-      );
-      const lecture = await transaction.lecture.create({
-        data: {
-          courseModuleId: input.moduleId,
-          title: input.title.trim(),
-          description: input.description.trim(),
-          position,
-        },
-      });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: input.academyId,
-        action: "content.lecture.created",
-        targetType: "Lecture",
-        targetId: lecture.id,
-        requestId: context.requestId,
-        after: { courseModuleId: input.moduleId, title: lecture.title, position },
-      });
-    });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async updateModule(
@@ -508,121 +276,130 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       moduleId: string;
       title?: string;
       description?: string;
-      isPublished?: boolean;
+      isVisible?: boolean;
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    const current = await this.requireModule(input.versionId, input.moduleId);
-    await this.prisma.$transaction(async (transaction) => {
-      const updated = await transaction.courseModule.update({
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const current = await this.requireModule(input.courseId, input.moduleId);
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.courseModule.update({
         where: { id: current.id },
         data: {
           ...(input.title === undefined ? {} : { title: input.title.trim() }),
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
-          ...(input.isPublished === undefined
-            ? {}
-            : { isPublished: input.isPublished }),
+          ...(input.isVisible === undefined ? {} : { isVisible: input.isVisible }),
         },
       });
-      await this.audit.write(transaction, {
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
-        action: "content.course_module.updated",
+        action: input.isVisible === undefined
+          ? "content.course_module.updated"
+          : "content.course_module.visibility_changed",
         targetType: "CourseModule",
         targetId: current.id,
         requestId: context.requestId,
-        before: {
-          title: current.title,
-          description: current.description,
-          isPublished: current.isPublished,
-        },
-        after: {
-          title: updated.title,
-          description: updated.description,
-          isPublished: updated.isPublished,
-        },
+        before: moduleAudit(current),
+        after: moduleAudit(updated),
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async deleteModule(
     identity: SupabaseIdentity,
-    input: {
-      academyId: string;
-      courseId: string;
-      versionId: string;
-      moduleId: string;
-    },
+    input: { academyId: string; courseId: string; moduleId: string },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    const current = await this.requireModule(input.versionId, input.moduleId);
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.courseModule.delete({ where: { id: current.id } });
-      const remaining = await transaction.courseModule.findMany({
-        where: { courseVersionId: input.versionId },
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        select: { id: true },
-      });
-      await repackPositions(
-        remaining.map((item) => item.id),
-        (id, position) =>
-          transaction.courseModule.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const current = await this.requireModule(input.courseId, input.moduleId);
+    await this.assertNoSubmissions({ moduleId: current.id });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.courseModule.delete({ where: { id: current.id } });
+      await compactModulePositions(tx, input.courseId);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.course_module.deleted",
         targetType: "CourseModule",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, position: current.position },
+        before: moduleAudit(current),
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async reorderModules(
     identity: SupabaseIdentity,
-    input: {
-      academyId: string;
-      courseId: string;
-      versionId: string;
-      orderedModuleIds: string[];
-    },
+    input: { academyId: string; courseId: string; orderedModuleIds: string[] },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    const existing = await this.prisma.courseModule.findMany({
-      where: { courseVersionId: input.versionId },
-      select: { id: true },
-    });
-    assertSameMembers(existing.map((item) => item.id), input.orderedModuleIds);
-    await this.prisma.$transaction(async (transaction) => {
-      await repackPositions(
-        input.orderedModuleIds,
-        (id, position) =>
-          transaction.courseModule.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    await this.assertExactIds(
+      input.orderedModuleIds,
+      await this.prisma.courseModule.findMany({
+        where: { courseId: input.courseId },
+        select: { id: true },
+      }),
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await rewritePositions(tx, "module", input.orderedModuleIds);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.course_module.reordered",
-        targetType: "CourseVersion",
-        targetId: input.versionId,
+        targetType: "Course",
+        targetId: input.courseId,
         requestId: context.requestId,
         after: { orderedModuleIds: input.orderedModuleIds },
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
+  }
+
+  async createLecture(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      moduleId: string;
+      title: string;
+      description: string;
+      position?: number;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    await this.requireModule(input.courseId, input.moduleId);
+    await this.prisma.$transaction(async (tx) => {
+      const position = input.position ?? await nextLecturePosition(tx, input.moduleId);
+      const created = await tx.lecture.create({
+        data: {
+          courseModuleId: input.moduleId,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          position,
+          isVisible: false,
+        },
+      });
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.lecture.created",
+        targetType: "Lecture",
+        targetId: created.id,
+        requestId: context.requestId,
+        after: { title: created.title, position, isVisible: false },
+      });
+    });
+    return this.currentTree(input);
   }
 
   async updateLecture(
@@ -630,86 +407,64 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       lectureId: string;
       title?: string;
       description?: string;
-      isPublished?: boolean;
+      isVisible?: boolean;
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    const current = await this.requireLecture(input.versionId, input.lectureId);
-    await this.prisma.$transaction(async (transaction) => {
-      const updated = await transaction.lecture.update({
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const current = await this.requireLecture(input.courseId, input.lectureId);
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.lecture.update({
         where: { id: current.id },
         data: {
           ...(input.title === undefined ? {} : { title: input.title.trim() }),
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
-          ...(input.isPublished === undefined
-            ? {}
-            : { isPublished: input.isPublished }),
+          ...(input.isVisible === undefined ? {} : { isVisible: input.isVisible }),
         },
       });
-      await this.audit.write(transaction, {
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
-        action: "content.lecture.updated",
+        action: input.isVisible === undefined
+          ? "content.lecture.updated"
+          : "content.lecture.visibility_changed",
         targetType: "Lecture",
         targetId: current.id,
         requestId: context.requestId,
-        before: {
-          title: current.title,
-          description: current.description,
-          isPublished: current.isPublished,
-        },
-        after: {
-          title: updated.title,
-          description: updated.description,
-          isPublished: updated.isPublished,
-        },
+        before: lectureAudit(current),
+        after: lectureAudit(updated),
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async deleteLecture(
     identity: SupabaseIdentity,
-    input: {
-      academyId: string;
-      courseId: string;
-      versionId: string;
-      lectureId: string;
-    },
+    input: { academyId: string; courseId: string; lectureId: string },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    const current = await this.requireLecture(input.versionId, input.lectureId);
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.lecture.delete({ where: { id: current.id } });
-      const remaining = await transaction.lecture.findMany({
-        where: { courseModuleId: current.courseModuleId },
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        select: { id: true },
-      });
-      await repackPositions(
-        remaining.map((item) => item.id),
-        (id, position) =>
-          transaction.lecture.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const current = await this.requireLecture(input.courseId, input.lectureId);
+    await this.assertNoSubmissions({ lectureId: current.id });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lecture.delete({ where: { id: current.id } });
+      await compactLecturePositions(tx, current.courseModuleId);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.lecture.deleted",
         targetType: "Lecture",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, position: current.position },
+        before: lectureAudit(current),
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async reorderLectures(
@@ -717,26 +472,23 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       moduleId: string;
       orderedLectureIds: string[];
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.requireDraftEditor(identity, input);
-    await this.requireModule(input.versionId, input.moduleId);
-    const existing = await this.prisma.lecture.findMany({
-      where: { courseModuleId: input.moduleId },
-      select: { id: true },
-    });
-    assertSameMembers(existing.map((item) => item.id), input.orderedLectureIds);
-    await this.prisma.$transaction(async (transaction) => {
-      await repackPositions(
-        input.orderedLectureIds,
-        (id, position) =>
-          transaction.lecture.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    await this.requireModule(input.courseId, input.moduleId);
+    await this.assertExactIds(
+      input.orderedLectureIds,
+      await this.prisma.lecture.findMany({
+        where: { courseModuleId: input.moduleId },
+        select: { id: true },
+      }),
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await rewritePositions(tx, "lecture", input.orderedLectureIds);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.lecture.reordered",
@@ -746,7 +498,7 @@ export class CourseService {
         after: { orderedLectureIds: input.orderedLectureIds },
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async getExercise(
@@ -754,7 +506,6 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       lectureId: string;
       materialId: string;
     },
@@ -772,30 +523,21 @@ export class CourseService {
     input: ExerciseWriteInput,
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "exercises.manage",
-    );
-    await this.requireEditableVersion(input);
-    await this.requireLecture(input.versionId, input.lectureId);
-    assertExerciseComplete(input);
-
-    const material = await this.prisma.$transaction(async (transaction) => {
-      const position = await nextMaterialPosition(transaction, input.lectureId);
-      const created = await transaction.material.create({
+    const actor = await this.requireExerciseManager(identity, input.academyId);
+    await this.requireLecture(input.courseId, input.lectureId);
+    const record = await this.prisma.$transaction(async (tx) => {
+      const position = await nextMaterialPosition(tx, input.lectureId);
+      const material = await tx.material.create({
         data: {
           lectureId: input.lectureId,
           type: "PROGRAMMING_EXERCISE",
           title: input.title.trim(),
           position,
           isRequired: true,
-          isPublished: input.isPublished,
+          isVisible: false,
           programmingExercise: {
             create: {
-              courseVersionId: input.versionId,
-              externalKey: `manual-${randomUUID()}`,
-              legacyProblemNo: null,
+              externalKey: randomUUID(),
               difficulty: input.difficulty,
               description: input.description,
               inputFormat: input.inputFormat,
@@ -806,71 +548,44 @@ export class CourseService {
               timeLimitMs: 3000,
               memoryLimitMb: 256,
               aiFeedbackEnabled: input.aiFeedbackEnabled,
-              testCases: {
-                create: input.testCases.map((testCase, index) => ({
-                  position: index + 1,
-                  input: testCase.input,
-                  expectedOutput: testCase.expectedOutput,
-                  visibility: testCase.visibility,
-                })),
-              },
-              hints: {
-                create: input.hints.map((hint, index) => ({
-                  position: index + 1,
-                  content: hint.content.trim(),
-                  triggerExpression:
-                    emptyToNull(hint.triggerExpression),
-                })),
-              },
+              gradingRevision: 1,
+              testCases: { create: testCaseCreates(input.testCases) },
+              hints: { create: hintCreates(input.hints) },
             },
           },
         },
+        include: exerciseAuthoringInclude,
       });
-      await this.audit.write(transaction, {
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.programming_exercise.created",
         targetType: "Material",
-        targetId: created.id,
+        targetId: material.id,
         requestId: context.requestId,
-        after: exerciseAuditSnapshot(input, position),
+        after: exerciseAuditFromInput(input, position, false, 1),
       });
-      return created;
+      return material;
     });
-
-    return this.getExercise(identity, {
-      ...input,
-      materialId: material.id,
-    });
+    return toExerciseAuthoringContext(record);
   }
 
   async updateExercise(
     identity: SupabaseIdentity,
-    input: ExerciseWriteInput & {
-      materialId: string;
-      expectedUpdatedAt: string;
-    },
+    input: ExerciseWriteInput & { materialId: string; expectedUpdatedAt: string },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "exercises.manage",
-    );
-    await this.requireEditableVersion(input);
+    const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
-    assertExerciseComplete(input);
-    const expectedUpdatedAt = new Date(input.expectedUpdatedAt);
-    const nextUpdatedAt = new Date(
-      Math.max(Date.now(), expectedUpdatedAt.getTime() + 1),
-    );
-
-    await this.prisma.$transaction(async (transaction) => {
-      const changed = await transaction.programmingExercise.updateMany({
-        where: {
-          materialId: input.materialId,
-          updatedAt: expectedUpdatedAt,
-        },
+    const exercise = current.programmingExercise!;
+    if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+      throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
+    }
+    const gradingChanged = !sameGradingDefinition(exercise.testCases, input.testCases);
+    const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
+    const record = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.programmingExercise.updateMany({
+        where: { materialId: current.id, updatedAt: exercise.updatedAt },
         data: {
           difficulty: input.difficulty,
           description: input.description,
@@ -878,58 +593,74 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
-          timeLimitMs: 3000,
-          memoryLimitMb: 256,
           aiFeedbackEnabled: input.aiFeedbackEnabled,
-          updatedAt: nextUpdatedAt,
+          ...(gradingChanged ? { gradingRevision: nextRevision } : {}),
         },
       });
-      if (changed.count !== 1) {
+      if (claimed.count !== 1) {
         throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
       }
-
-      await transaction.material.update({
-        where: { id: input.materialId },
-        data: { title: input.title.trim(), isPublished: input.isPublished },
+      await tx.material.update({
+        where: { id: current.id },
+        data: { title: input.title.trim(), isVisible: input.isVisible },
       });
-      await transaction.exerciseTestCase.deleteMany({
-        where: { exerciseMaterialId: input.materialId },
+      await tx.exerciseTestCase.deleteMany({
+        where: { exerciseMaterialId: current.id },
       });
-      await transaction.exerciseHint.deleteMany({
-        where: { exerciseMaterialId: input.materialId },
-      });
-      await transaction.exerciseTestCase.createMany({
-        data: input.testCases.map((testCase, index) => ({
-          exerciseMaterialId: input.materialId,
-          position: index + 1,
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          visibility: testCase.visibility,
+      await tx.exerciseTestCase.createMany({
+        data: testCaseCreates(input.testCases).map((testCase) => ({
+          ...testCase,
+          exerciseMaterialId: current.id,
         })),
       });
+      await tx.exerciseHint.deleteMany({
+        where: { exerciseMaterialId: current.id },
+      });
       if (input.hints.length > 0) {
-        await transaction.exerciseHint.createMany({
-          data: input.hints.map((hint, index) => ({
-            exerciseMaterialId: input.materialId,
-            position: index + 1,
-            content: hint.content.trim(),
-            triggerExpression: emptyToNull(hint.triggerExpression),
+        await tx.exerciseHint.createMany({
+          data: hintCreates(input.hints).map((hint) => ({
+            ...hint,
+            exerciseMaterialId: current.id,
           })),
         });
       }
-      await this.audit.write(transaction, {
+      let progressResetCount = 0;
+      if (gradingChanged) {
+        const reset = await tx.studentExerciseProgress.updateMany({
+          where: { materialId: current.id },
+          data: {
+            status: "NOT_STARTED",
+            attemptCount: 0,
+            bestPassed: 0,
+            bestScore: 0,
+            gradingRevision: nextRevision,
+            firstSolvedAt: null,
+            lastAttemptAt: null,
+          },
+        });
+        progressResetCount = reset.count;
+      }
+      const updated = await tx.material.findUniqueOrThrow({
+        where: { id: current.id },
+        include: exerciseAuthoringInclude,
+      });
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.programming_exercise.updated",
         targetType: "Material",
-        targetId: input.materialId,
+        targetId: current.id,
         requestId: context.requestId,
-        before: exerciseRecordAuditSnapshot(current),
-        after: exerciseAuditSnapshot(input, current.position),
+        before: exerciseRecordAudit(current),
+        after: {
+          ...exerciseRecordAudit(updated),
+          gradingChanged,
+          progressResetCount,
+        },
       });
+      return updated;
     });
-
-    return this.getExercise(identity, input);
+    return toExerciseAuthoringContext(record);
   }
 
   async setExerciseVisibility(
@@ -937,37 +668,31 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       lectureId: string;
       materialId: string;
-      isPublished: boolean;
+      isVisible: boolean;
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "exercises.manage",
-    );
-    await this.requireEditableVersion(input);
+    const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.material.update({
-        where: { id: input.materialId },
-        data: { isPublished: input.isPublished },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.material.update({
+        where: { id: current.id },
+        data: { isVisible: input.isVisible },
       });
-      await this.audit.write(transaction, {
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.programming_exercise.visibility_changed",
         targetType: "Material",
-        targetId: input.materialId,
+        targetId: current.id,
         requestId: context.requestId,
-        before: { isPublished: current.isPublished },
-        after: { isPublished: input.isPublished },
+        before: { isVisible: current.isVisible },
+        after: { isVisible: input.isVisible },
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async deleteExercise(
@@ -975,42 +700,28 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       lectureId: string;
       materialId: string;
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "exercises.manage",
-    );
-    await this.requireEditableVersion(input);
+    const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.material.delete({ where: { id: input.materialId } });
-      const remaining = await transaction.material.findMany({
-        where: { lectureId: input.lectureId },
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        select: { id: true },
-      });
-      await repackPositions(
-        remaining.map((item) => item.id),
-        (id, position) =>
-          transaction.material.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    await this.assertNoSubmissions({ materialId: current.id });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.material.delete({ where: { id: current.id } });
+      await compactMaterialPositions(tx, input.lectureId);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.programming_exercise.deleted",
         targetType: "Material",
-        targetId: input.materialId,
+        targetId: current.id,
         requestId: context.requestId,
-        before: exerciseRecordAuditSnapshot(current),
+        before: exerciseRecordAudit(current),
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
   async reorderExercises(
@@ -1018,34 +729,23 @@ export class CourseService {
     input: {
       academyId: string;
       courseId: string;
-      versionId: string;
       lectureId: string;
       orderedMaterialIds: string[];
     },
     context: ContentRequestContext = {},
   ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "exercises.manage",
-    );
-    await this.requireEditableVersion(input);
-    await this.requireLecture(input.versionId, input.lectureId);
-    const existing = await this.prisma.material.findMany({
-      where: { lectureId: input.lectureId },
-      select: { id: true },
-    });
-    assertSameMembers(
-      existing.map((item) => item.id),
+    const actor = await this.requireExerciseManager(identity, input.academyId);
+    await this.requireLecture(input.courseId, input.lectureId);
+    await this.assertExactIds(
       input.orderedMaterialIds,
+      await this.prisma.material.findMany({
+        where: { lectureId: input.lectureId, type: "PROGRAMMING_EXERCISE" },
+        select: { id: true },
+      }),
     );
-    await this.prisma.$transaction(async (transaction) => {
-      await repackPositions(
-        input.orderedMaterialIds,
-        (id, position) =>
-          transaction.material.update({ where: { id }, data: { position } }),
-      );
-      await this.audit.write(transaction, {
+    await this.prisma.$transaction(async (tx) => {
+      await rewritePositions(tx, "material", input.orderedMaterialIds);
+      await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
         action: "content.programming_exercise.reordered",
@@ -1055,117 +755,59 @@ export class CourseService {
         after: { orderedMaterialIds: input.orderedMaterialIds },
       });
     });
-    return this.getDraftTree(identity, input);
+    return this.currentTree(input);
   }
 
-  async validateVersion(
+  private async requireCurriculumManager(
     identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; versionId: string },
+    academyId: string,
   ) {
-    await this.access.requirePermission(
+    return this.access.requirePermission(
       identity.authUserId,
-      input.academyId,
-      "curriculum.review",
-    );
-    const version = await this.findVersion(input);
-    const issues = collectPublishIssues(toDraftTree(version));
-    return {
-      versionId: version.id,
-      publishable: issues.length === 0,
-      issues,
-    };
-  }
-
-  /**
-   * Publishing freezes the draft and retires the version it replaces. Existing
-   * classes keep pointing at the version they were created with.
-   */
-  async publishVersion(
-    identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; versionId: string },
-    context: ContentRequestContext = {},
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      "curriculum.publish",
-    );
-    const version = await this.findVersion(input);
-    if (version.status !== "DRAFT") {
-      throw new AppException("COURSE_VERSION_IMMUTABLE", HttpStatus.CONFLICT);
-    }
-    const issues = collectPublishIssues(toDraftTree(version));
-    if (issues.length > 0) {
-      throw new AppException(
-        "CONTENT_VALIDATION_FAILED",
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
-
-    const course = await this.prisma.$transaction(async (transaction) => {
-      const retired = await transaction.courseVersion.updateMany({
-        where: {
-          courseId: input.courseId,
-          status: "PUBLISHED",
-          id: { not: version.id },
-        },
-        data: { status: "ARCHIVED" },
-      });
-      const published = await transaction.courseVersion.update({
-        where: { id: version.id },
-        data: {
-          status: "PUBLISHED",
-          publishedByUserId: actor.userId,
-          publishedAt: new Date(),
-        },
-      });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: input.academyId,
-        action: "content.course_version.published",
-        targetType: "CourseVersion",
-        targetId: version.id,
-        requestId: context.requestId,
-        before: { status: "DRAFT" },
-        after: {
-          status: published.status,
-          versionNumber: published.versionNumber,
-          moduleCount: version.modules.length,
-          retiredVersionCount: retired.count,
-        },
-      });
-      return transaction.course.findUniqueOrThrow({
-        where: { id: input.courseId },
-        include: courseSummaryInclude,
-      });
-    });
-
-    const summary = toCourseSummary(course);
-    if (!summary.publishedVersion) {
-      throw new AppException(
-        "COURSE_VERSION_NOT_FOUND",
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-    return { course: summary, publishedVersion: summary.publishedVersion };
-  }
-
-  private async requireDraftEditor(
-    identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; versionId: string },
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
+      academyId,
       "curriculum.manage",
     );
-    await this.requireEditableVersion(input);
-    return actor;
   }
 
-  private async requireModule(versionId: string, moduleId: string) {
+  private async requireExerciseManager(
+    identity: SupabaseIdentity,
+    academyId: string,
+  ) {
+    return this.access.requirePermission(
+      identity.authUserId,
+      academyId,
+      "exercises.manage",
+    );
+  }
+
+  private async currentTree(input: { academyId: string; courseId: string }) {
+    return toCourseTree(await this.findCourseTree(input));
+  }
+
+  private async findCourseTree(input: { academyId: string; courseId: string }) {
+    const course = await this.prisma.course.findFirst({
+      where: { id: input.courseId, academyId: input.academyId },
+      include: treeInclude,
+    });
+    if (!course) {
+      throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    return course;
+  }
+
+  private async requireCourse(academyId: string, courseId: string) {
+    const course = await this.prisma.course.findFirst({
+      where: { id: courseId, academyId },
+    });
+    if (!course) {
+      throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    return course;
+  }
+
+  private async requireModule(courseId: string, moduleId: string) {
     const courseModule = await this.prisma.courseModule.findFirst({
-      where: { id: moduleId, courseVersionId: versionId },
+      where: { id: moduleId, courseId },
     });
     if (!courseModule) {
       throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
@@ -1173,9 +815,9 @@ export class CourseService {
     return courseModule;
   }
 
-  private async requireLecture(versionId: string, lectureId: string) {
+  private async requireLecture(courseId: string, lectureId: string) {
     const lecture = await this.prisma.lecture.findFirst({
-      where: { id: lectureId, courseModule: { courseVersionId: versionId } },
+      where: { id: lectureId, courseModule: { courseId } },
     });
     if (!lecture) {
       throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
@@ -1184,9 +826,7 @@ export class CourseService {
   }
 
   private async requireExercise(input: {
-    academyId: string;
     courseId: string;
-    versionId: string;
     lectureId: string;
     materialId: string;
   }) {
@@ -1194,15 +834,7 @@ export class CourseService {
       where: {
         id: input.materialId,
         lectureId: input.lectureId,
-        lecture: {
-          courseModule: {
-            courseVersionId: input.versionId,
-            courseVersion: {
-              courseId: input.courseId,
-              course: { academyId: input.academyId },
-            },
-          },
-        },
+        lecture: { courseModule: { courseId: input.courseId } },
       },
       include: exerciseAuthoringInclude,
     });
@@ -1216,12 +848,13 @@ export class CourseService {
     academyId: string,
     title: string,
     excludedCourseId?: string,
+    visibleOnly = false,
   ) {
     const duplicate = await this.prisma.course.findFirst({
       where: {
         academyId,
-        status: "ACTIVE",
         title: { equals: title, mode: "insensitive" },
+        ...(visibleOnly ? { isVisible: true } : {}),
         ...(excludedCourseId ? { id: { not: excludedCourseId } } : {}),
       },
       select: { id: true },
@@ -1231,132 +864,161 @@ export class CourseService {
     }
   }
 
-  private async requireCourse(academyId: string, courseId: string) {
-    const course = await this.prisma.course.findFirst({
-      where: { id: courseId, academyId },
+  private async assertNoSubmissions(input: {
+    moduleId?: string;
+    lectureId?: string;
+    materialId?: string;
+  }) {
+    const count = await this.prisma.submission.count({
+      where: input.materialId
+        ? { materialId: input.materialId }
+        : input.lectureId
+        ? { material: { lectureId: input.lectureId } }
+        : { material: { lecture: { courseModuleId: input.moduleId! } } },
     });
-    if (!course) {
-      throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    if (count > 0) {
+      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
     }
-    return course;
   }
 
-  private async findVersion(input: {
-    academyId: string;
-    courseId: string;
-    versionId: string;
-  }) {
-    const version = await this.prisma.courseVersion.findFirst({
-      where: {
-        id: input.versionId,
-        courseId: input.courseId,
-        course: { academyId: input.academyId },
-      },
-      include: draftTreeInclude,
-    });
-    if (!version) {
-      throw new AppException("COURSE_VERSION_NOT_FOUND", HttpStatus.NOT_FOUND);
+  private async assertExactIds(
+    orderedIds: string[],
+    records: Array<{ id: string }>,
+  ) {
+    const expected = new Set(records.map((record) => record.id));
+    const actual = new Set(orderedIds);
+    if (
+      actual.size !== orderedIds.length ||
+      actual.size !== expected.size ||
+      [...actual].some((id) => !expected.has(id))
+    ) {
+      throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.CONFLICT);
     }
-    return version;
-  }
-
-  private async requireEditableVersion(input: {
-    academyId: string;
-    courseId: string;
-    versionId: string;
-  }) {
-    const version = await this.findVersion(input);
-    if (version.status !== "DRAFT") {
-      throw new AppException(
-        "COURSE_VERSION_IMMUTABLE",
-        HttpStatus.CONFLICT,
-      );
-    }
-    return version;
   }
 }
 
 async function nextModulePosition(
-  transaction: Prisma.TransactionClient,
-  courseVersionId: string,
+  tx: Prisma.TransactionClient,
+  courseId: string,
 ) {
-  const aggregate = await transaction.courseModule.aggregate({
-    where: { courseVersionId },
+  const result = await tx.courseModule.aggregate({
+    where: { courseId },
     _max: { position: true },
   });
-  return (aggregate._max.position ?? 0) + 1;
+  return (result._max.position ?? 0) + 1;
 }
 
 async function nextLecturePosition(
-  transaction: Prisma.TransactionClient,
-  courseModuleId: string,
+  tx: Prisma.TransactionClient,
+  moduleId: string,
 ) {
-  const aggregate = await transaction.lecture.aggregate({
-    where: { courseModuleId },
+  const result = await tx.lecture.aggregate({
+    where: { courseModuleId: moduleId },
     _max: { position: true },
   });
-  return (aggregate._max.position ?? 0) + 1;
+  return (result._max.position ?? 0) + 1;
 }
 
 async function nextMaterialPosition(
-  transaction: Prisma.TransactionClient,
+  tx: Prisma.TransactionClient,
   lectureId: string,
 ) {
-  const aggregate = await transaction.material.aggregate({
+  const result = await tx.material.aggregate({
     where: { lectureId },
     _max: { position: true },
   });
-  return (aggregate._max.position ?? 0) + 1;
+  return (result._max.position ?? 0) + 1;
 }
 
-/**
- * Positions are unique per parent, so every reorder parks the rows on negative
- * placeholders before writing the final 1..n sequence.
- */
-async function repackPositions(
-  orderedIds: string[],
-  write: (id: string, position: number) => Promise<unknown>,
+async function compactModulePositions(
+  tx: Prisma.TransactionClient,
+  courseId: string,
 ) {
-  for (const [index, id] of orderedIds.entries()) {
-    await write(id, -(index + 1));
+  const records = await tx.courseModule.findMany({
+    where: { courseId },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  await rewritePositions(tx, "module", records.map((record) => record.id));
+}
+
+async function compactLecturePositions(
+  tx: Prisma.TransactionClient,
+  moduleId: string,
+) {
+  const records = await tx.lecture.findMany({
+    where: { courseModuleId: moduleId },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  await rewritePositions(tx, "lecture", records.map((record) => record.id));
+}
+
+async function compactMaterialPositions(
+  tx: Prisma.TransactionClient,
+  lectureId: string,
+) {
+  const records = await tx.material.findMany({
+    where: { lectureId },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  await rewritePositions(tx, "material", records.map((record) => record.id));
+}
+
+async function rewritePositions(
+  tx: Prisma.TransactionClient,
+  kind: "module" | "lecture" | "material",
+  ids: string[],
+) {
+  if (ids.length === 0) return;
+  const currentMax =
+    kind === "module"
+      ? await tx.courseModule.aggregate({
+          where: { id: { in: ids } },
+          _max: { position: true },
+        })
+      : kind === "lecture"
+        ? await tx.lecture.aggregate({
+            where: { id: { in: ids } },
+            _max: { position: true },
+          })
+        : await tx.material.aggregate({
+            where: { id: { in: ids } },
+            _max: { position: true },
+          });
+  const temporaryStart = (currentMax._max.position ?? 0) + ids.length + 1;
+  for (const [index, id] of ids.entries()) {
+    // Positions have positive CHECK constraints, so move records above the
+    // current range before assigning the final contiguous order.
+    const data = { position: temporaryStart + index };
+    if (kind === "module") await tx.courseModule.update({ where: { id }, data });
+    if (kind === "lecture") await tx.lecture.update({ where: { id }, data });
+    if (kind === "material") await tx.material.update({ where: { id }, data });
   }
-  for (const [index, id] of orderedIds.entries()) {
-    await write(id, index + 1);
+  for (const [index, id] of ids.entries()) {
+    const data = { position: index + 1 };
+    if (kind === "module") await tx.courseModule.update({ where: { id }, data });
+    if (kind === "lecture") await tx.lecture.update({ where: { id }, data });
+    if (kind === "material") await tx.material.update({ where: { id }, data });
   }
 }
 
-function assertSameMembers(existingIds: string[], submittedIds: string[]) {
-  const existing = new Set(existingIds);
-  const submitted = new Set(submittedIds);
-  const sameSize = existing.size === submitted.size
-    && submittedIds.length === submitted.size;
-  if (!sameSize || submittedIds.some((id) => !existing.has(id))) {
-    throw new AppException(
-      "CONTENT_POSITION_CONFLICT",
-      HttpStatus.UNPROCESSABLE_ENTITY,
-    );
-  }
+function testCaseCreates(testCases: ExerciseWriteInput["testCases"]) {
+  return testCases.map((testCase, index) => ({
+    position: index + 1,
+    input: testCase.input,
+    expectedOutput: testCase.expectedOutput,
+    visibility: testCase.visibility,
+  }));
 }
 
-function assertExerciseComplete(input: ExerciseWriteInput) {
-  const hasDescription = richTextToPlainText(input.description).length > 0;
-  // Authors pick visibility per case, so the sample students see must exist.
-  const hasUsableSample = hasSampleTestCase(input.testCases);
-  if (!hasDescription || !hasUsableSample) {
-    throw new AppException(
-      "EXERCISE_VALIDATION_FAILED",
-      HttpStatus.UNPROCESSABLE_ENTITY,
-    );
-  }
-}
-
-function richTextToPlainText(value: string) {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;|&#160;/gi, " ")
-    .replace(/&[a-z]+;|&#\d+;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function hintCreates(hints: ExerciseWriteInput["hints"]) {
+  return hints.map((hint, index) => ({
+    position: index + 1,
+    content: hint.content.trim(),
+    triggerExpression: emptyToNull(hint.triggerExpression),
+  }));
 }
 
 function emptyToNull(value: string | null) {
@@ -1364,7 +1026,52 @@ function emptyToNull(value: string | null) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function exerciseAuditSnapshot(input: ExerciseWriteInput, position: number) {
+function sameGradingDefinition(
+  current: Array<{
+    input: string;
+    expectedOutput: string;
+    visibility: "SAMPLE" | "HIDDEN";
+  }>,
+  next: ExerciseWriteInput["testCases"],
+) {
+  return current.length === next.length && current.every((testCase, index) => {
+    const candidate = next[index];
+    return candidate !== undefined &&
+      testCase.input === candidate.input &&
+      testCase.expectedOutput === candidate.expectedOutput &&
+      testCase.visibility === candidate.visibility;
+  });
+}
+
+function moduleAudit(record: {
+  title: string;
+  description: string;
+  position: number;
+  isVisible: boolean;
+}) {
+  return {
+    title: record.title,
+    description: record.description,
+    position: record.position,
+    isVisible: record.isVisible,
+  };
+}
+
+function lectureAudit(record: {
+  title: string;
+  description: string;
+  position: number;
+  isVisible: boolean;
+}) {
+  return moduleAudit(record);
+}
+
+function exerciseAuditFromInput(
+  input: ExerciseWriteInput,
+  position: number,
+  isVisible: boolean,
+  gradingRevision: number,
+) {
   return {
     title: input.title.trim(),
     difficulty: input.difficulty,
@@ -1373,7 +1080,8 @@ function exerciseAuditSnapshot(input: ExerciseWriteInput, position: number) {
     timeLimitMs: 3000,
     memoryLimitMb: 256,
     aiFeedbackEnabled: input.aiFeedbackEnabled,
-    isPublished: input.isPublished,
+    isVisible,
+    gradingRevision,
     testCaseCount: input.testCases.length,
     sampleTestCaseCount: input.testCases.filter(
       (testCase) => testCase.visibility === "SAMPLE",
@@ -1382,7 +1090,7 @@ function exerciseAuditSnapshot(input: ExerciseWriteInput, position: number) {
   };
 }
 
-function exerciseRecordAuditSnapshot(record: ExerciseRecord) {
+function exerciseRecordAudit(record: ExerciseRecord) {
   const exercise = record.programmingExercise!;
   return {
     title: record.title,
@@ -1392,7 +1100,8 @@ function exerciseRecordAuditSnapshot(record: ExerciseRecord) {
     timeLimitMs: exercise.timeLimitMs,
     memoryLimitMb: exercise.memoryLimitMb,
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
-    isPublished: record.isPublished,
+    isVisible: record.isVisible,
+    gradingRevision: exercise.gradingRevision,
     testCaseCount: exercise.testCases.length,
     sampleTestCaseCount: exercise.testCases.filter(
       (testCase) => testCase.visibility === "SAMPLE",
@@ -1401,341 +1110,65 @@ function exerciseRecordAuditSnapshot(record: ExerciseRecord) {
   };
 }
 
-async function copyVersionContent(
-  transaction: Prisma.TransactionClient,
-  sourceVersionId: string,
-  targetVersionId: string,
-) {
-  const modules = await transaction.courseModule.findMany({
-    where: { courseVersionId: sourceVersionId },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    include: {
-      lectures: {
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        include: {
-          materials: {
-            orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: {
-              programmingExercise: {
-                include: { testCases: true, hints: true },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  for (const courseModule of modules) {
-    const copiedModule = await transaction.courseModule.create({
-      data: {
-        courseVersionId: targetVersionId,
-        title: courseModule.title,
-        description: courseModule.description,
-        position: courseModule.position,
-        isPublished: courseModule.isPublished,
-      },
-    });
-    for (const lecture of courseModule.lectures) {
-      const copiedLecture = await transaction.lecture.create({
-        data: {
-          courseModuleId: copiedModule.id,
-          title: lecture.title,
-          description: lecture.description,
-          position: lecture.position,
-          isPublished: lecture.isPublished,
-        },
-      });
-      for (const material of lecture.materials) {
-        const copiedMaterial = await transaction.material.create({
-          data: {
-            lectureId: copiedLecture.id,
-            type: material.type,
-            title: material.title,
-            position: material.position,
-            isRequired: material.isRequired,
-            isPublished: material.isPublished,
-          },
-        });
-        const exercise = material.programmingExercise;
-        if (!exercise) continue;
-        await transaction.programmingExercise.create({
-          data: {
-            materialId: copiedMaterial.id,
-            courseVersionId: targetVersionId,
-            externalKey: exercise.externalKey,
-            legacyProblemNo: exercise.legacyProblemNo,
-            difficulty: exercise.difficulty,
-            description: exercise.description,
-            inputFormat: exercise.inputFormat,
-            outputFormat: exercise.outputFormat,
-            constraints: exercise.constraints,
-            starterCode: exercise.starterCode,
-            language: exercise.language,
-            timeLimitMs: exercise.timeLimitMs,
-            memoryLimitMb: exercise.memoryLimitMb,
-            aiFeedbackEnabled: exercise.aiFeedbackEnabled,
-            testCases: {
-              create: exercise.testCases.map((testCase) => ({
-                position: testCase.position,
-                input: testCase.input,
-                expectedOutput: testCase.expectedOutput,
-                visibility: testCase.visibility,
-              })),
-            },
-            hints: {
-              create: exercise.hints.map((hint) => ({
-                position: hint.position,
-                content: hint.content,
-                triggerExpression: hint.triggerExpression,
-              })),
-            },
-          },
-        });
-      }
-    }
-  }
-}
-
-type PublishIssue = {
-  path: string;
-  code: string;
-  message: string;
-  moduleId: string | null;
-  lectureId: string | null;
-  materialId: string | null;
-};
-
-/**
- * Drafts may stay incomplete; these rules only gate publishing.
- */
-export function collectPublishIssues(
-  tree: ReturnType<typeof toDraftTree>,
-): PublishIssue[] {
-  const issues: PublishIssue[] = [];
-
-  if (tree.course.title.trim().length === 0) {
-    issues.push({
-      path: "course.title",
-      code: "COURSE_TITLE_REQUIRED",
-      message: "The course needs a title.",
-      moduleId: null,
-      lectureId: null,
-      materialId: null,
-    });
-  }
-  if (tree.modules.length === 0) {
-    issues.push({
-      path: "modules",
-      code: "MODULE_REQUIRED",
-      message: "Add at least one module before publishing.",
-      moduleId: null,
-      lectureId: null,
-      materialId: null,
-    });
-  }
-
-  tree.modules.forEach((courseModule, moduleIndex) => {
-    if (courseModule.lectures.length === 0) {
-      issues.push({
-        path: `modules[${moduleIndex}].lectures`,
-        code: "LECTURE_REQUIRED",
-        message: `“${courseModule.title}” has no lectures.`,
-        moduleId: courseModule.id,
-        lectureId: null,
-        materialId: null,
-      });
-    }
-    courseModule.lectures.forEach((lecture, lectureIndex) => {
-      lecture.materials.forEach((material, materialIndex) => {
-        const path =
-          `modules[${moduleIndex}].lectures[${lectureIndex}].materials[${materialIndex}]`;
-        const exercise = material.programmingExercise;
-        if (!exercise) {
-          issues.push({
-            path,
-            code: "MATERIAL_INCOMPLETE",
-            message: `“${material.title}” has no exercise content.`,
-            moduleId: courseModule.id,
-            lectureId: lecture.id,
-            materialId: material.id,
-          });
-          return;
-        }
-        if (richTextToPlainText(exercise.description).length === 0) {
-          issues.push({
-            path: `${path}.description`,
-            code: "EXERCISE_DESCRIPTION_REQUIRED",
-            message: `“${material.title}” needs a problem description.`,
-            moduleId: courseModule.id,
-            lectureId: lecture.id,
-            materialId: material.id,
-          });
-        }
-        if (
-          !exercise.testCases.some(
-            (testCase) => testCase.expectedOutput.trim().length > 0,
-          )
-        ) {
-          issues.push({
-            path: `${path}.testCases`,
-            code: "TEST_CASE_REQUIRED",
-            message: `“${material.title}” needs at least one test case.`,
-            moduleId: courseModule.id,
-            lectureId: lecture.id,
-            materialId: material.id,
-          });
-        } else if (!hasSampleTestCase(exercise.testCases)) {
-          // Legacy imports can carry hidden-only cases; students would see
-          // no worked example, so block the publish until one is visible.
-          issues.push({
-            path: `${path}.testCases`,
-            code: "SAMPLE_TEST_CASE_REQUIRED",
-            message:
-              `“${material.title}” needs at least one sample test case students can see.`,
-            moduleId: courseModule.id,
-            lectureId: lecture.id,
-            materialId: material.id,
-          });
-        }
-      });
-    });
-  });
-
-  return issues;
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return typeof error === "object" && error !== null &&
-    "code" in error && error.code === "P2002";
-}
-
 export function toCourseSummary(course: {
   id: string;
   academyId: string;
   title: string;
   description: string;
-  status: "ACTIVE" | "ARCHIVED";
+  isVisible: boolean;
   createdAt: Date;
   updatedAt: Date;
-  versions: Array<{
-    id: string;
-    versionNumber: number;
-    status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-    publishedAt: Date | null;
-    updatedAt: Date;
-    modules?: Array<{
-      id: string;
-      lectures: Array<{ id: string; _count: { materials: number } }>;
+  modules: Array<{
+    lectures: Array<{
+      _count?: { materials: number };
+      materials?: unknown[];
     }>;
   }>;
 }) {
-  const toVersion = (version: (typeof course.versions)[number]) => ({
-    id: version.id,
-    versionNumber: version.versionNumber,
-    status: version.status,
-    publishedAt: version.publishedAt?.toISOString() ?? null,
-    updatedAt: version.updatedAt.toISOString(),
-  });
-  const draft = course.versions.find((version) => version.status === "DRAFT");
-  const published = course.versions.find(
-    (version) => version.status === "PUBLISHED",
-  );
+  let lectures = 0;
+  let exercises = 0;
+  for (const courseModule of course.modules) {
+    lectures += courseModule.lectures.length;
+    for (const lecture of courseModule.lectures) {
+      exercises += lecture._count?.materials ?? lecture.materials?.length ?? 0;
+    }
+  }
   return {
     id: course.id,
     academyId: course.academyId,
     title: course.title,
     description: course.description,
-    status: course.status,
-    draftVersion: draft ? toVersion(draft) : null,
-    publishedVersion: published ? toVersion(published) : null,
-    // Counts describe the version an author would open next.
-    content: countVersionContent((draft ?? published)?.modules),
+    isVisible: course.isVisible,
+    content: { modules: course.modules.length, lectures, exercises },
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
 }
 
-function countVersionContent(
-  modules?: Array<{ lectures: Array<{ _count: { materials: number } }> }>,
-) {
-  if (!modules) return { modules: 0, lectures: 0, exercises: 0 };
-  let lectures = 0;
-  let exercises = 0;
-  for (const courseModule of modules) {
-    lectures += courseModule.lectures.length;
-    for (const lecture of courseModule.lectures) {
-      exercises += lecture._count.materials;
-    }
-  }
-  return { modules: modules.length, lectures, exercises };
-}
-
-function toDraftTree(
-  version: Prisma.CourseVersionGetPayload<{ include: typeof draftTreeInclude }>,
-) {
+function toCourseTree(course: CourseRecord) {
   return {
-    course: toCourseSummary(version.course),
-    version: {
-      id: version.id,
-      versionNumber: version.versionNumber,
-      status: version.status,
-      publishedAt: version.publishedAt?.toISOString() ?? null,
-      updatedAt: version.updatedAt.toISOString(),
-    },
-    modules: version.modules.map((courseModule) => ({
+    course: toCourseSummary(course),
+    modules: course.modules.map((courseModule) => ({
       id: courseModule.id,
       title: courseModule.title,
       description: courseModule.description,
       position: courseModule.position,
-      isPublished: courseModule.isPublished,
+      isVisible: courseModule.isVisible,
       lectures: courseModule.lectures.map((lecture) => ({
         id: lecture.id,
         title: lecture.title,
         description: lecture.description,
         position: lecture.position,
-        isPublished: lecture.isPublished,
+        isVisible: lecture.isVisible,
         materials: lecture.materials.map((material) => ({
           id: material.id,
           type: material.type,
           title: material.title,
           position: material.position,
           isRequired: material.isRequired,
-          isPublished: material.isPublished,
+          isVisible: material.isVisible,
           programmingExercise: material.programmingExercise
-            ? {
-                materialId: material.programmingExercise.materialId,
-                externalKey: material.programmingExercise.externalKey,
-                legacyProblemNo: material.programmingExercise.legacyProblemNo,
-                difficulty: material.programmingExercise.difficulty,
-                description: material.programmingExercise.description,
-                inputFormat: material.programmingExercise.inputFormat,
-                outputFormat: material.programmingExercise.outputFormat,
-                constraints: material.programmingExercise.constraints,
-                starterCode: material.programmingExercise.starterCode,
-                language: material.programmingExercise.language,
-                timeLimitMs: material.programmingExercise.timeLimitMs,
-                memoryLimitMb: material.programmingExercise.memoryLimitMb,
-                aiFeedbackEnabled:
-                  material.programmingExercise.aiFeedbackEnabled,
-                updatedAt:
-                  material.programmingExercise.updatedAt.toISOString(),
-                testCases: material.programmingExercise.testCases.map(
-                  (testCase) => ({
-                    id: testCase.id,
-                    position: testCase.position,
-                    input: testCase.input,
-                    expectedOutput: testCase.expectedOutput,
-                    visibility: testCase.visibility,
-                  }),
-                ),
-                hints: material.programmingExercise.hints.map((hint) => ({
-                  id: hint.id,
-                  position: hint.position,
-                  content: hint.content,
-                  triggerExpression: hint.triggerExpression,
-                })),
-              }
+            ? serializeExercise(material.programmingExercise)
             : null,
         })),
       })),
@@ -1743,66 +1176,55 @@ function toDraftTree(
   };
 }
 
+function serializeExercise(exercise: NonNullable<
+  CourseRecord["modules"][number]["lectures"][number]["materials"][number]["programmingExercise"]
+>) {
+  return {
+    materialId: exercise.materialId,
+    externalKey: exercise.externalKey,
+    legacyProblemNo: exercise.legacyProblemNo,
+    difficulty: exercise.difficulty,
+    description: exercise.description,
+    inputFormat: exercise.inputFormat,
+    outputFormat: exercise.outputFormat,
+    constraints: exercise.constraints,
+    starterCode: exercise.starterCode,
+    language: exercise.language,
+    timeLimitMs: exercise.timeLimitMs,
+    memoryLimitMb: exercise.memoryLimitMb,
+    aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+    gradingRevision: exercise.gradingRevision,
+    updatedAt: exercise.updatedAt.toISOString(),
+    testCases: exercise.testCases.map((testCase) => ({
+      id: testCase.id,
+      position: testCase.position,
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput,
+      visibility: testCase.visibility,
+    })),
+    hints: exercise.hints.map((hint) => ({
+      id: hint.id,
+      position: hint.position,
+      content: hint.content,
+      triggerExpression: hint.triggerExpression,
+    })),
+  };
+}
+
 function toExerciseAuthoringContext(record: ExerciseRecord) {
   const courseModule = record.lecture.courseModule;
-  const version = courseModule.courseVersion;
-  const exercise = record.programmingExercise!;
   return {
-    course: {
-      id: version.course.id,
-      title: version.course.title,
-    },
-    version: {
-      id: version.id,
-      versionNumber: version.versionNumber,
-      status: version.status,
-      publishedAt: version.publishedAt?.toISOString() ?? null,
-      updatedAt: version.updatedAt.toISOString(),
-    },
-    module: {
-      id: courseModule.id,
-      title: courseModule.title,
-    },
-    lecture: {
-      id: record.lecture.id,
-      title: record.lecture.title,
-    },
+    course: { id: courseModule.course.id, title: courseModule.course.title },
+    module: { id: courseModule.id, title: courseModule.title },
+    lecture: { id: record.lecture.id, title: record.lecture.title },
     material: {
       id: record.id,
       type: record.type,
       title: record.title,
       position: record.position,
       isRequired: record.isRequired,
-      isPublished: record.isPublished,
-      programmingExercise: {
-        materialId: exercise.materialId,
-        externalKey: exercise.externalKey,
-        legacyProblemNo: exercise.legacyProblemNo,
-        difficulty: exercise.difficulty,
-        description: exercise.description,
-        inputFormat: exercise.inputFormat,
-        outputFormat: exercise.outputFormat,
-        constraints: exercise.constraints,
-        starterCode: exercise.starterCode,
-        language: exercise.language,
-        timeLimitMs: exercise.timeLimitMs,
-        memoryLimitMb: exercise.memoryLimitMb,
-        aiFeedbackEnabled: exercise.aiFeedbackEnabled,
-        updatedAt: exercise.updatedAt.toISOString(),
-        testCases: exercise.testCases.map((testCase) => ({
-          id: testCase.id,
-          position: testCase.position,
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          visibility: testCase.visibility,
-        })),
-        hints: exercise.hints.map((hint) => ({
-          id: hint.id,
-          position: hint.position,
-          content: hint.content,
-          triggerExpression: hint.triggerExpression,
-        })),
-      },
+      isVisible: record.isVisible,
+      programmingExercise: serializeExercise(record.programmingExercise!),
     },
   };
 }

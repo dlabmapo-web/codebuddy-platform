@@ -66,17 +66,6 @@ enum OAuthOnboardingIntentStatus {
   EXPIRED
 }
 
-enum CourseStatus {
-  ACTIVE
-  ARCHIVED
-}
-
-enum CourseVersionStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
 enum MaterialType {
   PROGRAMMING_EXERCISE
 }
@@ -138,20 +127,18 @@ model User {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships             AcademyMembership[]
-  invitationsCreated      AcademyInvitation[]  @relation("InvitationCreator")
-  invitationsAccepted     AcademyInvitation[]  @relation("InvitationAcceptor")
-  joinRequests            AcademyJoinRequest[] @relation("JoinRequester")
-  joinRequestsReviewed    AcademyJoinRequest[] @relation("JoinReviewer")
-  membershipInvitations   AcademyMembership[]  @relation("MembershipInviter")
-  membershipApprovals     AcademyMembership[]  @relation("MembershipApprover")
-  auditLogs               AuditLog[]           @relation("AuditActor")
-  coursesCreated          Course[]             @relation("CourseCreator")
-  courseVersionsCreated   CourseVersion[]      @relation("CourseVersionCreator")
-  courseVersionsPublished CourseVersion[]      @relation("CourseVersionPublisher")
-  exerciseDrafts          ExerciseDraft[]
-  submissions             Submission[]
-  exerciseProgress        StudentExerciseProgress[]
+  memberships           AcademyMembership[]
+  invitationsCreated    AcademyInvitation[]       @relation("InvitationCreator")
+  invitationsAccepted   AcademyInvitation[]       @relation("InvitationAcceptor")
+  joinRequests          AcademyJoinRequest[]      @relation("JoinRequester")
+  joinRequestsReviewed  AcademyJoinRequest[]      @relation("JoinReviewer")
+  membershipInvitations AcademyMembership[]       @relation("MembershipInviter")
+  membershipApprovals   AcademyMembership[]       @relation("MembershipApprover")
+  auditLogs             AuditLog[]                @relation("AuditActor")
+  coursesCreated        Course[]                  @relation("CourseCreator")
+  exerciseDrafts        ExerciseDraft[]
+  submissions           Submission[]
+  exerciseProgress      StudentExerciseProgress[]
 
   @@index([status])
   @@map("users")
@@ -306,61 +293,41 @@ model AuditLog {
 }
 
 model Course {
-  id              String       @id @default(uuid()) @db.Uuid
-  academyId       String       @map("academy_id") @db.Uuid
-  title           String
-  description     String       @default("")
-  status          CourseStatus @default(ACTIVE)
-  createdByUserId String       @map("created_by_user_id") @db.Uuid
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  academy   Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  versions  CourseVersion[]
-
-  @@index([academyId, status, updatedAt])
-  @@map("courses")
-}
-
-model CourseVersion {
-  id                String              @id @default(uuid()) @db.Uuid
-  courseId          String              @map("course_id") @db.Uuid
-  versionNumber     Int                 @map("version_number")
-  status            CourseVersionStatus @default(DRAFT)
-  createdByUserId   String              @map("created_by_user_id") @db.Uuid
-  publishedByUserId String?             @map("published_by_user_id") @db.Uuid
-  publishedAt       DateTime?           @map("published_at") @db.Timestamptz(6)
-  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  course               Course                @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  createdBy            User                  @relation("CourseVersionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  publishedBy          User?                 @relation("CourseVersionPublisher", fields: [publishedByUserId], references: [id], onDelete: SetNull)
-  modules              CourseModule[]
-  programmingExercises ProgrammingExercise[]
-
-  @@unique([courseId, versionNumber])
-  @@index([courseId, status])
-  @@map("course_versions")
-}
-
-model CourseModule {
   id              String   @id @default(uuid()) @db.Uuid
-  courseVersionId String   @map("course_version_id") @db.Uuid
+  academyId       String   @map("academy_id") @db.Uuid
   title           String
   description     String   @default("")
-  position        Int
-  /// Hidden modules stay in the curriculum but disappear for students.
-  isPublished     Boolean  @default(true) @map("is_published")
+  isVisible       Boolean  @default(false) @map("is_visible")
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  courseVersion CourseVersion @relation(fields: [courseVersionId], references: [id], onDelete: Cascade)
-  lectures      Lecture[]
+  academy        Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy      User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  modules        CourseModule[]
+  exerciseDrafts ExerciseDraft[]
+  submissions    Submission[]
 
-  @@unique([courseVersionId, position])
-  @@index([courseVersionId])
+  @@index([academyId, isVisible, updatedAt])
+  @@map("courses")
+}
+
+model CourseModule {
+  id          String   @id @default(uuid()) @db.Uuid
+  courseId    String   @map("course_id") @db.Uuid
+  title       String
+  description String   @default("")
+  position    Int
+  /// Hidden modules stay in the curriculum but disappear for students.
+  isVisible   Boolean  @default(false) @map("is_visible")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lectures Lecture[]
+
+  @@unique([courseId, position])
+  @@index([courseId])
   @@map("course_modules")
 }
 
@@ -371,7 +338,7 @@ model Lecture {
   description    String   @default("")
   position       Int
   /// Hidden lectures stay in the curriculum but disappear for students.
-  isPublished    Boolean  @default(true) @map("is_published")
+  isVisible      Boolean  @default(false) @map("is_visible")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -384,18 +351,18 @@ model Lecture {
 }
 
 model Material {
-  id          String       @id @default(uuid()) @db.Uuid
-  lectureId   String       @map("lecture_id") @db.Uuid
-  type        MaterialType
-  title       String
-  position    Int
-  isRequired  Boolean      @default(true) @map("is_required")
-  /// Hides a single material from students even while its version is published.
-  isPublished Boolean      @default(true) @map("is_published")
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id         String       @id @default(uuid()) @db.Uuid
+  lectureId  String       @map("lecture_id") @db.Uuid
+  type       MaterialType
+  title      String
+  position   Int
+  isRequired Boolean      @default(true) @map("is_required")
+  /// Hides a single material from students while preserving its work history.
+  isVisible  Boolean      @default(false) @map("is_visible")
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  lecture             Lecture              @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  lecture             Lecture                   @relation(fields: [lectureId], references: [id], onDelete: Cascade)
   programmingExercise ProgrammingExercise?
   drafts              ExerciseDraft[]
   submissions         Submission[]
@@ -408,7 +375,6 @@ model Material {
 
 model ProgrammingExercise {
   materialId        String             @id @map("material_id") @db.Uuid
-  courseVersionId   String             @map("course_version_id") @db.Uuid
   externalKey       String             @map("external_key")
   legacyProblemNo   Int?               @map("legacy_problem_no")
   difficulty        ExerciseDifficulty
@@ -421,15 +387,15 @@ model ProgrammingExercise {
   timeLimitMs       Int                @default(3000) @map("time_limit_ms")
   memoryLimitMb     Int                @default(256) @map("memory_limit_mb")
   aiFeedbackEnabled Boolean            @default(false) @map("ai_feedback_enabled")
+  gradingRevision   Int                @default(1) @map("grading_revision")
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  material      Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  courseVersion CourseVersion      @relation(fields: [courseVersionId], references: [id], onDelete: Cascade)
-  testCases     ExerciseTestCase[]
-  hints         ExerciseHint[]
+  material  Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  testCases ExerciseTestCase[]
+  hints     ExerciseHint[]
 
-  @@unique([courseVersionId, externalKey])
+  @@index([externalKey])
   @@index([legacyProblemNo])
   @@map("programming_exercises")
 }
@@ -458,15 +424,18 @@ model ExerciseTestCase {
 /// solution once it passed. One row per student per exercise, kept even after a
 /// correct answer.
 model ExerciseDraft {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  materialId String   @map("material_id") @db.Uuid
-  code       String
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  materialId       String?  @map("material_id") @db.Uuid
+  sourceMaterialId String   @map("source_material_id") @db.Uuid
+  courseId         String   @map("course_id") @db.Uuid
+  code             String
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Restrict)
 
   @@unique([userId, materialId])
   @@index([userId, updatedAt(sort: Desc)])
@@ -475,34 +444,56 @@ model ExerciseDraft {
 
 /// One graded attempt at an exercise.
 model Submission {
-  id              String           @id @default(uuid()) @db.Uuid
-  userId          String           @map("user_id") @db.Uuid
-  materialId      String           @map("material_id") @db.Uuid
-  courseVersionId String           @map("course_version_id") @db.Uuid
-  code            String
-  status          SubmissionStatus @default(QUEUED)
-  passedCount     Int              @default(0) @map("passed_count")
-  totalCount      Int              @map("total_count")
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  materialId       String?          @map("material_id") @db.Uuid
+  sourceMaterialId String           @map("source_material_id") @db.Uuid
+  courseId         String           @map("course_id") @db.Uuid
+  gradingRevision  Int              @map("grading_revision")
+  language         ExerciseLanguage
+  timeLimitMs      Int              @map("time_limit_ms")
+  memoryLimitMb    Int              @map("memory_limit_mb")
+  code             String
+  status           SubmissionStatus @default(QUEUED)
+  passedCount      Int              @default(0) @map("passed_count")
+  totalCount       Int              @map("total_count")
   /// 0-100. Every problem is worth the same, whatever its case count: a
   /// student must not score differently because an author split one case in
   /// two. Derived from cases passed, never stored per case.
-  score           Int              @default(0)
-  runtimeMs       Int?             @map("runtime_ms")
+  score            Int              @default(0)
+  runtimeMs        Int?             @map("runtime_ms")
   /// Which runtime produced the verdict, so a future upgrade stays auditable.
-  engineVersion   String           @map("engine_version")
-  failureReason   String?          @map("failure_reason")
+  engineVersion    String           @map("engine_version")
+  failureReason    String?          @map("failure_reason")
   /// Server-owned. v1 accepted a client-reported elapsed time.
-  startedAt       DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
-  gradedAt        DateTime?        @map("graded_at") @db.Timestamptz(6)
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt        DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
+  gradedAt         DateTime?        @map("graded_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  material Material         @relation(fields: [materialId], references: [id], onDelete: Restrict)
-  cases    SubmissionCase[]
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material     Material?               @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  course       Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  gradingCases SubmissionGradingCase[]
+  cases        SubmissionCase[]
 
   @@index([userId, materialId, createdAt(sort: Desc)])
   @@index([status, createdAt])
   @@map("submissions")
+}
+
+/// Immutable grading inputs captured before a submission enters the queue.
+model SubmissionGradingCase {
+  id             String  @id @default(uuid()) @db.Uuid
+  submissionId   String  @map("submission_id") @db.Uuid
+  position       Int
+  input          String
+  expectedOutput String  @map("expected_output")
+  isSample       Boolean @map("is_sample")
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, position])
+  @@map("submission_grading_cases")
 }
 
 model SubmissionCase {
@@ -527,18 +518,19 @@ model SubmissionCase {
 /// read: v1's teacher progress endpoint scans every submission per request and
 /// is already slow.
 model StudentExerciseProgress {
-  id            String                 @id @default(uuid()) @db.Uuid
-  userId        String                 @map("user_id") @db.Uuid
-  materialId    String                 @map("material_id") @db.Uuid
-  status        ExerciseProgressStatus @default(NOT_STARTED)
-  attemptCount  Int                    @default(0) @map("attempt_count")
-  bestPassed    Int                    @default(0) @map("best_passed")
+  id              String                 @id @default(uuid()) @db.Uuid
+  userId          String                 @map("user_id") @db.Uuid
+  materialId      String                 @map("material_id") @db.Uuid
+  status          ExerciseProgressStatus @default(NOT_STARTED)
+  attemptCount    Int                    @default(0) @map("attempt_count")
+  bestPassed      Int                    @default(0) @map("best_passed")
   /// Highest ever earned, never reduced by a later worse attempt. A summable
   /// column, so a future leaderboard is one GROUP BY rather than a walk over
   /// every submission.
-  bestScore     Int                    @default(0) @map("best_score")
-  firstSolvedAt DateTime?              @map("first_solved_at") @db.Timestamptz(6)
-  lastAttemptAt DateTime?              @map("last_attempt_at") @db.Timestamptz(6)
+  bestScore       Int                    @default(0) @map("best_score")
+  gradingRevision Int                    @default(1) @map("grading_revision")
+  firstSolvedAt   DateTime?              @map("first_solved_at") @db.Timestamptz(6)
+  lastAttemptAt   DateTime?              @map("last_attempt_at") @db.Timestamptz(6)
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)

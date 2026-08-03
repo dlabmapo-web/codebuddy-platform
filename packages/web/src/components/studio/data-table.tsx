@@ -78,6 +78,11 @@ export type DataTableProps<TData, TValue> = {
   /** Page-level actions ("New course") placed at the end of the toolbar. */
   toolbarActions?: React.ReactNode;
   onRowClick?: (row: TData) => void;
+  /**
+   * Drops the table's own card, for a table rendered inside one already. The
+   * header rule and row dividers stay, so it still reads as a table.
+   */
+  frameless?: boolean;
   className?: string;
 };
 
@@ -90,6 +95,7 @@ export function DataTable<TData, TValue>({
   facets,
   toolbarActions,
   onRowClick,
+  frameless = false,
   className,
 }: DataTableProps<TData, TValue>) {
   const { t } = useLayoutTranslation('common');
@@ -225,7 +231,12 @@ export function DataTable<TData, TValue>({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-card border border-border bg-white">
+      <div
+        className={cn(
+          'overflow-x-auto rounded-card border border-border bg-white',
+          frameless && 'rounded-none border-0 bg-transparent',
+        )}
+      >
         <table className="w-full border-collapse text-left">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (

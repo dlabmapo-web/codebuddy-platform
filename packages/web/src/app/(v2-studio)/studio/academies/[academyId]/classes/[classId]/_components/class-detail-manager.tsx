@@ -13,17 +13,22 @@ import { ClassCoursesPanel } from './class-courses-panel';
 import { ClassHeader } from './class-header';
 import { ClassOverviewCard } from './class-overview-card';
 import { ClassStudentsPanel } from './class-students-panel';
+import { ClassTeacherPanel } from './class-teacher-panel';
 import { CourseAssignmentDialog } from './course-assignment-dialog';
 import { StudentEnrollmentDialog } from './student-enrollment-dialog';
+import { TeacherAssignmentDialog } from './teacher-assignment-dialog';
+import { TeacherRemovalDialog } from './teacher-removal-dialog';
 
 export function ClassDetailManager({
   academyId,
   canAssignCourses,
+  canAssignTeacher,
   canEnroll,
   initialDetail,
 }: {
   academyId: string;
   canAssignCourses: boolean;
+  canAssignTeacher: boolean;
   canEnroll: boolean;
   initialDetail: ClassDetail;
 }) {
@@ -35,6 +40,7 @@ export function ClassDetailManager({
     initialDetail,
     canAssignCourses,
     canEnroll,
+    canAssignTeacher,
   });
 
   return (
@@ -43,13 +49,16 @@ export function ClassDetailManager({
 
       <ClassOverviewCard detail={manager.detail} />
 
-      {/* Courses before students: a class needs something to teach before the
-          question of who takes it means anything. */}
+      {/* Courses, then the teacher, then the roster: what is taught, who
+          teaches it, and only then the long list of who takes it. The roster
+          is the one panel that grows without bound, so it goes last rather
+          than pushing a one-line answer below a page of rows. */}
       <ClassCoursesPanel
         academyId={academyId}
         canAssign={canAssignCourses}
         manager={manager}
       />
+      <ClassTeacherPanel canAssign={canAssignTeacher} manager={manager} />
       <ClassStudentsPanel canEnroll={canEnroll} manager={manager} />
 
       {manager.loadError ? (
@@ -74,6 +83,12 @@ export function ClassDetailManager({
       ) : null}
       {canAssignCourses ? <CourseAssignmentDialog manager={manager} /> : null}
       {canEnroll ? <StudentEnrollmentDialog manager={manager} /> : null}
+      {canAssignTeacher ? (
+        <>
+          <TeacherAssignmentDialog manager={manager} />
+          <TeacherRemovalDialog manager={manager} />
+        </>
+      ) : null}
       <AccessRemovalDialog manager={manager} />
     </div>
   );

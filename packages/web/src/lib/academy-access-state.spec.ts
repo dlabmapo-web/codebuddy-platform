@@ -7,6 +7,7 @@ import {
   canManageContent,
   canManageAcademy,
   canManageClasses,
+  canManageClassTeachers,
   canManageEnrollment,
   canManageExercises,
   canPublishContent,
@@ -147,6 +148,15 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageEnrollment('TEACHER')).toBe(false);
     expect(canManageEnrollment('STUDENT')).toBe(false);
     expect(canManageEnrollment(null)).toBe(false);
+  });
+
+  it('shows teacher assignment controls to team leads and managers', () => {
+    expect(canManageClassTeachers('TEAM_LEAD')).toBe(true);
+    expect(canManageClassTeachers('MANAGER')).toBe(true);
+    // A Teacher never chooses who runs a class, not even their own.
+    expect(canManageClassTeachers('TEACHER')).toBe(false);
+    expect(canManageClassTeachers('STUDENT')).toBe(false);
+    expect(canManageClassTeachers(null)).toBe(false);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

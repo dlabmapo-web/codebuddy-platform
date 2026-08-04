@@ -187,6 +187,17 @@ export function canManageEnrollment(
   return role ? roleHasPermission(role, 'class-enrollments.manage') : false;
 }
 
+/**
+ * Who may put a teacher in charge of a class. A Teacher is deliberately not on
+ * this list: they hold `classes.assigned.manage`, which is about what they do
+ * with their own classes, never about choosing who runs one.
+ */
+export function canManageClassTeachers(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role ? roleHasPermission(role, 'class-teachers.manage') : false;
+}
+
 export function canManageExercises(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'exercises.manage') : false;
 }

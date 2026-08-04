@@ -13,7 +13,8 @@ import { orpc } from '@/lib/orpc';
 /** What the confirmation dialog is currently asking about. */
 export type PendingRemoval =
   | { kind: 'course'; id: string; title: string }
-  | { kind: 'student'; id: string; name: string };
+  | { kind: 'student'; id: string; name: string }
+  | { kind: 'teacher'; id: string; name: string };
 
 /**
  * Owns every mutation on the class page.
@@ -29,12 +30,14 @@ export function useClassDetailManager({
   initialDetail,
   canAssignCourses,
   canEnroll,
+  canAssignTeacher,
 }: {
   academyId: string;
   classId: string;
   initialDetail: ClassDetail;
   canAssignCourses: boolean;
   canEnroll: boolean;
+  canAssignTeacher: boolean;
 }) {
   const queryClient = useQueryClient();
   const detailKey = ['academy', academyId, 'class', classId];
@@ -44,6 +47,7 @@ export function useClassDetailManager({
   const [description, setDescription] = useState(initialDetail.description);
   const [assignOpen, setAssignOpen] = useState(false);
   const [enrollOpen, setEnrollOpen] = useState(false);
+  const [teacherOpen, setTeacherOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [removing, setRemoving] = useState<PendingRemoval | null>(null);
   // The dialogs' draft selections live here rather than inside them: opening
@@ -52,6 +56,11 @@ export function useClassDetailManager({
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [selectedMembershipIds, setSelectedMembershipIds] = useState<string[]>(
     [],
+  );
+  // One id, never an array: a class has one teacher, and a draft that could
+  // hold two would let the UI offer a state the API has no way to store.
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(
+    null,
   );
 
   const detailQuery = useQuery({
@@ -73,6 +82,12 @@ export function useClassDetailManager({
     queryKey: ['academy', academyId, 'class', classId, 'eligible-students'],
     queryFn: () => orpc.academyClasses.listEligibleStudents({ academyId, classId }),
     enabled: canEnroll && enrollOpen,
+  });
+
+  const eligibleTeachersQuery = useQuery({
+    queryKey: ['academy', academyId, 'class', classId, 'eligible-teachers'],
+    queryFn: () => orpc.academyClasses.listEligibleTeachers({ academyId, classId }),
+    enabled: canAssignTeacher && teacherOpen,
   });
 
   const applyDetail = async (next: ClassDetail) => {
@@ -128,6 +143,26 @@ export function useClassDetailManager({
       await queryClient.invalidateQueries({
         queryKey: ['academy', academyId, 'class', classId, 'eligible-students'],
       });
+    },
+  });
+
+  /**
+   * Assign, replace, and remove are the same call with a different argument,
+   * so they share one mutation — and one place where a stale revision is
+   * reported rather than silently retried against the newer class.
+   */
+  const teacherMutation = useMutation({
+    mutationFn: (teacherMembershipId: string | null) =>
+      orpc.academyClasses.setTeacher({
+        academyId,
+        classId,
+        teacherMembershipId,
+        expectedUpdatedAt: detail.updatedAt,
+      }),
+    onSuccess: async (next) => {
+      setTeacherOpen(false);
+      setRemoving(null);
+      await applyDetail(next);
     },
   });
 
@@ -198,11 +233,38 @@ export function useClassDetailManager({
     addPending: addStudentsMutation.isPending,
     addError: addStudentsMutation.error,
 
+    teacherOpen,
+    openTeacher: () => {
+      teacherMutation.reset();
+      // The current teacher opens selected when they are still eligible, so
+      // replacing starts from the truth rather than from an empty control.
+      setSelectedTeacherId(detail.assignedTeacher?.membershipId ?? null);
+      setTeacherOpen(true);
+    },
+    closeTeacher: () => setTeacherOpen(false),
+    eligibleTeachers: eligibleTeachersQuery.data?.teachers ?? [],
+    eligibleTeachersLoading: eligibleTeachersQuery.isLoading,
+    eligibleTeachersError: eligibleTeachersQuery.error,
+    retryEligibleTeachers: () => eligibleTeachersQuery.refetch(),
+    selectedTeacherId,
+    setSelectedTeacherId,
+    saveTeacher: () => teacherMutation.mutate(selectedTeacherId),
+    teacherPending: teacherMutation.isPending,
+    teacherError: teacherMutation.error,
+
     removing,
-    askRemoveCourse: (course: { id: string; title: string }) =>
-      setRemoving({ kind: 'course', id: course.id, title: course.title }),
-    askRemoveStudent: (student: EnrolledStudentSummary, name: string) =>
-      setRemoving({ kind: 'student', id: student.membershipId, name }),
+    askRemoveCourse: (course: { id: string; title: string }) => {
+      coursesMutation.reset();
+      setRemoving({ kind: 'course', id: course.id, title: course.title });
+    },
+    askRemoveStudent: (student: EnrolledStudentSummary, name: string) => {
+      removeStudentMutation.reset();
+      setRemoving({ kind: 'student', id: student.membershipId, name });
+    },
+    askRemoveTeacher: (teacher: { membershipId: string }, name: string) => {
+      teacherMutation.reset();
+      setRemoving({ kind: 'teacher', id: teacher.membershipId, name });
+    },
     cancelRemoval: () => setRemoving(null),
     confirmRemoval: () => {
       if (!removing) return;
@@ -214,12 +276,24 @@ export function useClassDetailManager({
         );
         return;
       }
+      if (removing.kind === 'teacher') {
+        teacherMutation.mutate(null);
+        return;
+      }
       removeStudentMutation.mutate(removing.id);
     },
     removalPending:
       removeStudentMutation.isPending ||
-      (coursesMutation.isPending && removing?.kind === 'course'),
-    removalError: removeStudentMutation.error ?? coursesMutation.error,
+      (coursesMutation.isPending && removing?.kind === 'course') ||
+      (teacherMutation.isPending && removing?.kind === 'teacher'),
+    removalError:
+      removing?.kind === 'student'
+        ? removeStudentMutation.error
+        : removing?.kind === 'course'
+          ? coursesMutation.error
+          : removing?.kind === 'teacher'
+            ? teacherMutation.error
+            : null,
   };
 }
 

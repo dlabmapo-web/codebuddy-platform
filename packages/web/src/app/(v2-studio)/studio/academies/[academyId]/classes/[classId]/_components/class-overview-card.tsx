@@ -9,15 +9,10 @@ import type { ReactNode } from 'react';
 import { useLayoutTranslation } from '@/i18n';
 
 import { useContentDate } from '../../../content/_components/content-date';
-
-/**
- * PLACEHOLDER. No teacher is attached to a class yet — assigning teachers is a
- * non-goal of the current design and arrives with the teacher-monitoring
- * feature. Until the `ClassTeacher` relation exists, this cell shows a fixed
- * name so the layout can be reviewed, and the copy under it says so. Replace
- * both with the real assignment; do not let this reach a customer as fact.
- */
-const PLACEHOLDER_TEACHER = 'Cove Teacher';
+import {
+  teacherAssignmentState,
+  teacherDisplayName,
+} from '../_lib/teacher-assignment';
 
 /** One tinted chip per fact, so the four read apart at a glance. */
 const tints = {
@@ -45,6 +40,9 @@ export function ClassOverviewCard({ detail }: { detail: ClassDetail }) {
 
   const visibleCourses = detail.courses.filter((course) => course.isVisible).length;
   const learning = detail.students.filter(enrollmentGrantsAccess).length;
+  // A stored teacher whose membership was suspended or moved off the role is
+  // the third state, and the one a bare name would misreport as staffed.
+  const teacherState = teacherAssignmentState(detail.assignedTeacher);
 
   return (
     <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
@@ -93,9 +91,23 @@ export function ClassOverviewCard({ detail }: { detail: ClassDetail }) {
       <Fact
         icon={GraduationCap}
         label={t('detail.overview.teacher')}
-        note={t('detail.overview.teacher_placeholder')}
+        note={
+          teacherState === 'none'
+            ? t('detail.overview.teacher_none')
+            : teacherState === 'active'
+              ? t('detail.overview.teacher_active')
+              : t('detail.overview.teacher_unavailable')
+        }
         tint="orange"
-        value={PLACEHOLDER_TEACHER}
+        tone={teacherState === 'unavailable' ? 'warn' : 'plain'}
+        value={
+          teacherState === 'none'
+            ? t('detail.overview.teacher_unassigned')
+            : teacherDisplayName(
+                detail.assignedTeacher,
+                t('detail.teacher_panel.no_name'),
+              )
+        }
       />
       <Fact
         icon={CalendarDays}

@@ -1,6 +1,10 @@
 'use client';
 
-import type { AssignedCourseSummary, ClassSummary } from '@cove/shared';
+import type {
+  AssignedCourseSummary,
+  AssignedTeacherSummary,
+  ClassSummary,
+} from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   Archive,
@@ -15,6 +19,7 @@ import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { DataTable } from '@/components/studio/data-table';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +31,7 @@ import {
 import { useLayoutTranslation } from '@/i18n';
 
 import { useContentDate } from '../../content/_components/content-date';
+import { teacherAssignmentState } from '../[classId]/_lib/teacher-assignment';
 import type { ClassesManagerState } from '../_hooks/use-classes-manager';
 import { ArchiveClassDialog } from './archive-class-dialog';
 import { ClassStatusBadge } from './class-status-badge';
@@ -73,6 +79,57 @@ function CoursesCell({ courses }: { courses: AssignedCourseSummary[] }) {
   );
 }
 
+/**
+ * Three states, and the middle one is the point: a class can store a teacher
+ * whose membership no longer grants anything. Showing that row as though it
+ * were staffed is the failure this cell exists to prevent, so an unavailable
+ * assignment keeps the name and says plainly that it grants nothing.
+ */
+function TeacherCell({ teacher }: { teacher: AssignedTeacherSummary | null }) {
+  const { t } = useLayoutTranslation('classes');
+  if (!teacher) {
+    return (
+      <span className="text-[13.5px] text-sub/60">{t('teacher_cell.none')}</span>
+    );
+  }
+
+  // The list carries no email, so the name falls back to the label directly.
+  const name = teacher.displayName ?? t('detail.teacher_panel.no_name');
+  const effective = teacherAssignmentState(teacher) === 'active';
+  return (
+    <span
+      aria-label={
+        effective
+          ? t('teacher_cell.aria_assigned', { name })
+          : t('teacher_cell.aria_unavailable', { name })
+      }
+      className="flex min-w-0 items-center gap-2"
+    >
+      <span
+        aria-hidden
+        className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-bold ${
+          effective ? 'bg-primary-light text-primary' : 'bg-draft-soft text-draft'
+        }`}
+      >
+        {name.trim().charAt(0).toUpperCase()}
+      </span>
+      <span aria-hidden className="min-w-0">
+        <span className="block truncate text-[14px] font-semibold">{name}</span>
+        {effective ? (
+          <span className="block truncate text-[12.5px] text-sub">
+            {t('teacher_cell.role')}
+          </span>
+        ) : (
+          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-draft-soft px-1.5 py-0.5 text-[11.5px] font-bold text-draft">
+            <span className="size-1.5 rounded-full bg-draft" />
+            {t('teacher_cell.unavailable')}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
 export function ClassesTable({
   academyId,
   manager,
@@ -84,6 +141,7 @@ export function ClassesTable({
 }) {
   const { t } = useLayoutTranslation('classes');
   const contentDate = useContentDate();
+  const isMobile = useIsMobile();
   const [toArchive, setToArchive] = useState<ClassSummary | null>(null);
 
   const columns = useMemo<ColumnDef<ClassSummary>[]>(
@@ -92,14 +150,32 @@ export function ClassesTable({
         id: 'class',
         accessorFn: (record) => `${record.name} ${record.description}`,
         header: t('column.class'),
-        cell: ({ row }) => (
-          <div className="min-w-0 max-w-md">
-            <span className="text-[15px] font-bold">{row.original.name}</span>
-            <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
-              {row.original.description || t('no_description')}
-            </p>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const teacher = row.original.assignedTeacher;
+          return (
+            <div className="min-w-0 max-w-md">
+              <span className="text-[15px] font-bold">{row.original.name}</span>
+              <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
+                {row.original.description || t('no_description')}
+              </p>
+              {/* The teacher column is dropped on a narrow viewport rather
+                  than pushing the table sideways, so its answer moves here. */}
+              {isMobile ? (
+                <p className="mt-1 truncate text-[12.5px] font-semibold text-sub">
+                  {teacher
+                    ? `${t('column.teacher')}: ${
+                        teacher.displayName ?? t('detail.teacher_panel.no_name')
+                      }${
+                        teacherAssignmentState(teacher) === 'active'
+                          ? ''
+                          : ` · ${t('teacher_cell.unavailable')}`
+                      }`
+                    : t('teacher_cell.aria_none')}
+                </p>
+              ) : null}
+            </div>
+          );
+        },
       },
       {
         id: 'status',
@@ -131,6 +207,14 @@ export function ClassesTable({
             {row.original.studentCount}
           </span>
         ),
+      },
+      {
+        id: 'teacher',
+        // Sorting and search both run on the name, so an unassigned class
+        // sorts with the other blanks rather than under a literal label.
+        accessorFn: (record) => record.assignedTeacher?.displayName ?? '',
+        header: t('column.teacher'),
+        cell: ({ row }) => <TeacherCell teacher={row.original.assignedTeacher} />,
       },
       {
         id: 'updated',
@@ -203,13 +287,17 @@ export function ClassesTable({
         },
       },
     ],
-    [academyId, contentDate, manager, t],
+    [academyId, contentDate, isMobile, manager, t],
   );
 
   return (
     <>
       <DataTable
-        columns={columns}
+        columns={
+          // Six columns do not fit a phone. The teacher answer is not dropped,
+          // only moved into the class cell above.
+          isMobile ? columns.filter((column) => column.id !== 'teacher') : columns
+        }
         data={manager.classes}
         // A filtered-empty table must not claim the academy has no classes.
         emptyMessage={

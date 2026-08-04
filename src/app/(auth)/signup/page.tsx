@@ -271,7 +271,7 @@ export default function SignupPage() {
           style={{ borderTop: '1px solid var(--color-muted)' }}
         >
           <img src="/dlab-logo.svg" alt="디랩코딩 D·LAB Coding" style={{ height: 38, width: 'auto' }} />
-          <span style={{ fontSize: '11px', fontWeight: 600, color: '#8A929E', letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-dlab)', letterSpacing: '-0.01em' }}>
             마포캠퍼스
           </span>
         </div>

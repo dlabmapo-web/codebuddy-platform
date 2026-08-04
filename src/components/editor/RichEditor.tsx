@@ -411,6 +411,11 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         .tiptap code { background: var(--color-muted); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
         .tiptap pre { background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border); padding: 12px 16px; border-radius: 8px; overflow-x: auto; }
         .tiptap pre code { background: none; color: inherit; }
+        /* 가져온 HTML의 인라인 배경이 코드 블록 배색을 깨뜨리지 않도록 (globals.css의
+           .tiptap-render 규칙과 동일한 이유 — 편집 화면에서도 같게 보여야 한다) */
+        .tiptap pre[style] { background: var(--code-bg) !important; color: var(--code-fg) !important; border-color: var(--code-border) !important; }
+        .tiptap pre[style] code { background: none !important; color: inherit !important; }
+        .tiptap blockquote[style] { background: var(--color-muted) !important; border-left-color: var(--color-border) !important; color: var(--color-ink) !important; }
         .tiptap hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
         .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #BCC0C7; pointer-events: none; float: left; height: 0; }
 

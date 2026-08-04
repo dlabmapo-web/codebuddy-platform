@@ -44,7 +44,12 @@ import type {
 } from '@/lib/curriculum/learningContext';
 import {
   isStudentPointerLeave,
+  normalizePointerPosition,
   parseStudentPointerMove,
+  resolvePointerSurface,
+  type CollaborationSurface,
+  type TeacherPointerLeavePayload,
+  type TeacherPointerMovePayload,
 } from '@/lib/collab/pointerSurfaces';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -211,7 +216,7 @@ export default function FeedbackClient({
   const lastCodeSentRef = useRef(0);
   const pendingCodeRef = useRef<string | null>(null);
   const lastPointerSentRef = useRef(0);
-  const editorPaneRef = useRef<HTMLDivElement>(null);
+  const lastPointerSurfaceRef = useRef<CollaborationSurface | null>(null);
   const wholePagePointerRef = useRef<WholePagePointerOverlayHandle>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
@@ -411,6 +416,86 @@ export default function FeedbackClient({
     }, 1000);
   }, [sessionId]);
 
+  // 선생님 포인터도 학생과 동일하게 화면 전체(문제 설명·교육과정·헤더·터미널)에서 공유한다.
+  // 좌표는 surface 기준 비율이라 양쪽 레이아웃이 달라도 같은 영역을 가리킨다.
+  useEffect(() => {
+    const problemId = session?.problem_id;
+    if (!problemId) return;
+
+    const sendLeave = () => {
+      if (!lastPointerSurfaceRef.current) return;
+      lastPointerSurfaceRef.current = null;
+      if (!channelRef.current || !hasPeerRef.current) return;
+
+      const payload: TeacherPointerLeavePayload = {
+        senderId: teacherId,
+        sessionId,
+        problemId,
+        role: 'teacher',
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'teacher:pointer:leave',
+        payload,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      // 지난 제출 미리보기 중에는 학생이 보고 있는 화면과 달라서 포인터를 보내지 않는다.
+      if (previewProblemIdRef.current || !channelRef.current || !hasPeerRef.current) {
+        lastPointerSurfaceRef.current = null;
+        return;
+      }
+
+      const resolved = resolvePointerSurface(event.target);
+      if (!resolved) {
+        sendLeave();
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastPointerSentRef.current < 80) return;
+      const position = normalizePointerPosition(
+        event.clientX,
+        event.clientY,
+        resolved.element.getBoundingClientRect()
+      );
+      if (!position) return;
+
+      lastPointerSentRef.current = now;
+      lastPointerSurfaceRef.current = resolved.surface;
+      const payload: TeacherPointerMovePayload = {
+        senderId: teacherId,
+        sessionId,
+        problemId,
+        name: teacherName,
+        role: 'teacher',
+        surface: resolved.surface,
+        ...position,
+        sentAt: now,
+      };
+      void channelRef.current.send({
+        type: 'broadcast',
+        event: 'teacher:pointer:move',
+        payload,
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) sendLeave();
+    };
+
+    document.addEventListener('pointermove', handlePointerMove, true);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', sendLeave);
+    return () => {
+      sendLeave();
+      document.removeEventListener('pointermove', handlePointerMove, true);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', sendLeave);
+    };
+  }, [session?.problem_id, sessionId, teacherId, teacherName]);
+
   useEffect(() => {
     if (!session) return;
 
@@ -601,36 +686,6 @@ export default function FeedbackClient({
       });
     });
   }, [teacherId, teacherName]);
-
-  const handlePaneMouseMove = useCallback((e: React.MouseEvent) => {
-    if (previewProblemIdRef.current) return;
-    if (!channelRef.current || !editorPaneRef.current || !hasPeerRef.current) return;
-    const now = Date.now();
-    if (now - lastPointerSentRef.current < 80) return;
-    lastPointerSentRef.current = now;
-    const rect = editorPaneRef.current.getBoundingClientRect();
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'pointer:move',
-      payload: {
-        senderId: teacherId,
-        name: teacherName,
-        role: 'teacher',
-        xPct: (e.clientX - rect.left) / rect.width,
-        yPct: (e.clientY - rect.top) / rect.height,
-      },
-    });
-  }, [teacherId, teacherName]);
-
-  const handlePaneMouseLeave = useCallback(() => {
-    if (previewProblemIdRef.current) return;
-    if (!channelRef.current || !hasPeerRef.current) return;
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'pointer:leave',
-      payload: { senderId: teacherId, role: 'teacher' },
-    });
-  }, [teacherId]);
 
   const handleCodeChange = useCallback((newCode: string) => {
     if (previewProblemIdRef.current) return;
@@ -873,6 +928,7 @@ finally:
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
       <WholePagePointerOverlay
         ref={wholePagePointerRef}
+        role="student"
         enabled={isMonitoringLiveProblem}
       />
       <header
@@ -1067,11 +1123,8 @@ finally:
         <div className="flex-shrink-0 cursor-col-resize" style={{ width: 5, backgroundColor: '#2D2D2D' }} onMouseDown={handleMouseDown} />
 
         <div
-          ref={editorPaneRef}
           data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
-          onMouseMove={handlePaneMouseMove}
-          onMouseLeave={handlePaneMouseLeave}
         >
           <div className="flex items-center px-4 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E' }}>
             <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>

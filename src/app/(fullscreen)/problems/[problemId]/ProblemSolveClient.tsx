@@ -14,12 +14,27 @@ import { HintPanel } from '@/components/demo/HintPanel';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
-import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
+import {
+  WholePagePointerOverlay,
+  type WholePagePointerOverlayHandle,
+} from '@/components/collab/WholePagePointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
+import { SyntaxErrorCoach } from '@/components/collab/SyntaxErrorCoach';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
-import { explainPythonError, type PythonExecutionError } from '@/lib/pyodide/pythonError';
+import {
+  createSyntaxLesson,
+  explainPythonError,
+  isSyntaxExecutionError,
+  type PythonExecutionError,
+  type SyntaxLesson,
+} from '@/lib/pyodide/pythonError';
+import {
+  canAskAiForSyntaxHelp,
+  recordSyntaxAttempt,
+  type SyntaxAttemptState,
+} from '@/lib/pyodide/syntaxCoach';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnMount } from '@monaco-editor/react';
@@ -33,8 +48,10 @@ import { shouldReconcileSubmission } from '@/lib/judge/reconciliationPolicy';
 import { SampleRunControls } from '@/components/judge/SampleRunControls';
 import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
 import {
+  compareSampleOutput,
   createSampleInputQueue,
-  isSampleOutputMatch,
+  dispatchSampleStdin,
+  hasSampleExecutionFailure,
 } from '@/lib/pyodide/sampleRun';
 import type {
   ProblemNavigation,
@@ -59,7 +76,9 @@ import {
   type LearningContextProblem,
 } from '@/lib/curriculum/learningContext';
 import {
+  isTeacherPointerLeave,
   normalizePointerPosition,
+  parseTeacherPointerMove,
   resolvePointerSurface,
   type CollaborationSurface,
   type StudentPointerLeavePayload,
@@ -86,10 +105,15 @@ type ProblemNavigationFailure = {
   destination: ProblemNavigationItem | null;
   direction: ProblemTransitionDirection | null;
 };
+type ActiveSyntaxCoach = {
+  error: PythonExecutionError;
+  lesson: SyntaxLesson;
+  code: string;
+  attemptCount: number;
+};
 
-// 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
-// (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
-const POINTER_IDLE_HIDE_MS = 3000;
+// 선생님 커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
+// (포인터 쪽 숨김은 WholePagePointerOverlay가 직접 관리)
 const CURSOR_IDLE_HIDE_MS = 3000;
 
 // 학생 화면에서는 선생님의 실제 이름(가입 시 입력값) 대신 항상 이 호칭으로 표시한다.
@@ -134,6 +158,7 @@ except BaseException as exc:
     error_type = type(exc).__name__
     error_message = str(exc)
     error_line = getattr(exc, 'lineno', None)
+    error_offset = getattr(exc, 'offset', None)
     if isinstance(exc, SyntaxError):
         error_display = ''.join(traceback.format_exception_only(type(exc), exc))
     else:
@@ -149,6 +174,7 @@ except BaseException as exc:
         'type': error_type,
         'message': error_message,
         'line': error_line,
+        'offset': error_offset,
         'display': error_display,
     }, ensure_ascii=False)
 finally:
@@ -208,8 +234,9 @@ export default function ProblemSolveClient({
   const [aiFeedbacks, setAiFeedbacks] = useState<AiFeedbackItem[]>([]);
   const [aiFeedbackPanelOpen, setAiFeedbackPanelOpen] = useState(false);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
-  const [currentAiFeedback, setCurrentAiFeedback] = useState<AiFeedbackItem | null>(null);
-  const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
+  const [syntaxCoach, setSyntaxCoach] = useState<ActiveSyntaxCoach | null>(null);
+  const [syntaxAiExplanation, setSyntaxAiExplanation] = useState<string | null>(null);
+  const [syntaxAiError, setSyntaxAiError] = useState<string | null>(null);
 
   const runnerRef = useRef<InteractiveRunner | null>(null);
   const runOffRef = useRef<(() => void) | null>(null);
@@ -217,6 +244,8 @@ export default function ProblemSolveClient({
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
   const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
+  const runExecutionErrorRef = useRef<string | null>(null);
+  const syntaxAttemptRef = useRef<SyntaxAttemptState | null>(null);
   const manualInputQueueRef = useRef<string[]>([]);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
   const runOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -231,8 +260,7 @@ export default function ProblemSolveClient({
   const lastCursorSentRef = useRef(0);
   const lastPointerSentRef = useRef(0);
   const lastPointerSurfaceRef = useRef<CollaborationSurface | null>(null);
-  // senderId별 "포인터 숨김" 타이머 — pointer:move가 끊기면 3초 뒤 해당 포인터를 제거
-  const pointerIdleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const wholePagePointerRef = useRef<WholePagePointerOverlayHandle>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
@@ -253,6 +281,7 @@ export default function ProblemSolveClient({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
   const remoteCursorDecorationsRef = useRef<string[]>([]);
+  const syntaxErrorDecorationsRef = useRef<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remoteCursorWidgetRef = useRef<any>(null);
 
@@ -314,6 +343,25 @@ export default function ProblemSolveClient({
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
     injectCursorStyles();
+    if (!document.getElementById('cove-syntax-error-styles')) {
+      const style = document.createElement('style');
+      style.id = 'cove-syntax-error-styles';
+      style.textContent = `
+        .cove-syntax-error-line {
+          background: rgba(239, 68, 68, 0.16);
+          border-left: 3px solid #F87171;
+        }
+        .cove-syntax-error-glyph {
+          background: #F87171;
+          border-radius: 999px;
+          height: 8px !important;
+          margin-left: 5px;
+          margin-top: 5px;
+          width: 8px !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       if (isApplyingRemoteRef.current) return;
@@ -505,6 +553,10 @@ export default function ProblemSolveClient({
         remoteCursorDecorationsRef.current,
         [],
       );
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations(
+        syntaxErrorDecorationsRef.current,
+        [],
+      );
       if (remoteCursorWidgetRef.current) {
         editor.removeContentWidget(remoteCursorWidgetRef.current);
         remoteCursorWidgetRef.current = null;
@@ -540,9 +592,12 @@ export default function ProblemSolveClient({
     setAiFeedbacks([]);
     setAiFeedbackPanelOpen(false);
     setAiFeedbackLoading(false);
-    setCurrentAiFeedback(null);
+    setSyntaxCoach(null);
+    setSyntaxAiExplanation(null);
+    setSyntaxAiError(null);
+    syntaxAttemptRef.current = null;
     setTeacherOnline(false);
-    setRemotePointers({});
+    wholePagePointerRef.current?.clear();
     setLoadError(false);
     setNavigationFailure(null);
     setProblemTransitionDirection(null);
@@ -840,6 +895,7 @@ export default function ProblemSolveClient({
 
     const supabase = supabaseBrowser();
     const channel = supabase.channel(`session:${sessionId}`, { config: { broadcast: { self: false } } });
+    const pointerOverlay = wholePagePointerRef.current;
 
     channel
       .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
@@ -859,32 +915,28 @@ export default function ProblemSolveClient({
         if (payload.senderId === myInfo.id) return;
         updateRemoteCursor(payload.name, payload.role, payload.position);
       })
-      .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
-        if (payload.senderId === myInfo.id || payload.role !== 'teacher') return;
-        const pointerName = payload.role === 'teacher' ? TEACHER_DISPLAY_NAME : payload.name;
-        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: pointerName, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
-        // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
-        const timers = pointerIdleTimersRef.current;
-        if (timers[payload.senderId]) clearTimeout(timers[payload.senderId]);
-        timers[payload.senderId] = setTimeout(() => {
-          delete timers[payload.senderId];
-          setRemotePointers(prev => {
-            if (!prev[payload.senderId]) return prev;
-            const next = { ...prev };
-            delete next[payload.senderId];
-            return next;
-          });
-        }, POINTER_IDLE_HIDE_MS);
-      })
-      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string; role?: string } }) => {
-        if (payload.role !== 'teacher') return;
-        const timers = pointerIdleTimersRef.current;
-        if (timers[payload.senderId]) { clearTimeout(timers[payload.senderId]); delete timers[payload.senderId]; }
-        setRemotePointers(prev => {
-          const next = { ...prev };
-          delete next[payload.senderId];
-          return next;
+      .on('broadcast', { event: 'teacher:pointer:move' }, ({ payload }: { payload: unknown }) => {
+        const currentProblemId = problemRef.current?.id;
+        if (!currentProblemId) return;
+        const pointer = parseTeacherPointerMove(payload, {
+          viewerId: myInfo.id,
+          sessionId,
+          problemId: currentProblemId,
         });
+        if (!pointer) return;
+        // 선생님의 실제 이름 대신 항상 '선생님'으로 표시 (숨김 타이머는 오버레이가 관리)
+        wholePagePointerRef.current?.show({ ...pointer, name: TEACHER_DISPLAY_NAME });
+      })
+      .on('broadcast', { event: 'teacher:pointer:leave' }, ({ payload }: { payload: unknown }) => {
+        const currentProblemId = problemRef.current?.id;
+        if (!currentProblemId) return;
+        if (isTeacherPointerLeave(payload, {
+          viewerId: myInfo.id,
+          sessionId,
+          problemId: currentProblemId,
+        })) {
+          wholePagePointerRef.current?.clear();
+        }
       })
       // 다른 참가자가 "최신 코드 주세요"라고 요청하면, 내 현재 코드를 응답
       .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
@@ -912,9 +964,7 @@ export default function ProblemSolveClient({
         hasPeerRef.current = !!teacher;
         setTeacherOnline(!!teacher);
         if (!teacher) {
-          setRemotePointers({});
-          Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
-          pointerIdleTimersRef.current = {};
+          wholePagePointerRef.current?.clear();
           if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
           const editor = editorRef.current;
           if (editor) {
@@ -941,8 +991,7 @@ export default function ProblemSolveClient({
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
-      Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
-      pointerIdleTimersRef.current = {};
+      pointerOverlay?.clear();
       if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
     };
   }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
@@ -1059,11 +1108,13 @@ export default function ProblemSolveClient({
     stdout: string;
     stderr: string;
     pythonError: PythonExecutionError | null;
+    executionError: string | null;
     stopped: boolean;
   }> => {
     runStdoutRef.current = '';
     runStderrRef.current = '';
     runPythonErrorRef.current = null;
+    runExecutionErrorRef.current = null;
     manualInputQueueRef.current = [];
     setLastPythonError(null);
     setTerminalTab('terminal');
@@ -1072,6 +1123,14 @@ export default function ProblemSolveClient({
     const runner = ensureRunner();
 
     if (!runner) {
+      // 대화식 실행을 지원하지 않는 브라우저: stdin이 고정 문자열이라 수동 실행에서도
+      // input()을 기다릴 수 없다. 학생이 "왜 입력이 안 되지?"로 헤매지 않게 알린다.
+      if (options?.sampleInput === undefined) {
+        appendTerminal(
+          '이 브라우저에서는 실행 중 직접 입력을 받을 수 없어요. input()이 있으면 테스트 버튼으로 실행해 주세요.\n',
+          'info',
+        );
+      }
       return runFallbackOnce(sourceCode, options?.sampleInput ?? '')
         .then(({ stdout, stderr, pythonError }) => {
           if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
@@ -1084,13 +1143,19 @@ export default function ProblemSolveClient({
           if (!stdout && !stderr && !pythonError) appendTerminal('(출력 없음)\n', 'info');
           flushRunOut();
           broadcastRun('run:end', {});
-          return { stdout, stderr, pythonError, stopped: false };
+          return { stdout, stderr, pythonError, executionError: null, stopped: false };
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : '실행 오류';
           appendTerminal(msg + '\n', 'err');
           broadcastRun('run:end', {});
-          return { stdout: '', stderr: msg, pythonError: null, stopped: false };
+          return {
+            stdout: '',
+            stderr: '',
+            pythonError: null,
+            executionError: msg,
+            stopped: false,
+          };
         });
     }
 
@@ -1098,10 +1163,10 @@ export default function ProblemSolveClient({
       appendTerminal('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
     }
 
-    const sampleInputQueue = options?.sampleInput === undefined
+    // 고정 입력 실행(테스트 N)이면 큐를 만든다. null이면 학생이 직접 입력하는 수동 실행.
+    let sampleInputQueue = options?.sampleInput === undefined
       ? null
       : createSampleInputQueue(options.sampleInput);
-    let inputExhaustedNoticeShown = false;
 
     return new Promise((resolve) => {
       const finish = (stopped: boolean) => {
@@ -1115,6 +1180,7 @@ export default function ProblemSolveClient({
           stdout: runStdoutRef.current,
           stderr: runStderrRef.current,
           pythonError: runPythonErrorRef.current,
+          executionError: runExecutionErrorRef.current,
           stopped,
         });
       };
@@ -1136,30 +1202,38 @@ export default function ProblemSolveClient({
           queueRunOut(ev.error.display, 'err');
         } else if (ev.type === 'stdin') {
           flushRunOut();
-          const inputLine = sampleInputQueue && sampleInputQueue.length > 0
-            ? sampleInputQueue.shift()
-            : manualInputQueueRef.current.shift();
-          if (inputLine !== undefined) {
-            appendTerminal(inputLine + '\n', 'in');
-            broadcastRun('run:stdin', { text: inputLine });
-            setAwaitingInput(false);
-            queueMicrotask(() => runner.provideInput(inputLine));
+          if (sampleInputQueue) {
+            // 고정 입력 실행은 공식 채점과 같은 계약을 따른다 — 입력이 떨어지면
+            // 학생에게 묻지 않고 stdin을 닫아 EOFError가 나게 한다.
+            sampleInputQueue = dispatchSampleStdin(sampleInputQueue, {
+              provideLine: (line) => {
+                appendTerminal(line + '\n', 'in');
+                broadcastRun('run:stdin', { text: line });
+                setAwaitingInput(false);
+                queueMicrotask(() => runner.provideInput(line));
+              },
+              sendEOF: () => {
+                setAwaitingInput(false);
+                queueMicrotask(() => runner.sendEOF());
+              },
+            });
           } else {
-            if (sampleInputQueue && !inputExhaustedNoticeShown) {
-              inputExhaustedNoticeShown = true;
-              appendTerminal(
-                '테스트 입력을 모두 사용했습니다. 필요한 입력을 직접 입력해 주세요.\n',
-                'info',
-              );
+            const inputLine = manualInputQueueRef.current.shift();
+            if (inputLine !== undefined) {
+              appendTerminal(inputLine + '\n', 'in');
+              broadcastRun('run:stdin', { text: inputLine });
+              setAwaitingInput(false);
+              queueMicrotask(() => runner.provideInput(inputLine));
+            } else {
+              setAwaitingInput(true);
+              broadcastRun('run:waiting', {});
             }
-            setAwaitingInput(true);
-            broadcastRun('run:waiting', {});
           }
         } else if (ev.type === 'done') {
           finish(false);
         } else if (ev.type === 'fatal') {
           const message = ev.text || '실행 오류';
-          runStderrRef.current += message;
+          runExecutionErrorRef.current = message;
           appendTerminal(message + '\n', 'err');
           finish(false);
         }
@@ -1189,6 +1263,74 @@ export default function ProblemSolveClient({
     setActiveSampleIndex(null);
   }, [appendTerminal]);
 
+  // 오류 코치의 위치 표시를 누르면 에디터의 그 자리로 커서를 옮긴다.
+  const focusEditorLine = useCallback((line: number, column: number) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column });
+    editor.focus();
+  }, []);
+
+  const updateSyntaxCoaching = useCallback((
+    pythonError: PythonExecutionError | null,
+    executedCode: string,
+  ) => {
+    const editor = editorRef.current;
+    if (editor) {
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations(
+        syntaxErrorDecorationsRef.current,
+        [],
+      );
+    }
+
+    setSyntaxAiExplanation(null);
+    setSyntaxAiError(null);
+
+    if (!isSyntaxExecutionError(pythonError)) {
+      syntaxAttemptRef.current = null;
+      setSyntaxCoach(null);
+      return;
+    }
+
+    const lesson = createSyntaxLesson(pythonError);
+    if (!lesson) return;
+
+    const nextAttempt = recordSyntaxAttempt(
+      syntaxAttemptRef.current,
+      lesson.category,
+      executedCode,
+    );
+    syntaxAttemptRef.current = nextAttempt;
+    setSyntaxCoach({
+      error: pythonError,
+      lesson,
+      code: executedCode,
+      attemptCount: nextAttempt.count,
+    });
+    setTerminalOpen(true);
+    setTerminalTab('error');
+    setErrorExplainSeen(true);
+
+    if (editor && monacoRef.current && pythonError.line) {
+      const model = editor.getModel();
+      const line = Math.min(
+        Math.max(pythonError.line, 1),
+        model?.getLineCount() ?? pythonError.line,
+      );
+      syntaxErrorDecorationsRef.current = editor.deltaDecorations([], [{
+        range: new monacoRef.current.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: 'cove-syntax-error-line',
+          glyphMarginClassName: 'cove-syntax-error-glyph',
+          hoverMessage: { value: lesson.title },
+        },
+      }]);
+      editor.revealLineInCenterIfOutsideViewport(line);
+    }
+  }, []);
+
   const handleRun = useCallback(async () => {
     if (isRunning || isProblemTransitioning || !problem) return;
     setIsRunning(true);
@@ -1196,9 +1338,10 @@ export default function ProblemSolveClient({
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ python solution.py\n', kind: 'meta' }]);
     const result = await executeInTerminal(code);
+    if (!result.stopped) updateSyntaxCoaching(result.pythonError, code);
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setIsRunning(false);
-  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, updateSyntaxCoaching, appendTerminal]);
 
   const handleRunSample = useCallback(async (
     sampleCase: ProblemDetail['test_cases'][number],
@@ -1216,32 +1359,89 @@ export default function ProblemSolveClient({
       { text: `$ python solution.py · 테스트 ${sampleNumber}\n`, kind: 'meta' },
       {
         text: queuedLineCount > 0
-          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄을 자동으로 사용합니다.\n`
+          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄만 사용합니다. 실제 채점과 똑같이 직접 입력할 수는 없어요.\n`
           : `입력이 없는 테스트 ${sampleNumber}을 실행합니다.\n`,
         kind: 'info',
       },
     ]);
 
     const result = await executeInTerminal(code, { sampleInput: sampleCase.input });
+    if (!result.stopped) updateSyntaxCoaching(result.pythonError, code);
 
-    if (!result.stopped && !result.pythonError && !result.stderr) {
-      if (isSampleOutputMatch(result.stdout, sampleCase.expected_output)) {
-        appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
-      } else {
-        appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+    if (!result.stopped) {
+      if (hasSampleExecutionFailure(result)) {
+        // 공식 채점에서도 실행 오류는 그 케이스의 실패다 — 비교를 건너뛰지 않는다.
         appendTerminal(
-          `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
-          'info',
+          `\n✕ 테스트 ${sampleNumber}: 실행 중 오류가 나서 통과하지 못했습니다.\n`,
+          'err',
         );
+      } else {
+        const comparison = compareSampleOutput(result.stdout, sampleCase.expected_output);
+        if (comparison === 'match') {
+          appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
+        } else {
+          appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+          appendTerminal(
+            `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
+            'info',
+          );
+        }
       }
-    } else if (!result.stopped) {
-      appendTerminal('\n실행 오류가 있어 예제 출력 비교를 건너뜁니다.\n', 'info');
     }
 
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');
     setActiveSampleIndex(null);
     setIsRunning(false);
-  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, appendTerminal]);
+  }, [isProblemTransitioning, isRunning, problem, code, executeInTerminal, updateSyntaxCoaching, appendTerminal]);
+
+  const handleAskSyntaxAi = useCallback(async () => {
+    if (
+      !problem?.use_ai_feedback
+      || !syntaxCoach
+      || !canAskAiForSyntaxHelp(syntaxAttemptRef.current)
+      || aiFeedbackLoading
+    ) return;
+
+    setAiFeedbackLoading(true);
+    setSyntaxAiError(null);
+    try {
+      const response = await fetch('/api/ai-feedbacks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_id: problem.id,
+          code: syntaxCoach.code,
+          error: syntaxCoach.error,
+          category: syntaxCoach.lesson.category,
+          local_explanation: syntaxCoach.lesson.whatHappened,
+        }),
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) {
+        setSyntaxAiError(
+          json?.error?.message
+          ?? 'AI 설명을 불러오지 못했어요. 위의 오류 코치를 참고해 다시 시도해 보세요.',
+        );
+        return;
+      }
+
+      const feedback = json?.feedback as AiFeedbackItem | undefined;
+      if (!feedback?.content) {
+        setSyntaxAiError('AI 설명을 불러오지 못했어요. 잠시 후 다시 시도해 보세요.');
+        return;
+      }
+      setSyntaxAiExplanation(feedback.content);
+      setAiFeedbacks((previous) => (
+        previous.some((item) => item.id === feedback.id)
+          ? previous
+          : [feedback, ...previous]
+      ));
+    } catch {
+      setSyntaxAiError('AI 서버에 연결하지 못했어요. 위의 오류 코치는 계속 사용할 수 있어요.');
+    } finally {
+      setAiFeedbackLoading(false);
+    }
+  }, [aiFeedbackLoading, problem, syntaxCoach]);
 
   const handleSubmit = useCallback(async () => {
     if (isRunning || isProblemTransitioning || !problem) return;
@@ -1251,7 +1451,6 @@ export default function ProblemSolveClient({
     setModalResult(null);
     setTerminalOpen(true);
     setTerminalLines([{ text: '$ solution.py 제출\n', kind: 'meta' }, { text: '비공개 테스트를 포함한 서버 채점을 시작합니다...\n', kind: 'info' }]);
-    setCurrentAiFeedback(null);
 
     if (sessionId) {
       await fetch(`/api/sessions/${sessionId}`, {
@@ -1337,7 +1536,6 @@ export default function ProblemSolveClient({
     }
 
     const status = finalSubmission.status;
-    const isStudentFailure = status === 'fail' || status === 'partial';
     const newAttempt = status === 'judge_error' ? attemptCount : attemptCount + 1;
     const runtimeMs = finalSubmission.runtime_ms ?? 0;
     const passedCount = finalSubmission.passed_count;
@@ -1360,29 +1558,6 @@ export default function ProblemSolveClient({
           status === 'pass' ? 'passed' : 'attempted'
         )
         : current);
-    }
-
-    if (isStudentFailure && problem.use_ai_feedback) {
-      setAiFeedbackLoading(true);
-      fetch('/api/ai-feedbacks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          submission_id: submissionId,
-          problem_id: problem.id,
-          code,
-          error_message: `${passedCount}/${totalCount} tests passed`,
-        }),
-      })
-        .then((r) => r.json())
-        .then((json) => {
-          if (json.feedback) {
-            setAiFeedbacks((prev) => [json.feedback, ...prev]);
-            setCurrentAiFeedback(json.feedback);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setAiFeedbackLoading(false));
     }
 
     setModalResult({
@@ -1453,6 +1628,11 @@ export default function ProblemSolveClient({
       data-problem-transitioning={isProblemTransitioning ? 'true' : 'false'}
       style={{ backgroundColor: 'var(--color-surface)' }}
     >
+      <WholePagePointerOverlay
+        ref={wholePagePointerRef}
+        role="teacher"
+        enabled={teacherOnline}
+      />
       <header
         data-collaboration-surface="header"
         className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
@@ -1714,7 +1894,6 @@ export default function ProblemSolveClient({
           data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
         >
-          <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>
             <div className="flex items-center gap-2">
@@ -1750,7 +1929,7 @@ export default function ProblemSolveClient({
               onMount={handleEditorMount}
               value={code}
               onChange={(v) => handleCodeChange(v ?? '')}
-              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
+              options={{ fontSize: editorFontSize, fontFamily: "'Fira Code', Consolas, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbers: 'on', glyphMargin: true, padding: { top: 12, bottom: 12 }, automaticLayout: true, tabSize: 4, editContext: false, readOnly: isProblemTransitioning }}
             />
           </div>
 
@@ -1844,23 +2023,48 @@ export default function ProblemSolveClient({
                   className="overflow-auto px-4 py-3"
                   style={{ height: terminalHeight - 38, backgroundColor: '#1E1E1E' }}
                 >
-                  <div
-                    className="rounded-xl px-4 py-3"
-                    style={{ backgroundColor: '#172033', border: '1px solid #334155', color: '#E2E8F0', fontFamily: 'Pretendard, sans-serif', fontSize: '13px', lineHeight: 1.7 }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <CircleHelp size={14} style={{ color: '#93C5FD' }} />
-                      <strong style={{ color: '#93C5FD', fontSize: '13px' }}>
-                        {lastPythonError.type}를 쉽게 설명하면
-                      </strong>
-                    </div>
-                    <p style={{ margin: 0 }}>{explainPythonError(lastPythonError)}</p>
-                    {lastPythonError.line && (
-                      <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-                        에디터 {lastPythonError.line}번째 줄을 확인해 보세요.
+                  {syntaxCoach ? (
+                    <SyntaxErrorCoach
+                      lesson={syntaxCoach.lesson}
+                      error={syntaxCoach.error}
+                      code={syntaxCoach.code}
+                      attemptCount={syntaxCoach.attemptCount}
+                      aiEnabled={problem.use_ai_feedback}
+                      aiLoading={aiFeedbackLoading}
+                      aiExplanation={syntaxAiExplanation}
+                      aiError={syntaxAiError}
+                      onAskAi={() => void handleAskSyntaxAi()}
+                      onFocusLine={focusEditorLine}
+                    />
+                  ) : (
+                    <section
+                      aria-label="파이썬 오류 설명"
+                      style={{ color: '#D4D4D4', fontFamily: 'Pretendard, sans-serif', fontSize: 13, lineHeight: 1.75 }}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        {lastPythonError.line && (
+                          <button
+                            type="button"
+                            onClick={() => focusEditorLine(lastPythonError.line as number, 1)}
+                            title="에디터에서 이 줄로 이동"
+                            className="shrink-0 transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70"
+                            style={{ padding: '2px 8px', borderRadius: 4, backgroundColor: 'rgba(232, 168, 61, 0.13)', border: '1px solid rgba(232, 168, 61, 0.4)', color: '#E8A33D', fontFamily: "'Fira Code', Consolas, monospace", fontSize: 12, fontWeight: 600 }}
+                          >
+                            {lastPythonError.line}줄
+                          </button>
+                        )}
+                        <h3 style={{ margin: 0, color: '#F1F3F6', fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>
+                          {lastPythonError.type}
+                        </h3>
+                      </div>
+                      <p
+                        className="mt-3.5"
+                        style={{ margin: 0, borderTop: '1px solid #2A303B', paddingTop: 14 }}
+                      >
+                        {explainPythonError(lastPythonError)}
                       </p>
-                    )}
-                  </div>
+                    </section>
+                  )}
                 </div>
               ) : (
                 <ConsoleTerminal
@@ -1883,9 +2087,9 @@ export default function ProblemSolveClient({
           onClose={() => setModalResult(null)}
           onRetry={() => setModalResult(null)}
           onHint={() => { setModalResult(null); setShowHint(true); }}
-          aiFeedbackEnabled={problem.use_ai_feedback}
-          aiFeedbackLoading={aiFeedbackLoading}
-          aiFeedbackContent={currentAiFeedback?.content ?? null}
+          aiFeedbackEnabled={false}
+          aiFeedbackLoading={false}
+          aiFeedbackContent={null}
           nextProblem={nextProblem}
           stageId={navigation?.stage_id ?? null}
           onNextProblem={() => handleNavigateProblem(nextProblem, 'next')}

@@ -44,7 +44,6 @@ function readStdin() {
 async function initPyodide() {
   importScripts(PYODIDE_CDN);
   // worker(importScripts) 환경에서는 indexURL 자동 감지가 안 되므로 명시한다
-  // eslint-disable-next-line no-undef
   pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
   pyodide.setStdout({ write: (buffer) => streamOutput('stdout', stdoutDecoder, buffer) });
   pyodide.setStderr({ write: (buffer) => streamOutput('stderr', stderrDecoder, buffer) });
@@ -73,14 +72,18 @@ self.onmessage = async (e) => {
       self.postMessage({ type: 'done' });
       return;
     }
+    let pythonError = null;
     try {
       pyodide.globals.set('_cove_source', msg.code);
       const errorJson = await pyodide.runPythonAsync(`
 import json as _cove_json
 import linecache as _cove_linecache
+import sys as _cove_sys
 import traceback as _cove_traceback
 
 _cove_error = None
+_cove_stdout = _cove_sys.stdout
+_cove_stderr = _cove_sys.stderr
 try:
     _cove_linecache.cache['solution.py'] = (
         len(_cove_source),
@@ -93,6 +96,7 @@ except BaseException as _cove_exc:
     _cove_type = type(_cove_exc).__name__
     _cove_message = str(_cove_exc)
     _cove_line = getattr(_cove_exc, 'lineno', None)
+    _cove_offset = getattr(_cove_exc, 'offset', None)
 
     if isinstance(_cove_exc, SyntaxError):
         _cove_display = ''.join(
@@ -115,13 +119,19 @@ except BaseException as _cove_exc:
         'type': _cove_type,
         'message': _cove_message,
         'line': _cove_line,
+        'offset': _cove_offset,
         'display': _cove_display,
     }, ensure_ascii=False)
+finally:
+    # Pyodide 인터프리터는 실행 후에도 살아 있으므로 CPython 프로세스 종료처럼
+    # Python 스트림을 명시적으로 비워야 마지막 개행 없는 출력도 JS에 전달된다.
+    _cove_stdout.flush()
+    _cove_stderr.flush()
 
 _cove_error
 `);
       if (errorJson) {
-        self.postMessage({ type: 'pythonError', error: JSON.parse(errorJson) });
+        pythonError = JSON.parse(errorJson);
       }
     } catch (err) {
       // 실행기 자체의 오류만 fatal 로 전달한다. 학생 코드 오류는 위 pythonError 로 분리된다.
@@ -130,6 +140,10 @@ _cove_error
     }
     flushOutput('stdout', stdoutDecoder);
     flushOutput('stderr', stderrDecoder);
+    // 남은 출력까지 모두 전달한 뒤 예외를 표시해야 터미널 순서가 실제 Python과 같다.
+    if (pythonError) {
+      self.postMessage({ type: 'pythonError', error: pythonError });
+    }
     self.postMessage({ type: 'done' });
   }
 };

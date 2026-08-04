@@ -20,6 +20,9 @@
   --color-danger: #DC2626;
   --color-warning: #D97706;
   --color-editor-bg: #1E1E1E;
+  /* D·LAB Coding brand orange — taken from public/dlab-logo.svg. Used only for
+     D·LAB branding (campus name next to the logo), never for app UI accents. */
+  --color-dlab: #E94B20;
 
   --radius: 8px;
   --radius-card: 10px;
@@ -67,6 +70,8 @@
   --color-surface: #14171F;
   --color-card: #1B1F29;
   --color-muted: #242935;
+  /* Lifted a step so the brand orange keeps contrast on the dark surfaces. */
+  --color-dlab: #F2703F;
 
   --tint-1: #1B2637;
   --tint-2: #161A24;
@@ -107,6 +112,27 @@ body {
 .tiptap-render code { background: var(--color-muted); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
 .tiptap-render pre { background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border); padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0.6em 0; }
 .tiptap-render pre code { background: none; color: inherit; }
+
+/* 외부에서 가져온 문제 설명(엘리스 등)은 <pre style="background:#f6f7f9"> 같은 표현용
+   인라인 스타일을 달고 온다. 인라인 배경은 위 규칙을 이기지만 글자색은 그대로 남아
+   "밝은 배경 + 밝은 글자"가 되어 읽을 수 없다. 코드/인용 블록의 배색만은 테마 값으로
+   고정해 어느 출처의 HTML이든 같은 대비를 갖게 한다.
+   (span 등에 저자가 의도적으로 넣은 글자색은 건드리지 않는다.) */
+.tiptap-render pre[style] {
+  background: var(--code-bg) !important;
+  color: var(--code-fg) !important;
+  border-color: var(--code-border) !important;
+}
+.tiptap-render pre[style] code { background: none !important; color: inherit !important; }
+.tiptap-render blockquote[style] {
+  background: var(--color-muted) !important;
+  border-left-color: var(--color-border) !important;
+  color: var(--color-ink) !important;
+}
+
+/* 가져온 본문 래퍼가 color:#16181d 처럼 라이트 테마 글자색을 고정으로 들고 오는 경우가
+   있어, 다크 테마에서 배경과 같은 색이 된다. 래퍼 한 겹만 테마 색으로 되돌린다. */
+.tiptap-render > div[style*="color"] { color: inherit !important; }
 .tiptap-render hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
 .tiptap-render img { max-width: 100%; border-radius: 6px; margin: 0.4em 0; }
 .tiptap-render a { color: var(--color-primary); text-decoration: underline; }

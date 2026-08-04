@@ -58,7 +58,7 @@ export class InteractiveRunner {
     Atomics.store(this.control, 0, 0);
     Atomics.store(this.control, 1, 0);
     Atomics.store(this.control, 2, 0);
-    this.worker = new Worker('/pyodide-worker.js?v=5');
+    this.worker = new Worker('/pyodide-worker.js?v=7');
     this.worker.onmessage = (e: MessageEvent<RunnerEvent>) => this.handle(e.data);
     this.worker.onerror = (e) => {
       const detail = e.message || (e.filename ? `${e.filename}:${e.lineno}` : '워커를 시작할 수 없습니다');

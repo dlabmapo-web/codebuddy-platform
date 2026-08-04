@@ -22,6 +22,18 @@ describe('validateTestCases', () => {
     expect(validateTestCases([{ ...sample, expected_output: '' }])).toContain('정답 출력값');
   });
 
+  it('requires stdin when the problem declares an input format', () => {
+    expect(validateTestCases(
+      [{ ...sample, input: '' }],
+      { requiresInput: true },
+    )).toContain('표준 입력값');
+    expect(validateTestCases(
+      [{ ...sample, input: '\n' }],
+      { requiresInput: true },
+    )).toBeNull();
+    expect(validateTestCases([{ ...sample, input: '' }])).toBeNull();
+  });
+
   it('rejects ambiguous visibility', () => {
     expect(validateTestCases([
       { ...sample, is_sample: false, is_hidden: false },

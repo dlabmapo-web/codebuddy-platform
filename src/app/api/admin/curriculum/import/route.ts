@@ -2,6 +2,7 @@ import { apiError, apiOk } from '@/lib/api/response';
 import { requireAdmin } from '@/lib/api/requireAdmin';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { validateTestCases } from '@/lib/judge/testCaseValidation';
+import { stripThemeLockedStyles } from '@/lib/problems/importedHtml';
 
 type ImportTestCase = {
   order_no: number;
@@ -75,7 +76,9 @@ function validateRows(rows: ImportRow[]) {
       errors.push(`${label}: 난이도는 easy, medium, hard 중 하나여야 합니다.`);
     }
     if (!row.test_cases?.length) errors.push(`${label}: 테스트케이스가 1개 이상 필요합니다.`);
-    const testCaseError = validateTestCases(row.test_cases ?? []);
+    const testCaseError = validateTestCases(row.test_cases ?? [], {
+      requiresInput: Boolean(row.problem?.input_format?.trim()),
+    });
     if (testCaseError) errors.push(`${label}: ${testCaseError}`);
     row.test_cases?.forEach((testCase, testIndex) => {
       if (!testCase.expected_output?.trim()) {
@@ -240,7 +243,8 @@ export async function POST(req: Request) {
         order_no: row.problem.order_no,
         title: row.problem.title.trim(),
         difficulty: row.problem.difficulty,
-        description: row.problem.description.trim(),
+        // 가져온 설명은 라이트 테마 색을 인라인으로 들고 오므로 저장 전에 제거한다.
+        description: stripThemeLockedStyles(row.problem.description.trim()),
         input_format: row.problem.input_format?.trim() || null,
         output_format: row.problem.output_format?.trim() || null,
         constraint_text: row.problem.constraint_text?.trim() || null,

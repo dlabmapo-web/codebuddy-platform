@@ -157,6 +157,9 @@ function validate(rows: ImportRow[], testCaseKeys: Set<string>, hintKeys: Set<st
     if (!row.problem.description) errors.push(`${label}: 문제설명을 입력해주세요.`);
     if (row.test_cases.length === 0) errors.push(`${label}: 테스트케이스 시트에 문제키 "${row.key}"의 정답을 입력해주세요.`);
     row.test_cases.forEach((testCase, testIndex) => {
+      if (row.problem.input_format && testCase.input === '') {
+        errors.push(`${label}: 테스트케이스 ${testIndex + 1}의 표준 입력값이 없습니다.`);
+      }
       if (!testCase.expected_output) errors.push(`${label}: 테스트케이스 ${testIndex + 1}의 정답출력이 없습니다.`);
       if (testCase.is_sample === testCase.is_hidden) {
         errors.push(`${label}: 테스트케이스 ${testIndex + 1}은 샘플여부와 숨김여부를 반대로 설정해주세요.`);

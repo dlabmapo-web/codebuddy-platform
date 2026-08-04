@@ -190,10 +190,12 @@ export interface DbAiFeedbackPattern {
 
 export interface DbAiFeedback {
   id: string;
-  submission_id: string;
+  submission_id: string | null;
   problem_id: string | null;
   student_id: string;
   matched_pattern_id: string | null;
+  error_category: string | null;
+  code_hash: string | null;
   content: string;
   model: string;
   created_at: string;

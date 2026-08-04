@@ -68,7 +68,9 @@ export async function POST(req: Request) {
   if (!['easy', 'medium', 'hard'].includes(difficulty)) return apiError('올바른 난이도를 선택해주세요.', 'INVALID_DIFFICULTY', 400);
   if (!description?.trim()) return apiError('문제 설명을 입력해주세요.', 'INVALID_DESCRIPTION', 400);
   if (!chapter_id) return apiError('챕터를 선택해주세요.', 'INVALID_CHAPTER', 400);
-  const testCaseError = validateTestCases(test_cases ?? []);
+  const testCaseError = validateTestCases(test_cases ?? [], {
+    requiresInput: Boolean(input_format?.trim()),
+  });
   if (testCaseError) return apiError(testCaseError, 'INVALID_TEST_CASES', 400);
 
   const db = supabaseAdmin();

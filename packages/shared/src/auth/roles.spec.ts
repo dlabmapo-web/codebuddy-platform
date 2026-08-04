@@ -57,9 +57,19 @@ describe("roleHasPermission", () => {
     }
   });
 
+  it("gives teacher assignment to team leads and managers only", () => {
+    expect(roleHasPermission("TEAM_LEAD", "class-teachers.manage")).toBe(true);
+    expect(roleHasPermission("MANAGER", "class-teachers.manage")).toBe(true);
+    expect(roleHasPermission("TEACHER", "class-teachers.manage")).toBe(false);
+    expect(roleHasPermission("STUDENT", "class-teachers.manage")).toBe(false);
+  });
+
   it("keeps the reserved teacher assignment permission out of class CRUD", () => {
     expect(roleHasPermission("TEACHER", "classes.assigned.manage")).toBe(true);
     expect(roleHasPermission("TEACHER", "classes.manage")).toBe(false);
+    // Holding the reserved permission must never imply the authority to
+    // choose who holds it.
+    expect(roleHasPermission("TEACHER", "class-teachers.manage")).toBe(false);
   });
 
   it("does not allow teachers or students to manage or import content", () => {

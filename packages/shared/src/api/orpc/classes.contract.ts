@@ -8,10 +8,12 @@ import {
   classSummarySchema,
   createClassSchema,
   eligibleStudentSummarySchema,
+  eligibleTeacherSummarySchema,
   listClassesSchema,
   removeClassStudentSchema,
   setClassCoursesSchema,
   setClassStatusSchema,
+  setClassTeacherSchema,
   updateClassSchema,
 } from "../../classes/class.js";
 
@@ -34,4 +36,8 @@ export const academyClassesContract = {
     .output(z.object({ students: z.array(eligibleStudentSummarySchema) })),
   addStudents: oc.input(addClassStudentsSchema).output(classDetailSchema),
   removeStudent: oc.input(removeClassStudentSchema).output(classDetailSchema),
+  listEligibleTeachers: oc
+    .input(classIdInputSchema)
+    .output(z.object({ teachers: z.array(eligibleTeacherSummarySchema) })),
+  setTeacher: oc.input(setClassTeacherSchema).output(classDetailSchema),
 };

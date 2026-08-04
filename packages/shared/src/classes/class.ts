@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
+import { userStatusSchema } from "../auth/session.js";
 import { membershipStatusSchema } from "../memberships/status.js";
 
 export const classStatuses = ["ACTIVE", "ARCHIVED"] as const;
@@ -50,6 +51,40 @@ export type EligibleStudentSummary = z.infer<
   typeof eligibleStudentSummarySchema
 >;
 
+/**
+ * The membership stored on the class, reported as it stands now. The status
+ * and role travel with it because a stored assignment can outlive the
+ * eligibility that created it, and the client must not read access off the
+ * presence of an ID.
+ */
+export const assignedTeacherSummarySchema = z.object({
+  membershipId: z.uuid(),
+  userId: z.uuid(),
+  displayName: z.string().nullable(),
+  userStatus: userStatusSchema,
+  membershipStatus: membershipStatusSchema,
+  role: academyRoleSchema,
+});
+export type AssignedTeacherSummary = z.infer<
+  typeof assignedTeacherSummarySchema
+>;
+
+/** The list gets by on a name; the detail page names the person exactly. */
+export const assignedTeacherDetailSchema = assignedTeacherSummarySchema.extend({
+  email: z.email().nullable(),
+});
+export type AssignedTeacherDetail = z.infer<typeof assignedTeacherDetailSchema>;
+
+export const eligibleTeacherSummarySchema = z.object({
+  membershipId: z.uuid(),
+  userId: z.uuid(),
+  displayName: z.string().nullable(),
+  email: z.email().nullable(),
+});
+export type EligibleTeacherSummary = z.infer<
+  typeof eligibleTeacherSummarySchema
+>;
+
 export const classSummarySchema = z.object({
   id: z.uuid(),
   academyId: z.uuid(),
@@ -58,6 +93,8 @@ export const classSummarySchema = z.object({
   status: classStatusSchema,
   courses: z.array(assignedCourseSummarySchema),
   studentCount: z.number().int().nonnegative(),
+  /** A class may run unassigned; nothing about it depends on having a teacher. */
+  assignedTeacher: assignedTeacherSummarySchema.nullable(),
   createdAt: z.iso.datetime(),
   /** Moves on course and roster changes too, not only on a name edit. */
   updatedAt: z.iso.datetime(),
@@ -67,6 +104,7 @@ export type ClassSummary = z.infer<typeof classSummarySchema>;
 
 export const classDetailSchema = classSummarySchema.extend({
   students: z.array(enrolledStudentSummarySchema),
+  assignedTeacher: assignedTeacherDetailSchema.nullable(),
 });
 export type ClassDetail = z.infer<typeof classDetailSchema>;
 
@@ -116,6 +154,16 @@ export const removeClassStudentSchema = classIdInputSchema.extend({
   membershipId: z.uuid(),
 });
 
+/**
+ * One nullable operation covers assign, replace, and remove. Splitting it
+ * would duplicate the concurrency, authorization, and audit logic three times
+ * for three shapes of the same decision: who is responsible for this class.
+ */
+export const setClassTeacherSchema = classIdInputSchema.extend({
+  teacherMembershipId: z.uuid().nullable(),
+  expectedUpdatedAt: z.iso.datetime(),
+});
+
 /* ----------------------------------------------------------------- helpers */
 
 /**
@@ -127,4 +175,24 @@ export function enrollmentGrantsAccess(
   student: Pick<EnrolledStudentSummary, "membershipStatus" | "role">,
 ): boolean {
   return student.membershipStatus === "ACTIVE" && student.role === "STUDENT";
+}
+
+/**
+ * The membership half of the effective-assignment predicate. Suspending the
+ * assigned member or moving them off the `TEACHER` role revokes their access
+ * without erasing the assignment, so the stored row stays visible to managers
+ * as unavailable rather than vanishing. The API pairs this with the class
+ * academy and status; never treat it as the whole authorization check.
+ */
+export function assignmentGrantsAccess(
+  teacher: Pick<
+    AssignedTeacherSummary,
+    "membershipStatus" | "role" | "userStatus"
+  > | null,
+): boolean {
+  return (
+    teacher?.userStatus === "ACTIVE" &&
+    teacher.membershipStatus === "ACTIVE" &&
+    teacher.role === "TEACHER"
+  );
 }

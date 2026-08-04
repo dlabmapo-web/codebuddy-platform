@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   addClassStudentsSchema,
+  assignedTeacherDetailSchema,
+  assignmentGrantsAccess,
+  classDetailSchema,
+  classSummarySchema,
   createClassSchema,
+  eligibleTeacherSummarySchema,
   enrollmentGrantsAccess,
   setClassCoursesSchema,
+  setClassTeacherSchema,
   updateClassSchema,
 } from "./class.js";
 
@@ -132,6 +138,171 @@ describe("addClassStudentsSchema", () => {
         membershipIds: [membershipId],
       }).membershipIds,
     ).toEqual([membershipId]);
+  });
+});
+
+describe("setClassTeacherSchema", () => {
+  it("accepts a membership id, which assigns or replaces", () => {
+    expect(
+      setClassTeacherSchema.parse({
+        academyId,
+        classId,
+        teacherMembershipId: membershipId,
+        expectedUpdatedAt: "2026-08-04T09:00:00.000Z",
+      }).teacherMembershipId,
+    ).toBe(membershipId);
+  });
+
+  it("accepts null, which removes the assignment", () => {
+    expect(
+      setClassTeacherSchema.parse({
+        academyId,
+        classId,
+        teacherMembershipId: null,
+        expectedUpdatedAt: "2026-08-04T09:00:00.000Z",
+      }).teacherMembershipId,
+    ).toBeNull();
+  });
+
+  it("distinguishes an omitted field from an explicit removal", () => {
+    expect(
+      setClassTeacherSchema.safeParse({
+        academyId,
+        classId,
+        expectedUpdatedAt: "2026-08-04T09:00:00.000Z",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a revision so two dialogs cannot overwrite each other", () => {
+    expect(
+      setClassTeacherSchema.safeParse({
+        academyId,
+        classId,
+        teacherMembershipId: membershipId,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("assigned teacher output", () => {
+  const base = {
+    id: classId,
+    academyId,
+    name: "Level 1 Evening",
+    description: "",
+    status: "ACTIVE" as const,
+    courses: [],
+    studentCount: 0,
+    createdAt: "2026-08-04T09:00:00.000Z",
+    updatedAt: "2026-08-04T09:00:00.000Z",
+    archivedAt: null,
+  };
+
+  it("lets a class report no teacher at all", () => {
+    expect(
+      classSummarySchema.parse({ ...base, assignedTeacher: null })
+        .assignedTeacher,
+    ).toBeNull();
+  });
+
+  it("keeps the membership's current status and role on the summary", () => {
+    const parsed = classSummarySchema.parse({
+      ...base,
+      assignedTeacher: {
+        membershipId,
+        userId: "55555555-5555-4555-8555-555555555555",
+        displayName: "Ada",
+        userStatus: "ACTIVE",
+        // A stored assignment survives suspension, so the summary must be
+        // able to carry a state that no longer grants access.
+        membershipStatus: "SUSPENDED",
+        role: "TEACHER",
+      },
+    });
+    expect(parsed.assignedTeacher?.membershipStatus).toBe("SUSPENDED");
+  });
+
+  it("adds the email only on the detail shape", () => {
+    expect(
+      assignedTeacherDetailSchema.parse({
+        membershipId,
+        userId: "55555555-5555-4555-8555-555555555555",
+        displayName: null,
+        userStatus: "ACTIVE",
+        membershipStatus: "ACTIVE",
+        role: "TEACHER",
+        email: "ada@example.com",
+      }).email,
+    ).toBe("ada@example.com");
+    expect(
+      classDetailSchema.safeParse({
+        ...base,
+        students: [],
+        assignedTeacher: {
+          membershipId,
+          userId: "55555555-5555-4555-8555-555555555555",
+          displayName: null,
+          userStatus: "ACTIVE",
+          membershipStatus: "ACTIVE",
+          role: "TEACHER",
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps the eligible summary free of status and role", () => {
+    const parsed = eligibleTeacherSummarySchema.parse({
+      membershipId,
+      userId: "55555555-5555-4555-8555-555555555555",
+      displayName: "Ada",
+      email: "ada@example.com",
+      membershipStatus: "ACTIVE",
+    });
+    expect(parsed).not.toHaveProperty("membershipStatus");
+  });
+});
+
+describe("assignmentGrantsAccess", () => {
+  it("grants only for an active teacher membership", () => {
+    expect(
+      assignmentGrantsAccess({
+        userStatus: "ACTIVE",
+        membershipStatus: "ACTIVE",
+        role: "TEACHER",
+      }),
+    ).toBe(true);
+  });
+
+  it("stops granting once the membership is suspended or moved off TEACHER", () => {
+    expect(
+      assignmentGrantsAccess({
+        userStatus: "ACTIVE",
+        membershipStatus: "SUSPENDED",
+        role: "TEACHER",
+      }),
+    ).toBe(false);
+    expect(
+      assignmentGrantsAccess({
+        userStatus: "ACTIVE",
+        membershipStatus: "ACTIVE",
+        role: "TEAM_LEAD",
+      }),
+    ).toBe(false);
+  });
+
+  it("stops granting when the assigned user's account is suspended", () => {
+    expect(
+      assignmentGrantsAccess({
+        userStatus: "SUSPENDED",
+        membershipStatus: "ACTIVE",
+        role: "TEACHER",
+      }),
+    ).toBe(false);
+  });
+
+  it("treats an unassigned class as granting nothing", () => {
+    expect(assignmentGrantsAccess(null)).toBe(false);
   });
 });
 

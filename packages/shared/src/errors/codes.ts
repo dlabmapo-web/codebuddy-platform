@@ -41,6 +41,7 @@ export const appErrorCodes = [
   "CLASS_EDIT_CONFLICT",
   "CLASS_VALIDATION_FAILED",
   "CLASS_MEMBERSHIP_INELIGIBLE",
+  "CLASS_TEACHER_INELIGIBLE",
   "COURSE_NOT_ASSIGNED",
   "DRAFT_TOO_LARGE",
   "SUBMISSION_IN_FLIGHT",
@@ -100,6 +101,9 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   CLASS_EDIT_CONFLICT: "This class changed in another session. Reload it before saving again.",
   CLASS_VALIDATION_FAILED: "Fix the class details and try again.",
   CLASS_MEMBERSHIP_INELIGIBLE: "Only active students of this academy can be enrolled.",
+  // Deliberately one message for every eligibility failure: a caller must not
+  // be able to tell a suspended teacher from one in another academy.
+  CLASS_TEACHER_INELIGIBLE: "Only an active teacher of this academy can be assigned to a class.",
   COURSE_NOT_ASSIGNED: "This course is not available to you.",
   DRAFT_TOO_LARGE: "Your code is too large to save.",
   SUBMISSION_IN_FLIGHT: "This problem is already being graded. Wait for the result.",

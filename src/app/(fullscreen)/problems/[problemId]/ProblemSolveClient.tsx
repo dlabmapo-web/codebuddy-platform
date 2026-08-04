@@ -1235,6 +1235,15 @@ export default function ProblemSolveClient({
     setActiveSampleIndex(null);
   }, [appendTerminal]);
 
+  // 오류 코치의 위치 표시를 누르면 에디터의 그 자리로 커서를 옮긴다.
+  const focusEditorLine = useCallback((line: number, column: number) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column });
+    editor.focus();
+  }, []);
+
   const updateSyntaxCoaching = useCallback((
     pythonError: PythonExecutionError | null,
     executedCode: string,
@@ -1982,31 +1991,44 @@ export default function ProblemSolveClient({
                   {syntaxCoach ? (
                     <SyntaxErrorCoach
                       lesson={syntaxCoach.lesson}
+                      error={syntaxCoach.error}
+                      code={syntaxCoach.code}
                       attemptCount={syntaxCoach.attemptCount}
                       aiEnabled={problem.use_ai_feedback}
                       aiLoading={aiFeedbackLoading}
                       aiExplanation={syntaxAiExplanation}
                       aiError={syntaxAiError}
                       onAskAi={() => void handleAskSyntaxAi()}
+                      onFocusLine={focusEditorLine}
                     />
                   ) : (
-                    <div
-                      className="rounded-xl px-4 py-3"
-                      style={{ backgroundColor: '#172033', border: '1px solid #334155', color: '#E2E8F0', fontFamily: 'Pretendard, sans-serif', fontSize: '13px', lineHeight: 1.7 }}
+                    <section
+                      aria-label="파이썬 오류 설명"
+                      style={{ color: '#D4D4D4', fontFamily: 'Pretendard, sans-serif', fontSize: 13, lineHeight: 1.75 }}
                     >
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <CircleHelp size={14} style={{ color: '#93C5FD' }} />
-                        <strong style={{ color: '#93C5FD', fontSize: '13px' }}>
-                          {lastPythonError.type}를 쉽게 설명하면
-                        </strong>
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        {lastPythonError.line && (
+                          <button
+                            type="button"
+                            onClick={() => focusEditorLine(lastPythonError.line as number, 1)}
+                            title="에디터에서 이 줄로 이동"
+                            className="shrink-0 transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70"
+                            style={{ padding: '2px 8px', borderRadius: 4, backgroundColor: 'rgba(232, 168, 61, 0.13)', border: '1px solid rgba(232, 168, 61, 0.4)', color: '#E8A33D', fontFamily: "'Fira Code', Consolas, monospace", fontSize: 12, fontWeight: 600 }}
+                          >
+                            {lastPythonError.line}줄
+                          </button>
+                        )}
+                        <h3 style={{ margin: 0, color: '#F1F3F6', fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>
+                          {lastPythonError.type}
+                        </h3>
                       </div>
-                      <p style={{ margin: 0 }}>{explainPythonError(lastPythonError)}</p>
-                      {lastPythonError.line && (
-                        <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-                          에디터 {lastPythonError.line}번째 줄을 확인해 보세요.
-                        </p>
-                      )}
-                    </div>
+                      <p
+                        className="mt-3.5"
+                        style={{ margin: 0, borderTop: '1px solid #2A303B', paddingTop: 14 }}
+                      >
+                        {explainPythonError(lastPythonError)}
+                      </p>
+                    </section>
                   )}
                 </div>
               ) : (

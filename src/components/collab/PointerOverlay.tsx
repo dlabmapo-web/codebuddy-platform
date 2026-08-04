@@ -2,8 +2,6 @@
 
 import { CURSOR_COLORS } from '@/lib/monaco/cursor';
 
-export type RemotePointer = { name: string; role: string; xPct: number; yPct: number };
-
 export function PointerMarker({ name, role }: { name: string; role: string }) {
   const color = CURSOR_COLORS[role] ?? CURSOR_COLORS.teacher;
 
@@ -29,31 +27,6 @@ export function PointerMarker({ name, role }: { name: string; role: string }) {
       >
         {name}
       </span>
-    </>
-  );
-}
-
-export function PointerOverlay({ pointers }: { pointers: Record<string, RemotePointer> }) {
-  return (
-    <>
-      {Object.entries(pointers).map(([id, p]) => {
-        return (
-          <div
-            key={id}
-            style={{
-              position: 'absolute',
-              left: `${p.xPct * 100}%`,
-              top: `${p.yPct * 100}%`,
-              pointerEvents: 'none',
-              zIndex: 60,
-              transition: 'left 0.06s linear, top 0.06s linear',
-              willChange: 'left, top',
-            }}
-          >
-            <PointerMarker name={p.name} role={p.role} />
-          </div>
-        );
-      })}
     </>
   );
 }

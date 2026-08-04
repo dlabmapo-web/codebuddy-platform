@@ -14,7 +14,10 @@ import { HintPanel } from '@/components/demo/HintPanel';
 import { registerCoveTheme } from '@/lib/monaco/theme';
 import { injectCursorStyles, CURSOR_COLORS } from '@/lib/monaco/cursor';
 import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
-import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
+import {
+  WholePagePointerOverlay,
+  type WholePagePointerOverlayHandle,
+} from '@/components/collab/WholePagePointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
 import { SyntaxErrorCoach } from '@/components/collab/SyntaxErrorCoach';
@@ -71,7 +74,9 @@ import {
   type LearningContextProblem,
 } from '@/lib/curriculum/learningContext';
 import {
+  isTeacherPointerLeave,
   normalizePointerPosition,
+  parseTeacherPointerMove,
   resolvePointerSurface,
   type CollaborationSurface,
   type StudentPointerLeavePayload,
@@ -105,9 +110,8 @@ type ActiveSyntaxCoach = {
   attemptCount: number;
 };
 
-// 선생님 포인터/커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
-// (선생님 화면에서 학생 표식을 숨기는 동작은 없음 — 선생님은 학생을 계속 제어해야 하므로)
-const POINTER_IDLE_HIDE_MS = 3000;
+// 선생님 커서가 이 시간(ms) 동안 움직이지 않으면 학생 화면에서 숨긴다.
+// (포인터 쪽 숨김은 WholePagePointerOverlay가 직접 관리)
 const CURSOR_IDLE_HIDE_MS = 3000;
 
 // 학생 화면에서는 선생님의 실제 이름(가입 시 입력값) 대신 항상 이 호칭으로 표시한다.
@@ -231,7 +235,6 @@ export default function ProblemSolveClient({
   const [syntaxCoach, setSyntaxCoach] = useState<ActiveSyntaxCoach | null>(null);
   const [syntaxAiExplanation, setSyntaxAiExplanation] = useState<string | null>(null);
   const [syntaxAiError, setSyntaxAiError] = useState<string | null>(null);
-  const [remotePointers, setRemotePointers] = useState<Record<string, RemotePointer>>({});
 
   const runnerRef = useRef<InteractiveRunner | null>(null);
   const runOffRef = useRef<(() => void) | null>(null);
@@ -254,8 +257,7 @@ export default function ProblemSolveClient({
   const lastCursorSentRef = useRef(0);
   const lastPointerSentRef = useRef(0);
   const lastPointerSurfaceRef = useRef<CollaborationSurface | null>(null);
-  // senderId별 "포인터 숨김" 타이머 — pointer:move가 끊기면 3초 뒤 해당 포인터를 제거
-  const pointerIdleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const wholePagePointerRef = useRef<WholePagePointerOverlayHandle>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const isApplyingRemoteRef = useRef(false);
   const hasPeerRef = useRef(false);
@@ -592,7 +594,7 @@ export default function ProblemSolveClient({
     setSyntaxAiError(null);
     syntaxAttemptRef.current = null;
     setTeacherOnline(false);
-    setRemotePointers({});
+    wholePagePointerRef.current?.clear();
     setLoadError(false);
     setNavigationFailure(null);
     setProblemTransitionDirection(null);
@@ -890,6 +892,7 @@ export default function ProblemSolveClient({
 
     const supabase = supabaseBrowser();
     const channel = supabase.channel(`session:${sessionId}`, { config: { broadcast: { self: false } } });
+    const pointerOverlay = wholePagePointerRef.current;
 
     channel
       .on('broadcast', { event: 'code:update' }, ({ payload }: { payload: { senderId: string; code: string } }) => {
@@ -909,32 +912,28 @@ export default function ProblemSolveClient({
         if (payload.senderId === myInfo.id) return;
         updateRemoteCursor(payload.name, payload.role, payload.position);
       })
-      .on('broadcast', { event: 'pointer:move' }, ({ payload }: { payload: { senderId: string; name: string; role: string; xPct: number; yPct: number } }) => {
-        if (payload.senderId === myInfo.id || payload.role !== 'teacher') return;
-        const pointerName = payload.role === 'teacher' ? TEACHER_DISPLAY_NAME : payload.name;
-        setRemotePointers(prev => ({ ...prev, [payload.senderId]: { name: pointerName, role: payload.role, xPct: payload.xPct, yPct: payload.yPct } }));
-        // 움직임이 올 때마다 숨김 타이머를 리셋 → 3초간 정지하면 학생 화면에서 포인터를 숨긴다.
-        const timers = pointerIdleTimersRef.current;
-        if (timers[payload.senderId]) clearTimeout(timers[payload.senderId]);
-        timers[payload.senderId] = setTimeout(() => {
-          delete timers[payload.senderId];
-          setRemotePointers(prev => {
-            if (!prev[payload.senderId]) return prev;
-            const next = { ...prev };
-            delete next[payload.senderId];
-            return next;
-          });
-        }, POINTER_IDLE_HIDE_MS);
-      })
-      .on('broadcast', { event: 'pointer:leave' }, ({ payload }: { payload: { senderId: string; role?: string } }) => {
-        if (payload.role !== 'teacher') return;
-        const timers = pointerIdleTimersRef.current;
-        if (timers[payload.senderId]) { clearTimeout(timers[payload.senderId]); delete timers[payload.senderId]; }
-        setRemotePointers(prev => {
-          const next = { ...prev };
-          delete next[payload.senderId];
-          return next;
+      .on('broadcast', { event: 'teacher:pointer:move' }, ({ payload }: { payload: unknown }) => {
+        const currentProblemId = problemRef.current?.id;
+        if (!currentProblemId) return;
+        const pointer = parseTeacherPointerMove(payload, {
+          viewerId: myInfo.id,
+          sessionId,
+          problemId: currentProblemId,
         });
+        if (!pointer) return;
+        // 선생님의 실제 이름 대신 항상 '선생님'으로 표시 (숨김 타이머는 오버레이가 관리)
+        wholePagePointerRef.current?.show({ ...pointer, name: TEACHER_DISPLAY_NAME });
+      })
+      .on('broadcast', { event: 'teacher:pointer:leave' }, ({ payload }: { payload: unknown }) => {
+        const currentProblemId = problemRef.current?.id;
+        if (!currentProblemId) return;
+        if (isTeacherPointerLeave(payload, {
+          viewerId: myInfo.id,
+          sessionId,
+          problemId: currentProblemId,
+        })) {
+          wholePagePointerRef.current?.clear();
+        }
       })
       // 다른 참가자가 "최신 코드 주세요"라고 요청하면, 내 현재 코드를 응답
       .on('broadcast', { event: 'sync:request' }, ({ payload }: { payload: { senderId: string } }) => {
@@ -962,9 +961,7 @@ export default function ProblemSolveClient({
         hasPeerRef.current = !!teacher;
         setTeacherOnline(!!teacher);
         if (!teacher) {
-          setRemotePointers({});
-          Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
-          pointerIdleTimersRef.current = {};
+          wholePagePointerRef.current?.clear();
           if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
           const editor = editorRef.current;
           if (editor) {
@@ -991,8 +988,7 @@ export default function ProblemSolveClient({
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
-      Object.values(pointerIdleTimersRef.current).forEach(clearTimeout);
-      pointerIdleTimersRef.current = {};
+      pointerOverlay?.clear();
       if (remoteCursorIdleTimerRef.current) { clearTimeout(remoteCursorIdleTimerRef.current); remoteCursorIdleTimerRef.current = null; }
     };
   }, [sessionId, myInfo, scheduleAutoSave, updateRemoteCursor]);
@@ -1588,6 +1584,11 @@ export default function ProblemSolveClient({
       data-problem-transitioning={isProblemTransitioning ? 'true' : 'false'}
       style={{ backgroundColor: 'var(--color-surface)' }}
     >
+      <WholePagePointerOverlay
+        ref={wholePagePointerRef}
+        role="teacher"
+        enabled={teacherOnline}
+      />
       <header
         data-collaboration-surface="header"
         className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
@@ -1849,7 +1850,6 @@ export default function ProblemSolveClient({
           data-collaboration-surface="editor"
           className="flex flex-col flex-1 overflow-hidden relative"
         >
-          <PointerOverlay pointers={remotePointers} />
           <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: '12px', color: 'var(--color-sub)', fontFamily: 'monospace' }}>Python 3</span>
             <div className="flex items-center gap-2">

@@ -4,12 +4,21 @@ import {
   collaborationSurfaceSelector,
   isCollaborationSurface,
   isStudentPointerLeave,
+  isTeacherPointerLeave,
   normalizePointerPosition,
   parseStudentPointerMove,
+  parseTeacherPointerMove,
 } from './pointerSurfaces';
 
 const expectedScope = {
   studentId: 'student-1',
+  sessionId: 'session-1',
+  problemId: 'problem-1',
+};
+
+// 학생은 선생님 id를 모르므로, 자기 자신만 제외하고 같은 세션/문제의 teacher를 받는다.
+const expectedTeacherScope = {
+  viewerId: 'student-1',
   sessionId: 'session-1',
   problemId: 'problem-1',
 };
@@ -110,5 +119,36 @@ describe('collaboration pointer surfaces', () => {
       { ...leave, sessionId: 'session-2' },
       expectedScope
     )).toBe(false);
+  });
+
+  it('accepts a teacher pointer anywhere in the same session and problem', () => {
+    const teacherPayload = pointerPayload({
+      senderId: 'teacher-9',
+      name: 'Teacher',
+      role: 'teacher',
+      surface: 'statement',
+    });
+
+    expect(parseTeacherPointerMove(teacherPayload, expectedTeacherScope))
+      .toMatchObject({ senderId: 'teacher-9', role: 'teacher', surface: 'statement' });
+    expect(isTeacherPointerLeave(
+      { senderId: 'teacher-9', sessionId: 'session-1', problemId: 'problem-1', role: 'teacher' },
+      expectedTeacherScope
+    )).toBe(true);
+  });
+
+  it('rejects a teacher pointer echoed back to its own viewer or from another problem', () => {
+    expect(parseTeacherPointerMove(
+      pointerPayload({ senderId: 'student-1', role: 'teacher' }),
+      expectedTeacherScope
+    )).toBeNull();
+    expect(parseTeacherPointerMove(
+      pointerPayload({ senderId: 'teacher-9', role: 'teacher', problemId: 'problem-2' }),
+      expectedTeacherScope
+    )).toBeNull();
+    expect(parseTeacherPointerMove(
+      pointerPayload({ senderId: 'teacher-9', role: 'student' }),
+      expectedTeacherScope
+    )).toBeNull();
   });
 });

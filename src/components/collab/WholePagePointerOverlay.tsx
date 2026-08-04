@@ -11,18 +11,32 @@ import {
 import { PointerMarker } from '@/components/collab/PointerOverlay';
 import {
   collaborationSurfaceSelector,
+  type CollaborationPointerRole,
   type CollaborationSurface,
-  type StudentPointerMovePayload,
+  type PointerMovePayload,
 } from '@/lib/collab/pointerSurfaces';
 
 const POINTER_IDLE_HIDE_MS = 3000;
 
-const SURFACE_ACTIVITY_LABEL: Record<CollaborationSurface, string> = {
-  header: '학생이 상단 메뉴를 보고 있습니다',
-  curriculum: '학생이 교육과정을 보고 있습니다',
-  statement: '학생이 문제 설명을 보고 있습니다',
-  editor: '학생이 코드 편집기를 보고 있습니다',
-  terminal: '학생이 터미널을 사용하고 있습니다',
+// 상대의 포인터가 내 화면에 없는 영역(예: 닫아둔 교육과정 패널)에 있을 때 대신 보여줄 문구
+const SURFACE_ACTIVITY_LABEL: Record<
+  CollaborationPointerRole,
+  Record<CollaborationSurface, string>
+> = {
+  student: {
+    header: '학생이 상단 메뉴를 보고 있습니다',
+    curriculum: '학생이 교육과정을 보고 있습니다',
+    statement: '학생이 문제 설명을 보고 있습니다',
+    editor: '학생이 코드 편집기를 보고 있습니다',
+    terminal: '학생이 터미널을 사용하고 있습니다',
+  },
+  teacher: {
+    header: '선생님이 상단 메뉴를 보고 있습니다',
+    curriculum: '선생님이 교육과정을 보고 있습니다',
+    statement: '선생님이 문제 설명을 보고 있습니다',
+    editor: '선생님이 코드 편집기를 보고 있습니다',
+    terminal: '선생님이 터미널을 보고 있습니다',
+  },
 };
 
 type OverlayPosition = {
@@ -32,15 +46,15 @@ type OverlayPosition = {
 };
 
 export type WholePagePointerOverlayHandle = {
-  show: (pointer: StudentPointerMovePayload) => void;
+  show: (pointer: PointerMovePayload) => void;
   clear: () => void;
 };
 
 export const WholePagePointerOverlay = forwardRef<
   WholePagePointerOverlayHandle,
-  { enabled: boolean }
->(function WholePagePointerOverlay({ enabled }, ref) {
-  const [pointer, setPointer] = useState<StudentPointerMovePayload | null>(null);
+  { enabled: boolean; role: CollaborationPointerRole }
+>(function WholePagePointerOverlay({ enabled, role }, ref) {
+  const [pointer, setPointer] = useState<PointerMovePayload | null>(null);
   const [position, setPosition] = useState<OverlayPosition | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -53,7 +67,7 @@ export const WholePagePointerOverlay = forwardRef<
     setPosition(null);
   }, []);
 
-  const show = useCallback((nextPointer: StudentPointerMovePayload) => {
+  const show = useCallback((nextPointer: PointerMovePayload) => {
     setPointer(nextPointer);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(clear, POINTER_IDLE_HIDE_MS);
@@ -125,9 +139,9 @@ export const WholePagePointerOverlay = forwardRef<
           fontSize: 11,
           fontWeight: 650,
         }}
-        data-testid="student-pointer-surface-activity"
+        data-testid={`${role}-pointer-surface-activity`}
       >
-        {SURFACE_ACTIVITY_LABEL[pointer.surface]}
+        {SURFACE_ACTIVITY_LABEL[role][pointer.surface]}
       </div>
     );
   }
@@ -136,7 +150,7 @@ export const WholePagePointerOverlay = forwardRef<
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[90] motion-reduce:transition-none"
-      data-testid="student-whole-page-pointer"
+      data-testid={`${role}-whole-page-pointer`}
       data-pointer-surface={pointer.surface}
       style={{
         left: position.left,
@@ -146,7 +160,7 @@ export const WholePagePointerOverlay = forwardRef<
         willChange: 'left, top',
       }}
     >
-      <PointerMarker name={pointer.name} role="student" />
+      <PointerMarker name={pointer.name} role={role} />
     </div>
   );
 });

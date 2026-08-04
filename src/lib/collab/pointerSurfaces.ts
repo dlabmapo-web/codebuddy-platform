@@ -10,29 +10,52 @@ export const COLLABORATION_SURFACES = [
 
 export type CollaborationSurface = (typeof COLLABORATION_SURFACES)[number];
 
-export type StudentPointerMovePayload = {
+// 포인터는 양방향이다 — 학생은 선생님에게, 선생님은 학생에게 같은 형식으로 보낸다.
+export const COLLABORATION_POINTER_ROLES = ['student', 'teacher'] as const;
+
+export type CollaborationPointerRole = (typeof COLLABORATION_POINTER_ROLES)[number];
+
+export type PointerMovePayload<
+  Role extends CollaborationPointerRole = CollaborationPointerRole
+> = {
   senderId: string;
   sessionId: string;
   problemId: string;
   name: string;
-  role: 'student';
+  role: Role;
   surface: CollaborationSurface;
   xPct: number;
   yPct: number;
   sentAt: number;
 };
 
-export type StudentPointerLeavePayload = Pick<
-  StudentPointerMovePayload,
+export type PointerLeavePayload<
+  Role extends CollaborationPointerRole = CollaborationPointerRole
+> = Pick<
+  PointerMovePayload<Role>,
   'senderId' | 'sessionId' | 'problemId' | 'role'
 >;
 
+export type StudentPointerMovePayload = PointerMovePayload<'student'>;
+export type StudentPointerLeavePayload = PointerLeavePayload<'student'>;
+export type TeacherPointerMovePayload = PointerMovePayload<'teacher'>;
+export type TeacherPointerLeavePayload = PointerLeavePayload<'teacher'>;
+
 type PointerRect = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
 
-type ExpectedStudentPointerScope = {
-  studentId: string;
+type ExpectedPointerScope = {
   sessionId: string;
   problemId: string;
+};
+
+type ExpectedStudentPointerScope = ExpectedPointerScope & {
+  studentId: string;
+};
+
+// 학생은 선생님의 id를 미리 알 수 없으므로, 같은 세션/문제의 teacher 역할이면 받아들이고
+// 자기 자신의 브로드캐스트만 걸러낸다.
+type ExpectedTeacherPointerScope = ExpectedPointerScope & {
+  viewerId: string;
 };
 
 const SURFACE_SET = new Set<string>(COLLABORATION_SURFACES);
@@ -92,18 +115,21 @@ export function resolvePointerSurface(
   return { element, surface };
 }
 
-export function parseStudentPointerMove(
+function parsePointerMove<Role extends CollaborationPointerRole>(
   payload: unknown,
-  expected: ExpectedStudentPointerScope
-): StudentPointerMovePayload | null {
+  role: Role,
+  expected: ExpectedPointerScope,
+  isExpectedSender: (senderId: string) => boolean
+): PointerMovePayload<Role> | null {
   if (!payload || typeof payload !== 'object') return null;
 
-  const candidate = payload as Partial<StudentPointerMovePayload>;
+  const candidate = payload as Partial<PointerMovePayload<Role>>;
   if (
-    candidate.senderId !== expected.studentId
+    typeof candidate.senderId !== 'string'
+    || !isExpectedSender(candidate.senderId)
     || candidate.sessionId !== expected.sessionId
     || candidate.problemId !== expected.problemId
-    || candidate.role !== 'student'
+    || candidate.role !== role
     || !isCollaborationSurface(candidate.surface)
     || typeof candidate.name !== 'string'
     || !Number.isFinite(candidate.xPct)
@@ -118,7 +144,7 @@ export function parseStudentPointerMove(
     sessionId: candidate.sessionId,
     problemId: candidate.problemId,
     name: candidate.name,
-    role: 'student',
+    role,
     surface: candidate.surface,
     xPct: clampPointerPercentage(candidate.xPct as number),
     yPct: clampPointerPercentage(candidate.yPct as number),
@@ -126,15 +152,66 @@ export function parseStudentPointerMove(
   };
 }
 
+function isPointerLeave<Role extends CollaborationPointerRole>(
+  payload: unknown,
+  role: Role,
+  expected: ExpectedPointerScope,
+  isExpectedSender: (senderId: string) => boolean
+): payload is PointerLeavePayload<Role> {
+  if (!payload || typeof payload !== 'object') return false;
+
+  const candidate = payload as Partial<PointerLeavePayload<Role>>;
+  return typeof candidate.senderId === 'string'
+    && isExpectedSender(candidate.senderId)
+    && candidate.sessionId === expected.sessionId
+    && candidate.problemId === expected.problemId
+    && candidate.role === role;
+}
+
+export function parseStudentPointerMove(
+  payload: unknown,
+  expected: ExpectedStudentPointerScope
+): StudentPointerMovePayload | null {
+  return parsePointerMove(
+    payload,
+    'student',
+    expected,
+    (senderId) => senderId === expected.studentId
+  );
+}
+
 export function isStudentPointerLeave(
   payload: unknown,
   expected: ExpectedStudentPointerScope
 ): payload is StudentPointerLeavePayload {
-  if (!payload || typeof payload !== 'object') return false;
+  return isPointerLeave(
+    payload,
+    'student',
+    expected,
+    (senderId) => senderId === expected.studentId
+  );
+}
 
-  const candidate = payload as Partial<StudentPointerLeavePayload>;
-  return candidate.senderId === expected.studentId
-    && candidate.sessionId === expected.sessionId
-    && candidate.problemId === expected.problemId
-    && candidate.role === 'student';
+export function parseTeacherPointerMove(
+  payload: unknown,
+  expected: ExpectedTeacherPointerScope
+): TeacherPointerMovePayload | null {
+  return parsePointerMove(
+    payload,
+    'teacher',
+    expected,
+    (senderId) => senderId.length > 0 && senderId !== expected.viewerId
+  );
+}
+
+export function isTeacherPointerLeave(
+  payload: unknown,
+  expected: ExpectedTeacherPointerScope
+): payload is TeacherPointerLeavePayload {
+  return isPointerLeave(
+    payload,
+    'teacher',
+    expected,
+    (senderId) => senderId.length > 0 && senderId !== expected.viewerId
+  );
 }

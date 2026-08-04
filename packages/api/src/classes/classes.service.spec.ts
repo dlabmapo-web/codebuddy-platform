@@ -24,7 +24,26 @@ const courseB = "50000000-0000-4000-8000-00000000000b";
 const courseC = "50000000-0000-4000-8000-00000000000c";
 const membershipId = "60000000-0000-4000-8000-000000000001";
 const otherMembershipId = "60000000-0000-4000-8000-000000000002";
+const teacherA = "70000000-0000-4000-8000-00000000000a";
+const teacherB = "70000000-0000-4000-8000-00000000000b";
 const updatedAt = new Date("2026-08-03T09:00:00.000Z");
+
+function teacherMembership(
+  id: string,
+  overrides: Partial<{ status: string; role: string; userStatus: string }> = {},
+) {
+  return {
+    id,
+    role: overrides.role ?? "TEACHER",
+    status: overrides.status ?? "ACTIVE",
+    user: {
+      id: `user-${id}`,
+      displayName: "Teacher",
+      email: "teacher@example.com",
+      status: overrides.userStatus ?? "ACTIVE",
+    },
+  };
+}
 
 function classRecord(
   overrides: Partial<{
@@ -32,8 +51,11 @@ function classRecord(
     courseIds: string[];
     membershipIds: string[];
     updatedAt: Date;
+    /** The stored assignment, valid or not. */
+    teacher: ReturnType<typeof teacherMembership> | null;
   }> = {},
 ) {
+  const teacher = overrides.teacher ?? null;
   return {
     id: classId,
     academyId,
@@ -41,6 +63,8 @@ function classRecord(
     description: "",
     status: overrides.status ?? "ACTIVE",
     createdByUserId: actorUserId,
+    teacherMembershipId: teacher?.id ?? null,
+    assignedTeacher: teacher,
     archivedAt: null,
     createdAt: updatedAt,
     updatedAt: overrides.updatedAt ?? updatedAt,
@@ -72,6 +96,10 @@ function createService(options?: {
   /** Courses the academy actually owns, for cross-academy rejection. */
   academyCourseIds?: string[];
   eligibleMembershipIds?: string[];
+  /** Memberships that satisfy every teacher eligibility condition. */
+  eligibleTeacherIds?: string[];
+  /** Forces the conditional update to lose, as a concurrent write would. */
+  claimFails?: boolean;
 }) {
   const record = options?.record === undefined ? classRecord() : options.record;
   const enrollmentIds = new Set(
@@ -84,7 +112,8 @@ function createService(options?: {
       updateMany: vi.fn().mockImplementation(({ where }: {
         where: { status?: string; updatedAt?: Date };
       }) => Promise.resolve({
-        count: record
+        count: !options?.claimFails
+          && record
           && (!where.status || where.status === record.status)
           && (!where.updatedAt
             || where.updatedAt.toISOString() === record.updatedAt.toISOString())
@@ -149,6 +178,16 @@ function createService(options?: {
           where.id.in
             .filter((id) => eligible.includes(id))
             .map((id) => ({ id })),
+        );
+      }),
+      // Answers only for a membership that meets every condition the service
+      // asked for, which is how a cross-academy or suspended id gets rejected.
+      findFirst: vi.fn().mockImplementation(({ where }: {
+        where: { id: string };
+      }) => {
+        const eligible = options?.eligibleTeacherIds ?? [teacherA, teacherB];
+        return Promise.resolve(
+          eligible.includes(where.id) ? { id: where.id } : null,
         );
       }),
     },
@@ -438,6 +477,402 @@ describe("ClassesService enrollment", () => {
         },
       }),
     );
+  });
+});
+
+describe("ClassesService teacher assignment", () => {
+  const revision = updatedAt.toISOString();
+
+  it("gates every teacher operation on class-teachers.manage", async () => {
+    const list = createService();
+    await list.service.listEligibleTeachers(identity, { academyId, classId });
+    expect(list.access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "class-teachers.manage",
+    );
+
+    const set = createService();
+    await set.service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+    expect(set.access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "class-teachers.manage",
+    );
+  });
+
+  it("never gates assignment on the teacher's own reserved permission", async () => {
+    const { service, access } = createService();
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(access.requirePermission).not.toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "classes.assigned.manage",
+    );
+  });
+
+  it("offers only active same-academy teachers with an active user", async () => {
+    const { service, prisma } = createService();
+
+    await service.listEligibleTeachers(identity, { academyId, classId });
+
+    expect(prisma.academyMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          academyId,
+          role: "TEACHER",
+          status: "ACTIVE",
+          user: { status: "ACTIVE" },
+        },
+        orderBy: [{ user: { displayName: "asc" } }, { id: "asc" }],
+      }),
+    );
+  });
+
+  it("lists candidates for an archived class but refuses to write to it", async () => {
+    const { service } = createService({
+      record: classRecord({ status: "ARCHIVED" }),
+    });
+
+    await expect(
+      service.listEligibleTeachers(identity, { academyId, classId }),
+    ).resolves.toMatchObject({ teachers: [] });
+    await expect(
+      service.setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherA,
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_ARCHIVED" });
+  });
+
+  it("refuses an idempotent teacher request while the class is archived", async () => {
+    const { service, transaction, audit } = createService({
+      record: classRecord({
+        status: "ARCHIVED",
+        teacher: teacherMembership(teacherA),
+      }),
+    });
+
+    await expect(
+      service.setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherA,
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_ARCHIVED" });
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("assigns a teacher in the same write that claims the revision", async () => {
+    const { service, transaction } = createService();
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).toHaveBeenCalledWith({
+      where: { id: classId, academyId, status: "ACTIVE", updatedAt },
+      data: { teacherMembershipId: teacherA },
+    });
+  });
+
+  it("replaces the stored teacher without touching the roster", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherB,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { teacherMembershipId: teacherB } }),
+    );
+    expect(transaction.classEnrollment.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("removes an assignment and leaves the class active", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+
+    const detail = await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: null,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { teacherMembershipId: null } }),
+    );
+    expect(detail.status).toBe("ACTIVE");
+  });
+
+  it("validates eligibility inside the transaction, before any write", async () => {
+    const { service, transaction } = createService({
+      eligibleTeacherIds: [],
+    });
+
+    await expect(
+      service.setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherA,
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_TEACHER_INELIGIBLE" });
+    expect(transaction.academyMembership.findFirst).toHaveBeenCalled();
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("checks the academy, role, status, and user in one membership query", async () => {
+    const { service, transaction } = createService();
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.academyMembership.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: teacherA,
+          academyId,
+          role: "TEACHER",
+          status: "ACTIVE",
+          user: { status: "ACTIVE" },
+        },
+      }),
+    );
+  });
+
+  it("gives a cross-academy id the same answer as an ineligible one", async () => {
+    const crossAcademy = createService({ eligibleTeacherIds: [] });
+    const suspended = createService({ eligibleTeacherIds: [] });
+
+    const first = await crossAcademy.service
+      .setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherA,
+        expectedUpdatedAt: revision,
+      })
+      .catch((error: AppException) => error.code);
+    const second = await suspended.service
+      .setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherB,
+        expectedUpdatedAt: revision,
+      })
+      .catch((error: AppException) => error.code);
+
+    expect(first).toBe("CLASS_TEACHER_INELIGIBLE");
+    expect(second).toBe(first);
+  });
+
+  it("does not touch or audit a repeat of the current assignment", async () => {
+    const { service, transaction, audit } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+    expect(transaction.academyMembership.findFirst).not.toHaveBeenCalled();
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("does not touch or audit removal from an already empty class", async () => {
+    const { service, transaction, audit } = createService();
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: null,
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale revision instead of overwriting the other decision", async () => {
+    const { service } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+
+    await expect(
+      service.setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherB,
+        expectedUpdatedAt: "2026-08-03T08:00:00.000Z",
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_EDIT_CONFLICT" });
+  });
+
+  it("reports a conflict when a concurrent write wins the same revision", async () => {
+    // The read saw the expected revision, so the loss can only mean another
+    // transaction committed between the read and the conditional update.
+    const { service, audit } = createService({ claimFails: true });
+
+    await expect(
+      service.setTeacher(identity, {
+        academyId,
+        classId,
+        teacherMembershipId: teacherA,
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_EDIT_CONFLICT" });
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("audits each transition with its own action and both membership ids", async () => {
+    const assign = createService();
+    await assign.service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+    expect(vi.mocked(assign.audit.write).mock.calls[0]?.[1]).toMatchObject({
+      action: "class.teacher.assigned",
+      academyId,
+      actorUserId,
+      targetId: classId,
+      before: { teacherMembershipId: null },
+      after: { teacherMembershipId: teacherA },
+    });
+
+    const replace = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+    await replace.service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherB,
+      expectedUpdatedAt: revision,
+    });
+    expect(vi.mocked(replace.audit.write).mock.calls[0]?.[1]).toMatchObject({
+      action: "class.teacher.replaced",
+      before: { teacherMembershipId: teacherA },
+      after: { teacherMembershipId: teacherB },
+    });
+
+    const remove = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+    });
+    await remove.service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: null,
+      expectedUpdatedAt: revision,
+    });
+    expect(vi.mocked(remove.audit.write).mock.calls[0]?.[1]).toMatchObject({
+      action: "class.teacher.removed",
+      before: { teacherMembershipId: teacherA },
+      after: { teacherMembershipId: null },
+    });
+  });
+
+  it("keeps names and emails out of the audit payload", async () => {
+    const { service, audit } = createService();
+
+    await service.setTeacher(identity, {
+      academyId,
+      classId,
+      teacherMembershipId: teacherA,
+      expectedUpdatedAt: revision,
+    });
+
+    const payload = JSON.stringify(vi.mocked(audit.write).mock.calls[0]?.[1]);
+    expect(payload).not.toContain("teacher@example.com");
+    expect(payload).not.toContain("Teacher");
+  });
+
+  it("reports a stored assignment that no longer grants access", async () => {
+    // Suspension deletes nothing, so a Manager still sees who was in charge
+    // and can decide whether to replace or clear them.
+    const { service } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA, { status: "SUSPENDED" }),
+      }),
+    });
+
+    const detail = await service.get(identity, { academyId, classId });
+
+    expect(detail.assignedTeacher).toMatchObject({
+      membershipId: teacherA,
+      membershipStatus: "SUSPENDED",
+      role: "TEACHER",
+    });
+  });
+
+  it("reports the assigned user's current account status", async () => {
+    const { service } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA, { userStatus: "SUSPENDED" }),
+      }),
+    });
+
+    const detail = await service.get(identity, { academyId, classId });
+
+    expect(detail.assignedTeacher).toMatchObject({
+      membershipId: teacherA,
+      userStatus: "SUSPENDED",
+    });
+  });
+
+  it("reports an unassigned class as having no teacher", async () => {
+    const { service } = createService();
+
+    expect(
+      (await service.get(identity, { academyId, classId })).assignedTeacher,
+    ).toBeNull();
+  });
+
+  it("keeps the list's teacher include free of roster and email", async () => {
+    const { service, prisma } = createService();
+
+    await service.list(identity, { academyId });
+
+    const include = vi.mocked(prisma.class.findMany).mock.calls[0]?.[0]?.include;
+    expect(include).toHaveProperty("assignedTeacher");
+    expect(
+      // @ts-expect-error narrowing the generated include type is not the point
+      include?.assignedTeacher?.select?.user?.select,
+    ).toEqual({ id: true, displayName: true, status: true });
   });
 });
 

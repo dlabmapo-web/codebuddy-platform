@@ -4,6 +4,7 @@ import type {
   ClassStatus,
   ClassSummary,
   EligibleStudentSummary,
+  EligibleTeacherSummary,
 } from "@cove/shared";
 
 import { AuditService } from "../academies/audit.service.js";
@@ -15,12 +16,37 @@ import type { Prisma } from "../generated/prisma/client.js";
 
 type ClassRequestContext = { requestId?: string };
 
+/**
+ * The teacher the class stores, whether or not it still grants anything. The
+ * status and role come back so the caller can say "unavailable" instead of
+ * silently showing a suspended member as the responsible teacher.
+ */
+const assignedTeacherSelect = {
+  select: {
+    id: true,
+    role: true,
+    status: true,
+    user: { select: { id: true, displayName: true, status: true } },
+  },
+} as const;
+
+/** The detail page names the person exactly; the list gets by on a name. */
+const assignedTeacherDetailSelect = {
+  select: {
+    id: true,
+    role: true,
+    status: true,
+    user: { select: { id: true, displayName: true, email: true, status: true } },
+  },
+} as const;
+
 /** The list intentionally avoids loading roster PII just to calculate a count. */
 const classListInclude = {
   courseAssignments: {
     include: { course: { select: { id: true, title: true, isVisible: true } } },
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
+  assignedTeacher: assignedTeacherSelect,
   _count: { select: { enrollments: true } },
 } as const satisfies Prisma.ClassInclude;
 
@@ -29,6 +55,7 @@ const classDetailInclude = {
     include: { course: { select: { id: true, title: true, isVisible: true } } },
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
+  assignedTeacher: assignedTeacherDetailSelect,
   enrollments: {
     include: {
       membership: {
@@ -438,6 +465,114 @@ export class ClassesService {
     return toClassDetail(updated);
   }
 
+  /**
+   * The academy's active teachers, whoever is on this class already. The
+   * current teacher stays in the list so the dialog can show them selected
+   * rather than presenting an empty control for an assigned class.
+   *
+   * Readable for an archived class too: staff planning a restore can see the
+   * candidates, while `setTeacher` still refuses to write until it is active.
+   */
+  async listEligibleTeachers(
+    identity: SupabaseIdentity,
+    input: { academyId: string; classId: string },
+  ): Promise<{ teachers: EligibleTeacherSummary[] }> {
+    await this.requireTeacherManager(identity, input.academyId);
+    await this.requireClass(input.academyId, input.classId);
+    const memberships = await this.prisma.academyMembership.findMany({
+      where: eligibleTeacherWhere(input.academyId),
+      select: {
+        id: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+      orderBy: [{ user: { displayName: "asc" } }, { id: "asc" }],
+    });
+    return {
+      teachers: memberships.map((membership) => ({
+        membershipId: membership.id,
+        userId: membership.user.id,
+        displayName: membership.user.displayName,
+        email: membership.user.email,
+      })),
+    };
+  }
+
+  /**
+   * Assigns, replaces, or removes the class's one teacher.
+   *
+   * Eligibility is resolved inside the transaction and the revision is claimed
+   * by the same conditional update that writes the assignment — a read then an
+   * unconditional write would let two staff members each replace the teacher
+   * and silently lose one of the two decisions.
+   */
+  async setTeacher(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      teacherMembershipId: string | null;
+      expectedUpdatedAt: string;
+    },
+    context: ClassRequestContext = {},
+  ): Promise<ClassDetail> {
+    const actor = await this.requireTeacherManager(identity, input.academyId);
+    const requested = input.teacherMembershipId;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await requireClass(tx, input.academyId, input.classId);
+      assertActive(current);
+      const previous = current.teacherMembershipId;
+      // Reassigning the same teacher, or clearing an already empty class, is
+      // not a decision. It must not move the revision or invent audit history.
+      if (previous === requested) return current;
+
+      if (requested !== null) {
+        const eligible = await tx.academyMembership.findFirst({
+          where: { id: requested, ...eligibleTeacherWhere(input.academyId) },
+          select: { id: true },
+        });
+        // One code for every failure — cross-academy, suspended, inactive
+        // user, wrong role — so a caller cannot probe memberships they
+        // cannot otherwise see.
+        if (!eligible) {
+          throw new AppException(
+            "CLASS_TEACHER_INELIGIBLE",
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      const claimed = await tx.class.updateMany({
+        where: {
+          id: current.id,
+          academyId: input.academyId,
+          status: "ACTIVE",
+          updatedAt: new Date(input.expectedUpdatedAt),
+        },
+        data: { teacherMembershipId: requested },
+      });
+      if (claimed.count !== 1) {
+        throwClassWriteConflict(current, input.expectedUpdatedAt);
+      }
+
+      const record = await requireClass(tx, input.academyId, input.classId);
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: teacherAuditAction(previous, requested),
+        targetType: "Class",
+        targetId: current.id,
+        requestId: context.requestId,
+        // Membership ids only: the audit trail answers who was responsible,
+        // and needs no name, email, or student work to do it.
+        before: { teacherMembershipId: previous },
+        after: { teacherMembershipId: requested },
+      });
+      return record;
+    });
+    return toClassDetail(updated);
+  }
+
   private requireClassManager(identity: SupabaseIdentity, academyId: string) {
     return this.access.requirePermission(
       identity.authUserId,
@@ -457,6 +592,18 @@ export class ClassesService {
     );
   }
 
+  /**
+   * Never `classes.assigned.manage`: a Teacher holds that one, and holding it
+   * must not let them put themselves or a colleague in charge of a class.
+   */
+  private requireTeacherManager(identity: SupabaseIdentity, academyId: string) {
+    return this.access.requirePermission(
+      identity.authUserId,
+      academyId,
+      "class-teachers.manage",
+    );
+  }
+
   private async requireClass(
     academyId: string,
     classId: string,
@@ -470,6 +617,36 @@ export class ClassesService {
     }
     return record;
   }
+}
+
+/**
+ * The membership half of the effective-assignment predicate, used both to
+ * offer candidates and to validate a submitted one. Writing it once keeps the
+ * dialog from ever offering a choice the mutation would reject.
+ *
+ * The academy is a parameter rather than a fixed field so no caller can
+ * accidentally leave it out and match a membership in another tenant.
+ */
+function eligibleTeacherWhere(academyId: string) {
+  return {
+    academyId,
+    role: "TEACHER",
+    status: "ACTIVE",
+    user: { status: "ACTIVE" },
+  } as const satisfies Prisma.AcademyMembershipWhereInput;
+}
+
+/**
+ * Three transitions, three events. A single `class.teacher.changed` would make
+ * an auditor read the payload to learn whether a class gained or lost its
+ * teacher, which is the first question they ask.
+ */
+function teacherAuditAction(
+  previous: string | null,
+  next: string | null,
+): "class.teacher.assigned" | "class.teacher.replaced" | "class.teacher.removed" {
+  if (next === null) return "class.teacher.removed";
+  return previous === null ? "class.teacher.assigned" : "class.teacher.replaced";
 }
 
 /** Archived classes grant nothing, so they also accept nothing but a restore. */
@@ -523,6 +700,18 @@ function classSummaryFields(
       isVisible: assignment.course.isVisible,
     })),
     studentCount,
+    assignedTeacher: record.assignedTeacher
+      ? {
+          membershipId: record.assignedTeacher.id,
+          userId: record.assignedTeacher.user.id,
+          displayName: record.assignedTeacher.user.displayName,
+          userStatus: record.assignedTeacher.user.status,
+          // Reported as they stand now, not as they stood when assigned: a
+          // suspended teacher must read as unavailable, not as in charge.
+          membershipStatus: record.assignedTeacher.status,
+          role: record.assignedTeacher.role,
+        }
+      : null,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     archivedAt: record.archivedAt?.toISOString() ?? null,
@@ -538,8 +727,16 @@ function toClassSummary(record: ClassRecord): ClassSummary {
 }
 
 function toClassDetail(record: ClassRecord): ClassDetail {
+  const summary = toClassSummary(record);
   return {
-    ...toClassSummary(record),
+    ...summary,
+    assignedTeacher:
+      summary.assignedTeacher && record.assignedTeacher
+        ? {
+            ...summary.assignedTeacher,
+            email: record.assignedTeacher.user.email,
+          }
+        : null,
     students: record.enrollments.map((enrollment) => ({
       membershipId: enrollment.membershipId,
       userId: enrollment.membership.user.id,

@@ -67,6 +67,18 @@ export function createClassesRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      listEligibleTeachers: os.academyClasses.listEligibleTeachers
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.classesService.listEligibleTeachers(context.identity, input)
+        ),
+      setTeacher: os.academyClasses.setTeacher
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.classesService.setTeacher(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
     },
   };
 }

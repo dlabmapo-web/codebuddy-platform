@@ -1,7 +1,7 @@
 # Prompt-Aware Console Grading Design
 
 **Date:** 2026-08-04
-**Status:** Draft for user review
+**Status:** Corrective revision approved; awaiting written-spec review
 
 ## Summary
 
@@ -32,10 +32,11 @@ The current platform exposes three related but not fully consistent behaviors:
 This makes it possible for a student to complete a sample run with extra manual
 input and then receive a runtime error during official grading.
 
-The local sample output comparator also differs from Judge0. Local comparison
-currently removes whitespace only at the end of the complete output, while
-Judge0 removes trailing whitespace from each line and then from the complete
-output. A sample can therefore appear wrong locally and pass officially.
+The local sample output comparator also differs from Judge0 on trailing
+whitespace. Local comparison removes whitespace only at the end of the complete
+output, while Judge0 removes trailing ASCII whitespace from each line and then
+from the complete output. A sample can therefore appear wrong locally and pass
+officially.
 
 Finally, the teacher test-case editor labels standard input and expected output
 but does not explain two important beginner cases:
@@ -118,6 +119,16 @@ The test-case editor will add concise guidance near the stdin and stdout fields:
 The guidance will include a compact two-input example using a name and password.
 It will not require a new form field, modal, or database column.
 
+When the problem declares a non-empty input format, every test case must contain
+stdin. A case whose `input` value is exactly the empty string is invalid: the
+editor shows an actionable error and saving is blocked. A single newline remains
+valid and represents one intentional blank input line.
+
+This validation uses the problem's explicit input-format metadata rather than
+trying to parse starter code with a regular expression. Starter code is not a
+reference solution, may contain comments or incomplete examples, and cannot
+reliably prove which prompts a correct student solution will print.
+
 The existing labels remain authoritative:
 
 - Standard input (`stdin`) is data provided to the program.
@@ -133,7 +144,11 @@ If the program requests another value after the queue is empty, the runner sends
 EOF and displays the resulting Python error. The current message inviting the
 student to type missing sample input is removed.
 
-The ordinary Run button retains the existing waiting-for-input experience.
+The ordinary Run button retains the existing waiting-for-input experience on
+browsers that support the interactive worker. On browsers without cross-origin
+isolation the fallback runner has always used a fixed stdin string and cannot
+pause for input at all; Manual Run there now says so explicitly instead of
+surfacing a bare `EOFError`.
 
 ### Official result
 
@@ -167,21 +182,33 @@ it receives only input lines or EOF commands.
 
 ### Output normalization
 
-A shared, pure output-normalization function will define the local preview
-contract. It will:
+A shared, pure output-normalization function defines the local preview contract
+using Judge0 CE's standard comparison algorithm. It will:
 
-1. normalize CRLF and CR line endings to LF;
-2. remove trailing whitespace from every line;
-3. remove trailing whitespace and trailing empty lines from the complete output;
-4. preserve line order, case, prompts, and non-trailing/internal whitespace.
+1. split output on LF line boundaries;
+2. remove trailing NUL and ASCII whitespace from every line;
+3. rejoin lines with LF;
+4. remove trailing NUL and ASCII whitespace from the complete output;
+5. preserve line order, case, prompts, and meaningful internal whitespace.
 
-Sample output matching uses this function for both actual and expected output.
-The behavior mirrors Judge0's standard expected-output comparison closely
-enough that local preview and official grading agree for CodeBuddy-authored text
-cases.
+Both actual and expected output use this function. CRLF output is handled because
+the CR remaining at each split line ending is trailing ASCII whitespace. A lone
+internal CR is not converted into LF, matching Judge0 instead of introducing a
+more permissive local rule.
 
 The server continues delegating the official comparison to Judge0. CodeBuddy
 does not independently replace an official verdict based on local normalization.
+
+### stderr and execution failure
+
+Captured stderr is not itself a failed execution. A program may write warnings or
+diagnostics to stderr, exit successfully, and still receive Accepted when stdout
+matches expected output. Sample Run therefore displays stderr but continues the
+stdout comparison.
+
+Python exceptions and runner/infrastructure failures remain execution failures.
+The local execution result carries a failure field distinct from captured stderr
+so the UI never infers process status from the presence of stderr text.
 
 ### Server grading contract
 
@@ -235,6 +262,16 @@ Teacher guidance is the primary prevention mechanism. The platform will not
 guess missing values, repeat the last value, insert an empty string, or pause an
 official submission for user interaction.
 
+When a problem declares an input format, the admin UI and admin API reject test
+cases whose stdin is exactly empty. This prevents the common configuration error
+where the problem statement promises input but Sample Run and Judge0 receive EOF.
+Problems without a declared input format may still intentionally use empty stdin.
+
+The shared test-case validator accepts whether the problem declares input. The
+create route derives that value from the submitted `input_format`; the update
+route uses the submitted value when present and otherwise the problem's stored
+value. This keeps partial API updates consistent with the editor.
+
 ### Extra fixed input
 
 If a program reads fewer values than a case provides, unused stdin remains
@@ -269,11 +306,15 @@ Add or update tests for:
 - CRLF normalization;
 - trailing whitespace on each output line;
 - prompt text remaining significant;
-- output case, order, and meaningful internal whitespace remaining significant.
+- output case, order, and meaningful internal whitespace remaining significant;
+- stderr with matching stdout remaining eligible to pass;
+- Python and runner failures still failing the sample;
+- declared-input problems rejecting exactly empty stdin;
+- one intentional blank line remaining valid stdin.
 
 The existing assertion that all whitespace inside a multi-line output is strict
-must be refined: trailing whitespace on an intermediate line is ignored, while
-spacing inside the meaningful content of a line remains strict.
+must be refined: Judge0-compatible trailing ASCII whitespace on an intermediate
+line is ignored, while spacing inside the meaningful content remains strict.
 
 ### Runner behavior tests
 
@@ -281,9 +322,13 @@ Cover the event-policy boundary without loading Pyodide:
 
 - Sample Run provides queued lines in order.
 - On the first stdin request after the last fixed line is consumed, Sample Run
-  calls EOF instead of waiting for manual input.
+  calls the runner's EOF effect instead of waiting for manual input.
 - Sample Run never consults the manual input queue after fixed exhaustion.
 - Manual Run continues waiting when no student input is available.
+
+The production event handler and tests must use the same fixed-stdin dispatcher;
+testing only a queue-return helper is insufficient because it does not prove that
+`sendEOF()` is wired to the runner.
 
 ### Server contract tests
 
@@ -361,6 +406,32 @@ cases are authored correctly from the start.
 - Languages other than Python
 - Database schema changes
 
+## Corrective revision after implementation review
+
+The implementation review identified four corrections incorporated above:
+
+1. Successful stderr output must not be treated as an execution failure.
+2. Local comparison must implement Judge0's code-defined per-line trailing
+   whitespace behavior instead of describing it as instance configuration.
+3. Regex parsing of starter code is removed because it creates false prompt
+   warnings and cannot validate a student's eventual solution.
+4. The fixed-input test boundary must exercise the EOF side effect, not only a
+   pure queue helper.
+
+The screenshot-driven empty-input case adds one authoring safeguard: when the
+problem explicitly declares input, exactly empty test-case stdin is rejected.
+
+## Known gap: failed cases still show no output
+
+A case that fails official grading still reports only an outcome. Judge0's
+callback carries `stdout`, and `getJudge0Batch` could request it, but both drop
+it, and `submission_test_results` has nowhere to put it. Sample cases are now
+diagnosable because a faithful Sample Run reproduces them locally; **hidden cases
+are not**, for either the student or the teacher.
+
+Closing this needs a schema change, which this spec rules out as a non-goal. It
+is the natural follow-up and should not be treated as covered by this work.
+
 ## Acceptance Criteria
 
 - Manual Run displays prompts and accepts student-entered lines interactively.
@@ -369,9 +440,12 @@ cases are authored correctly from the start.
 - Two `input()` calls consume two teacher-authored input lines in order.
 - `input()` prompt text remains part of captured and officially graded stdout.
 - Teacher guidance explains multiline stdin, prompt output, and non-echoed input.
-- Local sample output normalization matches Judge0's per-line trailing-whitespace
-  behavior.
+- Declared-input problems cannot save a test case with exactly empty stdin.
+- Prompt guidance does not rely on regex parsing of starter code.
+- Successful stderr output does not fail a sample whose stdout matches.
+- Local sample output normalization matches Judge0's per-line trailing ASCII
+  whitespace behavior.
 - Tests cover two-input prompt programs, EOF, normalization, Judge0 request
-  construction, and aggregate grading.
+  construction, stderr, empty-input validation, and aggregate grading.
 - Existing hidden-case privacy and authoritative server grading are preserved.
 - The full automated test suite passes.

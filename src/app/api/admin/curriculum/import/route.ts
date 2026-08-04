@@ -2,6 +2,7 @@ import { apiError, apiOk } from '@/lib/api/response';
 import { requireAdmin } from '@/lib/api/requireAdmin';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { validateTestCases } from '@/lib/judge/testCaseValidation';
+import { stripThemeLockedStyles } from '@/lib/problems/importedHtml';
 
 type ImportTestCase = {
   order_no: number;
@@ -240,7 +241,8 @@ export async function POST(req: Request) {
         order_no: row.problem.order_no,
         title: row.problem.title.trim(),
         difficulty: row.problem.difficulty,
-        description: row.problem.description.trim(),
+        // 가져온 설명은 라이트 테마 색을 인라인으로 들고 오므로 저장 전에 제거한다.
+        description: stripThemeLockedStyles(row.problem.description.trim()),
         input_format: row.problem.input_format?.trim() || null,
         output_format: row.problem.output_format?.trim() || null,
         constraint_text: row.problem.constraint_text?.trim() || null,

@@ -49,3 +49,6 @@ docs
 
 # local design companion artifacts
 .superpowers/
+
+# 일회성 데이터 정리 전 백업 (커밋하지 않는다)
+.local-backups/

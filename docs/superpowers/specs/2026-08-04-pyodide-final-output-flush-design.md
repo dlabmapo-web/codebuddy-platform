@@ -1,7 +1,7 @@
 # Pyodide Final Output Flush Design
 
 **Date:** 2026-08-04
-**Status:** Approved design; awaiting written-spec review
+**Status:** Implemented and verified
 
 ## Summary
 

@@ -16,11 +16,16 @@ describe("development seed manifest", () => {
   it("contains unique accounts for every platform and academy role", () => {
     expect(() => validateSeedUsers(developmentUsers)).not.toThrow();
     expect(new Set(developmentUsers.map((user) => normalizeEmail(user.email))).size)
-      .toBe(5);
+      .toBe(6);
     expect(developmentUsers.filter((user) => user.platformRole === "ADMIN"))
       .toHaveLength(1);
     expect(developmentUsers.map((user) => user.academyRole).filter(Boolean).sort())
-      .toEqual(["MANAGER", "STUDENT", "TEACHER", "TEAM_LEAD"]);
+      .toEqual(["MANAGER", "STUDENT", "TEACHER", "TEACHER", "TEAM_LEAD"]);
+  });
+
+  it("keeps two teachers, so replacing one has somebody to replace it with", () => {
+    expect(developmentUsers.filter((user) => user.academyRole === "TEACHER"))
+      .toHaveLength(2);
   });
 
   it("gives memberships only to academy-scoped users", () => {

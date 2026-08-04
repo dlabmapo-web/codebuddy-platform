@@ -46,6 +46,17 @@ export const developmentUsers = [
     academyRole: "TEACHER",
   },
   {
+    // A second teacher exists so replacement is a real transition rather than
+    // a hypothetical one: with only one teacher, "replace" has nobody to
+    // replace them with, and the tests could only assign and remove.
+    id: "30000000-0000-4000-8000-000000000006",
+    membershipId: "40000000-0000-4000-8000-000000000006",
+    email: "teacher2@cove.test",
+    displayName: "Cove Second Teacher",
+    platformRole: "USER",
+    academyRole: "TEACHER",
+  },
+  {
     id: "30000000-0000-4000-8000-000000000005",
     membershipId: "40000000-0000-4000-8000-000000000005",
     email: "student@cove.test",

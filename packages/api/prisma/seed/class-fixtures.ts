@@ -21,8 +21,32 @@ export async function seedClassFixture(
     courseIds: readonly string[];
     /** Emails of the users to enroll, resolved to their academy membership. */
     studentEmails: readonly string[];
+    /**
+     * Email of the teacher put in charge of the class. Resolved to an active
+     * teacher membership in this academy — never to a user id, because the
+     * assignment is what carries the academy scope and the academy role.
+     */
+    teacherEmail?: string;
   },
-): Promise<{ enrolled: number }> {
+): Promise<{ enrolled: number; teacherAssigned: boolean }> {
+  const teacherMembership = fixture.teacherEmail
+    ? await prisma.academyMembership.findFirst({
+        where: {
+          academyId: fixture.academyId,
+          role: "TEACHER",
+          status: "ACTIVE",
+          user: { email: fixture.teacherEmail, status: "ACTIVE" },
+        },
+        select: { id: true },
+      })
+    : null;
+
+  if (fixture.teacherEmail && !teacherMembership) {
+    throw new Error(
+      `Class fixture teacher ${fixture.teacherEmail} is not an active teacher of academy ${fixture.academyId}`,
+    );
+  }
+
   await prisma.class.upsert({
     where: { id: fixture.classId },
     create: {
@@ -32,10 +56,17 @@ export async function seedClassFixture(
       description: fixture.description,
       status: "ACTIVE",
       createdByUserId: fixture.createdByUserId,
+      teacherMembershipId: teacherMembership?.id ?? null,
     },
     // A rerun restores an archived fixture, so a manual archive during testing
-    // never leaves the automated journey without access.
-    update: { name: fixture.name, status: "ACTIVE", archivedAt: null },
+    // never leaves the automated journey without access. A rerun also restores
+    // the assignment, so a test that removes the teacher stays repeatable.
+    update: {
+      name: fixture.name,
+      status: "ACTIVE",
+      archivedAt: null,
+      teacherMembershipId: teacherMembership?.id ?? null,
+    },
   });
 
   await prisma.classCourse.createMany({
@@ -65,5 +96,8 @@ export async function seedClassFixture(
     skipDuplicates: true,
   });
 
-  return { enrolled: memberships.length };
+  return {
+    enrolled: memberships.length,
+    teacherAssigned: teacherMembership !== null,
+  };
 }

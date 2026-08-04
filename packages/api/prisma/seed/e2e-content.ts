@@ -176,8 +176,10 @@ export async function seedE2eContent(prisma: PrismaClient) {
   }
 
   // Without this the Playwright student is enrolled nowhere and the whole
-  // journey sees an empty catalog, however visible the curriculum is.
-  const { enrolled } = await seedClassFixture(prisma, {
+  // journey sees an empty catalog, however visible the curriculum is. The
+  // teacher assignment gives the teacher-assignment specs a class that starts
+  // assigned, which is the state replacement and removal are tested from.
+  const { enrolled, teacherAssigned } = await seedClassFixture(prisma, {
     classId: e2eContent.classId,
     academyId: academy.id,
     name: e2eContent.className,
@@ -187,9 +189,12 @@ export async function seedE2eContent(prisma: PrismaClient) {
     studentEmails: developmentUsers
       .filter((user) => user.academyRole === "STUDENT")
       .map((user) => user.email),
+    teacherEmail: developmentUsers.find(
+      (user) => user.academyRole === "TEACHER",
+    )?.email,
   });
 
-  return { academyId: academy.id, enrolled };
+  return { academyId: academy.id, enrolled, teacherAssigned };
 }
 
 if (process.argv[1]?.endsWith("e2e-content.ts")) {
@@ -198,9 +203,12 @@ if (process.argv[1]?.endsWith("e2e-content.ts")) {
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
   seedE2eContent(prisma)
-    .then(({ academyId, enrolled }) => {
+    .then(({ academyId, enrolled, teacherAssigned }) => {
       console.log(`🌱 E2E content seeded for academy ${academyId}`);
       console.log(`   class:    ${e2eContent.className} (${enrolled} enrolled)`);
+      console.log(
+        `   teacher:  ${teacherAssigned ? "assigned" : "unassigned"}`,
+      );
     })
     .catch((error: unknown) => {
       console.error(error);

@@ -163,6 +163,11 @@ async function main(): Promise<void> {
     studentEmails: developmentUsers
       .filter((user) => user.academyRole === "STUDENT")
       .map((user) => user.email),
+    // Assigned so the class detail's teacher panel has something real to show
+    // while exploring by hand, rather than only its empty state.
+    teacherEmail: developmentUsers.find(
+      (user) => user.academyRole === "TEACHER",
+    )?.email,
   });
 
   const student = await prisma.user.findFirst({

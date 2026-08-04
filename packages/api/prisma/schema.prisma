@@ -225,6 +225,7 @@ model AcademyMembership {
   invitedBy        User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
   approvedBy       User?             @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   classEnrollments ClassEnrollment[]
+  assignedClasses  Class[]           @relation("ClassTeacher")
 
   @@unique([academyId, userId])
   @@index([userId, status])
@@ -336,6 +337,12 @@ model Class {
   description     String      @default("")
   status          ClassStatus @default(ACTIVE)
   createdByUserId String      @map("created_by_user_id") @db.Uuid
+  /// The one teacher responsible for this class, or null while unassigned.
+  /// Deliberately not unique: one teacher runs many classes. It stores the
+  /// membership rather than the user so academy scope and academy role are
+  /// both explicit — but the key alone cannot prove same-academy, so every
+  /// read and write still checks the academy in the query.
+  teacherMembershipId String? @map("teacher_membership_id") @db.Uuid
   archivedAt      DateTime?   @map("archived_at") @db.Timestamptz(6)
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Touched by course and roster changes too, so the management list reports
@@ -344,11 +351,18 @@ model Class {
 
   academy           Academy           @relation(fields: [academyId], references: [id], onDelete: Restrict)
   createdBy         User              @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  /// SetNull, not Cascade: deleting a membership must leave the class intact
+  /// and merely unassigned. Suspension and role changes delete nothing, so a
+  /// stale assignment stays visible to managers as unavailable.
+  assignedTeacher   AcademyMembership? @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
   courseAssignments ClassCourse[]
   enrollments       ClassEnrollment[]
 
   @@index([academyId, status, updatedAt(sort: Desc)])
   @@index([academyId, name])
+  /// Answers "which active classes is this teacher responsible for", the
+  /// query the later monitoring design starts from.
+  @@index([teacherMembershipId, status])
   @@map("classes")
 }
 

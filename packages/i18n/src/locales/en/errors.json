@@ -41,6 +41,7 @@
   "CLASS_EDIT_CONFLICT": "This class changed in another session. Reload it before saving again.",
   "CLASS_VALIDATION_FAILED": "Fix the class details and try again.",
   "CLASS_MEMBERSHIP_INELIGIBLE": "Only active students of this academy can be enrolled.",
+  "CLASS_TEACHER_INELIGIBLE": "Only an active teacher of this academy can be assigned to a class.",
   "COURSE_NOT_ASSIGNED": "This course is not available to you.",
   "DRAFT_TOO_LARGE": "Your code is too large to save. Shorten it and try again.",
   "SUBMISSION_IN_FLIGHT": "This problem is already being graded. Wait for the result.",

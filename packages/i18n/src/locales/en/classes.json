@@ -26,6 +26,7 @@
     "status": "Status",
     "courses": "Assigned courses",
     "students": "Students",
+    "teacher": "Assigned teacher",
     "updated": "Last change",
     "actions": "Actions"
   },
@@ -34,6 +35,14 @@
     "more": "+{{count}}",
     "aria_one": "1 assigned course: {{titles}}",
     "aria_other": "{{count}} assigned courses: {{titles}}"
+  },
+  "teacher_cell": {
+    "none": "Not assigned",
+    "role": "Teacher",
+    "unavailable": "Unavailable",
+    "aria_assigned": "Assigned teacher: {{name}}",
+    "aria_unavailable": "{{name}} is assigned but the assignment grants no access",
+    "aria_none": "No teacher assigned"
   },
   "create": {
     "heading": "Name the class",
@@ -73,7 +82,10 @@
       "students_some_inactive_one": "1 seat grants no access",
       "students_some_inactive_other": "{{count}} seats grant no access",
       "teacher": "Teacher",
-      "teacher_placeholder": "Sample data for now",
+      "teacher_unassigned": "Not assigned",
+      "teacher_none": "Nobody is responsible yet",
+      "teacher_active": "Responsible for this class",
+      "teacher_unavailable": "Assigned, but grants no access",
       "last_change": "Last change",
       "last_change_note": "Any edit, course, or roster change"
     },
@@ -86,6 +98,24 @@
       "hidden_note": "Assigned, but hidden. Students cannot open it until the course is visible.",
       "row_menu_aria": "Actions for “{{title}}”",
       "remove": "Remove from class"
+    },
+    "teacher_panel": {
+      "heading": "Assigned teacher",
+      "body": "One teacher is responsible for this class. The same teacher can run any number of classes.",
+      "assign": "Assign teacher",
+      "replace": "Replace teacher",
+      "remove": "Remove assignment",
+      "empty": "No teacher is assigned yet. Assign the teacher responsible for this class.",
+      "empty_readonly": "No teacher is assigned yet.",
+      "archived_readonly": "This class is archived. Restore it before changing who teaches it.",
+      "no_name": "Name not set",
+      "no_email": "No email",
+      "role": "Teacher",
+      "active": "Active membership",
+      "unavailable": "Unavailable",
+      "unavailable_account": "This user account is inactive, so the assignment grants no access. Replace it or remove it.",
+      "unavailable_suspended": "This membership is suspended, so the assignment grants no access. Replace it or remove it.",
+      "unavailable_role": "This member is no longer a teacher, so the assignment grants no access. Replace it or remove it."
     },
     "students_panel": {
       "heading": "Students",
@@ -138,6 +168,28 @@
     "submit": "Add to class",
     "submitting": "Adding…",
     "failed": "Could not add the students. Reload the class and try again."
+  },
+  "teacher_dialog": {
+    "heading_assign": "Assign a teacher",
+    "heading_replace": "Replace the teacher",
+    "body": "Only active teachers of this academy appear here. One teacher can be responsible for many classes.",
+    "trigger_label": "Select a teacher",
+    "search": "Search by name or email",
+    "empty": "No teacher matches that search.",
+    "none_eligible": "This academy has no active teachers yet. Invite one, or change a member's role to Teacher.",
+    "load_failed": "Teachers could not be loaded. Check your connection and try again.",
+    "unselected": "No teacher selected yet.",
+    "replace_warning": "{{name}} loses class-monitoring access to this class as soon as you save.",
+    "submit_assign": "Assign teacher",
+    "submit_replace": "Replace teacher",
+    "submitting": "Saving…",
+    "failed": "Could not save the teacher. Reload the class and try again."
+  },
+  "remove_teacher": {
+    "heading": "Remove this teacher?",
+    "body": "{{name}} loses class-monitoring access to this class right away. The class stays active with its courses and students, and runs unassigned until you pick someone else.",
+    "confirm": "Remove assignment",
+    "submitting": "Removing…"
   },
   "remove_course": {
     "heading": "Remove this course?",

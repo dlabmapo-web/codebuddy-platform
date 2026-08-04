@@ -67,12 +67,39 @@ export async function PATCH(req: Request, { params }: Params) {
     hints?: Array<{ hint_text: string; trigger_pattern?: string; order_no: number }>;
   };
 
-  if (test_cases !== undefined) {
-    const testCaseError = validateTestCases(test_cases);
+  const db = supabaseAdmin();
+
+  if (test_cases !== undefined || fields.input_format !== undefined) {
+    const [problemResult, casesResult] = await Promise.all([
+      db
+        .from('problems')
+        .select('input_format')
+        .eq('id', id)
+        .maybeSingle(),
+      test_cases === undefined
+        ? db
+            .from('test_cases')
+            .select('input, expected_output, is_sample, is_hidden, order_no')
+            .eq('problem_id', id)
+            .order('order_no', { ascending: true })
+        : Promise.resolve({ data: test_cases, error: null }),
+    ]);
+    if (problemResult.error) {
+      return apiError('문제 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+    }
+    if (!problemResult.data) {
+      return apiError('문제를 찾을 수 없습니다.', 'NOT_FOUND', 404);
+    }
+    if (casesResult.error) {
+      return apiError('테스트케이스 조회 중 오류가 발생했습니다.', 'INTERNAL_ERROR', 500);
+    }
+
+    const effectiveInputFormat = fields.input_format ?? problemResult.data.input_format ?? '';
+    const testCaseError = validateTestCases(casesResult.data ?? [], {
+      requiresInput: Boolean(effectiveInputFormat.trim()),
+    });
     if (testCaseError) return apiError(testCaseError, 'INVALID_TEST_CASES', 400);
   }
-
-  const db = supabaseAdmin();
 
   const updateFields: Record<string, unknown> = {};
   if (fields.title !== undefined) updateFields.title = fields.title.trim();

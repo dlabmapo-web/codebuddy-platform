@@ -530,7 +530,9 @@ export default function AdminProblemsPage() {
       return;
     }
     const invalidCaseIndex = form.test_cases.findIndex((tc) => (
-      !tc.expected_output.trim() || tc.is_sample === tc.is_hidden
+      (Boolean(form.input_format.trim()) && tc.input === '')
+      || !tc.expected_output.trim()
+      || tc.is_sample === tc.is_hidden
     ));
     if (invalidCaseIndex >= 0) {
       setSaving(false);
@@ -1069,6 +1071,7 @@ export default function AdminProblemsPage() {
                 <TestCaseEditor
                   value={form.test_cases}
                   onChange={(testCases) => setForm((current) => ({ ...current, test_cases: testCases }))}
+                  requiresInput={Boolean(form.input_format.trim())}
                 />
               </Section>
 

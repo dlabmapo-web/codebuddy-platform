@@ -76,7 +76,9 @@ function validateRows(rows: ImportRow[]) {
       errors.push(`${label}: 난이도는 easy, medium, hard 중 하나여야 합니다.`);
     }
     if (!row.test_cases?.length) errors.push(`${label}: 테스트케이스가 1개 이상 필요합니다.`);
-    const testCaseError = validateTestCases(row.test_cases ?? []);
+    const testCaseError = validateTestCases(row.test_cases ?? [], {
+      requiresInput: Boolean(row.problem?.input_format?.trim()),
+    });
     if (testCaseError) errors.push(`${label}: ${testCaseError}`);
     row.test_cases?.forEach((testCase, testIndex) => {
       if (!testCase.expected_output?.trim()) {

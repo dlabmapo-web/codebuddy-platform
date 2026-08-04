@@ -1,7 +1,7 @@
 # Prompt-Aware Console Grading Design
 
 **Date:** 2026-08-04
-**Status:** Corrective revision approved; awaiting written-spec review
+**Status:** Implemented
 
 ## Summary
 

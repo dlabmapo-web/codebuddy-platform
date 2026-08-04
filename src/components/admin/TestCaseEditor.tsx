@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   CheckCircle2,
@@ -23,6 +24,8 @@ export type TestCaseDraft = {
 type Props = {
   value: TestCaseDraft[];
   onChange: (testCases: TestCaseDraft[]) => void;
+  /** 문제에서 입력 형식을 선언했는지 여부 */
+  requiresInput?: boolean;
 };
 
 function withOrder(testCases: TestCaseDraft[]) {
@@ -32,13 +35,14 @@ function withOrder(testCases: TestCaseDraft[]) {
   }));
 }
 
-function caseError(testCase: TestCaseDraft) {
+function caseError(testCase: TestCaseDraft, requiresInput: boolean) {
+  if (requiresInput && testCase.input === '') return '표준 입력값을 입력해주세요.';
   if (!testCase.expected_output.trim()) return '기대 출력값을 입력해주세요.';
   if (testCase.is_sample === testCase.is_hidden) return '공개 방식을 하나만 선택해주세요.';
   return null;
 }
 
-export function TestCaseEditor({ value, onChange }: Props) {
+export function TestCaseEditor({ value, onChange, requiresInput = false }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const activeIndex = value.length === 0
     ? 0
@@ -47,13 +51,14 @@ export function TestCaseEditor({ value, onChange }: Props) {
   const summary = useMemo(() => ({
     sample: value.filter((testCase) => testCase.is_sample).length,
     hidden: value.filter((testCase) => testCase.is_hidden).length,
-    invalid: value.filter((testCase) => caseError(testCase)).length,
-  }), [value]);
+    invalid: value.filter((testCase) => caseError(testCase, requiresInput)).length,
+  }), [requiresInput, value]);
 
   const selected = value[activeIndex];
   const approximatePoints = value.length > 0
     ? Math.round(100 / value.length)
     : 0;
+  const inputMissing = Boolean(selected && requiresInput && selected.input === '');
 
   const replaceSelected = (patch: Partial<TestCaseDraft>) => {
     onChange(value.map((testCase, index) => (
@@ -175,7 +180,7 @@ export function TestCaseEditor({ value, onChange }: Props) {
             </div>
             <div className="flex flex-col gap-1 p-2">
               {value.map((testCase, index) => {
-                const error = caseError(testCase);
+                const error = caseError(testCase, requiresInput);
                 const active = index === activeIndex;
                 return (
                   <button
@@ -312,6 +317,66 @@ export function TestCaseEditor({ value, onChange }: Props) {
                     </span>
                   )}
                 </label>
+              </div>
+
+              {inputMissing && (
+                <div
+                  role="alert"
+                  data-testid="test-case-input-warning"
+                  className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5"
+                  style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--tint-danger-line)' }}
+                >
+                  <AlertTriangle size={14} style={{ marginTop: 1, flexShrink: 0, color: '#DC2626' }} />
+                  <p style={{ fontSize: 11, lineHeight: 1.6, color: 'var(--color-ink)' }}>
+                    이 문제는 입력 형식을 사용하지만 표준 입력이 비어 있습니다. 예를 들어 두 수의 합 문제라면 <code>3 5</code>처럼 실제 채점값을 입력해주세요.
+                  </p>
+                </div>
+              )}
+
+              <div
+                className="mt-3 rounded-xl px-3 py-2.5"
+                style={{ backgroundColor: 'var(--tint-soft)', border: '1px solid var(--tint-line)' }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink)' }}>
+                  입력과 출력 작성 규칙
+                </div>
+                <ul style={{ marginTop: 5, paddingLeft: 14, fontSize: 11, lineHeight: 1.7, color: 'var(--color-sub)', listStyle: 'disc' }}>
+                  <li>
+                    <code>input()</code> 한 번이 입력 한 줄을 읽습니다. <code>input()</code>이 두 번이면 입력도 두 줄로 적어주세요.
+                  </li>
+                  <li>
+                    <code>input(&quot;이름: &quot;)</code>의 안내 문구는 화면에 출력되는 글자입니다. 기대 출력에 똑같이 포함해주세요.
+                  </li>
+                  <li>
+                    학생이 입력한 값 자체는 출력에 남지 않습니다. 프로그램이 직접 출력할 때만 기대 출력에 넣어주세요.
+                  </li>
+                </ul>
+                <div
+                  className="mt-2.5 grid gap-2 sm:grid-cols-2"
+                  style={{ fontFamily: 'monospace', fontSize: 10.5, lineHeight: 1.6 }}
+                >
+                  <div>
+                    <div style={{ marginBottom: 3, fontFamily: 'inherit', color: 'var(--color-sub)' }}>코드</div>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', padding: '6px 8px', borderRadius: 6, backgroundColor: 'var(--code-bg)', color: 'var(--code-fg)' }}>
+{`name = input("이름: ")
+pw = input("비밀번호: ")
+print(f"환영합니다, {name}")`}
+                    </pre>
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 3, color: 'var(--color-sub)' }}>표준 입력 / 기대 출력</div>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', padding: '6px 8px', borderRadius: 6, backgroundColor: 'var(--code-bg)', color: 'var(--code-fg)' }}>
+{`철수
+1234
+---
+이름: 비밀번호: 환영합니다, 철수`}
+                    </pre>
+                  </div>
+                </div>
+                <p style={{ marginTop: 6, fontSize: 10.5, lineHeight: 1.6, color: 'var(--color-sub)' }}>
+                  안내 문구 두 개가 한 줄에 붙는 이유는 <code>input()</code>이 줄바꿈 없이 문구만 출력하기 때문입니다.
+                  (<code>---</code> 윗줄이 표준 입력, 아랫줄이 기대 출력)
+                </p>
               </div>
             </div>
           )}

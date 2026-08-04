@@ -48,8 +48,10 @@ import { shouldReconcileSubmission } from '@/lib/judge/reconciliationPolicy';
 import { SampleRunControls } from '@/components/judge/SampleRunControls';
 import { PublicProblemStatement } from '@/components/problems/PublicProblemStatement';
 import {
+  compareSampleOutput,
   createSampleInputQueue,
-  isSampleOutputMatch,
+  dispatchSampleStdin,
+  hasSampleExecutionFailure,
 } from '@/lib/pyodide/sampleRun';
 import type {
   ProblemNavigation,
@@ -242,6 +244,7 @@ export default function ProblemSolveClient({
   const runStdoutRef = useRef('');
   const runStderrRef = useRef('');
   const runPythonErrorRef = useRef<PythonExecutionError | null>(null);
+  const runExecutionErrorRef = useRef<string | null>(null);
   const syntaxAttemptRef = useRef<SyntaxAttemptState | null>(null);
   const manualInputQueueRef = useRef<string[]>([]);
   const runOutBufRef = useRef<Array<{ text: string; kind: TerminalLine['kind'] }>>([]);
@@ -1105,11 +1108,13 @@ export default function ProblemSolveClient({
     stdout: string;
     stderr: string;
     pythonError: PythonExecutionError | null;
+    executionError: string | null;
     stopped: boolean;
   }> => {
     runStdoutRef.current = '';
     runStderrRef.current = '';
     runPythonErrorRef.current = null;
+    runExecutionErrorRef.current = null;
     manualInputQueueRef.current = [];
     setLastPythonError(null);
     setTerminalTab('terminal');
@@ -1118,6 +1123,14 @@ export default function ProblemSolveClient({
     const runner = ensureRunner();
 
     if (!runner) {
+      // 대화식 실행을 지원하지 않는 브라우저: stdin이 고정 문자열이라 수동 실행에서도
+      // input()을 기다릴 수 없다. 학생이 "왜 입력이 안 되지?"로 헤매지 않게 알린다.
+      if (options?.sampleInput === undefined) {
+        appendTerminal(
+          '이 브라우저에서는 실행 중 직접 입력을 받을 수 없어요. input()이 있으면 테스트 버튼으로 실행해 주세요.\n',
+          'info',
+        );
+      }
       return runFallbackOnce(sourceCode, options?.sampleInput ?? '')
         .then(({ stdout, stderr, pythonError }) => {
           if (stdout) { appendTerminal(stdout, 'out'); queueRunOut(stdout, 'out'); }
@@ -1130,13 +1143,19 @@ export default function ProblemSolveClient({
           if (!stdout && !stderr && !pythonError) appendTerminal('(출력 없음)\n', 'info');
           flushRunOut();
           broadcastRun('run:end', {});
-          return { stdout, stderr, pythonError, stopped: false };
+          return { stdout, stderr, pythonError, executionError: null, stopped: false };
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : '실행 오류';
           appendTerminal(msg + '\n', 'err');
           broadcastRun('run:end', {});
-          return { stdout: '', stderr: msg, pythonError: null, stopped: false };
+          return {
+            stdout: '',
+            stderr: '',
+            pythonError: null,
+            executionError: msg,
+            stopped: false,
+          };
         });
     }
 
@@ -1144,10 +1163,10 @@ export default function ProblemSolveClient({
       appendTerminal('실행 환경(Python)을 불러오는 중입니다... 최초 실행은 몇 초 걸릴 수 있어요.\n', 'info');
     }
 
-    const sampleInputQueue = options?.sampleInput === undefined
+    // 고정 입력 실행(테스트 N)이면 큐를 만든다. null이면 학생이 직접 입력하는 수동 실행.
+    let sampleInputQueue = options?.sampleInput === undefined
       ? null
       : createSampleInputQueue(options.sampleInput);
-    let inputExhaustedNoticeShown = false;
 
     return new Promise((resolve) => {
       const finish = (stopped: boolean) => {
@@ -1161,6 +1180,7 @@ export default function ProblemSolveClient({
           stdout: runStdoutRef.current,
           stderr: runStderrRef.current,
           pythonError: runPythonErrorRef.current,
+          executionError: runExecutionErrorRef.current,
           stopped,
         });
       };
@@ -1182,30 +1202,38 @@ export default function ProblemSolveClient({
           queueRunOut(ev.error.display, 'err');
         } else if (ev.type === 'stdin') {
           flushRunOut();
-          const inputLine = sampleInputQueue && sampleInputQueue.length > 0
-            ? sampleInputQueue.shift()
-            : manualInputQueueRef.current.shift();
-          if (inputLine !== undefined) {
-            appendTerminal(inputLine + '\n', 'in');
-            broadcastRun('run:stdin', { text: inputLine });
-            setAwaitingInput(false);
-            queueMicrotask(() => runner.provideInput(inputLine));
+          if (sampleInputQueue) {
+            // 고정 입력 실행은 공식 채점과 같은 계약을 따른다 — 입력이 떨어지면
+            // 학생에게 묻지 않고 stdin을 닫아 EOFError가 나게 한다.
+            sampleInputQueue = dispatchSampleStdin(sampleInputQueue, {
+              provideLine: (line) => {
+                appendTerminal(line + '\n', 'in');
+                broadcastRun('run:stdin', { text: line });
+                setAwaitingInput(false);
+                queueMicrotask(() => runner.provideInput(line));
+              },
+              sendEOF: () => {
+                setAwaitingInput(false);
+                queueMicrotask(() => runner.sendEOF());
+              },
+            });
           } else {
-            if (sampleInputQueue && !inputExhaustedNoticeShown) {
-              inputExhaustedNoticeShown = true;
-              appendTerminal(
-                '테스트 입력을 모두 사용했습니다. 필요한 입력을 직접 입력해 주세요.\n',
-                'info',
-              );
+            const inputLine = manualInputQueueRef.current.shift();
+            if (inputLine !== undefined) {
+              appendTerminal(inputLine + '\n', 'in');
+              broadcastRun('run:stdin', { text: inputLine });
+              setAwaitingInput(false);
+              queueMicrotask(() => runner.provideInput(inputLine));
+            } else {
+              setAwaitingInput(true);
+              broadcastRun('run:waiting', {});
             }
-            setAwaitingInput(true);
-            broadcastRun('run:waiting', {});
           }
         } else if (ev.type === 'done') {
           finish(false);
         } else if (ev.type === 'fatal') {
           const message = ev.text || '실행 오류';
-          runStderrRef.current += message;
+          runExecutionErrorRef.current = message;
           appendTerminal(message + '\n', 'err');
           finish(false);
         }
@@ -1331,7 +1359,7 @@ export default function ProblemSolveClient({
       { text: `$ python solution.py · 테스트 ${sampleNumber}\n`, kind: 'meta' },
       {
         text: queuedLineCount > 0
-          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄을 자동으로 사용합니다.\n`
+          ? `테스트 ${sampleNumber} 입력 ${queuedLineCount}줄만 사용합니다. 실제 채점과 똑같이 직접 입력할 수는 없어요.\n`
           : `입력이 없는 테스트 ${sampleNumber}을 실행합니다.\n`,
         kind: 'info',
       },
@@ -1340,18 +1368,25 @@ export default function ProblemSolveClient({
     const result = await executeInTerminal(code, { sampleInput: sampleCase.input });
     if (!result.stopped) updateSyntaxCoaching(result.pythonError, code);
 
-    if (!result.stopped && !result.pythonError && !result.stderr) {
-      if (isSampleOutputMatch(result.stdout, sampleCase.expected_output)) {
-        appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
-      } else {
-        appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+    if (!result.stopped) {
+      if (hasSampleExecutionFailure(result)) {
+        // 공식 채점에서도 실행 오류는 그 케이스의 실패다 — 비교를 건너뛰지 않는다.
         appendTerminal(
-          `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
-          'info',
+          `\n✕ 테스트 ${sampleNumber}: 실행 중 오류가 나서 통과하지 못했습니다.\n`,
+          'err',
         );
+      } else {
+        const comparison = compareSampleOutput(result.stdout, sampleCase.expected_output);
+        if (comparison === 'match') {
+          appendTerminal(`\n✓ 테스트 ${sampleNumber} 결과가 예상 출력과 일치합니다.\n`, 'meta');
+        } else {
+          appendTerminal(`\n✕ 테스트 ${sampleNumber} 결과가 예상 출력과 다릅니다.\n`, 'err');
+          appendTerminal(
+            `예상 출력:\n${sampleCase.expected_output || '(출력 없음)'}\n`,
+            'info',
+          );
+        }
       }
-    } else if (!result.stopped) {
-      appendTerminal('\n실행 오류가 있어 예제 출력 비교를 건너뜁니다.\n', 'info');
     }
 
     if (!result.stopped) appendTerminal('\n[프로그램이 종료되었습니다]\n', 'meta');

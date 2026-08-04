@@ -20,6 +20,9 @@
   --color-danger: #DC2626;
   --color-warning: #D97706;
   --color-editor-bg: #1E1E1E;
+  /* D·LAB Coding brand orange — taken from public/dlab-logo.svg. Used only for
+     D·LAB branding (campus name next to the logo), never for app UI accents. */
+  --color-dlab: #E94B20;
 
   --radius: 8px;
   --radius-card: 10px;
@@ -67,6 +70,8 @@
   --color-surface: #14171F;
   --color-card: #1B1F29;
   --color-muted: #242935;
+  /* Lifted a step so the brand orange keeps contrast on the dark surfaces. */
+  --color-dlab: #F2703F;
 
   --tint-1: #1B2637;
   --tint-2: #161A24;

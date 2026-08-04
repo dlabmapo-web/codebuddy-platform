@@ -119,7 +119,7 @@ export default function LoginPage() {
             alt="디랩코딩 D·LAB Coding"
             style={{ height: 52, width: 'auto' }}
           />
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-sub)', letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-dlab)', letterSpacing: '-0.01em' }}>
             마포캠퍼스
           </span>
         </div>

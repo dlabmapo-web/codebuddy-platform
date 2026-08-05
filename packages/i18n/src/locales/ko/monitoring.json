@@ -1,0 +1,139 @@
+{
+  "classes": {
+    "title": "내 반",
+    "description": "담당하고 있는 반입니다.",
+    "empty_title": "담당 반이 없습니다",
+    "empty_body": "반에 배정되면 여기에 표시됩니다.",
+    "disabled_title": "실시간 모니터링이 비활성화되어 있습니다",
+    "disabled_body": "학원 관리자에게 실시간 모니터링 활성화를 요청하세요.",
+    "forbidden_title": "이용할 수 없습니다",
+    "forbidden_body": "실시간 모니터링은 반 담당 강사만 사용할 수 있습니다.",
+    "unavailable_title": "반 목록을 불러오지 못했습니다",
+    "unavailable_body": "서버가 응답하지 않았습니다. 잠시 후 다시 시도하세요.",
+    "course_count_other": "코스 {{count}}개",
+    "student_count_other": "학생 {{count}}명",
+    "online_count": "접속 {{count}}명",
+    "solving_count": "풀이 중 {{count}}명",
+    "open": "실시간 반 열기"
+  },
+  "roster": {
+    "back": "내 반",
+    "summary_total": "등록",
+    "summary_online": "접속",
+    "summary_solving": "풀이 중",
+    "search_label": "학생 검색",
+    "search_placeholder": "이름 또는 이메일",
+    "filter_all": "전체",
+    "filter_online": "접속",
+    "filter_solving": "풀이 중",
+    "filter_idle": "대기",
+    "filter_offline": "오프라인",
+    "column_student": "학생",
+    "column_state": "상태",
+    "column_exercise": "현재 문제",
+    "column_activity": "마지막 활동",
+    "column_run": "최근 실행",
+    "empty": "조건에 맞는 학생이 없습니다.",
+    "no_enrollments": "아직 이 반에 등록된 학생이 없습니다.",
+    "truncated": "이 반의 처음 {{count}}명만 표시합니다.",
+    "open_live": "실시간 보기",
+    "no_exercise": "문제 풀이 중이 아님",
+    "never_seen": "없음",
+    "membership_inactive": "비활성 멤버십",
+    "in_exercise": "문제 풀이 중"
+  },
+  "state": {
+    "ONLINE": "접속",
+    "SOLVING": "풀이 중",
+    "IDLE": "대기",
+    "RECONNECTING": "재연결 중",
+    "OFFLINE": "오프라인"
+  },
+  "run": {
+    "STARTED": "실행 중",
+    "COMPLETED": "{{passed}}/{{total}} 통과",
+    "FAILED": "실행 실패",
+    "CANCELLED": "실행 중지"
+  },
+  "run_plain": {
+    "STARTED": "실행 중",
+    "COMPLETED": "코드 실행 완료",
+    "FAILED": "실행 실패",
+    "CANCELLED": "실행 중지"
+  },
+  "connection": {
+    "connecting": "연결 중",
+    "live": "실시간",
+    "reconnecting": "재연결 중",
+    "resynchronizing": "동기화 중",
+    "degraded": "실시간 업데이트를 사용할 수 없습니다",
+    "degraded_body": "반 정보는 최신이지만 실시간 상태는 중지되었습니다.",
+    "revoked": "접근 권한이 해제되었습니다",
+    "revoked_body": "더 이상 이 반의 담당 강사가 아닙니다."
+  },
+  "workspace": {
+    "title": "실시간 지도",
+    "back": "반으로 돌아가기",
+    "student_left": "학생이 나갔습니다",
+    "unsaved": "저장되지 않은 변경",
+    "saved": "저장됨",
+    "editing_together": "{{name}} 학생과 함께 편집 중",
+    "tab_you": "내 실행",
+    "tab_student": "{{name}} 실행",
+    "no_run": "아직 실행 기록이 없습니다.",
+    "run_empty": "출력이 없습니다.",
+    "result_title": "최근 제출",
+    "result_score": "점수 {{score}}",
+    "result_cases": "테스트 {{total}}개 중 {{passed}}개 통과",
+    "run_private": "이 터미널은 강사 전용입니다. 학생에게는 보이지 않으며, 제출은 학생만 할 수 있습니다.",
+    "loading": "작업 공간을 여는 중",
+    "unavailable_title": "이 학생을 열 수 없습니다",
+    "unavailable_body": "이 반에서 제외되었거나 계정이 더 이상 활성 상태가 아닙니다.",
+    "not_solving_title": "문제 풀이 중이 아닙니다",
+    "not_solving_body": "이 학생은 지금 문제를 풀고 있지 않습니다.",
+    "ended_title": "모니터링이 종료되었습니다",
+    "narrow_title": "화면이 너무 좁습니다",
+    "narrow_body": "학생과 함께 코드를 편집하려면 더 넓은 화면을 사용하세요."
+  },
+  "feedback": {
+    "title": "피드백",
+    "empty": "아직 피드백이 없습니다.",
+    "placeholder": "학생에게 남길 짧은 메모를 작성하세요",
+    "send": "보내기",
+    "sending": "보내는 중",
+    "failed": "메시지를 보내지 못했습니다. 다시 시도하세요.",
+    "author_you": "나",
+    "author_teacher": "강사",
+    "waiting": "작업 공간이 연결되면 피드백을 보낼 수 있습니다."
+  },
+  "peer": {
+    "teacher": "선생님",
+    "looking_at": "{{name}}이 {{surface}} 보고 있습니다",
+    "surface": {
+      "header": "상단 메뉴를",
+      "curriculum": "교육과정을",
+      "statement": "문제 설명을",
+      "editor": "코드를",
+      "terminal": "터미널을",
+      "feedback": "피드백을"
+    }
+  },
+  "indicator": {
+    "monitoring": "강사가 모니터링 중입니다",
+    "helping": "강사가 도와주고 있습니다",
+    "reconnecting": "재연결 중"
+  },
+  "end_reason": {
+    "TEACHER_LEFT": "이 작업 공간에서 나갔습니다.",
+    "WATCH_REPLACED": "다른 학생을 열었습니다.",
+    "STUDENT_LEFT": "학생이 문제를 닫았습니다.",
+    "ASSIGNMENT_CHANGED": "이 반이 다른 강사에게 배정되었습니다.",
+    "CLASS_ARCHIVED": "이 반이 보관되었습니다.",
+    "ENROLLMENT_REMOVED": "학생이 이 반에서 제외되었습니다.",
+    "MEMBERSHIP_INACTIVE": "멤버십이 더 이상 활성 상태가 아닙니다.",
+    "ROLE_CHANGED": "역할이 변경되었습니다.",
+    "MATERIAL_UNAVAILABLE": "문제를 더 이상 이용할 수 없습니다.",
+    "CONNECTION_EXPIRED": "연결이 끊어졌습니다.",
+    "FEATURE_DISABLED": "실시간 모니터링이 해제되었습니다."
+  }
+}

@@ -30,3 +30,30 @@ export const localeNames: Record<Locale, string> = {
 export function isLocale(value: string | undefined | null): value is Locale {
   return typeof value === "string" && (locales as readonly string[]).includes(value);
 }
+
+/**
+ * The namespaces the root layout ships in every page's RSC payload.
+ *
+ * The budget in `locales.spec.ts` is measured against exactly this list. A
+ * namespace that belongs to one route — the monitoring copy, for instance —
+ * stays out of it and is loaded by that route through
+ * `PageTranslationsProvider`, so a feature used by one role does not cost
+ * every page its payload.
+ */
+export const layoutNamespaces = [
+  "common",
+  "nav",
+  "auth",
+  "academy",
+  "members",
+  "applications",
+  "invitations",
+  "courses",
+  "classes",
+  "content",
+  "learn",
+  "errors",
+  "validation",
+] as const;
+
+export type LayoutNamespace = (typeof layoutNamespaces)[number];

@@ -1,0 +1,141 @@
+{
+  "classes": {
+    "title": "My classes",
+    "description": "The classes you are responsible for.",
+    "empty_title": "No classes yet",
+    "empty_body": "You will see a class here once you are assigned to one.",
+    "disabled_title": "Live monitoring is not enabled",
+    "disabled_body": "Ask a manager to enable live monitoring for this academy.",
+    "forbidden_title": "Not available",
+    "forbidden_body": "Live monitoring is for the teacher assigned to a class.",
+    "unavailable_title": "Could not load your classes",
+    "unavailable_body": "The service did not respond. Try again in a moment.",
+    "course_count_one": "{{count}} course",
+    "course_count_other": "{{count}} courses",
+    "student_count_one": "{{count}} student",
+    "student_count_other": "{{count}} students",
+    "online_count": "{{count}} online",
+    "solving_count": "{{count}} solving",
+    "open": "Open live class"
+  },
+  "roster": {
+    "back": "My classes",
+    "summary_total": "Enrolled",
+    "summary_online": "Online",
+    "summary_solving": "Solving",
+    "search_label": "Search students",
+    "search_placeholder": "Name or email",
+    "filter_all": "All",
+    "filter_online": "Online",
+    "filter_solving": "Solving",
+    "filter_idle": "Idle",
+    "filter_offline": "Offline",
+    "column_student": "Student",
+    "column_state": "State",
+    "column_exercise": "Current exercise",
+    "column_activity": "Last activity",
+    "column_run": "Latest run",
+    "empty": "No students match this filter.",
+    "no_enrollments": "Nobody is enrolled in this class yet.",
+    "truncated": "Showing the first {{count}} students of this class.",
+    "open_live": "Open live",
+    "no_exercise": "Not in an exercise",
+    "never_seen": "Never",
+    "membership_inactive": "Inactive membership",
+    "in_exercise": "In an exercise"
+  },
+  "state": {
+    "ONLINE": "Online",
+    "SOLVING": "Solving",
+    "IDLE": "Idle",
+    "RECONNECTING": "Reconnecting",
+    "OFFLINE": "Offline"
+  },
+  "run": {
+    "STARTED": "Running",
+    "COMPLETED": "Ran {{passed}}/{{total}}",
+    "FAILED": "Run failed",
+    "CANCELLED": "Run stopped"
+  },
+  "run_plain": {
+    "STARTED": "Running",
+    "COMPLETED": "Ran the code",
+    "FAILED": "Run failed",
+    "CANCELLED": "Run stopped"
+  },
+  "connection": {
+    "connecting": "Connecting",
+    "live": "Live",
+    "reconnecting": "Reconnecting",
+    "resynchronizing": "Resynchronizing",
+    "degraded": "Live updates unavailable",
+    "degraded_body": "Class data is current, but live states are paused.",
+    "revoked": "Access revoked",
+    "revoked_body": "You are no longer the assigned teacher for this class."
+  },
+  "workspace": {
+    "title": "Live help",
+    "back": "Back to class",
+    "student_left": "Student left",
+    "unsaved": "Unsaved changes",
+    "saved": "Saved",
+    "editing_together": "Editing with {{name}}",
+    "tab_you": "Your run",
+    "tab_student": "{{name}}'s run",
+    "no_run": "The student has not run anything yet.",
+    "run_empty": "The run produced no output.",
+    "result_title": "Latest submission",
+    "result_score": "Score {{score}}",
+    "result_cases": "{{passed}} of {{total}} tests passed",
+    "run_private": "This terminal is yours. The student does not see it, and only they can submit.",
+    "loading": "Opening the workspace",
+    "unavailable_title": "This student cannot be opened",
+    "unavailable_body": "They are no longer enrolled in this class, or their account is no longer active.",
+    "not_solving_title": "Not in an exercise",
+    "not_solving_body": "This student is not working on an exercise right now.",
+    "ended_title": "Monitoring ended",
+    "narrow_title": "Screen too small for live help",
+    "narrow_body": "Use a wider screen to edit alongside a student."
+  },
+  "feedback": {
+    "title": "Feedback",
+    "empty": "No feedback yet.",
+    "placeholder": "Write a short note for this student",
+    "send": "Send",
+    "sending": "Sending",
+    "failed": "The message was not sent. Try again.",
+    "author_you": "You",
+    "author_teacher": "Teacher",
+    "waiting": "Feedback opens once the workspace is live."
+  },
+  "peer": {
+    "teacher": "Teacher",
+    "looking_at": "{{name}} is looking at {{surface}}",
+    "surface": {
+      "header": "the toolbar",
+      "curriculum": "the course outline",
+      "statement": "the problem",
+      "editor": "the code",
+      "terminal": "the terminal",
+      "feedback": "the feedback"
+    }
+  },
+  "indicator": {
+    "monitoring": "Teacher is monitoring",
+    "helping": "Teacher is helping",
+    "reconnecting": "Reconnecting"
+  },
+  "end_reason": {
+    "TEACHER_LEFT": "You left this workspace.",
+    "WATCH_REPLACED": "You opened another student.",
+    "STUDENT_LEFT": "The student closed the exercise.",
+    "ASSIGNMENT_CHANGED": "This class was assigned to another teacher.",
+    "CLASS_ARCHIVED": "This class was archived.",
+    "ENROLLMENT_REMOVED": "The student was removed from this class.",
+    "MEMBERSHIP_INACTIVE": "The membership is no longer active.",
+    "ROLE_CHANGED": "The role changed.",
+    "MATERIAL_UNAVAILABLE": "The exercise is no longer available.",
+    "CONNECTION_EXPIRED": "The connection was lost.",
+    "FEATURE_DISABLED": "Live monitoring was turned off."
+  }
+}

@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import type { Locale } from '@cove/i18n/settings';
 
 import { initTranslations } from '../init-translations';
-import type { LayoutNamespace } from '../namespaces';
+import type { LayoutNamespace, PageNamespace } from '../namespaces';
 import { getLocale } from './get-locale';
 
 /**
@@ -17,7 +17,10 @@ import { getLocale } from './get-locale';
  * fresh instance per call and would be wasteful in a render loop.
  */
 export async function getServerTranslation<
-  const Ns extends readonly [LayoutNamespace, ...LayoutNamespace[]],
+  const Ns extends readonly [
+    LayoutNamespace | PageNamespace,
+    ...Array<LayoutNamespace | PageNamespace>,
+  ],
 >(namespaces: Ns): Promise<{ locale: Locale; t: TFunction<Ns> }> {
   const locale = await getLocale();
   const { i18n } = await initTranslations(locale, namespaces);

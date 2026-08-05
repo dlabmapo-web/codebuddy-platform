@@ -17,7 +17,8 @@
     "members": "멤버",
     "applications": "가입 신청",
     "invitations": "초대",
-    "my_courses": "내 코스"
+    "my_courses": "내 코스",
+    "my_classes": "내 반"
   },
   "academy_switcher": {
     "select": "학원 선택",

@@ -48,5 +48,12 @@
   "SUBMISSION_RATE_LIMITED": "Too many submissions. Wait a moment and try again.",
   "SUBMISSION_NOT_FOUND": "That submission was not found.",
   "GRADING_UNAVAILABLE": "Grading is temporarily unavailable. Your code is saved.",
+  "MONITORING_DISABLED": "Live monitoring is not enabled for this academy.",
+  "MONITORING_ACCESS_DENIED": "You are not the assigned teacher for this class.",
+  "MONITORING_STUDENT_UNAVAILABLE": "This student is not available to monitor right now.",
+  "MONITORING_WATCH_REPLACED": "This session was replaced by a newer one.",
+  "MONITORING_PAYLOAD_TOO_LARGE": "That change was too large to send. It will be synchronized in full.",
+  "MONITORING_REALTIME_UNAVAILABLE": "Live monitoring is temporarily unavailable.",
+  "MONITORING_FEEDBACK_INVALID": "Feedback must be between 1 and 2,000 characters.",
   "UNKNOWN": "Something went wrong. Try again."
 }

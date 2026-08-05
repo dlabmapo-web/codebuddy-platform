@@ -1,25 +1,13 @@
-/**
- * Every namespace the root layout loads into `LayoutTranslationsProvider`.
- *
- * These ship in the RSC payload of every v2 page, so the set has a budget:
- * ≤50 KB per locale in total, and no single namespace over 15 KB. When one
- * outgrows it, drop it from this list and load it on its own route with
- * `PageTranslationsProvider`. `i18n/payload-budget.spec.ts` enforces both.
- */
-export const layoutNamespaces = [
-  "common",
-  "nav",
-  "auth",
-  "academy",
-  "members",
-  "applications",
-  "invitations",
-  "courses",
-  "classes",
-  "content",
-  "learn",
-  "errors",
-  "validation",
-] as const;
+export { layoutNamespaces, type LayoutNamespace } from "@cove/i18n/settings";
 
-export type LayoutNamespace = (typeof layoutNamespaces)[number];
+/**
+ * Namespaces a single route mounts for itself with `PageTranslationsProvider`.
+ *
+ * Live monitoring is a Teacher-only surface, so its copy is paid for by the
+ * teaching routes rather than by every page's RSC payload. The budget in
+ * `@cove/i18n`'s `locales.spec.ts` measures the layout list only, and caps
+ * each namespace separately.
+ */
+export const monitoringNamespaces = ["monitoring", "errors"] as const;
+
+export type PageNamespace = (typeof monitoringNamespaces)[number];

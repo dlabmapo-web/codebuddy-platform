@@ -15,6 +15,7 @@ import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
 import type learn from '@cove/i18n/locales/en/learn.json';
 import type members from '@cove/i18n/locales/en/members.json';
+import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
 import type validation from '@cove/i18n/locales/en/validation.json';
 
@@ -33,6 +34,7 @@ declare module 'i18next' {
       invitations: typeof invitations;
       learn: typeof learn;
       members: typeof members;
+      monitoring: typeof monitoring;
       nav: typeof nav;
       validation: typeof validation;
     };

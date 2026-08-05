@@ -2,11 +2,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { fallbackLocale, locales } from "./settings.js";
+import { fallbackLocale, layoutNamespaces, locales } from "./settings.js";
 
 const localesDir = join(import.meta.dirname, "locales");
 
-/** Total bytes of one locale's namespaces allowed in the root RSC payload. */
+/** Total bytes of the layout namespaces allowed in the root RSC payload. */
 const TOTAL_BUDGET_BYTES = 50 * 1024;
 /** Bytes above which a single namespace should move to a page provider. */
 const NAMESPACE_BUDGET_BYTES = 15 * 1024;
@@ -73,17 +73,31 @@ describe("locale files", () => {
   });
 
   it("stays inside the layout payload budget", () => {
+    const layout = new Set<string>(
+      layoutNamespaces.map((namespace) => `${namespace}.json`),
+    );
     for (const locale of locales) {
       let total = 0;
       for (const file of namespaceFiles(locale)) {
         const bytes = readFileSync(join(localesDir, locale, file)).byteLength;
+        // Every namespace is capped, whichever provider loads it: one that
+        // large is a payload problem on whatever route it ships with.
         expect(
           bytes,
-          `${locale}/${file} should move to a page provider`,
+          `${locale}/${file} should be split`,
         ).toBeLessThan(NAMESPACE_BUDGET_BYTES);
-        total += bytes;
+        // Only the layout list counts toward the root payload. A page-scoped
+        // namespace is paid for by the one route that mounts it.
+        if (layout.has(file)) total += bytes;
       }
-      expect(total, `${locale} total`).toBeLessThan(TOTAL_BUDGET_BYTES);
+      expect(total, `${locale} layout total`).toBeLessThan(TOTAL_BUDGET_BYTES);
+    }
+  });
+
+  it("loads every layout namespace from a file that exists", () => {
+    const files = new Set(namespaceFiles(fallbackLocale));
+    for (const namespace of layoutNamespaces) {
+      expect(files, namespace).toContain(`${namespace}.json`);
     }
   });
 });

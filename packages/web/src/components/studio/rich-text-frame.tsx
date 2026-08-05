@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
 
 /**
  * Authored HTML stays in an iframe so it can never restyle or script the
@@ -33,6 +34,34 @@ export function RichTextFrame({
 
     let observer: ResizeObserver | undefined;
     let cancelled = false;
+    let detachPointerBridge: () => void = () => undefined;
+
+    const bridgePointer = () => {
+      const innerDocument = frame.contentDocument;
+      const innerWindow = frame.contentWindow;
+      if (!innerDocument || !innerWindow) return;
+      // WebKit can keep the same Document wrapper while replacing about:blank
+      // with srcDoc. Reattach on every load/retry instead of using object
+      // identity as proof that the live document is already wired.
+      detachPointerBridge();
+      const forward = (event: MouseEvent) => {
+        frame.dispatchEvent(
+          new CustomEvent(iframePointerMoveEvent, {
+            bubbles: true,
+            detail: { clientX: event.clientX, clientY: event.clientY },
+          }),
+        );
+      };
+      innerWindow.addEventListener('pointermove', forward, true);
+      // WebKit's sandboxed srcDoc path reports Mouse Events consistently even
+      // when Pointer Events are absent. The outer throttle coalesces browsers
+      // that report both.
+      innerWindow.addEventListener('mousemove', forward, true);
+      detachPointerBridge = () => {
+        innerWindow.removeEventListener('pointermove', forward, true);
+        innerWindow.removeEventListener('mousemove', forward, true);
+      };
+    };
 
     const measure = () => {
       const body = frame.contentDocument?.body;
@@ -48,6 +77,7 @@ export function RichTextFrame({
     const attach = () => {
       if (cancelled) return;
       measure();
+      bridgePointer();
       const body = frame.contentDocument?.body;
       if (!body || observer) return;
       // Late-loading images change the height after the initial measure.
@@ -72,6 +102,7 @@ export function RichTextFrame({
       retries.forEach(window.clearTimeout);
       frame.removeEventListener('load', attach);
       observer?.disconnect();
+      detachPointerBridge();
     };
   }, [content, minHeight]);
 

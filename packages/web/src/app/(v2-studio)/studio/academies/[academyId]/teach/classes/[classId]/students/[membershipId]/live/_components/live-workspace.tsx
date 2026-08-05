@@ -2,7 +2,6 @@
 
 import type { MonitoringStudentContext } from '@cove/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Users } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -243,11 +242,6 @@ export function LiveWorkspace({
             <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
               <span className="font-mono text-[11.5px] text-[#a5a5a5]">
                 {tl('workspace.language_python')}
-              </span>
-              {/* The one place the shared document is named as shared. */}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-peer/15 px-2 py-0.5 text-[11.5px] font-semibold text-[#C4B5FD]">
-                <Users aria-hidden className="size-3" />
-                {t('workspace.editing_together', { name: student })}
               </span>
               <div className="ml-auto">
                 <FontSizeControls {...preferences} />

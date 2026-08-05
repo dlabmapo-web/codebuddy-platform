@@ -16,6 +16,7 @@ import {
 import * as React from 'react';
 import * as Y from 'yjs';
 
+import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { monitoringAck, type MonitoringAckResult } from './types';
 import { canActLive } from './connection';
@@ -211,10 +212,17 @@ export function useLiveWorkspace({
   /* -------------------------------------------------------------- awareness */
 
   // The student's cursor and pointer, and this teacher's own on the way out.
-  // Both halves are the same hook the student runs; only the origin differs.
+  // Both halves are the same hook the student runs; the origin differs, and so
+  // does what silence means.
+  //
+  // The student's arrow stays where they left it. A teacher reading a workspace
+  // is reading where the student was last looking, and a student who has gone
+  // quiet for four seconds is thinking, not absent — the pointer goes when the
+  // student leaves the surface, the tab, or the session, and not before.
   const { remote, publishCursor } = useAwareness({
     draftId: session?.draftId ?? null,
     peerOrigin: 'STUDENT',
+    remotePointer: staysUntilCleared,
     socket,
   });
 

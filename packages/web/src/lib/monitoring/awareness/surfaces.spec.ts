@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { iframePointToViewport } from './iframe-pointer-capture';
 import { isBoxVisible, toSurfaceFraction, toViewportPoint } from './surfaces';
 
 const box = { left: 100, top: 50, width: 400, height: 200 };
@@ -25,6 +26,17 @@ describe('toSurfaceFraction', () => {
     expect(
       toSurfaceFraction({ clientX: 10, clientY: 10 }, { ...box, width: 0 }),
     ).toBeNull();
+  });
+});
+
+describe('iframePointToViewport', () => {
+  it('translates a frame-local point into the parent viewport', () => {
+    expect(
+      iframePointToViewport(
+        { clientX: 32, clientY: 18 },
+        { left: 120, top: 80, width: 500, height: 240 },
+      ),
+    ).toEqual({ clientX: 152, clientY: 98 });
   });
 });
 

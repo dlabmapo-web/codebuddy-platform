@@ -1,8 +1,10 @@
 'use client';
 
-import { monitoringTiming, type CollaborationCursor } from '@cove/shared';
+import type { CollaborationCursor } from '@cove/shared';
 
 import type { MonacoCodeEditor } from '../yjs-monaco';
+
+export type RemoteCursorRole = 'student' | 'teacher';
 
 /**
  * The other person's caret, drawn inside the editor.
@@ -12,20 +14,21 @@ import type { MonacoCodeEditor } from '../yjs-monaco';
  * which an absolutely positioned element would have to re-derive on every
  * frame and would still get wrong the moment a line above it grew.
  *
- * The caret stays for as long as the peer is in the document — it marks where
- * they are working, and that remains true while they read. Only the name tag
- * fades, because after the first few seconds the reader knows whose caret it
- * is and the label is just something in front of the code.
+ * The caret and its label stay for as long as the peer is in the document. A
+ * teacher must be able to distinguish the student's caret from their own even
+ * after pausing to read the code, and the student's generic `Teacher` label
+ * discloses no identity by remaining visible.
  */
 export function attachRemoteCursor(
   editor: MonacoCodeEditor,
   label: string,
+  role: RemoteCursorRole,
 ): {
   update: (cursor: CollaborationCursor | null) => void;
   dispose: () => void;
 } {
   const node = document.createElement('div');
-  node.className = 'cove-peer-cursor';
+  node.className = `cove-peer-cursor cove-peer-cursor--${role}`;
   const caret = document.createElement('span');
   caret.className = 'cove-peer-caret';
   const tag = document.createElement('span');
@@ -36,7 +39,6 @@ export function attachRemoteCursor(
   let position = { lineNumber: 1, column: 1 };
   let attached = false;
   let decorations: string[] = [];
-  let fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const widget = {
     getId: () => 'cove.peer.cursor',
@@ -46,14 +48,8 @@ export function attachRemoteCursor(
     getPosition: () => ({ position, preference: [0] }),
   };
 
-  const clearFade = () => {
-    if (fadeTimer) clearTimeout(fadeTimer);
-    fadeTimer = null;
-  };
-
   const update = (cursor: CollaborationCursor | null) => {
     if (!cursor) {
-      clearFade();
       if (attached) {
         editor.removeContentWidget(widget);
         attached = false;
@@ -63,18 +59,14 @@ export function attachRemoteCursor(
     }
 
     position = { lineNumber: cursor.line, column: cursor.column };
+    node.dataset.peerLine = String(cursor.line);
+    node.dataset.peerColumn = String(cursor.column);
     if (attached) {
       editor.layoutContentWidget(widget);
     } else {
       editor.addContentWidget(widget);
       attached = true;
     }
-
-    node.classList.remove('is-idle');
-    clearFade();
-    fadeTimer = setTimeout(() => {
-      node.classList.add('is-idle');
-    }, monitoringTiming.pointerExpiryMs);
 
     // Only a real selection is painted. A collapsed range would tint one
     // character and read as a highlight the peer did not make.
@@ -91,7 +83,10 @@ export function attachRemoteCursor(
                 endLineNumber: cursor.selectionEndLine ?? cursor.line,
                 endColumn: cursor.selectionEndColumn ?? cursor.column,
               },
-              options: { className: 'cove-peer-selection', stickiness: 1 },
+              options: {
+                className: `cove-peer-selection cove-peer-selection--${role}`,
+                stickiness: 1,
+              },
             },
           ]
         : [],
@@ -101,7 +96,6 @@ export function attachRemoteCursor(
   return {
     update,
     dispose: () => {
-      clearFade();
       if (attached) editor.removeContentWidget(widget);
       attached = false;
       decorations = editor.deltaDecorations(decorations, []);

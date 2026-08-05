@@ -10,6 +10,7 @@ import {
 import * as React from 'react';
 import * as Y from 'yjs';
 
+import { expiresWhenIdle } from './awareness/pointer-lifecycle';
 import { attachRemoteCursor, readCursor } from './awareness/remote-cursor';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor } from './yjs-monaco';
@@ -204,9 +205,14 @@ export function useStudentMonitoring({
 
   // The same hook the teacher runs, with the origins swapped: this side sends
   // the student's cursor and mouse, and renders the teacher's.
+  //
+  // The teacher's arrow fades three seconds after it stops moving. The student
+  // is working, not supervising, and an arrow parked over their code says
+  // somebody is following along when nobody may be.
   const { remote, publishCursor } = useAwareness({
     draftId,
     peerOrigin: 'TEACHER',
+    remotePointer: expiresWhenIdle,
     socket,
   });
 
@@ -219,7 +225,7 @@ export function useStudentMonitoring({
     // Nothing is drawn in the editor until a teacher is actually in the room;
     // an unwatched student's editor is exactly the editor it always was.
     if (!editor || !draftId) return;
-    const cursor = attachRemoteCursor(editor, teacherLabel);
+    const cursor = attachRemoteCursor(editor, teacherLabel, 'teacher');
     remoteCursorRef.current = cursor;
     return () => {
       cursor.dispose();
@@ -233,11 +239,26 @@ export function useStudentMonitoring({
 
   React.useEffect(() => {
     if (!editor || !draftId) return;
-    const listener = editor.onDidChangeCursorSelection((event) => {
+    const cursorListener = editor.onDidChangeCursorSelection((event) => {
       markActive();
       publishCursor(readCursor(event.selection));
     });
-    return () => listener.dispose();
+    let frame = 0;
+    const contentListener = editor.onDidChangeModelContent(() => {
+      markActive();
+      cancelAnimationFrame(frame);
+      // WebKit Monaco can apply text without a following cursor-selection
+      // event. Read after Monaco finishes the edit so the teacher receives
+      // the final column rather than the position before the keystroke.
+      frame = requestAnimationFrame(() => {
+        publishCursor(readCursor(editor.getSelection()));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      cursorListener.dispose();
+      contentListener.dispose();
+    };
   }, [draftId, editor, markActive, publishCursor]);
 
   /* -------------------------------------------------------------- publishing */

@@ -155,18 +155,21 @@ h1, h2, h3, h4 {
    beneath, and none of it may be reached by the caret or a screen reader —
    the code is what is being read here, not the annotation on top of it. */
 .cove-peer-cursor {
+  --cove-peer-color: #7C3AED;
   position: relative;
   width: 0;
   height: 0;
   pointer-events: none;
 }
+.cove-peer-cursor--student { --cove-peer-color: #1B64DA; }
+.cove-peer-cursor--teacher { --cove-peer-color: #7C3AED; }
 .cove-peer-caret {
   position: absolute;
   top: 0;
   left: -1px;
   width: 2px;
   height: 1.35em;
-  background: var(--color-peer);
+  background: var(--cove-peer-color);
   border-radius: 1px;
 }
 .cove-peer-label {
@@ -175,7 +178,7 @@ h1, h2, h3, h4 {
   bottom: 1.35em;
   padding: 1px 5px;
   border-radius: 3px 3px 3px 0;
-  background: var(--color-peer);
+  background: var(--cove-peer-color);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -183,12 +186,12 @@ h1, h2, h3, h4 {
   white-space: nowrap;
   opacity: 1;
 }
-/* The name fades once the peer stops moving; the caret stays, because it is
-   still where they are working. */
-.cove-peer-cursor.is-idle .cove-peer-label { opacity: 0; }
-@media (prefers-reduced-motion: no-preference) {
-  .cove-peer-label { transition: opacity 220ms ease; }
-}
 .cove-peer-selection {
   background: color-mix(in srgb, var(--color-peer) 18%, transparent);
+}
+.cove-peer-selection--student {
+  background: color-mix(in srgb, #1B64DA 18%, transparent);
+}
+.cove-peer-selection--teacher {
+  background: color-mix(in srgb, #7C3AED 18%, transparent);
 }

@@ -7,6 +7,7 @@ import { PrismaClient } from "../../src/generated/prisma/client.js";
 import { seedClassFixture } from "./class-fixtures.js";
 import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
+import { seedMonitoringFixture } from "./monitoring-fixtures.js";
 
 /**
  * A visible course for end-to-end tests.
@@ -194,7 +195,16 @@ export async function seedE2eContent(prisma: PrismaClient) {
     )?.email,
   });
 
-  return { academyId: academy.id, enrolled, teacherAssigned };
+  // Puts the academy inside the monitoring rollout and leaves the fixture
+  // student mid-solution with feedback already stored, which is the state the
+  // teacher monitoring journey starts from.
+  const monitoring = await seedMonitoringFixture(prisma, {
+    academyId: academy.id,
+    classId: e2eContent.classId,
+    materialId: e2eContent.sumMaterialId,
+  });
+
+  return { academyId: academy.id, enrolled, teacherAssigned, monitoring };
 }
 
 if (process.argv[1]?.endsWith("e2e-content.ts")) {
@@ -203,11 +213,14 @@ if (process.argv[1]?.endsWith("e2e-content.ts")) {
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
   seedE2eContent(prisma)
-    .then(({ academyId, enrolled, teacherAssigned }) => {
+    .then(({ academyId, enrolled, teacherAssigned, monitoring }) => {
       console.log(`🌱 E2E content seeded for academy ${academyId}`);
       console.log(`   class:    ${e2eContent.className} (${enrolled} enrolled)`);
       console.log(
         `   teacher:  ${teacherAssigned ? "assigned" : "unassigned"}`,
+      );
+      console.log(
+        `   monitoring: enabled for ${monitoring.studentMembershipId}`,
       );
     })
     .catch((error: unknown) => {

@@ -71,6 +71,29 @@ enum ClassStatus {
   ARCHIVED
 }
 
+/// Per-academy rollout switches. An enum rather than a free string so a typo
+/// cannot read as "off" for every academy at once.
+enum AcademyFeature {
+  TEACHER_LIVE_MONITORING
+}
+
+/// Why one teacher's watch of one student ended. Recorded on the visit and
+/// sent to both clients, so a revoked teacher sees a reason instead of a
+/// silent disconnection.
+enum MonitoringVisitEndReason {
+  TEACHER_LEFT
+  WATCH_REPLACED
+  STUDENT_LEFT
+  ASSIGNMENT_CHANGED
+  CLASS_ARCHIVED
+  ENROLLMENT_REMOVED
+  MEMBERSHIP_INACTIVE
+  ROLE_CHANGED
+  MATERIAL_UNAVAILABLE
+  CONNECTION_EXPIRED
+  FEATURE_DISABLED
+}
+
 enum MaterialType {
   PROGRAMMING_EXERCISE
 }
@@ -174,7 +197,7 @@ model Academy {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization           Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships            AcademyMembership[]
   invitations            AcademyInvitation[]
   joinRequests           AcademyJoinRequest[]
@@ -182,10 +205,30 @@ model Academy {
   auditLogs              AuditLog[]
   courses                Course[]
   classes                Class[]
+  featureFlags           AcademyFeatureFlag[]
+  monitoringVisits       TeacherMonitoringVisit[]
+  teacherFeedback        TeacherFeedback[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
   @@map("academies")
+}
+
+/// One rollout switch for one academy.
+///
+/// A missing row means off: enabling a feature is always a deliberate write,
+/// so a new academy never starts inside a staged rollout.
+model AcademyFeatureFlag {
+  academyId String         @map("academy_id") @db.Uuid
+  feature   AcademyFeature
+  isEnabled Boolean        @default(false) @map("is_enabled")
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@id([academyId, feature])
+  @@map("academy_feature_flags")
 }
 
 model OAuthOnboardingIntent {
@@ -226,6 +269,11 @@ model AcademyMembership {
   approvedBy       User?             @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   classEnrollments ClassEnrollment[]
   assignedClasses  Class[]           @relation("ClassTeacher")
+
+  monitoringVisitsAsTeacher TeacherMonitoringVisit[] @relation("MonitoringVisitTeacher")
+  monitoringVisitsAsStudent TeacherMonitoringVisit[] @relation("MonitoringVisitStudent")
+  feedbackAuthored          TeacherFeedback[]        @relation("TeacherFeedbackAuthor")
+  feedbackReceived          TeacherFeedback[]        @relation("TeacherFeedbackRecipient")
 
   @@unique([academyId, userId])
   @@index([userId, status])
@@ -331,32 +379,34 @@ model Course {
 /// Names are intentionally not unique — an academy reuses "Level 1" every
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
-  id              String      @id @default(uuid()) @db.Uuid
-  academyId       String      @map("academy_id") @db.Uuid
-  name            String
-  description     String      @default("")
-  status          ClassStatus @default(ACTIVE)
-  createdByUserId String      @map("created_by_user_id") @db.Uuid
+  id                  String      @id @default(uuid()) @db.Uuid
+  academyId           String      @map("academy_id") @db.Uuid
+  name                String
+  description         String      @default("")
+  status              ClassStatus @default(ACTIVE)
+  createdByUserId     String      @map("created_by_user_id") @db.Uuid
   /// The one teacher responsible for this class, or null while unassigned.
   /// Deliberately not unique: one teacher runs many classes. It stores the
   /// membership rather than the user so academy scope and academy role are
   /// both explicit — but the key alone cannot prove same-academy, so every
   /// read and write still checks the academy in the query.
-  teacherMembershipId String? @map("teacher_membership_id") @db.Uuid
-  archivedAt      DateTime?   @map("archived_at") @db.Timestamptz(6)
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  teacherMembershipId String?     @map("teacher_membership_id") @db.Uuid
+  archivedAt          DateTime?   @map("archived_at") @db.Timestamptz(6)
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Touched by course and roster changes too, so the management list reports
   /// the most recent change of any kind rather than only the last rename.
-  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy           Academy           @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy         User              @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  academy           Academy                  @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy         User                     @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   /// SetNull, not Cascade: deleting a membership must leave the class intact
   /// and merely unassigned. Suspension and role changes delete nothing, so a
   /// stale assignment stays visible to managers as unavailable.
-  assignedTeacher   AcademyMembership? @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  assignedTeacher   AcademyMembership?       @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
   courseAssignments ClassCourse[]
   enrollments       ClassEnrollment[]
+  monitoringVisits  TeacherMonitoringVisit[]
+  teacherFeedback   TeacherFeedback[]
 
   @@index([academyId, status, updatedAt(sort: Desc)])
   @@index([academyId, name])
@@ -390,10 +440,14 @@ model ClassCourse {
 /// A suspended or promoted membership stops granting access even while the
 /// row remains, so a Manager can still see and clear a stale seat.
 model ClassEnrollment {
-  classId          String   @map("class_id") @db.Uuid
-  membershipId     String   @map("membership_id") @db.Uuid
-  enrolledByUserId String   @map("enrolled_by_user_id") @db.Uuid
-  enrolledAt       DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  classId            String    @map("class_id") @db.Uuid
+  membershipId       String    @map("membership_id") @db.Uuid
+  enrolledByUserId   String    @map("enrolled_by_user_id") @db.Uuid
+  enrolledAt         DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  /// Contextual history for an offline roster label, throttled to at most one
+  /// write a minute per student. Never a presence truth source: a timestamp
+  /// cannot tell a closed laptop from a tab that is still open.
+  lastLearningSeenAt DateTime? @map("last_learning_seen_at") @db.Timestamptz(6)
 
   class      Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
   membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
@@ -459,6 +513,8 @@ model Material {
   drafts              ExerciseDraft[]
   submissions         Submission[]
   progress            StudentExerciseProgress[]
+  monitoringVisits    TeacherMonitoringVisit[]
+  teacherFeedback     TeacherFeedback[]
 
   @@unique([lectureId, position])
   @@index([lectureId])
@@ -525,13 +581,44 @@ model ExerciseDraft {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  material Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
-  course   Course    @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  user                  User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material              Material?                      @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  course                Course                         @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  collaborationDocument ExerciseCollaborationDocument?
 
   @@unique([userId, materialId])
   @@index([userId, updatedAt(sort: Desc)])
   @@map("exercise_drafts")
+}
+
+/// The CRDT state behind one draft, written only while that draft is being
+/// collaborated on.
+///
+/// One row per draft, created lazily on first live collaboration — an academy
+/// that never monitors never grows this table. `ExerciseDraft.code` remains
+/// the readable latest snapshot every ordinary learning and submission flow
+/// reads; this row exists so a reconnecting client can be told exactly what it
+/// missed instead of being handed somebody's whole document.
+///
+/// The room identity is derived from `draftId` server-side. A client never
+/// names a room, so it can never name another student's.
+model ExerciseCollaborationDocument {
+  draftId         String   @id @map("draft_id") @db.Uuid
+  /// A merged Yjs update, not a document history: updates are commutative and
+  /// idempotent, so this is safe to overwrite with a merge of itself.
+  yjsState        Bytes    @map("yjs_state")
+  /// Compare-and-swap guard. Two API instances flushing the same document
+  /// merge and retry rather than one silently overwriting the other.
+  snapshotVersion BigInt   @default(0) @map("snapshot_version")
+  /// Of the plain code derived in the same transaction, so a mismatch between
+  /// the CRDT and the draft snapshot is detectable rather than invisible.
+  codeHash        String   @map("code_hash")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  draft ExerciseDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@map("exercise_collaboration_documents")
 }
 
 /// One graded attempt at an exercise.
@@ -630,6 +717,83 @@ model StudentExerciseProgress {
   @@unique([userId, materialId])
   @@index([userId, status])
   @@map("student_exercise_progress")
+}
+
+/// One teacher's watch of one student, from entry to exit.
+///
+/// Access accountability, not a replay. It answers "who could see this student
+/// and when", and it deliberately cannot answer more: there is no column for
+/// source code, cursors, pointers, feedback text, or grading internals.
+///
+/// The live membership relations are `SetNull` so removing a member never
+/// deletes the record of what they did, while the immutable `*_ref` UUIDs keep
+/// the answer readable afterwards — the same principle as `AuditLog.targetId`.
+/// Academy and class are `Restrict`: their lifecycle is archive, not delete.
+model TeacherMonitoringVisit {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  academyId            String                    @map("academy_id") @db.Uuid
+  classId              String                    @map("class_id") @db.Uuid
+  teacherMembershipId  String?                   @map("teacher_membership_id") @db.Uuid
+  studentMembershipId  String?                   @map("student_membership_id") @db.Uuid
+  teacherMembershipRef String                    @map("teacher_membership_ref") @db.Uuid
+  studentMembershipRef String                    @map("student_membership_ref") @db.Uuid
+  materialId           String?                   @map("material_id") @db.Uuid
+  startedAt            DateTime                  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt              DateTime?                 @map("ended_at") @db.Timestamptz(6)
+  endReason            MonitoringVisitEndReason? @map("end_reason")
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  academy           Academy            @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  class             Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  teacherMembership AcademyMembership? @relation("MonitoringVisitTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  studentMembership AcademyMembership? @relation("MonitoringVisitStudent", fields: [studentMembershipId], references: [id], onDelete: SetNull)
+  material          Material?          @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  feedback          TeacherFeedback[]
+
+  /// Answers "who watched this student, most recently first".
+  @@index([studentMembershipRef, startedAt(sort: Desc)])
+  @@index([teacherMembershipRef, startedAt(sort: Desc)])
+  /// Finds the visits still open, which is what revocation has to close.
+  @@index([classId, endedAt])
+  @@map("teacher_monitoring_visits")
+}
+
+/// A durable written message from the assigned teacher to one student.
+///
+/// Persisted before it is broadcast, so a client never renders a message the
+/// database rejected. The unique key makes a retried send store one row rather
+/// than two, which is what lets the socket command retry at all.
+///
+/// The body lives here and nowhere else: it is excluded from audit payloads
+/// and operational logs on purpose.
+model TeacherFeedback {
+  id                   String   @id @default(uuid()) @db.Uuid
+  academyId            String   @map("academy_id") @db.Uuid
+  classId              String   @map("class_id") @db.Uuid
+  teacherMembershipId  String?  @map("teacher_membership_id") @db.Uuid
+  studentMembershipId  String?  @map("student_membership_id") @db.Uuid
+  teacherMembershipRef String   @map("teacher_membership_ref") @db.Uuid
+  studentMembershipRef String   @map("student_membership_ref") @db.Uuid
+  materialId           String?  @map("material_id") @db.Uuid
+  monitoringVisitId    String?  @map("monitoring_visit_id") @db.Uuid
+  /// Client-generated per send. Scoped to the author, so two teachers cannot
+  /// collide and one teacher's retry cannot overwrite another's message.
+  idempotencyKey       String   @map("idempotency_key") @db.Uuid
+  body                 String
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  academy           Academy                 @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  class             Class                   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  teacherMembership AcademyMembership?      @relation("TeacherFeedbackAuthor", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  studentMembership AcademyMembership?      @relation("TeacherFeedbackRecipient", fields: [studentMembershipId], references: [id], onDelete: SetNull)
+  material          Material?               @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  monitoringVisit   TeacherMonitoringVisit? @relation(fields: [monitoringVisitId], references: [id], onDelete: SetNull)
+
+  @@unique([teacherMembershipRef, idempotencyKey])
+  /// The student's own history, and one exercise's thread inside it.
+  @@index([studentMembershipRef, createdAt(sort: Desc)])
+  @@index([studentMembershipRef, materialId, createdAt(sort: Desc)], map: "teacher_feedback_student_material_created_at_idx")
+  @@map("teacher_feedback")
 }
 
 model ExerciseHint {

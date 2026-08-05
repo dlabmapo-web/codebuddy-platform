@@ -77,7 +77,12 @@ function createService(options?: { duplicate?: boolean }) {
     access,
     audit,
     prisma,
-    service: new CourseService(prisma, access, audit),
+    service: new CourseService(
+      prisma,
+      access,
+      audit,
+      { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
+    ),
     transaction,
   };
 }
@@ -282,7 +287,12 @@ function createExerciseService() {
     write: vi.fn().mockResolvedValue({ id: "audit-id" }),
   } as unknown as AuditService;
   return {
-    service: new CourseService(prisma, access, audit),
+    service: new CourseService(
+      prisma,
+      access,
+      audit,
+      { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
+    ),
     prisma,
     audit,
     transaction,
@@ -360,7 +370,12 @@ describe("CourseService direct problem editing", () => {
       requirePermission: vi.fn().mockResolvedValue({ userId: actorUserId }),
     } as unknown as AcademyAccessService;
     const audit = { write: vi.fn() } as unknown as AuditService;
-    const service = new CourseService(prisma, access, audit);
+    const service = new CourseService(
+      prisma,
+      access,
+      audit,
+      { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
+    );
 
     await expect(
       service.deleteLecture(identity, { academyId, courseId, lectureId }),

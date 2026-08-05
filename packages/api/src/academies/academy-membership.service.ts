@@ -6,6 +6,7 @@ import { AcademyAccessService } from "../authorization/academy-access.service.js
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { AuditService } from "./audit.service.js";
 
 const membershipInclude = {
@@ -20,6 +21,11 @@ export class AcademyMembershipService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
+    /**
+     * Suspending a member or moving them off a role revokes live monitoring
+     * on both sides of it, published after the transaction commits.
+     */
+    private readonly revocation: MonitoringRevocationService,
   ) {}
 
   async list(identity: SupabaseIdentity, academyId: string) {
@@ -41,7 +47,7 @@ export class AcademyMembershipService {
     input: { academyId: string; membershipId: string; role: AcademyRole },
   ) {
     const actor = await this.requireManager(identity, input.academyId);
-    return this.prisma.$transaction(async (transaction) => {
+    const { member, changed } = await this.prisma.$transaction(async (transaction) => {
       const membership = await this.lockMembership(
         transaction,
         input.academyId,
@@ -60,7 +66,9 @@ export class AcademyMembershipService {
           membership.id,
         );
       }
-      if (membership.role === input.role) return toAcademyMember(membership);
+      if (membership.role === input.role) {
+        return { member: toAcademyMember(membership), changed: false };
+      }
 
       const updated = await transaction.academyMembership.update({
         where: { id: membership.id },
@@ -76,8 +84,12 @@ export class AcademyMembershipService {
         before: { role: membership.role, status: membership.status },
         after: { role: updated.role, status: updated.status },
       });
-      return toAcademyMember(updated);
+      return { member: toAcademyMember(updated), changed: true };
     });
+    if (changed) {
+      await this.revocation.revokeMembership(input.membershipId, "ROLE_CHANGED");
+    }
+    return member;
   }
 
   async suspend(
@@ -85,7 +97,7 @@ export class AcademyMembershipService {
     input: { academyId: string; membershipId: string },
   ) {
     const actor = await this.requireManager(identity, input.academyId);
-    return this.prisma.$transaction(async (transaction) => {
+    const suspended = await this.prisma.$transaction(async (transaction) => {
       const membership = await this.lockMembership(
         transaction,
         input.academyId,
@@ -120,6 +132,11 @@ export class AcademyMembershipService {
       });
       return toAcademyMember(updated);
     });
+    await this.revocation.revokeMembership(
+      input.membershipId,
+      "MEMBERSHIP_INACTIVE",
+    );
+    return suspended;
   }
 
   async restore(

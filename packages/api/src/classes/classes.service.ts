@@ -12,6 +12,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 type ClassRequestContext = { requestId?: string };
@@ -80,6 +81,13 @@ export class ClassesService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
+    /**
+     * Access changes are published after the transaction commits, never
+     * inside it: a rolled-back archive must not end a teacher's session, and
+     * a committed one must end it immediately rather than at the next
+     * revalidation.
+     */
+    private readonly revocation: MonitoringRevocationService,
   ) {}
 
   async list(
@@ -229,6 +237,9 @@ export class ClassesService {
       });
       return record;
     });
+    if (archiving && updated.status === "ARCHIVED") {
+      await this.revocation.revokeClass(input.classId, "CLASS_ARCHIVED");
+    }
     return toClassDetail(updated);
   }
 
@@ -250,7 +261,7 @@ export class ClassesService {
     const actor = await this.requireClassManager(identity, input.academyId);
     const desired = [...new Set(input.courseIds)];
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const { record: updated, removed } = await this.prisma.$transaction(async (tx) => {
       const current = await requireClass(tx, input.academyId, input.classId);
       const assigned = current.courseAssignments.map(
         (assignment) => assignment.courseId,
@@ -307,8 +318,11 @@ export class ClassesService {
         before: { courseIds: assigned },
         after: { courseIds: desired, added, removed },
       });
-      return record;
+      return { record, removed };
     });
+    if (removed.length > 0) {
+      await this.revocation.revokeClass(input.classId, "MATERIAL_UNAVAILABLE");
+    }
     return toClassDetail(updated);
   }
 
@@ -462,6 +476,10 @@ export class ClassesService {
       });
       return record;
     });
+    await this.revocation.revokeScope(
+      { classId: input.classId, studentMembershipRef: input.membershipId },
+      "ENROLLMENT_REMOVED",
+    );
     return toClassDetail(updated);
   }
 
@@ -518,13 +536,14 @@ export class ClassesService {
     const actor = await this.requireTeacherManager(identity, input.academyId);
     const requested = input.teacherMembershipId;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const { record: updated, replaced } = await this.prisma.$transaction(
+      async (tx) => {
       const current = await requireClass(tx, input.academyId, input.classId);
       assertActive(current);
       const previous = current.teacherMembershipId;
       // Reassigning the same teacher, or clearing an already empty class, is
       // not a decision. It must not move the revision or invent audit history.
-      if (previous === requested) return current;
+      if (previous === requested) return { record: current, replaced: null };
 
       if (requested !== null) {
         const eligible = await tx.academyMembership.findFirst({
@@ -568,8 +587,17 @@ export class ClassesService {
         before: { teacherMembershipId: previous },
         after: { teacherMembershipId: requested },
       });
-      return record;
-    });
+      return { record, replaced: previous };
+      },
+    );
+    // The teacher who just lost the class stops monitoring it now, not when
+    // their claim next expires.
+    if (replaced !== null) {
+      await this.revocation.revokeScope(
+        { classId: input.classId, teacherMembershipRef: replaced },
+        "ASSIGNMENT_CHANGED",
+      );
+    }
     return toClassDetail(updated);
   }
 

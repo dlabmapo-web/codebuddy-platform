@@ -51,6 +51,24 @@ export const apiEnvironmentSchema = z.object({
       message: "must be a redis:// or rediss:// URL",
     })
     .optional(),
+  /**
+   * Live monitoring's Redis. Falls back to `REDIS_URL` so a single-instance
+   * development setup needs no extra configuration, and stays separable so
+   * production can keep presence off the grading queue's memory budget.
+   */
+  MONITORING_REDIS_URL: z
+    .string()
+    .refine((value) => usesProtocol(value, ["redis:", "rediss:"]), {
+      message: "must be a redis:// or rediss:// URL",
+    })
+    .optional(),
+  /** Bounded so an idle classroom cannot grow the delivery stream forever. */
+  MONITORING_STREAM_MAX_LENGTH: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(1_000_000)
+    .default(10_000),
   /** CPU-bound work, so this tracks cores rather than being set high. */
   JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
   /** Pinned, and shared with the browser so run and submit agree. */

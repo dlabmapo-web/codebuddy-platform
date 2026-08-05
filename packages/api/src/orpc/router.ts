@@ -22,6 +22,8 @@ import { createContentRouters } from "../content/content.router.js";
 import { LearnService } from "../learn/learn.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
+import { MonitoringService } from "../monitoring/monitoring.service.js";
+import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
 import type { ORPCContext, ORPCDeps } from "./context.js";
 import { toORPCError } from "./error-mapping.js";
 
@@ -50,6 +52,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     classesService: app.get(ClassesService, { strict: false }),
     learnService: app.get(LearnService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
+    monitoringService: app.get(MonitoringService, { strict: false }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -86,5 +89,6 @@ function createORPCRouter(deps: ORPCDeps) {
     ...contentRouters,
     ...classesRouters,
     learn: createLearnRouter(os, deps),
+    monitoring: createMonitoringRouter(os, deps),
   });
 }

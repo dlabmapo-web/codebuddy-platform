@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { ClassesService } from "./classes.service.js";
 
 /**
@@ -10,7 +11,7 @@ import { ClassesService } from "./classes.service.js";
  * so the learn module does not depend on this one.
  */
 @Module({
-  imports: [AcademiesModule, AuthorizationModule],
+  imports: [AcademiesModule, AuthorizationModule, MonitoringRevocationModule],
   providers: [ClassesService],
   exports: [ClassesService],
 })

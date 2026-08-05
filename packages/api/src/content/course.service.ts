@@ -7,6 +7,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { AuditService } from "../academies/audit.service.js";
+import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 
 type ContentRequestContext = { requestId?: string };
 
@@ -95,6 +96,7 @@ export class CourseService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
+    private readonly revocation: MonitoringRevocationService,
   ) {}
 
   async list(identity: SupabaseIdentity, academyId: string) {
@@ -219,6 +221,7 @@ export class CourseService {
       });
       return updated;
     });
+    if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return toCourseSummary(course);
   }
 
@@ -309,6 +312,7 @@ export class CourseService {
         after: moduleAudit(updated),
       });
     });
+    if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -333,6 +337,7 @@ export class CourseService {
         before: moduleAudit(current),
       });
     });
+    await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -440,6 +445,7 @@ export class CourseService {
         after: lectureAudit(updated),
       });
     });
+    if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -464,6 +470,7 @@ export class CourseService {
         before: lectureAudit(current),
       });
     });
+    await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -692,6 +699,7 @@ export class CourseService {
         after: { isVisible: input.isVisible },
       });
     });
+    if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -721,6 +729,7 @@ export class CourseService {
         before: exerciseRecordAudit(current),
       });
     });
+    await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
   }
 
@@ -756,6 +765,18 @@ export class CourseService {
       });
     });
     return this.currentTree(input);
+  }
+
+  private async revokeCourseMonitoring(courseId: string): Promise<void> {
+    const assignments = await this.prisma.classCourse.findMany({
+      where: { courseId },
+      select: { classId: true },
+    });
+    await Promise.all(
+      assignments.map(({ classId }) =>
+        this.revocation.revokeClass(classId, "MATERIAL_UNAVAILABLE"),
+      ),
+    );
   }
 
   private async requireCurriculumManager(

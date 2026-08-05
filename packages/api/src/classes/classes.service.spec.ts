@@ -5,6 +5,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import type { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { ClassesService } from "./classes.service.js";
 
 const identity: SupabaseIdentity = {
@@ -214,12 +215,19 @@ function createService(options?: {
   } as unknown as AcademyAccessService;
   const audit = { write: vi.fn().mockResolvedValue(undefined) } as unknown as
     AuditService;
+  const revocation = {
+    revokeClass: vi.fn().mockResolvedValue(undefined),
+    revokeTeacher: vi.fn().mockResolvedValue(undefined),
+    revokeStudent: vi.fn().mockResolvedValue(undefined),
+    revokeScope: vi.fn().mockResolvedValue(undefined),
+  } as unknown as MonitoringRevocationService;
   return {
     prisma,
     access,
     audit,
+    revocation: revocation as unknown as Record<string, ReturnType<typeof vi.fn>>,
     transaction,
-    service: new ClassesService(prisma, access, audit),
+    service: new ClassesService(prisma, access, audit, revocation),
   };
 }
 

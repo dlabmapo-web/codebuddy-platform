@@ -1,0 +1,38 @@
+import { Module } from "@nestjs/common";
+
+import { AuthModule } from "../auth/auth.module.js";
+import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { CollaborationDocumentService } from "./collaboration-document.service.js";
+import { MonitoringAccessService } from "./monitoring-access.service.js";
+import { MonitoringFeedbackService } from "./monitoring-feedback.service.js";
+import { MonitoringGateway } from "./monitoring.gateway.js";
+import { MonitoringRevocationModule } from "./monitoring-revocation.module.js";
+import { MonitoringService } from "./monitoring.service.js";
+import { PresenceRegistry } from "./presence.registry.js";
+
+/**
+ * Live teacher monitoring: composition only.
+ *
+ * `MONITORING_REDIS` resolves to null without a configured Redis, exactly as
+ * the grading queue does. The durable oRPC reads keep working; only realtime
+ * reports itself degraded, which is the honest failure and never an empty
+ * roster presented as an absent class.
+ *
+ * The access service and the revocation service are exported because the
+ * gateway and the services that change access both authorize through them.
+ * Two gates for one boundary is how a socket ends up trusting something HTTP
+ * would have refused.
+ */
+@Module({
+  imports: [AuthModule, AuthorizationModule, MonitoringRevocationModule],
+  providers: [
+    MonitoringAccessService,
+    MonitoringService,
+    PresenceRegistry,
+    CollaborationDocumentService,
+    MonitoringFeedbackService,
+    MonitoringGateway,
+  ],
+  exports: [MonitoringAccessService, MonitoringService, MonitoringRevocationModule],
+})
+export class MonitoringModule {}

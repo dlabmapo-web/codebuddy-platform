@@ -2,8 +2,12 @@ import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 
+import { monitoringTiming } from "@cove/shared";
+
 import { AppModule } from "./app.module.js";
 import type { ApiEnvironment } from "./config/env.schema.js";
+import { MonitoringSocketAdapter } from "./monitoring/monitoring-socket.adapter.js";
+import { MONITORING_REDIS } from "./monitoring/monitoring.tokens.js";
 import { registerORPCRoutes } from "./orpc/router.js";
 
 async function bootstrap(): Promise<void> {
@@ -17,6 +21,19 @@ async function bootstrap(): Promise<void> {
   });
   app.enableShutdownHooks();
   registerORPCRoutes(app);
+
+  // The monitoring namespace shares this HTTP server. Its adapter is installed
+  // here rather than inside the gateway because cross-instance delivery is a
+  // property of the process, not of one namespace.
+  app.useWebSocketAdapter(
+    new MonitoringSocketAdapter(app, app.get(MONITORING_REDIS, { strict: false }), {
+      origin: configService.get("WEB_ORIGIN", { infer: true }),
+      streamMaxLength: configService.get("MONITORING_STREAM_MAX_LENGTH", {
+        infer: true,
+      }),
+      recoveryWindowMs: monitoringTiming.recoveryGraceMs,
+    }),
+  );
 
   await app.listen(configService.get("PORT", { infer: true }));
 }

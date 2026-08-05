@@ -25,6 +25,10 @@
     "./memberships": {
       "types": "./dist/memberships/index.d.ts",
       "default": "./dist/memberships/index.js"
+    },
+    "./monitoring": {
+      "types": "./dist/monitoring/index.d.ts",
+      "default": "./dist/monitoring/index.js"
     }
   },
   "files": [

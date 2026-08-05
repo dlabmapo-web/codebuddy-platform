@@ -8,7 +8,7 @@ import {
 } from '@/lib/pyodide/interactiveRunner';
 import type { PythonExecutionError } from '@/lib/pyodide/pythonError';
 
-import { createSampleInputQueue } from '../_lib/sample-run';
+import { createSampleInputQueue } from './sample-run';
 
 export type TerminalKind = 'out' | 'err' | 'in' | 'meta' | 'info';
 export type TerminalLine = { text: string; kind: TerminalKind };

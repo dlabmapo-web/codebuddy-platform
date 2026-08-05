@@ -1,19 +1,21 @@
 'use client';
 
 import type { LearnSampleTestCase } from '@cove/shared';
-import { Minus, Plus } from 'lucide-react';
-import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
+import { FontSizeControls } from '@/components/workspace/font-size-controls';
+import { RunControls } from '@/components/workspace/run-controls';
+import { TerminalPanel } from '@/components/workspace/terminal-panel';
+import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
+import type { PythonRunnerState } from '@/lib/workspace/use-python-runner';
+import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
-import type { PythonRunnerState } from '../_hooks/use-python-runner';
 import type { SubmissionState } from '../_hooks/use-submission';
-import { useEditorPreferences } from '../_hooks/use-editor-preferences';
-import { useSplitPane } from '../_hooks/use-split-pane';
+import type { OnMount } from '@monaco-editor/react';
+
 import { CodeEditor } from './code-editor';
 import { ResultPanel } from './result-panel';
-import { RunControls } from './run-controls';
-import { TerminalPanel } from './terminal-panel';
 
 export type OutputTab = 'terminal' | 'result';
 
@@ -32,25 +34,30 @@ export function EditorPane({
   submission,
   sampleTestCases,
   activeSample,
+  onRun,
   onRunSample,
   tab,
   onTabChange,
+  onEditorMount,
   unreadResult,
 }: {
   code: string;
   onCodeChange: (value: string) => void;
+  /** Lets live collaboration bind to the very model the student is typing in. */
+  onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
   runner: PythonRunnerState;
   submission: SubmissionState;
   sampleTestCases: LearnSampleTestCase[];
   activeSample: number | null;
+  /** Owned by the workspace, which reports the run to a watching teacher. */
+  onRun: () => void;
   onRunSample: (index: number) => void;
   tab: OutputTab;
   onTabChange: (tab: OutputTab) => void;
   unreadResult: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
-  const { fontSize, increase, decrease, canIncrease, canDecrease } =
-    useEditorPreferences();
+  const preferences = useEditorPreferences();
   const {
     size: outputHeight,
     dragging,
@@ -75,31 +82,21 @@ export function EditorPane({
         <span className="font-mono text-[11.5px] text-[#a5a5a5]">
           {t('workspace.language_python')}
         </span>
-        <div className="ml-auto flex items-center gap-0.5">
-          <FontButton
-            disabled={!canDecrease}
-            label={t('workspace.font_smaller')}
-            onClick={decrease}
-          >
-            <Minus className="size-3" />
-          </FontButton>
-          <span
-            aria-live="polite"
-            className="w-6 text-center font-mono text-[11.5px] text-[#a5a5a5]"
-          >
-            {fontSize}
-          </span>
-          <FontButton
-            disabled={!canIncrease}
-            label={t('workspace.font_larger')}
-            onClick={increase}
-          >
-            <Plus className="size-3" />
-          </FontButton>
+        <div className="ml-auto">
+          <FontSizeControls {...preferences} />
         </div>
       </header>
 
-      <CodeEditor code={code} fontSize={fontSize} onChange={onCodeChange} />
+      {/* Named so a watching teacher's pointer can be drawn over the same
+          pane on their screen, whatever size they have dragged it to. */}
+      <div className="flex min-h-0 flex-1 flex-col" {...surfaceProps('editor')}>
+        <CodeEditor
+          code={code}
+          fontSize={preferences.fontSize}
+          onChange={onCodeChange}
+          onMount={onEditorMount}
+        />
+      </div>
 
       <div
         aria-label={t('workspace.resize_terminal')}
@@ -113,6 +110,7 @@ export function EditorPane({
       <div
         className="flex shrink-0 flex-col overflow-hidden bg-editor-bg"
         style={{ height: outputHeight }}
+        {...surfaceProps('terminal')}
       >
         <div className="flex shrink-0 items-center gap-1 border-b border-white/10 bg-[#2d2d2d] px-2">
           <div className="flex" role="tablist">
@@ -157,12 +155,7 @@ export function EditorPane({
           <div className="ml-auto flex items-center gap-1.5 py-1">
             <RunControls
               activeSample={activeSample}
-              onRun={() => {
-                onTabChange('terminal');
-                void runner.run(code, {
-                  banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
-                });
-              }}
+              onRun={onRun}
               onRunSample={onRunSample}
               onStop={runner.stop}
               ready={runner.ready}
@@ -191,30 +184,5 @@ export function EditorPane({
         </div>
       </div>
     </section>
-  );
-}
-
-function FontButton({
-  children,
-  disabled,
-  label,
-  onClick,
-}: {
-  children: React.ReactNode;
-  disabled: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-label={label}
-      className="grid size-6 place-items-center rounded text-[#a5a5a5] transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
-      disabled={disabled}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      {children}
-    </button>
   );
 }

@@ -225,6 +225,15 @@ export class MonitoringGateway
         ),
       );
       if (data.student.draftId) {
+        // The teacher's copy of this student's arrow does not expire on its
+        // own, so a connection that ends without a leave event has to be
+        // spoken for. Announced before the flush, because the flush is a
+        // database round trip and the arrow is already wrong.
+        this.clearAwareness(
+          data.student.academyId,
+          data.student.draftId,
+          "STUDENT",
+        );
         await this.documents.flush(data.student.draftId);
       }
     }
@@ -941,6 +950,33 @@ export class MonitoringGateway
       });
   }
 
+  /**
+   * The server saying, on a peer's behalf, that their mouse and caret are gone.
+   *
+   * A client clears its own awareness when it leaves a surface or a tab. It
+   * cannot do so when the transport dies under it or when its authorization is
+   * withdrawn, and one of the two directions renders a pointer that no timer
+   * will ever remove — so the end of a connection or a watch is announced with
+   * the same event a client would have sent, stamped with the origin the
+   * gateway knows rather than one a payload claimed.
+   *
+   * Nothing here is stored; this is the absence of state, published.
+   */
+  private clearAwareness(
+    academyId: string,
+    draftId: string,
+    origin: "STUDENT" | "TEACHER",
+  ): void {
+    this.server
+      .to(monitoringRooms.draft(academyId, draftId))
+      .emit(monitoringServerEvents.awarenessChanged, {
+        draftId,
+        cursor: null,
+        pointer: null,
+        origin,
+      });
+  }
+
   private async endWatch(
     socket: MonitoringSocket,
     reason: MonitoringVisitEndReason,
@@ -951,6 +987,10 @@ export class MonitoringGateway
 
     await this.visits.end(watch.visitId, reason);
     await this.activeWatches.clear(watch.claim.membershipId, watch.visitId);
+    // Said while the room still exists and this socket is still in it. After
+    // the leave below there is no longer anything to send it through, and the
+    // student would be left with the teacher's last caret on their screen.
+    this.clearAwareness(watch.claim.academyId, watch.draftId, "TEACHER");
     await socket.leave(
       monitoringRooms.draft(watch.claim.academyId, watch.draftId),
     );

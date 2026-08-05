@@ -3,7 +3,7 @@ import type {
   AuthMeResponse,
   AuthUser,
 } from '@cove/shared';
-import { roleHasPermission } from '@cove/shared';
+import { roleCanMonitor, roleHasPermission } from '@cove/shared';
 
 type Membership = AuthUser['memberships'][number];
 type Application = AuthUser['applications'][number];
@@ -196,6 +196,21 @@ export function canManageClassTeachers(
   role: AcademyRole | null | undefined,
 ): boolean {
   return role ? roleHasPermission(role, 'class-teachers.manage') : false;
+}
+
+/**
+ * Who sees the teacher's own monitoring surface.
+ *
+ * Deliberately not `classes.assigned.manage` on its own: a Team Lead holds
+ * that permission for later operational reasons, and the shared predicate is
+ * what keeps the nav in step with what the server will actually allow. Seeing
+ * the link still proves nothing — every page and every socket event
+ * re-checks the assignment itself.
+ */
+export function canMonitorClasses(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role ? roleCanMonitor(role) : false;
 }
 
 export function canManageExercises(role: AcademyRole | null | undefined): boolean {

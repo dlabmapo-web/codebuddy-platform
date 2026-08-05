@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  MonitorPlay,
   UserCheck,
   Users,
   type LucideIcon,
@@ -67,6 +68,7 @@ export function StudioSidebar({
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canMonitor,
 }: {
   academies: StudioAcademy[];
   academyId: string;
@@ -74,6 +76,7 @@ export function StudioSidebar({
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canMonitor: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
   const pathname = usePathname();
@@ -83,6 +86,7 @@ export function StudioSidebar({
     canManageAcademy,
     canManageClasses,
     canManageContent,
+    canMonitor,
   });
   // Decided across every group: the Overview link prefixes all the others, so
   // only the most specific match can be the active one.
@@ -245,12 +249,14 @@ function studioNavGroups({
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canMonitor,
 }: {
   academyId: string;
   canLearn: boolean;
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canMonitor: boolean;
 }): NavGroup[] {
   const base = `/studio/academies/${academyId}`;
   const groups: NavGroup[] = [
@@ -289,21 +295,28 @@ function studioNavGroups({
     });
   }
 
-  // Its own group, gated on class management rather than curriculum or
-  // membership rights: a Team Lead sees it without academy administration,
-  // and a Teacher does not see it at all in this phase.
+  // One group, two audiences, two routes. `/classes` is the management view a
+  // Team Lead or Manager uses to arrange a class; `/teach/classes` is the
+  // assigned teacher's own live view, with no class, roster, or assignment
+  // controls on it at all. Nobody sees both entries, because nobody holds both
+  // roles at once.
+  const teaching: NavLink[] = [];
   if (canManageClasses) {
-    groups.push({
-      id: 'teaching',
-      labelKey: 'group.teaching',
-      items: [
-        {
-          href: `${base}/classes`,
-          labelKey: 'link.classes',
-          icon: Presentation,
-        },
-      ],
+    teaching.push({
+      href: `${base}/classes`,
+      labelKey: 'link.classes',
+      icon: Presentation,
     });
+  }
+  if (canMonitor) {
+    teaching.push({
+      href: `${base}/teach/classes`,
+      labelKey: 'link.my_classes',
+      icon: MonitorPlay,
+    });
+  }
+  if (teaching.length > 0) {
+    groups.push({ id: 'teaching', labelKey: 'group.teaching', items: teaching });
   }
 
   if (canManageAcademy) {

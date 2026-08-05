@@ -2,17 +2,22 @@
 
 import type { LearnExerciseWorkspace } from '@cove/shared';
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
+import { RemotePointer } from '@/components/monitoring/remote-pointer';
+import { ProblemStatement } from '@/components/workspace/problem-statement';
+import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
+import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
+import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { useExerciseNavigation } from '../_hooks/use-exercise-navigation';
-import { usePythonRunner } from '../_hooks/use-python-runner';
 import { useSubmission } from '../_hooks/use-submission';
-import { useSplitPane } from '../_hooks/use-split-pane';
-import { resolveSampleVerdict } from '../_lib/sample-run';
 import { EditorPane, type OutputTab } from './editor-pane';
-import { ProblemStatement } from './problem-statement';
+import { MonitoringIndicator } from './monitoring-indicator';
 import { WorkspaceHeader } from './workspace-header';
 
 export function Workspace({
@@ -23,6 +28,9 @@ export function Workspace({
   workspace: LearnExerciseWorkspace;
 }) {
   const { t } = useLayoutTranslation('learn');
+  // The monitoring copy is mounted by this page for the indicator; the peer
+  // labels come from the same namespace.
+  const { t: tm } = useTranslation('monitoring');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
   const [outputTab, setOutputTab] = React.useState<OutputTab>('terminal');
@@ -32,6 +40,7 @@ export function Workspace({
   const [revealedHints, setRevealedHints] = React.useState(0);
 
   const runner = usePythonRunner();
+  const runSample = useSampleRunner(runner);
   const { workspace, navigating, navigate } = useExerciseNavigation({
     academyId,
     initialWorkspace,
@@ -49,6 +58,18 @@ export function Workspace({
     starterCode: exercise.starterCode,
   });
 
+  // The student's own half of monitoring: signals out, a generic indicator
+  // back. It publishes nothing the student cannot already see, and learns
+  // nothing about who is watching.
+  const monitoring = useStudentMonitoring({
+    academyId,
+    courseId: workspace.breadcrumb.course.id,
+    materialId: exercise.materialId,
+    onBeforeCollaborate: draft.flushNow,
+    // Never a name: the student is told a teacher is here, not which one.
+    teacherLabel: tm('peer.teacher'),
+  });
+
   // Destructured rather than kept as objects: reading `.containerRef` off a
   // hook result during render is a ref access as far as the React compiler is
   // concerned, and it is right to flag it.
@@ -64,46 +85,90 @@ export function Workspace({
       if (!sample) return;
       setOutputTab('terminal');
       setActiveSample(index);
-
-      const outcome = await runner.run(draft.code, {
-        stdin: sample.input,
-        banner: [
-          {
-            text: `$ python solution.py · ${t('workspace.sample_n', { number: index + 1 })}\n`,
-            kind: 'meta',
-          },
-        ],
+      const clientRunId = crypto.randomUUID();
+      monitoring.publishRun({
+        clientRunId,
+        lifecycle: 'STARTED',
+        sampleCount: exercise.sampleTestCases.length,
+        passedCount: 0,
+        output: '',
       });
+
+      const { outcome, verdict } = await runSample(draft.code, sample, index);
       setActiveSample(null);
-      if (!outcome) return;
-
-      const verdict = resolveSampleVerdict({
-        stdout: outcome.stdout,
-        expectedOutput: sample.expectedOutput,
-        stopped: outcome.stopped,
-        failed: outcome.failed,
-      });
-
-      if (verdict.kind === 'match') {
-        runner.appendLine(
-          `\n✓ ${t('workspace.sample_match', { number: index + 1 })}\n`,
-          'meta',
-        );
-      } else if (verdict.kind === 'mismatch') {
-        runner.appendLine(
-          `\n✕ ${t('workspace.sample_mismatch', { number: index + 1 })}\n`,
-          'err',
-        );
-        runner.appendLine(
-          `${t('workspace.expected')}\n${verdict.expected || '(empty)'}\n`,
-          'info',
-        );
-      } else if (verdict.reason === 'error') {
-        runner.appendLine(`\n${t('workspace.sample_skipped')}\n`, 'info');
+      if (!outcome || !verdict) {
+        monitoring.publishRun({
+          clientRunId,
+          lifecycle: 'CANCELLED',
+          sampleCount: exercise.sampleTestCases.length,
+          passedCount: 0,
+          output: '',
+        });
+        return;
       }
+
+      // Counts and the output the student is already looking at. There is no
+      // field here a hidden case could travel in.
+      monitoring.publishRun({
+        clientRunId,
+        lifecycle: verdict.kind === 'match' ? 'COMPLETED' : 'FAILED',
+        sampleCount: exercise.sampleTestCases.length,
+        passedCount: verdict.kind === 'match' ? 1 : 0,
+        output: outcome.stdout,
+      });
     },
-    [draft.code, exercise.sampleTestCases, runner, t],
+    [draft.code, exercise.sampleTestCases, monitoring, runSample],
   );
+
+  /**
+   * A plain run, reported to whoever is watching.
+   *
+   * The teacher's copy of this workspace shows the student's terminal, so a
+   * run that published nothing would leave them looking at an empty pane while
+   * the student stares at a traceback. The output sent is the text already on
+   * the student's screen — stdout, and the error if the program raised one.
+   */
+  const handleRun = React.useCallback(async () => {
+    setOutputTab('terminal');
+    const clientRunId = crypto.randomUUID();
+    monitoring.publishRun({
+      clientRunId,
+      lifecycle: 'STARTED',
+      sampleCount: 0,
+      passedCount: 0,
+      output: '',
+    });
+
+    const outcome = await runner.run(draft.code, {
+      banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
+    });
+    // A dropped request still has to be closed out, or the teacher's mirror
+    // sits on "Running" for a run that never happened.
+    if (!outcome) {
+      monitoring.publishRun({
+        clientRunId,
+        lifecycle: 'CANCELLED',
+        sampleCount: 0,
+        passedCount: 0,
+        output: '',
+      });
+      return;
+    }
+
+    monitoring.publishRun({
+      clientRunId,
+      lifecycle: outcome.stopped
+        ? 'CANCELLED'
+        : outcome.failed
+          ? 'FAILED'
+          : 'COMPLETED',
+      sampleCount: 0,
+      passedCount: 0,
+      output: outcome.error
+        ? `${outcome.stdout}${outcome.error.display}`
+        : outcome.stdout,
+    });
+  }, [draft.code, monitoring, runner]);
 
   const handleSubmit = React.useCallback(() => {
     // The submitted code is the draft, so it is persisted before grading
@@ -113,6 +178,11 @@ export function Workspace({
     setLastReadSubmissionId(null);
     void submission.submit(draft.code);
   }, [draft, submission]);
+
+  const resultId = submission.result?.submissionId ?? null;
+  React.useEffect(() => {
+    if (resultId) monitoring.publishResult(resultId);
+  }, [monitoring, resultId]);
 
   const handleOutputTabChange = React.useCallback((tab: OutputTab) => {
     if (outputTab === 'result' && submission.result) {
@@ -126,38 +196,48 @@ export function Workspace({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      <WorkspaceHeader
-        academyId={academyId}
-        navigating={navigating}
-        hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}
-        onNavigate={(materialId) => {
-          // Pending work is settled here rather than inside the hook: the draft
-          // is derived from the workspace the hook owns, so passing a teardown
-          // callback into it would be circular.
-          draft.flushNow();
-          runner.stop();
-          runner.clear();
-          submission.reset();
-          setRevealedHints(0);
-          setOutputTab('terminal');
-          setLastReadSubmissionId(null);
-          void navigate(materialId);
-        }}
-        onReset={() => {
-          if (draft.code === exercise.starterCode) return;
-          if (!window.confirm(t('workspace.reset_confirm'))) return;
-          draft.resetTo(exercise.starterCode);
-        }}
-        onRevealHint={() =>
-          setRevealedHints((current) =>
-            Math.min(exercise.hints.length, current + 1),
-          )
-        }
-        onSubmit={handleSubmit}
-        saveState={draft.saveState}
-        submitting={submission.submitting}
-        workspace={workspace}
+      {/* The teacher's mouse while one is helping, drawn over whichever pane
+          they are pointing at. */}
+      <RemotePointer
+        name={tm('peer.teacher')}
+        pointer={monitoring.remote.pointer}
       />
+
+      <div className="shrink-0" {...surfaceProps('header')}>
+        <WorkspaceHeader
+          academyId={academyId}
+          indicator={<MonitoringIndicator state={monitoring.indicator} />}
+          navigating={navigating}
+          hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}
+          onNavigate={(materialId) => {
+            // Pending work is settled here rather than inside the hook: the draft
+            // is derived from the workspace the hook owns, so passing a teardown
+            // callback into it would be circular.
+            draft.flushNow();
+            runner.stop();
+            runner.clear();
+            submission.reset();
+            setRevealedHints(0);
+            setOutputTab('terminal');
+            setLastReadSubmissionId(null);
+            void navigate(materialId);
+          }}
+          onReset={() => {
+            if (draft.code === exercise.starterCode) return;
+            if (!window.confirm(t('workspace.reset_confirm'))) return;
+            draft.resetTo(exercise.starterCode);
+          }}
+          onRevealHint={() =>
+            setRevealedHints((current) =>
+              Math.min(exercise.hints.length, current + 1),
+            )
+          }
+          onSubmit={handleSubmit}
+          saveState={draft.saveState}
+          submitting={submission.submitting}
+          workspace={workspace}
+        />
+      </div>
 
       {/* Below `md` the panes stack behind tabs: a split pane on a phone gives
           neither side enough room to be usable. */}
@@ -190,6 +270,7 @@ export function Workspace({
           className={`min-w-0 overflow-y-auto bg-white md:block md:w-[var(--statement-width)] md:flex-none ${
             mobileTab === 'problem' ? 'flex-1' : 'hidden'
           }`}
+          {...surfaceProps('statement')}
         >
           <ProblemStatement exercise={exercise} revealedHints={revealedHints} />
         </section>
@@ -210,7 +291,12 @@ export function Workspace({
           <EditorPane
             activeSample={activeSample}
             code={draft.code}
-            onCodeChange={draft.setCode}
+            onCodeChange={(value) => {
+              monitoring.markActive();
+              draft.setCode(value);
+            }}
+            onEditorMount={monitoring.registerEditor}
+            onRun={() => void handleRun()}
             onRunSample={(index) => void handleRunSample(index)}
             onTabChange={handleOutputTabChange}
             runner={runner}

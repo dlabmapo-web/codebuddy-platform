@@ -20,6 +20,14 @@
   --color-brand-soft: #EAF1FE;
   --color-canvas: #F4F7FC;
 
+  /*
+   * The other person in a shared workspace. One colour carries the whole idea:
+   * the peer's caret, the tab holding their output, and the badge naming them
+   * are all this violet, so a teacher never has to ask whose anything is.
+   */
+  --color-peer: #7C3AED;
+  --color-peer-soft: #F3EEFE;
+
   /* Content lifecycle: draft is in progress, brand blue is live, slate is retired */
   --color-draft: #A45A08;
   --color-draft-soft: #FDF4E3;
@@ -141,3 +149,46 @@ h1, h2, h3, h4 {
 .tiptap-render table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 .tiptap-render th { background: #F9FAFB; font-weight: 600; padding: 8px 12px; border: 1px solid #E5E8EC; text-align: left; }
 .tiptap-render td { padding: 8px 12px; border: 1px solid #E5E8EC; }
+
+/* The peer's caret, name, and selection inside a shared editor.
+   Never interactive: none of it may swallow a click meant for the code
+   beneath, and none of it may be reached by the caret or a screen reader —
+   the code is what is being read here, not the annotation on top of it. */
+.cove-peer-cursor {
+  position: relative;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.cove-peer-caret {
+  position: absolute;
+  top: 0;
+  left: -1px;
+  width: 2px;
+  height: 1.35em;
+  background: var(--color-peer);
+  border-radius: 1px;
+}
+.cove-peer-label {
+  position: absolute;
+  left: -1px;
+  bottom: 1.35em;
+  padding: 1px 5px;
+  border-radius: 3px 3px 3px 0;
+  background: var(--color-peer);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+  opacity: 1;
+}
+/* The name fades once the peer stops moving; the caret stays, because it is
+   still where they are working. */
+.cove-peer-cursor.is-idle .cove-peer-label { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .cove-peer-label { transition: opacity 220ms ease; }
+}
+.cove-peer-selection {
+  background: color-mix(in srgb, var(--color-peer) 18%, transparent);
+}

@@ -1,6 +1,10 @@
 import type { LearnExerciseWorkspace } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
+import { PageTranslationsProvider } from '@/i18n';
+import { initTranslations } from '@/i18n/init-translations';
+import { monitoringNamespaces } from '@/i18n/namespaces';
+import { getLocale } from '@/i18n/server/get-locale';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { Workspace } from './_components/workspace';
@@ -30,5 +34,18 @@ export default async function ExerciseWorkspacePage({
   }
   if (!workspace) notFound();
 
-  return <Workspace academyId={academyId} workspace={workspace} />;
+  // Only the monitoring indicator needs this namespace, and only while a
+  // teacher is present — but the copy has to be in hand before that happens.
+  const locale = await getLocale();
+  const { resources } = await initTranslations(locale, monitoringNamespaces);
+
+  return (
+    <PageTranslationsProvider
+      locale={locale}
+      namespaces={monitoringNamespaces}
+      resources={resources}
+    >
+      <Workspace academyId={academyId} workspace={workspace} />
+    </PageTranslationsProvider>
+  );
 }

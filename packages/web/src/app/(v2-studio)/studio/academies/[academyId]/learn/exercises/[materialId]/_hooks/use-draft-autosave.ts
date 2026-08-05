@@ -153,7 +153,7 @@ export function useDraftAutosave({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    void sync(codeRef.current);
+    return sync(codeRef.current);
   }, [sync]);
 
   /**

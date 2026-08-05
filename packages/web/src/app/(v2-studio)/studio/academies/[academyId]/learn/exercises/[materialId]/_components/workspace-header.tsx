@@ -42,9 +42,12 @@ export function WorkspaceHeader({
   onRevealHint,
   submitting,
   hintsRemaining,
+  indicator,
 }: {
   academyId: string;
   workspace: LearnExerciseWorkspace;
+  /** The generic "a teacher is here" badge, or nothing when nobody is. */
+  indicator?: React.ReactNode;
   saveState: DraftSaveState;
   onNavigate: (materialId: string) => void;
   navigating: boolean;
@@ -85,6 +88,8 @@ export function WorkspaceHeader({
           </span>
         </div>
       </div>
+
+      {indicator}
 
       <ExerciseTimer key={exercise.materialId} />
 

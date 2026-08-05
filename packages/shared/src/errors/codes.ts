@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const appErrorCodes = [
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
@@ -48,9 +50,22 @@ export const appErrorCodes = [
   "SUBMISSION_RATE_LIMITED",
   "SUBMISSION_NOT_FOUND",
   "GRADING_UNAVAILABLE",
+  "MONITORING_DISABLED",
+  "MONITORING_ACCESS_DENIED",
+  "MONITORING_STUDENT_UNAVAILABLE",
+  "MONITORING_WATCH_REPLACED",
+  "MONITORING_PAYLOAD_TOO_LARGE",
+  "MONITORING_REALTIME_UNAVAILABLE",
+  "MONITORING_FEEDBACK_INVALID",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
+
+/**
+ * The same vocabulary as a schema, for payloads that carry a failure rather
+ * than throwing one — a socket acknowledgement has no HTTP status to lean on.
+ */
+export const appErrorCodeSchema = z.enum(appErrorCodes);
 
 const appErrorCodeSet = new Set<string>(appErrorCodes);
 
@@ -110,4 +125,14 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   SUBMISSION_RATE_LIMITED: "Too many submissions. Wait a moment and try again.",
   SUBMISSION_NOT_FOUND: "That submission was not found.",
   GRADING_UNAVAILABLE: "Grading is temporarily unavailable. Your code is saved.",
+  MONITORING_DISABLED: "Live monitoring is not enabled for this academy.",
+  // One message for every access failure — not assigned, wrong academy,
+  // archived class, suspended membership — so a caller cannot learn which
+  // classes or students exist by reading the error.
+  MONITORING_ACCESS_DENIED: "You are not the assigned teacher for this class.",
+  MONITORING_STUDENT_UNAVAILABLE: "This student is not available to monitor right now.",
+  MONITORING_WATCH_REPLACED: "This session was replaced by a newer one.",
+  MONITORING_PAYLOAD_TOO_LARGE: "That change was too large to send.",
+  MONITORING_REALTIME_UNAVAILABLE: "Live monitoring is temporarily unavailable.",
+  MONITORING_FEEDBACK_INVALID: "Feedback must be between 1 and 2,000 characters.",
 };

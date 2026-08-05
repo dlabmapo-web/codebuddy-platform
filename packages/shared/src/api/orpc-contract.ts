@@ -9,6 +9,7 @@ import {
 import { academyClassesContract } from "./orpc/classes.contract.js";
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
+import { monitoringContract } from "./orpc/monitoring.contract.js";
 
 export const appContract = {
   auth: authContract,
@@ -20,6 +21,7 @@ export const appContract = {
   academyCourses: academyCoursesContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
+  monitoring: monitoringContract,
 };
 
 export type AppContract = typeof appContract;

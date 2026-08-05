@@ -201,7 +201,24 @@ async function sweep(page: Page, surface: string) {
   }
 }
 
-test('each side sees where the other is pointing', async () => {
+/** Moves inside the sandboxed authored-content document, not over its frame. */
+async function sweepStatementIframe(page: Page) {
+  const frame = page
+    .locator('[data-collab-surface="statement"] iframe')
+    .first();
+  await expect(frame).toBeVisible({ timeout: 30_000 });
+  const box = await frame.boundingBox();
+  expect(box).not.toBeNull();
+  for (let step = 0; step <= 6; step += 1) {
+    await page.mouse.move(
+      box!.x + box!.width * (0.18 + step * 0.09),
+      box!.y + Math.min(box!.height - 4, 8 + step * 2),
+    );
+    await page.waitForTimeout(120);
+  }
+}
+
+test('each side sees where the other is pointing', async ({}, testInfo) => {
   // The teacher's mouse over the problem reaches the student's copy of the
   // problem — a different pane, at a different width, on a different screen.
   await sweep(teacherPage, 'statement');
@@ -221,6 +238,20 @@ test('each side sees where the other is pointing', async () => {
     'editor',
     { timeout: 30_000 },
   );
+
+  if (testInfo.project.name === 'chromium') {
+    // Authored problem HTML is a separate document. Movement inside it must be
+    // translated back into the surrounding statement surface for the teacher.
+    // Playwright WebKit does not route synthetic mouse input into sandboxed
+    // srcDoc frames, so WebKit covers the parent surfaces and caret path while
+    // Chromium exercises the real iframe boundary.
+    await sweepStatementIframe(studentPage);
+    await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
+      'data-peer-surface',
+      'statement',
+      { timeout: 30_000 },
+    );
+  }
 });
 
 test("each side sees the other's caret in the shared editor", async () => {
@@ -233,11 +264,120 @@ test("each side sees the other's caret in the shared editor", async () => {
     TEACHER_NAME,
   );
 
-  await studentPage.locator('.monaco-editor').first().click();
-  await studentPage.keyboard.press('ArrowRight');
-  await expect(teacherPage.locator('.cove-peer-label')).toBeVisible({
+  // Put the student at an exact coordinate, then type immediately. The click
+  // and keystroke are intentionally closer than the cursor throttle interval:
+  // the trailing event must still deliver the final column, not strand the
+  // teacher at the leading position.
+  await studentPage.evaluate(() => {
+    const monaco = (
+      window as unknown as {
+        monaco?: {
+          editor: {
+            getEditors(): {
+              focus(): void;
+              setPosition(position: {
+                lineNumber: number;
+                column: number;
+              }): void;
+            }[];
+          };
+        };
+      }
+    ).monaco;
+    const editor = monaco?.editor.getEditors()[0];
+    editor?.setPosition({ lineNumber: 2, column: 5 });
+    editor?.focus();
+  });
+  await studentPage.keyboard.type('x');
+
+  const studentCaret = teacherPage.locator('.cove-peer-cursor');
+  await expect(studentCaret).toHaveAttribute('data-peer-line', '2', {
     timeout: 30_000,
   });
+  await expect(studentCaret).toHaveAttribute('data-peer-column', '6');
+  const studentLabel = studentCaret.locator('.cove-peer-label');
+  await expect(studentCaret).toHaveClass(/cove-peer-cursor--student/);
+  await expect(studentLabel).toBeVisible();
+  await expect(studentLabel).toHaveCSS('background-color', 'rgb(27, 100, 218)');
+  await expect(teacherPage.getByText(/editing with/i)).toHaveCount(0);
+
+  // A paused student may be reading or thinking. Their named caret stays on
+  // the exact code position until the collaboration lifecycle clears it.
+  await teacherPage.waitForTimeout(3_500);
+  await expect(studentLabel).toBeVisible();
+});
+
+/**
+ * The asymmetry, in the browser.
+ *
+ * Both arrows travel the same path and are drawn by the same component; the
+ * only difference is what each side does with silence. These three cases are
+ * the whole product rule, and they can only be seen with both screens open.
+ *
+ * They run after the caret case on purpose: the last of them checks that an
+ * expiring pointer and a cleared one both leave the peer's caret alone, and
+ * there has to be a caret on screen for that to mean anything.
+ */
+test("the teacher's arrow fades from the student's screen when it stops", async () => {
+  await sweep(teacherPage, 'terminal');
+  await expect(studentPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'terminal',
+    { timeout: 30_000 },
+  );
+
+  // Nobody touches the teacher's mouse for longer than the three-second
+  // budget. The student stops being told that somebody is following along.
+  await expect(studentPage.getByTestId('peer-pointer')).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  // And it is gone rather than broken: moving again brings it straight back.
+  await sweep(teacherPage, 'statement');
+  await expect(studentPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'statement',
+    { timeout: 30_000 },
+  );
+});
+
+test("the student's arrow stays put on the teacher's screen", async () => {
+  await sweep(studentPage, 'editor');
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'editor',
+    { timeout: 30_000 },
+  );
+
+  // Well past the teacher-side budget, with the student sitting still. A
+  // student who has gone quiet is thinking, and where they were last looking
+  // is part of what the teacher is reading.
+  await studentPage.waitForTimeout(6_000);
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'editor',
+  );
+});
+
+test("the student leaving the window clears the teacher's copy", async () => {
+  // Dispatched rather than provoked: the two browser contexts are independent,
+  // so neither can take focus from the other and both believe they have it.
+  // The listener under test is the real one.
+  await studentPage.evaluate(() => window.dispatchEvent(new Event('blur')));
+
+  // Nothing on the teacher's side expires, so this clear is the only thing
+  // that can remove the arrow — and it is sent reliably for exactly that
+  // reason.
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveCount(0, {
+    timeout: 30_000,
+  });
+
+  // The student's caret is untouched by it: a caret marks a place in the
+  // document, and the document is still open.
+  await expect(teacherPage.locator('.cove-peer-cursor')).toHaveAttribute(
+    'data-peer-line',
+    '2',
+  );
 });
 
 test('a pointer over a pane the reader does not have is named, not drawn', async () => {

@@ -27,6 +27,16 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      // The live-monitoring pointer crosses a sandboxed iframe boundary. Keep
+      // that path covered by WebKit because Safari's document/event behavior
+      // is the browser-specific failure a teacher reported in production use.
+      name: 'webkit-monitoring',
+      grepInvert:
+        /teacher runs|submitting stays|feedback is stored|temporary disconnect|indicator clears/,
+      testMatch: /teacher-live-monitoring\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { parseUsername } from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
@@ -43,6 +44,9 @@ export class SupabaseAuthService {
       authUserId: claims.sub,
       email,
       emailVerified: email !== null && emailVerified,
+      // User metadata is client-writable, so this is untrusted input and is
+      // revalidated here rather than trusted as a stored value.
+      username: parseUsername(metadata.username),
       displayName: firstString(metadata.full_name, metadata.name),
       avatarUrl: firstUrl(metadata.avatar_url, metadata.picture),
       provider: firstString(appMetadata.provider),

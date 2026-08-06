@@ -10,6 +10,7 @@ const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "teacher@example.com",
   emailVerified: true,
+  username: null,
   displayName: "Teacher",
   avatarUrl: null,
   provider: null,

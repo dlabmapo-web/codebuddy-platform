@@ -13,6 +13,7 @@ const identity: SupabaseIdentity = {
   authUserId,
   email: "social@example.com",
   emailVerified: true,
+  username: null,
   displayName: "Social User",
   avatarUrl: null,
   provider: "google",
@@ -24,6 +25,7 @@ function userRecord() {
     id: userId,
     authUserId,
     email: identity.email,
+    username: null,
     displayName: identity.displayName,
     avatarUrl: null,
     platformRole: "USER",
@@ -84,6 +86,215 @@ function createCompletionService(provider = "google") {
     service: new AuthService(prisma, onboarding),
   };
 }
+
+describe("AuthService.bootstrap username claim", () => {
+  const usernameConflict = Object.assign(new Error("unique"), {
+    code: "P2002",
+    meta: { target: ["users_username_key"] },
+  });
+  const signup: SupabaseIdentity = { ...identity, username: "minsu01" };
+
+  function createService(createResults: unknown[]) {
+    const create = vi.fn();
+    for (const result of createResults) {
+      create.mockImplementationOnce(() =>
+        result instanceof Error ? Promise.reject(result) : Promise.resolve(result)
+      );
+    }
+    const update = vi.fn();
+    const prisma = {
+      user: {
+        findUnique: vi.fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue(userRecord()),
+        create,
+        update,
+      },
+    } as unknown as PrismaService;
+    const onboarding = {
+      ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AcademyOnboardingService;
+    return { create, update, service: new AuthService(prisma, onboarding) };
+  }
+
+  it("stores the signup username on the new profile", async () => {
+    const { create, service } = createService([
+      { ...userRecord(), username: "minsu01" },
+    ]);
+
+    await service.bootstrap(signup);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[0].data).toMatchObject({
+      username: "minsu01",
+    });
+  });
+
+  /**
+   * The person already holds a Supabase identity by this point, so losing the
+   * race has to cost them the name and not the account.
+   */
+  it("creates the profile without a username when the name was taken", async () => {
+    const { create, service } = createService([
+      usernameConflict,
+      userRecord(),
+    ]);
+
+    const result = await service.bootstrap(signup);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1]?.[0].data).not.toHaveProperty("username");
+    expect(result.user.username).toBeNull();
+  });
+
+  it("does not swallow a conflict on another column", async () => {
+    const emailConflict = Object.assign(new Error("unique"), {
+      code: "P2002",
+      meta: { target: ["users_email_key"] },
+    });
+    const { create, service } = createService([emailConflict]);
+
+    await expect(service.bootstrap(signup)).rejects.toBe(emailConflict);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The claim arrives in client-writable user metadata, so honoring it on a
+   * later sign-in would turn editing that metadata into a rename.
+   */
+  it("never overwrites a username an account already holds", async () => {
+    const update = vi.fn().mockResolvedValue({
+      ...userRecord(),
+      username: "original",
+    });
+    const prisma = {
+      user: {
+        findUnique: vi.fn()
+          .mockResolvedValueOnce({ ...userRecord(), username: "original" })
+          .mockResolvedValue({ ...userRecord(), username: "original" }),
+        update,
+      },
+    } as unknown as PrismaService;
+    const onboarding = {
+      ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AcademyOnboardingService;
+
+    const result = await new AuthService(prisma, onboarding).bootstrap({
+      ...identity,
+      username: "somebody-else",
+    });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0]?.[0].data).not.toHaveProperty("username");
+    expect(result.user.username).toBe("original");
+  });
+});
+
+describe("AuthService.resolveSignInEmail", () => {
+  function service(owner: { email: string | null } | null) {
+    const findUnique = vi.fn().mockResolvedValue(owner);
+    const prisma = { user: { findUnique } } as unknown as PrismaService;
+    return {
+      findUnique,
+      service: new AuthService(prisma, {} as AcademyOnboardingService),
+    };
+  }
+
+  it("passes an email straight through, normalized", async () => {
+    const { service: subject, findUnique } = service(null);
+    await expect(subject.resolveSignInEmail("  Teacher@Cove.Test "))
+      .resolves.toEqual({ email: "teacher@cove.test" });
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("maps a known username to its account email", async () => {
+    const { service: subject } = service({ email: "minsu@cove.test" });
+    await expect(subject.resolveSignInEmail("MinSu01"))
+      .resolves.toEqual({ email: "minsu@cove.test" });
+  });
+
+  /**
+   * The point of the whole route: a name nobody holds must be answered exactly
+   * like a name somebody does, so the sign-in that follows is the only thing
+   * that can fail and it fails the same way either time.
+   */
+  it("answers an unknown username with an unreachable address", async () => {
+    const { service: subject } = service(null);
+    await expect(subject.resolveSignInEmail("nobody99"))
+      .resolves.toEqual({ email: "nobody99@unresolved.invalid" });
+  });
+
+  it("does not fall back to a username account that has no email", async () => {
+    const { service: subject } = service({ email: null });
+    await expect(subject.resolveSignInEmail("minsu01"))
+      .resolves.toEqual({ email: "minsu01@unresolved.invalid" });
+  });
+});
+
+describe("AuthService.setUsername", () => {
+  const conflict = Object.assign(new Error("unique"), {
+    code: "P2002",
+    meta: { target: ["username"] },
+  });
+
+  function service(
+    current: { id: string; status: string; username: string | null } | null,
+    updateResult: Promise<unknown> = Promise.resolve({}),
+  ) {
+    const update = vi.fn().mockReturnValue(updateResult);
+    const prisma = {
+      user: {
+        findUnique: vi.fn()
+          .mockResolvedValueOnce(current)
+          .mockResolvedValue({ ...userRecord(), username: "minsu01" }),
+        update,
+      },
+    } as unknown as PrismaService;
+    return {
+      update,
+      service: new AuthService(prisma, {} as AcademyOnboardingService),
+    };
+  }
+
+  it("claims a free name for an account that has none", async () => {
+    const { service: subject, update } = service({
+      id: userId,
+      status: "ACTIVE",
+      username: null,
+    });
+
+    const result = await subject.setUsername(identity, "minsu01");
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { username: "minsu01" },
+    });
+    expect(result.user.username).toBe("minsu01");
+  });
+
+  it("refuses to rename an account that already has a username", async () => {
+    const { service: subject, update } = service({
+      id: userId,
+      status: "ACTIVE",
+      username: "taken-already",
+    });
+
+    await expect(subject.setUsername(identity, "minsu01"))
+      .rejects.toMatchObject({ code: "USERNAME_ALREADY_SET" });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reports a lost race as a taken username", async () => {
+    const { service: subject } = service(
+      { id: userId, status: "ACTIVE", username: null },
+      Promise.reject(conflict),
+    );
+
+    await expect(subject.setUsername(identity, "minsu01"))
+      .rejects.toMatchObject({ code: "USERNAME_TAKEN" });
+  });
+});
 
 describe("AuthService.completeOAuthOnboarding", () => {
   it("requires an onboarding intent for a new social identity", async () => {

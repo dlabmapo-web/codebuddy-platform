@@ -16,6 +16,36 @@ export function createAuthRouter(os: ORPCImplementer, deps: ORPCDeps) {
         );
         return deps.authService.bootstrap(context.identity);
       }),
+    checkUsernameAvailable: os.auth.checkUsernameAvailable
+      .handler(({ context, input }) => {
+        deps.rateLimitService.assert(
+          `auth:username:check:${requestAddress(context.req)}`,
+          30,
+          10 * 60_000,
+        );
+        return deps.authService
+          .isUsernameAvailable(input.username)
+          .then((available) => ({ available }));
+      }),
+    resolveSignInEmail: os.auth.resolveSignInEmail
+      .handler(({ context, input }) => {
+        deps.rateLimitService.assert(
+          `auth:signin:resolve:${requestAddress(context.req)}`,
+          20,
+          10 * 60_000,
+        );
+        return deps.authService.resolveSignInEmail(input.identifier);
+      }),
+    setUsername: os.auth.setUsername
+      .use(access.authenticated)
+      .handler(({ context, input }) => {
+        deps.rateLimitService.assert(
+          `auth:username:set:${context.identity.authUserId}`,
+          10,
+          60 * 60_000,
+        );
+        return deps.authService.setUsername(context.identity, input.username);
+      }),
     createOAuthOnboardingIntent: os.auth.createOAuthOnboardingIntent
       .handler(({ context, input }) => {
         deps.rateLimitService.assert(

@@ -143,6 +143,9 @@ model User {
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
   email              String?      @unique
+  /// Sign-in name. Lowercase, globally unique, and never reused as a rename
+  /// handle. Null for accounts that arrived through OAuth or predate it.
+  username           String?      @unique
   displayName        String?      @map("display_name")
   avatarUrl          String?      @map("avatar_url")
   platformRole       PlatformRole @default(USER) @map("platform_role")

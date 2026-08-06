@@ -20,11 +20,11 @@
   },
   "roster": {
     "back": "My classes",
+    "courses_label": "Courses",
     "summary_total": "Enrolled",
     "summary_online": "Online",
     "summary_solving": "Solving",
-    "search_label": "Search students",
-    "search_placeholder": "Name or email",
+    "search_placeholder": "Name, username, or email",
     "filter_all": "All",
     "filter_online": "Online",
     "filter_solving": "Solving",

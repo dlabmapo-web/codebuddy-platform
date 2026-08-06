@@ -75,6 +75,12 @@ export type DataTableProps<TData, TValue> = {
   pageSize?: number;
   /** Per-column multi-select filters, rendered as chips in the toolbar. */
   facets?: TableFacet[];
+  /**
+   * A caller-owned filter control, placed beside the search box where the
+   * facet chips go. For a choice the table cannot make itself — one whose
+   * options do not map onto a single column's values.
+   */
+  toolbarFilters?: React.ReactNode;
   /** Page-level actions ("New course") placed at the end of the toolbar. */
   toolbarActions?: React.ReactNode;
   onRowClick?: (row: TData) => void;
@@ -93,6 +99,7 @@ export function DataTable<TData, TValue>({
   emptyMessage,
   pageSize,
   facets,
+  toolbarFilters,
   toolbarActions,
   onRowClick,
   frameless = false,
@@ -140,6 +147,7 @@ export function DataTable<TData, TValue>({
   const showToolbar = Boolean(
     searchPlaceholder ||
       facets?.length ||
+      toolbarFilters ||
       hideableColumns.length > 0 ||
       toolbarActions,
   );
@@ -161,6 +169,8 @@ export function DataTable<TData, TValue>({
               />
             </div>
           ) : null}
+
+          {toolbarFilters}
 
           {facets?.map((facet) => (
             <FacetedFilter

@@ -18,11 +18,11 @@
   },
   "roster": {
     "back": "내 반",
+    "courses_label": "과목",
     "summary_total": "등록",
     "summary_online": "접속",
     "summary_solving": "풀이 중",
-    "search_label": "학생 검색",
-    "search_placeholder": "이름 또는 이메일",
+    "search_placeholder": "이름, 아이디 또는 이메일",
     "filter_all": "전체",
     "filter_online": "접속",
     "filter_solving": "풀이 중",

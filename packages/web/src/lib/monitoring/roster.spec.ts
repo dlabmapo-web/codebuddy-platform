@@ -1,11 +1,17 @@
-import type { MonitoringRosterStudent, PresenceEntry } from '@cove/shared';
+import type {
+  MonitoringLiveState,
+  MonitoringRosterStudent,
+  PresenceEntry,
+} from '@cove/shared';
 import { describe, expect, it } from 'vitest';
 
 import {
+  compareLiveState,
   countRoster,
-  filterRoster,
+  matchesFilter,
   mergeRoster,
   sortRoster,
+  studentSearchText,
   type RosterFilter,
 } from './roster';
 
@@ -17,6 +23,7 @@ function student(
   return {
     userId: `user-${overrides.membershipId}`,
     displayName: 'Student',
+    username: 'student01',
     email: 'student@example.com',
     membershipStatus: 'ACTIVE',
     userStatus: 'ACTIVE',
@@ -57,19 +64,35 @@ describe('mergeRoster', () => {
     );
     expect(row!.state).toBe('IDLE');
     expect(row!.materialId).toBe(materialId);
-    expect(row!.canOpenLive).toBe(true);
   });
 
-  it('opens an online student whose current exercise was verified', () => {
+  it('opens a student who is solving', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
-      [presence('a', { state: 'ONLINE', materialId })],
+      [presence('a', { state: 'SOLVING', materialId })],
     );
     expect(row).toMatchObject({
-      state: 'ONLINE',
+      state: 'SOLVING',
       materialId,
       canOpenLive: true,
     });
+  });
+
+  /**
+   * Both hold an exercise, and neither has anything live in it: Idle has done
+   * nothing for a minute, and Online's workspace is behind another window.
+   */
+  it('does not open a student who holds an exercise but is not working', () => {
+    const [idle] = mergeRoster(
+      [student({ membershipId: 'a' })],
+      [presence('a', { state: 'IDLE', materialId })],
+    );
+    const [online] = mergeRoster(
+      [student({ membershipId: 'b' })],
+      [presence('b', { state: 'ONLINE', materialId })],
+    );
+    expect(idle!.canOpenLive).toBe(false);
+    expect(online!.canOpenLive).toBe(false);
   });
 
   it('ignores presence for somebody who is not on the roster', () => {
@@ -104,7 +127,7 @@ describe('mergeRoster', () => {
   });
 });
 
-describe('filterRoster', () => {
+describe('matchesFilter', () => {
   const rows = mergeRoster(
     [
       student({ membershipId: 'a', displayName: 'Ada' }),
@@ -117,8 +140,43 @@ describe('filterRoster', () => {
     ],
   );
 
+  function count(filter: RosterFilter): number {
+    return rows.filter((row) => matchesFilter(row, filter)).length;
+  }
+
   it('counts every live connection as online, not only solving', () => {
-    expect(filterRoster(rows, { filter: 'online', search: '' })).toHaveLength(2);
+    expect(count('online')).toBe(2);
+  });
+
+  /**
+   * Three signed in, two of them solving: Online lists all three and Solving
+   * lists two. The narrowed Open live rule must never leak into the filter —
+   * a student who is working is still a student who is here.
+   */
+  it('keeps a solving student in the online list', () => {
+    const signedIn = mergeRoster(
+      [
+        student({ membershipId: 'a', displayName: 'Ada' }),
+        student({ membershipId: 'b', displayName: 'Bo' }),
+        student({ membershipId: 'c', displayName: 'Cy' }),
+      ],
+      [
+        presence('a', { state: 'SOLVING' }),
+        presence('b', { state: 'SOLVING' }),
+        presence('c', { state: 'ONLINE', materialId: null }),
+      ],
+    );
+    expect(signedIn.filter((row) => matchesFilter(row, 'online'))).toHaveLength(3);
+    expect(signedIn.filter((row) => matchesFilter(row, 'solving'))).toHaveLength(2);
+  });
+
+  /** Online with no exercise is the ordinary state of a signed-in student. */
+  it('never offers to open a student who has no exercise', () => {
+    const [row] = mergeRoster(
+      [student({ membershipId: 'a' })],
+      [presence('a', { state: 'ONLINE', materialId: null })],
+    );
+    expect(row!.canOpenLive).toBe(false);
   });
 
   it.each([
@@ -127,24 +185,63 @@ describe('filterRoster', () => {
     ['offline', 1],
     ['all', 3],
   ] as Array<[RosterFilter, number]>)('filters %s', (filter, expected) => {
-    expect(filterRoster(rows, { filter, search: '' })).toHaveLength(expected);
+    expect(count(filter)).toBe(expected);
+  });
+});
+
+describe('studentSearchText', () => {
+  it('covers all three identifiers a teacher might type', () => {
+    const [row] = mergeRoster(
+      [
+        student({
+          membershipId: 'a',
+          displayName: 'Ada',
+          username: 'ada01',
+          email: 'ada@school.test',
+        }),
+      ],
+      [],
+    );
+    expect(studentSearchText(row!)).toBe('Ada ada01 ada@school.test');
   });
 
-  it('searches name and email, case-insensitively', () => {
-    expect(filterRoster(rows, { filter: 'all', search: 'ADA' })).toHaveLength(1);
-    expect(
-      filterRoster(rows, { filter: 'all', search: 'bo@school' }),
-    ).toHaveLength(1);
+  /** An OAuth account has no username, and must stay findable by name. */
+  it('drops the blanks rather than joining them', () => {
+    const [row] = mergeRoster(
+      [
+        student({
+          membershipId: 'a',
+          displayName: 'Ada',
+          username: null,
+          email: null,
+        }),
+      ],
+      [],
+    );
+    expect(studentSearchText(row!)).toBe('Ada');
   });
+});
 
-  it('ignores surrounding whitespace in the search box', () => {
-    expect(filterRoster(rows, { filter: 'all', search: '  ' })).toHaveLength(3);
-  });
-
-  it('applies the filter and the search together', () => {
-    expect(
-      filterRoster(rows, { filter: 'solving', search: 'Bo' }),
-    ).toHaveLength(0);
+describe('compareLiveState', () => {
+  /**
+   * The table's State column sorts through this. Alphabetical order would put
+   * IDLE above SOLVING and scatter the students the default order gathers.
+   */
+  it('orders by who needs attention, not by the enum spelling', () => {
+    const states: MonitoringLiveState[] = [
+      'OFFLINE',
+      'ONLINE',
+      'RECONNECTING',
+      'IDLE',
+      'SOLVING',
+    ];
+    expect([...states].sort(compareLiveState)).toEqual([
+      'SOLVING',
+      'IDLE',
+      'ONLINE',
+      'RECONNECTING',
+      'OFFLINE',
+    ]);
   });
 });
 

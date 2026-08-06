@@ -145,7 +145,7 @@ test('a student appears live when the teacher opened the roster first', async ()
   await typeIntoEditor(studentPage, 'a = int(input())\n');
 
   const studentRow = teacherPage
-    .getByRole('listitem')
+    .getByRole('row')
     .filter({ hasText: 'Cove Student' });
   // Scope this to the row. The summary card and filter also say "Solving" and
   // allowed the old snapshot-only test to pass while the student stayed

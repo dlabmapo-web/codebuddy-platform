@@ -7,19 +7,19 @@ import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useLocale } from '@/i18n';
 import { orpc } from '@/lib/orpc';
 import { useClassPresence } from '@/lib/monitoring/use-class-presence';
 import {
   countRoster,
-  filterRoster,
+  matchesFilter,
   mergeRoster,
   sortRoster,
   type RosterFilter,
 } from '@/lib/monitoring/roster';
 import { cn } from '@/lib/utils';
 
-import { ConnectionBadge, LiveStateBadge } from '../../../_components/live-badges';
+import { ConnectionBadge } from '../../../_components/live-badges';
+import { RosterTable } from './roster-table';
 
 const filters: RosterFilter[] = ['all', 'online', 'solving', 'idle', 'offline'];
 
@@ -40,10 +40,8 @@ export function LiveRoster({
   initialRoster: MonitoringClassRoster;
 }) {
   const { t } = useTranslation('monitoring');
-  const locale = useLocale();
   const classId = initialRoster.class.classId;
   const [filter, setFilter] = React.useState<RosterFilter>('all');
-  const [search, setSearch] = React.useState('');
 
   const rosterQuery = useQuery({
     queryKey: ['academy', academyId, 'teaching-roster', classId],
@@ -59,14 +57,12 @@ export function LiveRoster({
     [entries, roster.students],
   );
   const counts = React.useMemo(() => countRoster(rows), [rows]);
+  // The pills decide which rows the table receives; the table owns text
+  // search. Splitting them this way keeps `online` meaning "any live
+  // connection", which a per-column filter could not express.
   const visible = React.useMemo(
-    () => filterRoster(rows, { filter, search }),
-    [filter, rows, search],
-  );
-
-  const relative = React.useMemo(
-    () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
-    [locale],
+    () => rows.filter((row) => matchesFilter(row, filter)),
+    [filter, rows],
   );
 
   return (
@@ -93,47 +89,28 @@ export function LiveRoster({
         </p>
       ) : null}
 
+      {/* The class's courses belong to the whole page rather than to any one
+          row — every student on this roster is in the same group studying the
+          same courses, so a column would repeat one answer on every line. */}
+      {roster.courses.length > 0 ? (
+        <p className="flex flex-wrap items-center gap-1.5 text-[13px] text-sub">
+          <span className="font-semibold">{t('roster.courses_label')}</span>
+          {roster.courses.map((course) => (
+            <span
+              className="rounded-md bg-brand-soft px-2 py-0.5 text-[12.5px] font-semibold text-brand"
+              key={course.id}
+            >
+              {course.title}
+            </span>
+          ))}
+        </p>
+      ) : null}
+
       <dl className="grid grid-cols-3 gap-3">
         <SummaryCard label={t('roster.summary_total')} value={counts.total} />
         <SummaryCard label={t('roster.summary_online')} value={counts.online} />
         <SummaryCard label={t('roster.summary_solving')} value={counts.solving} />
       </dl>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div
-          aria-label={t('roster.filter_all')}
-          className="flex flex-wrap gap-1.5"
-          role="group"
-        >
-          {filters.map((option) => (
-            <button
-              aria-pressed={filter === option}
-              className={cn(
-                'rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
-                filter === option
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-border text-sub hover:text-ink',
-              )}
-              key={option}
-              onClick={() => setFilter(option)}
-              type="button"
-            >
-              {t(`roster.filter_${option}`)}
-            </button>
-          ))}
-        </div>
-
-        <label className="ml-auto flex min-w-[220px] flex-1 flex-col gap-1 sm:max-w-xs">
-          <span className="sr-only">{t('roster.search_label')}</span>
-          <input
-            className="h-9 rounded-lg border border-border bg-surface px-3 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t('roster.search_placeholder')}
-            type="search"
-            value={search}
-          />
-        </label>
-      </div>
 
       {roster.truncated ? (
         <p className="text-[13px] font-semibold text-draft">
@@ -145,65 +122,38 @@ export function LiveRoster({
         <p className="rounded-card border border-border bg-surface p-5 text-[14px] text-sub">
           {t('roster.no_enrollments')}
         </p>
-      ) : visible.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface p-5 text-[14px] text-sub">
-          {t('roster.empty')}
-        </p>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-          {visible.map((row) => (
-            <li
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3"
-              key={row.membershipId}
+        <RosterTable
+          academyId={academyId}
+          classId={classId}
+          // A filter that matched nothing must not claim the class is empty.
+          emptyMessage={t('roster.empty')}
+          filters={
+            <div
+              aria-label={t('roster.filter_all')}
+              className="flex flex-wrap items-center gap-1.5"
+              role="group"
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14.5px] font-bold">
-                  {row.displayName ?? row.email ?? row.membershipId}
-                </p>
-                <p className="truncate text-[13px] text-sub">
-                  {row.active ? row.email : t('roster.membership_inactive')}
-                </p>
-              </div>
-
-              <LiveStateBadge state={row.state} />
-
-              <p className="min-w-[140px] text-[13px] text-sub">
-                {row.materialId ? t('roster.in_exercise') : t('roster.no_exercise')}
-              </p>
-
-              {/* "9 minutes ago" is computed against the reader's clock, so
-                  the server's copy and the browser's disagree by whatever time
-                  the response spent in flight. The value is deliberately fuzzy
-                  and the row re-renders on the next presence event, so the
-                  browser's answer simply wins. */}
-              <p className="min-w-[110px] text-[13px] text-sub" suppressHydrationWarning>
-                {lastSeenLabel(row.lastLearningSeenAt, relative) ??
-                  t('roster.never_seen')}
-              </p>
-
-              <p className="min-w-[120px] text-[13px] text-sub">
-                {row.run
-                  ? t(`run.${row.run.lifecycle}`, {
-                      passed: row.run.passedCount,
-                      total: row.run.sampleCount,
-                    })
-                  : null}
-              </p>
-
-              {/* Only for a student actually inside a monitorable exercise:
-                  the workspace has nothing to show otherwise, and the server
-                  would refuse the watch anyway. */}
-              {row.canOpenLive ? (
-                <Link
-                  className="rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                  href={`/studio/academies/${academyId}/teach/classes/${classId}/students/${row.membershipId}/live`}
+              {filters.map((option) => (
+                <button
+                  aria-pressed={filter === option}
+                  className={cn(
+                    'h-10 rounded-lg border px-3 text-[13.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+                    filter === option
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-border bg-white text-sub hover:border-brand hover:text-brand',
+                  )}
+                  key={option}
+                  onClick={() => setFilter(option)}
+                  type="button"
                 >
-                  {t('roster.open_live')}
-                </Link>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                  {t(`roster.filter_${option}`)}
+                </button>
+              ))}
+            </div>
+          }
+          rows={visible}
+        />
       )}
     </div>
   );
@@ -218,20 +168,4 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       </dd>
     </div>
   );
-}
-
-/**
- * Last activity as "12 minutes ago" rather than a timestamp: a teacher wants
- * to know how stale a row is, not when it happened.
- */
-function lastSeenLabel(
-  value: string | null,
-  relative: Intl.RelativeTimeFormat,
-): string | null {
-  if (!value) return null;
-  const minutes = Math.round((Date.parse(value) - Date.now()) / 60_000);
-  if (minutes > -60) return relative.format(minutes, 'minute');
-  const hours = Math.round(minutes / 60);
-  if (hours > -24) return relative.format(hours, 'hour');
-  return relative.format(Math.round(hours / 24), 'day');
 }

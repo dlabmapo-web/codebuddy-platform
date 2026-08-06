@@ -56,6 +56,19 @@ export function mergeRoster(
 }
 
 /**
+ * Everything a teacher might type to find this row, as one string.
+ *
+ * The table's search runs over column accessors, so putting all three
+ * identifiers here is what makes a username findable without a second filter
+ * beside the one the table already owns. Blanks are dropped rather than joined
+ * as empty strings: a student with no username must not become the row that
+ * matches every search for a double space.
+ */
+export function studentSearchText(row: RosterRow): string {
+  return [row.displayName, row.username, row.email].filter(Boolean).join(' ');
+}
+
+/**
  * `online` means "any live connection", which includes solving and idle. A
  * teacher scanning for who is around should not have to select three filters
  * to see everybody who is there.
@@ -73,23 +86,6 @@ export function matchesFilter(row: RosterRow, filter: RosterFilter): boolean {
     case 'offline':
       return row.state === 'OFFLINE';
   }
-}
-
-/** Case-insensitive, over the two identifiers a teacher actually knows. */
-export function matchesSearch(row: RosterRow, search: string): boolean {
-  const term = search.trim().toLowerCase();
-  if (term.length === 0) return true;
-  return (
-    (row.displayName ?? '').toLowerCase().includes(term) ||
-    (row.email ?? '').toLowerCase().includes(term)
-  );
-}
-
-export function filterRoster(
-  rows: readonly RosterRow[],
-  { filter, search }: { filter: RosterFilter; search: string },
-): RosterRow[] {
-  return rows.filter((row) => matchesFilter(row, filter) && matchesSearch(row, search));
 }
 
 /**
@@ -121,6 +117,18 @@ const stateOrder: Record<MonitoringLiveState, number> = {
   RECONNECTING: 3,
   OFFLINE: 4,
 };
+
+/**
+ * The same order as a comparator, for the table's own State column. Sorting
+ * that column alphabetically would scatter the students the default order
+ * deliberately gathered at the top.
+ */
+export function compareLiveState(
+  left: MonitoringLiveState,
+  right: MonitoringLiveState,
+): number {
+  return stateOrder[left] - stateOrder[right];
+}
 
 export function sortRoster(rows: readonly RosterRow[]): RosterRow[] {
   return [...rows].sort((left, right) => {

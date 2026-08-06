@@ -99,9 +99,31 @@ describe("PresenceRegistry", () => {
     expect(entry?.state).toBe("SOLVING");
   });
 
-  it("reports online when the workspace is not in the foreground", async () => {
+  /**
+   * A covered window still reports work. WebKit calls a page hidden when
+   * anything overlaps it, so demoting on visibility alone dropped a Safari
+   * student the moment the teacher's own roster came to the front.
+   */
+  it("keeps a hidden workspace solving while activity is recent", async () => {
     const entry = await registry.publish(signal({ visibility: "HIDDEN" }));
-    expect(entry?.state).toBe("ONLINE");
+    expect(entry?.state).toBe("SOLVING");
+  });
+
+  it("reports online once a hidden workspace also goes quiet", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-04T09:00:00.000Z"));
+      await registry.publish(signal({ active: true, visibility: "HIDDEN" }));
+      vi.setSystemTime(new Date("2026-08-04T09:02:00.000Z"));
+      const entry = await registry.publish(
+        signal({ active: false, visibility: "HIDDEN" }),
+      );
+      // Left open behind something else, rather than sat in front of and
+      // ignored — which is what keeps this out of Idle.
+      expect(entry?.state).toBe("ONLINE");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not move last activity on a heartbeat without activity", async () => {
@@ -174,8 +196,10 @@ describe("PresenceRegistry", () => {
 
   it("counts online and solving from the same snapshot", async () => {
     await registry.publish(signal());
+    // Connected but outside an exercise: online without solving, which is what
+    // makes the two counts different rather than the same number twice.
     await registry.publish(
-      signal({ studentMembershipId: otherMembershipId, visibility: "HIDDEN" }),
+      signal({ studentMembershipId: otherMembershipId, materialId: null }),
     );
     const snapshot = await registry.snapshot(academyId, classId);
     expect(snapshot?.entries).toHaveLength(2);

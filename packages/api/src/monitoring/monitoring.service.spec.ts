@@ -58,6 +58,7 @@ function classRecord(overrides?: {
           user: {
             id: studentUserId,
             displayName: "Student",
+            username: "student01",
             email: "student@example.com",
             status: "ACTIVE",
           },
@@ -260,6 +261,7 @@ describe("getClassRoster", () => {
         membershipId: studentMembershipId,
         userId: studentUserId,
         displayName: "Student",
+        username: "student01",
         email: "student@example.com",
         membershipStatus: "ACTIVE",
         userStatus: "ACTIVE",

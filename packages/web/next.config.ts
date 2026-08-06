@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 
 const crossOriginIsolationHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+  // `credentialless` is not implemented by Safari, which leaves
+  // `crossOriginIsolated` false and makes SharedArrayBuffer unavailable.
+  // `require-corp` is supported by Safari, Chromium, and Firefox; all Python
+  // runtime assets are same-origin and explicitly carry CORP below.
+  { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
 ];
 
 // 워커/파이오다이드 자원(같은 출처 하위 리소스)에 CORP 부여 (COEP 는 전역 규칙에서 적용)

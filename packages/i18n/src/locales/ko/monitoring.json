@@ -81,7 +81,6 @@
     "tab_you": "내 실행",
     "tab_student": "{{name}} 실행",
     "no_run": "아직 실행 기록이 없습니다.",
-    "run_empty": "출력이 없습니다.",
     "result_title": "최근 제출",
     "result_score": "점수 {{score}}",
     "result_cases": "테스트 {{total}}개 중 {{passed}}개 통과",
@@ -93,7 +92,9 @@
     "not_solving_body": "이 학생은 지금 문제를 풀고 있지 않습니다.",
     "ended_title": "모니터링이 종료되었습니다",
     "narrow_title": "화면이 너무 좁습니다",
-    "narrow_body": "학생과 함께 코드를 편집하려면 더 넓은 화면을 사용하세요."
+    "narrow_body": "학생과 함께 코드를 편집하려면 더 넓은 화면을 사용하세요.",
+    "mirror_waiting": "학생의 입력을 기다리는 중",
+    "mirror_catching_up": "따라잡는 중…"
   },
   "feedback": {
     "title": "피드백",

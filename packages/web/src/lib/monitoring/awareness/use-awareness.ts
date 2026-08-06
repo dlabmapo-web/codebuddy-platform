@@ -12,31 +12,30 @@ import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
 import {
+  expireCursor,
+  expirePointer,
+  idleAwarenessState,
+  receiveAwareness,
+  type ReceivedAwarenessState,
+} from './awareness-state';
+import {
   observeSurfaceIframes,
   type PointerCaptureSurface,
   type PointerViewportPoint,
 } from './iframe-pointer-capture';
 import {
-  scheduleRemotePointerExpiry,
-  type RemotePointerLifecycle,
+  scheduleRemoteAwarenessExpiry,
+  type RemoteAwarenessLifecycle,
 } from './pointer-lifecycle';
 import { resolvePointerSurface, toSurfaceFraction } from './surfaces';
 
 export type RemoteAwareness = {
   cursor: CollaborationCursor | null;
   pointer: CollaborationPointer | null;
+  /** Changes only with the Monaco caret, independently of mouse traffic. */
+  cursorMovedAt: number;
   /** Changes only with the pointer, so cursor traffic cannot prolong it. */
   pointerMovedAt: number;
-};
-
-/** Kept with the document it was measured against, so it can be disowned. */
-type ReceivedAwareness = RemoteAwareness & { draftId: string | null };
-
-const idle: ReceivedAwareness = {
-  draftId: null,
-  cursor: null,
-  pointer: null,
-  pointerMovedAt: 0,
 };
 
 /**
@@ -59,20 +58,24 @@ const idle: ReceivedAwareness = {
 export function useAwareness({
   draftId,
   peerOrigin,
+  remoteCursor,
   remotePointer,
   socket,
 }: {
   /** Null until a shared document exists; publishing is off until then. */
   draftId: string | null;
   peerOrigin: AwarenessChangedEvent['origin'];
+  /** Whether the peer's Monaco caret expires or stays until an explicit clear. */
+  remoteCursor: RemoteAwarenessLifecycle;
   /** Whether the peer's arrow fades on silence or waits to be cleared. */
-  remotePointer: RemotePointerLifecycle;
+  remotePointer: RemoteAwarenessLifecycle;
   socket: Socket | null;
 }): {
   remote: RemoteAwareness;
   publishCursor: (cursor: CollaborationCursor | null) => void;
 } {
-  const [received, setReceived] = React.useState<ReceivedAwareness>(idle);
+  const [received, setReceived] =
+    React.useState<ReceivedAwarenessState>(idleAwarenessState);
 
   // Handlers outlive the render that created them, so the parts that change
   // often are read through refs rather than closed over.
@@ -99,14 +102,19 @@ export function useAwareness({
   }, []);
 
   React.useEffect(() => {
+    const previousDraftId = draftRef.current;
     cancelPointerFlush();
     cancelCursorFlush();
     lastPointerAt.current = 0;
     lastCursorAt.current = 0;
     draftRef.current = draftId;
-    if (draftId) return;
-    pointerRef.current = null;
-    cursorRef.current = null;
+    if (previousDraftId !== draftId) {
+      // Awareness coordinates belong to one document. A direct transition
+      // between two non-null drafts must not attach either half of the old
+      // position to the first packet emitted for the new draft.
+      pointerRef.current = null;
+      cursorRef.current = null;
+    }
   }, [cancelCursorFlush, cancelPointerFlush, draftId]);
 
   React.useEffect(() => cancelPointerFlush, [cancelPointerFlush]);
@@ -120,17 +128,20 @@ export function useAwareness({
    * other person's last position frozen on screen, and matching the document
    * it was measured against means there is no window at all in which a stale
    * caret or a stale arrow could be rendered. It also means no timer has to be
-   * cancelled to make that true, which matters for the arrow that has none.
+   * cancelled to make that true, which matters for markers configured without
+   * an idle expiry.
    */
   const remote: RemoteAwareness =
-    draftId !== null && received.draftId === draftId ? received : idle;
+    draftId !== null && received.draftId === draftId
+      ? received
+      : idleAwarenessState;
 
   /**
    * @param reliable Movement is volatile: the next event supersedes this one
    *   within eighty milliseconds, so a dropped frame costs nothing. A clear is
-   *   not superseded by anything — a peer whose pointer does not expire would
-   *   be left holding the last position forever — so it is sent on the
-   *   ordinary channel and buffered across a reconnection.
+   *   not superseded by anything, so it is sent on the ordinary channel and
+   *   buffered across a reconnection. That also clears markers immediately on
+   *   teardown instead of waiting for their idle policy.
    */
   const send = React.useCallback(
     (reliable = false) => {
@@ -152,12 +163,14 @@ export function useAwareness({
     (cursor: CollaborationCursor | null) => {
       cursorRef.current = cursor;
       const now = Date.now();
-      const remaining =
-        monitoringTiming.cursorIntervalMs - (now - lastCursorAt.current);
+      const elapsed = now - lastCursorAt.current;
+      const remaining = monitoringTiming.cursorIntervalMs - elapsed;
       if (remaining <= 0) {
         cancelCursorFlush();
         lastCursorAt.current = now;
-        send();
+        // The first event after the peer could have expired this marker must
+        // not be dropped as volatile, or activity would fail to restore it.
+        send(elapsed >= monitoringTiming.pointerExpiryMs);
         return;
       }
       // A leading-edge-only throttle can permanently lose the final caret
@@ -184,12 +197,14 @@ export function useAwareness({
       }
 
       const now = Date.now();
-      const remaining =
-        monitoringTiming.pointerIntervalMs - (now - lastPointerAt.current);
+      const elapsed = now - lastPointerAt.current;
+      const remaining = monitoringTiming.pointerIntervalMs - elapsed;
       if (remaining <= 0) {
         cancelPointerFlush();
         lastPointerAt.current = now;
-        send();
+        // Reliably wake an idle marker; subsequent high-frequency samples stay
+        // volatile and bounded by the normal pointer interval.
+        send(elapsed >= monitoringTiming.pointerExpiryMs);
         return;
       }
       // Movement is sampled, but the last sample is never discarded. A quick
@@ -208,20 +223,14 @@ export function useAwareness({
   React.useEffect(() => {
     if (!socket || !draftId || typeof document === 'undefined') return;
 
-    const leave = () => {
-      if (!pointerRef.current) return;
-      publishPointer(null);
-    };
-
     const publishPoint = (
       point: PointerViewportPoint,
       resolved: PointerCaptureSurface | null,
     ) => {
       if (!resolved) {
-        // Off every collaboration surface — the browser chrome, a modal, a gap
-        // between panes. Reporting the last known position would leave the
-        // peer's arrow stuck on a pane the sender has left.
-        leave();
+        // There is no shared coordinate for browser chrome, a modal, or a gap
+        // between panes. Keep the last representable position: the receiver's
+        // lifecycle decides whether it fades or remains until session end.
         return;
       }
       const position = toSurfaceFraction(
@@ -236,30 +245,37 @@ export function useAwareness({
       publishPoint(event, resolvePointerSurface(event.target));
     };
 
-    const onVisibility = () => {
-      if (document.hidden) leave();
-    };
-
     // Capture phase: Monaco and the terminal stop propagation of their own
     // pointer handling, and a listener on the bubble phase would go silent
     // over exactly the two panes that matter most.
     document.addEventListener('pointermove', onPointerMove, true);
-    document.addEventListener('pointerleave', leave, true);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('blur', leave);
     const stopObservingFrames = observeSurfaceIframes({
-      onLeave: leave,
+      // Crossing out of a shared frame has no useful destination coordinate.
+      // The parent listener publishes again if another shared surface is hit.
+      onLeave: () => undefined,
       onPointerMove: publishPoint,
     });
     return () => {
-      leave();
       stopObservingFrames();
       document.removeEventListener('pointermove', onPointerMove, true);
-      document.removeEventListener('pointerleave', leave, true);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('blur', leave);
     };
   }, [draftId, publishPointer, socket]);
+
+  React.useEffect(() => {
+    if (!socket || !draftId) return;
+    return () => {
+      // This cleanup represents leaving a document, not pointer inactivity.
+      // Clear both fields together and reliably so a held student marker can
+      // never survive navigation, draft replacement, or hook teardown.
+      pointerRef.current = null;
+      cursorRef.current = null;
+      socket.emit(monitoringClientEvents.awarenessUpdate, {
+        draftId,
+        cursor: null,
+        pointer: null,
+      });
+    };
+  }, [draftId, socket]);
 
   /* ------------------------------------------------------------- incoming */
 
@@ -267,19 +283,7 @@ export function useAwareness({
     if (!socket) return;
     const onAwareness = (event: AwarenessChangedEvent) => {
       if (event.origin !== peerOrigin) return;
-      setReceived((current) => ({
-        draftId: event.draftId,
-        cursor: event.cursor,
-        pointer: event.pointer,
-        // Cursor and pointer share one compact wire event. A cursor-only
-        // update repeats the last pointer, but it is not mouse movement and
-        // must not restart the student's three-second teacher-pointer timer.
-        pointerMovedAt:
-          current.draftId === event.draftId &&
-          samePointer(current.pointer, event.pointer)
-            ? current.pointerMovedAt
-            : Date.now(),
-      }));
+      setReceived((current) => receiveAwareness(current, event, Date.now()));
     };
     socket.on(monitoringServerEvents.awarenessChanged, onAwareness);
     return () => {
@@ -294,33 +298,30 @@ export function useAwareness({
    * dropped frame, switched tabs, or lost the connection, and in every one of
    * those cases an arrow left hovering over the code is claiming something
    * that is no longer true. When it does not, the position is held until
-   * somebody says otherwise: the sender's own leave event, or the gateway
-   * speaking for a connection that can no longer speak for itself.
+   * collaboration teardown or the gateway speaking for a connection that can
+   * no longer speak for itself.
    *
-   * The caret is not expired with it either way — a caret marks a place in the
-   * document, and it is still where they left it.
+   * Cursor expiry is scheduled independently below. Mouse traffic must never
+   * prolong a caret, and cursor traffic must never prolong an arrow.
    */
   React.useEffect(
     () =>
       // Measured from what is on screen, not from what arrived: awareness for
       // a document this hook has already left is never counted down, and
       // never reaches back into state to remove something it does not own.
-      scheduleRemotePointerExpiry(remotePointer, remote.pointer, () =>
-        setReceived((current) => ({ ...current, pointer: null })),
+      scheduleRemoteAwarenessExpiry(remotePointer, remote.pointer, () =>
+        setReceived(expirePointer),
       ),
     [remote.pointer, remote.pointerMovedAt, remotePointer],
   );
 
-  return { remote, publishCursor };
-}
-
-function samePointer(
-  left: CollaborationPointer | null,
-  right: CollaborationPointer | null,
-): boolean {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  return (
-    left.surface === right.surface && left.x === right.x && left.y === right.y
+  React.useEffect(
+    () =>
+      scheduleRemoteAwarenessExpiry(remoteCursor, remote.cursor, () =>
+        setReceived(expireCursor),
+      ),
+    [remote.cursor, remote.cursorMovedAt, remoteCursor],
   );
+
+  return { remote, publishCursor };
 }

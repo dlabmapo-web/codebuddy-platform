@@ -11,6 +11,7 @@ import { applyMinimalEdit } from '@/lib/monaco/applyEdit';
 import { PointerOverlay, type RemotePointer } from '@/components/collab/PointerOverlay';
 import { ConsoleTerminal, type TerminalLine } from '@/components/collab/ConsoleTerminal';
 import { AiFeedbackPanel, type AiFeedbackItem } from '@/components/collab/AiFeedbackPanel';
+import { withAnonymousImageCors } from '@/components/studio/rich-text-html';
 import { InteractiveRunner, isInteractiveSupported } from '@/lib/pyodide/interactiveRunner';
 import { loadPyodide as loadPyodideFallback } from '@/lib/pyodide/loader';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -603,7 +604,9 @@ finally:
               <div
                   className="tiptap-render"
                   style={{ fontSize: '14px', color: '#16181D', lineHeight: 1.75, marginBottom: 16 }}
-                  dangerouslySetInnerHTML={{ __html: problem.description }}
+                  dangerouslySetInnerHTML={{
+                    __html: withAnonymousImageCors(problem.description),
+                  }}
                 />
               {problem.input_format && (
                 <>

@@ -4,6 +4,8 @@ import * as React from 'react';
 
 import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
 
+import { withAnonymousImageCors } from './rich-text-html';
+
 /**
  * Authored HTML stays in an iframe so it can never restyle or script the
  * studio around it. `allow-same-origin` (without `allow-scripts`) keeps script
@@ -126,7 +128,7 @@ export function RichTextFrame({
  * features sharing this frame cannot drift apart.
  */
 export function previewDocument(content: string, padding = 16) {
-  const body = content.trim().length > 0 ? content : '';
+  const body = content.trim().length > 0 ? withAnonymousImageCors(content) : '';
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 *{box-sizing:border-box}
 html,body{margin:0}

@@ -30,6 +30,11 @@ export function useSampleRunner(runner: PythonRunnerState) {
       code: string,
       sample: LearnSampleTestCase,
       index: number,
+      options?: {
+        /** Shared with the run this student reports to a watching teacher. */
+        clientRunId?: string;
+        sampleCount?: number;
+      },
     ): Promise<SampleRun> => {
       const outcome = await runner.run(code, {
         stdin: sample.input,
@@ -41,6 +46,8 @@ export function useSampleRunner(runner: PythonRunnerState) {
             kind: 'meta',
           },
         ],
+        clientRunId: options?.clientRunId,
+        sampleCount: options?.sampleCount,
       });
       if (!outcome) return { outcome: null, verdict: null };
 
@@ -70,6 +77,16 @@ export function useSampleRunner(runner: PythonRunnerState) {
         // here would point at the wrong problem entirely.
         runner.appendLine(`\n${t('workspace.sample_skipped')}\n`, 'info');
       }
+
+      // The verdict exists only now, after the comparison. Reporting it here
+      // means a mirrored run's pass count arrives with the narration a reader
+      // is looking at rather than a moment before it.
+      runner.settleRun({
+        passedCount: verdict.kind === 'match' ? 1 : 0,
+        // A successful process can still fail the sample comparison. Runtime
+        // errors and manual stops already carry FAILED/CANCELLED respectively.
+        lifecycle: verdict.kind === 'mismatch' ? 'FAILED' : undefined,
+      });
 
       return { outcome, verdict };
     },

@@ -27,7 +27,13 @@ export type MonitoringCounter =
   | "revocation.applied"
   | "presence.degraded"
   | "payload.rejected"
-  | "rate.limited";
+  | "rate.limited"
+  | "terminal.run.started"
+  | "terminal.delta.forwarded"
+  | "terminal.delta.rejected"
+  | "terminal.budget.exceeded"
+  | "terminal.snapshot.forwarded"
+  | "terminal.snapshot.requested";
 
 @Injectable()
 export class MonitoringMetricsService {

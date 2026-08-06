@@ -68,6 +68,14 @@ export function Workspace({
     onBeforeCollaborate: draft.flushNow,
     // Never a name: the student is told a teacher is here, not which one.
     teacherLabel: tm('peer.teacher'),
+    // The terminal the student is looking at, as its own events. The mirror is
+    // fed from here rather than from a run's final `stdout`, which is why the
+    // teacher sees banners, submitted input, tracebacks, and sample verdicts
+    // instead of only what `print` happened to produce.
+    terminal: {
+      readTranscript: runner.readTranscript,
+      subscribeTerminal: runner.subscribeTerminal,
+    },
   });
 
   // Destructured rather than kept as objects: reading `.containerRef` off a
@@ -94,7 +102,13 @@ export function Workspace({
         output: '',
       });
 
-      const { outcome, verdict } = await runSample(draft.code, sample, index);
+      // One id for both halves of the report: the presence summary and the
+      // mirrored terminal describe the same execution, so a teacher cannot see
+      // a transcript from one run beside a verdict from another.
+      const { outcome, verdict } = await runSample(draft.code, sample, index, {
+        clientRunId,
+        sampleCount: exercise.sampleTestCases.length,
+      });
       setActiveSample(null);
       if (!outcome || !verdict) {
         monitoring.publishRun({
@@ -141,6 +155,7 @@ export function Workspace({
 
     const outcome = await runner.run(draft.code, {
       banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
+      clientRunId,
     });
     // A dropped request still has to be closed out, or the teacher's mirror
     // sits on "Running" for a run that never happened.

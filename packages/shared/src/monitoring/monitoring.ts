@@ -96,6 +96,14 @@ export const monitoringTiming = {
   documentFlushDebounceMs: 1_000,
   /** A remote pointer disappears this long after it last moved. */
   pointerExpiryMs: 3_000,
+  /**
+   * Upper bound on how long a terminal line may wait for company.
+   *
+   * A mirrored terminal is read as it is typed, so the ceiling is a person's
+   * perception rather than a network budget: one batch per frame keeps the
+   * teacher within a blink of the student without one message per `print`.
+   */
+  terminalBatchMaxDelayMs: 80,
   /** How long a granted access claim is trusted before it is re-queried. */
   accessClaimTtlMs: 60_000,
 } as const;
@@ -118,6 +126,27 @@ export const monitoringLimits = {
   runOutputMaxLength: 4_000,
   /** Roster search input, bounded before it reaches a query. */
   rosterSearchMaxLength: 120,
+  /**
+   * The mirrored terminal budget, in UTF-8 bytes.
+   *
+   * Deliberately the student runner's own output ceiling: the two sides append
+   * through the same reducer, so an identical budget is what makes them stop at
+   * an identical line rather than at two different ones.
+   */
+  terminalTranscriptMaxBytes: 512 * 1_024,
+  /** One terminal delta on the wire. A full batch flushes early instead. */
+  terminalDeltaMaxBytes: 16 * 1_024,
+  /** One terminal line, before it is split at a code-point boundary. */
+  terminalLineMaxBytes: 8 * 1_024,
+  /** Lines in one delta. The byte budget above is the binding limit. */
+  terminalLinesPerDelta: 256,
+  /**
+   * Lines one transcript may hold. Adjacent lines of the same kind coalesce,
+   * so this is reached only by output that genuinely alternates that often.
+   */
+  terminalTranscriptMaxLines: 4_000,
+  /** A single run cannot legitimately produce more numbered events than this. */
+  terminalMaxSequence: 1_000_000,
 } as const;
 
 /* -------------------------------------------------------------- surfaces */

@@ -17,6 +17,7 @@ import {
   documentUpdatePayloadSchema,
   feedbackSendPayloadSchema,
   monitoringClientEvents,
+  monitoringLimits,
   monitoringNamespace,
   monitoringRooms,
   monitoringServerEvents,
@@ -25,6 +26,14 @@ import {
   resultPublishPayloadSchema,
   runActivityPayloadSchema,
   shouldPersistLastSeen,
+  terminalAppendMessageSchema,
+  terminalClearMessageSchema,
+  terminalFinishMessageSchema,
+  terminalLinesByteLength,
+  terminalResyncPayloadSchema,
+  terminalSnapshotMessageSchema,
+  terminalStartMessageSchema,
+  terminalStateMessageSchema,
   watchStartPayloadSchema,
   type AppErrorCode,
   type MonitoringAck,
@@ -89,6 +98,26 @@ type StudentClassMembership = {
   membershipId: string;
 };
 
+/**
+ * The whole of what the server keeps about a mirrored terminal.
+ *
+ * A run id, two counters, one boundary flag, and no transcript. The gateway
+ * proves that a delta
+ * belongs to the run it claims, continues that run's order, and stays inside
+ * the run's byte budget — none of which requires holding the text, and holding
+ * the text would turn every watched student into server-side memory that grows
+ * with their output.
+ */
+type TerminalRunState = {
+  clientRunId: string;
+  /** The highest sequence accepted for this run. */
+  sequence: number;
+  /** Terminal bytes accepted for this run, against the transcript budget. */
+  bytes: number;
+  /** True after the one delta that crossed the content budget was accepted. */
+  truncated: boolean;
+};
+
 type StudentState = {
   academyId: string;
   membershipId: string;
@@ -97,6 +126,8 @@ type StudentState = {
   draftId: string | null;
   /** Throttles the durable `lastLearningSeenAt` write. */
   lastSeenPersistedAt: number | null;
+  /** One mirrored run at a time, or none. */
+  terminal: TerminalRunState | null;
 };
 
 type MonitoringSocketData = {
@@ -404,6 +435,15 @@ export class MonitoringGateway
             startedAt,
           });
 
+        // A student may already be mid-run. Asking now is what makes the
+        // mirrored terminal show the transcript they are looking at rather than
+        // an empty pane until their next execution.
+        this.requestTerminalSnapshot(
+          claim.academyId,
+          claim.studentMembershipId,
+          draftId,
+        );
+
         this.metrics.increment("watch.started");
         return {
           draftId,
@@ -534,6 +574,173 @@ export class MonitoringGateway
     socket
       .to(monitoringRooms.draft(student.academyId, parsed.data.draftId))
       .emit(monitoringServerEvents.runChanged, parsed.data);
+  }
+
+  /* ----------------------------------------------------- terminal mirroring */
+
+  /**
+   * A student's terminal, as the student's own screen shows it.
+   *
+   * The five handlers below carry no authority of their own: the origin, the
+   * academy, the room, and the student are all read from the authenticated
+   * socket, and the payload only says which draft and which run. A teacher's
+   * terminal never travels — running code beside a student is private to them,
+   * and a mirror message from that side is dropped rather than relabelled.
+   */
+  @SubscribeMessage(monitoringClientEvents.terminalStart)
+  async terminalStart(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    await this.forwardTerminal(
+      socket,
+      "terminal.start",
+      terminalStartMessageSchema,
+      body,
+      (student, payload) => {
+        // A new run replaces the previous one, budget and numbering included.
+        student.terminal = {
+          clientRunId: payload.clientRunId,
+          sequence: 0,
+          bytes: terminalLinesByteLength(payload.lines),
+          truncated: false,
+        };
+        this.metrics.increment("terminal.run.started");
+        return true;
+      },
+    );
+  }
+
+  @SubscribeMessage(monitoringClientEvents.terminalAppend)
+  async terminalAppend(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    await this.forwardTerminal(
+      socket,
+      "terminal.delta",
+      terminalAppendMessageSchema,
+      body,
+      (student, payload) =>
+        this.acceptTerminalDelta(
+          student,
+          payload,
+          terminalLinesByteLength(payload.lines),
+        ),
+    );
+  }
+
+  @SubscribeMessage(monitoringClientEvents.terminalState)
+  async terminalState(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    await this.forwardTerminal(
+      socket,
+      "terminal.delta",
+      terminalStateMessageSchema,
+      body,
+      (student, payload) => this.acceptTerminalDelta(student, payload, 0),
+    );
+  }
+
+  @SubscribeMessage(monitoringClientEvents.terminalFinish)
+  async terminalFinish(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    await this.forwardTerminal(
+      socket,
+      "terminal.delta",
+      terminalFinishMessageSchema,
+      body,
+      (student, payload) => this.acceptTerminalDelta(student, payload, 0),
+    );
+  }
+
+  @SubscribeMessage(monitoringClientEvents.terminalClear)
+  async terminalClear(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    await this.forwardTerminal(
+      socket,
+      "terminal.delta",
+      terminalClearMessageSchema,
+      body,
+      (student) => {
+        student.terminal = null;
+        return true;
+      },
+    );
+  }
+
+  /**
+   * The whole transcript, in answer to a request.
+   *
+   * The one terminal message that may arrive before the shared document has
+   * been established — a teacher can open a workspace mid-run — so ownership of
+   * the draft is proven here rather than assumed from earlier traffic.
+   */
+  @SubscribeMessage(monitoringClientEvents.terminalSnapshot)
+  async terminalSnapshot(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    if (!this.allow(socket, "terminal.snapshot")) return;
+    const parsed = terminalSnapshotMessageSchema.safeParse(body);
+    if (!parsed.success) return void this.rejectPayload(socket);
+    if (socket.data?.teacher?.watch) return;
+    const student = await this.requireStudentForTerminalSnapshot(
+      socket,
+      parsed.data.draftId,
+    );
+    if (!student) return;
+
+    // Authoritative: it is the student's own current state, so it re-bases the
+    // run, the numbering, and the budget the deltas after it are measured from.
+    student.terminal = {
+      clientRunId: parsed.data.clientRunId,
+      sequence: parsed.data.sequence,
+      bytes: Math.min(
+        terminalLinesByteLength(parsed.data.lines),
+        monitoringLimits.terminalTranscriptMaxBytes,
+      ),
+      truncated: parsed.data.truncated,
+    };
+    socket
+      .to(monitoringRooms.draft(student.academyId, parsed.data.draftId))
+      .emit(monitoringServerEvents.terminalChanged, {
+        ...parsed.data,
+        origin: "STUDENT",
+      });
+    this.metrics.increment("terminal.snapshot.forwarded");
+  }
+
+  /**
+   * A teacher asking for the transcript again, after a gap or a reconnection.
+   *
+   * The request that reaches the student carries a draft id and nothing else —
+   * not which teacher asked, and not that a teacher asked at all.
+   */
+  @SubscribeMessage(monitoringClientEvents.terminalResync)
+  async terminalResync(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<void> {
+    if (!this.allow(socket, "terminal.resync")) return;
+    const parsed = terminalResyncPayloadSchema.safeParse(body);
+    if (!parsed.success) return void this.rejectPayload(socket);
+    const watch = socket.data?.teacher?.watch;
+    if (!watch || watch.draftId !== parsed.data.draftId) return;
+    if (!(await this.activeWatches.isActive(watch.claim.membershipId, watch.visitId))) {
+      return;
+    }
+    this.requestTerminalSnapshot(
+      watch.claim.academyId,
+      watch.claim.studentMembershipId,
+      parsed.data.draftId,
+    );
   }
 
   /* ---------------------------------------------------------- collaboration */
@@ -765,6 +972,130 @@ export class MonitoringGateway
     }
   }
 
+  /**
+   * Validate, authorize, account, and forward one terminal message.
+   *
+   * Every mirror event on the hot path goes through here, so none of them can
+   * forget the student check, the draft check, or the per-run accounting — and
+   * none of them performs a database or Redis round trip to do it.
+   */
+  private async forwardTerminal<Payload extends { draftId: string }>(
+    socket: MonitoringSocket,
+    rule: string,
+    schema: z.ZodType<Payload>,
+    body: unknown,
+    accept: (student: StudentState, payload: Payload) => boolean,
+  ): Promise<void> {
+    if (!this.allow(socket, rule)) return;
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) return void this.rejectPayload(socket);
+
+    // A teacher cannot run a student's code, so a mirror message from a
+    // watching socket is not a state to record — it is a payload to drop.
+    if (socket.data?.teacher?.watch) return;
+    const student = socket.data?.student;
+    if (!student || student.draftId !== parsed.data.draftId) return;
+    if (!accept(student, parsed.data)) return;
+
+    socket
+      .to(monitoringRooms.draft(student.academyId, parsed.data.draftId))
+      .emit(monitoringServerEvents.terminalChanged, {
+        ...parsed.data,
+        origin: "STUDENT",
+      });
+    this.metrics.increment("terminal.delta.forwarded");
+  }
+
+  /**
+   * Whether one delta may extend the run the socket is currently mirroring.
+   *
+   * Monotonic rather than strictly consecutive: a refused or dropped delta must
+   * not wedge the rest of the run, and the teacher's reducer already treats a
+   * hole as a gap and repairs it from a snapshot. What is refused here is a
+   * sequence that walks backwards, a delta for a run this socket is not
+   * mirroring, and output beyond the run's byte budget.
+   */
+  private acceptTerminalDelta(
+    student: StudentState,
+    payload: { clientRunId: string; sequence: number },
+    bytes: number,
+  ): boolean {
+    const run = student.terminal;
+    if (!run || run.clientRunId !== payload.clientRunId) {
+      this.metrics.increment("terminal.delta.rejected");
+      return false;
+    }
+    if (payload.sequence <= run.sequence) {
+      this.metrics.increment("terminal.delta.rejected");
+      return false;
+    }
+    if (bytes > 0 && run.truncated) {
+      // Exactly one crossing delta is accepted. Both clients clip that delta
+      // through the shared reducer; later output is no longer visible locally
+      // and therefore has no legitimate reason to enter the room.
+      this.metrics.increment("terminal.budget.exceeded");
+      return false;
+    }
+    run.sequence = payload.sequence;
+    if (
+      bytes > 0 &&
+      run.bytes + bytes > monitoringLimits.terminalTranscriptMaxBytes
+    ) {
+      run.bytes = monitoringLimits.terminalTranscriptMaxBytes;
+      run.truncated = true;
+    } else {
+      run.bytes += bytes;
+    }
+    return true;
+  }
+
+  /**
+   * Restores the minimum student state needed by a cold terminal snapshot.
+   *
+   * Socket.IO recovery normally retains socket data. After the recovery grace
+   * period it does not, so the first snapshot performs the durable ownership
+   * check once and re-establishes the student's draft. Deltas after it remain
+   * entirely on the in-memory hot path.
+   */
+  private async requireStudentForTerminalSnapshot(
+    socket: MonitoringSocket,
+    draftId: string,
+  ): Promise<StudentState | null> {
+    const current = socket.data?.student;
+    if (current?.draftId === draftId) return current;
+
+    const ownedDraft = await this.prisma.exerciseDraft.findFirst({
+      where: {
+        id: draftId,
+        user: { authUserId: socket.data.identity.authUserId },
+      },
+      select: { course: { select: { academyId: true } } },
+    });
+    if (!ownedDraft) return null;
+
+    const student = await this.resolveStudent(
+      socket,
+      ownedDraft.course.academyId,
+    );
+    if (!student) return null;
+    student.draftId = draftId;
+    await socket.join(
+      monitoringRooms.student(student.academyId, student.membershipId),
+    );
+    return student;
+  }
+
+  private requestTerminalSnapshot(
+    academyId: string,
+    studentMembershipId: string,
+    draftId: string,
+  ): void {
+    this.server
+      .to(monitoringRooms.student(academyId, studentMembershipId))
+      .emit(monitoringServerEvents.terminalSnapshotRequest, { draftId });
+    this.metrics.increment("terminal.snapshot.requested");
+  }
+
   private allow(socket: MonitoringSocket, event: string): boolean {
     if (!socket.data) return false;
     const allowed = socket.data.limiter.take(event);
@@ -886,6 +1217,7 @@ export class MonitoringGateway
       materialId: null,
       draftId: null,
       lastSeenPersistedAt: null,
+      terminal: null,
     };
     socket.data.student = state;
     await socket.join(monitoringRooms.student(academyId, membership.id));
@@ -953,12 +1285,12 @@ export class MonitoringGateway
   /**
    * The server saying, on a peer's behalf, that their mouse and caret are gone.
    *
-   * A client clears its own awareness when it leaves a surface or a tab. It
-   * cannot do so when the transport dies under it or when its authorization is
-   * withdrawn, and one of the two directions renders a pointer that no timer
-   * will ever remove — so the end of a connection or a watch is announced with
-   * the same event a client would have sent, stamped with the origin the
-   * gateway knows rather than one a payload claimed.
+   * A client clears its own awareness when its collaborative workspace tears
+   * down. It cannot do so when the transport dies under it or when its
+   * authorization is withdrawn, and the teacher deliberately holds the
+   * student's markers without an idle timer — so the end of a connection or a
+   * watch is announced with the same event a client would have sent, stamped
+   * with the origin the gateway knows rather than one a payload claimed.
    *
    * Nothing here is stored; this is the absence of state, published.
    */

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   expiresWhenIdle,
   idleExpiryFor,
+  scheduleRemoteAwarenessExpiry,
   scheduleRemotePointerExpiry,
   staysUntilCleared,
 } from './pointer-lifecycle';
@@ -96,6 +97,39 @@ describe('scheduleRemotePointerExpiry', () => {
     cancel?.();
 
     vi.advanceTimersByTime(monitoringTiming.pointerExpiryMs * 2);
+    expect(expired).not.toHaveBeenCalled();
+  });
+});
+
+describe('scheduleRemoteAwarenessExpiry', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('uses the same policy for a Monaco caret', () => {
+    const expired = vi.fn();
+    const caret = {
+      line: 4,
+      column: 7,
+      selectionEndLine: null,
+      selectionEndColumn: null,
+    };
+    scheduleRemoteAwarenessExpiry(expiresWhenIdle, caret, expired);
+
+    vi.advanceTimersByTime(monitoringTiming.pointerExpiryMs - 1);
+    expect(expired).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(expired).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a held Monaco caret until collaboration clears it', () => {
+    const expired = vi.fn();
+    scheduleRemoteAwarenessExpiry(
+      staysUntilCleared,
+      { line: 2, column: 5 },
+      expired,
+    );
+
+    vi.advanceTimersByTime(monitoringTiming.pointerExpiryMs * 10);
     expect(expired).not.toHaveBeenCalled();
   });
 });

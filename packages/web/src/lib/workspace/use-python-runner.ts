@@ -9,9 +9,18 @@ import {
 import type { PythonExecutionError } from '@/lib/pyodide/pythonError';
 
 import { createSampleInputQueue } from './sample-run';
+import {
+  appendToTranscript,
+  emptyTranscript,
+  settleTranscript,
+  startTranscript,
+  type TerminalKind,
+  type TerminalLifecycle,
+  type TerminalLine,
+  type TerminalTranscript,
+} from './terminal-transcript';
 
-export type TerminalKind = 'out' | 'err' | 'in' | 'meta' | 'info';
-export type TerminalLine = { text: string; kind: TerminalKind };
+export type { TerminalKind, TerminalLine };
 
 export type RunOutcome = {
   stdout: string;
@@ -20,13 +29,42 @@ export type RunOutcome = {
   error: PythonExecutionError | null;
 };
 
-/** Stops a runaway `while True: print(x)` from filling the tab's memory. */
-const MAX_OUTPUT_BYTES = 512 * 1024;
+/**
+ * What happened to the terminal, for anybody who needs to know.
+ *
+ * The runner publishes the very events that redraw its own panel, so a
+ * subscriber cannot see a different terminal from the one on screen. It is
+ * deliberately ignorant of who subscribes: there is no socket, teacher,
+ * academy, or monitoring concept anywhere in this module, and the mirroring
+ * adapter is the thing that knows about all four.
+ */
+export type TerminalEvent =
+  /** A new execution: the previous transcript is replaced by this banner. */
+  | {
+      type: 'reset';
+      clientRunId: string;
+      lines: TerminalLine[];
+      sampleCount: number;
+      awaitingInput: boolean;
+    }
+  /** Output, submitted input, errors, and narration, in the order shown. */
+  | { type: 'append'; lines: TerminalLine[] }
+  | { type: 'waiting'; awaitingInput: boolean }
+  | {
+      type: 'finish';
+      lifecycle: Exclude<TerminalLifecycle, 'STARTED'>;
+      passedCount: number;
+      sampleCount: number;
+    }
+  /** The transcript no longer describes anything on screen. */
+  | { type: 'clear' };
+
 /** Batches worker chunks into one render per frame rather than one per write. */
 const FLUSH_INTERVAL_MS = 40;
 
 export function usePythonRunner() {
-  const [lines, setLines] = React.useState<TerminalLine[]>([]);
+  const [transcript, setTranscript] =
+    React.useState<TerminalTranscript>(emptyTranscript);
   const [running, setRunning] = React.useState(false);
   const [awaitingInput, setAwaitingInput] = React.useState(false);
   const [ready, setReady] = React.useState(false);
@@ -40,25 +78,60 @@ export function usePythonRunner() {
   const failedRef = React.useRef(false);
   const errorRef = React.useRef<PythonExecutionError | null>(null);
   const queueRef = React.useRef<string[]>([]);
-  const truncatedRef = React.useRef(false);
   const bufferRef = React.useRef<TerminalLine[]>([]);
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The transcript as the last commit left it. Socket handlers and worker
+  // callbacks both need to read it outside a render, and reading state there
+  // would give them whichever value their closure was created with.
+  const transcriptRef = React.useRef<TerminalTranscript>(emptyTranscript);
+  const listenersRef = React.useRef(new Set<(event: TerminalEvent) => void>());
+  const runRef = React.useRef<{
+    clientRunId: string;
+    sampleCount: number;
+    lifecycle: Exclude<TerminalLifecycle, 'STARTED'> | null;
+  } | null>(null);
+  // Filling the output budget has to end the run, and the flush that discovers
+  // it is defined before the callback that ends one.
+  const stopRef = React.useRef<() => void>(() => undefined);
 
   const supported = React.useMemo(
     () => (typeof window === 'undefined' ? true : isInteractiveSupported()),
     [],
   );
 
+  const publish = React.useCallback((event: TerminalEvent) => {
+    for (const listener of listenersRef.current) listener(event);
+  }, []);
+
+  const commit = React.useCallback((next: TerminalTranscript) => {
+    transcriptRef.current = next;
+    setTranscript(next);
+  }, []);
+
   const flush = React.useCallback(() => {
     flushTimerRef.current = null;
     if (bufferRef.current.length === 0) return;
     const pending = bufferRef.current;
     bufferRef.current = [];
-    setLines((current) => [...current, ...pending]);
-  }, []);
+
+    const previous = transcriptRef.current;
+    const next = appendToTranscript(previous, pending);
+    commit(next);
+    // The raw lines, not the reduced ones: the subscriber folds them through
+    // the same reducer and therefore reaches the same transcript, truncation
+    // boundary included.
+    publish({ type: 'append', lines: pending });
+
+    // A runaway `while True: print(x)` has now filled the budget. Ending the
+    // run here is what keeps the tab responsive; the boundary line the reducer
+    // wrote is already on both screens, and the cancelled lifecycle follows it
+    // rather than leaving both terminals running forever.
+    if (next.truncated && !previous.truncated) stopRef.current();
+  }, [commit, publish]);
 
   const append = React.useCallback(
     (text: string, kind: TerminalKind) => {
+      if (text === '') return;
       bufferRef.current.push({ text, kind });
       if (flushTimerRef.current === null) {
         flushTimerRef.current = setTimeout(flush, FLUSH_INTERVAL_MS);
@@ -67,10 +140,40 @@ export function usePythonRunner() {
     [flush],
   );
 
+  /** Waiting is a state change, so pending output is on screen before it. */
+  const setWaiting = React.useCallback(
+    (value: boolean) => {
+      flush();
+      setAwaitingInput(value);
+      commit({ ...transcriptRef.current, awaitingInput: value });
+      publish({ type: 'waiting', awaitingInput: value });
+    },
+    [commit, flush, publish],
+  );
+
+  const finishRun = React.useCallback(
+    (lifecycle: Exclude<TerminalLifecycle, 'STARTED'>) => {
+      const run = runRef.current;
+      if (!run) return;
+      run.lifecycle = lifecycle;
+      flush();
+      commit({ ...transcriptRef.current, lifecycle, awaitingInput: false });
+      publish({
+        type: 'finish',
+        lifecycle,
+        passedCount: 0,
+        sampleCount: run.sampleCount,
+      });
+    },
+    [commit, flush, publish],
+  );
+
   const ensureRunner = React.useCallback(() => {
     if (runnerRef.current && !runnerRef.current.isFailed) {
       return runnerRef.current;
     }
+    runnerRef.current?.dispose();
+    setReady(false);
     const runner = new InteractiveRunner();
     runnerRef.current = runner;
 
@@ -81,14 +184,8 @@ export function usePythonRunner() {
           break;
         case 'stdout':
         case 'stderr': {
-          if (truncatedRef.current) break;
+          if (transcriptRef.current.truncated) break;
           if (event.type === 'stdout') stdoutRef.current += event.text;
-          if (stdoutRef.current.length > MAX_OUTPUT_BYTES) {
-            truncatedRef.current = true;
-            append('\n[output truncated]\n', 'info');
-            runner.stop();
-            break;
-          }
           append(event.text, event.type === 'stdout' ? 'out' : 'err');
           break;
         }
@@ -106,13 +203,17 @@ export function usePythonRunner() {
             append(`${next}\n`, 'in');
             runner.provideInput(next);
           } else {
-            setAwaitingInput(true);
+            setWaiting(true);
           }
           break;
         }
         case 'fatal':
           failedRef.current = true;
           append(event.text, 'err');
+          // A failed preload must not leave the only action disabled behind a
+          // permanent "Preparing" label. Enabling it gives the student an
+          // explicit retry; `ensureRunner` replaces the failed worker.
+          setReady(true);
           break;
         case 'done':
           break;
@@ -122,6 +223,7 @@ export function usePythonRunner() {
         flush();
         setAwaitingInput(false);
         setRunning(false);
+        finishRun(failedRef.current ? 'FAILED' : 'COMPLETED');
         finishRef.current?.({
           stdout: stdoutRef.current,
           stopped: false,
@@ -133,7 +235,7 @@ export function usePythonRunner() {
     });
 
     return runner;
-  }, [append, flush]);
+  }, [append, finishRun, flush, setWaiting]);
 
   /**
    * Pyodide is ~13 MB. v1 began loading it on the first Run click, leaving the
@@ -152,18 +254,45 @@ export function usePythonRunner() {
   }, [ensureRunner, supported]);
 
   const run = React.useCallback(
-    (code: string, options?: { stdin?: string; banner?: TerminalLine[] }) => {
+    (
+      code: string,
+      options?: {
+        stdin?: string;
+        banner?: TerminalLine[];
+        /** Generated by the caller when it also reports the run elsewhere. */
+        clientRunId?: string;
+        /** How many public samples this run belongs to, zero for a plain run. */
+        sampleCount?: number;
+      },
+    ) => {
       if (runnerRef.current?.isRunning) return Promise.resolve(null);
 
       stdoutRef.current = '';
       failedRef.current = false;
       errorRef.current = null;
-      truncatedRef.current = false;
       bufferRef.current = [];
       queueRef.current = options?.stdin
         ? createSampleInputQueue(options.stdin)
         : [];
-      setLines(options?.banner ?? []);
+      const clientRunId = options?.clientRunId ?? crypto.randomUUID();
+      const sampleCount = options?.sampleCount ?? 0;
+      const banner = options?.banner ?? [];
+      runRef.current = { clientRunId, sampleCount, lifecycle: null };
+      commit(
+        startTranscript(transcriptRef.current, {
+          clientRunId,
+          lines: banner,
+          sampleCount,
+          awaitingInput: false,
+        }),
+      );
+      publish({
+        type: 'reset',
+        clientRunId,
+        lines: banner,
+        sampleCount,
+        awaitingInput: false,
+      });
       setLastError(null);
       setAwaitingInput(false);
       setRunning(true);
@@ -174,7 +303,7 @@ export function usePythonRunner() {
         void runner.run(code);
       });
     },
-    [ensureRunner],
+    [commit, ensureRunner, publish],
   );
 
   const stop = React.useCallback(() => {
@@ -184,6 +313,7 @@ export function usePythonRunner() {
     flush();
     setRunning(false);
     setAwaitingInput(false);
+    finishRun('CANCELLED');
     // `stop()` terminates the worker, so no `done` event arrives — the pending
     // promise has to be settled here or the caller waits forever.
     finishRef.current?.({
@@ -193,13 +323,24 @@ export function usePythonRunner() {
       error: errorRef.current,
     });
     finishRef.current = null;
-  }, [flush]);
+  }, [finishRun, flush]);
 
-  const submitInput = React.useCallback((value: string) => {
-    setAwaitingInput(false);
-    append(`${value}\n`, 'in');
-    runnerRef.current?.provideInput(value);
-  }, [append]);
+  React.useEffect(() => {
+    stopRef.current = stop;
+  }, [stop]);
+
+  const submitInput = React.useCallback(
+    (value: string) => {
+      setAwaitingInput(false);
+      // Only after the student presses Enter. A draft in the field is theirs
+      // alone, and there is no event that could carry one.
+      append(`${value}\n`, 'in');
+      commit({ ...transcriptRef.current, awaitingInput: false });
+      publish({ type: 'waiting', awaitingInput: false });
+      runnerRef.current?.provideInput(value);
+    },
+    [append, commit, publish],
+  );
 
   const appendLine = React.useCallback(
     (text: string, kind: TerminalKind) => {
@@ -209,8 +350,67 @@ export function usePythonRunner() {
     [append, flush],
   );
 
+  /**
+   * The verdict, once the comparison has been made.
+   *
+   * A sample run's pass count exists only after its output has been compared,
+   * which happens after the narration is on screen — so the lifecycle line is
+   * refined here rather than guessed at when the worker stopped.
+   */
+  const settleRun = React.useCallback(
+    (settlement: {
+      passedCount: number;
+      lifecycle?: Exclude<TerminalLifecycle, 'STARTED'>;
+    }) => {
+      const run = runRef.current;
+      if (!run?.lifecycle) return;
+      flush();
+      const lifecycle = settlement.lifecycle ?? run.lifecycle;
+      run.lifecycle = lifecycle;
+      commit(
+        settleTranscript(transcriptRef.current, {
+          lifecycle,
+          passedCount: settlement.passedCount,
+          sampleCount: run.sampleCount,
+        }),
+      );
+      publish({
+        type: 'finish',
+        lifecycle,
+        passedCount: settlement.passedCount,
+        sampleCount: run.sampleCount,
+      });
+    },
+    [commit, flush, publish],
+  );
+
+  const clear = React.useCallback(() => {
+    bufferRef.current = [];
+    runRef.current = null;
+    commit(emptyTranscript);
+    publish({ type: 'clear' });
+  }, [commit, publish]);
+
+  /**
+   * A terminal subscription, for anything that needs the same events the panel
+   * draws. Returns its own removal, so a subscriber cannot outlive its effect.
+   */
+  const subscribeTerminal = React.useCallback(
+    (listener: (event: TerminalEvent) => void) => {
+      listenersRef.current.add(listener);
+      return () => {
+        listenersRef.current.delete(listener);
+      };
+    },
+    [],
+  );
+
+  /** The current transcript, read outside React for a snapshot response. */
+  const readTranscript = React.useCallback(() => transcriptRef.current, []);
+
   return {
-    lines,
+    lines: transcript.lines,
+    transcript,
     running,
     awaitingInput,
     ready,
@@ -220,7 +420,10 @@ export function usePythonRunner() {
     stop,
     submitInput,
     appendLine,
-    clear: () => setLines([]),
+    settleRun,
+    subscribeTerminal,
+    readTranscript,
+    clear,
   };
 }
 

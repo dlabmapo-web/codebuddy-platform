@@ -275,6 +275,21 @@ export const monitoringClientEvents = {
   runActivity: "run.activity",
   resultPublish: "result.publish",
   feedbackSend: "feedback.send",
+  /**
+   * The mirrored terminal, one event name per message kind.
+   *
+   * Separate names rather than one envelope because their ceilings differ:
+   * starting a run is rate-limited on its own, and a delta is on the hot path
+   * and must not pay for the validation a start needs.
+   */
+  terminalStart: "terminal.start",
+  terminalAppend: "terminal.append",
+  terminalState: "terminal.state",
+  terminalFinish: "terminal.finish",
+  terminalSnapshot: "terminal.snapshot",
+  terminalClear: "terminal.clear",
+  /** A teacher asking for a snapshot after a gap or a reconnection. */
+  terminalResync: "terminal.resync",
 } as const;
 
 export const monitoringServerEvents = {
@@ -292,6 +307,15 @@ export const monitoringServerEvents = {
   accessRevoked: "access.revoked",
   serverDegraded: "server.degraded",
   studentIndicator: "student.indicator",
+  /**
+   * One event for every mirror message, because the teacher folds all of them
+   * into a single transcript through a single reducer. A second handler that
+   * could apply a delta without consulting the sequence is exactly the drift
+   * this protocol exists to prevent.
+   */
+  terminalChanged: "terminal.changed",
+  /** Sent only to a student, and only by the server. */
+  terminalSnapshotRequest: "terminal.snapshot.request",
 } as const;
 
 export type MonitoringClientEvent =

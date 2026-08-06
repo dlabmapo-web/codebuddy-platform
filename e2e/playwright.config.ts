@@ -37,6 +37,14 @@ export default defineConfig({
       testMatch: /teacher-live-monitoring\.spec\.ts/,
       use: { ...devices['Desktop Safari'] },
     },
+    {
+      // Safari does not implement COEP `credentialless`; this project guards
+      // the `require-corp` isolation contract needed by SharedArrayBuffer and
+      // exercises real stdin wake-up through the Pyodide worker.
+      name: 'webkit-python',
+      testMatch: /interactive-python\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined

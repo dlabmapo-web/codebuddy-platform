@@ -10,11 +10,15 @@ import {
 import * as React from 'react';
 import * as Y from 'yjs';
 
+import type { TerminalTranscript } from '@/lib/workspace/terminal-transcript';
+import type { TerminalEvent } from '@/lib/workspace/use-python-runner';
+
 import { expiresWhenIdle } from './awareness/pointer-lifecycle';
 import { attachRemoteCursor, readCursor } from './awareness/remote-cursor';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor } from './yjs-monaco';
 import { useMonitoringSocket } from './use-monitoring-socket';
+import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
 
 /**
  * The student's half of live monitoring.
@@ -34,12 +38,23 @@ export function useStudentMonitoring({
   materialId,
   onBeforeCollaborate,
   teacherLabel,
+  terminal,
 }: {
   academyId: string;
   courseId: string | null;
   materialId: string | null;
   /** Flushes the local draft, so the server seeds the document from it. */
   onBeforeCollaborate?: () => Promise<void>;
+  /**
+   * The student's own terminal, mirrored to whoever is watching.
+   *
+   * Passed in rather than created here: the runner belongs to the workspace and
+   * knows nothing about monitoring, and this hook knows nothing about Python.
+   */
+  terminal: {
+    subscribeTerminal: (listener: (event: TerminalEvent) => void) => () => void;
+    readTranscript: () => TerminalTranscript;
+  };
   /**
    * What the teacher's caret is called on this student's screen.
    *
@@ -212,6 +227,7 @@ export function useStudentMonitoring({
   const { remote, publishCursor } = useAwareness({
     draftId,
     peerOrigin: 'TEACHER',
+    remoteCursor: expiresWhenIdle,
     remotePointer: expiresWhenIdle,
     socket,
   });
@@ -260,6 +276,17 @@ export function useStudentMonitoring({
       contentListener.dispose();
     };
   }, [draftId, editor, markActive, publishCursor]);
+
+  /* ---------------------------------------------------------------- terminal */
+
+  // The live terminal mirror. It publishes only while a draft room exists, so
+  // an unwatched student's runs stay entirely local.
+  useTerminalMirrorPublisher({
+    draftId,
+    readTranscript: terminal.readTranscript,
+    socket,
+    subscribeTerminal: terminal.subscribeTerminal,
+  });
 
   /* -------------------------------------------------------------- publishing */
 

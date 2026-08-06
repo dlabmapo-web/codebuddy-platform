@@ -256,13 +256,50 @@ test('each side sees where the other is pointing', async ({}, testInfo) => {
 
 test("each side sees the other's caret in the shared editor", async () => {
   await teacherPage.locator('.monaco-editor').first().click();
-  await teacherPage.keyboard.press('ArrowDown');
+  await teacherPage.keyboard.press('ArrowUp');
   await expect(studentPage.locator('.cove-peer-label')).toBeVisible({
     timeout: 30_000,
   });
   await expect(studentPage.locator('.cove-peer-label')).not.toHaveText(
     TEACHER_NAME,
   );
+  // `main` hides the teacher marker from the student after three seconds of
+  // caret inactivity. The monitoring indicator remains; only the annotation
+  // over the student's code expires.
+  await expect(studentPage.locator('.cove-peer-cursor')).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  // Activity restores it immediately and restarts the deadline.
+  await expect
+    .poll(
+      async () => {
+        await teacherPage.evaluate(() => {
+          const editor = (
+            window as unknown as {
+              monaco?: {
+                editor: {
+                  getEditors(): {
+                    focus(): void;
+                    getPosition(): { column: number } | null;
+                    setPosition(position: {
+                      lineNumber: number;
+                      column: number;
+                    }): void;
+                  }[];
+                };
+              };
+            }
+          ).monaco?.editor.getEditors()[0];
+          const nextColumn = editor?.getPosition()?.column === 1 ? 2 : 1;
+          editor?.setPosition({ lineNumber: 1, column: nextColumn });
+          editor?.focus();
+        });
+        return studentPage.locator('.cove-peer-label').count();
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(1);
 
   // Put the student at an exact coordinate, then type immediately. The click
   // and keystroke are intentionally closer than the cursor throttle interval:
@@ -308,23 +345,31 @@ test("each side sees the other's caret in the shared editor", async () => {
 });
 
 /**
- * The asymmetry, in the browser.
+ * The marker lifetimes, in the browser.
  *
- * Both arrows travel the same path and are drawn by the same component; the
- * only difference is what each side does with silence. These three cases are
- * the whole product rule, and they can only be seen with both screens open.
+ * Both arrows travel the same path and are drawn by the same component, but
+ * their receiver-owned lifetimes differ. These cases can only be seen with
+ * both screens open.
  *
- * They run after the caret case on purpose: the last of them checks that an
- * expiring pointer and a cleared one both leave the peer's caret alone, and
- * there has to be a caret on screen for that to mean anything.
+ * They run after the caret case on purpose: the last of them checks that
+ * pointer lifecycle does not disturb the peer's caret, and there has to be a
+ * caret on screen for that to mean anything.
  */
 test("the teacher's arrow fades from the student's screen when it stops", async () => {
-  await sweep(teacherPage, 'terminal');
-  await expect(studentPage.getByTestId('peer-pointer')).toHaveAttribute(
-    'data-peer-surface',
-    'terminal',
-    { timeout: 30_000 },
-  );
+  // A first movement after a long idle interval wakes an expired marker. The
+  // poll repeats real movement so this assertion does not depend on one burst
+  // of synthetic Pointer Events reaching two independent browser contexts.
+  await expect
+    .poll(
+      async () => {
+        await sweep(teacherPage, 'terminal');
+        return studentPage
+          .getByTestId('peer-pointer')
+          .getAttribute('data-peer-surface');
+      },
+      { timeout: 30_000 },
+    )
+    .toBe('terminal');
 
   // Nobody touches the teacher's mouse for longer than the three-second
   // budget. The student stops being told that somebody is following along.
@@ -341,7 +386,7 @@ test("the teacher's arrow fades from the student's screen when it stops", async 
   );
 });
 
-test("the student's arrow stays put on the teacher's screen", async () => {
+test("the student's arrow remains on the teacher's screen", async () => {
   await sweep(studentPage, 'editor');
   await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
     'data-peer-surface',
@@ -349,28 +394,37 @@ test("the student's arrow stays put on the teacher's screen", async () => {
     { timeout: 30_000 },
   );
 
-  // Well past the teacher-side budget, with the student sitting still. A
-  // student who has gone quiet is thinking, and where they were last looking
-  // is part of what the teacher is reading.
-  await studentPage.waitForTimeout(6_000);
+  await teacherPage.waitForTimeout(3_500);
   await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
     'data-peer-surface',
     'editor',
   );
 });
 
-test("the student leaving the window clears the teacher's copy", async () => {
-  // Dispatched rather than provoked: the two browser contexts are independent,
-  // so neither can take focus from the other and both believe they have it.
-  // The listener under test is the real one.
-  await studentPage.evaluate(() => window.dispatchEvent(new Event('blur')));
+test("unsupported movement keeps the student's arrow until collaboration ends", async () => {
+  await sweep(studentPage, 'editor');
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'editor',
+    { timeout: 30_000 },
+  );
 
-  // Nothing on the teacher's side expires, so this clear is the only thing
-  // that can remove the arrow — and it is sent reliably for exactly that
-  // reason.
-  await expect(teacherPage.getByTestId('peer-pointer')).toHaveCount(0, {
-    timeout: 30_000,
+  // Movement from an unsupported page target has no corresponding surface in
+  // the teacher's layout, so it preserves the last representable position.
+  await studentPage.evaluate(() => {
+    document.body.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: 5,
+        clientY: 5,
+      }),
+    );
   });
+  await teacherPage.waitForTimeout(3_500);
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveAttribute(
+    'data-peer-surface',
+    'editor',
+  );
 
   // The student's caret is untouched by it: a caret marks a place in the
   // document, and the document is still open.
@@ -420,6 +474,211 @@ test('submitting stays student-only', async () => {
   ).toHaveCount(0);
 });
 
+/**
+ * The student's terminal, on the teacher's screen.
+ *
+ * These are the cases a single browser cannot express: the transcript the
+ * teacher reads has to be the transcript the student is looking at — the same
+ * banner, the same submitted input, the same verdict, in the same order — while
+ * the teacher's own terminal stays entirely theirs.
+ *
+ * They run in WebKit as well as Chromium. Safari's worker, isolation, and event
+ * behaviour differ enough that a mirror working in one proves nothing about the
+ * other, and interactive Python is exactly where that has bitten before.
+ */
+
+const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
+
+const mirror = () => teacherPage.getByTestId('mirrored-terminal');
+const studentTerminal = () => studentPage.getByTestId('terminal');
+const stdin = (page: Page) =>
+  page.getByRole('textbox', { name: /program input|프로그램 입력/i });
+
+/** Selects one of the teacher's two output tabs by its stable id. */
+async function selectOutputTab(tab: 'you' | 'student') {
+  await teacherPage.locator(`#live-${tab}-tab`).click();
+}
+
+async function runSampleOne() {
+  const button = studentPage.getByRole('button', { name: /^test 1$|^테스트 1$/i });
+  await expect(button).toBeEnabled({ timeout: 120_000 });
+  await button.click();
+}
+
+test("a sample run is mirrored with its banner, input, output, and verdict", async () => {
+  test.setTimeout(180_000);
+  // Earlier collaboration cases deliberately type into the shared model. A
+  // terminal assertion owns its program instead of inheriting that mutation.
+  await typeIntoEditor(
+    studentPage,
+    'a = int(input())\nb = int(input())\nprint(a + b)\n',
+  );
+  // Start from the teacher's own tab, so the switch below is something that
+  // happened rather than something that was already true.
+  await selectOutputTab('you');
+  await expect(mirror()).toHaveCount(0);
+
+  await runSampleOne();
+
+  // Opening the student's tab is part of their run starting.
+  await expect(mirror()).toBeVisible({ timeout: 120_000 });
+  await expect(mirror()).toContainText('$ python solution.py · Test 1', {
+    timeout: 120_000,
+  });
+  // The sample's input lines are consumed by `input()` and echoed on both
+  // screens; the sum is what the program printed.
+  await expect(mirror()).toContainText('3', { timeout: 60_000 });
+  await expect(mirror()).toContainText(/matches the expected output|일치/i, {
+    timeout: 60_000,
+  });
+  await expect(studentTerminal()).toContainText('$ python solution.py · Test 1');
+
+  // Same order as the student's screen: the banner opens the run, the sample's
+  // input lines follow it, and the verdict comes after the output it judges.
+  const mirrored = await mirror().innerText();
+  expect(mirrored.trimStart().startsWith('$ python solution.py · Test 1')).toBe(
+    true,
+  );
+  expect(mirrored).toContain('1\n2\n');
+  expect(mirrored.indexOf('1\n2\n')).toBeLessThan(mirrored.indexOf('3\n'));
+  expect(mirrored.indexOf('3\n')).toBeLessThan(
+    mirrored.search(/matches the expected output|일치/i),
+  );
+
+  // Grading data the student cannot see has no field in this protocol and no
+  // path to this pane.
+  await expect(mirror()).not.toContainText(HIDDEN_SENTINEL);
+  await expect(teacherPage.locator('body')).not.toContainText(HIDDEN_SENTINEL);
+});
+
+test('a waiting student program is mirrored as a passive indicator', async () => {
+  test.setTimeout(180_000);
+  const run = studentPage.getByRole('button', { name: /^run$|^실행$/i });
+  await expect(run).toBeEnabled({ timeout: 120_000 });
+  await run.click();
+
+  await expect(mirror()).toContainText('$ python solution.py', {
+    timeout: 120_000,
+  });
+  await expect(teacherPage.getByTestId('mirrored-waiting')).toBeVisible({
+    timeout: 120_000,
+  });
+  // Read-only by construction: the mirror has no control to answer with, so a
+  // teacher cannot feed a student's process even by accident.
+  await expect(
+    teacherPage.getByRole('tabpanel').getByRole('textbox'),
+  ).toHaveCount(0);
+
+  // Only submitted input travels. What the student is still typing does not.
+  await stdin(studentPage).fill('7');
+  await expect(mirror()).not.toContainText('7');
+  await stdin(studentPage).press('Enter');
+  await expect(mirror()).toContainText('7', { timeout: 60_000 });
+
+  await expect(stdin(studentPage)).toBeVisible({ timeout: 60_000 });
+  await stdin(studentPage).fill('5');
+  await stdin(studentPage).press('Enter');
+
+  // Output continues after the answer, and the waiting state ends on both
+  // screens rather than only on the one that owns the process.
+  await expect(mirror()).toContainText('12', { timeout: 60_000 });
+  await expect(studentTerminal()).toContainText('12');
+  await expect(teacherPage.getByTestId('mirrored-waiting')).toHaveCount(0, {
+    timeout: 60_000,
+  });
+});
+
+test("the teacher's private run leaves the student's transcript alone", async () => {
+  test.setTimeout(180_000);
+  await selectOutputTab('you');
+  await teacherPage
+    .getByRole('button', { name: /^run$|^실행$/i })
+    .click({ timeout: 120_000 });
+  await expect(teacherPage.getByTestId('terminal')).toContainText(
+    '$ python solution.py',
+    { timeout: 120_000 },
+  );
+  // The seeded code reads stdin, so this run is still waiting. Stop it, or the
+  // worker outlives this test holding the terminal open.
+  await teacherPage.getByRole('button', { name: /^stop$|^중지$/i }).click();
+
+  // Nothing about it reached the student, and nothing about it replaced the
+  // transcript the student produced.
+  await expect(studentTerminal()).toContainText('12');
+  await selectOutputTab('student');
+  await expect(mirror()).toContainText('12');
+});
+
+test('a new student run resets the mirror and selects it again', async () => {
+  test.setTimeout(180_000);
+  // A teacher who deliberately went back to their own terminal is brought
+  // forward again by the student starting something new.
+  await selectOutputTab('you');
+  await expect(mirror()).toHaveCount(0);
+
+  await runSampleOne();
+
+  await expect(mirror()).toBeVisible({ timeout: 120_000 });
+  await expect(mirror()).toContainText(/matches the expected output|일치/i, {
+    timeout: 120_000,
+  });
+  // Replaced, not appended: one banner, and none of the previous run's output.
+  const mirrored = await mirror().innerText();
+  expect(mirrored.match(/\$ python solution\.py/g)).toHaveLength(1);
+  expect(mirrored).not.toContain('12');
+});
+
+test('the mirror survives a teacher reconnection', async () => {
+  test.setTimeout(180_000);
+  await teacherPage.context().setOffline(true);
+  await expect(
+    teacherPage.getByText(/reconnecting|재연결/i).first(),
+  ).toBeVisible({ timeout: 60_000 });
+  await teacherPage.context().setOffline(false);
+  await expect(teacherPage.getByText(/^live$|^실시간$/i).first()).toBeVisible({
+    timeout: 120_000,
+  });
+
+  // The watch is re-established, the server asks the student for their current
+  // terminal, and the next run lands without a permanent hole in the sequence.
+  await runSampleOne();
+  await expect(mirror()).toBeVisible({ timeout: 120_000 });
+  await expect(mirror()).toContainText('$ python solution.py · Test 1', {
+    timeout: 120_000,
+  });
+  await expect(mirror()).toContainText(/matches the expected output|일치/i, {
+    timeout: 120_000,
+  });
+});
+
+test('a student reconnect continues the same interactive terminal', async () => {
+  test.setTimeout(180_000);
+  const run = studentPage.getByRole('button', { name: /^run$|^실행$/i });
+  await expect(run).toBeEnabled({ timeout: 120_000 });
+  await run.click();
+  await expect(teacherPage.getByTestId('mirrored-waiting')).toBeVisible({
+    timeout: 120_000,
+  });
+
+  // Preserve the local Pyodide process while forcing the monitoring transport
+  // to reconnect. The publisher must reassert the current snapshot before the
+  // next input/output delta; otherwise a fresh gateway socket rejects it as an
+  // append for a run it has never seen begin.
+  await studentPage.context().setOffline(true);
+  await studentPage.waitForTimeout(3_000);
+  await studentPage.context().setOffline(false);
+
+  await expect(stdin(studentPage)).toBeVisible({ timeout: 60_000 });
+  await stdin(studentPage).fill('314159');
+  await stdin(studentPage).press('Enter');
+  await expect(stdin(studentPage)).toBeVisible({ timeout: 60_000 });
+  await stdin(studentPage).fill('271828');
+  await stdin(studentPage).press('Enter');
+
+  await expect(mirror()).toContainText('585987', { timeout: 120_000 });
+  await expect(studentTerminal()).toContainText('585987');
+});
+
 test('feedback is stored once and appears on both clients', async () => {
   const message = `Check the second input ${Date.now()}`;
   const composer = teacherPage.getByRole('textbox').last();
@@ -457,6 +716,29 @@ test('a temporary disconnect recovers without duplicating anything', async () =>
   await expect
     .poll(() => editorText(teacherPage), { timeout: 30_000 })
     .toContain('print(a + b)');
+});
+
+test('student markers clear when the student leaves the problem page', async () => {
+  // Re-establish both markers immediately before navigating so this proves
+  // lifecycle cleanup rather than inheriting absence from an earlier case.
+  await sweep(studentPage, 'editor');
+  await studentPage.locator('.monaco-editor').first().click();
+  await studentPage.keyboard.press('ArrowLeft');
+  await expect(teacherPage.getByTestId('peer-pointer')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(teacherPage.locator('.cove-peer-cursor')).toHaveCount(1, {
+    timeout: 30_000,
+  });
+
+  await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
+
+  await expect(teacherPage.getByTestId('peer-pointer')).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  await expect(teacherPage.locator('.cove-peer-cursor')).toHaveCount(0, {
+    timeout: 30_000,
+  });
 });
 
 test('the student indicator clears when the teacher leaves', async () => {

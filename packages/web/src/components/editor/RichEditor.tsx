@@ -63,6 +63,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
         <img
           src={src}
           alt={alt ?? ''}
+          crossOrigin="anonymous"
           style={{
             width: width ? `${width}px` : 'auto',
             maxWidth: '100%',
@@ -190,7 +191,12 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      ResizableImage,
+      ResizableImage.configure({
+        // COEP `require-corp` needs cross-origin images to use CORS. Uploaded
+        // problem assets are public Supabase Storage URLs, so anonymous is
+        // both sufficient and avoids sending credentials to the asset host.
+        HTMLAttributes: { crossorigin: 'anonymous' },
+      }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,

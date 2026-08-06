@@ -59,6 +59,17 @@ export const monitoringRateRules: Record<string, RateLimitRule> = {
   "awareness.update": { capacity: 900, windowMs: 60_000 },
   "run.activity": { capacity: 60, windowMs: 60_000 },
   "feedback.send": { capacity: 30, windowMs: 60_000 },
+  // Starting a run is a deliberate act with a page's worth of setup behind it;
+  // a client claiming sixty of them a minute is not a student pressing Run.
+  "terminal.start": { capacity: 60, windowMs: 60_000 },
+  /**
+   * Deltas are already coalesced into one batch per 80 ms frame, which is
+   * twelve a second per run. The ceiling is that rate with room for bursts,
+   * and the per-run byte budget is what actually bounds the volume.
+   */
+  "terminal.delta": { capacity: 900, windowMs: 60_000 },
+  "terminal.snapshot": { capacity: 30, windowMs: 60_000 },
+  "terminal.resync": { capacity: 30, windowMs: 60_000 },
 };
 
 /** How many malformed payloads one socket may send before it is closed. */

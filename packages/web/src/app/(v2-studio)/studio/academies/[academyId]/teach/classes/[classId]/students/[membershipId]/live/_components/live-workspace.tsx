@@ -63,6 +63,22 @@ export function LiveWorkspace({
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [readRunId, setReadRunId] = React.useState<string | null>(null);
 
+  /**
+   * A new student run brings the mirror forward; nothing else does.
+   *
+   * The tab follows the *start* of an execution and not its output, so a
+   * teacher who deliberately switched back to their own terminal keeps it for
+   * the rest of that run. Their next run selects the mirror again, because a
+   * run beginning is the moment the interesting thing is happening elsewhere.
+   */
+  const mirroredRunId = live.terminal.clientRunId;
+  const shownRunIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!mirroredRunId || shownRunIdRef.current === mirroredRunId) return;
+    shownRunIdRef.current = mirroredRunId;
+    setOutputTab('student');
+  }, [mirroredRunId]);
+
   // The exercise is fetched once the watch says which one the student has
   // open. A remembered material id in the URL would let a teacher name an
   // exercise the student is not on; the server chooses it instead.
@@ -287,6 +303,7 @@ export function LiveWorkspace({
                 sampleTestCases={sampleTestCases}
                 studentName={student}
                 tab={outputTab}
+                terminal={live.terminal}
                 unreadStudentRun={
                   live.run !== null && live.run.clientRunId !== readRunId
                 }

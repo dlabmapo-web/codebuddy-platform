@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { RunControls } from '@/components/workspace/run-controls';
 import { TerminalPanel } from '@/components/workspace/terminal-panel';
+import type { TerminalTranscript } from '@/lib/workspace/terminal-transcript';
 import type { PythonRunnerState } from '@/lib/workspace/use-python-runner';
 
 import { StudentRunPanel } from './student-run-panel';
@@ -37,6 +38,7 @@ export function LiveOutput({
   sampleTestCases,
   studentName,
   tab,
+  terminal,
   unreadStudentRun,
 }: {
   activeSample: number | null;
@@ -49,6 +51,8 @@ export function LiveOutput({
   sampleTestCases: LearnSampleTestCase[];
   studentName: string;
   tab: LiveOutputTab;
+  /** The student's own terminal, mirrored. Read-only by construction. */
+  terminal: TerminalTranscript;
   unreadStudentRun: boolean;
 }) {
   const { t } = useTranslation('monitoring');
@@ -141,9 +145,26 @@ export function LiveOutput({
             </div>
           </>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <StudentRunPanel result={result} run={run} />
-          </div>
+          // The transcript is the content. The lifecycle line above it is
+          // compact metadata — when it ran, how it ended, the latest verdict —
+          // and deliberately does not restate the output underneath it.
+          <>
+            <div className="shrink-0">
+              <StudentRunPanel result={result} run={run} />
+            </div>
+            <div className="min-h-0 flex-1">
+              <TerminalPanel
+                awaitingInput={terminal.awaitingInput}
+                emptyHint={t('workspace.no_run')}
+                lines={terminal.lines}
+                mode="mirror"
+                supported
+                synchronizing={terminal.synchronizing}
+                synchronizingLabel={t('workspace.mirror_catching_up')}
+                waitingLabel={t('workspace.mirror_waiting')}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

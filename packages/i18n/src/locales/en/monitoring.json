@@ -83,7 +83,6 @@
     "tab_you": "Your run",
     "tab_student": "{{name}}'s run",
     "no_run": "The student has not run anything yet.",
-    "run_empty": "The run produced no output.",
     "result_title": "Latest submission",
     "result_score": "Score {{score}}",
     "result_cases": "{{passed}} of {{total}} tests passed",
@@ -95,7 +94,9 @@
     "not_solving_body": "This student is not working on an exercise right now.",
     "ended_title": "Monitoring ended",
     "narrow_title": "Screen too small for live help",
-    "narrow_body": "Use a wider screen to edit alongside a student."
+    "narrow_body": "Use a wider screen to edit alongside a student.",
+    "mirror_waiting": "Waiting for the student's input",
+    "mirror_catching_up": "Catching up…"
   },
   "feedback": {
     "title": "Feedback",

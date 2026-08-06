@@ -11,10 +11,17 @@ import {
   type MonitoringVisitEndReason,
   type ResultChangedEvent,
   type RunActivityPayload,
+  type TerminalMirrorEvent,
   type WatchEndedEvent,
 } from '@cove/shared';
 import * as React from 'react';
 import * as Y from 'yjs';
+
+import {
+  applyTerminalEvent,
+  emptyTranscript,
+  type TerminalTranscript,
+} from '@/lib/workspace/terminal-transcript';
 
 import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
@@ -55,6 +62,14 @@ export function useLiveWorkspace({
   const [run, setRun] = React.useState<RunActivityPayload | null>(null);
   const [result, setResult] = React.useState<ResultChangedEvent | null>(null);
   const [feedback, setFeedback] = React.useState<MonitoringFeedback[]>([]);
+  // The student's terminal, folded through the shared reducer. Held in a ref as
+  // well as in state because a socket handler has to read the current mirror to
+  // decide whether the next message continues it, and a stale closure would
+  // apply a delta over a transcript it never saw.
+  const [terminal, setTerminal] =
+    React.useState<TerminalTranscript>(emptyTranscript);
+  const terminalRef = React.useRef<TerminalTranscript>(emptyTranscript);
+  const resyncedAtRef = React.useRef(0);
 
   // One document per mounted workspace, created once. A state initializer
   // rather than a lazily filled ref: the document is a value this component
@@ -178,6 +193,48 @@ export function useLiveWorkspace({
     return () => doc.off('update', onUpdate);
   }, [doc, socket]);
 
+  /* ------------------------------------------------------- terminal mirror */
+
+  /**
+   * One snapshot request, not a storm of them.
+   *
+   * A gap is usually one hole, but a burst of deltas can report it several
+   * times before the answer arrives, and each request costs the student a whole
+   * transcript.
+   */
+  const requestTerminalSnapshot = React.useCallback(() => {
+    const current = sessionRef.current;
+    if (!socket || !current) return;
+    const now = Date.now();
+    if (now - resyncedAtRef.current < 500) return;
+    resyncedAtRef.current = now;
+    socket.emit(monitoringClientEvents.terminalResync, {
+      draftId: current.draftId,
+    });
+  }, [socket]);
+
+  React.useEffect(() => {
+    if (!socket) return;
+
+    const onTerminal = (event: TerminalMirrorEvent) => {
+      if (event.draftId !== sessionRef.current?.draftId) return;
+      const { outcome, transcript } = applyTerminalEvent(
+        terminalRef.current,
+        event,
+      );
+      terminalRef.current = transcript;
+      setTerminal(transcript);
+      // Nothing uncertain is rendered over a hole: the mirror says it is
+      // catching up and asks the student for the transcript instead.
+      if (outcome === 'gap') requestTerminalSnapshot();
+    };
+
+    socket.on(monitoringServerEvents.terminalChanged, onTerminal);
+    return () => {
+      socket.off(monitoringServerEvents.terminalChanged, onTerminal);
+    };
+  }, [requestTerminalSnapshot, socket]);
+
   /* -------------------------------------------------- activity and results */
 
   React.useEffect(() => {
@@ -215,13 +272,13 @@ export function useLiveWorkspace({
   // Both halves are the same hook the student runs; the origin differs, and so
   // does what silence means.
   //
-  // The student's arrow stays where they left it. A teacher reading a workspace
-  // is reading where the student was last looking, and a student who has gone
-  // quiet for four seconds is thinking, not absent — the pointer goes when the
-  // student leaves the surface, the tab, or the session, and not before.
+  // The student's last pointer and Monaco caret remain visible to the teacher
+  // for the whole problem-detail visit. A reliable lifecycle clear removes
+  // both when the student leaves the workspace or the connection ends.
   const { remote, publishCursor } = useAwareness({
     draftId: session?.draftId ?? null,
     peerOrigin: 'STUDENT',
+    remoteCursor: staysUntilCleared,
     remotePointer: staysUntilCleared,
     socket,
   });
@@ -264,10 +321,13 @@ export function useLiveWorkspace({
     unsaved,
     run,
     result,
+    /** The student's terminal, read-only, as they currently see it. */
+    terminal,
     feedback,
     remote,
     setFeedback,
     publishCursor,
+    requestTerminalSnapshot,
     sendFeedback,
     // Editing and feedback stay disabled until the watch and the first
     // document sync are both confirmed.

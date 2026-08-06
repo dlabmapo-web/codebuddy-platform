@@ -6,22 +6,33 @@ import { z } from 'zod';
 import type { Provider } from '@supabase/supabase-js';
 import {
   socialAuthProviderSchema,
+  usernameSchema,
   type SocialAuthProvider,
 } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { toApiError } from '@/lib/api-errors';
 import { publicConfig } from '@/lib/config';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { createClient } from '@/lib/supabase/server';
 
 export type AuthFormState = { message?: string; success?: boolean };
 
+/**
+ * Deliberately not `usernameSchema`. The field is labelled as a username and
+ * that is what people are told to type, but an account created before usernames
+ * existed still has only an email to sign in with, so the field has to carry
+ * one. Which of the two it is stays the resolver's decision.
+ */
 const credentialsSchema = z.object({
-  email: z.email(),
+  identifier: z.string().trim().min(1).max(320),
   password: z.string().min(8),
 });
 
-const signupSchema = credentialsSchema.extend({
+const signupSchema = z.object({
+  username: usernameSchema,
+  email: z.email(),
+  password: z.string().min(8),
   displayName: z.string().trim().min(2).max(100),
   academyId: z.uuid(),
 });
@@ -36,7 +47,7 @@ export async function loginAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   const input = credentialsSchema.safeParse({
-    email: formData.get('email'),
+    identifier: formData.get('identifier'),
     password: formData.get('password'),
   });
   const { t } = await getServerTranslation(['auth', 'validation']);
@@ -44,8 +55,23 @@ export async function loginAction(
     return { message: t('validation:credentials_invalid') };
   }
 
+  // Supabase authenticates a password against an address, never a name, so the
+  // username is exchanged for one first. An unknown name resolves to an address
+  // that cannot exist, which is what makes the rejection below identical
+  // whether the name was wrong or the password was.
+  let email: string;
+  try {
+    ({ email } = await createServerORPCClient(undefined, await clientAddress())
+      .auth.resolveSignInEmail({ identifier: input.data.identifier }));
+  } catch {
+    return { message: t('error.sign_in_failed') };
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(input.data);
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password: input.data.password,
+  });
   if (error) return { message: t('error.credentials_rejected') };
   if ((await cookies()).has('cove_invitation')) redirect('/auth/invitation');
   redirect('/auth/welcome');
@@ -57,13 +83,33 @@ export async function signupAction(
 ): Promise<AuthFormState> {
   const input = signupSchema.safeParse({
     displayName: formData.get('displayName'),
+    username: formData.get('username'),
     email: formData.get('email'),
     password: formData.get('password'),
     academyId: formData.get('academyId'),
   });
   const { t } = await getServerTranslation(['auth', 'validation']);
   if (!input.success) {
-    return { message: t('validation:signup_invalid') };
+    const usernameFailed = input.error.issues.some(
+      (issue) => issue.path[0] === 'username',
+    );
+    return {
+      message: usernameFailed
+        ? t('validation:username_invalid')
+        : t('validation:signup_invalid'),
+    };
+  }
+
+  // Advisory only — the unique index decides. Checking here is what keeps a
+  // taken name from being discovered after the Supabase account already exists.
+  try {
+    const { available } = await createServerORPCClient(
+      undefined,
+      await clientAddress(),
+    ).auth.checkUsernameAvailable({ username: input.data.username });
+    if (!available) return { message: t('error.username_taken') };
+  } catch {
+    return { message: t('error.signup_failed') };
   }
 
   const supabase = await createClient();
@@ -74,6 +120,7 @@ export async function signupAction(
     options: {
       data: {
         full_name: input.data.displayName,
+        username: input.data.username,
         ...(hasInvitation
           ? {}
           : { requested_academy_id: input.data.academyId }),
@@ -108,12 +155,9 @@ export async function startSocialAuthAction(input: {
     cookieStore.delete('cove_oauth_intent');
   } else {
     try {
-      const requestHeaders = await headers();
-      const forwardedClientAddress = requestHeaders.get('x-forwarded-for')
-        ?.split(',')[0]?.trim() || requestHeaders.get('x-real-ip') || undefined;
       const intent = await createServerORPCClient(
         undefined,
-        forwardedClientAddress,
+        await clientAddress(),
       )
         .auth.createOAuthOnboardingIntent({
           academyId: parsed.data.academyId,
@@ -146,8 +190,52 @@ export async function startSocialAuthAction(input: {
   redirect(data.url);
 }
 
+/**
+ * Claims a username for an account that has none — one created before the
+ * column existed, or one whose signup name was taken in the moment between the
+ * availability check and the profile being written.
+ */
+export async function setUsernameAction(
+  _state: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const input = usernameSchema.safeParse(formData.get('username'));
+  const { t } = await getServerTranslation(['auth', 'validation', 'errors']);
+  if (!input.success) {
+    return { message: t('validation:username_invalid') };
+  }
+
+  try {
+    await createServerORPCClient().auth.setUsername({ username: input.data });
+  } catch (error) {
+    const { code } = toApiError(error);
+    if (code === 'USERNAME_TAKEN') {
+      return { message: t('errors:USERNAME_TAKEN') };
+    }
+    if (code === 'USERNAME_ALREADY_SET') {
+      return { message: t('errors:USERNAME_ALREADY_SET') };
+    }
+    return { message: t('errors:UNKNOWN') };
+  }
+
+  redirect('/auth/welcome');
+}
+
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/auth/login');
+}
+
+/**
+ * The address the rate limiter should count against. Server Actions run
+ * behind the BFF, so without this every caller looks like one machine.
+ */
+async function clientAddress(): Promise<string | undefined> {
+  const requestHeaders = await headers();
+  return (
+    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    requestHeaders.get('x-real-ip') ||
+    undefined
+  );
 }

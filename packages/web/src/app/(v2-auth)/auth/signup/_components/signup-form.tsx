@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, User } from 'lucide-react';
+import { AtSign, Mail, User } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState } from 'react';
 
@@ -46,6 +46,15 @@ export function SignupForm({
           label={t('field.name')}
           name="displayName"
           placeholder={t('field.name_placeholder')}
+          required
+        />
+        <TextField
+          autoComplete="username"
+          hint={t('field.username_hint')}
+          icon={AtSign}
+          label={t('field.username')}
+          name="username"
+          placeholder={t('field.username_placeholder')}
           required
         />
         <TextField

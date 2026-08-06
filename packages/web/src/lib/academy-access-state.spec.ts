@@ -28,6 +28,7 @@ function account(overrides: Partial<AuthMeResponse['user']> = {}): AuthMeRespons
       id: '30000000-0000-4000-8000-000000000001',
       authUserId: '40000000-0000-4000-8000-000000000001',
       email: 'user@cove.test',
+      username: 'cove-user',
       displayName: 'Cove User',
       avatarUrl: null,
       platformRole: 'USER',

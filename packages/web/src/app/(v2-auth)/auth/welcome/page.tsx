@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { AuthCard } from '../_components/auth-card';
 import { SignOutControl } from '../_components/sign-out-control';
+import { UsernameClaim } from '../_components/username-claim';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { ServerTrans } from '@/i18n/server/server-trans';
 import { authDestination } from '@/lib/academy-access-state';
@@ -44,12 +45,14 @@ export default async function WelcomePage() {
             t={t}
             values={{
               identity:
+                account.user.username ??
                 account.user.email ??
                 account.user.displayName ??
                 t('common:fallback.user'),
             }}
           />
         </p>
+        {account.user.username ? null : <UsernameClaim />}
         <p className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
           {t('welcome.no_academy')}
         </p>

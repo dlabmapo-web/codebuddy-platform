@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail } from 'lucide-react';
+import { User } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState } from 'react';
 
@@ -21,17 +21,16 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     <div>
       <SocialLoginButtons />
 
-      <AuthDivider label={t('divider.or_with_email')} />
+      <AuthDivider label={t('divider.or_with_username')} />
 
       <form action={action} className="space-y-5">
         <TextField
-          autoComplete="email"
-          icon={Mail}
-          label={t('field.email')}
-          name="email"
-          placeholder={t('field.email_placeholder')}
+          autoComplete="username"
+          icon={User}
+          label={t('field.username')}
+          name="identifier"
+          placeholder={t('field.username_placeholder')}
           required
-          type="email"
         />
 
         <div>

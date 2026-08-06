@@ -19,6 +19,7 @@ export function TextField({
   placeholder,
   required,
   icon: Icon,
+  hint,
 }: {
   label: string;
   name: string;
@@ -27,6 +28,7 @@ export function TextField({
   placeholder?: string;
   required?: boolean;
   icon?: LucideIcon;
+  hint?: string;
 }) {
   const id = useId();
   return (
@@ -46,6 +48,7 @@ export function TextField({
           type={type}
         />
       </div>
+      {hint ? <p className="mt-2 text-[14px] leading-5 text-sub">{hint}</p> : null}
     </div>
   );
 }

@@ -34,6 +34,21 @@
   --color-retired: #64748B;
   --color-retired-soft: #F1F5F9;
 
+  /*
+   * Live presence. Two states the other families cannot say: `present` is
+   * connected with nothing to act on, `unstable` is a connection in doubt
+   * rather than a student in doubt. Kept out of `success` and `retired` on
+   * purpose — those carry meanings of their own elsewhere, and one colour
+   * standing for two things is how a roster stops being scannable.
+   *
+   * Both foregrounds are darker than the hue they read as, so the badge text
+   * clears 4.5:1 against its own tint.
+   */
+  --color-present: #15803D;
+  --color-present-soft: #E9F7EF;
+  --color-unstable: #475569;
+  --color-unstable-soft: #EEF2F6;
+
   /* Surfaces used by the shared UI primitives */
   --color-muted: #F6F7F9;
   --color-accent: #F1F5F9;

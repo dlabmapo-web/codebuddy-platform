@@ -30,12 +30,34 @@ const stateIcons: Record<MonitoringLiveState, LucideIcon> = {
   OFFLINE: CircleSlash,
 };
 
+/**
+ * A ramp, not a palette.
+ *
+ * This column is read vertically at speed down a class of twenty-six, so five
+ * unrelated hues would slow the scan rather than help it. The tones run along
+ * one axis instead — how much of the teacher's attention the row can absorb —
+ * and that axis is the order `sortRoster` already puts the rows in, so colour
+ * agrees with position and the eye never fights the list.
+ *
+ * Solving is the only state given a solid fill: it is the one where somebody
+ * is typing right now, which is the row a teacher joins to help live rather
+ * than to find out what happened. Peripheral vision keys on light-versus-dark
+ * long before it resolves hue, so those students form a visible spine down the
+ * column. Offline sits at the other end and recedes.
+ *
+ * Not the same thing as openable — Idle and Online rows carrying an exercise
+ * are openable too. The fill tracks who is working, not what the button does.
+ *
+ * Reconnecting is deliberately slate rather than another amber: it is a
+ * connection in doubt, not a student in doubt, and reading it as a second kind
+ * of Idle would send a teacher to the wrong person.
+ */
 const stateTones: Record<MonitoringLiveState, string> = {
-  SOLVING: 'bg-brand/10 text-brand',
+  SOLVING: 'bg-brand text-white',
   IDLE: 'bg-draft-soft text-draft',
-  ONLINE: 'bg-canvas text-ink',
-  RECONNECTING: 'bg-draft-soft text-draft',
-  OFFLINE: 'bg-canvas text-sub',
+  ONLINE: 'bg-present-soft text-present',
+  RECONNECTING: 'bg-unstable-soft text-unstable',
+  OFFLINE: 'bg-surface text-sub',
 };
 
 export function LiveStateBadge({ state }: { state: MonitoringLiveState }) {
@@ -63,11 +85,16 @@ export function LiveStateBadge({ state }: { state: MonitoringLiveState }) {
   );
 }
 
+/**
+ * The same vocabulary as the rows below it: a connection in doubt is slate
+ * here too. A page header calling reconnection amber while every row calls it
+ * slate would teach a teacher that the two words mean different things.
+ */
 const connectionTones: Record<MonitoringConnectionState, string> = {
   connecting: 'text-sub',
   live: 'text-brand',
-  reconnecting: 'text-draft',
-  resynchronizing: 'text-draft',
+  reconnecting: 'text-unstable',
+  resynchronizing: 'text-unstable',
   degraded: 'text-danger',
   revoked: 'text-danger',
 };

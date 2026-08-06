@@ -35,7 +35,7 @@ let teacherPage: Page;
 
 async function signIn(page: Page, email: string): Promise<string> {
   await page.goto('/auth/login');
-  await page.getByRole('textbox', { name: /email/i }).fill(email);
+  await page.locator('input[name="identifier"]').fill(email);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
   await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });

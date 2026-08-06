@@ -10,7 +10,7 @@ async function signIn(page: Page): Promise<string> {
   expect(response?.headers()['cross-origin-embedder-policy']).toBe('require-corp');
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
-  await page.getByRole('textbox', { name: /email/i }).fill(STUDENT_EMAIL);
+  await page.locator('input[name="identifier"]').fill(STUDENT_EMAIL);
   await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
   await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });

@@ -35,9 +35,16 @@ async function main(): Promise<void> {
   try {
     const seedIds = developmentUsers.map((user) => user.id);
     const seedEmails = developmentUsers.map((user) => user.email);
+    const seedUsernames = developmentUsers.map((user) => user.username);
     const existingBeforeAuth = await prisma.user.findMany({
-      where: { OR: [{ id: { in: seedIds } }, { email: { in: seedEmails } }] },
-      select: { id: true, authUserId: true, email: true },
+      where: {
+        OR: [
+          { id: { in: seedIds } },
+          { email: { in: seedEmails } },
+          { username: { in: seedUsernames } },
+        ],
+      },
+      select: { id: true, authUserId: true, email: true, username: true },
     });
     assertNoCoveUserConflicts(existingBeforeAuth, developmentUsers);
 
@@ -53,10 +60,11 @@ async function main(): Promise<void> {
         OR: [
           { id: { in: seedIds } },
           { email: { in: seedEmails } },
+          { username: { in: seedUsernames } },
           { authUserId: { in: [...authUserIds.values()] } },
         ],
       },
-      select: { id: true, authUserId: true, email: true },
+      select: { id: true, authUserId: true, email: true, username: true },
     });
     assertNoCoveUserConflicts(existingAfterAuth, developmentUsers, authUserIds);
 
@@ -90,6 +98,7 @@ async function main(): Promise<void> {
         const userData = {
           authUserId,
           email: seedUser.email,
+          username: seedUser.username,
           displayName: seedUser.displayName,
           platformRole: seedUser.platformRole,
           status: "ACTIVE" as const,
@@ -124,7 +133,9 @@ async function main(): Promise<void> {
     });
 
     console.log("✅ Development authentication seed complete.");
-    for (const user of developmentUsers) console.log(`   - ${user.email}`);
+    for (const user of developmentUsers) {
+      console.log(`   - ${user.username} (${user.email})`);
+    }
   } finally {
     await prisma.$disconnect();
   }

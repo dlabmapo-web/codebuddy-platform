@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { usernameSchema } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { developmentUsers } from "./data/users.js";
@@ -21,6 +22,19 @@ describe("development seed manifest", () => {
       .toHaveLength(1);
     expect(developmentUsers.map((user) => user.academyRole).filter(Boolean).sort())
       .toEqual(["MANAGER", "STUDENT", "TEACHER", "TEACHER", "TEAM_LEAD"]);
+  });
+
+  it("gives every seed account a distinct, signable-in username", () => {
+    expect(new Set(developmentUsers.map((user) => user.username)).size).toBe(6);
+    for (const user of developmentUsers) {
+      expect(usernameSchema.safeParse(user.username).success).toBe(true);
+    }
+  });
+
+  it("rejects a seed username the signup form would refuse", () => {
+    expect(() =>
+      validateSeedUsers([{ ...developmentUsers[0], username: "admin" }])
+    ).toThrowError("Invalid seed username: admin");
   });
 
   it("keeps two teachers, so replacing one has somebody to replace it with", () => {
@@ -49,17 +63,37 @@ describe("development seed safety", () => {
           id: "90000000-0000-4000-8000-000000000001",
           authUserId: null,
           email: developmentUsers[0].email,
+          username: null,
         }],
         developmentUsers,
       )
     ).toThrowError(`Cove email conflict for ${developmentUsers[0].email}.`);
   });
 
+  it("rejects a Cove username owned by a different user ID", () => {
+    expect(() =>
+      assertNoCoveUserConflicts(
+        [{
+          id: "90000000-0000-4000-8000-000000000001",
+          authUserId: null,
+          email: null,
+          username: developmentUsers[0].username,
+        }],
+        developmentUsers,
+      )
+    ).toThrowError(`Cove username conflict for ${developmentUsers[0].username}.`);
+  });
+
   it("accepts the matching stable Cove user", () => {
     const user = developmentUsers[0];
     expect(() =>
       assertNoCoveUserConflicts(
-        [{ id: user.id, authUserId: null, email: user.email }],
+        [{
+          id: user.id,
+          authUserId: null,
+          email: user.email,
+          username: user.username,
+        }],
         developmentUsers,
       )
     ).not.toThrow();

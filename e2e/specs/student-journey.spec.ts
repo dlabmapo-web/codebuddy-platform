@@ -7,7 +7,12 @@ import { expect, test, type Page } from '@playwright/test';
  * Both are idempotent.
  */
 
-const STUDENT_EMAIL = process.env.E2E_STUDENT_EMAIL ?? 'student@cove.test';
+/**
+ * Signs in by username, which is what the login form asks for. The other
+ * suites sign in with an email, so between them both branches of the resolver
+ * stay covered.
+ */
+const STUDENT_USERNAME = process.env.E2E_STUDENT_USERNAME ?? 'cove-student';
 const STUDENT_PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 
 const COURSE_TITLE = 'E2E Python Basics';
@@ -28,7 +33,7 @@ let academyId = '';
 
 async function signIn(page: Page) {
   await page.goto('/auth/login');
-  await page.getByRole('textbox', { name: /email/i }).fill(STUDENT_EMAIL);
+  await page.locator('input[name="identifier"]').fill(STUDENT_USERNAME);
   await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
   await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });

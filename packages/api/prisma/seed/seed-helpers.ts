@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { usernameSchema } from "@cove/shared";
 
 import type { DevelopmentUser } from "./data/users.js";
 
@@ -8,6 +9,7 @@ export type CoveUserIdentity = {
   id: string;
   authUserId: string | null;
   email: string | null;
+  username: string | null;
 };
 
 const authUsersPerPage = 1_000;
@@ -24,6 +26,7 @@ export function normalizeEmail(email: string): string {
 
 export function validateSeedUsers(users: readonly DevelopmentUser[]): void {
   const emails = new Set<string>();
+  const usernames = new Set<string>();
   const ids = new Set<string>();
   const membershipIds = new Set<string>();
 
@@ -31,6 +34,15 @@ export function validateSeedUsers(users: readonly DevelopmentUser[]): void {
     const email = normalizeEmail(user.email);
     if (emails.has(email)) throw new Error(`Duplicate seed email: ${email}`);
     if (ids.has(user.id)) throw new Error(`Duplicate seed user ID: ${user.id}`);
+    // The same rule the signup form applies, so a seed name that could never
+    // be typed into the real form fails here rather than at the unique index.
+    if (!usernameSchema.safeParse(user.username).success) {
+      throw new Error(`Invalid seed username: ${user.username}`);
+    }
+    if (usernames.has(user.username)) {
+      throw new Error(`Duplicate seed username: ${user.username}`);
+    }
+    usernames.add(user.username);
     if (user.academyRole === null && user.membershipId !== null) {
       throw new Error(`Seed user ${email} has a membership ID without an academy role.`);
     }
@@ -57,6 +69,9 @@ export function assertNoCoveUserConflicts(
     seedUsers.map((user) => [normalizeEmail(user.email), user]),
   );
   const seedById = new Map(seedUsers.map((user) => [user.id, user]));
+  const seedByUsername = new Map(
+    seedUsers.map((user) => [user.username, user]),
+  );
   const seedByAuthId = new Map(
     seedUsers.flatMap((user) => {
       const authUserId = authUserIds.get(user.id);
@@ -69,6 +84,15 @@ export function assertNoCoveUserConflicts(
     const emailOwner = email ? seedByEmail.get(email) : undefined;
     if (emailOwner && emailOwner.id !== existing.id) {
       throw new Error(`Cove email conflict for ${email}.`);
+    }
+
+    // Caught here rather than at the unique index, so the failure names the
+    // account somebody already took instead of surfacing a raw P2002.
+    const usernameOwner = existing.username
+      ? seedByUsername.get(existing.username)
+      : undefined;
+    if (usernameOwner && usernameOwner.id !== existing.id) {
+      throw new Error(`Cove username conflict for ${existing.username}.`);
     }
 
     const idOwner = seedById.get(existing.id);
@@ -111,6 +135,9 @@ export async function synchronizeSupabaseUsers(
       email_confirm: true,
       user_metadata: {
         full_name: seedUser.displayName,
+        // Kept in step with the Cove row so a seeded identity that ever goes
+        // through `bootstrap` claims the same name the seed wrote.
+        username: seedUser.username,
         cove_development_seed: true,
       },
     };

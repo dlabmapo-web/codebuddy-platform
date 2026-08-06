@@ -1,8 +1,8 @@
 # V2 Monitoring Pointer and Caret Parity
 
 **Date:** 2026-08-06
-**Status:** Approved for implementation
-**Reference:** Observable monitoring behavior on `main`
+**Status:** Awaiting final spec review
+**Reference:** Corrected teacher/student monitoring lifecycle approved by the user
 
 ## Problem
 
@@ -12,29 +12,31 @@ rules drift from the established `main` experience:
 
 - the teacher's purple Monaco caret and generic label remain indefinitely on
   the student screen instead of disappearing after three seconds of inactivity;
-- the student's mouse arrow remains indefinitely on the teacher screen instead
-  of disappearing after three seconds;
+- the student's mouse arrow and caret must remain at their last valid positions
+  on the teacher screen for the entire problem-detail visit;
 - browser blur and pointer-leave handling can clear an arrow immediately when
   one person tests Student and Teacher in two windows on one computer, making
   working pointer transport look broken before the other window can be viewed.
 
 The active collaboration room and cursor transport are functioning: the
 screenshots show the teacher and student Monaco caret labels on the opposite
-screens. The required change is to reproduce `main`'s marker lifecycle and make
-the mouse path reliably observable without replacing v2's backend.
+screens. The required change is to apply the corrected asymmetric lifecycle
+without replacing v2's backend.
 
 ## Reference Behavior
 
-The implementation on `main` establishes these product rules:
+The required product rules are:
 
 - the teacher's Monaco caret and generic name on the student screen disappear
   three seconds after the teacher stops moving the caret;
 - the student's Monaco caret and name remain at the last active line on the
-  teacher screen while the live collaboration session remains active;
-- teacher and student mouse arrows disappear three seconds after their last
-  movement;
-- a new pointer or caret event makes the corresponding marker appear
-  immediately and restarts its timer;
+  teacher screen while the student remains on the problem-detail workspace;
+- the student's mouse arrow remains at its last valid position on the teacher
+  screen while the student remains on that workspace;
+- the teacher's mouse arrow on the student screen disappears three seconds
+  after the teacher's last movement;
+- a new pointer or caret event updates the corresponding marker immediately
+  and, for teacher markers, restarts its timer;
 - ending collaboration removes every remote marker.
 
 V2 will match those observable rules. It will not copy `main`'s public
@@ -61,24 +63,29 @@ cursor:
 | --- | --- | --- |
 | Student | Teacher mouse | Expires after 3 seconds |
 | Student | Teacher Monaco caret/name | Expires after 3 seconds |
-| Teacher | Student mouse | Expires after 3 seconds |
-| Teacher | Student Monaco caret/name | Held until cleared/session end |
+| Teacher | Student mouse | Held until the student leaves the problem workspace |
+| Teacher | Student Monaco caret/name | Held until the student leaves the problem workspace |
 
 Pointer and caret expiry are independent. Cursor traffic cannot keep a mouse
 arrow alive, and mouse traffic cannot keep a Monaco caret alive.
 
 ## Focus, Leave, and Disconnect Semantics
 
-Moving onto an unsupported area inside the same visible page may clear the
-arrow because the peer is no longer pointing at a shared Cove surface.
+Moving onto an unsupported area inside the same visible page does not clear the
+last valid arrow. There is no meaningful shared coordinate for that area, so
+the receiver retains the last representable position. Returning to a shared
+surface updates it normally.
 
 Browser `blur`, document `pointerleave`, and `visibilitychange` will not send an
-immediate pointer clear. The last valid pointer remains subject to the normal
-three-second receiver expiry. This preserves `main`'s visible idle behavior and
-lets a developer switch between Student and Teacher windows to inspect it.
+immediate pointer clear. The teacher's last valid pointer remains subject to
+its three-second receiver expiry; the student's remains visible to the teacher.
+This also lets a developer switch between Student and Teacher windows to
+inspect the behavior.
 
-Component teardown, draft replacement, confirmed watch end, access revocation,
-and socket departure still clear awareness immediately. Those events mean the
+Student problem-workspace teardown, draft replacement, confirmed watch end,
+access revocation, and socket departure clear awareness immediately. Closing
+or navigating away from the student's problem-detail page therefore removes
+both student markers from the teacher screen. Those events mean the
 collaboration ended; they are not ordinary inactivity.
 
 ## Components and Data Flow
@@ -100,7 +107,8 @@ is added to the protocol.
 ## Error and Recovery Behavior
 
 - A dropped volatile movement frame is superseded by the next movement.
-- The last successfully received marker expires according to policy.
+- The last successfully received marker expires or remains according to its
+  receiver policy.
 - Reliable server or lifecycle clears remove both pointer and cursor without
   waiting for an inactivity timer.
 - Reconnection and document resynchronization do not revive an expired marker;
@@ -120,11 +128,14 @@ Unit tests will cover:
 Two-browser end-to-end tests will cover:
 
 - teacher mouse movement appearing on the student screen and expiring;
-- student mouse movement appearing on the teacher screen and expiring;
+- student mouse movement appearing on the teacher screen and remaining beyond
+  three seconds of inactivity;
 - switching focus between the two windows without an immediate clear;
 - teacher caret appearing on the student screen and expiring;
 - student caret appearing on the teacher screen and remaining;
-- movement after expiry restoring each marker;
+- teacher movement after expiry restoring the teacher marker;
+- student navigation away from the problem page clearing the student's pointer
+  and caret;
 - watch end clearing every marker;
 - WebKit and Chromium behavior on supported parent surfaces.
 

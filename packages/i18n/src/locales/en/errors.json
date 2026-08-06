@@ -25,6 +25,8 @@
   "OAUTH_PROVIDER_MISMATCH": "The social provider does not match this signup request.",
   "LAST_MANAGER_REQUIRED": "The academy must keep at least one active manager.",
   "IDENTITY_LINK_CONFLICT": "This identity cannot be linked automatically.",
+  "USERNAME_TAKEN": "That username is already taken. Choose another one.",
+  "USERNAME_ALREADY_SET": "This account already has a username.",
   "LEGACY_ACCOUNT_ALREADY_MIGRATED": "This legacy account is already migrated.",
   "COURSE_NOT_FOUND": "The selected course was not found.",
   "COURSE_TITLE_CONFLICT": "A course already uses this title.",

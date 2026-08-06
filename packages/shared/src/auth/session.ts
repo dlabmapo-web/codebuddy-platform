@@ -28,6 +28,7 @@ export const authUserSchema = z.object({
   id: z.uuid(),
   authUserId: z.uuid(),
   email: z.email().nullable(),
+  username: z.string().nullable(),
   displayName: z.string().nullable(),
   avatarUrl: z.url().nullable(),
   platformRole: platformRoleSchema,

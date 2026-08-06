@@ -403,6 +403,11 @@ export const presenceEntrySchema = z.object({
   courseId: z.uuid().nullable(),
   /** Contextual history for an offline row, never proof of a connection. */
   lastActivityAt: z.iso.datetime().nullable(),
+  /**
+   * The instant a time-limited label must be recomputed. Present only while a
+   * dropped connection is inside its recovery grace window.
+   */
+  stateExpiresAt: z.iso.datetime().nullable(),
   /** The student's own latest sample run, if one is in flight or recent. */
   run: z
     .object({

@@ -456,6 +456,7 @@ describe("presenceDeltaSchema", () => {
         materialId,
         courseId: null,
         lastActivityAt: null,
+        stateExpiresAt: null,
         run: null,
         latestSubmissionId: null,
         code: "print(1)",

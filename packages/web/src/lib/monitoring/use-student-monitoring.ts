@@ -101,12 +101,18 @@ export function useStudentMonitoring({
       publish();
     };
 
-    publish();
+    // Publishing to a disconnected Socket.IO client relies on its temporary
+    // send buffer. That is useful for commands, but presence describes the
+    // connection that actually delivered it. Reassert it on every connect so
+    // the teacher-first and reconnect paths have the same deterministic start.
+    socket.on('connect', publish);
+    if (socket.connected) publish();
     const timer = setInterval(publish, monitoringTiming.presenceHeartbeatMs);
     globalThis.document?.addEventListener('visibilitychange', onVisibility);
     return () => {
       clearInterval(timer);
       globalThis.document?.removeEventListener('visibilitychange', onVisibility);
+      socket.off('connect', publish);
     };
   }, [academyId, courseId, materialId, socket]);
 

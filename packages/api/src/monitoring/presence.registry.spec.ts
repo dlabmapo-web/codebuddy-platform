@@ -47,6 +47,27 @@ function fakeRedis() {
       strings.set(key, String(next));
       return next;
     }),
+    eval: vi.fn(
+      async (
+        _script: string,
+        _keyCount: number,
+        key: string,
+        generation: string,
+        now: string,
+      ) => {
+        const raw = strings.get(key);
+        if (!raw) return null;
+        const stored = JSON.parse(raw) as {
+          socketGeneration: string;
+          interruptedAt: number | null;
+        };
+        if (stored.socketGeneration !== generation) return null;
+        stored.interruptedAt = Number(now);
+        const updated = JSON.stringify(stored);
+        strings.set(key, updated);
+        return updated;
+      },
+    ),
   };
 }
 
@@ -117,7 +138,10 @@ describe("PresenceRegistry", () => {
       membershipId,
       "generation-1",
     );
-    expect(entry?.state).toBe("SOLVING");
+    expect(entry).toBeNull();
+    expect((await registry.snapshot(academyId, classId))?.entries[0]?.state).toBe(
+      "SOLVING",
+    );
   });
 
   it("reports offline once the grace window has passed", async () => {
@@ -192,6 +216,7 @@ describe("PresenceRegistry", () => {
       "materialId",
       "run",
       "state",
+      "stateExpiresAt",
       "studentMembershipId",
     ]);
   });

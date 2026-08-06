@@ -61,6 +61,25 @@ export type PresenceSignal = {
 const presenceTtlMs =
   monitoringTiming.presenceHeartbeatMs * 2 + monitoringTiming.recoveryGraceMs;
 
+/**
+ * Compare the departing socket generation and mark it interrupted as one Redis
+ * operation. A JavaScript read followed by a write can interleave with a new
+ * connection's publish and overwrite that newer session with stale state.
+ */
+const markInterruptedScript = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return nil end
+
+local decoded, stored = pcall(cjson.decode, raw)
+if not decoded then return nil end
+if stored.socketGeneration ~= ARGV[1] then return nil end
+
+stored.interruptedAt = tonumber(ARGV[2])
+local updated = cjson.encode(stored)
+redis.call('PSETEX', KEYS[1], tonumber(ARGV[3]), updated)
+return updated
+`;
+
 @Injectable()
 export class PresenceRegistry {
   private readonly logger = new Logger(PresenceRegistry.name);
@@ -151,17 +170,27 @@ export class PresenceRegistry {
     studentMembershipId: string,
     socketGeneration: string,
   ): Promise<PresenceEntry | null> {
-    return this.mutate(
-      academyId,
-      classId,
-      studentMembershipId,
-      (stored, now) =>
-        // A newer connection already replaced this one, so its disconnect is
-        // the old tab closing and must not touch the live row.
-        stored.socketGeneration === socketGeneration
-          ? { ...stored, interruptedAt: now }
-          : stored,
-    );
+    const redis = this.client();
+    if (!redis) return null;
+    const now = Date.now();
+    try {
+      const raw = await redis.eval(
+        markInterruptedScript,
+        1,
+        presenceKey(academyId, classId, studentMembershipId),
+        socketGeneration,
+        now.toString(),
+        presenceTtlMs.toString(),
+      );
+      // `null` means the key expired or a newer socket generation owns it. In
+      // both cases there was no transition, so the gateway must emit no delta.
+      if (typeof raw !== "string") return null;
+      const stored = parse(raw);
+      return stored ? toEntry(stored, now) : null;
+    } catch (error) {
+      this.fail(error);
+      return null;
+    }
   }
 
   async clear(
@@ -383,6 +412,12 @@ function toEntry(stored: StoredPresence, now: number): PresenceEntry {
     materialId: stored.materialId,
     courseId: stored.courseId,
     lastActivityAt: new Date(stored.lastActivityAt).toISOString(),
+    stateExpiresAt:
+      state === "RECONNECTING" && stored.interruptedAt !== null
+        ? new Date(
+            stored.interruptedAt + monitoringTiming.recoveryGraceMs,
+          ).toISOString()
+        : null,
     run: stored.run,
     latestSubmissionId: stored.latestSubmissionId,
   };

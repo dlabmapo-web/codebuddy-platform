@@ -11,6 +11,7 @@ import {
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
+import { nextPresenceDeadline } from './presence-deadline';
 import { monitoringAck } from './types';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
@@ -30,10 +31,15 @@ export function useClassPresence({
   classId: string;
 }) {
   const { socket, state, report } = useMonitoringSocket();
-  const [entries, setEntries] = React.useState<PresenceEntry[]>([]);
-  const [version, setVersion] = React.useState(0);
+  const [presence, setPresence] = React.useState<{
+    entries: PresenceEntry[];
+    version: number;
+  }>({ entries: [], version: 0 });
   const [denied, setDenied] = React.useState<string | null>(null);
-  const versionRef = React.useRef(0);
+  // Socket events arrive outside React. Advance their canonical value
+  // synchronously before scheduling a render so two deltas in one render
+  // window are still compared against one another, not against stale state.
+  const presenceRef = React.useRef(presence);
 
   const requestSnapshot = React.useCallback(
     (instance: Socket) => {
@@ -61,29 +67,25 @@ export function useClassPresence({
 
     const onSnapshot = (snapshot: PresenceSnapshot) => {
       if (snapshot.classId !== classId) return;
-      setEntries(snapshot.entries);
-      setVersion(snapshot.version);
-      versionRef.current = snapshot.version;
+      const next = { entries: snapshot.entries, version: snapshot.version };
+      presenceRef.current = next;
+      setPresence(next);
       report({ type: 'synchronized' });
     };
 
     const onDelta = (delta: PresenceDelta) => {
       if (delta.classId !== classId) return;
-      setEntries((current) => {
-        const result = applyPresenceDelta(
-          { version: versionRef.current, entries: current },
-          delta,
-        );
-        if (result.outcome === 'stale') return current;
-        if (result.outcome === 'gap') {
-          // One refresh, then back to deltas.
-          requestSnapshot(socket);
-          return current;
-        }
-        versionRef.current = result.version;
-        setVersion(result.version);
-        return result.entries;
-      });
+      const result = applyPresenceDelta(presenceRef.current, delta);
+      if (result.outcome === 'stale') return;
+      if (result.outcome === 'gap') {
+        // One authoritative refresh, then back to deltas. The old state stays
+        // visible until that snapshot arrives; no partial delta is guessed.
+        requestSnapshot(socket);
+        return;
+      }
+      const next = { entries: result.entries, version: result.version };
+      presenceRef.current = next;
+      setPresence(next);
     };
 
     // Named, so the cleanup can actually remove it: an inline arrow here
@@ -107,5 +109,25 @@ export function useClassPresence({
     };
   }, [academyId, classId, report, requestSnapshot, socket]);
 
-  return { entries, version, state, denied, socket };
+  React.useEffect(() => {
+    if (!socket) return;
+    const deadline = nextPresenceDeadline(presence.entries);
+    if (deadline === null) return;
+    // One deadline-driven authoritative read converts RECONNECTING to OFFLINE
+    // after the grace period. The small margin absorbs clock and timer jitter
+    // so a snapshot cannot arrive just before the server's boundary.
+    const timer = setTimeout(
+      () => requestSnapshot(socket),
+      Math.max(0, deadline - Date.now()) + 100,
+    );
+    return () => clearTimeout(timer);
+  }, [presence.entries, requestSnapshot, socket]);
+
+  return {
+    entries: presence.entries,
+    version: presence.version,
+    state,
+    denied,
+    socket,
+  };
 }

@@ -129,27 +129,37 @@ test('a team lead cannot reach the teaching routes', async () => {
   }
 });
 
-test('a solving student appears on the live roster', async () => {
-  // The student opens the seeded exercise and starts working.
+test('a student appears live when the teacher opened the roster first', async () => {
+  // Open the teacher's socket room while the student is outside an exercise.
+  // This is the ordering that snapshots alone cannot cover: the row has to
+  // change from a presence delta without a teacher navigation or reload.
   await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
-  await studentPage.getByText(SUM_TITLE).first().click();
-  await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
-  await typeIntoEditor(studentPage, 'a = int(input())\n');
-
   await teacherPage.goto(`/studio/academies/${academyId}/teach/classes`);
   await teacherPage.getByRole('heading', { name: CLASS_NAME }).click();
   await teacherPage.waitForURL(/\/teach\/classes\/[0-9a-f-]+$/, {
     timeout: 30_000,
   });
 
-  // Presence, not a database timestamp: the row has to reach a live state.
-  await expect(
-    teacherPage.getByText(/solving|풀이 중/i).first(),
-  ).toBeVisible({ timeout: 30_000 });
+  await studentPage.getByText(SUM_TITLE).first().click();
+  await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await typeIntoEditor(studentPage, 'a = int(input())\n');
+
+  const studentRow = teacherPage
+    .getByRole('listitem')
+    .filter({ hasText: 'Cove Student' });
+  // Scope this to the row. The summary card and filter also say "Solving" and
+  // allowed the old snapshot-only test to pass while the student stayed
+  // visibly offline.
+  await expect(studentRow.getByText(/^solving$|^풀이 중$/i)).toBeVisible({
+    timeout: 30_000,
+  });
   // A realtime outage would show this instead, and must not.
   await expect(
     teacherPage.getByText(/live updates unavailable|사용할 수 없습니다/i),
   ).toHaveCount(0);
+  await expect(
+    studentRow.getByRole('link', { name: /open live|실시간 보기/i }),
+  ).toBeVisible({ timeout: 30_000 });
 });
 
 test('the teacher opens the live workspace and the student is told', async () => {

@@ -36,6 +36,7 @@ function presence(
     materialId,
     courseId: null,
     lastActivityAt: null,
+    stateExpiresAt: null,
     run: null,
     latestSubmissionId: null,
     ...overrides,

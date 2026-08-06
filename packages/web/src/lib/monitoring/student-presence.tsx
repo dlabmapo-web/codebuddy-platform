@@ -1,0 +1,144 @@
+'use client';
+
+import {
+  monitoringClientEvents,
+  monitoringTiming,
+  shouldPublishActivity,
+} from '@cove/shared';
+import * as React from 'react';
+
+import { useMonitoringSocket } from './use-monitoring-socket';
+
+type OpenMaterial = { materialId: string; courseId: string | null };
+
+type StudentPresence = {
+  /**
+   * What the student has open, for as long as the page holding it is mounted.
+   * Null everywhere else, which is what the roster reads as Online.
+   */
+  setOpenMaterial: (material: OpenMaterial | null) => void;
+  /** Any real interaction. A heartbeat on its own is not activity. */
+  markActive: () => void;
+};
+
+/**
+ * A no-op rather than a thrown error. Presence is ambient: a page that renders
+ * outside the provider — a teacher's, or a student's before the layout has
+ * resolved their role — should go on working silently rather than crash over a
+ * signal it was never going to send.
+ */
+const noop: StudentPresence = {
+  setOpenMaterial: () => undefined,
+  markActive: () => undefined,
+};
+
+const StudentPresenceContext = React.createContext<StudentPresence>(noop);
+
+export function useStudentPresence(): StudentPresence {
+  return React.useContext(StudentPresenceContext);
+}
+
+/**
+ * The student's presence, published for as long as they are in this academy.
+ *
+ * Mounted once by the academy layout so it survives navigation. There must be
+ * exactly one of these per student: presence is a single row per class in the
+ * registry, and a second publisher would fight the first over what the student
+ * has open, flipping the teacher's roster between Online and Solving.
+ *
+ * It reports; it never decides. The server reads these signals and derives the
+ * state, which is what stops a modified client from calling itself Solving
+ * forever.
+ */
+export function StudentPresenceProvider({
+  academyId,
+  children,
+}: {
+  academyId: string;
+  children: React.ReactNode;
+}) {
+  const { socket } = useMonitoringSocket();
+  const materialRef = React.useRef<OpenMaterial | null>(null);
+  const activeRef = React.useRef(false);
+  const visibilityRef = React.useRef<'VISIBLE' | 'HIDDEN'>('VISIBLE');
+  const lastPublishedAtRef = React.useRef<number | null>(null);
+  const publishRef = React.useRef<() => void>(() => undefined);
+
+  const markActive = React.useCallback(() => {
+    activeRef.current = true;
+    // Straight out rather than on the next beat, so Solving lands within
+    // seconds of the keystroke that earned it. The floor keeps continuous
+    // typing and a moving pointer down to one frame per interval.
+    if (shouldPublishActivity(lastPublishedAtRef.current, Date.now())) {
+      publishRef.current();
+    }
+  }, []);
+
+  const setOpenMaterial = React.useCallback(
+    (material: OpenMaterial | null) => {
+      const previous = materialRef.current?.materialId ?? null;
+      materialRef.current = material;
+      // Opening or leaving an exercise moves the student between Solving and
+      // Online, so it goes out immediately rather than waiting for a beat.
+      if (previous !== (material?.materialId ?? null)) publishRef.current();
+    },
+    [],
+  );
+
+  React.useEffect(() => {
+    if (!socket) return;
+
+    const publish = () => {
+      lastPublishedAtRef.current = Date.now();
+      socket.emit(monitoringClientEvents.presencePublish, {
+        academyId,
+        materialId: materialRef.current?.materialId ?? null,
+        courseId: materialRef.current?.courseId ?? null,
+        visibility: visibilityRef.current,
+        active: activeRef.current,
+      });
+      activeRef.current = false;
+    };
+    publishRef.current = publish;
+
+    const onVisibility = () => {
+      visibilityRef.current = document.hidden ? 'HIDDEN' : 'VISIBLE';
+      publish();
+    };
+
+    // Any interaction with the page, not only with the editor. A student
+    // reading the question and moving their cursor over the samples is
+    // working, and calling that idle libels them.
+    const onPointerMove = () => {
+      markActive();
+    };
+
+    // Publishing to a disconnected Socket.IO client relies on its temporary
+    // send buffer. That is useful for commands, but presence describes the
+    // connection that actually delivered it. Reassert it on every connect so
+    // the teacher-first and reconnect paths have the same deterministic start.
+    socket.on('connect', publish);
+    if (socket.connected) publish();
+    const timer = setInterval(publish, monitoringTiming.presenceHeartbeatMs);
+    globalThis.document?.addEventListener('visibilitychange', onVisibility);
+    globalThis.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => {
+      clearInterval(timer);
+      globalThis.document?.removeEventListener('visibilitychange', onVisibility);
+      globalThis.removeEventListener('pointermove', onPointerMove);
+      socket.off('connect', publish);
+      publishRef.current = () => undefined;
+    };
+  }, [academyId, markActive, socket]);
+
+  const value = React.useMemo(
+    () => ({ markActive, setOpenMaterial }),
+    [markActive, setOpenMaterial],
+  );
+
+  return (
+    <StudentPresenceContext.Provider value={value}>
+      {children}
+    </StudentPresenceContext.Provider>
+  );
+}

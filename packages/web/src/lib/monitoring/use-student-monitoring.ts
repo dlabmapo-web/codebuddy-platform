@@ -3,7 +3,6 @@
 import {
   monitoringClientEvents,
   monitoringServerEvents,
-  monitoringTiming,
   type StudentIndicatorState,
   type WatchStartedEvent,
 } from '@cove/shared';
@@ -17,6 +16,7 @@ import { expiresWhenIdle } from './awareness/pointer-lifecycle';
 import { attachRemoteCursor, readCursor } from './awareness/remote-cursor';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor } from './yjs-monaco';
+import { useStudentPresence } from './student-presence';
 import { useMonitoringSocket } from './use-monitoring-socket';
 import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
 
@@ -33,14 +33,12 @@ import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
  * keeps the everyday path exactly as it was.
  */
 export function useStudentMonitoring({
-  academyId,
   courseId,
   materialId,
   onBeforeCollaborate,
   teacherLabel,
   terminal,
 }: {
-  academyId: string;
   courseId: string | null;
   materialId: string | null;
   /** Flushes the local draft, so the server seeds the document from it. */
@@ -72,49 +70,21 @@ export function useStudentMonitoring({
   const [doc] = React.useState(() => new Y.Doc());
   const editorRef = React.useRef<MonacoCodeEditor | null>(null);
   const bindingRef = React.useRef<{ destroy: () => void } | null>(null);
-  const activeRef = React.useRef(false);
-  const visibilityRef = React.useRef<'VISIBLE' | 'HIDDEN'>('VISIBLE');
-
-  /** Any real interaction; a heartbeat on its own is not activity. */
-  const markActive = React.useCallback(() => {
-    activeRef.current = true;
-  }, []);
-
   /* ------------------------------------------------------------- presence */
 
+  /**
+   * Presence lives in the academy layout, not here. This hook is mounted only
+   * inside an exercise, and a student is on the roster the whole time they are
+   * signed in — so all this page owns is telling the one publisher which
+   * exercise is open, and marking activity while it is.
+   */
+  const { markActive, setOpenMaterial } = useStudentPresence();
+
   React.useEffect(() => {
-    if (!socket) return;
-
-    const publish = () => {
-      socket.emit(monitoringClientEvents.presencePublish, {
-        academyId,
-        materialId,
-        courseId,
-        visibility: visibilityRef.current,
-        active: activeRef.current,
-      });
-      activeRef.current = false;
-    };
-
-    const onVisibility = () => {
-      visibilityRef.current = document.hidden ? 'HIDDEN' : 'VISIBLE';
-      publish();
-    };
-
-    // Publishing to a disconnected Socket.IO client relies on its temporary
-    // send buffer. That is useful for commands, but presence describes the
-    // connection that actually delivered it. Reassert it on every connect so
-    // the teacher-first and reconnect paths have the same deterministic start.
-    socket.on('connect', publish);
-    if (socket.connected) publish();
-    const timer = setInterval(publish, monitoringTiming.presenceHeartbeatMs);
-    globalThis.document?.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      clearInterval(timer);
-      globalThis.document?.removeEventListener('visibilitychange', onVisibility);
-      socket.off('connect', publish);
-    };
-  }, [academyId, courseId, materialId, socket]);
+    if (!materialId) return;
+    setOpenMaterial({ materialId, courseId });
+    return () => setOpenMaterial(null);
+  }, [courseId, materialId, setOpenMaterial]);
 
   /* ------------------------------------------------- the teacher's arrival */
 
@@ -259,15 +229,31 @@ export function useStudentMonitoring({
     remoteCursorRef.current?.update(remote.cursor);
   }, [remote.cursor]);
 
+  /**
+   * Activity, whether or not anybody is watching.
+   *
+   * Deliberately outside the `draftId` gate below. A student arrowing through
+   * their code is working, and until this was split out that only counted once
+   * a teacher had already opened them — so the roster reported different
+   * things about identical behaviour depending on who was looking.
+   */
+  React.useEffect(() => {
+    if (!editor) return;
+    const cursorListener = editor.onDidChangeCursorSelection(markActive);
+    const contentListener = editor.onDidChangeModelContent(markActive);
+    return () => {
+      cursorListener.dispose();
+      contentListener.dispose();
+    };
+  }, [editor, markActive]);
+
   React.useEffect(() => {
     if (!editor || !draftId) return;
     const cursorListener = editor.onDidChangeCursorSelection((event) => {
-      markActive();
       publishCursor(readCursor(event.selection));
     });
     let frame = 0;
     const contentListener = editor.onDidChangeModelContent(() => {
-      markActive();
       cancelAnimationFrame(frame);
       // WebKit Monaco can apply text without a following cursor-selection
       // event. Read after Monaco finishes the edit so the teacher receives
@@ -281,7 +267,7 @@ export function useStudentMonitoring({
       cursorListener.dispose();
       contentListener.dispose();
     };
-  }, [draftId, editor, markActive, publishCursor]);
+  }, [draftId, editor, publishCursor]);
 
   /* ---------------------------------------------------------------- terminal */
 

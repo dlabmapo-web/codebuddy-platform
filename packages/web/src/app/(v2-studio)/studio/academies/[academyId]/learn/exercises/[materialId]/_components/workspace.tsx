@@ -62,7 +62,6 @@ export function Workspace({
   // back. It publishes nothing the student cannot already see, and learns
   // nothing about who is watching.
   const monitoring = useStudentMonitoring({
-    academyId,
     courseId: workspace.breadcrumb.course.id,
     materialId: exercise.materialId,
     onBeforeCollaborate: draft.flushNow,

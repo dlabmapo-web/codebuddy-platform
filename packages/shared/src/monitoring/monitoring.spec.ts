@@ -16,6 +16,7 @@ import {
   resolveLiveState,
   roleCanMonitor,
   shouldPersistLastSeen,
+  shouldPublishActivity,
   type MonitoringClassFacts,
   type MonitoringTeacherFacts,
   type PresenceEntry,
@@ -220,8 +221,25 @@ describe("resolveLiveState", () => {
     expect(resolveLiveState({ ...base, materialId: null }, now)).toBe("ONLINE");
   });
 
-  it("is online when the workspace is not the foreground document", () => {
-    expect(resolveLiveState({ ...base, visibility: "HIDDEN" }, now)).toBe("ONLINE");
+  /**
+   * The regression this ordering exists to prevent. WebKit calls a page hidden
+   * when another window merely covers it, so checking visibility ahead of
+   * activity demoted a Safari student the moment the teacher's own roster came
+   * to the front — one second of Solving, then Online again.
+   */
+  it("stays solving when a covered window reports itself hidden", () => {
+    expect(resolveLiveState({ ...base, visibility: "HIDDEN" }, now)).toBe(
+      "SOLVING",
+    );
+  });
+
+  it("is online once a hidden workspace also goes quiet", () => {
+    const signals = {
+      ...base,
+      visibility: "HIDDEN" as const,
+      lastActivityAt: now - monitoringTiming.idleAfterMs - 1,
+    };
+    expect(resolveLiveState(signals, now)).toBe("ONLINE");
   });
 
   it("is solving with recent activity in a visible workspace", () => {
@@ -243,10 +261,18 @@ describe("resolveLiveState", () => {
 });
 
 describe("canOpenLiveWorkspace", () => {
-  it("opens for a connected student inside an exercise", () => {
-    expect(canOpenLiveWorkspace({ state: "ONLINE", materialId })).toBe(true);
+  it("opens for a student who is solving", () => {
     expect(canOpenLiveWorkspace({ state: "SOLVING", materialId })).toBe(true);
-    expect(canOpenLiveWorkspace({ state: "IDLE", materialId })).toBe(true);
+  });
+
+  /**
+   * There has to be something live to join. Idle is in an exercise but has
+   * done nothing for a minute, and Online's exercise is behind another window;
+   * opening either shows a still frame and calls it live.
+   */
+  it("does not open a student who is in an exercise but not working", () => {
+    expect(canOpenLiveWorkspace({ state: "IDLE", materialId })).toBe(false);
+    expect(canOpenLiveWorkspace({ state: "ONLINE", materialId })).toBe(false);
   });
 
   it("does not open without a current exercise", () => {
@@ -257,6 +283,38 @@ describe("canOpenLiveWorkspace", () => {
   it("does not open for an offline or reconnecting student", () => {
     expect(canOpenLiveWorkspace({ state: "OFFLINE", materialId })).toBe(false);
     expect(canOpenLiveWorkspace({ state: "RECONNECTING", materialId })).toBe(false);
+  });
+});
+
+describe("shouldPublishActivity", () => {
+  const floor = monitoringTiming.activityPublishFloorMs;
+
+  it("publishes the first signal of a session", () => {
+    expect(shouldPublishActivity(null, 1_000, floor)).toBe(true);
+  });
+
+  it("holds a second signal inside the floor", () => {
+    expect(shouldPublishActivity(1_000, 1_000 + floor - 1, floor)).toBe(false);
+  });
+
+  it("publishes again once the floor has passed", () => {
+    expect(shouldPublishActivity(1_000, 1_000 + floor, floor)).toBe(true);
+  });
+
+  /**
+   * The reason a pointer listener is safe to have at all: a burst at screen
+   * refresh rate collapses to one frame, not one per event.
+   */
+  it("collapses a burst to a single publish", () => {
+    let lastPublishedAt: number | null = null;
+    let published = 0;
+    for (let at = 0; at < floor; at += 16) {
+      if (shouldPublishActivity(lastPublishedAt, at, floor)) {
+        lastPublishedAt = at;
+        published += 1;
+      }
+    }
+    expect(published).toBe(1);
   });
 });
 

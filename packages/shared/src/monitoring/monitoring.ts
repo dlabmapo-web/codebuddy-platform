@@ -86,6 +86,15 @@ export const monitoringTiming = {
   cursorIntervalMs: 50,
   /** Student heartbeat while a learning connection is open. */
   presenceHeartbeatMs: 15_000,
+  /**
+   * Floor between two activity-triggered publishes.
+   *
+   * Waiting for the heartbeat put Solving up to fifteen seconds behind the
+   * keystroke that earned it. Publishing on activity closes that, and this
+   * floor is what makes a pointer listener safe to have at all — without it a
+   * mouse dragged across the editor would publish at screen refresh rate.
+   */
+  activityPublishFloorMs: 3_000,
   /** No editor, run, pointer, or navigation activity for this long is idle. */
   idleAfterMs: 60_000,
   /** How long an interrupted connection reads as reconnecting, not offline. */
@@ -348,28 +357,62 @@ export function resolveLiveState(
       ? "RECONNECTING"
       : "OFFLINE";
   }
-  if (signals.materialId === null || signals.visibility === "HIDDEN") {
-    return "ONLINE";
-  }
+  if (signals.materialId === null) return "ONLINE";
+  // Activity outranks visibility, and the order is the whole point.
+  //
+  // WebKit reports a page as hidden when its window is merely covered by
+  // another, where Chromium reports it only on a tab switch. Checking
+  // visibility first therefore demoted a Safari student the instant anything
+  // overlapped their window — including the teacher's own roster — and undid
+  // the keystroke they had just typed.
+  //
+  // Someone who typed four seconds ago is working, whatever is stacked on top
+  // of them. Someone who walked away stops producing signals and falls out of
+  // Solving within the minute regardless, so nothing is lost by trusting the
+  // activity first.
   if (
     signals.lastActivityAt !== null &&
     now - signals.lastActivityAt <= timing.idleAfterMs
   ) {
     return "SOLVING";
   }
+  // Quiet and out of sight is a student who left the page open, not one
+  // sitting in front of a problem doing nothing. Only the second is Idle.
+  if (signals.visibility === "HIDDEN") return "ONLINE";
   return "IDLE";
 }
 
-/** Only a connected state with a current exercise can be opened for help. */
+/**
+ * Whether a teacher may open this student's workspace.
+ *
+ * Solving only: there has to be something live to join. Both other rows that
+ * can hold an exercise have been quiet for a minute — Idle in front of it,
+ * Online with it left open behind something else — so opening either shows a
+ * still frame and calls it live.
+ *
+ * The consequence is that the button leaves a row the moment the student goes
+ * quiet, including under the cursor of a teacher about to click it. The server
+ * re-authorizes every watch regardless, so a stale click is refused rather than
+ * mishandled.
+ */
 export function canOpenLiveWorkspace(
   presence: { state: MonitoringLiveState; materialId: string | null },
 ): boolean {
-  return (
-    presence.materialId !== null &&
-    (presence.state === "ONLINE" ||
-      presence.state === "SOLVING" ||
-      presence.state === "IDLE")
-  );
+  return presence.materialId !== null && presence.state === "SOLVING";
+}
+
+/**
+ * Whether an activity signal should publish now or wait for the heartbeat.
+ *
+ * Pure so the floor is testable on a fake clock rather than by waiting three
+ * seconds in a test.
+ */
+export function shouldPublishActivity(
+  lastPublishedAt: number | null,
+  now: number,
+  floorMs: number = monitoringTiming.activityPublishFloorMs,
+): boolean {
+  return lastPublishedAt === null || now - lastPublishedAt >= floorMs;
 }
 
 /**
@@ -501,6 +544,12 @@ export const monitoringRosterStudentSchema = z.object({
   membershipId: z.uuid(),
   userId: z.uuid(),
   displayName: z.string().nullable(),
+  /**
+   * How the student signs in, and so how a teacher refers to them. Nullable:
+   * an OAuth account never passed through the signup form, and a roster that
+   * omitted those students would be worse than one that shows them unnamed.
+   */
+  username: z.string().nullable(),
   email: z.email().nullable(),
   membershipStatus: membershipStatusSchema,
   userStatus: userStatusSchema,

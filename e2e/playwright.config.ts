@@ -28,6 +28,15 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {
+      // The curriculum dock changes the containing block for a percentage-
+      // sized split pane. Safari has historically resolved flex percentages
+      // differently here, so the reported student layout stays covered by
+      // the engine that exposed it.
+      name: 'webkit-navigator',
+      testMatch: /curriculum-navigator\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
       // The live-monitoring pointer crosses a sandboxed iframe boundary. Keep
       // that path covered by WebKit because Safari's document/event behavior
       // is the browser-specific failure a teacher reported in production use.

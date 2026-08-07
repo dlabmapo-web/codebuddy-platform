@@ -71,12 +71,16 @@ test('starts closed, and opens as a column that takes width from the panes', asy
   await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
 
   const before = await statement(page).boundingBox();
+  const paneRowBefore = await statement(page)
+    .locator('xpath=..')
+    .boundingBox();
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(trigger(page)).toHaveAttribute('aria-expanded', 'true');
 
   const panelBox = (await panel(page).boundingBox())!;
   const after = (await statement(page).boundingBox())!;
+  const paneRowAfter = await statement(page).locator('xpath=..').boundingBox();
 
   // A dedicated column, not a cover: the statement begins where the panel
   // ends, and it gave up exactly the width the panel took.
@@ -84,6 +88,13 @@ test('starts closed, and opens as a column that takes width from the panes', asy
   expect(Math.round(after.x)).toBe(Math.round(panelBox.width));
   expect(after.width).toBeLessThan(before!.width);
   expect(after.width).toBeGreaterThan(0);
+  // The divider keeps the same percentage of the *remaining* pane row. This
+  // catches Safari retaining a width resolved against the pre-sidebar row and
+  // taking the entire dock width from the problem alone.
+  expect(after.width / paneRowAfter!.width).toBeCloseTo(
+    before!.width / paneRowBefore!.width,
+    1,
+  );
   await expectStatementContentContained(page);
 });
 
@@ -106,6 +117,38 @@ test('is still a column at two-pane widths below the desktop breakpoint', async 
   ).toBe('static');
   expect(Math.round(statementBox.x)).toBe(Math.round(panelBox.width));
   await expectStatementContentContained(page);
+});
+
+test('keeps sample blocks inside the resized statement on Safari', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openWorkspace(page);
+  await trigger(page).click();
+  await panel(page)
+    .getByRole('button')
+    .filter({ hasText: 'Doing arithmetic' })
+    .click();
+  await panel(page)
+    .getByRole('button')
+    .filter({ hasText: 'Adding numbers' })
+    .click();
+  await panel(page)
+    .getByRole('button')
+    .filter({ hasText: 'Sum two numbers' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Sum two numbers' })).toBeVisible();
+
+  const statementBox = (await statement(page).boundingBox())!;
+  const blocks = await problem(page).locator('pre').all();
+  expect(blocks.length).toBeGreaterThan(0);
+  for (const block of blocks) {
+    const box = (await block.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(statementBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      statementBox.x + statementBox.width + 1,
+    );
+  }
 });
 
 /**

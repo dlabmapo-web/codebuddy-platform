@@ -399,7 +399,7 @@ export function Workspace({
           }
         >
           <section
-            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:w-[var(--statement-width)] md:flex-none ${
+            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:basis-[var(--statement-width)] md:flex-none ${
               mobileTab === 'problem' ? 'flex-1' : 'hidden'
             }`}
             {...surfaceProps('statement')}

@@ -366,7 +366,7 @@ export function LiveWorkspace({
           }
         >
           <div
-            className="@container min-w-0 shrink-0 overflow-x-hidden overflow-y-auto bg-white lg:w-[var(--statement-width)]"
+            className="@container min-w-0 shrink-0 basis-[var(--statement-width)] overflow-x-hidden overflow-y-auto bg-white"
             {...surfaceProps('statement')}
           >
             {shown ? (

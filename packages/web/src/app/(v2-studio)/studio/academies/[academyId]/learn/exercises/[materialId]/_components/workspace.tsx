@@ -389,19 +389,18 @@ export function Workspace({
         />
 
         <div
-          className="flex min-h-0 flex-1"
+          className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
           ref={paneContainerRef}
-          // Scoped to this container rather than an inline width, so the drag
-          // size applies only from `md:` up and the mobile tab layout is free
-          // to ignore it.
-          style={
-            { '--statement-width': `${statementWidth}%` } as React.CSSProperties
-          }
         >
           <section
-            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:basis-[var(--statement-width)] md:flex-none ${
+            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:flex-none ${
               mobileTab === 'problem' ? 'flex-1' : 'hidden'
             }`}
+            // Inline deliberately: older Safari releases can discard the
+            // Tailwind arbitrary-value selector that carried this custom
+            // property, leaving `flex: none` with an auto basis and crushing
+            // the statement against Monaco's intrinsic width.
+            style={{ flexBasis: `${statementWidth}%` }}
             {...surfaceProps('statement')}
           >
             <ProblemStatement exercise={exercise} revealedHints={revealedHints} />

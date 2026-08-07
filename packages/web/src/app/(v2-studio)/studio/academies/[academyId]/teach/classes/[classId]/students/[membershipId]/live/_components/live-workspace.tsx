@@ -359,14 +359,12 @@ export function LiveWorkspace({
         />
 
         <div
-          className="hidden min-h-0 flex-1 lg:flex"
+          className="hidden min-h-0 min-w-0 flex-1 overflow-hidden lg:flex"
           ref={paneContainerRef}
-          style={
-            { '--statement-width': `${statementWidth}%` } as React.CSSProperties
-          }
         >
           <div
-            className="@container min-w-0 shrink-0 basis-[var(--statement-width)] overflow-x-hidden overflow-y-auto bg-white"
+            className="@container min-w-0 shrink-0 overflow-x-hidden overflow-y-auto bg-white"
+            style={{ flexBasis: `${statementWidth}%` }}
             {...surfaceProps('statement')}
           >
             {shown ? (

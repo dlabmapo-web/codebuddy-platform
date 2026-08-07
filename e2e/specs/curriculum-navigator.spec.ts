@@ -81,6 +81,9 @@ test('starts closed, and opens as a column that takes width from the panes', asy
   const panelBox = (await panel(page).boundingBox())!;
   const after = (await statement(page).boundingBox())!;
   const paneRowAfter = await statement(page).locator('xpath=..').boundingBox();
+  const flexBasis = await statement(page).evaluate(
+    (node) => getComputedStyle(node).flexBasis,
+  );
 
   // A dedicated column, not a cover: the statement begins where the panel
   // ends, and it gave up exactly the width the panel took.
@@ -88,6 +91,7 @@ test('starts closed, and opens as a column that takes width from the panes', asy
   expect(Math.round(after.x)).toBe(Math.round(panelBox.width));
   expect(after.width).toBeLessThan(before!.width);
   expect(after.width).toBeGreaterThan(0);
+  expect(flexBasis).toBe('46%');
   // The divider keeps the same percentage of the *remaining* pane row. This
   // catches Safari retaining a width resolved against the pre-sidebar row and
   // taking the entire dock width from the problem alone.

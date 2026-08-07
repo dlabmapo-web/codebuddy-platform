@@ -4,6 +4,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { MonitoringAccessService } from "./monitoring-access.service.js";
+import type { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 import { MonitoringService } from "./monitoring.service.js";
 
 const identity: SupabaseIdentity = {
@@ -110,15 +111,30 @@ function materialRecord() {
   };
 }
 
-function feedbackRow(index: number) {
+function feedbackRow(index: number, author = teacherMembershipId): {
+  id: string;
+  classId: string;
+  teacherMembershipRef: string;
+  studentMembershipRef: string;
+  materialId: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+  readAt: Date | null;
+  /** Null once the membership behind the note is gone. */
+  teacherMembership: { user: { displayName: string } } | null;
+} {
   return {
     id: `f0000000-0000-4000-8000-00000000000${index}`,
     classId,
-    teacherMembershipRef: teacherMembershipId,
+    teacherMembershipRef: author,
     studentMembershipRef: studentMembershipId,
     materialId,
     body: `message ${index}`,
     createdAt: new Date(Date.UTC(2026, 7, 4, 9, index)),
+    updatedAt: new Date(Date.UTC(2026, 7, 4, 9, index)),
+    readAt: null,
+    teacherMembership: { user: { displayName: "Kim" } },
   };
 }
 
@@ -130,6 +146,8 @@ function createService(options?: {
   material?: ReturnType<typeof materialRecord> | null;
   draft?: { id: string } | null;
   feedback?: ReturnType<typeof feedbackRow>[];
+  readCount?: number;
+  studentSelfError?: AppException;
 }) {
   const prisma = {
     class: {
@@ -155,6 +173,9 @@ function createService(options?: {
     },
     teacherFeedback: {
       findMany: vi.fn().mockResolvedValue(options?.feedback ?? []),
+      updateMany: vi
+        .fn()
+        .mockResolvedValue({ count: options?.readCount ?? 0 }),
     },
   } as unknown as PrismaService;
 
@@ -184,17 +205,39 @@ function createService(options?: {
     }),
     assignedClassScope: vi.fn().mockReturnValue(classScope),
     monitoredMaterialScope: vi.fn().mockReturnValue({ AND: [] }),
+    requireStudentSelf: vi.fn().mockImplementation(() =>
+      options?.studentSelfError
+        ? Promise.reject(options.studentSelfError)
+        : Promise.resolve({
+            academyId,
+            membershipId: studentMembershipId,
+            userId: studentUserId,
+          })
+    ),
   } as unknown as MonitoringAccessService;
 
+  // Attached to nothing, so a read receipt is a no-op here. The broadcast is
+  // best-effort by design and is covered in the broadcaster's own tests.
+  const broadcaster = {
+    feedbackRead: vi.fn().mockResolvedValue(undefined),
+  } as unknown as MonitoringFeedbackBroadcaster;
+
   return {
-    service: new MonitoringService(prisma, access),
+    service: new MonitoringService(prisma, access, broadcaster),
+    broadcaster: broadcaster as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >,
     prisma: prisma as unknown as {
       class: {
         findMany: ReturnType<typeof vi.fn>;
         findFirstOrThrow: ReturnType<typeof vi.fn>;
       };
       material: { findFirst: ReturnType<typeof vi.fn> };
-      teacherFeedback: { findMany: ReturnType<typeof vi.fn> };
+      teacherFeedback: {
+        findMany: ReturnType<typeof vi.fn>;
+        updateMany: ReturnType<typeof vi.fn>;
+      };
     },
     access: access as unknown as Record<string, ReturnType<typeof vi.fn>>,
   };
@@ -384,7 +427,7 @@ describe("getStudentContext", () => {
 });
 
 describe("listFeedback", () => {
-  it("returns stored messages without naming their author", async () => {
+  it("returns stored notes with their author named", async () => {
     const { service } = createService({ feedback: [feedbackRow(1)] });
     const result = await service.listFeedback(identity, {
       academyId,
@@ -400,6 +443,9 @@ describe("listFeedback", () => {
       materialId,
       body: "message 1",
       createdAt: feedbackRow(1).createdAt.toISOString(),
+      updatedAt: feedbackRow(1).updatedAt.toISOString(),
+      readAt: null,
+      teacherName: "Kim",
     });
     expect(result.feedback[0]).not.toHaveProperty("displayName");
   });
@@ -423,30 +469,56 @@ describe("listFeedback", () => {
     );
   });
 
-  it("reads one row past the page to decide whether more exist", async () => {
-    const { service, prisma } = createService({
-      feedback: [feedbackRow(1), feedbackRow(2), feedbackRow(3)],
+  /**
+   * Rows written before notes became singular are still on disk. The read
+   * collapses them rather than deleting them, so a student is shown the
+   * teacher's current advice and not every wording it has ever had.
+   */
+  it("returns only the newest note per author", async () => {
+    const { service } = createService({
+      // Newest first, as the query orders them.
+      feedback: [feedbackRow(3), feedbackRow(2), feedbackRow(1)],
     });
     const result = await service.listFeedback(identity, {
       academyId,
       classId,
       membershipId: studentMembershipId,
-      limit: 2,
+      limit: 50,
     });
-    expect(prisma.teacherFeedback.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 3 }),
-    );
-    expect(result.feedback).toHaveLength(2);
-    expect(result.nextBefore).toBe(feedbackRow(2).createdAt.toISOString());
+    expect(result.feedback).toHaveLength(1);
+    expect(result.feedback[0]!.body).toBe("message 3");
   });
 
-  it("ends the history rather than paging forever", async () => {
-    const { service } = createService({ feedback: [feedbackRow(1)] });
+  it("keeps one note for each teacher who wrote one", async () => {
+    const otherTeacher = "40000000-0000-4000-8000-000000000002";
+    const { service } = createService({
+      feedback: [
+        feedbackRow(3),
+        feedbackRow(2, otherTeacher),
+        feedbackRow(1),
+      ],
+    });
     const result = await service.listFeedback(identity, {
       academyId,
       classId,
       membershipId: studentMembershipId,
-      limit: 2,
+      limit: 50,
+    });
+    expect(result.feedback.map((note) => note.body)).toEqual([
+      "message 3",
+      "message 2",
+    ]);
+  });
+
+  it("never pages: the result is bounded by authors, not by volume", async () => {
+    const { service } = createService({
+      feedback: [feedbackRow(3), feedbackRow(2), feedbackRow(1)],
+    });
+    const result = await service.listFeedback(identity, {
+      academyId,
+      classId,
+      membershipId: studentMembershipId,
+      limit: 1,
     });
     expect(result.nextBefore).toBeNull();
   });
@@ -477,5 +549,146 @@ describe("listFeedback", () => {
         limit: 50,
       }),
     ).rejects.toMatchObject({ code: "MONITORING_DISABLED" });
+  });
+});
+
+describe("listMyFeedback", () => {
+  it("selects on the caller's own membership, resolved from their identity", async () => {
+    const { service, prisma, access } = createService({
+      feedback: [feedbackRow(1)],
+    });
+    await service.listMyFeedback(identity, { academyId, limit: 50 });
+
+    expect(access.requireStudentSelf).toHaveBeenCalledWith(identity, academyId);
+    expect(prisma.teacherFeedback.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          studentMembershipRef: studentMembershipId,
+          academyId,
+        }),
+      }),
+    );
+  });
+
+  /**
+   * The authorization property this endpoint exists to hold: a student cannot
+   * name a thread. There is no membership parameter, so an extra field in the
+   * request cannot become one.
+   */
+  it("ignores a membership smuggled into the input", async () => {
+    const { service, prisma } = createService();
+    // Held in a variable rather than written inline: the extra field is not
+    // part of the input type, and the point of the test is that a forged
+    // client can send it anyway. The query must be built without it.
+    const forged = {
+      academyId,
+      limit: 50,
+      membershipId: teacherMembershipId,
+    };
+    await service.listMyFeedback(identity, forged);
+
+    const where = prisma.teacherFeedback.findMany.mock.calls[0]![0].where;
+    expect(where.studentMembershipRef).toBe(studentMembershipId);
+    expect(where).not.toHaveProperty("membershipId");
+  });
+
+  it("names the author, so the student knows who advised them", async () => {
+    const { service } = createService({ feedback: [feedbackRow(1)] });
+    const result = await service.listMyFeedback(identity, {
+      academyId,
+      limit: 50,
+    });
+    expect(result.feedback[0]!.teacherName).toBe("Kim");
+  });
+
+  it("reports a null name when the author's membership is gone", async () => {
+    const orphan = { ...feedbackRow(1), teacherMembership: null };
+    const { service } = createService({ feedback: [orphan] });
+    const result = await service.listMyFeedback(identity, {
+      academyId,
+      limit: 50,
+    });
+    // The advice outlives the row behind its author; the name does not.
+    expect(result.feedback[0]!.teacherName).toBeNull();
+  });
+
+  it("refuses a caller who is not an active student of the academy", async () => {
+    const { service } = createService({
+      studentSelfError: new AppException("MONITORING_ACCESS_DENIED", 403),
+    });
+    await expect(
+      service.listMyFeedback(identity, { academyId, limit: 50 }),
+    ).rejects.toMatchObject({ code: "MONITORING_ACCESS_DENIED" });
+  });
+
+  it("refuses while the academy is outside the rollout", async () => {
+    const { service } = createService({ featureEnabled: false });
+    await expect(
+      service.listMyFeedback(identity, { academyId, limit: 50 }),
+    ).rejects.toMatchObject({ code: "MONITORING_DISABLED" });
+  });
+});
+
+describe("markMyFeedbackRead", () => {
+  it("stamps only the caller's own unread rows for that exercise", async () => {
+    const { service, prisma } = createService({ readCount: 2 });
+    const result = await service.markMyFeedbackRead(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(prisma.teacherFeedback.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          academyId,
+          studentMembershipRef: studentMembershipId,
+          materialId,
+          readAt: null,
+        }),
+      }),
+    );
+    expect(result.readCount).toBe(2);
+  });
+
+  it("is idempotent: a second call stamps nothing", async () => {
+    const { service } = createService({ readCount: 0 });
+    const result = await service.markMyFeedbackRead(identity, {
+      academyId,
+      materialId,
+    });
+    expect(result.readCount).toBe(0);
+  });
+
+  it("announces the read to a watching teacher", async () => {
+    const { service, broadcaster } = createService({ readCount: 1 });
+    await service.markMyFeedbackRead(identity, { academyId, materialId });
+    expect(broadcaster.feedbackRead).toHaveBeenCalledWith({
+      academyId,
+      studentUserId,
+      materialId,
+      readCount: 1,
+    });
+  });
+
+  /**
+   * The panel must open whether or not anybody is listening. A receipt that
+   * could fail the student's own read would make the socket a dependency of
+   * an HTTP write that has already committed.
+   */
+  it("succeeds when the broadcast fails", async () => {
+    const { service, broadcaster } = createService({ readCount: 1 });
+    broadcaster.feedbackRead.mockRejectedValue(new Error("no server"));
+    await expect(
+      service.markMyFeedbackRead(identity, { academyId, materialId }),
+    ).resolves.toEqual({ readCount: 1 });
+  });
+
+  it("refuses a caller who is not an active student of the academy", async () => {
+    const { service } = createService({
+      studentSelfError: new AppException("MONITORING_ACCESS_DENIED", 403),
+    });
+    await expect(
+      service.markMyFeedbackRead(identity, { academyId, materialId }),
+    ).rejects.toMatchObject({ code: "MONITORING_ACCESS_DENIED" });
   });
 });

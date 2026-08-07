@@ -8,11 +8,13 @@ import {
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
 import {
   MonitoringAccessService,
   type MonitoringClassClaim,
 } from "./monitoring-access.service.js";
+import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 
 /**
  * The durable reads behind live monitoring.
@@ -28,6 +30,7 @@ export class MonitoringService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: MonitoringAccessService,
+    private readonly broadcaster: MonitoringFeedbackBroadcaster,
   ) {}
 
   /**
@@ -212,12 +215,12 @@ export class MonitoringService {
   }
 
   /**
-   * The feedback history for one student in one class, newest first.
+   * The current notes on one student, newest first — one per teacher.
    *
    * Read through the same access claim as the live workspace, so a teacher who
-   * loses the assignment loses the history with it. Rows are matched on the
-   * immutable membership reference: a message stays readable after the
-   * membership row behind it is gone.
+   * loses the assignment loses the notes with it. Rows are matched on the
+   * immutable membership reference: a note stays readable after the membership
+   * row behind it is gone.
    */
   async listFeedback(
     identity: SupabaseIdentity,
@@ -242,42 +245,91 @@ export class MonitoringService {
         classId: claim.classId,
         studentMembershipRef: student.studentMembershipId,
         ...(input.materialId ? { materialId: input.materialId } : {}),
-        ...(input.before ? { createdAt: { lt: new Date(input.before) } } : {}),
       },
-      select: {
-        id: true,
-        classId: true,
-        teacherMembershipRef: true,
-        studentMembershipRef: true,
-        materialId: true,
-        body: true,
-        createdAt: true,
-      },
+      select: feedbackSelection,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      // One extra row answers "is there more" without a second count query.
-      take: input.limit + 1,
+      take: monitoringLimits.feedbackPageSize,
     });
 
-    const page = rows.slice(0, input.limit);
-    return {
-      feedback: page.map((row) => ({
-        id: row.id,
-        classId: row.classId,
-        // No author name: the student is told a teacher is monitoring, never
-        // which one, and a named message would hand back what the indicator
-        // withholds. The teacher's own client matches this against the
-        // membership it is signed in as.
-        teacherMembershipRef: row.teacherMembershipRef,
-        studentMembershipRef: row.studentMembershipRef,
-        materialId: row.materialId,
-        body: row.body,
-        createdAt: row.createdAt.toISOString(),
-      })),
-      nextBefore:
-        rows.length > input.limit && page.length > 0
-          ? page[page.length - 1]!.createdAt.toISOString()
-          : null,
-    };
+    return currentNotes(rows, input.limit);
+  }
+
+  /**
+   * The notes a student currently has, newest first — one per teacher.
+   *
+   * The recipient's read, not the author's. Rows are selected on the caller's
+   * own membership reference — resolved from their identity, never accepted as
+   * input — so there is no argument to this method capable of naming another
+   * student's notes.
+   *
+   * Not scoped to a class: a student enrolled in two classes experiences one
+   * exercise, not two, and splitting their notes by which class the teacher
+   * happened to write from would be an implementation detail surfacing as a
+   * feature.
+   */
+  async listMyFeedback(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      materialId?: string;
+      limit: number;
+      before?: string;
+    },
+  ): Promise<{ feedback: MonitoringFeedback[]; nextBefore: string | null }> {
+    await this.access.requireFeature(input.academyId);
+    const self = await this.access.requireStudentSelf(identity, input.academyId);
+
+    const rows = await this.prisma.teacherFeedback.findMany({
+      where: {
+        academyId: input.academyId,
+        studentMembershipRef: self.membershipId,
+        ...(input.materialId ? { materialId: input.materialId } : {}),
+      },
+      select: feedbackSelection,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: monitoringLimits.feedbackPageSize,
+    });
+
+    return currentNotes(rows, input.limit);
+  }
+
+  /**
+   * Marks one exercise's thread read.
+   *
+   * Idempotent by construction: already-read rows fail the `readAt: null`
+   * predicate, so a second call updates nothing and reports zero rather than
+   * restamping a timestamp the teacher may already have seen.
+   */
+  async markMyFeedbackRead(
+    identity: SupabaseIdentity,
+    input: { academyId: string; materialId: string },
+  ): Promise<{ readCount: number }> {
+    await this.access.requireFeature(input.academyId);
+    const self = await this.access.requireStudentSelf(identity, input.academyId);
+
+    const result = await this.prisma.teacherFeedback.updateMany({
+      where: {
+        academyId: input.academyId,
+        studentMembershipRef: self.membershipId,
+        materialId: input.materialId,
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+
+    // Best-effort, and deliberately after the write has already committed: the
+    // student's panel must open whether or not a teacher is listening, so a
+    // broadcast failure cannot become their error.
+    await this.broadcaster
+      .feedbackRead({
+        academyId: input.academyId,
+        studentUserId: self.userId,
+        materialId: input.materialId,
+        readCount: result.count,
+      })
+      .catch(() => undefined);
+
+    return { readCount: result.count };
   }
 
   /** Feature, teacher, and assignment, in the order that leaks the least. */
@@ -386,4 +438,76 @@ export class MonitoringService {
       draftId: draft?.id ?? null,
     };
   }
+}
+
+const feedbackSelection = {
+  id: true,
+  classId: true,
+  teacherMembershipRef: true,
+  // The author's name, through the membership rather than stored on the note:
+  // a teacher who changes their display name changes it on past notes too.
+  teacherMembership: { select: { user: { select: { displayName: true } } } },
+  studentMembershipRef: true,
+  materialId: true,
+  body: true,
+  createdAt: true,
+  updatedAt: true,
+  readAt: true,
+} as const;
+
+/**
+ * Derived from the selection rather than restated.
+ *
+ * A hand-written copy drifts the moment a field is added to `feedbackSelection`
+ * — and it drifts into a type error somewhere unrelated, which is exactly what
+ * happened the first time the author's name was selected here.
+ */
+type FeedbackRow = Prisma.TeacherFeedbackGetPayload<{
+  select: typeof feedbackSelection;
+}>;
+
+/**
+ * Collapses stored rows to the note each teacher currently has standing.
+ *
+ * A teacher now writes one note per student per exercise and rewrites it in
+ * place, but rows written before that are still in the table. Rather than
+ * delete them, the newest row per author wins and the superseded ones simply
+ * stop being returned — the history stays on disk, and nobody is shown a
+ * transcript of every time a sentence was reworded.
+ *
+ * Rows arrive newest-first, so the first sighting of an author is their
+ * current note.
+ */
+function currentNotes(
+  rows: readonly FeedbackRow[],
+  limit: number,
+): { feedback: MonitoringFeedback[]; nextBefore: string | null } {
+  const seenAuthors = new Set<string>();
+  const current: MonitoringFeedback[] = [];
+
+  for (const row of rows) {
+    // Keyed on author *and* exercise: one teacher legitimately has a separate
+    // note on every exercise the student is working through.
+    const author = `${row.teacherMembershipRef}:${row.materialId ?? ""}`;
+    if (seenAuthors.has(author)) continue;
+    seenAuthors.add(author);
+    current.push({
+      id: row.id,
+      classId: row.classId,
+      teacherMembershipRef: row.teacherMembershipRef,
+      // Named: a written note is attributable, unlike the live indicator.
+      teacherName: row.teacherMembership?.user.displayName ?? null,
+      studentMembershipRef: row.studentMembershipRef,
+      materialId: row.materialId,
+      body: row.body,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      readAt: row.readAt?.toISOString() ?? null,
+    });
+    if (current.length === limit) break;
+  }
+
+  // Always null: the result is bounded by how many teachers have written, not
+  // by how much they have written, so there is no second page to fetch.
+  return { feedback: current, nextBefore: null };
 }

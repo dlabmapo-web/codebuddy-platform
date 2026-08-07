@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import {
   listFeedbackInputSchema,
+  listMyFeedbackInputSchema,
+  markMyFeedbackReadInputSchema,
   monitoringAcademyInputSchema,
   monitoringClassInputSchema,
   monitoringClassRosterSchema,
@@ -51,4 +53,21 @@ export const monitoringContract = {
       nextBefore: z.iso.datetime().nullable(),
     }),
   ),
+  /**
+   * The student's own feedback, for the student.
+   *
+   * The only operation in this contract that does not answer to an assigned
+   * teacher: it answers to the recipient. It reads through the caller's
+   * identity and takes no membership, so the authorization here shares nothing
+   * with `listFeedback` beyond the row shape it returns.
+   */
+  listMyFeedback: oc.input(listMyFeedbackInputSchema).output(
+    z.object({
+      feedback: z.array(monitoringFeedbackSchema),
+      nextBefore: z.iso.datetime().nullable(),
+    }),
+  ),
+  markMyFeedbackRead: oc
+    .input(markMyFeedbackReadInputSchema)
+    .output(z.object({ readCount: z.number().int().nonnegative() })),
 };

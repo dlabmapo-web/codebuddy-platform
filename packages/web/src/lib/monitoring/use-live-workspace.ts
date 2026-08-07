@@ -241,11 +241,37 @@ export function useLiveWorkspace({
     if (!socket) return;
     const onRun = (event: RunActivityPayload) => setRun(event);
     const onResult = (event: ResultChangedEvent) => setResult(event);
+    /**
+     * Replaced by id, not appended.
+     *
+     * A teacher rewrites their note in place, so a revision comes back under
+     * the id it already had. Skipping ids already present — which is what this
+     * did while notes were append-only — would leave the dock showing the
+     * wording the teacher just replaced.
+     */
     const onFeedback = (event: FeedbackCreatedEvent) => {
+      setFeedback((current) => {
+        const index = current.findIndex((item) => item.id === event.feedback.id);
+        if (index === -1) return [...current, event.feedback];
+        const next = [...current];
+        next[index] = event.feedback;
+        return next;
+      });
+    };
+    /**
+     * The student opened the thread.
+     *
+     * Stamps every message the teacher can see rather than the ids in the
+     * event, which carries a count and no identifiers — the student read the
+     * exercise's thread, and that is the whole of what the teacher is told.
+     */
+    const onFeedbackRead = (event: { readAt: string }) => {
       setFeedback((current) =>
-        current.some((item) => item.id === event.feedback.id)
+        current.every((item) => item.readAt !== null)
           ? current
-          : [...current, event.feedback],
+          : current.map((item) =>
+              item.readAt === null ? { ...item, readAt: event.readAt } : item,
+            ),
       );
     };
     const onEnded = (event: WatchEndedEvent) => {
@@ -257,11 +283,13 @@ export function useLiveWorkspace({
     socket.on(monitoringServerEvents.runChanged, onRun);
     socket.on(monitoringServerEvents.resultChanged, onResult);
     socket.on(monitoringServerEvents.feedbackCreated, onFeedback);
+    socket.on(monitoringServerEvents.feedbackRead, onFeedbackRead);
     socket.on(monitoringServerEvents.watchEnded, onEnded);
     return () => {
       socket.off(monitoringServerEvents.runChanged, onRun);
       socket.off(monitoringServerEvents.resultChanged, onResult);
       socket.off(monitoringServerEvents.feedbackCreated, onFeedback);
+      socket.off(monitoringServerEvents.feedbackRead, onFeedbackRead);
       socket.off(monitoringServerEvents.watchEnded, onEnded);
     };
   }, [socket]);

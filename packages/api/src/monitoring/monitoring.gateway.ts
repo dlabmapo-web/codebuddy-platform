@@ -58,6 +58,7 @@ import {
   monitoringLogLine,
   toPublicErrorCode,
 } from "./monitoring-event-mapper.js";
+import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 import { MonitoringFeedbackService } from "./monitoring-feedback.service.js";
 import { MonitoringMetricsService } from "./monitoring-metrics.service.js";
 import { MonitoringRevocationService } from "./monitoring-revocation.service.js";
@@ -178,6 +179,7 @@ export class MonitoringGateway
     private readonly activeWatches: ActiveWatchRegistry,
     private readonly visits: MonitoringVisitService,
     private readonly feedback: MonitoringFeedbackService,
+    private readonly feedbackBroadcaster: MonitoringFeedbackBroadcaster,
     private readonly revocation: MonitoringRevocationService,
     private readonly metrics: MonitoringMetricsService,
   ) {}
@@ -212,6 +214,10 @@ export class MonitoringGateway
     // Revocation needs to reach rooms on every instance, which is the adapter's
     // job — so it borrows the server rather than opening its own channel.
     this.revocation.attach(server);
+    // The read receipt travels the same way, and for the same reason: the
+    // student's read is an HTTP write on whichever instance served it, and the
+    // watching teacher may be connected to another one.
+    this.feedbackBroadcaster.attach(server);
     // Persistence is announced separately from convergence, so the editor's
     // unsaved indicator answers to Postgres rather than to an acknowledgement.
     this.documents.onFlush((event) => {
@@ -917,7 +923,7 @@ export class MonitoringGateway
         // a minute is long enough to have lost the class.
         await this.revalidate(socket, watch.claim);
 
-        const record = await this.feedback.create(watch.claim, {
+        const record = await this.feedback.upsert(watch.claim, {
           idempotencyKey: payload.idempotencyKey,
           body: payload.body,
           visitId: watch.visitId,

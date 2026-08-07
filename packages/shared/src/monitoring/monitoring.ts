@@ -624,22 +624,34 @@ export const feedbackBodySchema = z
   .max(monitoringLimits.feedbackMaxLength);
 
 /**
- * A stored feedback message.
+ * A stored feedback note.
  *
- * Deliberately without the author's name. The student is told a teacher is
- * monitoring, never which one, and a message that named its author would
- * hand back exactly what the indicator withholds. The teacher's own client
- * recognizes its own messages by comparing `teacherMembershipRef` with the
- * membership it is signed in as.
+ * The author is named. A written note is a deliberate, attributable act — the
+ * student is told who advised them, exactly as they were before v2 — while the
+ * live monitoring indicator stays generic, because passive observation is a
+ * different thing from signing your name to advice.
  */
 export const monitoringFeedbackSchema = z.object({
   id: z.uuid(),
   classId: z.uuid(),
   teacherMembershipRef: z.uuid(),
+  /**
+   * Who wrote it. Null once the membership behind the note is gone — the note
+   * outlives its author's row, so the name has to be allowed to disappear
+   * without taking the advice with it.
+   */
+  teacherName: z.string().nullable(),
   studentMembershipRef: z.uuid(),
   materialId: z.uuid().nullable(),
   body: z.string(),
   createdAt: z.iso.datetime(),
+  /**
+   * When the note last changed. Equal to `createdAt` until the teacher
+   * rewrites it, which is what the student's timestamp should show.
+   */
+  updatedAt: z.iso.datetime(),
+  /** Null until the student opens it. Cleared again when the note is rewritten. */
+  readAt: z.iso.datetime().nullable(),
 });
 export type MonitoringFeedback = z.infer<typeof monitoringFeedbackSchema>;
 
@@ -676,6 +688,32 @@ export const listFeedbackInputSchema = monitoringStudentInputSchema.extend({
   /** Keyset paging on `createdAt`; feedback is append-only. */
   before: z.iso.datetime().optional(),
 });
+
+/**
+ * The student reading their own feedback.
+ *
+ * Deliberately not an extension of `listFeedbackInputSchema`, and deliberately
+ * without a membership field. The caller's membership is resolved from their
+ * identity on the server; accepting one here would let a student name somebody
+ * else's. Kept as a separate declaration so the teacher's input can never grow
+ * a field that silently reaches this endpoint.
+ */
+export const listMyFeedbackInputSchema = monitoringAcademyInputSchema.extend({
+  materialId: z.uuid().optional(),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(monitoringLimits.feedbackPageSize)
+    .default(monitoringLimits.feedbackPageSize),
+  before: z.iso.datetime().optional(),
+});
+
+/** Marks one exercise's thread read. Scoped to the caller, same as above. */
+export const markMyFeedbackReadInputSchema =
+  monitoringAcademyInputSchema.extend({
+    materialId: z.uuid(),
+  });
 
 /* ------------------------------------------------------- visit lifecycle */
 

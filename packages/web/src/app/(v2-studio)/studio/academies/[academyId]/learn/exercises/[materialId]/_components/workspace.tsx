@@ -8,6 +8,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { RemotePointer } from '@/components/monitoring/remote-pointer';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { useStudentFeedback } from '@/lib/monitoring/use-student-feedback';
 import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
@@ -17,6 +18,7 @@ import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { useExerciseNavigation } from '../_hooks/use-exercise-navigation';
 import { useSubmission } from '../_hooks/use-submission';
 import { EditorPane, type OutputTab } from './editor-pane';
+import { FeedbackPanel } from './feedback-panel';
 import { MonitoringIndicator } from './monitoring-indicator';
 import { WorkspaceHeader } from './workspace-header';
 
@@ -75,6 +77,14 @@ export function Workspace({
       readTranscript: runner.readTranscript,
       subscribeTerminal: runner.subscribeTerminal,
     },
+  });
+
+  // The written half of monitoring, on the same connection: a second socket
+  // would rejoin the student's rooms and double every event this page sees.
+  const feedback = useStudentFeedback({
+    academyId,
+    materialId: exercise.materialId,
+    socket: monitoring.socket,
   });
 
   // Destructured rather than kept as objects: reading `.containerRef` off a
@@ -220,6 +230,15 @@ export function Workspace({
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader
           academyId={academyId}
+          feedback={
+            <FeedbackPanel
+              isHighlighted={feedback.isHighlighted}
+              messages={feedback.messages}
+              onOpenChange={feedback.setOpen}
+              open={feedback.open}
+              unreadCount={feedback.unreadCount}
+            />
+          }
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
           navigating={navigating}
           hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}

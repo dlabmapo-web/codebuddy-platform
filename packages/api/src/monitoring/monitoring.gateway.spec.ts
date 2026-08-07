@@ -85,6 +85,7 @@ function createGateway(overrides?: {
     visits as never,
     absent,
     absent,
+    absent,
     metrics as never,
   );
   gateway.server = server;

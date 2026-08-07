@@ -29,5 +29,15 @@ export function createMonitoringRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.monitoringService.listFeedback(context.identity, input)
       ),
+    listMyFeedback: os.monitoring.listMyFeedback
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.monitoringService.listMyFeedback(context.identity, input)
+      ),
+    markMyFeedbackRead: os.monitoring.markMyFeedbackRead
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.monitoringService.markMyFeedbackRead(context.identity, input)
+      ),
   };
 }

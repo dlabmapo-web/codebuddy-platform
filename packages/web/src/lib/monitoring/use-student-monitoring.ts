@@ -327,6 +327,14 @@ export function useStudentMonitoring({
       editorRef.current = instance;
       setEditor(instance);
     },
+    /**
+     * Shared with the feedback thread, which listens on the same connection.
+     *
+     * Exposed rather than opened twice: `useMonitoringSocket` creates a socket
+     * per call, and a second one would join the student's rooms again and
+     * double every event the page receives.
+     */
+    socket,
   };
 }
 

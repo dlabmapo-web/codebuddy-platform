@@ -43,11 +43,17 @@ export function WorkspaceHeader({
   submitting,
   hintsRemaining,
   indicator,
+  feedback,
 }: {
   academyId: string;
   workspace: LearnExerciseWorkspace;
   /** The generic "a teacher is here" badge, or nothing when nobody is. */
   indicator?: React.ReactNode;
+  /**
+   * The teacher's written notes. Renders nothing until one exists, so an
+   * unwatched student's header is exactly the header it always was.
+   */
+  feedback?: React.ReactNode;
   saveState: DraftSaveState;
   onNavigate: (materialId: string) => void;
   navigating: boolean;
@@ -89,7 +95,11 @@ export function WorkspaceHeader({
         </div>
       </div>
 
+      {/* Kept beside the indicator: both say something about the teacher, and
+          a note is easiest to connect to "somebody is watching" when the two
+          sit together rather than at opposite ends of the bar. */}
       {indicator}
+      {feedback}
 
       <ExerciseTimer key={exercise.materialId} />
 

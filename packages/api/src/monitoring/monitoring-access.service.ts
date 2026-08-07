@@ -133,6 +133,37 @@ export class MonitoringAccessService {
     return assignedClassWhere(actor);
   }
 
+  /**
+   * The caller as a student of this academy.
+   *
+   * The counterpart to `requireTeacher`, and the only authorization a student
+   * reading their own feedback needs. It takes no membership id — the identity
+   * is the subject, so there is no parameter here that could name somebody
+   * else. Returns the membership id every student-owned row is keyed on.
+   */
+  async requireStudentSelf(
+    identity: SupabaseIdentity,
+    academyId: string,
+  ): Promise<{ academyId: string; membershipId: string; userId: string }> {
+    const membership = await this.prisma.academyMembership.findFirst({
+      where: {
+        academyId,
+        role: "STUDENT",
+        status: "ACTIVE",
+        user: { authUserId: identity.authUserId, status: "ACTIVE" },
+      },
+      select: { id: true, userId: true },
+    });
+    if (!membership) {
+      throw new AppException("MONITORING_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+    return {
+      academyId,
+      membershipId: membership.id,
+      userId: membership.userId,
+    };
+  }
+
   async requireMonitorableStudent(
     claim: MonitoringClassClaim,
     studentMembershipId: string,

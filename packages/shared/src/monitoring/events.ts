@@ -304,6 +304,8 @@ export const monitoringServerEvents = {
   runChanged: "run.changed",
   resultChanged: "result.changed",
   feedbackCreated: "feedback.created",
+  /** The student opened the thread. Sent only to a watching teacher. */
+  feedbackRead: "feedback.read",
   accessRevoked: "access.revoked",
   serverDegraded: "server.degraded",
   studentIndicator: "student.indicator",

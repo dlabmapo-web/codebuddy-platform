@@ -781,9 +781,21 @@ model TeacherFeedback {
   monitoringVisitId    String?  @map("monitoring_visit_id") @db.Uuid
   /// Client-generated per send. Scoped to the author, so two teachers cannot
   /// collide and one teacher's retry cannot overwrite another's message.
-  idempotencyKey       String   @map("idempotency_key") @db.Uuid
+  idempotencyKey       String    @map("idempotency_key") @db.Uuid
   body                 String
-  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// When the teacher last rewrote this note.
+  ///
+  /// A teacher gets one note per student per exercise and edits it in place,
+  /// so the row outlives its original wording. Equal to `createdAt` until the
+  /// first rewrite.
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// When the student opened the thread this message was in.
+  ///
+  /// Null is unread. One column answers both halves of the question: the
+  /// student's badge counts nulls, and the teacher learns whether the sentence
+  /// they wrote was actually read. Never set by the author.
+  readAt               DateTime? @map("read_at") @db.Timestamptz(6)
 
   academy           Academy                 @relation(fields: [academyId], references: [id], onDelete: Restrict)
   class             Class                   @relation(fields: [classId], references: [id], onDelete: Restrict)
@@ -796,6 +808,8 @@ model TeacherFeedback {
   /// The student's own history, and one exercise's thread inside it.
   @@index([studentMembershipRef, createdAt(sort: Desc)])
   @@index([studentMembershipRef, materialId, createdAt(sort: Desc)], map: "teacher_feedback_student_material_created_at_idx")
+  /// The one note this teacher already wrote this student for this exercise.
+  @@index([teacherMembershipRef, studentMembershipRef, materialId, createdAt(sort: Desc)], map: "teacher_feedback_author_thread_idx")
   @@map("teacher_feedback")
 }
 

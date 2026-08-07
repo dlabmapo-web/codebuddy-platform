@@ -4,6 +4,7 @@ import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
 import { MonitoringAccessService } from "./monitoring-access.service.js";
+import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 import { MonitoringFeedbackService } from "./monitoring-feedback.service.js";
 import { MonitoringGateway } from "./monitoring.gateway.js";
 import { MonitoringRevocationModule } from "./monitoring-revocation.module.js";
@@ -31,6 +32,7 @@ import { PresenceRegistry } from "./presence.registry.js";
     PresenceRegistry,
     CollaborationDocumentService,
     MonitoringFeedbackService,
+    MonitoringFeedbackBroadcaster,
     MonitoringGateway,
   ],
   exports: [MonitoringAccessService, MonitoringService, MonitoringRevocationModule],

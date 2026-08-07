@@ -29,6 +29,19 @@ import {
 } from './pointer-lifecycle';
 import { resolvePointerSurface, toSurfaceFraction } from './surfaces';
 
+/**
+ * One sequence across every exercise hook that reuses an academy socket.
+ * A component-local counter would restart after navigation while the server's
+ * connection-local high-water mark correctly remains in place.
+ */
+const awarenessSequences = new WeakMap<Socket, number>();
+
+function nextAwarenessSequence(socket: Socket): number {
+  const sequence = (awarenessSequences.get(socket) ?? -1) + 1;
+  awarenessSequences.set(socket, sequence);
+  return sequence;
+}
+
 export type RemoteAwareness = {
   cursor: CollaborationCursor | null;
   pointer: CollaborationPointer | null;
@@ -150,6 +163,7 @@ export function useAwareness({
       const channel = reliable ? socket : socket.volatile;
       channel.emit(monitoringClientEvents.awarenessUpdate, {
         draftId: currentDraft,
+        sequence: nextAwarenessSequence(socket),
         cursor: cursorRef.current,
         pointer: pointerRef.current,
       });
@@ -221,6 +235,21 @@ export function useAwareness({
   );
 
   React.useEffect(() => {
+    if (!socket) return;
+    const restoreAfterReconnect = () => {
+      // The gateway clears awareness as soon as a transport ends. Socket.IO
+      // may recover the room moments later, so reassert the last meaningful
+      // state instead of leaving the peer with a false absence until the local
+      // person happens to move again.
+      if (draftRef.current) send(true);
+    };
+    socket.on('connect', restoreAfterReconnect);
+    return () => {
+      socket.off('connect', restoreAfterReconnect);
+    };
+  }, [send, socket]);
+
+  React.useEffect(() => {
     if (!socket || !draftId || typeof document === 'undefined') return;
 
     const publishPoint = (
@@ -271,6 +300,7 @@ export function useAwareness({
       cursorRef.current = null;
       socket.emit(monitoringClientEvents.awarenessUpdate, {
         draftId,
+        sequence: nextAwarenessSequence(socket),
         cursor: null,
         pointer: null,
       });

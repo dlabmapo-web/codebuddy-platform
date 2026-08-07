@@ -6,12 +6,26 @@ import {
   shouldPublishActivity,
 } from '@cove/shared';
 import * as React from 'react';
+import type { Socket } from 'socket.io-client';
 
+import type {
+  ConnectionEvent,
+  MonitoringConnectionState,
+} from './connection';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
 type OpenMaterial = { materialId: string; courseId: string | null };
 
 type StudentPresence = {
+  /**
+   * The student's one academy-scoped realtime connection.
+   *
+   * Collaboration consumers attach to this same socket so the private room
+   * joined by presence is also the room on which they hear watch events.
+   */
+  socket: Socket | null;
+  state: MonitoringConnectionState;
+  report: (event: ConnectionEvent) => void;
   /**
    * What the student has open, for as long as the page holding it is mounted.
    * Null everywhere else, which is what the roster reads as Online.
@@ -28,6 +42,9 @@ type StudentPresence = {
  * signal it was never going to send.
  */
 const noop: StudentPresence = {
+  socket: null,
+  state: 'connecting',
+  report: () => undefined,
   setOpenMaterial: () => undefined,
   markActive: () => undefined,
 };
@@ -57,7 +74,7 @@ export function StudentPresenceProvider({
   academyId: string;
   children: React.ReactNode;
 }) {
-  const { socket } = useMonitoringSocket();
+  const { socket, state, report } = useMonitoringSocket();
   const materialRef = React.useRef<OpenMaterial | null>(null);
   const activeRef = React.useRef(false);
   const visibilityRef = React.useRef<'VISIBLE' | 'HIDDEN'>('VISIBLE');
@@ -132,8 +149,8 @@ export function StudentPresenceProvider({
   }, [academyId, markActive, socket]);
 
   const value = React.useMemo(
-    () => ({ markActive, setOpenMaterial }),
-    [markActive, setOpenMaterial],
+    () => ({ markActive, report, setOpenMaterial, socket, state }),
+    [markActive, report, setOpenMaterial, socket, state],
   );
 
   return (

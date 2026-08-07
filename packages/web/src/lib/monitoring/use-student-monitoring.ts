@@ -17,7 +17,6 @@ import { attachRemoteCursor, readCursor } from './awareness/remote-cursor';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor } from './yjs-monaco';
 import { useStudentPresence } from './student-presence';
-import { useMonitoringSocket } from './use-monitoring-socket';
 import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
 
 /**
@@ -62,7 +61,12 @@ export function useStudentMonitoring({
    */
   teacherLabel: string;
 }) {
-  const { socket, state } = useMonitoringSocket();
+  const {
+    markActive,
+    setOpenMaterial,
+    socket,
+    state,
+  } = useStudentPresence();
   const [indicator, setIndicator] = React.useState<StudentIndicatorState>('NONE');
   const [draftId, setDraftId] = React.useState<string | null>(null);
   // Created once, for this student's session. See `use-live-workspace` for why
@@ -78,8 +82,6 @@ export function useStudentMonitoring({
    * signed in — so all this page owns is telling the one publisher which
    * exercise is open, and marking activity while it is.
    */
-  const { markActive, setOpenMaterial } = useStudentPresence();
-
   React.useEffect(() => {
     if (!materialId) return;
     setOpenMaterial({ materialId, courseId });

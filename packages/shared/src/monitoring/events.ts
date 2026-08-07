@@ -125,6 +125,8 @@ export const documentUpdatePayloadSchema = commandBase.extend({
 
 export const awarenessUpdatePayloadSchema = z.object({
   draftId: z.uuid(),
+  /** Monotonic for one Socket.IO client; prevents async authorization reorder. */
+  sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   cursor: collaborationCursorSchema.nullable(),
   pointer: collaborationPointerSchema.nullable(),
 });
@@ -202,6 +204,8 @@ export const documentUpdatedEventSchema = z.object({
 });
 
 export const awarenessChangedEventSchema = awarenessUpdatePayloadSchema.extend({
+  // Server-authored lifecycle clears have no client sequence.
+  sequence: awarenessUpdatePayloadSchema.shape.sequence.optional(),
   origin: z.enum(["STUDENT", "TEACHER"]),
 });
 

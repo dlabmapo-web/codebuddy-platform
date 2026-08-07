@@ -137,6 +137,8 @@ type MonitoringSocketData = {
   generation: string;
   limiter: SocketRateLimiter;
   invalidPayloads: number;
+  /** Latest awareness packet delivered after asynchronous authorization. */
+  awarenessSequence: number;
   teacher: TeacherState | null;
   student: StudentState | null;
 };
@@ -201,6 +203,7 @@ export class MonitoringGateway
             generation: randomUUID(),
             limiter: new SocketRateLimiter(monitoringRateRules),
             invalidPayloads: 0,
+            awarenessSequence: -1,
             teacher: null,
             student: null,
           };
@@ -837,6 +840,10 @@ export class MonitoringGateway
     } catch {
       return;
     }
+    // Ownership checks can finish out of order under database or Redis load.
+    // Never let an older caret/pointer overwrite a newer position (or clear).
+    if (parsed.data.sequence <= socket.data.awarenessSequence) return;
+    socket.data.awarenessSequence = parsed.data.sequence;
     // Volatile by design: a cursor that arrives late is worse than one that
     // never arrives, and none of this is ever persisted.
     socket.to(room).emit(monitoringServerEvents.awarenessChanged, {

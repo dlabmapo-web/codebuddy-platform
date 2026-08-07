@@ -21,6 +21,7 @@ const event = (
   next: Partial<AwarenessChangedEvent>,
 ): AwarenessChangedEvent => ({
   draftId,
+  sequence: 0,
   cursor,
   pointer,
   origin: 'STUDENT',

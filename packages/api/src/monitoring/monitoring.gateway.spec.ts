@@ -118,6 +118,7 @@ function createSocket(data: Record<string, unknown>): TestSocket {
       generation: "generation-1",
       limiter: { take: () => true },
       invalidPayloads: 0,
+      awarenessSequence: -1,
       teacher: null,
       student: null,
       ...data,
@@ -216,6 +217,45 @@ describe("handleDisconnect", () => {
     await gateway.handleDisconnect(socket);
     expect(awarenessClears(emissions)).toHaveLength(0);
     expect(documents.flush).not.toHaveBeenCalled();
+  });
+});
+
+describe("awarenessUpdate", () => {
+  it("does not let an older authorized packet overwrite a newer position", async () => {
+    const { gateway } = createGateway();
+    const socket = createSocket({
+      teacher: {
+        claims: new Map(),
+        watch: { claim, visitId, draftId, helping: false },
+      },
+    });
+
+    await gateway.awarenessUpdate(socket, {
+      draftId,
+      sequence: 2,
+      cursor: null,
+      pointer: { surface: "editor", x: 0.5, y: 0.5 },
+    });
+    await gateway.awarenessUpdate(socket, {
+      draftId,
+      sequence: 1,
+      cursor: null,
+      pointer: { surface: "statement", x: 0.25, y: 0.25 },
+    });
+
+    expect(socket.broadcast).toEqual([
+      {
+        room: monitoringRooms.draft(academyId, draftId),
+        event: monitoringServerEvents.awarenessChanged,
+        payload: {
+          draftId,
+          sequence: 2,
+          cursor: null,
+          pointer: { surface: "editor", x: 0.5, y: 0.5 },
+          origin: "TEACHER",
+        },
+      },
+    ]);
   });
 });
 

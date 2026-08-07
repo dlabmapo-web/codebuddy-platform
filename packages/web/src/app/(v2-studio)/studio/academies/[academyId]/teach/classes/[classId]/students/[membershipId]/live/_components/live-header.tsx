@@ -1,6 +1,9 @@
 'use client';
 
-import type { MonitoringExerciseContext, MonitoringStudentContext } from '@cove/shared';
+import type {
+  MonitoringExercisePreview,
+  MonitoringStudentContext,
+} from '@cove/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
@@ -28,14 +31,26 @@ export function LiveHeader({
   classId,
   connection,
   context,
+  curriculum,
   exercise,
+  liveStatus,
   unsaved,
 }: {
   academyId: string;
   classId: string;
   connection: React.ComponentProps<typeof ConnectionBadge>['state'];
   context: MonitoringStudentContext;
-  exercise: MonitoringExerciseContext | null;
+  /** The curriculum trigger, owned by the page so focus can return to it. */
+  curriculum?: React.ReactNode;
+  /**
+   * The exercise on screen, which during a preview is not the student's.
+   *
+   * Deliberately the public projection: a header that took the live context
+   * would be a second place holding a draft id, and it has no use for one.
+   */
+  exercise: MonitoringExercisePreview | null;
+  /** Where the student actually is, said separately from where the screen is. */
+  liveStatus?: string;
   unsaved: boolean;
 }) {
   const { t } = useTranslation('monitoring');
@@ -71,10 +86,14 @@ export function LiveHeader({
         </div>
       </div>
 
+      {curriculum}
+
       {exercise ? (
         <div className="hidden min-w-0 flex-1 border-l border-border pl-3 xl:block">
-          <p className="truncate text-[11.5px] text-sub">
-            {exercise.breadcrumb.course.title} · {exercise.breadcrumb.lecture.title}
+          {/* Where the student is, which the path above deliberately does not
+              say: during a preview those are two different exercises. */}
+          <p aria-live="polite" className="truncate text-[11.5px] text-sub">
+            {liveStatus ?? exercise.breadcrumb.course.title}
           </p>
           <div className="flex items-center gap-2">
             <h1 className="truncate text-[14px] font-bold leading-tight">

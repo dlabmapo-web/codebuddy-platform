@@ -17,6 +17,8 @@ export type MonitoringCounter =
   | "watch.started"
   | "watch.denied"
   | "watch.replaced"
+  /** Movement events emitted into an authorized watch-context room. */
+  | "watch.context.changed"
   | "document.update.applied"
   | "document.update.rejected"
   | "document.resync"

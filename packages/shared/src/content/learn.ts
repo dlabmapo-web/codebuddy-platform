@@ -154,6 +154,83 @@ export type LearnExerciseWorkspace = z.infer<
   typeof learnExerciseWorkspaceSchema
 >;
 
+/* --------------------------------------------- curriculum navigator */
+
+/**
+ * Where the workspace currently is, as one line of context.
+ *
+ * The same four segments the fullscreen header prints — Course › Module ›
+ * Lecture › Exercise — and the same four the gateway sends when a watched
+ * student moves. Declared once so the header, the navigator, and the realtime
+ * event cannot disagree about what a position is.
+ */
+export const navigatorPathSchema = z.object({
+  course: z.object({ id: z.uuid(), title: titleSchema }),
+  module: z.object({ id: z.uuid(), title: titleSchema }),
+  lecture: z.object({ id: z.uuid(), title: titleSchema }),
+  exercise: z.object({ materialId: z.uuid(), title: titleSchema }),
+});
+export type NavigatorPath = z.infer<typeof navigatorPathSchema>;
+
+export const navigatorExerciseSchema = z.object({
+  materialId: z.uuid(),
+  title: titleSchema,
+  position: positionSchema,
+  status: exerciseProgressStatusSchema,
+  /** Null until the student has earned one, so 0 never reads as a grade. */
+  bestScore: z.number().int().min(0).max(100).nullable(),
+});
+export type NavigatorExercise = z.infer<typeof navigatorExerciseSchema>;
+
+export const navigatorLectureSchema = z.object({
+  id: z.uuid(),
+  title: titleSchema,
+  position: positionSchema,
+  exercises: z.array(navigatorExerciseSchema),
+});
+
+export const navigatorModuleSchema = z.object({
+  id: z.uuid(),
+  title: titleSchema,
+  position: positionSchema,
+  lectures: z.array(navigatorLectureSchema),
+});
+
+/**
+ * One course, as the fullscreen navigator draws it.
+ *
+ * Deliberately a projection of `LearnCourseOutline` rather than a second
+ * curriculum type: `toNavigatorContext` is the only thing that builds one, so
+ * a change to ordering or progress semantics happens in one place and reaches
+ * the outline page, both fullscreen panels, and previous/next together.
+ */
+export const workspaceNavigatorContextSchema = z.object({
+  path: navigatorPathSchema,
+  course: z.object({
+    id: z.uuid(),
+    title: titleSchema,
+    progress: learnCourseProgressSchema,
+    modules: z.array(navigatorModuleSchema),
+  }),
+});
+export type WorkspaceNavigatorContext = z.infer<
+  typeof workspaceNavigatorContextSchema
+>;
+
+/**
+ * The workspace and its course, in one authorized read.
+ *
+ * The initial fullscreen entry needs both; an in-place transition inside the
+ * same course needs only the first, which is why they stay separable.
+ */
+export const learnExerciseBootstrapSchema = z.object({
+  workspace: learnExerciseWorkspaceSchema,
+  navigator: workspaceNavigatorContextSchema,
+});
+export type LearnExerciseBootstrap = z.infer<
+  typeof learnExerciseBootstrapSchema
+>;
+
 export const learnDraftSummarySchema = z.object({
   materialId: z.uuid(),
   exerciseTitle: titleSchema,
@@ -240,6 +317,201 @@ export function resolveExerciseNeighbors(
     previous: ordered[index - 1] ?? null,
     next: ordered[index + 1] ?? null,
   };
+}
+
+/**
+ * The outline as one course the navigator can draw, positioned at a material.
+ *
+ * Returns `null` when the material is not a visible programming exercise of
+ * this course. That is not an error shape — it is how a caller learns that a
+ * remembered id no longer belongs here, and it is the only way this function
+ * refuses.
+ */
+export function toNavigatorContext(
+  outline: LearnCourseOutline,
+  materialId: string,
+): WorkspaceNavigatorContext | null {
+  const path = navigatorPathFor(outline, materialId);
+  if (!path) return null;
+
+  return {
+    path,
+    course: {
+      id: outline.course.id,
+      title: outline.course.title,
+      progress: outline.progress,
+      modules: orderedModules(outline.modules).map((courseModule) => ({
+        id: courseModule.id,
+        title: courseModule.title,
+        position: courseModule.position,
+        lectures: orderedLectures(courseModule.lectures).map((lecture) => ({
+          id: lecture.id,
+          title: lecture.title,
+          position: lecture.position,
+          exercises: orderedExercises(lecture.exercises).map((exercise) => ({
+            materialId: exercise.materialId,
+            title: exercise.title,
+            position: exercise.position,
+            status: exercise.status,
+            // A best score belongs to work that happened. Reporting 0 for an
+            // untouched exercise would render as a failing grade.
+            bestScore:
+              exercise.status === "NOT_STARTED" ? null : exercise.bestScore,
+          })),
+        })),
+      })),
+    },
+  };
+}
+
+/**
+ * The same four segments, from a payload that already carries them.
+ *
+ * Both fullscreen workspaces receive a breadcrumb and an exercise with every
+ * response; deriving the header path from those rather than from the loaded
+ * course is what keeps the printed position and the rendered exercise from
+ * ever describing two different things.
+ */
+export function navigatorPathFromBreadcrumb(input: {
+  breadcrumb: {
+    course: { id: string; title: string };
+    module: { id: string; title: string };
+    lecture: { id: string; title: string };
+  };
+  exercise: { materialId: string; title: string };
+}): NavigatorPath {
+  return {
+    course: input.breadcrumb.course,
+    module: input.breadcrumb.module,
+    lecture: input.breadcrumb.lecture,
+    exercise: {
+      materialId: input.exercise.materialId,
+      title: input.exercise.title,
+    },
+  };
+}
+
+/** The four segments the fullscreen header prints, or nothing. */
+export function navigatorPathFor(
+  outline: LearnCourseOutline,
+  materialId: string,
+): NavigatorPath | null {
+  for (const courseModule of outline.modules) {
+    for (const lecture of courseModule.lectures) {
+      const exercise = lecture.exercises.find(
+        (candidate) => candidate.materialId === materialId,
+      );
+      if (!exercise) continue;
+      return {
+        course: { id: outline.course.id, title: outline.course.title },
+        module: { id: courseModule.id, title: courseModule.title },
+        lecture: { id: lecture.id, title: lecture.title },
+        exercise: { materialId: exercise.materialId, title: exercise.title },
+      };
+    }
+  }
+  return null;
+}
+
+export type NavigatorRow = NavigatorExercise & {
+  /** Stable, course-relative, and 1-based: the number printed on the row. */
+  number: number;
+  moduleId: string;
+  lectureId: string;
+};
+
+/**
+ * The course in the order a student walks it, numbered.
+ *
+ * The same traversal as `flattenOutlineExercises`, so the number on a
+ * navigator row and the destination Previous/Next reaches for it are decided
+ * by one ordering rather than two that happen to agree today.
+ */
+export function flattenNavigatorExercises(
+  context: WorkspaceNavigatorContext,
+): NavigatorRow[] {
+  const rows: NavigatorRow[] = [];
+  for (const courseModule of orderedModules(context.course.modules)) {
+    for (const lecture of orderedLectures(courseModule.lectures)) {
+      for (const exercise of orderedExercises(lecture.exercises)) {
+        rows.push({
+          ...exercise,
+          number: rows.length + 1,
+          moduleId: courseModule.id,
+          lectureId: lecture.id,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+/**
+ * Fresh progress over the tree the user is already looking at.
+ *
+ * Merged rather than replaced so a refresh after a submission cannot reset the
+ * accordion branches they opened: statuses move, identity and order do not.
+ */
+export function mergeNavigatorProgress(
+  current: WorkspaceNavigatorContext,
+  incoming: WorkspaceNavigatorContext,
+): WorkspaceNavigatorContext {
+  if (current.course.id !== incoming.course.id) return incoming;
+  const statuses = new Map(
+    flattenNavigatorExercises(incoming).map((row) => [
+      row.materialId,
+      { status: row.status, bestScore: row.bestScore },
+    ]),
+  );
+
+  return {
+    ...incoming,
+    course: {
+      ...incoming.course,
+      modules: incoming.course.modules.map((courseModule) => ({
+        ...courseModule,
+        lectures: courseModule.lectures.map((lecture) => ({
+          ...lecture,
+          exercises: lecture.exercises.map((exercise) => ({
+            ...exercise,
+            ...(statuses.get(exercise.materialId) ?? {}),
+          })),
+        })),
+      })),
+    },
+  };
+}
+
+function orderedModules<T extends { position: number; id: string }>(
+  modules: ReadonlyArray<T>,
+): T[] {
+  return byPosition(modules);
+}
+
+function orderedLectures<T extends { position: number; id: string }>(
+  lectures: ReadonlyArray<T>,
+): T[] {
+  return byPosition(lectures);
+}
+
+function orderedExercises<T extends { position: number; materialId: string }>(
+  exercises: ReadonlyArray<T>,
+): T[] {
+  return [...exercises].sort(
+    (left, right) =>
+      left.position - right.position ||
+      left.materialId.localeCompare(right.materialId),
+  );
+}
+
+/** Position first, id as the tiebreak — the ordering every read applies. */
+function byPosition<T extends { position: number; id: string }>(
+  items: ReadonlyArray<T>,
+): T[] {
+  return [...items].sort(
+    (left, right) =>
+      left.position - right.position || left.id.localeCompare(right.id),
+  );
 }
 
 /**

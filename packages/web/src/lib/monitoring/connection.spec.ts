@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canActLive,
+  canEditSynchronizedDraft,
   monitoringSocketUrl,
   nextConnectionState,
   type MonitoringConnectionState,
@@ -76,5 +77,37 @@ describe('canActLive', () => {
     ];
     for (const state of states) expect(canActLive(state)).toBe(false);
     expect(canActLive('live')).toBe(true);
+  });
+});
+
+describe('canEditSynchronizedDraft', () => {
+  it('locks a newly followed draft until that exact document is synchronized', () => {
+    expect(
+      canEditSynchronizedDraft({
+        state: 'live',
+        sessionDraftId: 'draft-new',
+        syncedDraftId: 'draft-old',
+        ended: false,
+      }),
+    ).toBe(false);
+    expect(
+      canEditSynchronizedDraft({
+        state: 'live',
+        sessionDraftId: 'draft-new',
+        syncedDraftId: 'draft-new',
+        ended: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps synchronized documents locked after the watch ends', () => {
+    expect(
+      canEditSynchronizedDraft({
+        state: 'live',
+        sessionDraftId: 'draft-1',
+        syncedDraftId: 'draft-1',
+        ended: true,
+      }),
+    ).toBe(false);
   });
 });

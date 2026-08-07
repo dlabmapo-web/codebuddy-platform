@@ -33,10 +33,11 @@ const saveStateStyles: Record<Exclude<DraftSaveState, 'idle'>, string> = {
 
 export function WorkspaceHeader({
   academyId,
+  curriculum,
   workspace,
   saveState,
   onNavigate,
-  navigating,
+  navigationDisabled,
   onSubmit,
   onReset,
   onRevealHint,
@@ -46,6 +47,13 @@ export function WorkspaceHeader({
   feedback,
 }: {
   academyId: string;
+  /**
+   * The curriculum trigger, owned by the page so focus can return to it.
+   *
+   * Passed in rather than rendered here: the panel it controls lives beside
+   * the workspace panes, and the two have to agree on one open state.
+   */
+  curriculum?: React.ReactNode;
   workspace: LearnExerciseWorkspace;
   /** The generic "a teacher is here" badge, or nothing when nobody is. */
   indicator?: React.ReactNode;
@@ -56,7 +64,8 @@ export function WorkspaceHeader({
   feedback?: React.ReactNode;
   saveState: DraftSaveState;
   onNavigate: (materialId: string) => void;
-  navigating: boolean;
+  /** Running, submitting, or changing exercise owns navigation exclusively. */
+  navigationDisabled: boolean;
   onSubmit: () => void;
   onReset: () => void;
   onRevealHint: () => void;
@@ -76,11 +85,9 @@ export function WorkspaceHeader({
         <ArrowLeft className="size-4" />
       </Link>
 
+      {curriculum}
+
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[11.5px] text-sub">
-          {breadcrumb.course.title} · {breadcrumb.module.title} ·{' '}
-          {breadcrumb.lecture.title}
-        </p>
         <div className="flex items-center gap-2">
           <h1 className="truncate text-[15px] font-bold leading-tight">
             {exercise.title}
@@ -121,7 +128,7 @@ export function WorkspaceHeader({
       <nav className="flex shrink-0 items-center gap-1">
         <NavButton
           direction="previous"
-          disabled={!neighbors.previous || navigating}
+          disabled={!neighbors.previous || navigationDisabled}
           label={t('learn:workspace.previous')}
           onClick={() =>
             neighbors.previous && onNavigate(neighbors.previous.materialId)
@@ -129,7 +136,7 @@ export function WorkspaceHeader({
         />
         <NavButton
           direction="next"
-          disabled={!neighbors.next || navigating}
+          disabled={!neighbors.next || navigationDisabled}
           label={t('learn:workspace.next')}
           onClick={() => neighbors.next && onNavigate(neighbors.next.materialId)}
         />

@@ -41,14 +41,14 @@ export function ExampleCard({
   };
 
   return (
-    <article className="rounded-lg border border-border p-4">
+    <article className="min-w-0 overflow-hidden rounded-lg border border-border p-4">
       <header className="mb-3">
         <h4 className="text-[13.5px] font-bold">
           {t('workspace.example_n', { number: index + 1 })}
         </h4>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid min-w-0 gap-3 @md:grid-cols-2">
         <ValueBlock
           action={
             <button

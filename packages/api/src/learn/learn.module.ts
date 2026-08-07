@@ -5,6 +5,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
+import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
 import { SubmissionController } from "./submission.controller.js";
 import { SubmissionService } from "./submission.service.js";
@@ -18,6 +19,7 @@ import { SubmissionService } from "./submission.service.js";
   imports: [AcademiesModule, AuthModule, AuthorizationModule],
   controllers: [SubmissionController],
   providers: [
+    CurriculumOutlineService,
     LearnService,
     SubmissionService,
     {
@@ -29,6 +31,14 @@ import { SubmissionService } from "./submission.service.js";
       },
     },
   ],
-  exports: [LearnService, SubmissionService, JudgeQueue],
+  // The outline builder is exported because monitoring reads a student's
+  // curriculum through it. Two implementations of "what a course looks like"
+  // is exactly what the teacher's navigator must not introduce.
+  exports: [
+    CurriculumOutlineService,
+    LearnService,
+    SubmissionService,
+    JudgeQueue,
+  ],
 })
 export class LearnModule {}

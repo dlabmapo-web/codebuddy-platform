@@ -581,18 +581,36 @@ export type MonitoringClassRoster = z.infer<typeof monitoringClassRosterSchema>;
  * shape, and it has no field capable of holding a hidden expectation. A
  * teacher monitoring surface must not become the one place they leak.
  */
-export const monitoringExerciseContextSchema = z.object({
+export const monitoringPublicExerciseSchema = z.object({
   breadcrumb: z.object({
     course: z.object({ id: z.uuid(), title: z.string().min(1) }),
     module: z.object({ id: z.uuid(), title: z.string().min(1) }),
     lecture: z.object({ id: z.uuid(), title: z.string().min(1) }),
   }),
   exercise: learnExerciseSchema,
-  /** The collaboration room is derived from this server-side, never named by a client. */
-  draftId: z.uuid().nullable(),
 });
+
+export const monitoringExerciseContextSchema =
+  monitoringPublicExerciseSchema.extend({
+    /** The collaboration room is derived from this server-side, never named by a client. */
+    draftId: z.uuid().nullable(),
+  });
 export type MonitoringExerciseContext = z.infer<
   typeof monitoringExerciseContextSchema
+>;
+
+/**
+ * An exercise the teacher is reading rather than watching.
+ *
+ * The public projection with the draft id structurally absent, not merely
+ * omitted: preview code that wanted to join a collaboration room would have to
+ * invent an identifier, because this contract has no field that carries one.
+ * That is the whole reason it is a separate type from the live context above
+ * rather than the same type with a nulled field.
+ */
+export const monitoringExercisePreviewSchema = monitoringPublicExerciseSchema;
+export type MonitoringExercisePreview = z.infer<
+  typeof monitoringExercisePreviewSchema
 >;
 
 export const monitoringStudentContextSchema = z.object({
@@ -675,6 +693,19 @@ export const monitoringStudentContextInputSchema =
      * ack supplies the material, and the page then asks for it here.
      */
     materialId: z.uuid().optional(),
+  });
+
+/**
+ * One named exercise inside one student's claim.
+ *
+ * Shared by the teacher's curriculum and preview reads because they answer to
+ * exactly the same authorization: assigned class, enrolled student, and a
+ * material this class is actually taught. Knowing the two ids is not the
+ * permission — holding the claim is.
+ */
+export const monitoringMaterialInputSchema =
+  monitoringStudentInputSchema.extend({
+    materialId: z.uuid(),
   });
 
 export const listFeedbackInputSchema = monitoringStudentInputSchema.extend({

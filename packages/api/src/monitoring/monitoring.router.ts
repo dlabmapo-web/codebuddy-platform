@@ -24,6 +24,16 @@ export function createMonitoringRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.monitoringService.getStudentContext(context.identity, input)
       ),
+    getStudentCurriculum: os.monitoring.getStudentCurriculum
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.monitoringService.getStudentCurriculum(context.identity, input)
+      ),
+    getExercisePreview: os.monitoring.getExercisePreview
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.monitoringService.getExercisePreview(context.identity, input)
+      ),
     listFeedback: os.monitoring.listFeedback
       .use(access.authenticated)
       .handler(({ context, input }) =>

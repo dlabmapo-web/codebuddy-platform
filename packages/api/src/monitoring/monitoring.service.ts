@@ -1,15 +1,20 @@
-import { Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   monitoringLimits,
+  toNavigatorContext,
   type MonitoringClassRoster,
   type MonitoringClassSummary,
+  type MonitoringExercisePreview,
   type MonitoringFeedback,
   type MonitoringStudentContext,
+  type WorkspaceNavigatorContext,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
 import {
   MonitoringAccessService,
   type MonitoringClassClaim,
@@ -31,6 +36,7 @@ export class MonitoringService {
     private readonly prisma: PrismaService,
     private readonly access: MonitoringAccessService,
     private readonly broadcaster: MonitoringFeedbackBroadcaster,
+    private readonly curriculum: CurriculumOutlineService,
   ) {}
 
   /**
@@ -215,6 +221,87 @@ export class MonitoringService {
   }
 
   /**
+   * The monitored student's course, as the teacher's navigator draws it.
+   *
+   * The subject is derived, never supplied: the input names a class and a
+   * membership, and the student's user id comes out of the assignment and
+   * enrollment checks. Knowing a membership id is therefore not a way to read
+   * somebody's progress — the caller has to be the teacher responsible for
+   * them, in a class that is actually taught the course being asked about.
+   */
+  async getStudentCurriculum(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      membershipId: string;
+      materialId: string;
+    },
+  ): Promise<WorkspaceNavigatorContext> {
+    const claim = await this.requireClass(identity, input);
+    const student = await this.access.requireMonitorableStudent(
+      claim,
+      input.membershipId,
+    );
+    // Reachability through *this* class's assigned courses, so a student in two
+    // classes never exposes one class's curriculum to the other's teacher.
+    const material = await this.access.requireMonitorableMaterial(
+      student,
+      input.materialId,
+    );
+
+    const outline = await this.curriculum.outlineForCourse(
+      material.courseId,
+      claim.academyId,
+      student.studentUserId,
+    );
+    const navigator = outline && toNavigatorContext(outline, material.materialId);
+    if (!navigator) {
+      // The same shape as an exercise outside the claim: a teacher must not be
+      // able to tell "hidden" from "not yours" by the error they receive.
+      throw new AppException(
+        "MONITORING_STUDENT_UNAVAILABLE",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return navigator;
+  }
+
+  /**
+   * One exercise the teacher wants to read while the watch stays live.
+   *
+   * Built from the same public projection as the live workspace and returned
+   * as a contract with no draft id, so nothing in this response can be used to
+   * join a collaboration room, apply an update, or address the student's own
+   * work.
+   */
+  async getExercisePreview(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      membershipId: string;
+      materialId: string;
+    },
+  ): Promise<MonitoringExercisePreview> {
+    const claim = await this.requireClass(identity, input);
+    const student = await this.access.requireMonitorableStudent(
+      claim,
+      input.membershipId,
+    );
+    await this.access.requireMonitorableMaterial(student, input.materialId);
+
+    const preview = await this.loadPublicExercise(claim, input.materialId);
+    if (!preview) {
+      throw new AppException(
+        "MONITORING_STUDENT_UNAVAILABLE",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return preview;
+  }
+
+  /**
    * The current notes on one student, newest first — one per teacher.
    *
    * Read through the same access claim as the live workspace, so a teacher who
@@ -342,11 +429,43 @@ export class MonitoringService {
     return this.access.requireAssignedClass(actor, input.classId);
   }
 
+  /**
+   * The live workspace's exercise: the public text, plus the room to join.
+   *
+   * The draft id is added here and nowhere else. `loadPublicExercise` below is
+   * what the preview reads, and it has no access to one — which is what makes
+   * "preview cannot join a document" a property of the code rather than a rule
+   * somebody has to remember.
+   */
   private async loadExercise(
     claim: MonitoringClassClaim,
     studentUserId: string,
     materialId: string,
   ) {
+    const preview = await this.loadPublicExercise(claim, materialId);
+    if (!preview) return null;
+
+    const draft = await this.prisma.exerciseDraft.findUnique({
+      where: {
+        userId_materialId: { userId: studentUserId, materialId },
+      },
+      select: { id: true },
+    });
+
+    return {
+      ...preview,
+      // Null until the student has actually started: the collaboration
+      // document is created lazily, and naming a room for a draft that does
+      // not exist is how a client ends up inventing one.
+      draftId: draft?.id ?? null,
+    };
+  }
+
+  /** The exercise as a student sees it, and nothing a teacher could act with. */
+  private async loadPublicExercise(
+    claim: MonitoringClassClaim,
+    materialId: string,
+  ): Promise<MonitoringExercisePreview | null> {
     const material = await this.prisma.material.findFirst({
       where: {
         id: materialId,
@@ -382,13 +501,6 @@ export class MonitoringService {
       // a teacher must not learn that a hidden exercise exists.
       return null;
     }
-
-    const draft = await this.prisma.exerciseDraft.findUnique({
-      where: {
-        userId_materialId: { userId: studentUserId, materialId: material.id },
-      },
-      select: { id: true },
-    });
 
     return {
       breadcrumb: {
@@ -432,10 +544,6 @@ export class MonitoringService {
           (testCase) => testCase.visibility === "HIDDEN",
         ).length,
       },
-      // Null until the student has actually started: the collaboration
-      // document is created lazily, and naming a room for a draft that does
-      // not exist is how a client ends up inventing one.
-      draftId: draft?.id ?? null,
     };
   }
 }

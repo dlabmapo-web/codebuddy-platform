@@ -148,5 +148,24 @@
     "MATERIAL_UNAVAILABLE": "The exercise is no longer available.",
     "CONNECTION_EXPIRED": "The connection was lost.",
     "FEATURE_DISABLED": "Live monitoring was turned off."
+  },
+  "navigator": {
+    "footer_teacher": "Back to the class"
+  },
+  "preview": {
+    "badge": "Preview",
+    "banner": "Previewing {{preview}} · Student is live on {{live}}",
+    "banner_unavailable": "Previewing {{preview}} · The student is not solving an exercise",
+    "return": "Return to live",
+    "returning": "Returning…",
+    "read_only": "You are reading this problem. The student is working elsewhere, and nothing here reaches them.",
+    "loading": "Opening the preview…",
+    "failed": "That problem could not be opened.",
+    "retry": "Try again",
+    "starter_code": "Starting code"
+  },
+  "live": {
+    "not_solving": "Student is not currently solving an exercise",
+    "on_exercise": "Live on {{title}}"
   }
 }

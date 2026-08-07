@@ -29,6 +29,7 @@ const tabs: LiveOutputTab[] = ['you', 'student'];
  */
 export function LiveOutput({
   activeSample,
+  canRun,
   onRun,
   onRunSample,
   onTabChange,
@@ -42,6 +43,14 @@ export function LiveOutput({
   unreadStudentRun,
 }: {
   activeSample: number | null;
+  /**
+   * False while the teacher is reading another exercise.
+   *
+   * The document the run controls would execute belongs to the exercise the
+   * student is on, not the one on screen — so rather than run the wrong code,
+   * the controls are absent until the teacher is beside them again.
+   */
+  canRun: boolean;
   onRun: () => void;
   onRunSample: (index: number) => void;
   onTabChange: (tab: LiveOutputTab) => void;
@@ -112,15 +121,17 @@ export function LiveOutput({
         {/* Running belongs to the teacher's tab: the control and its output sit
             in the same region, and neither one reaches the student. */}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 py-1">
-          <RunControls
-            activeSample={activeSample}
-            onRun={onRun}
-            onRunSample={onRunSample}
-            onStop={runner.stop}
-            ready={runner.ready}
-            running={runner.running}
-            sampleTestCases={sampleTestCases}
-          />
+          {canRun ? (
+            <RunControls
+              activeSample={activeSample}
+              onRun={onRun}
+              onRunSample={onRunSample}
+              onStop={runner.stop}
+              ready={runner.ready}
+              running={runner.running}
+              sampleTestCases={sampleTestCases}
+            />
+          ) : null}
         </div>
       </div>
 

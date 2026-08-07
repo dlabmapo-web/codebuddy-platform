@@ -74,3 +74,27 @@ export function nextConnectionState(
 export function canActLive(state: MonitoringConnectionState): boolean {
   return state === 'live';
 }
+
+/**
+ * A live transport is not sufficient after Follow swaps the collaborative
+ * document. Mutations stay locked until the authoritative snapshot for the
+ * exact newly-authorized draft has been applied.
+ */
+export function canEditSynchronizedDraft({
+  state,
+  sessionDraftId,
+  syncedDraftId,
+  ended,
+}: {
+  state: MonitoringConnectionState;
+  sessionDraftId: string | null;
+  syncedDraftId: string | null;
+  ended: boolean;
+}): boolean {
+  return (
+    canActLive(state) &&
+    sessionDraftId !== null &&
+    syncedDraftId === sessionDraftId &&
+    !ended
+  );
+}

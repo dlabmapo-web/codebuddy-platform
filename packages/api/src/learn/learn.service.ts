@@ -3,10 +3,11 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   flattenOutlineExercises,
   progressStatusFromDraft,
-  type ExerciseProgressStatus,
+  toNavigatorContext,
   resolveExerciseNeighbors,
   type LearnCourseOutline,
   type LearnCourseSummary,
+  type LearnExerciseBootstrap,
   type LearnExerciseWorkspace,
 } from "@cove/shared";
 
@@ -19,38 +20,54 @@ import {
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import {
+  countProgress,
+  CurriculumOutlineService,
+  exerciseMaterialIds,
+  nonemptyModules,
+  visibleCurriculumInclude,
+} from "./curriculum-outline.service.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 
-/** The one student-visible hierarchy. Every read applies all ancestor flags. */
-const visibleCurriculumInclude = {
-  modules: {
-    where: { isVisible: true },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
+/** The material graph one authorized workspace read produces. */
+const workspaceMaterialInclude = {
+  programmingExercise: {
     include: {
-      lectures: {
-        where: { isVisible: true },
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        include: {
-          materials: {
-            where: { isVisible: true },
-            orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: { programmingExercise: true },
-          },
-        },
-      },
+      testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+      hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
     },
   },
-} as const satisfies Prisma.CourseInclude;
+  lecture: {
+    include: {
+      courseModule: { include: { course: { include: visibleCurriculumInclude } } },
+    },
+  },
+} as const satisfies Prisma.MaterialInclude;
 
-type VisibleCourse = Prisma.CourseGetPayload<{
-  include: typeof visibleCurriculumInclude;
-}>;
+/**
+ * A material that is known to carry an exercise.
+ *
+ * The `NonNullable` is what lets `buildWorkspace` be written without a second
+ * existence check: the only way to obtain this type is through the lookup that
+ * already refused a material without one.
+ */
+type WorkspaceMaterial = Omit<
+  Prisma.MaterialGetPayload<{ include: typeof workspaceMaterialInclude }>,
+  "programmingExercise"
+> & {
+  programmingExercise: NonNullable<
+    Prisma.MaterialGetPayload<{
+      include: typeof workspaceMaterialInclude;
+    }>["programmingExercise"]
+  >;
+};
 
 @Injectable()
 export class LearnService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
+    private readonly curriculum: CurriculumOutlineService,
   ) {}
 
   async listCourses(
@@ -64,7 +81,7 @@ export class LearnService {
       orderBy: [{ title: "asc" }, { id: "asc" }],
     });
     const materialIds = courses.flatMap(exerciseMaterialIds);
-    const statuses = await this.statusByMaterial(userId, materialIds);
+    const statuses = await this.curriculum.statusByMaterial(userId, materialIds);
 
     return {
       courses: courses.flatMap((course) => {
@@ -95,38 +112,37 @@ export class LearnService {
   ): Promise<LearnCourseOutline> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const course = await this.requireVisibleCourse(input, scope);
-    const modules = nonemptyModules(course);
-    const materialIds = exerciseMaterialIds({ ...course, modules });
-    const statuses = await this.statusByMaterial(userId, materialIds);
+    return this.curriculum.outlineFor(course, userId);
+  }
 
-    return {
-      course: { id: course.id, title: course.title, description: course.description },
-      progress: countProgress(materialIds, statuses),
-      modules: modules.map((courseModule) => ({
-        id: courseModule.id,
-        title: courseModule.title,
-        description: courseModule.description,
-        position: courseModule.position,
-        lectures: courseModule.lectures.map((lecture) => ({
-          id: lecture.id,
-          title: lecture.title,
-          description: lecture.description,
-          position: lecture.position,
-          exercises: lecture.materials.flatMap((material) =>
-            material.programmingExercise
-              ? [{
-                  materialId: material.id,
-                  title: material.title,
-                  position: material.position,
-                  difficulty: material.programmingExercise.difficulty,
-                  status: statuses.get(material.id)?.status ?? "NOT_STARTED",
-                  bestScore: statuses.get(material.id)?.bestScore ?? 0,
-                }]
-              : []
-          ),
-        })),
-      })),
-    };
+  /**
+   * The fullscreen workspace and the course it sits in, from one read.
+   *
+   * The material query already joins its whole visible course — it has to, to
+   * resolve Previous/Next — so the navigator costs one progress query on top
+   * of what opening the exercise cost anyway. Splitting this into two
+   * authorized endpoints would read the same curriculum graph twice.
+   */
+  async getExerciseBootstrap(
+    identity: SupabaseIdentity,
+    input: { academyId: string; materialId: string },
+  ): Promise<LearnExerciseBootstrap> {
+    const learner = await this.requireLearner(identity, input.academyId);
+    const material = await this.requireWorkspaceMaterial(input, learner.scope);
+    const course = material.lecture.courseModule.course;
+
+    const [workspace, outline] = await Promise.all([
+      this.buildWorkspace(material, learner.userId),
+      this.curriculum.outlineFor(course, learner.userId),
+    ]);
+    const navigator = toNavigatorContext(outline, material.id);
+    if (!navigator) {
+      // The material resolved through the visibility predicate but is absent
+      // from the outline the same predicate produced. That is a contradiction
+      // rather than a missing exercise, and it must not render half a page.
+      throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
+    }
+    return { workspace, navigator };
   }
 
   async getExerciseWorkspace(
@@ -134,32 +150,35 @@ export class LearnService {
     input: { academyId: string; materialId: string },
   ): Promise<LearnExerciseWorkspace> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
+    return this.buildWorkspace(
+      await this.requireWorkspaceMaterial(input, scope),
+      userId,
+    );
+  }
+
+  private async requireWorkspaceMaterial(
+    input: { academyId: string; materialId: string },
+    scope: LearningScope,
+  ) {
     const material = await this.prisma.material.findFirst({
       where: {
         id: input.materialId,
         ...reachableMaterialWhere(input.academyId, scope),
       },
-      include: {
-        programmingExercise: {
-          include: {
-            testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-            hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-          },
-        },
-        lecture: {
-          include: {
-            courseModule: {
-              include: { course: { include: visibleCurriculumInclude } },
-            },
-          },
-        },
-      },
+      include: workspaceMaterialInclude,
     });
-    const exercise = material?.programmingExercise;
-    if (!material || !exercise) {
+    if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
+    return material as WorkspaceMaterial;
+  }
 
+  /** One material's own payload. Nothing here reads the course a second time. */
+  private async buildWorkspace(
+    material: WorkspaceMaterial,
+    userId: string,
+  ): Promise<LearnExerciseWorkspace> {
+    const exercise = material.programmingExercise;
     const { courseModule } = material.lecture;
     const course = courseModule.course;
     const [draft, progress] = await Promise.all([
@@ -349,74 +368,6 @@ export class LearnService {
     return material;
   }
 
-  private async statusByMaterial(
-    userId: string,
-    materialIds: string[],
-  ): Promise<Map<string, { status: ExerciseProgressStatus; bestScore: number }>> {
-    const statuses = new Map<
-      string,
-      { status: ExerciseProgressStatus; bestScore: number }
-    >();
-    if (materialIds.length === 0) return statuses;
-    const [drafts, progress] = await Promise.all([
-      this.prisma.exerciseDraft.findMany({
-        where: { userId, materialId: { in: materialIds } },
-        select: { materialId: true },
-      }),
-      this.prisma.studentExerciseProgress.findMany({
-        where: { userId, materialId: { in: materialIds } },
-        select: { materialId: true, status: true, bestScore: true },
-      }),
-    ]);
-    for (const draft of drafts) {
-      if (!draft.materialId) continue;
-      statuses.set(draft.materialId, {
-        status: progressStatusFromDraft(true),
-        bestScore: 0,
-      });
-    }
-    for (const record of progress) {
-      if (record.status === "NOT_STARTED") continue;
-      statuses.set(record.materialId, {
-        status: record.status,
-        bestScore: record.bestScore,
-      });
-    }
-    return statuses;
-  }
-}
-
-function nonemptyModules(course: VisibleCourse): VisibleCourse["modules"] {
-  return course.modules.flatMap((courseModule) => {
-    const lectures = courseModule.lectures.filter((lecture) =>
-      lecture.materials.some((material) => material.programmingExercise !== null)
-    );
-    return lectures.length > 0 ? [{ ...courseModule, lectures }] : [];
-  });
-}
-
-function exerciseMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
-  return course.modules.flatMap((courseModule) =>
-    courseModule.lectures.flatMap((lecture) =>
-      lecture.materials.flatMap((material) =>
-        material.programmingExercise ? [material.id] : []
-      )
-    )
-  );
-}
-
-function countProgress(
-  materialIds: string[],
-  statuses: Map<string, { status: ExerciseProgressStatus; bestScore: number }>,
-) {
-  let started = 0;
-  let solved = 0;
-  for (const id of materialIds) {
-    const status = statuses.get(id)?.status;
-    if (status === "SOLVED") solved += 1;
-    else if (status === "IN_PROGRESS") started += 1;
-  }
-  return { total: materialIds.length, started: started + solved, solved };
 }
 
 function countLines(code: string): number {

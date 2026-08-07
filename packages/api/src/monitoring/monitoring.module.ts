@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { LearnModule } from "../learn/learn.module.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
 import { MonitoringAccessService } from "./monitoring-access.service.js";
 import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
@@ -25,7 +26,14 @@ import { PresenceRegistry } from "./presence.registry.js";
  * would have refused.
  */
 @Module({
-  imports: [AuthModule, AuthorizationModule, MonitoringRevocationModule],
+  imports: [
+    AuthModule,
+    AuthorizationModule,
+    // For the outline builder only: a teacher's copy of a student's curriculum
+    // is the student's own outline, read through a teacher's claim.
+    LearnModule,
+    MonitoringRevocationModule,
+  ],
   providers: [
     MonitoringAccessService,
     MonitoringService,

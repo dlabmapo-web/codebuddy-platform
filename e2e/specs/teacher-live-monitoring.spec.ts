@@ -728,6 +728,53 @@ test('a temporary disconnect recovers without duplicating anything', async () =>
     .toContain('print(a + b)');
 });
 
+test('curriculum preview is read-only and returns to the synchronized live watch', async () => {
+  const outlineTrigger = teacherPage
+    .getByRole('button', { name: /course outline|코스 목차/i })
+    .first();
+  await outlineTrigger.click();
+  const outline = teacherPage.locator(
+    'aside[data-collab-surface="curriculum"]',
+  );
+  await expect(outline).toBeVisible();
+
+  await outline
+    .getByRole('button')
+    .filter({ hasText: 'Getting started' })
+    .click();
+  await outline
+    .getByRole('button')
+    .filter({ hasText: 'Reading input' })
+    .click();
+  await outline
+    .getByRole('button')
+    .filter({ hasText: 'Echo the input' })
+    .click();
+
+  await expect(
+    teacherPage.getByText(/previewing|미리보기/i).first(),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    teacherPage.getByRole('heading', { name: /feedback|피드백/i }),
+  ).toHaveCount(0);
+  await expect(
+    teacherPage.getByRole('button', { name: /^run$|^실행$/i }),
+  ).toHaveCount(0);
+
+  await teacherPage
+    .getByRole('button', { name: /return to live|실시간.*돌아/i })
+    .click();
+  await expect(
+    teacherPage.getByText(/previewing|미리보기/i),
+  ).toHaveCount(0, { timeout: 30_000 });
+  await expect
+    .poll(() => editorText(teacherPage), { timeout: 30_000 })
+    .toContain('print(a + b)');
+  await expect(
+    teacherPage.getByRole('heading', { name: /feedback|피드백/i }),
+  ).toBeVisible();
+});
+
 test('student markers clear when the student leaves the problem page', async () => {
   // Re-establish both markers immediately before navigating so this proves
   // lifecycle cleanup rather than inheriting absence from an earlier case.

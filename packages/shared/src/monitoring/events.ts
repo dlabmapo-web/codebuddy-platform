@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { navigatorPathSchema } from "../content/learn.js";
 import { appErrorCodeSchema } from "../errors/codes.js";
 import {
   collaborationCursorSchema,
@@ -41,6 +42,25 @@ export const monitoringRooms = {
     `academy:${academyId}:draft:${exerciseDraftId}`,
   student: (academyId: string, studentMembershipId: string) =>
     `academy:${academyId}:student:${studentMembershipId}`,
+  /**
+   * The audience for one already-authorized focused watch.
+   *
+   * Deliberately not the student's own room and not the class presence room:
+   * the movement event is for a teacher who has already passed `watchStart`,
+   * and joining is a server action taken after that check rather than
+   * something a client may ask for. Students never join it, so a student's
+   * own socket cannot observe that anybody is watching them.
+   *
+   * Keyed by class as well as by student because reachability is: a student
+   * sitting in two classes may move onto a course only one of them is taught,
+   * and each teacher must be told about their own class's curriculum only.
+   */
+  watchContext: (
+    academyId: string,
+    classId: string,
+    studentMembershipId: string,
+  ) =>
+    `academy:${academyId}:class:${classId}:student:${studentMembershipId}:watch-context`,
 } as const;
 
 /* ------------------------------------------------ acknowledgements */
@@ -245,6 +265,27 @@ export const feedbackCreatedEventSchema = z.object({
   feedback: monitoringFeedbackSchema,
 });
 
+/**
+ * The watched student opened a different exercise.
+ *
+ * Metadata, never permission. It moves the teacher's LIVE marker and nothing
+ * else: no code, no draft id, no test data, no feedback, and no identity
+ * beyond the membership the teacher already watches. Following it performs a
+ * fresh `watchStart`, so a client that fabricated one would gain nothing.
+ */
+export const studentContextChangedEventSchema = z.object({
+  studentMembershipId: z.uuid(),
+  materialId: z.uuid().nullable(),
+  courseId: z.uuid().nullable(),
+  path: navigatorPathSchema.nullable(),
+  /** False when the student is between exercises or on something unmonitorable. */
+  available: z.boolean(),
+  changedAt: z.iso.datetime(),
+});
+export type StudentContextChangedEvent = z.infer<
+  typeof studentContextChangedEventSchema
+>;
+
 export const accessRevokedEventSchema = z.object({
   classId: z.uuid(),
   studentMembershipId: z.uuid().nullable(),
@@ -301,6 +342,8 @@ export const monitoringServerEvents = {
   presenceChanged: "presence.changed",
   watchStarted: "watch.started",
   watchEnded: "watch.ended",
+  /** Sent only into the watch-context room of an authorized focused watch. */
+  studentContextChanged: "student.context.changed",
   documentSynced: "document.synced",
   documentUpdated: "document.updated",
   documentPersisted: "document.persisted",

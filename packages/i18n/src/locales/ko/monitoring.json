@@ -146,5 +146,24 @@
     "MATERIAL_UNAVAILABLE": "문제를 더 이상 이용할 수 없습니다.",
     "CONNECTION_EXPIRED": "연결이 끊어졌습니다.",
     "FEATURE_DISABLED": "실시간 모니터링이 해제되었습니다."
+  },
+  "navigator": {
+    "footer_teacher": "반으로 돌아가기"
+  },
+  "preview": {
+    "badge": "미리 보기",
+    "banner": "{{preview}} 미리 보는 중 · 학생은 {{live}}에서 실시간으로 풀고 있습니다",
+    "banner_unavailable": "{{preview}} 미리 보는 중 · 학생이 문제를 풀고 있지 않습니다",
+    "return": "실시간으로 돌아가기",
+    "returning": "돌아가는 중…",
+    "read_only": "이 문제를 읽고 있습니다. 학생은 다른 곳에서 작업 중이며, 여기의 어떤 것도 학생에게 전달되지 않습니다.",
+    "loading": "미리 보기를 여는 중…",
+    "failed": "해당 문제를 열지 못했습니다.",
+    "retry": "다시 시도",
+    "starter_code": "시작 코드"
+  },
+  "live": {
+    "not_solving": "학생이 지금 문제를 풀고 있지 않습니다",
+    "on_exercise": "{{title}} 실시간"
   }
 }

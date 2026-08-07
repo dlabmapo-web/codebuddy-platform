@@ -23,12 +23,27 @@ import type { MonitoringAckResult } from '@/lib/monitoring/types';
  */
 export function FeedbackDock({
   canSend,
+  draft,
   feedback,
+  materialId,
+  onDraftChange,
   onSend,
   teacherMembershipRef,
 }: {
   canSend: boolean;
+  /**
+   * The composer's text, held by the page and keyed by material.
+   *
+   * Controlled rather than local because this dock outlives the exercise it
+   * is about: a teacher who types half a sentence, reads ahead through the
+   * curriculum panel, and comes back must find their words on the thread they
+   * were writing them for — and must never find them on another one.
+   */
+  draft: string;
   feedback: readonly MonitoringFeedback[];
+  /** Which thread is on screen. Null before a watch has resolved one. */
+  materialId: string | null;
+  onDraftChange: (body: string) => void;
   onSend: (body: string) => Promise<MonitoringAckResult<{ feedbackId: string }>>;
   /** Identifies the teacher's own note without naming its author. */
   teacherMembershipRef: string | null;
@@ -58,20 +73,29 @@ export function FeedbackDock({
     [feedback, teacherMembershipRef],
   );
 
-  const [body, setBody] = React.useState(mine?.body ?? '');
+  const stored = mine?.body ?? '';
   /**
-   * The note the box was last filled from.
+   * The note the box was last filled from, and which thread it was for.
    *
    * Refilling is keyed on the server's text rather than on a dirty flag: the
    * box follows the server when the server's copy changes, and leaves a
-   * half-typed revision alone the rest of the time.
+   * half-typed revision alone the rest of the time. Arriving at a thread the
+   * teacher already has unsent words on leaves those words alone too.
    */
-  const [filledFrom, setFilledFrom] = React.useState(mine?.body ?? '');
-  if ((mine?.body ?? '') !== filledFrom) {
-    setFilledFrom(mine?.body ?? '');
-    setBody(mine?.body ?? '');
-  }
+  const filledRef = React.useRef<{ materialId: string | null; body: string }>({
+    materialId: null,
+    body: '',
+  });
+  React.useEffect(() => {
+    const filled = filledRef.current;
+    const arrived = filled.materialId !== materialId;
+    if (!arrived && filled.body === stored) return;
+    filledRef.current = { materialId, body: stored };
+    if (arrived && draft.length > 0) return;
+    onDraftChange(stored);
+  }, [draft.length, materialId, onDraftChange, stored]);
 
+  const body = draft;
   const trimmed = body.trim();
   const unchanged = trimmed === (mine?.body ?? '').trim();
 
@@ -119,7 +143,7 @@ export function FeedbackDock({
               className="h-16 w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-[13.5px] leading-[1.55] outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:bg-canvas disabled:opacity-70"
               disabled={!canSend}
               maxLength={monitoringLimits.feedbackMaxLength}
-              onChange={(event) => setBody(event.target.value)}
+              onChange={(event) => onDraftChange(event.target.value)}
               // The composer sits inches from the code being discussed, so the
               // shortcut a teacher already uses in chat sends it here too.
               onKeyDown={(event) => {

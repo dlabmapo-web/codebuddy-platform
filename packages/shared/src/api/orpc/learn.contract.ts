@@ -14,6 +14,7 @@ import {
   learnCourseOutlineSchema,
   learnCourseSummarySchema,
   learnDraftSummarySchema,
+  learnExerciseBootstrapSchema,
   learnExerciseWorkspaceSchema,
   learnMaterialInputSchema,
   saveDraftSchema,
@@ -38,6 +39,17 @@ export const learnContract = {
   getExerciseWorkspace: oc
     .input(learnMaterialInputSchema)
     .output(learnExerciseWorkspaceSchema),
+  /**
+   * The fullscreen entry point: the exercise and the course it sits in.
+   *
+   * Kept beside `getExerciseWorkspace` rather than replacing it. Opening the
+   * workspace needs the course outline once; stepping to the next exercise
+   * inside that same course needs only the lean payload, and paying for the
+   * whole curriculum on every step is what this split exists to avoid.
+   */
+  getExerciseBootstrap: oc
+    .input(learnMaterialInputSchema)
+    .output(learnExerciseBootstrapSchema),
   listDrafts: oc
     .input(learnAcademyInputSchema)
     .output(z.object({ drafts: z.array(learnDraftSummarySchema) })),

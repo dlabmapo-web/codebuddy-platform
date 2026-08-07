@@ -1,4 +1,4 @@
-import type { LearnExerciseWorkspace } from '@cove/shared';
+import type { LearnExerciseBootstrap } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
@@ -20,9 +20,12 @@ export default async function ExerciseWorkspacePage({
 }) {
   const { academyId, materialId } = await params;
 
-  let workspace: LearnExerciseWorkspace | null = null;
+  // One authorized read for the exercise and the course it sits in: the
+  // navigator opens with the curriculum already in hand rather than showing a
+  // loading panel on every entry.
+  let bootstrap: LearnExerciseBootstrap | null = null;
   try {
-    workspace = await createServerORPCClient().learn.getExerciseWorkspace({
+    bootstrap = await createServerORPCClient().learn.getExerciseBootstrap({
       academyId,
       materialId,
     });
@@ -32,7 +35,7 @@ export default async function ExerciseWorkspacePage({
     // cannot see.
     notFound();
   }
-  if (!workspace) notFound();
+  if (!bootstrap) notFound();
 
   // Only the monitoring indicator needs this namespace, and only while a
   // teacher is present — but the copy has to be in hand before that happens.
@@ -45,7 +48,7 @@ export default async function ExerciseWorkspacePage({
       namespaces={monitoringNamespaces}
       resources={resources}
     >
-      <Workspace academyId={academyId} workspace={workspace} />
+      <Workspace academyId={academyId} bootstrap={bootstrap} />
     </PageTranslationsProvider>
   );
 }

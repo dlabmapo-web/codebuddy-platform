@@ -2,6 +2,9 @@ import {
   monitoringLimits,
   monitoringRooms,
   monitoringServerEvents,
+  monitoringTiming,
+  type PresenceEntry,
+  type PresenceSnapshot,
 } from "@cove/shared";
 import type { Server } from "socket.io";
 import { describe, expect, it, vi } from "vitest";
@@ -43,7 +46,8 @@ type Emission = { room: string; event: string; payload: unknown };
 type GatewaySocket = Parameters<MonitoringGateway["handleDisconnect"]>[0];
 
 function createGateway(overrides?: {
-  markInterrupted?: () => Promise<null>;
+  markInterrupted?: () => Promise<PresenceEntry | null>;
+  snapshot?: () => Promise<PresenceSnapshot | null>;
   flush?: () => Promise<void>;
   prisma?: unknown;
 }) {
@@ -61,6 +65,14 @@ function createGateway(overrides?: {
     markInterrupted: vi
       .fn()
       .mockImplementation(overrides?.markInterrupted ?? (async () => null)),
+    // Enough of the registry for the publish path. A movement event is decided
+    // before any of this matters, so the roster half is deliberately inert.
+    isAvailable: true,
+    publish: vi.fn().mockResolvedValue(null),
+    nextVersion: vi.fn().mockResolvedValue(null),
+    snapshot: vi
+      .fn()
+      .mockImplementation(overrides?.snapshot ?? (async () => null)),
   };
   const documents = {
     flush: vi.fn().mockImplementation(overrides?.flush ?? (async () => undefined)),
@@ -217,6 +229,132 @@ describe("handleDisconnect", () => {
     await gateway.handleDisconnect(socket);
     expect(awarenessClears(emissions)).toHaveLength(0);
     expect(documents.flush).not.toHaveBeenCalled();
+  });
+
+  it("withdraws the live context when recovery grace expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const interrupted: PresenceEntry = {
+        studentMembershipId,
+        state: "RECONNECTING",
+        materialId,
+        courseId: claim.courseId,
+        lastActivityAt: new Date().toISOString(),
+        stateExpiresAt: new Date(
+          Date.now() + monitoringTiming.recoveryGraceMs,
+        ).toISOString(),
+        run: null,
+        latestSubmissionId: null,
+      };
+      const snapshot: PresenceSnapshot = {
+        classId,
+        version: 2,
+        entries: [],
+        onlineCount: 0,
+        solvingCount: 0,
+        takenAt: new Date().toISOString(),
+      };
+      const { gateway, emissions } = createGateway({
+        markInterrupted: async () => interrupted,
+        snapshot: async () => snapshot,
+      });
+      const socket = createSocket({
+        student: {
+          academyId,
+          membershipId: studentMembershipId,
+          classes: [{ classId, membershipId: studentMembershipId }],
+          materialId,
+          draftId: null,
+          lastSeenPersistedAt: null,
+          terminal: null,
+          publishedContext: new Map([
+            [
+              classId,
+              { materialId, courseId: claim.courseId, available: true },
+            ],
+          ]),
+        },
+      });
+
+      await gateway.handleDisconnect(socket);
+      await vi.advanceTimersByTimeAsync(monitoringTiming.recoveryGraceMs + 1);
+
+      expect(emissions).toContainEqual({
+        room: monitoringRooms.watchContext(
+          academyId,
+          classId,
+          studentMembershipId,
+        ),
+        event: monitoringServerEvents.studentContextChanged,
+        payload: expect.objectContaining({
+          studentMembershipId,
+          materialId: null,
+          courseId: null,
+          path: null,
+          available: false,
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not let an old disconnect timer clear a recovered student", async () => {
+    vi.useFakeTimers();
+    try {
+      const entry: PresenceEntry = {
+        studentMembershipId,
+        state: "RECONNECTING",
+        materialId,
+        courseId: claim.courseId,
+        lastActivityAt: new Date().toISOString(),
+        stateExpiresAt: new Date(
+          Date.now() + monitoringTiming.recoveryGraceMs,
+        ).toISOString(),
+        run: null,
+        latestSubmissionId: null,
+      };
+      const { gateway, emissions } = createGateway({
+        markInterrupted: async () => entry,
+        snapshot: async () => ({
+          classId,
+          version: 3,
+          entries: [{ ...entry, state: "SOLVING", stateExpiresAt: null }],
+          onlineCount: 1,
+          solvingCount: 1,
+          takenAt: new Date().toISOString(),
+        }),
+      });
+      const socket = createSocket({
+        student: {
+          academyId,
+          membershipId: studentMembershipId,
+          classes: [{ classId, membershipId: studentMembershipId }],
+          materialId,
+          draftId: null,
+          lastSeenPersistedAt: null,
+          terminal: null,
+          publishedContext: new Map([
+            [
+              classId,
+              { materialId, courseId: claim.courseId, available: true },
+            ],
+          ]),
+        },
+      });
+
+      await gateway.handleDisconnect(socket);
+      await vi.advanceTimersByTimeAsync(monitoringTiming.recoveryGraceMs + 1);
+
+      expect(
+        emissions.filter(
+          (entry) =>
+            entry.event === monitoringServerEvents.studentContextChanged,
+        ),
+      ).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -677,6 +815,26 @@ describe("watchStop", () => {
     expect(clearsAtLeave).toBe(1);
   });
 
+  /**
+   * Delivery ends with the watch. Without this leave, a teacher who opened a
+   * second student would keep receiving the first one's movement.
+   */
+  it("leaves the watch-context room it was listening on", async () => {
+    const { gateway } = createGateway();
+    const socket = createSocket({
+      teacher: {
+        claims: new Map(),
+        watch: { claim, visitId, draftId, helping: false },
+      },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId });
+
+    expect(socket.leave).toHaveBeenCalledWith(
+      monitoringRooms.watchContext(academyId, classId, studentMembershipId),
+    );
+  });
+
   it("has nothing to clear when no watch was open", async () => {
     const { gateway, emissions, visits } = createGateway();
     const socket = createSocket({});
@@ -684,5 +842,185 @@ describe("watchStop", () => {
     await gateway.watchStop(socket, { eventId: visitId });
     expect(awarenessClears(emissions)).toHaveLength(0);
     expect(visits.end).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A watched student changing exercise.
+ *
+ * The event exists so a teacher's LIVE marker is right without polling. What
+ * these tests hold to is the other half of that: it fires on a change and on
+ * nothing else, it reaches only an authorized watch's own room, and it names
+ * where the student went without carrying anything about what they are doing
+ * there.
+ */
+describe("student movement", () => {
+  const courseId = "90000000-0000-4000-8000-000000000001";
+  const otherMaterialId = "80000000-0000-4000-8000-000000000002";
+
+  function materialRow(id: string) {
+    return {
+      id,
+      title: "Sum two numbers",
+      lecture: {
+        id: "c0000000-0000-4000-8000-000000000001",
+        title: "Input and output",
+        courseModule: {
+          id: "b0000000-0000-4000-8000-000000000001",
+          title: "Getting started",
+          courseId,
+          course: { id: courseId, title: "Python Basics" },
+        },
+      },
+    };
+  }
+
+  function createStudent(options?: { assigned?: boolean; material?: unknown }) {
+    const prisma = {
+      material: {
+        findFirst: vi.fn().mockImplementation(({ where }: { where: { id: string } }) =>
+          options?.material === undefined
+            ? Promise.resolve(materialRow(where.id))
+            : Promise.resolve(options.material),
+        ),
+      },
+      classCourse: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue(options?.assigned === false ? [] : [{ classId }]),
+      },
+      classEnrollment: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const harness = createGateway({ prisma });
+    const socket = createSocket({
+      student: {
+        academyId,
+        membershipId: studentMembershipId,
+        classes: [{ classId, membershipId: studentMembershipId }],
+        materialId: null,
+        draftId: null,
+        lastSeenPersistedAt: null,
+        terminal: null,
+        publishedContext: new Map(),
+      },
+    });
+    const publish = (material: string | null) =>
+      harness.gateway.presencePublish(socket, {
+        academyId,
+        materialId: material,
+        courseId,
+        visibility: "VISIBLE",
+        active: true,
+      });
+    return { ...harness, socket, publish, prisma };
+  }
+
+  const movements = (emissions: Emission[]) =>
+    emissions.filter(
+      (entry) => entry.event === monitoringServerEvents.studentContextChanged,
+    );
+
+  it("announces the exercise a student opened, and where it sits", async () => {
+    const { emissions, publish } = createStudent();
+
+    await publish(materialId);
+
+    expect(movements(emissions)).toEqual([
+      {
+        room: monitoringRooms.watchContext(
+          academyId,
+          classId,
+          studentMembershipId,
+        ),
+        event: monitoringServerEvents.studentContextChanged,
+        payload: expect.objectContaining({
+          studentMembershipId,
+          materialId,
+          courseId,
+          available: true,
+          path: expect.objectContaining({
+            course: { id: courseId, title: "Python Basics" },
+            exercise: { materialId, title: "Sum two numbers" },
+          }),
+        }),
+      },
+    ]);
+  });
+
+  /** Fifteen seconds apart, all day, on the same problem. */
+  it("stays silent while the student remains on one exercise", async () => {
+    const { emissions, publish } = createStudent();
+
+    await publish(materialId);
+    await publish(materialId);
+    await publish(materialId);
+
+    expect(movements(emissions)).toHaveLength(1);
+  });
+
+  it("announces each move", async () => {
+    const { emissions, publish } = createStudent();
+
+    await publish(materialId);
+    await publish(otherMaterialId);
+
+    expect(movements(emissions).map((entry) => (entry.payload as { materialId: string }).materialId))
+      .toEqual([materialId, otherMaterialId]);
+  });
+
+  it("reports leaving the workspace as unavailable rather than as a move", async () => {
+    const { emissions, publish } = createStudent();
+
+    await publish(materialId);
+    await publish(null);
+
+    expect(movements(emissions).at(-1)?.payload).toMatchObject({
+      materialId: null,
+      courseId: null,
+      path: null,
+      available: false,
+    });
+  });
+
+  /**
+   * A student in two classes may walk onto a course only one of them teaches.
+   * The other teacher is told the student is unavailable, never where they are.
+   */
+  it("does not broadcast a material this class is not taught", async () => {
+    const { emissions, publish } = createStudent({ assigned: false });
+
+    await publish(materialId);
+
+    expect(movements(emissions).at(-1)?.payload).toMatchObject({
+      materialId: null,
+      available: false,
+      path: null,
+    });
+  });
+
+  it("reports an invisible material as unavailable", async () => {
+    const { emissions, publish } = createStudent({ material: null });
+
+    await publish(materialId);
+
+    expect(movements(emissions).at(-1)?.payload).toMatchObject({
+      available: false,
+      path: null,
+    });
+  });
+
+  it("carries no code, draft, feedback, or teacher identity", async () => {
+    const { emissions, publish } = createStudent();
+
+    await publish(materialId);
+
+    expect(Object.keys(movements(emissions)[0]?.payload as object).sort()).toEqual([
+      "available",
+      "changedAt",
+      "courseId",
+      "materialId",
+      "path",
+      "studentMembershipId",
+    ]);
   });
 });

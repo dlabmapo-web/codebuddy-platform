@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
 
 const identity: SupabaseIdentity = {
@@ -185,7 +186,12 @@ function createService(options?: {
       role: options?.role ?? "STUDENT",
     }),
   } as unknown as AcademyAccessService;
-  return { prisma, access, service: new LearnService(prisma, access) };
+  const curriculum = new CurriculumOutlineService(prisma);
+  return {
+    prisma,
+    access,
+    service: new LearnService(prisma, access, curriculum),
+  };
 }
 
 describe("LearnService visible curriculum", () => {
@@ -391,5 +397,60 @@ describe("LearnService class-assigned access", () => {
     expect(prisma.course.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { academyId, isVisible: true } }),
     );
+  });
+});
+
+describe("getExerciseBootstrap", () => {
+  it("returns the workspace and its whole course from one entry", async () => {
+    const { service } = createService();
+
+    const { workspace, navigator } = await service.getExerciseBootstrap(
+      identity,
+      { academyId, materialId },
+    );
+
+    expect(workspace.exercise.materialId).toBe(materialId);
+    expect(navigator.course.id).toBe(courseId);
+    expect(
+      navigator.course.modules[0]?.lectures[0]?.exercises.map(
+        (exercise) => exercise.materialId,
+      ),
+    ).toEqual([materialId, nextMaterialId]);
+  });
+
+  it("positions the path at the exercise the workspace opened", async () => {
+    const { service } = createService();
+
+    const { navigator } = await service.getExerciseBootstrap(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(navigator.path).toEqual({
+      course: { id: courseId, title: "Python Foundations" },
+      module: { id: moduleId, title: "Basics" },
+      lecture: { id: lectureId, title: "Addition" },
+      exercise: { materialId, title: "Sum two numbers" },
+    });
+  });
+
+  /** The navigator is a student surface: it may not carry a hidden case. */
+  it("carries no hidden test data into the navigator", async () => {
+    const { service } = createService();
+
+    const { navigator } = await service.getExerciseBootstrap(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(JSON.stringify(navigator)).not.toContain("secret");
+  });
+
+  it("refuses a material the student cannot reach", async () => {
+    const { service } = createService({ material: null });
+
+    await expect(
+      service.getExerciseBootstrap(identity, { academyId, materialId }),
+    ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
   });
 });

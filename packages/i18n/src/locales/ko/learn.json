@@ -181,5 +181,17 @@
       "MEMORY_LIMIT": "메모리 초과",
       "SKIPPED": "건너뜀"
     }
+  },
+  "navigator": {
+    "title": "코스",
+    "toggle": "코스 목차 열기 또는 닫기",
+    "close": "코스 목차 닫기",
+    "loading": "코스 목차를 불러오는 중…",
+    "error": "코스 목차를 불러오지 못했습니다.",
+    "retry": "다시 시도",
+    "live": "실시간",
+    "footer_student": "코스로 돌아가기",
+    "transition_failed": "해당 문제를 열지 못했습니다. 작성한 코드는 그대로입니다.",
+    "transition_retry": "다시 시도"
   }
 }

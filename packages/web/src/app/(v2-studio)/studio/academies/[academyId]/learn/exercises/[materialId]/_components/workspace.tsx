@@ -1,21 +1,28 @@
 'use client';
 
-import type { LearnExerciseWorkspace } from '@cove/shared';
+import type { LearnExerciseBootstrap } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 import { RemotePointer } from '@/components/monitoring/remote-pointer';
+import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
+import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useStudentFeedback } from '@/lib/monitoring/use-student-feedback';
 import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
+import { navigatorRow } from '@/lib/workspace/navigator-geometry';
+import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
-import { useExerciseNavigation } from '../_hooks/use-exercise-navigation';
+import {
+  useExerciseNavigation,
+  type ExerciseTransitionLifecycle,
+} from '../_hooks/use-exercise-navigation';
 import { useSubmission } from '../_hooks/use-submission';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
@@ -24,10 +31,10 @@ import { WorkspaceHeader } from './workspace-header';
 
 export function Workspace({
   academyId,
-  workspace: initialWorkspace,
+  bootstrap,
 }: {
   academyId: string;
-  workspace: LearnExerciseWorkspace;
+  bootstrap: LearnExerciseBootstrap;
 }) {
   const { t } = useLayoutTranslation('learn');
   // The monitoring copy is mounted by this page for the indicator; the peer
@@ -40,13 +47,27 @@ export function Workspace({
     string | null
   >(null);
   const [revealedHints, setRevealedHints] = React.useState(0);
+  const beforeTransitionRef =
+    React.useRef<ExerciseTransitionLifecycle | null>(null);
 
   const runner = usePythonRunner();
   const runSample = useSampleRunner(runner);
-  const { workspace, navigating, navigate } = useExerciseNavigation({
+  const navigation = useExerciseNavigation({
     academyId,
-    initialWorkspace,
+    bootstrap,
+    beforeTransitionRef,
   });
+  const { workspace, navigating } = navigation;
+  // Destructured rather than kept as an object: reading `.open` off a hook
+  // result that also carries a ref is a ref access as far as the React
+  // compiler is concerned, and it is right to flag it.
+  const {
+    close: closePanel,
+    open: panelOpen,
+    panelId,
+    toggle: togglePanel,
+    triggerRef,
+  } = useNavigatorPanel('workspace-curriculum');
 
   const { exercise } = workspace;
   const submission = useSubmission({
@@ -204,9 +225,49 @@ export function Workspace({
   }, [draft, submission]);
 
   const resultId = submission.result?.submissionId ?? null;
+  const { refreshProgress } = navigation;
   React.useEffect(() => {
-    if (resultId) monitoring.publishResult(resultId);
-  }, [monitoring, resultId]);
+    if (!resultId) return;
+    monitoring.publishResult(resultId);
+    // The badge in the curriculum panel answers to the verdict that just
+    // arrived, not to the next full page load.
+    refreshProgress();
+  }, [monitoring, refreshProgress, resultId]);
+
+  /**
+   * When the workspace is not the reader's to move.
+   *
+   * A run in progress owns the worker and a submission owns the verdict panel;
+   * both would be discarded by a transition, so the rows are disabled rather
+   * than allowed to silently throw the work away. Stopping a local run is
+   * still available — that control belongs to the terminal.
+   */
+  const busy =
+    navigating ||
+    submission.submitting ||
+    runner.running ||
+    activeSample !== null;
+
+  React.useEffect(() => {
+    beforeTransitionRef.current = {
+      canStart: () => !busy,
+      beforeCommit: () => {
+        draft.flushNow();
+        runner.stop();
+        runner.clear();
+        submission.reset();
+        setActiveSample(null);
+        setRevealedHints(0);
+        setOutputTab('terminal');
+        setLastReadSubmissionId(null);
+      },
+    };
+    return () => {
+      beforeTransitionRef.current = null;
+    };
+  }, [busy, draft, runner, submission]);
+
+  const handleNavigate = navigation.navigate;
 
   const handleOutputTabChange = React.useCallback((tab: OutputTab) => {
     if (outputTab === 'result' && submission.result) {
@@ -240,21 +301,18 @@ export function Workspace({
             />
           }
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
-          navigating={navigating}
+          navigationDisabled={busy}
           hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}
-          onNavigate={(materialId) => {
-            // Pending work is settled here rather than inside the hook: the draft
-            // is derived from the workspace the hook owns, so passing a teardown
-            // callback into it would be circular.
-            draft.flushNow();
-            runner.stop();
-            runner.clear();
-            submission.reset();
-            setRevealedHints(0);
-            setOutputTab('terminal');
-            setLastReadSubmissionId(null);
-            void navigate(materialId);
-          }}
+          curriculum={
+            <CurriculumTrigger
+              onToggle={togglePanel}
+              open={panelOpen}
+              panelId={panelId}
+              path={navigation.path}
+              ref={triggerRef}
+            />
+          }
+          onNavigate={handleNavigate}
           onReset={() => {
             if (draft.code === exercise.starterCode) return;
             if (!window.confirm(t('workspace.reset_confirm'))) return;
@@ -271,6 +329,25 @@ export function Workspace({
           workspace={workspace}
         />
       </div>
+
+      {/* A destination that would not open. Said here, above work that is
+          still entirely intact, rather than by routing away to an error page
+          and taking the draft and the running worker with it. */}
+      {navigation.failedDestination ? (
+        <p
+          className="flex shrink-0 items-center gap-3 border-b border-danger/25 bg-danger/5 px-4 py-2 text-[13px] font-semibold text-danger"
+          role="alert"
+        >
+          {t('navigator.transition_failed')}
+          <button
+            className="rounded-md border border-danger/30 px-2 py-0.5 text-[12.5px] font-bold transition-colors hover:bg-danger/10"
+            onClick={navigation.retry}
+            type="button"
+          >
+            {t('navigator.transition_retry')}
+          </button>
+        </p>
+      ) : null}
 
       {/* Below `md` the panes stack behind tabs: a split pane on a phone gives
           neither side enough room to be usable. */}
@@ -291,58 +368,81 @@ export function Workspace({
         ))}
       </div>
 
-      <div
-        className="flex min-h-0 flex-1"
-        ref={paneContainerRef}
-        // Scoped to this container rather than an inline width, so the drag
-        // size applies only from `md:` up and the mobile tab layout is free to
-        // ignore it.
-        style={{ '--statement-width': `${statementWidth}%` } as React.CSSProperties}
-      >
-        <section
-          className={`min-w-0 overflow-y-auto bg-white md:block md:w-[var(--statement-width)] md:flex-none ${
-            mobileTab === 'problem' ? 'flex-1' : 'hidden'
-          }`}
-          {...surfaceProps('statement')}
-        >
-          <ProblemStatement exercise={exercise} revealedHints={revealedHints} />
-        </section>
-
-        <div
-          aria-hidden
-          className={`hidden w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-brand/40 md:block ${
-            draggingStatement ? 'bg-brand/60' : ''
-          }`}
-          {...statementDividerProps}
+      {/* The panel and the panes share one row, so opening the course takes
+          width from the workspace rather than covering it. */}
+      <div className={navigatorRow}>
+        <WorkspaceCurriculumNavigator
+          busyMaterialId={navigation.navigatingTo}
+          context={navigation.navigator}
+          disabled={busy}
+          displayedMaterialId={exercise.materialId}
+          error={navigation.navigatorFailed}
+          footer={{
+            href: `/studio/academies/${academyId}/learn/courses/${workspace.breadcrumb.course.id}`,
+            label: t('navigator.footer_student'),
+          }}
+          onClose={closePanel}
+          onRetry={navigation.loadCourse}
+          onSelect={handleNavigate}
+          open={panelOpen}
+          panelId={panelId}
         />
 
-        <section
-          className={`min-w-0 flex-1 flex-col ${
-            mobileTab === 'code' ? 'flex' : 'hidden'
-          } md:flex`}
+        <div
+          className="flex min-h-0 flex-1"
+          ref={paneContainerRef}
+          // Scoped to this container rather than an inline width, so the drag
+          // size applies only from `md:` up and the mobile tab layout is free
+          // to ignore it.
+          style={
+            { '--statement-width': `${statementWidth}%` } as React.CSSProperties
+          }
         >
-          <EditorPane
-            activeSample={activeSample}
-            code={draft.code}
-            onCodeChange={(value) => {
-              monitoring.markActive();
-              draft.setCode(value);
-            }}
-            onEditorMount={monitoring.registerEditor}
-            onRun={() => void handleRun()}
-            onRunSample={(index) => void handleRunSample(index)}
-            onTabChange={handleOutputTabChange}
-            runner={runner}
-            sampleTestCases={exercise.sampleTestCases}
-            submission={submission}
-            tab={outputTab}
-            unreadResult={
-              outputTab !== 'result' &&
-              submission.result !== null &&
-              submission.result.submissionId !== lastReadSubmissionId
-            }
+          <section
+            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:w-[var(--statement-width)] md:flex-none ${
+              mobileTab === 'problem' ? 'flex-1' : 'hidden'
+            }`}
+            {...surfaceProps('statement')}
+          >
+            <ProblemStatement exercise={exercise} revealedHints={revealedHints} />
+          </section>
+
+          <div
+            aria-hidden
+            className={`hidden w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-brand/40 md:block ${
+              draggingStatement ? 'bg-brand/60' : ''
+            }`}
+            {...statementDividerProps}
           />
-        </section>
+
+          <section
+            className={`min-w-0 flex-1 flex-col ${
+              mobileTab === 'code' ? 'flex' : 'hidden'
+            } md:flex`}
+          >
+            <EditorPane
+              activeSample={activeSample}
+              code={draft.code}
+              onCodeChange={(value) => {
+                monitoring.markActive();
+                draft.setCode(value);
+              }}
+              onEditorMount={monitoring.registerEditor}
+              onRun={() => void handleRun()}
+              onRunSample={(index) => void handleRunSample(index)}
+              onTabChange={handleOutputTabChange}
+              runner={runner}
+              sampleTestCases={exercise.sampleTestCases}
+              submission={submission}
+              tab={outputTab}
+              unreadResult={
+                outputTab !== 'result' &&
+                submission.result !== null &&
+                submission.result.submissionId !== lastReadSubmissionId
+              }
+            />
+          </section>
+        </div>
       </div>
     </div>
   );

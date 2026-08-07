@@ -45,7 +45,10 @@ export function ProblemStatement({
     exercise.outputFormat.trim().length > 0;
 
   return (
-    <div className="space-y-7 px-5 py-5">
+    <div
+      className="max-w-full min-w-0 space-y-7 overflow-x-hidden px-5 py-5"
+      data-testid="problem-statement"
+    >
       {exercise.description.trim() ? (
         <Section title={t('learn:workspace.problem')}>
           {/* Authored HTML stays sandboxed — it must never restyle or script
@@ -62,9 +65,9 @@ export function ProblemStatement({
 
       {hasFormat ? (
         <Section title={t('learn:workspace.format')}>
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid min-w-0 gap-4 @md:grid-cols-2">
             {exercise.inputFormat.trim() ? (
-              <div className="rounded-lg border border-border px-4 py-3">
+              <div className="min-w-0 rounded-lg border border-border px-4 py-3">
                 <dt className="text-[12px] font-bold text-sub">
                   {t('learn:workspace.input')}
                 </dt>
@@ -74,7 +77,7 @@ export function ProblemStatement({
               </div>
             ) : null}
             {exercise.outputFormat.trim() ? (
-              <div className="rounded-lg border border-border px-4 py-3">
+              <div className="min-w-0 rounded-lg border border-border px-4 py-3">
                 <dt className="text-[12px] font-bold text-sub">
                   {t('learn:workspace.output')}
                 </dt>

@@ -188,5 +188,17 @@
       "MEMORY_LIMIT": "Memory limit exceeded",
       "SKIPPED": "Skipped"
     }
+  },
+  "navigator": {
+    "title": "Course",
+    "toggle": "Show or hide the course outline",
+    "close": "Close the course outline",
+    "loading": "Loading the course outline…",
+    "error": "The course outline could not be loaded.",
+    "retry": "Try again",
+    "live": "Live",
+    "footer_student": "Back to the course",
+    "transition_failed": "That problem could not be opened. Your code is untouched.",
+    "transition_retry": "Try again"
   }
 }

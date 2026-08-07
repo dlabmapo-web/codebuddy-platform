@@ -38,6 +38,7 @@ import {
   type AppErrorCode,
   type MonitoringAck,
   type MonitoringVisitEndReason,
+  type NavigatorPath,
   type PresenceEntry,
 } from "@cove/shared";
 import type { Server, Socket } from "socket.io";
@@ -119,6 +120,19 @@ type TerminalRunState = {
   truncated: boolean;
 };
 
+/**
+ * What a watching teacher was last told about this student, per class.
+ *
+ * Movement is published from a comparison rather than from every heartbeat: a
+ * student sitting on one exercise beats every fifteen seconds for an hour, and
+ * a teacher's LIVE marker must move when they move and at no other time.
+ */
+type PublishedContext = {
+  materialId: string | null;
+  courseId: string | null;
+  available: boolean;
+};
+
 type StudentState = {
   academyId: string;
   membershipId: string;
@@ -129,6 +143,8 @@ type StudentState = {
   lastSeenPersistedAt: number | null;
   /** One mirrored run at a time, or none. */
   terminal: TerminalRunState | null;
+  /** The last context announced per class, keyed by class id. */
+  publishedContext: Map<string, PublishedContext>;
 };
 
 type MonitoringSocketData = {
@@ -259,9 +275,16 @@ export class MonitoringGateway
             entry.classId,
             entry.membershipId,
             data.generation,
-          ).then((entryState) =>
-            this.publishPresence(data.student!.academyId, entry.classId, entryState)
-          )
+          ).then(async (entryState) => {
+            await this.publishPresence(
+              data.student!.academyId,
+              entry.classId,
+              entryState,
+            );
+            if (entryState?.state === "RECONNECTING") {
+              this.scheduleWatchContextExpiry(data.student!, entry.classId);
+            }
+          })
         ),
       );
       if (data.student.draftId) {
@@ -416,7 +439,17 @@ export class MonitoringGateway
           this.metrics.increment("watch.replaced");
         }
 
-        await socket.join(monitoringRooms.draft(claim.academyId, draftId));
+        await socket.join([
+          monitoringRooms.draft(claim.academyId, draftId),
+          // Joined by the server, after the whole predicate has passed. The
+          // room name is never accepted from a client, and a teacher without
+          // an authorized watch is never in it.
+          monitoringRooms.watchContext(
+            claim.academyId,
+            claim.classId,
+            claim.studentMembershipId,
+          ),
+        ]);
         const teacher = socket.data.teacher ?? { claims: new Map(), watch: null };
         teacher.claims.set(classClaim.classId, classClaim);
         teacher.watch = { claim, visitId: visit.id, draftId, helping: false };
@@ -494,13 +527,34 @@ export class MonitoringGateway
 
     const student = await this.resolveStudent(socket, parsed.data.academyId);
     if (!student) return;
+    // The same verification the roster needs, selecting the titles the
+    // watch-context event needs as well: a movement event has to name where
+    // the student went, and re-reading the curriculum to find out would put a
+    // second query on the heartbeat path.
     const material = parsed.data.materialId
       ? await this.prisma.material.findFirst({
           where: {
             id: parsed.data.materialId,
             ...effectivelyVisibleMaterialWhere(student.academyId),
           },
-          select: { lecture: { select: { courseModule: { select: { courseId: true } } } } },
+          select: {
+            id: true,
+            title: true,
+            lecture: {
+              select: {
+                id: true,
+                title: true,
+                courseModule: {
+                  select: {
+                    id: true,
+                    title: true,
+                    courseId: true,
+                    course: { select: { id: true, title: true } },
+                  },
+                },
+              },
+            },
+          },
         })
       : null;
     const verifiedCourseId = material?.lecture.courseModule.courseId ?? null;
@@ -534,6 +588,29 @@ export class MonitoringGateway
         active: parsed.data.active,
       });
       await this.publishPresence(student.academyId, entry.classId, state);
+      this.publishWatchContext(student, entry.classId, {
+        available: visibleInClass,
+        materialId: visibleInClass ? material!.id : null,
+        courseId: visibleInClass ? verifiedCourseId : null,
+        path:
+          visibleInClass && material
+            ? {
+                course: {
+                  id: material.lecture.courseModule.course.id,
+                  title: material.lecture.courseModule.course.title,
+                },
+                module: {
+                  id: material.lecture.courseModule.id,
+                  title: material.lecture.courseModule.title,
+                },
+                lecture: {
+                  id: material.lecture.id,
+                  title: material.lecture.title,
+                },
+                exercise: { materialId: material.id, title: material.title },
+              }
+            : null,
+      });
     }
 
     // History for an offline label, written at most once a minute rather than
@@ -1231,6 +1308,7 @@ export class MonitoringGateway
       draftId: null,
       lastSeenPersistedAt: null,
       terminal: null,
+      publishedContext: new Map(),
     };
     socket.data.student = state;
     await socket.join(monitoringRooms.student(academyId, membership.id));
@@ -1271,6 +1349,97 @@ export class MonitoringGateway
       select: { id: true },
     });
     return draft.id;
+  }
+
+  /**
+   * The watched student moved, or stopped being watchable.
+   *
+   * Emitted on a verified change and on nothing else — not on a heartbeat, not
+   * on an activity beat, and not on a material the class is not taught, which
+   * becomes unavailable rather than being broadcast. The payload carries where
+   * the student is and nothing about what they are doing there: no code, no
+   * draft id, no test data, no feedback, and no identity beyond the membership
+   * the teacher already watches.
+   *
+   * Advisory by design. A teacher following it performs a fresh `watchStart`,
+   * so this event is never the authorization for anything.
+   */
+  private publishWatchContext(
+    student: StudentState,
+    classId: string,
+    context: {
+      materialId: string | null;
+      courseId: string | null;
+      path: NavigatorPath | null;
+      available: boolean;
+    },
+  ): void {
+    const previous = student.publishedContext.get(classId);
+    if (
+      previous &&
+      previous.materialId === context.materialId &&
+      previous.courseId === context.courseId &&
+      previous.available === context.available
+    ) {
+      return;
+    }
+    student.publishedContext.set(classId, {
+      materialId: context.materialId,
+      courseId: context.courseId,
+      available: context.available,
+    });
+
+    this.server
+      .to(
+        monitoringRooms.watchContext(
+          student.academyId,
+          classId,
+          student.membershipId,
+        ),
+      )
+      .emit(monitoringServerEvents.studentContextChanged, {
+        studentMembershipId: student.membershipId,
+        materialId: context.materialId,
+        courseId: context.courseId,
+        path: context.path,
+        available: context.available,
+        changedAt: new Date().toISOString(),
+      });
+    this.metrics.increment("watch.context.changed");
+  }
+
+  /**
+   * A dropped transport remains followable during Socket.IO's recovery grace.
+   * If it does not recover, presence becomes authoritative for the absence and
+   * the focused teacher must lose the LIVE marker too. The snapshot check is
+   * essential: an old socket's timer must never clear a newer connection.
+   */
+  private scheduleWatchContextExpiry(
+    student: StudentState,
+    classId: string,
+  ): void {
+    const timer = setTimeout(() => {
+      void this.expireWatchContext(student, classId);
+    }, monitoringTiming.recoveryGraceMs + 1);
+    timer.unref?.();
+  }
+
+  private async expireWatchContext(
+    student: StudentState,
+    classId: string,
+  ): Promise<void> {
+    const snapshot = await this.presence.snapshot(student.academyId, classId);
+    if (!snapshot) return;
+    const current = snapshot.entries.find(
+      (entry) => entry.studentMembershipId === student.membershipId,
+    );
+    if (current && current.state !== "OFFLINE") return;
+    this.publishWatchContext(student, classId, {
+      materialId: null,
+      courseId: null,
+      path: null,
+      available: false,
+    });
   }
 
   private async publishPresence(
@@ -1338,6 +1507,16 @@ export class MonitoringGateway
     this.clearAwareness(watch.claim.academyId, watch.draftId, "TEACHER");
     await socket.leave(
       monitoringRooms.draft(watch.claim.academyId, watch.draftId),
+    );
+    // Movement is only ever delivered to a watch that is still open. A
+    // replaced watch leaves here and joins the new student's room in
+    // `watchStart`, so a teacher never receives two students' movement.
+    await socket.leave(
+      monitoringRooms.watchContext(
+        watch.claim.academyId,
+        watch.claim.classId,
+        watch.claim.studentMembershipId,
+      ),
     );
     const endedAt = new Date().toISOString();
     const payload = {

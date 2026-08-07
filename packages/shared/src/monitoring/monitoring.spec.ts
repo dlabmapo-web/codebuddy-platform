@@ -343,6 +343,9 @@ describe("applyPresenceDelta", () => {
     materialId,
     courseId: null,
     lastActivityAt: null,
+    // Only a connection inside its recovery window carries one, and this row
+    // is connected.
+    stateExpiresAt: null,
     run: null,
     latestSubmissionId: null,
   };

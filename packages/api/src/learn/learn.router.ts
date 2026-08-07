@@ -20,6 +20,11 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.learnService.getExerciseWorkspace(context.identity, input)
       ),
+    getExerciseBootstrap: os.learn.getExerciseBootstrap
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.learnService.getExerciseBootstrap(context.identity, input)
+      ),
     listDrafts: os.learn.listDrafts
       .use(access.authenticated)
       .handler(({ context, input }) =>

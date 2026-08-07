@@ -1,6 +1,7 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
+import { workspaceNavigatorContextSchema } from "../../content/learn.js";
 import {
   listFeedbackInputSchema,
   listMyFeedbackInputSchema,
@@ -9,7 +10,9 @@ import {
   monitoringClassInputSchema,
   monitoringClassRosterSchema,
   monitoringClassSummarySchema,
+  monitoringExercisePreviewSchema,
   monitoringFeedbackSchema,
+  monitoringMaterialInputSchema,
   monitoringStudentContextInputSchema,
   monitoringStudentContextSchema,
 } from "../../monitoring/monitoring.js";
@@ -46,6 +49,25 @@ export const monitoringContract = {
   getStudentContext: oc
     .input(monitoringStudentContextInputSchema)
     .output(monitoringStudentContextSchema),
+  /**
+   * The monitored student's own course, as the navigator draws it.
+   *
+   * Returns that student's progress, which is why it is here rather than on
+   * the learn contract: `learn.getExerciseBootstrap` derives its subject from
+   * the caller's identity and structurally cannot report somebody else's.
+   */
+  getStudentCurriculum: oc
+    .input(monitoringMaterialInputSchema)
+    .output(workspaceNavigatorContextSchema),
+  /**
+   * One exercise the teacher wants to read, without leaving the live watch.
+   *
+   * The public projection only. It has no draft id, so the preview surface has
+   * nothing to join a collaboration room with even by mistake.
+   */
+  getExercisePreview: oc
+    .input(monitoringMaterialInputSchema)
+    .output(monitoringExercisePreviewSchema),
   listFeedback: oc.input(listFeedbackInputSchema).output(
     z.object({
       feedback: z.array(monitoringFeedbackSchema),

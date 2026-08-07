@@ -1,8 +1,10 @@
+import type { LearnCourseOutline } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import type { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
 import type { MonitoringAccessService } from "./monitoring-access.service.js";
 import type { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 import { MonitoringService } from "./monitoring.service.js";
@@ -24,6 +26,8 @@ const classId = "50000000-0000-4000-8000-000000000001";
 const studentMembershipId = "60000000-0000-4000-8000-000000000001";
 const studentUserId = "70000000-0000-4000-8000-000000000001";
 const materialId = "80000000-0000-4000-8000-000000000001";
+const otherMaterialId = "80000000-0000-4000-8000-000000000002";
+const courseId = "90000000-0000-4000-8000-000000000001";
 const draftId = "a0000000-0000-4000-8000-000000000001";
 const updatedAt = new Date("2026-08-04T09:00:00.000Z");
 
@@ -69,6 +73,48 @@ function classRecord(overrides?: {
   };
 }
 
+/** The student's own outline, as the shared builder would return it. */
+function courseOutline(): LearnCourseOutline {
+  return {
+    course: { id: courseId, title: "Python basics", description: "" },
+    progress: { total: 2, started: 1, solved: 1 },
+    modules: [
+      {
+        id: "b0000000-0000-4000-8000-000000000001",
+        title: "Getting started",
+        description: "",
+        position: 1,
+        lectures: [
+          {
+            id: "c0000000-0000-4000-8000-000000000001",
+            title: "Input and output",
+            description: "",
+            position: 1,
+            exercises: [
+              {
+                materialId,
+                title: "Sum two numbers",
+                position: 1,
+                difficulty: "EASY",
+                status: "SOLVED",
+                bestScore: 100,
+              },
+              {
+                materialId: otherMaterialId,
+                title: "Print a triangle",
+                position: 2,
+                difficulty: "MEDIUM",
+                status: "NOT_STARTED",
+                bestScore: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function materialRecord() {
   return {
     id: materialId,
@@ -89,7 +135,7 @@ function materialRecord() {
       inputFormat: "",
       outputFormat: "",
       constraints: "",
-      starterCode: "",
+      starterCode: "print()",
       timeLimitMs: 3_000,
       memoryLimitMb: 256,
       testCases: [
@@ -148,6 +194,8 @@ function createService(options?: {
   feedback?: ReturnType<typeof feedbackRow>[];
   readCount?: number;
   studentSelfError?: AppException;
+  materialError?: AppException;
+  outline?: LearnCourseOutline | null;
 }) {
   const prisma = {
     class: {
@@ -203,6 +251,19 @@ function createService(options?: {
       studentMembershipId,
       studentUserId,
     }),
+    requireMonitorableMaterial: vi.fn().mockImplementation(() =>
+      options?.materialError
+        ? Promise.reject(options.materialError)
+        : Promise.resolve({
+            ...actor,
+            classId,
+            grantedAt: Date.now(),
+            studentMembershipId,
+            studentUserId,
+            materialId,
+            courseId,
+          })
+    ),
     assignedClassScope: vi.fn().mockReturnValue(classScope),
     monitoredMaterialScope: vi.fn().mockReturnValue({ AND: [] }),
     requireStudentSelf: vi.fn().mockImplementation(() =>
@@ -222,8 +283,20 @@ function createService(options?: {
     feedbackRead: vi.fn().mockResolvedValue(undefined),
   } as unknown as MonitoringFeedbackBroadcaster;
 
+  // The outline builder is the student's own, read through a teacher's claim.
+  // Stubbed here so these tests are about the authorization around it.
+  const curriculum = {
+    outlineForCourse: vi.fn().mockResolvedValue(
+      options?.outline === undefined ? courseOutline() : options.outline,
+    ),
+  } as unknown as CurriculumOutlineService;
+
   return {
-    service: new MonitoringService(prisma, access, broadcaster),
+    service: new MonitoringService(prisma, access, broadcaster, curriculum),
+    curriculum: curriculum as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >,
     broadcaster: broadcaster as unknown as Record<
       string,
       ReturnType<typeof vi.fn>
@@ -234,6 +307,7 @@ function createService(options?: {
         findFirstOrThrow: ReturnType<typeof vi.fn>;
       };
       material: { findFirst: ReturnType<typeof vi.fn> };
+      exerciseDraft: { findUnique: ReturnType<typeof vi.fn> };
       teacherFeedback: {
         findMany: ReturnType<typeof vi.fn>;
         updateMany: ReturnType<typeof vi.fn>;
@@ -690,5 +764,117 @@ describe("markMyFeedbackRead", () => {
     await expect(
       service.markMyFeedbackRead(identity, { academyId, materialId }),
     ).rejects.toMatchObject({ code: "MONITORING_ACCESS_DENIED" });
+  });
+});
+
+describe("getStudentCurriculum", () => {
+  const input = { academyId, classId, membershipId: studentMembershipId, materialId };
+
+  it("returns the monitored student's own progress for that course", async () => {
+    const { service, curriculum } = createService();
+
+    const context = await service.getStudentCurriculum(identity, input);
+
+    expect(context.course.progress).toEqual({ total: 2, started: 1, solved: 1 });
+    expect(context.course.modules[0]?.lectures[0]?.exercises).toEqual([
+      expect.objectContaining({ materialId, status: "SOLVED", bestScore: 100 }),
+      expect.objectContaining({
+        materialId: otherMaterialId,
+        status: "NOT_STARTED",
+        // Never 0 for untouched work: an unearned score is absent, not failing.
+        bestScore: null,
+      }),
+    ]);
+    // The subject is the student the claim resolved, never an id from input.
+    expect(curriculum.outlineForCourse).toHaveBeenCalledWith(
+      courseId,
+      academyId,
+      studentUserId,
+    );
+  });
+
+  it("positions the path at the requested exercise", async () => {
+    const { service } = createService();
+    const context = await service.getStudentCurriculum(identity, input);
+    expect(context.path.exercise).toEqual({
+      materialId,
+      title: "Sum two numbers",
+    });
+  });
+
+  it("refuses a material this class is not taught", async () => {
+    const { service } = createService({
+      materialError: new AppException("MONITORING_STUDENT_UNAVAILABLE", 404),
+    });
+    await expect(
+      service.getStudentCurriculum(identity, input),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+  });
+
+  it("refuses a teacher who is not assigned to the class", async () => {
+    const { service } = createService({
+      teacherError: new AppException("PERMISSION_DENIED", 403),
+    });
+    await expect(
+      service.getStudentCurriculum(identity, input),
+    ).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+  });
+
+  /** A hidden course and one outside the claim answer the same way. */
+  it("reports the same unavailable shape when the course cannot be read", async () => {
+    const { service } = createService({ outline: null });
+    await expect(
+      service.getStudentCurriculum(identity, input),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+  });
+});
+
+describe("getExercisePreview", () => {
+  const input = { academyId, classId, membershipId: studentMembershipId, materialId };
+
+  it("returns the public statement, samples, and hints", async () => {
+    const { service } = createService();
+
+    const preview = await service.getExercisePreview(identity, input);
+
+    expect(preview.exercise.starterCode).toBe("print()");
+    expect(preview.exercise.sampleTestCases).toEqual([
+      { position: 1, input: "1 2", expectedOutput: "3" },
+    ]);
+    expect(preview.exercise.hints).toEqual([
+      { position: 1, content: "Use input()." },
+    ]);
+    expect(preview.breadcrumb.course.title).toBe("Python Basics");
+  });
+
+  /**
+   * The structural guarantee, asserted rather than assumed: a preview carries
+   * no hidden expectation and nothing that could address a live document.
+   */
+  it("carries no hidden cases, no draft id, and no student work", async () => {
+    const { service, prisma } = createService();
+
+    const preview = await service.getExercisePreview(identity, input);
+
+    expect(preview.exercise.hiddenTestCaseCount).toBe(1);
+    expect(JSON.stringify(preview)).not.toContain("999 1");
+    expect(preview).not.toHaveProperty("draftId");
+    expect(prisma.exerciseDraft.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("refuses an exercise outside the class's assigned courses", async () => {
+    const { service } = createService({
+      materialError: new AppException("MONITORING_STUDENT_UNAVAILABLE", 404),
+    });
+    await expect(
+      service.getExercisePreview(identity, input),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+  });
+
+  it("refuses a hidden material without disclosing that it exists", async () => {
+    const { service } = createService({ material: null });
+    await expect(
+      service.getExercisePreview(identity, input),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
   });
 });

@@ -26,7 +26,7 @@ import {
 import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { monitoringAck, type MonitoringAckResult } from './types';
-import { canActLive } from './connection';
+import { canEditSynchronizedDraft } from './connection';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
 /**
@@ -59,6 +59,8 @@ export function useLiveWorkspace({
   const [ended, setEnded] = React.useState<MonitoringVisitEndReason | null>(null);
   const [denied, setDenied] = React.useState<string | null>(null);
   const [unsaved, setUnsaved] = React.useState(false);
+  /** The exact draft whose authoritative snapshot has been applied. */
+  const [syncedDraftId, setSyncedDraftId] = React.useState<string | null>(null);
   const [run, setRun] = React.useState<RunActivityPayload | null>(null);
   const [result, setResult] = React.useState<ResultChangedEvent | null>(null);
   const [feedback, setFeedback] = React.useState<MonitoringFeedback[]>([]);
@@ -71,20 +73,54 @@ export function useLiveWorkspace({
   const terminalRef = React.useRef<TerminalTranscript>(emptyTranscript);
   const resyncedAtRef = React.useRef(0);
 
-  // One document per mounted workspace, created once. A state initializer
-  // rather than a lazily filled ref: the document is a value this component
-  // owns for its whole life, not something read back during render.
-  const [doc] = React.useState(() => new Y.Doc());
-  // Socket handlers outlive any one render, so they read the session through a
-  // ref rather than closing over the value they were created with.
+  /**
+   * One document per watch, not one per mounted page.
+   *
+   * A teacher who follows a student to another exercise is joining a different
+   * draft, and reusing the Y.Doc would merge two students' — or one student's
+   * two problems' — histories into a single CRDT that then synchronizes back
+   * to the server. The document is therefore replaced whenever the watch
+   * resolves a different draft, and the old one is destroyed once the
+   * replacement has rendered.
+   */
+  const [doc, setDoc] = React.useState(() => new Y.Doc());
+  // Socket handlers outlive any one render, so they read the document and the
+  // session through refs rather than closing over the values they were created
+  // with.
+  const docRef = React.useRef(doc);
   const sessionRef = React.useRef<LiveWorkspaceSession | null>(null);
   React.useEffect(() => {
     sessionRef.current = session;
   }, [session]);
 
-  React.useEffect(() => () => doc.destroy(), [doc]);
+  /**
+   * Destroyed after the replacement is on screen.
+   *
+   * Passive effects run child-first, so by the time this fires the editor has
+   * already rebound to the new document — the old one is observed by nothing
+   * at the moment it goes away.
+   */
+  const retiredDocRef = React.useRef<Y.Doc | null>(null);
+  React.useEffect(() => {
+    const stale = retiredDocRef.current;
+    retiredDocRef.current = doc;
+    if (stale && stale !== doc) stale.destroy();
+  }, [doc]);
+  React.useEffect(() => () => docRef.current.destroy(), []);
 
   /* ------------------------------------------------------------- the watch */
+
+  /**
+   * Asking the server, again, which exercise this student is on.
+   *
+   * Exposed so `Return to live` is the same command as the initial watch: it
+   * never carries a material id, so a stale marker cannot become an
+   * instruction. The server re-reads presence, revalidates the assignment, the
+   * enrollment, and the material, ends the previous visit, and answers with
+   * the draft the teacher may actually join.
+   */
+  const startWatchRef = React.useRef<(() => void) | null>(null);
+  const follow = React.useCallback(() => startWatchRef.current?.(), []);
 
   React.useEffect(() => {
     if (!socket) return;
@@ -107,6 +143,29 @@ export function useLiveWorkspace({
             return;
           }
           setDenied(null);
+          setEnded(null);
+          // A watch acknowledgement authorizes a room; it does not prove the
+          // room's document has arrived. Even when the material resolves to the
+          // same draft, live mutations wait for this watch's sync response.
+          setSyncedDraftId(null);
+
+          // A different draft is a different watch. Everything the previous
+          // one produced — its document, its terminal, its run and verdict —
+          // describes an exercise this teacher is no longer on, and carrying
+          // any of it forward would show one problem's output beside another
+          // problem's code.
+          if (sessionRef.current?.draftId !== ack.data.draftId) {
+            const replacement = new Y.Doc();
+            docRef.current = replacement;
+            setDoc(replacement);
+            setRun(null);
+            setResult(null);
+            setFeedback([]);
+            setUnsaved(false);
+            terminalRef.current = emptyTranscript;
+            setTerminal(emptyTranscript);
+          }
+
           // Socket events can arrive before React commits the state update.
           // Publish the authorized session to handlers synchronously so the
           // first document snapshot cannot be mistaken for a stale room.
@@ -119,7 +178,7 @@ export function useLiveWorkspace({
             {
               eventId: crypto.randomUUID(),
               draftId: ack.data.draftId,
-              stateVector: Y.encodeStateVector(doc),
+              stateVector: Y.encodeStateVector(docRef.current),
             },
             () => undefined,
           );
@@ -127,10 +186,12 @@ export function useLiveWorkspace({
       );
     };
 
+    startWatchRef.current = startWatch;
     socket.on('connect', startWatch);
     if (socket.connected) startWatch();
 
     return () => {
+      startWatchRef.current = null;
       socket.off('connect', startWatch);
       socket.emit(
         monitoringClientEvents.watchStop,
@@ -138,7 +199,7 @@ export function useLiveWorkspace({
         () => undefined,
       );
     };
-  }, [academyId, classId, doc, report, socket, studentMembershipId]);
+  }, [academyId, classId, report, socket, studentMembershipId]);
 
   /* ---------------------------------------------------------- the document */
 
@@ -147,7 +208,8 @@ export function useLiveWorkspace({
 
     const onSynced = (event: DocumentSyncedEvent) => {
       if (event.draftId !== sessionRef.current?.draftId) return;
-      Y.applyUpdate(doc, toBytes(event.update), 'server');
+      Y.applyUpdate(docRef.current, toBytes(event.update), 'server');
+      setSyncedDraftId(event.draftId);
       // Teacher editing is disabled until this snapshot arrives, so the
       // teacher cannot legitimately be ahead of the server here. Only the
       // student performs bidirectional reconciliation; sending a teacher-side
@@ -157,7 +219,7 @@ export function useLiveWorkspace({
 
     const onUpdated = (event: DocumentUpdatedEvent) => {
       if (event.draftId !== sessionRef.current?.draftId) return;
-      Y.applyUpdate(doc, toBytes(event.update), 'remote');
+      Y.applyUpdate(docRef.current, toBytes(event.update), 'remote');
     };
 
     const onPersisted = (event: DocumentPersistedEvent) => {
@@ -174,7 +236,7 @@ export function useLiveWorkspace({
       socket.off(monitoringServerEvents.documentUpdated, onUpdated);
       socket.off(monitoringServerEvents.documentPersisted, onPersisted);
     };
-  }, [doc, report, socket]);
+  }, [report, socket]);
 
   /** Local edits leave as bounded updates, never as a whole document. */
   React.useEffect(() => {
@@ -276,6 +338,7 @@ export function useLiveWorkspace({
     };
     const onEnded = (event: WatchEndedEvent) => {
       setEnded(event.reason);
+      setSyncedDraftId(null);
       sessionRef.current = null;
       setSession(null);
     };
@@ -342,6 +405,8 @@ export function useLiveWorkspace({
   return {
     doc,
     text,
+    /** Re-resolves the student's current exercise and replaces the watch. */
+    follow,
     session,
     state,
     ended,
@@ -357,9 +422,20 @@ export function useLiveWorkspace({
     publishCursor,
     requestTerminalSnapshot,
     sendFeedback,
+    /**
+     * Shared with the teacher's display controller, which listens for the
+     * watched student's movement on this same connection. Opening a second
+     * socket would rejoin the watch's rooms and double every event.
+     */
+    socket,
     // Editing and feedback stay disabled until the watch and the first
     // document sync are both confirmed.
-    canEdit: canActLive(state) && session !== null && ended === null,
+    canEdit: canEditSynchronizedDraft({
+      state,
+      sessionDraftId: session?.draftId ?? null,
+      syncedDraftId,
+      ended: ended !== null,
+    }),
   };
 }
 

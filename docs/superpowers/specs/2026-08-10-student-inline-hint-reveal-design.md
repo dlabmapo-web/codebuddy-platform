@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-10
 
-**Status:** Approved revision
+**Status:** Implemented
 
 **Scope:** V2 student programming-exercise workspace
 
@@ -11,8 +11,9 @@
 ## 1. Decision
 
 Move the student's hint action out of the crowded fullscreen header and into
-the problem statement. Place a clear progressive-reveal control directly below
-the **Problem** section heading and above the problem description.
+the problem statement. Place a clear progressive-reveal control after the
+complete authored statement content, including description, format, examples,
+and constraints.
 
 The initial control reads **Show a hint** and includes the number of unrevealed
 hints. Each activation reveals exactly one additional authored hint beneath the
@@ -33,10 +34,9 @@ that prefix of the hint list inline near the bottom of the statement.
 
 The feature appears missing because its only entry point is a quiet control in
 the dense top header. At narrower widths its text is hidden, leaving only a
-lightbulb icon among unrelated workspace actions. The revealed content also
-appears far below the description, formats, samples, and constraints, so the
-action and its result are separated from the text where the student needs
-help.
+lightbulb icon among unrelated workspace actions. The revised action remains
+explicit while moving into the statement flow after the content a student
+should attempt to understand first.
 
 The old production workspace makes the action explicit with **View Hint** and
 opens a 360px right drawer. That is discoverable, but it dims the problem,
@@ -46,7 +46,7 @@ old action's clarity while using contextual, progressive inline disclosure.
 ## 3. Goals
 
 - Make authored hints clearly discoverable to students.
-- Place help next to the problem description it explains.
+- Place help after the complete problem statement it supports.
 - Reveal one hint at a time so students request only as much help as needed.
 - Keep revealed hints visible without covering or disabling the editor.
 - Let students collapse and reopen revealed hints without losing reveal
@@ -76,14 +76,22 @@ The **Problem** section renders in this order:
 
 ```text
 PROBLEM
+Problem description
+FORMAT
+Input and output formats
+EXAMPLES
+Sample test cases
+CONSTRAINTS (when authored)
 Need help?  Show a hint (N left)
 Revealed hint cards, when any
-Problem description
 ```
 
 The reveal row is visually secondary to the statement but unmistakably
 interactive. It uses the existing lightbulb icon, brand-soft treatment, and a
 real button with a visible focus state. It does not compete with Run or Submit.
+The reveal and Hide/Show controls remain compact, content-width buttons at
+every breakpoint. On a narrow statement pane the row may wrap naturally, but
+the controls do not expand to fill the available width.
 
 The control is part of the statement's normal document flow. It must not be
 positioned as an overlay, must not reduce the editor width, and must not open a
@@ -164,9 +172,9 @@ Revealed hints are local to the currently displayed exercise.
 - the number already revealed; and
 - a callback that requests the next reveal.
 
-It renders the control and the revealed prefix inside the Problem section,
-before the description. Hint markup moves out of the separate bottom-of-page
-Hints section so there is exactly one rendering path.
+It renders the control and the revealed prefix after the complete authored
+statement content. Hint markup moves out of the separate titled Hints section
+so there is exactly one rendering path without adding another section divider.
 
 The component remains presentational: it does not own navigation, persistence,
 API calls, or the reveal count.
@@ -262,8 +270,8 @@ hints remain unchanged under the existing guarded transition behavior.
 ### End-to-end coverage
 
 1. Open a seeded student exercise with multiple hints.
-2. Verify the hint control is above the description and no Hint action exists
-   in the top header.
+2. Verify the hint control is below the description, format, examples, and
+   constraints, and no Hint action exists in the top header.
 3. Reveal hints one at a time and verify their order and remaining counts.
 4. Hide and reopen the cards, verify the same hints return, and then reveal the
    next hint.
@@ -278,8 +286,10 @@ hints remain unchanged under the existing guarded transition behavior.
 - A student can immediately identify how to request help from the Problem
   section without searching the top header.
 - The action appears only when the displayed exercise has authored hints.
-- One activation reveals one additional authored hint inline above the problem
-  description.
+- One activation reveals one additional authored hint inline after all
+  statement content.
+- Reveal and Hide/Show controls remain compact rather than filling the
+  statement width.
 - Previously revealed hints remain visible and ordered.
 - Students can hide and reopen revealed hints without losing progress.
 - The remaining count is accurate and the reveal-next control disappears when

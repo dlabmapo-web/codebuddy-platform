@@ -198,6 +198,20 @@ or resize the workspace beside it.
 
 ## 7. Component boundaries
 
+### Teacher header placement
+
+The teacher live-workspace header follows the same leading-control order as
+the student problem workspace:
+
+```text
+Back → curriculum navigator trigger → student identity → live problem context
+```
+
+The navigator trigger sits immediately after Back, before the student's avatar
+and name. This makes the shared problem-list action discoverable in the same
+place for both roles. The change reuses the existing trigger and does not alter
+its open state, focus restoration, accessible name, or responsive behavior.
+
 ### Shared monitoring contracts
 
 Extend the document-sync acknowledgement contract to carry the authoritative

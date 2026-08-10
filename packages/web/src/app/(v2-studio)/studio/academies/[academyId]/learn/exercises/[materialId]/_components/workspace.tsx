@@ -47,6 +47,7 @@ export function Workspace({
     string | null
   >(null);
   const [revealedHints, setRevealedHints] = React.useState(0);
+  const [hintsExpanded, setHintsExpanded] = React.useState(true);
   const beforeTransitionRef =
     React.useRef<ExerciseTransitionLifecycle | null>(null);
 
@@ -258,6 +259,7 @@ export function Workspace({
         submission.reset();
         setActiveSample(null);
         setRevealedHints(0);
+        setHintsExpanded(true);
         setOutputTab('terminal');
         setLastReadSubmissionId(null);
       },
@@ -268,6 +270,13 @@ export function Workspace({
   }, [busy, draft, runner, submission]);
 
   const handleNavigate = navigation.navigate;
+
+  // One activation, one hint, never past the end of what this exercise
+  // authored.
+  const hintCount = exercise.hints.length;
+  const handleRevealHint = React.useCallback(() => {
+    setRevealedHints((current) => Math.min(hintCount, current + 1));
+  }, [hintCount]);
 
   const handleOutputTabChange = React.useCallback((tab: OutputTab) => {
     if (outputTab === 'result' && submission.result) {
@@ -302,7 +311,6 @@ export function Workspace({
           }
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
           navigationDisabled={busy}
-          hintsRemaining={Math.max(0, exercise.hints.length - revealedHints)}
           curriculum={
             <CurriculumTrigger
               onToggle={togglePanel}
@@ -318,11 +326,6 @@ export function Workspace({
             if (!window.confirm(t('workspace.reset_confirm'))) return;
             draft.resetTo(exercise.starterCode);
           }}
-          onRevealHint={() =>
-            setRevealedHints((current) =>
-              Math.min(exercise.hints.length, current + 1),
-            )
-          }
           onSubmit={handleSubmit}
           saveState={draft.saveState}
           submitting={submission.submitting}
@@ -403,7 +406,13 @@ export function Workspace({
             style={{ flexBasis: `${statementWidth}%` }}
             {...surfaceProps('statement')}
           >
-            <ProblemStatement exercise={exercise} revealedHints={revealedHints} />
+            <ProblemStatement
+              exercise={exercise}
+              hintsExpanded={hintsExpanded}
+              onHintsExpandedChange={setHintsExpanded}
+              onRevealHint={handleRevealHint}
+              revealedHints={revealedHints}
+            />
           </section>
 
           <div

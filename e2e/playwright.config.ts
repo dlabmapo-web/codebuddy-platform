@@ -47,6 +47,19 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
     },
     {
+      // The reveal row wraps inside a percentage-sized split pane, which is
+      // where a control that fits at desktop stops fitting. Narrow enough to
+      // wrap, wide enough to stay in the two-pane layout the design assumes.
+      name: 'chromium-hints-narrow',
+      testMatch: /student-hints\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 900, height: 800 } },
+    },
+    {
+      name: 'webkit-hints',
+      testMatch: /student-hints\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
       // Safari does not implement COEP `credentialless`; this project guards
       // the `require-corp` isolation contract needed by SharedArrayBuffer and
       // exercises real stdin wake-up through the Pyodide worker.

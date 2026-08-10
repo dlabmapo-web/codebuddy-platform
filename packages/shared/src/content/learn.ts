@@ -48,6 +48,7 @@ export const learnHintSchema = z.object({
   position: positionSchema,
   content: z.string(),
 });
+export type LearnHint = z.infer<typeof learnHintSchema>;
 
 export const learnExerciseSummarySchema = z.object({
   materialId: z.uuid(),

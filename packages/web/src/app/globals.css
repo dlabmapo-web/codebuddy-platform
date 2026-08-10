@@ -126,6 +126,15 @@ h1, h2, h3, h4 {
 .cove-pop[data-state="open"] { animation: cove-pop-in 140ms ease-out; }
 .cove-pop[data-state="closed"] { animation: cove-pop-out 110ms ease-in; }
 
+/* A hint arriving under the reveal control. Short and downward: the card came
+   from the button the student just pressed, and the eye should follow it there
+   rather than hunt for what changed. */
+@keyframes cove-hint-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cove-hint-in { animation: cove-hint-in 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+
 /* Radix reports the natural height, so the outline can slide open. */
 @keyframes cove-collapse-open {
   from { height: 0; opacity: 0; }
@@ -140,7 +149,7 @@ h1, h2, h3, h4 {
 .cove-collapse[data-state="closed"] { animation: cove-collapse-close 150ms cubic-bezier(0.32, 0.72, 0, 1); }
 
 @media (prefers-reduced-motion: reduce) {
-  .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse { animation: none !important; }
+  .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse, .cove-hint-in { animation: none !important; }
 }
 
 .tiptap-render p { margin: 0.4em 0; }

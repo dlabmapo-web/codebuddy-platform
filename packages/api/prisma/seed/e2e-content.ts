@@ -34,6 +34,12 @@ export const e2eContent = {
   echoTitle: "Echo the input",
   sumTitle: "Sum two numbers",
   hiddenExerciseTitle: "Never visible to students",
+  /** Authored order matters: the workspace reveals this list front to back. */
+  echoHints: [
+    "Read one line with input().",
+    "Store what you read in a variable.",
+    "Print the variable back out.",
+  ],
   /** Must never appear in any student-facing response. */
   hiddenSentinel: "E2E_HIDDEN_SENTINEL",
 } as const;
@@ -106,6 +112,12 @@ export async function seedE2eContent(prisma: PrismaClient) {
         { position: 1, input: "hello\n", expectedOutput: "hello", visibility: "SAMPLE" as const },
         { position: 2, input: `${e2eContent.hiddenSentinel}\n`, expectedOutput: e2eContent.hiddenSentinel, visibility: "HIDDEN" as const },
       ],
+      // The only seeded exercise with hints, so the student journey can prove
+      // both branches: progressive reveal here, no control at all on the next.
+      hints: e2eContent.echoHints.map((content, index) => ({
+        position: index + 1,
+        content,
+      })),
     },
     {
       materialId: e2eContent.sumMaterialId,
@@ -174,6 +186,20 @@ export async function seedE2eContent(prisma: PrismaClient) {
         ...testCase,
       })),
     });
+
+    // Replaced rather than upserted, for the same reason the cases are: the
+    // fixture owns the whole list, and a shortened list has to shrink.
+    await prisma.exerciseHint.deleteMany({
+      where: { exerciseMaterialId: exercise.materialId },
+    });
+    if (exercise.hints?.length) {
+      await prisma.exerciseHint.createMany({
+        data: exercise.hints.map((hint) => ({
+          exerciseMaterialId: exercise.materialId,
+          ...hint,
+        })),
+      });
+    }
   }
 
   // Without this the Playwright student is enrolled nowhere and the whole

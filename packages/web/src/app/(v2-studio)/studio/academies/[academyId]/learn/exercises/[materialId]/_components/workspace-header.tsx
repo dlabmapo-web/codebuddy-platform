@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
-  Lightbulb,
   RotateCcw,
   Send,
 } from 'lucide-react';
@@ -40,9 +39,7 @@ export function WorkspaceHeader({
   navigationDisabled,
   onSubmit,
   onReset,
-  onRevealHint,
   submitting,
-  hintsRemaining,
   indicator,
   feedback,
 }: {
@@ -68,9 +65,7 @@ export function WorkspaceHeader({
   navigationDisabled: boolean;
   onSubmit: () => void;
   onReset: () => void;
-  onRevealHint: () => void;
   submitting: boolean;
-  hintsRemaining: number;
 }) {
   const { t } = useLayoutTranslation(['learn', 'content']);
   const { breadcrumb, exercise, neighbors } = workspace;
@@ -119,10 +114,9 @@ export function WorkspaceHeader({
         </span>
       )}
 
-      {/* Quiet controls: available, but never competing with Submit. */}
-      {hintsRemaining > 0 ? (
-        <QuietButton icon={Lightbulb} label={t('learn:workspace.hint')} onClick={onRevealHint} />
-      ) : null}
+      {/* Quiet control: available, but never competing with Submit. Reset acts
+          on the workspace, so it belongs here; asking for a hint acts on the
+          problem, and lives in the statement beside the text it explains. */}
       <QuietButton icon={RotateCcw} label={t('learn:workspace.reset')} onClick={onReset} />
 
       <nav className="flex shrink-0 items-center gap-1">
@@ -168,7 +162,7 @@ function QuietButton({
   label,
   onClick,
 }: {
-  icon: typeof Lightbulb;
+  icon: typeof RotateCcw;
   label: string;
   onClick: () => void;
 }) {

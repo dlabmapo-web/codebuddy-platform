@@ -4,6 +4,7 @@ import {
   monitoringClientEvents,
   monitoringServerEvents,
   type DocumentPersistedEvent,
+  type DocumentSyncResult,
   type DocumentSyncedEvent,
   type DocumentUpdatedEvent,
   type FeedbackCreatedEvent,
@@ -25,8 +26,9 @@ import {
 
 import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
-import { monitoringAck, type MonitoringAckResult } from './types';
 import { canEditSynchronizedDraft } from './connection';
+import { applyDocumentSyncResult, toBytes } from './document-sync';
+import { monitoringAck, type MonitoringAckResult } from './types';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
 /**
@@ -94,6 +96,31 @@ export function useLiveWorkspace({
   }, [session]);
 
   /**
+   * One completion path for the command acknowledgement and compatibility
+   * event. It validates the binary payload and exact current draft before the
+   * readiness marker can unlock Monaco.
+   */
+  const completeDocumentSync = React.useCallback(
+    (result: unknown) => {
+      const current = sessionRef.current;
+      if (
+        !current ||
+        !applyDocumentSyncResult({
+          currentDraftId: current.draftId,
+          doc: docRef.current,
+          result,
+        })
+      ) {
+        return false;
+      }
+      setSyncedDraftId(current.draftId);
+      report({ type: 'synchronized' });
+      return true;
+    },
+    [report],
+  );
+
+  /**
    * Destroyed after the replacement is on screen.
    *
    * Passive effects run child-first, so by the time this fires the editor has
@@ -148,6 +175,7 @@ export function useLiveWorkspace({
           // room's document has arrived. Even when the material resolves to the
           // same draft, live mutations wait for this watch's sync response.
           setSyncedDraftId(null);
+          report({ type: 'recovery_failed' });
 
           // A different draft is a different watch. Everything the previous
           // one produced — its document, its terminal, its run and verdict —
@@ -180,7 +208,18 @@ export function useLiveWorkspace({
               draftId: ack.data.draftId,
               stateVector: Y.encodeStateVector(docRef.current),
             },
-            () => undefined,
+            monitoringAck<DocumentSyncResult>((syncAck) => {
+              // A replaced watch may name the same draft, so the visit as well
+              // as the draft must still be current when its acknowledgement
+              // arrives.
+              if (
+                !syncAck?.ok ||
+                sessionRef.current?.visitId !== ack.data.visitId
+              ) {
+                return;
+              }
+              completeDocumentSync(syncAck.data);
+            }),
           );
         }),
       );
@@ -199,7 +238,14 @@ export function useLiveWorkspace({
         () => undefined,
       );
     };
-  }, [academyId, classId, report, socket, studentMembershipId]);
+  }, [
+    academyId,
+    classId,
+    completeDocumentSync,
+    report,
+    socket,
+    studentMembershipId,
+  ]);
 
   /* ---------------------------------------------------------- the document */
 
@@ -207,14 +253,7 @@ export function useLiveWorkspace({
     if (!socket) return;
 
     const onSynced = (event: DocumentSyncedEvent) => {
-      if (event.draftId !== sessionRef.current?.draftId) return;
-      Y.applyUpdate(docRef.current, toBytes(event.update), 'server');
-      setSyncedDraftId(event.draftId);
-      // Teacher editing is disabled until this snapshot arrives, so the
-      // teacher cannot legitimately be ahead of the server here. Only the
-      // student performs bidirectional reconciliation; sending a teacher-side
-      // delta during bootstrap would falsely classify setup as active help.
-      report({ type: 'synchronized' });
+      completeDocumentSync(event);
     };
 
     const onUpdated = (event: DocumentUpdatedEvent) => {
@@ -236,7 +275,7 @@ export function useLiveWorkspace({
       socket.off(monitoringServerEvents.documentUpdated, onUpdated);
       socket.off(monitoringServerEvents.documentPersisted, onPersisted);
     };
-  }, [report, socket]);
+  }, [completeDocumentSync, socket]);
 
   /** Local edits leave as bounded updates, never as a whole document. */
   React.useEffect(() => {
@@ -437,12 +476,4 @@ export function useLiveWorkspace({
       ended: ended !== null,
     }),
   };
-}
-
-/**
- * Socket.IO hands binary payloads back as `ArrayBuffer` in some transports and
- * as `Uint8Array` in others; Yjs needs the view either way.
- */
-function toBytes(value: Uint8Array | ArrayBuffer): Uint8Array {
-  return value instanceof Uint8Array ? value : new Uint8Array(value);
 }

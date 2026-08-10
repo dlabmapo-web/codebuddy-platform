@@ -49,6 +49,10 @@ function createGateway(overrides?: {
   markInterrupted?: () => Promise<PresenceEntry | null>;
   snapshot?: () => Promise<PresenceSnapshot | null>;
   flush?: () => Promise<void>;
+  sync?: (
+    draftId: string,
+    stateVector: Uint8Array,
+  ) => Promise<{ update: Uint8Array; stateVector: Uint8Array }>;
   prisma?: unknown;
 }) {
   const emissions: Emission[] = [];
@@ -76,6 +80,13 @@ function createGateway(overrides?: {
   };
   const documents = {
     flush: vi.fn().mockImplementation(overrides?.flush ?? (async () => undefined)),
+    sync: vi.fn().mockImplementation(
+      overrides?.sync ??
+        (async () => ({
+          update: new Uint8Array(),
+          stateVector: new Uint8Array(),
+        })),
+    ),
   };
   const visits = { end: vi.fn().mockResolvedValue(undefined) };
   const activeWatches = {
@@ -162,6 +173,73 @@ const awarenessClears = (emissions: Emission[]) =>
   emissions.filter(
     (entry) => entry.event === monitoringServerEvents.awarenessChanged,
   );
+
+describe("documentSync", () => {
+  it("returns the authorized authoritative sync in the acknowledgement", async () => {
+    const update = new Uint8Array([1, 2, 3]);
+    const stateVector = new Uint8Array([4, 5]);
+    const { gateway, documents } = createGateway({
+      sync: async () => ({ update, stateVector }),
+    });
+    const socket = createSocket({
+      teacher: {
+        claims: new Map(),
+        watch: {
+          claim: { ...claim, grantedAt: Date.now() },
+          visitId,
+          draftId,
+          helping: false,
+        },
+      },
+    });
+
+    const ack = await gateway.documentSync(socket, {
+      eventId: visitId,
+      draftId,
+      stateVector: new Uint8Array(),
+    });
+
+    expect(ack).toEqual({
+      ok: true,
+      eventId: visitId,
+      data: { draftId, update, stateVector },
+    });
+    expect(documents.sync).toHaveBeenCalledWith(draftId, new Uint8Array());
+    expect(socket.emitted).toContainEqual({
+      room: "self",
+      event: monitoringServerEvents.documentSynced,
+      payload: { draftId, update, stateVector },
+    });
+  });
+
+  it("returns no sync payload for a draft outside the active watch", async () => {
+    const { gateway, documents } = createGateway();
+    const socket = createSocket({
+      teacher: {
+        claims: new Map(),
+        watch: {
+          claim: { ...claim, grantedAt: Date.now() },
+          visitId,
+          draftId,
+          helping: false,
+        },
+      },
+    });
+
+    const ack = await gateway.documentSync(socket, {
+      eventId: visitId,
+      draftId: "a0000000-0000-4000-8000-0000000000ff",
+      stateVector: new Uint8Array(),
+    });
+
+    expect(ack).toEqual({
+      ok: false,
+      eventId: visitId,
+      code: "MONITORING_ACCESS_DENIED",
+    });
+    expect(documents.sync).not.toHaveBeenCalled();
+  });
+});
 
 describe("handleDisconnect", () => {
   it("clears a departed student's pointer and caret in the draft room", async () => {

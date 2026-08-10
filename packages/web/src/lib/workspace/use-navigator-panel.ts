@@ -13,7 +13,11 @@ import * as React from 'react';
  * the element the reader used to get here.
  */
 export function useNavigatorPanel(panelId: string) {
-  const [open, setOpen] = React.useState(false);
+  // Every fresh student or teacher problem workspace starts with its course
+  // context visible. This state stays local to the mounted workspace: closing
+  // survives in-place problem movement, while leaving and re-entering starts
+  // open again without persisting a preference.
+  const [open, setOpen] = React.useState(true);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const close = React.useCallback(() => {

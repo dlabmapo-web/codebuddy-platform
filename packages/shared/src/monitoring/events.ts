@@ -133,6 +133,31 @@ const stateVectorSchema = z
     message: "state vector exceeds the maximum size",
   });
 
+/**
+ * Socket.IO may deserialize server-to-client binary data as either view.
+ * Accept both on responses while keeping client commands as Uint8Array, which
+ * is the representation the server-side Yjs service consumes directly.
+ */
+const responseBinaryUpdateSchema = z.union([
+  binaryUpdateSchema,
+  z
+    .instanceof(ArrayBuffer)
+    .refine(
+      (value) => value.byteLength <= monitoringLimits.documentUpdateMaxBytes,
+      { message: "update exceeds the maximum size" },
+    ),
+]);
+
+const responseStateVectorSchema = z.union([
+  stateVectorSchema,
+  z
+    .instanceof(ArrayBuffer)
+    .refine(
+      (value) => value.byteLength <= monitoringLimits.stateVectorMaxBytes,
+      { message: "state vector exceeds the maximum size" },
+    ),
+]);
+
 export const documentSyncPayloadSchema = commandBase.extend({
   draftId: z.uuid(),
   stateVector: stateVectorSchema,
@@ -208,13 +233,15 @@ export const watchEndedEventSchema = z.object({
   endedAt: z.iso.datetime(),
 });
 
-export const documentSyncedEventSchema = z.object({
+export const documentSyncResultSchema = z.object({
   draftId: z.uuid(),
   /** Only what the peer is missing, empty when it is already current. */
-  update: binaryUpdateSchema,
+  update: responseBinaryUpdateSchema,
   /** The server's own vector, so the client can offer what the server lacks. */
-  stateVector: stateVectorSchema,
+  stateVector: responseStateVectorSchema,
 });
+
+export const documentSyncedEventSchema = documentSyncResultSchema;
 
 export const documentUpdatedEventSchema = z.object({
   draftId: z.uuid(),
@@ -378,6 +405,11 @@ export type ClassJoinPayload = z.infer<typeof classJoinPayloadSchema>;
 export type WatchStartPayload = z.infer<typeof watchStartPayloadSchema>;
 export type PresencePublishPayload = z.infer<typeof presencePublishPayloadSchema>;
 export type DocumentSyncPayload = z.infer<typeof documentSyncPayloadSchema>;
+export type DocumentSyncResult = {
+  draftId: string;
+  update: Uint8Array | ArrayBuffer;
+  stateVector: Uint8Array | ArrayBuffer;
+};
 export type DocumentUpdatePayload = z.infer<typeof documentUpdatePayloadSchema>;
 export type AwarenessUpdatePayload = z.infer<typeof awarenessUpdatePayloadSchema>;
 export type RunActivityPayload = z.infer<typeof runActivityPayloadSchema>;
@@ -388,7 +420,7 @@ export type DocumentPersistedEvent = z.infer<
 export type FeedbackSendPayload = z.infer<typeof feedbackSendPayloadSchema>;
 export type WatchStartedEvent = z.infer<typeof watchStartedEventSchema>;
 export type WatchEndedEvent = z.infer<typeof watchEndedEventSchema>;
-export type DocumentSyncedEvent = z.infer<typeof documentSyncedEventSchema>;
+export type DocumentSyncedEvent = DocumentSyncResult;
 export type DocumentUpdatedEvent = z.infer<typeof documentUpdatedEventSchema>;
 export type AwarenessChangedEvent = z.infer<typeof awarenessChangedEventSchema>;
 export type ResultChangedEvent = z.infer<typeof resultChangedEventSchema>;

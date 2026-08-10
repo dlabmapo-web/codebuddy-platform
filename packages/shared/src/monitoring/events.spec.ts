@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { monitoringLimits } from "./monitoring.js";
 import {
+  documentSyncResultSchema,
   documentUpdatePayloadSchema,
   feedbackSendPayloadSchema,
   monitoringAckSchema,
@@ -114,6 +115,38 @@ describe("documentUpdatePayloadSchema", () => {
         eventId,
         draftId,
         update: "print(1)",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("documentSyncResultSchema", () => {
+  it("accepts both Socket.IO binary response representations", () => {
+    expect(
+      documentSyncResultSchema.parse({
+        draftId,
+        update: new Uint8Array([1, 2, 3]),
+        stateVector: new ArrayBuffer(2),
+      }),
+    ).toEqual({
+      draftId,
+      update: new Uint8Array([1, 2, 3]),
+      stateVector: new ArrayBuffer(2),
+    });
+  });
+
+  it("rejects incomplete and oversized sync results", () => {
+    expect(
+      documentSyncResultSchema.safeParse({
+        draftId,
+        update: new Uint8Array(),
+      }).success,
+    ).toBe(false);
+    expect(
+      documentSyncResultSchema.safeParse({
+        draftId,
+        update: new ArrayBuffer(monitoringLimits.documentUpdateMaxBytes + 1),
+        stateVector: new Uint8Array(),
       }).success,
     ).toBe(false);
   });

@@ -36,6 +36,7 @@ import {
   terminalStateMessageSchema,
   watchStartPayloadSchema,
   type AppErrorCode,
+  type DocumentSyncResult,
   type MonitoringAck,
   type MonitoringVisitEndReason,
   type NavigatorPath,
@@ -835,7 +836,7 @@ export class MonitoringGateway
   async documentSync(
     @ConnectedSocket() socket: MonitoringSocket,
     @MessageBody() body: unknown,
-  ): Promise<MonitoringAck<{ draftId: string }>> {
+  ): Promise<MonitoringAck<DocumentSyncResult>> {
     return this.command(
       socket,
       monitoringClientEvents.documentSync,
@@ -849,13 +850,14 @@ export class MonitoringGateway
           payload.draftId,
           payload.stateVector,
         );
-        socket.emit(monitoringServerEvents.documentSynced, {
+        const result: DocumentSyncResult = {
           draftId: payload.draftId,
           update: sync.update,
           stateVector: sync.stateVector,
-        });
+        };
+        socket.emit(monitoringServerEvents.documentSynced, result);
         this.metrics.increment("document.resync");
-        return { draftId: payload.draftId };
+        return result;
       },
     );
   }

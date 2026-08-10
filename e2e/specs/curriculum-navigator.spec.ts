@@ -60,15 +60,18 @@ async function expectStatementContentContained(page: Page) {
   );
 }
 
-test('starts closed, and opens as a column that takes width from the panes', async ({
+test('starts open, and can reopen as a column that takes width from the panes', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openWorkspace(page);
 
-  // Fresh entries start closed: the workspace is what the student came for.
+  // Fresh problem entries show course context, but the reader still owns the
+  // panel for the rest of this mounted workspace.
+  await expect(panel(page)).toBeVisible();
+  await expect(trigger(page)).toHaveAttribute('aria-expanded', 'true');
+  await trigger(page).click();
   await expect(panel(page)).toHaveCount(0);
-  await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
 
   const before = await statement(page).boundingBox();
   const paneRowBefore = await statement(page)
@@ -111,7 +114,6 @@ test('is still a column at two-pane widths below the desktop breakpoint', async 
 }) => {
   await page.setViewportSize({ width: 900, height: 900 });
   await openWorkspace(page);
-  await trigger(page).click();
 
   const panelBox = (await panel(page).boundingBox())!;
   const statementBox = (await statement(page).boundingBox())!;
@@ -128,7 +130,6 @@ test('keeps sample blocks inside the resized statement on Safari', async ({
 }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openWorkspace(page);
-  await trigger(page).click();
   await panel(page)
     .getByRole('button')
     .filter({ hasText: 'Doing arithmetic' })
@@ -163,7 +164,6 @@ test('keeps sample blocks inside the resized statement on Safari', async ({
 test('overlays without trapping focus once the panes stack', async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 900 });
   await openWorkspace(page);
-  await trigger(page).click();
 
   const panelBox = (await panel(page).boundingBox())!;
   expect(
@@ -177,7 +177,6 @@ test('overlays without trapping focus once the panes stack', async ({ page }) =>
 test('closes on Escape and returns focus to the trigger', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openWorkspace(page);
-  await trigger(page).click();
   await expect(panel(page)).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -192,7 +191,6 @@ test('moves from any row and reconciles browser Back through the same workspace'
   await page.setViewportSize({ width: 1440, height: 900 });
   await openWorkspace(page);
   const originalUrl = page.url();
-  await trigger(page).click();
 
   // Selecting the row already displayed is a true no-op: the URL, open panel,
   // and workspace remain exactly where they are.

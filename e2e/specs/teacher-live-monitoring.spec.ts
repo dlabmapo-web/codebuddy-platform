@@ -168,6 +168,19 @@ test('the teacher opens the live workspace and the student is told', async () =>
     timeout: 30_000,
   });
 
+  // Match the student's workspace: Back, then the problem-list trigger, then
+  // the identity/context the teacher is watching.
+  const outlineTrigger = teacherPage
+    .getByRole('button', { name: /course outline|코스 목차/i })
+    .first();
+  await expect(outlineTrigger).toHaveAttribute('aria-expanded', 'true');
+  const triggerBox = (await outlineTrigger.boundingBox())!;
+  const studentBox = (await teacherPage
+    .getByText('Cove Student', { exact: true })
+    .first()
+    .boundingBox())!;
+  expect(triggerBox.x).toBeLessThan(studentBox.x);
+
   // Generic, and only generic: the teacher's name must not appear anywhere in
   // what the student's browser renders.
   await expect(
@@ -732,11 +745,11 @@ test('curriculum preview is read-only and returns to the synchronized live watch
   const outlineTrigger = teacherPage
     .getByRole('button', { name: /course outline|코스 목차/i })
     .first();
-  await outlineTrigger.click();
   const outline = teacherPage.locator(
     'aside[data-collab-surface="curriculum"]',
   );
   await expect(outline).toBeVisible();
+  await expect(outlineTrigger).toHaveAttribute('aria-expanded', 'true');
 
   await outline
     .getByRole('button')

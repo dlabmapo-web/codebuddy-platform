@@ -70,6 +70,8 @@ export function LiveHeader({
         <ArrowLeft className="size-4" />
       </Link>
 
+      {curriculum}
+
       <div className="flex min-w-0 items-center gap-2.5">
         {/* The peer violet, the same one their caret draws in. */}
         <span
@@ -85,8 +87,6 @@ export function LiveHeader({
           <p className="truncate text-[11.5px] text-sub">{context.class.name}</p>
         </div>
       </div>
-
-      {curriculum}
 
       {exercise ? (
         <div className="hidden min-w-0 flex-1 border-l border-border pl-3 xl:block">

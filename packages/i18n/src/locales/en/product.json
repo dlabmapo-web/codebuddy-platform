@@ -1,0 +1,73 @@
+{
+  "meta": {
+    "title": "Cove Studio — a coding platform that started in a real classroom",
+    "description": "From a student running their first line of code to a teacher running the room, Cove Studio holds the whole lesson. Python in the browser, automatic grading, live class monitoring."
+  },
+  "hero": {
+    "eyebrow": "Cove Studio",
+    "title": "The coding environment a class actually runs on",
+    "lead": "No twenty minutes lost to install instructions. Students open a browser and start writing; teachers see how far the whole room has gotten on one screen.",
+    "cta_primary": "Talk to us about adoption",
+    "cta_secondary": "Sign in",
+    "back": "COVE Edu home"
+  },
+  "student": {
+    "eyebrow": "For students",
+    "title": "Nobody gets left stuck",
+    "lead": "The problem, the editor, and the output share one screen. Submitting shows which test failed and why, and a hint opens right where it was asked for.",
+    "point_1_title": "Python with nothing to install",
+    "point_1_body": "It runs inside the browser, so a school laptop and an academy desktop behave the same way.",
+    "point_2_title": "Programs that read input, too",
+    "point_2_body": "Exercises using input() run for real in a terminal, prompt and answer both.",
+    "point_3_title": "Not just pass or fail",
+    "point_3_body": "Which input, what was expected, what came back instead.",
+    "point_4_title": "Hints, only when asked",
+    "point_4_body": "The answer is never handed over first. A student asks, and it opens in place.",
+    "shot_alt": "The student view — problem description, code editor, and result panel"
+  },
+  "teacher": {
+    "eyebrow": "For teachers",
+    "title": "You can see what's happening in the room",
+    "lead": "Finding out who's stuck shouldn't mean walking a lap. It's on the roster, and if you need to, you can open that student's screen.",
+    "point_1_title": "A roster that updates itself",
+    "point_1_body": "Who's connected and how far along, per student, as it changes.",
+    "point_2_title": "Watch a student's screen",
+    "point_2_body": "Their code and their output, live, down to where the cursor is.",
+    "point_3_title": "Classes and courses",
+    "point_3_body": "Build the curriculum, assign it to a class, enrol the students — in one place.",
+    "point_4_title": "Write your own problems",
+    "point_4_body": "Description, starter code, test cases, and hints, authored by the teacher.",
+    "shot_alt": "The teacher monitoring view — class roster with live progress"
+  },
+  "flow": {
+    "eyebrow": "How it fits",
+    "title": "Curriculum to evidence, without a gap",
+    "step_1_title": "Curriculum",
+    "step_1_body": "Design the course as subjects, chapters, and lessons.",
+    "step_2_title": "Classes",
+    "step_2_body": "Enrol students and assign the teacher who takes them.",
+    "step_3_title": "The lesson",
+    "step_3_body": "Students solve; teachers watch the same screen.",
+    "step_4_title": "Progress data",
+    "step_4_body": "Submissions and results accumulate into a reason for what comes next."
+  },
+  "detail": {
+    "eyebrow": "Details",
+    "title": "The things that used to get in the way",
+    "item_1_title": "Korean and English",
+    "item_1_body": "The whole interface is ready in both.",
+    "item_2_title": "Light and dark",
+    "item_2_body": "Whichever a student picks, it's remembered.",
+    "item_3_title": "A browser is enough",
+    "item_3_body": "Chrome, Edge, Safari, and Firefox all behave the same.",
+    "item_4_title": "Per academy and school",
+    "item_4_body": "Members and permissions are scoped to the institution they belong to."
+  },
+  "close": {
+    "title": "Thinking about bringing it in?",
+    "lead": "An academy, a school, or a university can start with a single class. Tell us how you teach and we'll propose the setup that fits.",
+    "phone_label": "Talk to us",
+    "phone": "+82 2-6941-1311",
+    "cta": "About COVE Edu"
+  }
+}

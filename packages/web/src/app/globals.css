@@ -1,38 +1,106 @@
 @import "tailwindcss";
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
-@theme {
-  --color-primary: #E8461C;
-  --color-primary-hover: #C93A15;
-  --color-primary-light: #FDEDE7;
-  --color-ink: #16181D;
-  --color-sub: #5A6270;
-  --color-border: #E5E8EC;
-  --color-surface: #F6F7F9;
-  --color-success: #16A34A;
-  --color-danger: #DC2626;
-  --color-warning: #D97706;
-  --color-editor-bg: #1E1E1E;
+/*
+ * Theming, in two layers.
+ *
+ * The palette below is plain custom properties, redefined per theme. The
+ * `@theme inline` block further down maps them onto Tailwind's colour names.
+ * The `inline` keyword is what makes the whole thing work: without it Tailwind
+ * resolves each var() at build time and the dark overrides do nothing.
+ *
+ * Component code never references a `--palette` name and never writes a
+ * `dark:` variant. `bg-card`, `text-ink`, `border-border` switch on their own.
+ *
+ * See docs/superpowers/specs/2026-08-11-light-dark-theme-design.md.
+ */
+
+/*
+ * Tailwind v4 has no `darkMode` config option; the class variant is declared
+ * here instead. Dark is always an explicit choice — the `.dark` class the
+ * server renders from the cookie — so there is no media query to consult.
+ *
+ * Cove code does not use this variant. It exists for third-party markup and
+ * one-off cases the token layer cannot reach.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * `.theme-light` pins a subtree to the light palette regardless of the theme
+ * on `<html>`.
+ *
+ * It exists for the v1-era route groups. Those pages carry over 1,200 colours
+ * in inline `style` props, which no class-based migration reaches, so their
+ * tokenised surfaces would darken while their hardcoded text stayed near-black:
+ * unreadable, and worse than not migrating them at all. They are removed at the
+ * v1 cutover, so pinning them costs nothing and rewriting them buys nothing.
+ *
+ * Custom properties inherit from the nearest declaring ancestor, so a
+ * `.theme-light` element inside `<html class="dark">` wins for its own subtree
+ * without any specificity contest.
+ */
+:root,
+.theme-light {
+  color-scheme: light;
+
+  /*
+   * Surfaces, from the page up. In light, a raised surface is white on a grey
+   * page and carries a shadow. `canvas` is the page, `card` is what sits on it.
+   */
+  --canvas: #F4F7FC;
+  --surface: #F6F7F9;
+  --card: #FFFFFF;
+  --muted: #F6F7F9;
+  --accent: #F1F5F9;
+  --border: #E5E8EC;
+
+  --ink: #16181D;
+  --sub: #5A6270;
+
+  --primary: #E8461C;
+  --primary-hover: #C93A15;
+  --primary-light: #FDEDE7;
 
   /* Auth-specific brand + cool neutrals */
-  --color-brand: #1B64DA;
-  --color-brand-deep: #1450B5;
-  --color-brand-soft: #EAF1FE;
-  --color-canvas: #F4F7FC;
+  --brand: #1B64DA;
+  --brand-deep: #1450B5;
+  --brand-soft: #EAF1FE;
+
+  /*
+   * The full-height brand plane on the auth screens, and only that.
+   *
+   * It cannot borrow `--brand`: the other brand tokens lighten in dark so they
+   * can carry text and small fills, and a surface covering half the viewport
+   * has the opposite requirement. Large planes recede in dark; they do not get
+   * brighter than their light-mode selves.
+   */
+  --brand-panel: #1B64DA;
+  --on-brand-panel: #FFFFFF;
+
+  /*
+   * Status. `success` and `warning` are darker than the hues they read as:
+   * the lighter #16A34A and #D97706 they replaced sat at 3.3:1 and 3.2:1 as
+   * label text on a white card, below the 4.5:1 body-text bar. Both are used
+   * as text on `bg-success/10` chips, not only as icon fills, so the darker
+   * pair is the one that can carry a word.
+   */
+  --success: #15803D;
+  --danger: #DC2626;
+  --warning: #B45309;
 
   /*
    * The other person in a shared workspace. One colour carries the whole idea:
    * the peer's caret, the tab holding their output, and the badge naming them
    * are all this violet, so a teacher never has to ask whose anything is.
    */
-  --color-peer: #7C3AED;
-  --color-peer-soft: #F3EEFE;
+  --peer: #7C3AED;
+  --peer-soft: #F3EEFE;
 
   /* Content lifecycle: draft is in progress, brand blue is live, slate is retired */
-  --color-draft: #A45A08;
-  --color-draft-soft: #FDF4E3;
-  --color-retired: #64748B;
-  --color-retired-soft: #F1F5F9;
+  --draft: #A45A08;
+  --draft-soft: #FDF4E3;
+  --retired: #5A677A;
+  --retired-soft: #F1F5F9;
 
   /*
    * Live presence. Two states the other families cannot say: `present` is
@@ -44,28 +112,171 @@
    * Both foregrounds are darker than the hue they read as, so the badge text
    * clears 4.5:1 against its own tint.
    */
-  --color-present: #15803D;
-  --color-present-soft: #E9F7EF;
-  --color-unstable: #475569;
-  --color-unstable-soft: #EEF2F6;
+  --present: #15803D;
+  --present-soft: #E9F7EF;
+  --unstable: #475569;
+  --unstable-soft: #EEF2F6;
 
-  /* Surfaces used by the shared UI primitives */
-  --color-muted: #F6F7F9;
-  --color-accent: #F1F5F9;
-  --color-ring: #1B64DA;
-  --color-sidebar: #FFFFFF;
-  --color-sidebar-border: #E9EDF3;
-  --color-sidebar-accent: #EAF1FE;
+  --ring: #1B64DA;
+  --sidebar: #FFFFFF;
+  --sidebar-border: #E9EDF3;
+  --sidebar-accent: #EAF1FE;
 
+  /*
+   * The label on a filled swatch of the colour it names. Separate tokens
+   * because dark mode lightens its fills rather than darkening them: white on
+   * the dark-theme brand blue is 3.0:1, while near-black on it is 6.3:1.
+   */
+  --on-brand: #FFFFFF;
+  --on-primary: #FFFFFF;
+  --on-peer: #FFFFFF;
+  --on-success: #FFFFFF;
+  --on-danger: #FFFFFF;
+  --on-warning: #FFFFFF;
+
+  /* The editor is a code surface and stays dark in both themes. */
+  --editor-bg: #1E1E1E;
+
+  --shadow-modal: 0 8px 32px rgb(22 24 29 / 0.18);
+  --shadow-card: 0 1px 2px rgb(22 24 29 / 0.06);
+}
+
+/*
+ * Dark.
+ *
+ * Elevation inverts: shadows are invisible on a dark page, so `card` is
+ * *lighter* than `canvas` and raised surfaces carry a border instead. Nothing
+ * here is pure #FFF on pure #000 — `ink` on `canvas` is 15.5:1, above the bar
+ * without the halation full contrast causes on OLED.
+ *
+ * Every hue is lightened enough to clear 4.5:1 as text on `card`, which is why
+ * the `--on-*` foregrounds flip to near-black: these fills are light now.
+ */
+.dark {
+  color-scheme: dark;
+
+  --canvas: #0E1117;
+  --surface: #12161F;
+  --card: #171C26;
+  --muted: #12161F;
+  --accent: #1E2532;
+  --border: #262D3A;
+
+  --ink: #E6E9EF;
+  --sub: #99A1B0;
+
+  --primary: #F2683F;
+  --primary-hover: #FF7B54;
+  --primary-light: #2C1610;
+
+  --brand: #5B93F5;
+  --brand-deep: #7FADFF;
+  --brand-soft: #16233A;
+
+  /* Luminance 0.031 against the light theme's 0.144 — darker, as a plane
+     this size must be. Still 1.45:1 against the canvas, so it stays a
+     distinct blue field rather than melting into the page. */
+  --brand-panel: #14315A;
+  --on-brand-panel: #DCE5F5;
+
+  --success: #45C97F;
+  --danger: #F87171;
+  --warning: #E3A008;
+
+  --peer: #A78BFA;
+  --peer-soft: #221B3A;
+
+  --draft: #E0A34A;
+  --draft-soft: #2A2011;
+  --retired: #94A3B8;
+  --retired-soft: #1B222D;
+
+  --present: #45C97F;
+  --present-soft: #10241A;
+  --unstable: #94A3B8;
+  --unstable-soft: #1B222D;
+
+  --ring: #5B93F5;
+  --sidebar: #12161F;
+  --sidebar-border: #222937;
+  --sidebar-accent: #1B2740;
+
+  --on-brand: #0B1017;
+  --on-primary: #0B1017;
+  --on-peer: #0B1017;
+  --on-success: #0B1017;
+  --on-danger: #0B1017;
+  --on-warning: #0B1017;
+
+  --editor-bg: #1E1E1E;
+
+  --shadow-modal: 0 16px 48px rgb(0 0 0 / 0.6);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+
+  --color-ink: var(--ink);
+  --color-sub: var(--sub);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-panel: var(--brand-panel);
+  --color-on-brand-panel: var(--on-brand-panel);
+
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+
+  --color-peer: var(--peer);
+  --color-peer-soft: var(--peer-soft);
+
+  --color-draft: var(--draft);
+  --color-draft-soft: var(--draft-soft);
+  --color-retired: var(--retired);
+  --color-retired-soft: var(--retired-soft);
+
+  --color-present: var(--present);
+  --color-present-soft: var(--present-soft);
+  --color-unstable: var(--unstable);
+  --color-unstable-soft: var(--unstable-soft);
+
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+
+  --color-on-brand: var(--on-brand);
+  --color-on-primary: var(--on-primary);
+  --color-on-peer: var(--on-peer);
+  --color-on-success: var(--on-success);
+  --color-on-danger: var(--on-danger);
+  --color-on-warning: var(--on-warning);
+
+  --color-editor-bg: var(--editor-bg);
+
+  --shadow-modal: var(--shadow-modal);
+  --shadow-card: var(--shadow-card);
+}
+
+/* Sizes, type, and motion do not vary by theme. */
+@theme {
   --radius: 8px;
   --radius-card: 10px;
   --radius-modal: 12px;
 
   --font-sans: "Pretendard Variable", Pretendard, sans-serif;
-}
-
-:root {
-  color-scheme: light;
 }
 
 /*
@@ -78,8 +289,8 @@ body {
   font-size: 15px;
   line-height: 1.6;
   letter-spacing: -0.006em;
-  color: #16181D;
-  background: #F6F7F9;
+  color: var(--ink);
+  background: var(--surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -163,30 +374,38 @@ h1, h2, h3, h4 {
 .tiptap-render em { font-style: italic; }
 .tiptap-render u { text-decoration: underline; }
 .tiptap-render s { text-decoration: line-through; }
-.tiptap-render blockquote { border-left: 3px solid #E5E8EC; padding-left: 12px; color: #5A6270; margin: 0.6em 0; }
-.tiptap-render code { background: #F3F4F6; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-.tiptap-render pre { background: #1E1E1E; color: #D4D4D4; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0.6em 0; }
+.tiptap-render blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--sub); margin: 0.6em 0; }
+.tiptap-render code { background: var(--accent); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+/* Code blocks are a code surface: dark in both themes, like the editor. */
+.tiptap-render pre { background: var(--editor-bg); color: #D4D4D4; padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0.6em 0; }
 .tiptap-render pre code { background: none; color: inherit; }
-.tiptap-render hr { border: none; border-top: 1px solid #E5E8EC; margin: 1em 0; }
+.tiptap-render hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
 .tiptap-render img { max-width: 100%; border-radius: 6px; margin: 0.4em 0; }
-.tiptap-render a { color: #1B64DA; text-decoration: underline; }
+.tiptap-render a { color: var(--brand); text-decoration: underline; }
 .tiptap-render table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
-.tiptap-render th { background: #F9FAFB; font-weight: 600; padding: 8px 12px; border: 1px solid #E5E8EC; text-align: left; }
-.tiptap-render td { padding: 8px 12px; border: 1px solid #E5E8EC; }
+.tiptap-render th { background: var(--muted); font-weight: 600; padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
+.tiptap-render td { padding: 8px 12px; border: 1px solid var(--border); }
 
 /* The peer's caret, name, and selection inside a shared editor.
    Never interactive: none of it may swallow a click meant for the code
    beneath, and none of it may be reached by the caret or a screen reader —
    the code is what is being read here, not the annotation on top of it. */
 .cove-peer-cursor {
-  --cove-peer-color: #7C3AED;
+  --cove-peer-color: var(--peer);
+  --cove-peer-fg: var(--on-peer);
   position: relative;
   width: 0;
   height: 0;
   pointer-events: none;
 }
-.cove-peer-cursor--student { --cove-peer-color: #1B64DA; }
-.cove-peer-cursor--teacher { --cove-peer-color: #7C3AED; }
+.cove-peer-cursor--student {
+  --cove-peer-color: var(--brand);
+  --cove-peer-fg: var(--on-brand);
+}
+.cove-peer-cursor--teacher {
+  --cove-peer-color: var(--peer);
+  --cove-peer-fg: var(--on-peer);
+}
 .cove-peer-caret {
   position: absolute;
   top: 0;
@@ -203,7 +422,11 @@ h1, h2, h3, h4 {
   padding: 1px 5px;
   border-radius: 3px 3px 3px 0;
   background: var(--cove-peer-color);
-  color: #fff;
+  /*
+   * Not a literal white: dark mode lightens the peer hues, so the label needs
+   * the near-black `--on-*` foreground to stay readable on its own fill.
+   */
+  color: var(--cove-peer-fg);
   font-size: 10px;
   font-weight: 700;
   line-height: 14px;
@@ -214,8 +437,8 @@ h1, h2, h3, h4 {
   background: color-mix(in srgb, var(--color-peer) 18%, transparent);
 }
 .cove-peer-selection--student {
-  background: color-mix(in srgb, #1B64DA 18%, transparent);
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
 }
 .cove-peer-selection--teacher {
-  background: color-mix(in srgb, #7C3AED 18%, transparent);
+  background: color-mix(in srgb, var(--peer) 18%, transparent);
 }

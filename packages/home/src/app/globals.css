@@ -1,0 +1,615 @@
+@import "tailwindcss";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+
+/*
+ * COVE Edu — marketing site tokens.
+ *
+ * See docs/superpowers/specs/2026-08-11-coveedu-marketing-site-design.md §4.
+ *
+ * Light only, on purpose. `@cove/web` carries a full light/dark token layer
+ * because a student sits in front of it for two hours; a marketing page is a
+ * brand statement that should look the same in every screenshot anyone takes
+ * of it. The tokens are still declared on `:root` rather than inlined, so
+ * adding a `.dark` block later is an additive change.
+ */
+
+:root {
+  /*
+   * The four hues, sampled from the supplied logo.
+   *
+   * Every Korean edtech site is one blue over a grey card stack — the mark
+   * itself sanctions four, so the page uses them as a system: one hue per part
+   * of the business, carried from the hero panels down to the footer bar.
+   */
+  --cove-blue: #095edb;
+  --cove-blue-deep: #0749ab;
+  --cove-teal: #58d5c3;
+  --cove-coral: #f56b61;
+  --cove-sun: #fac517;
+  /* The mark's second wave. Kept for fills that need a lighter blue. */
+  --cove-sky: #86bbf1;
+
+  /*
+   * The same hues, darkened until they can carry a word or an icon on paper.
+   *
+   * This split is not tidiness. As text on white the logo values measure
+   * 1.8:1 (teal), 2.9:1 (coral), and 1.6:1 (sun) — all below the 4.5:1 body
+   * bar, and the last two below even the 3:1 bar for large text and icons.
+   * They are correct as fills and on the deep bands, and wrong the moment a
+   * glyph is set in them. The `-ink` values clear 5.2:1, 4.6:1, and 5.1:1.
+   *
+   * Blue needs no counterpart: #095EDB is already 5.8:1 on white.
+   */
+  --cove-teal-ink: #0b7a6a;
+  --cove-coral-ink: #d33f32;
+  --cove-sun-ink: #8f6708;
+
+  /* Deep water. The hero panels, the Cove Studio band, the footer. */
+  --cove-deep: #101c2e;
+
+  --paper: #ffffff;
+  /*
+   * Neutrals are pulled toward the blue rather than taken from a stock grey
+   * ramp. `--mist` at #F2F6FC still reads as "white-ish" but never as default
+   * slate, which is most of what separates this from a template.
+   *
+   * `--ink` is the logo wordmark's own #1B2638. The logo's `edu` grey
+   * (#8693A4) is only 3.1:1 on white, so it stays at logo scale and `--sub`
+   * carries body text instead.
+   */
+  --mist: #f2f6fc;
+  --ink: #1b2638;
+  --sub: #5a6678;
+  --line: #e1e8f3;
+
+  /* On a filled swatch of the colour it names. */
+  --on-deep: #ffffff;
+  --on-blue: #ffffff;
+
+  --radius: 14px;
+
+  /* ---------------------------------------------------------------------
+   * Gradients.
+   *
+   * All of them are the mark, enlarged. The one thing avoided is a single
+   * four-stop sweep through every hue: the mark's colours cross from cool to
+   * warm, and interpolating blue straight into coral runs through a muddy
+   * purple that appears nowhere in the brand. So the hues are paired the way
+   * the mark pairs them — the two cool blocks together, the two warm blocks
+   * together — and the full four only ever appear as discrete segments, which
+   * is what they are in the logo anyway.
+   * ------------------------------------------------------------------- */
+
+  /* The wave: the mark's blue running into its teal. The primary gradient. */
+  --grad-brand: linear-gradient(135deg, #095edb 0%, #1e7ff0 46%, #58d5c3 100%);
+  /* The two warm blocks, for the enterprise and startup sections. */
+  --grad-warm: linear-gradient(135deg, #f56b61 0%, #fac517 100%);
+  /* Depth for the navy bands, lit from the top left like the mark. */
+  --grad-deep: radial-gradient(
+    92% 120% at 10% -12%,
+    #1c3d70 0%,
+    #142a49 42%,
+    #101c2e 76%
+  );
+
+  /*
+   * The product's own blue.
+   *
+   * Cove Studio is a blue product — `--brand` in `@cove/web` is #1B64DA and it
+   * is on every screen a user of the platform sees. So `/cove-studio` runs on
+   * this rather than on the company page's navy: a visitor moving from the
+   * marketing page into the product should feel the colour arrive, not change.
+   * The closing band uses it at full strength, which is also what separates
+   * that band from the navy footer directly beneath it.
+   */
+  --grad-studio: linear-gradient(150deg, #0b4bb0 0%, #095edb 45%, #1b7ae8 100%);
+  /*
+   * The product hero. Bright blue rather than the near-black navy it started
+   * as: Cove Studio's own interface is a light product, and opening its page
+   * on a dark plane promised something the app does not look like.
+   */
+  --grad-studio-hero: linear-gradient(
+    155deg,
+    #1268e4 0%,
+    #2a7ef0 42%,
+    #4f9df7 78%,
+    #6fb0f2 100%
+  );
+
+  /* ---------------------------------------------------------------------
+   * Elevation. Tinted with the ink rather than neutral black, so a raised
+   * card reads as lifted off *this* page and not off a grey one.
+   * ------------------------------------------------------------------- */
+  --shadow-card: 0 1px 2px rgb(16 28 46 / 0.04), 0 8px 24px -12px rgb(16 28 46 / 0.1);
+  --shadow-lift: 0 2px 4px rgb(16 28 46 / 0.05), 0 22px 48px -18px rgb(16 28 46 / 0.22);
+  --shadow-brand: 0 10px 26px -10px rgb(9 94 219 / 0.55);
+  --shadow-brand-lift: 0 16px 34px -12px rgb(9 94 219 / 0.6);
+}
+
+@theme inline {
+  --color-cove-blue: var(--cove-blue);
+  --color-cove-blue-deep: var(--cove-blue-deep);
+  --color-cove-teal: var(--cove-teal);
+  --color-cove-coral: var(--cove-coral);
+  --color-cove-sun: var(--cove-sun);
+  --color-cove-sky: var(--cove-sky);
+
+  --color-cove-teal-ink: var(--cove-teal-ink);
+  --color-cove-coral-ink: var(--cove-coral-ink);
+  --color-cove-sun-ink: var(--cove-sun-ink);
+
+  --color-cove-deep: var(--cove-deep);
+
+  --color-paper: var(--paper);
+  --color-mist: var(--mist);
+  --color-ink: var(--ink);
+  --color-sub: var(--sub);
+  --color-line: var(--line);
+
+  --color-on-deep: var(--on-deep);
+  --color-on-blue: var(--on-blue);
+
+  --radius-cove: var(--radius);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-lift: var(--shadow-lift);
+  --shadow-brand: var(--shadow-brand);
+  --shadow-brand-lift: var(--shadow-brand-lift);
+
+  /*
+   * Two faces, two jobs. Pretendard carries every Korean glyph and all body
+   * copy; Space Grotesk carries the Latin structural layer only — eyebrows,
+   * section labels, ordinals. Setting the English in the same Pretendard is
+   * exactly what makes the reference sites interchangeable.
+   */
+  --font-sans: var(--font-pretendard), Pretendard, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-pretendard), sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.75;
+  letter-spacing: -0.006em;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Korean has no spaces inside a word, so the default `break-word` splits 어절
+ * mid-word and reads as broken text to a native speaker. Scoped to :lang(ko)
+ * so English keeps normal wrapping.
+ */
+:lang(ko) {
+  word-break: keep-all;
+}
+
+/*
+ * The eyebrows are tracked for uppercase Latin. Hangul has no uppercase and
+ * needs far less letter-spacing before it stops reading as one word, so the
+ * Korean locale gets its own value rather than inheriting a Latin figure.
+ */
+:lang(ko) .cove-eyebrow {
+  letter-spacing: 0.02em;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+/* Ordinals and figures must not jitter between renders. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+ * Gradient surfaces.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * The hero aura: the mark's four blocks blown up to the width of the page and
+ * blurred into the paper. The positions follow the logo — teal upper left,
+ * blue upper right, sun far right, coral low centre — so the wash behind the
+ * headline is the logo's own colour arrangement rather than a stock mesh.
+ *
+ * Alphas are low enough that `--ink` still clears 14:1 on top of it.
+ */
+.cove-aura {
+  background-image:
+    radial-gradient(44% 58% at 10% 4%, rgb(88 213 195 / 0.3), transparent 70%),
+    radial-gradient(48% 62% at 60% -10%, rgb(9 94 219 / 0.16), transparent 72%),
+    radial-gradient(40% 54% at 95% 26%, rgb(250 197 23 / 0.16), transparent 70%),
+    radial-gradient(36% 48% at 32% 74%, rgb(245 107 97 / 0.13), transparent 72%);
+  /*
+   * A very slow drift — 28s, a few percent of travel. It should never be
+   * caught moving; it should only make the page feel less like a flat print
+   * when the reader's eye rests on it. Anything faster reads as a screensaver.
+   */
+  animation: cove-aura-drift 28s ease-in-out infinite;
+}
+
+@keyframes cove-aura-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-1.5%, 1.5%, 0) scale(1.06);
+  }
+}
+
+/* A quieter version: one soft brand bloom at the top of a light section. */
+.cove-wash {
+  background-image: radial-gradient(
+    62% 46% at 50% 0%,
+    rgb(9 94 219 / 0.06),
+    transparent 72%
+  );
+}
+
+.cove-deep-grad {
+  background-image: var(--grad-deep);
+}
+
+/* The product page's hero band — the platform's blue, not the company navy. */
+.cove-studio-grad {
+  background-image: var(--grad-studio-hero);
+}
+
+/*
+ * The light sections' grounds.
+ *
+ * Plain white read as unfinished between the coloured bands, so every light
+ * section now carries one of the mark's hues at the alpha of a whisper. They
+ * alternate — cool, warm, cool — so consecutive sections never share a wash,
+ * and none of them is strong enough to cost the body text contrast.
+ */
+.cove-ground-cool {
+  background-image:
+    radial-gradient(58% 42% at 8% 0%, rgb(9 94 219 / 0.06), transparent 68%),
+    radial-gradient(52% 40% at 96% 70%, rgb(88 213 195 / 0.1), transparent 70%);
+}
+
+.cove-ground-warm {
+  background-image:
+    radial-gradient(55% 40% at 12% 0%, rgb(245 107 97 / 0.09), transparent 68%),
+    radial-gradient(50% 45% at 88% 30%, rgb(250 197 23 / 0.11), transparent 70%);
+}
+
+.cove-ground-teal {
+  background-image:
+    radial-gradient(60% 45% at 92% 0%, rgb(88 213 195 / 0.13), transparent 70%),
+    radial-gradient(45% 38% at 4% 84%, rgb(9 94 219 / 0.05), transparent 70%);
+}
+
+/*
+ * The product page's closing band. Full brand blue, so it reads as a distinct
+ * plane against the navy footer beneath it instead of merging into one dark
+ * mass — which is exactly what a second navy section did.
+ */
+.cove-studio-cta {
+  background-image: var(--grad-studio);
+}
+
+.cove-grad-brand {
+  background-image: var(--grad-brand);
+}
+
+.cove-grad-warm {
+  background-image: var(--grad-warm);
+}
+
+/* Gradient-filled type, for the one or two words that carry the brand. */
+.cove-grad-text {
+  background-image: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/*
+ * The sheen. A band of light crossing the primary button once on hover.
+ *
+ * Only the filled brand button gets it — a highlight that sweeps across every
+ * control on the page stops being an accent and becomes noise. Driven by a
+ * pseudo-element so no extra span is needed at any call site.
+ */
+@keyframes cove-sheen {
+  from {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+.cove-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.cove-sheen::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inline-size: 45%;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.35),
+    transparent
+  );
+  transform: translateX(-140%) skewX(-18deg);
+}
+
+.cove-sheen:hover::after {
+  animation: cove-sheen 720ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/*
+ * A live indicator that actually pulses. This one earns the motion: it is the
+ * only element on the site whose whole job is to say "this is happening now".
+ */
+@keyframes cove-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(88 213 195 / 0.55);
+  }
+  70% {
+    opacity: 0.75;
+    box-shadow: 0 0 0 5px rgb(88 213 195 / 0);
+  }
+}
+
+.cove-live-dot {
+  animation: cove-live-pulse 2.2s ease-out infinite;
+}
+
+/* ---------------------------------------------------------------------------
+ * The card.
+ *
+ * At rest it is a hairline box. On hover the hairline becomes the brand
+ * gradient — done with two stacked backgrounds clipped differently, so the
+ * border is a real gradient rather than a faked inset shadow, and the card
+ * keeps its radius without a wrapper element.
+ * ------------------------------------------------------------------------- */
+.cove-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--paper);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 320ms cubic-bezier(0.22, 0.68, 0, 1),
+    box-shadow 320ms cubic-bezier(0.22, 0.68, 0, 1),
+    border-color 220ms ease;
+}
+
+.cove-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+  border-color: transparent;
+  background-image: linear-gradient(var(--paper), var(--paper)),
+    var(--grad-brand);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/*
+ * The hue glow. Each card carries its section's colour as a soft bloom in the
+ * top-right corner, off until hover — so the rail's meaning reaches the card
+ * without four permanently tinted boxes fighting the type.
+ */
+.cove-card__glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.cove-card:hover .cove-card__glow {
+  opacity: 1;
+}
+
+/* The language menu, matching the pop the product uses for the same control. */
+@keyframes cove-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cove-pop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.cove-pop[data-state="open"] {
+  animation: cove-pop-in 140ms ease-out;
+}
+.cove-pop[data-state="closed"] {
+  animation: cove-pop-out 110ms ease-in;
+}
+
+/* ---------------------------------------------------------------------------
+ * The partner marquee.
+ *
+ * Two tracks of identical content, translated by exactly -50% so the loop is
+ * seamless. Paused on hover: a wall a reader cannot stop to read is decoration
+ * pretending to be evidence.
+ * ------------------------------------------------------------------------- */
+@keyframes cove-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.cove-marquee {
+  display: flex;
+  width: max-content;
+  animation: cove-marquee var(--marquee-duration, 42s) linear infinite;
+}
+
+.cove-marquee--reverse {
+  animation-direction: reverse;
+}
+
+.cove-marquee-mask:hover .cove-marquee {
+  animation-play-state: paused;
+}
+
+/*
+ * `overflow: hidden` is load-bearing, not tidiness: the track is `max-content`
+ * — sixteen tiles, some 3,400px — and without it that width becomes the
+ * document's, giving every page on the site a horizontal scrollbar.
+ */
+.cove-marquee-mask {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion.
+ *
+ * One orchestrated moment on the page — the hero's two headline lines fade up,
+ * then the four audience panels wipe up in sequence. Everything else is a
+ * single fade on scroll. No parallax, no counters, no hover tilts.
+ * ------------------------------------------------------------------------- */
+
+@keyframes cove-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cove-wipe-up {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.cove-rise {
+  animation: cove-rise 620ms cubic-bezier(0.22, 0.68, 0, 1) both;
+}
+
+.cove-wipe {
+  animation: cove-wipe-up 700ms cubic-bezier(0.22, 0.68, 0, 1) both;
+}
+
+/*
+ * Scroll reveal. The element starts hidden and is switched on by an
+ * IntersectionObserver setting `data-shown`. The `no-js`-safe default is
+ * visible: if the observer never runs, `@media (scripting: none)` and the
+ * reduced-motion block below both restore full opacity.
+ */
+.cove-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 620ms cubic-bezier(0.22, 0.68, 0, 1),
+    transform 620ms cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+.cove-reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cove-rise,
+  .cove-wipe {
+    animation: none;
+  }
+
+  .cove-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .cove-aura,
+  .cove-live-dot {
+    animation: none;
+  }
+
+  .cove-sheen:hover::after {
+    animation: none;
+  }
+
+  /* A logo wall that never stops moving is the worst offender on the page. */
+  .cove-marquee {
+    animation: none;
+    /* Without the animation the doubled track would overflow; show one copy. */
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cove-card,
+  .cove-card__glow {
+    transition: none;
+  }
+
+  .cove-card:hover {
+    transform: none;
+  }
+}
+
+@media (scripting: none) {
+  .cove-reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Keyboard focus is never removed, only restyled. */
+:focus-visible {
+  outline: 2px solid var(--cove-blue);
+  outline-offset: 3px;
+  border-radius: 3px;
+}

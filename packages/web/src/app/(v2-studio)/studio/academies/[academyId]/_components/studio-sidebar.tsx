@@ -19,7 +19,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { SignOutControl } from '@/app/(v2-auth)/auth/_components/sign-out-control';
-import { LanguageSwitcher } from '@/components/studio/language-switcher';
 import {
   ResponsiveSelector,
   type SelectorItem,
@@ -107,8 +106,9 @@ export function StudioSidebar({
         ))}
       </SidebarContent>
       <SidebarFooter>
+        {/* Theme and language moved to the header's top right; the footer keeps
+            only the action that ends the session. */}
         <SidebarSeparator className="mx-0" />
-        <LanguageSwitcher />
         <SignOutControl
           className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[14px] font-semibold text-sub outline-none transition-colors hover:bg-sidebar-accent hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
           label={
@@ -184,7 +184,7 @@ const AcademyTrigger = React.forwardRef<
       type="button"
       {...props}
     >
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-brand text-[13px] font-bold text-white">
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-brand text-[13px] font-bold text-on-brand">
         {initial}
       </span>
       {collapsed ? null : (

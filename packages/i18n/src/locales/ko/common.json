@@ -39,6 +39,11 @@
     "ko": "한국어",
     "en": "English"
   },
+  "theme": {
+    "label": "테마",
+    "light": "라이트",
+    "dark": "다크"
+  },
   "role": {
     "STUDENT": "학생",
     "TEACHER": "강사",

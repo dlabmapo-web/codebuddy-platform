@@ -25,7 +25,7 @@ function PopoverContent({
       <PopoverPrimitive.Content
         align={align}
         className={cn(
-          'cove-pop z-50 rounded-card border border-border bg-white shadow-lg outline-none',
+          'cove-pop z-50 rounded-card border border-border bg-card shadow-lg outline-none',
           className,
         )}
         data-slot="popover-content"
@@ -52,7 +52,7 @@ function DrawerContent({
       <DrawerPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
       <DrawerPrimitive.Content
         className={cn(
-          'fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col rounded-t-modal border-t border-border bg-white outline-none',
+          'fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col rounded-t-modal border-t border-border bg-card outline-none',
           className,
         )}
         {...props}
@@ -175,7 +175,7 @@ function DropdownMenuContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         className={cn(
-          'cove-pop z-50 min-w-[10rem] overflow-hidden rounded-card border border-border bg-white p-1 shadow-lg',
+          'cove-pop z-50 min-w-[10rem] overflow-hidden rounded-card border border-border bg-card p-1 shadow-lg',
           className,
         )}
         data-slot="dropdown-menu-content"
@@ -197,6 +197,33 @@ function DropdownMenuItem({
         className,
       )}
       data-slot="dropdown-menu-item"
+      {...props}
+    />
+  );
+}
+
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+
+/**
+ * A menu row that is one of a set, where the set is short enough to show every
+ * option at once — theme, language.
+ *
+ * No indicator slot: with two or three rows a checkmark costs a column of
+ * padding to say what weight and colour already say. Radix still reports
+ * `aria-checked`, so nothing is lost to a screen reader.
+ */
+function DropdownMenuRadioItem({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  return (
+    <DropdownMenuPrimitive.RadioItem
+      className={cn(
+        'relative flex cursor-pointer select-none items-center rounded-md px-2.5 py-1.5 text-[14px] font-medium text-sub outline-none transition-colors',
+        'focus:bg-accent focus:text-ink data-[state=checked]:font-semibold data-[state=checked]:text-ink',
+        className,
+      )}
+      data-slot="dropdown-menu-radio-item"
       {...props}
     />
   );
@@ -240,6 +267,8 @@ export {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Popover,

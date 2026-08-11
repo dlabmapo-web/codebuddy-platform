@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { HeaderControls } from '@/components/studio/header-controls';
 import {
   SidebarInset,
   SidebarProvider,
@@ -72,6 +73,9 @@ export async function StudioShell({
           <span className="truncate text-[14px] font-semibold text-sub">
             {title}
           </span>
+          {/* Theme and language sit at the far right of every studio page, in
+              the one place a reader already looks for account-level controls. */}
+          <HeaderControls className="ml-auto" />
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
@@ -94,7 +98,7 @@ export async function StudioShell({
           {bleed ? (
             children
           ) : (
-            <section className="rounded-card border border-border bg-white p-6">
+            <section className="rounded-card border border-border bg-card p-6">
               {children}
             </section>
           )}

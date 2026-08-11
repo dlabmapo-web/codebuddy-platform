@@ -251,7 +251,7 @@ export function CurriculumExcelImportModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(22,24,29,0.55)' }} onClick={onClose}>
       <div
-        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white"
+        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card"
         style={{ boxShadow: '0 16px 48px rgba(22,24,29,0.22)' }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -315,7 +315,7 @@ export function CurriculumExcelImportModal({
             className="flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-9 transition-colors"
             style={{ borderColor: dragging ? '#1B64DA' : '#C9CED6', backgroundColor: dragging ? '#F0F7FF' : '#FAFBFC' }}
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card text-primary shadow-sm">
               <Upload size={21} />
             </div>
             <p className="mt-3" style={{ fontSize: '14px', fontWeight: 700, color: '#16181D' }}>

@@ -47,7 +47,7 @@ function Toast({ message, type }: { message: string; type: 'ok' | 'err' }) {
 function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onCancel}>
-      <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>패턴 삭제</h3>
         <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>이 AI 피드백 기준을 삭제하시겠습니까?</p>
         <div className="flex gap-2">
@@ -81,7 +81,7 @@ function PatternModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
       <div
-        className="bg-white rounded-2xl w-full mx-4 flex flex-col"
+        className="bg-card rounded-2xl w-full mx-4 flex flex-col"
         style={{ maxWidth: 560, maxHeight: '88vh', boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -274,7 +274,7 @@ export default function AdminAiFeedbackPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-white w-fit" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-card w-fit" style={{ border: '1px solid #E5E8EC' }}>
         {[
           { key: 'all', label: `전체 ${patterns.length}` },
           ...typeOptions.map((type) => ({ key: type, label: `${type} ${patterns.filter((p) => p.pattern_type === type).length}` })),
@@ -299,10 +299,10 @@ export default function AdminAiFeedbackPage() {
       <div className="flex flex-col gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl animate-pulse" style={{ height: 100, border: '1px solid #E5E8EC' }} />
+            <div key={i} className="bg-card rounded-2xl animate-pulse" style={{ height: 100, border: '1px solid #E5E8EC' }} />
           ))
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="bg-card rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid #E5E8EC' }}>
             <Sparkles size={40} style={{ color: '#E5E8EC' }} />
             <p style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>등록된 기준이 없습니다</p>
             <p style={{ fontSize: '14px', color: '#5A6270' }}>새 패턴을 추가해 AI 피드백 기준을 만들어보세요</p>
@@ -313,7 +313,7 @@ export default function AdminAiFeedbackPage() {
             return (
             <div
               key={p.id}
-              className="bg-white rounded-2xl p-5 flex flex-col gap-3"
+              className="bg-card rounded-2xl p-5 flex flex-col gap-3"
               style={{ border: '1px solid #E5E8EC', opacity: p.is_active ? 1 : 0.6 }}
             >
               <div className="flex items-start justify-between gap-3">

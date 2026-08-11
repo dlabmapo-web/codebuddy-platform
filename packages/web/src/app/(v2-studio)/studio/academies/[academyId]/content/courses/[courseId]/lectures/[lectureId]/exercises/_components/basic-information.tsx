@@ -86,7 +86,7 @@ export function BasicInformation({
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-white">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
             <RichTextFrame
               content={draft.description}
               minHeight={120}

@@ -140,7 +140,7 @@ function Fact({
   // than as a person, so text values keep the body face and a calmer size.
   const numeric = typeof value === 'number';
   return (
-    <div className="min-w-0 bg-white px-5 py-4">
+    <div className="min-w-0 bg-card px-5 py-4">
       <dt className="flex items-center gap-2">
         <span
           className={`grid size-7 shrink-0 place-items-center rounded-md ${tints[tint]}`}

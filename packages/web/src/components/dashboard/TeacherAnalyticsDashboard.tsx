@@ -65,7 +65,7 @@ function StatCard({
   background: string;
 }) {
   return (
-    <div className="bg-white rounded-xl p-4 flex items-start gap-3 min-w-0" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="bg-card rounded-xl p-4 flex items-start gap-3 min-w-0" style={{ border: '1px solid #E5E8EC' }}>
       <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 38, height: 38, color, backgroundColor: background }}>
         {icon}
       </div>
@@ -93,7 +93,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl p-5 min-w-0 overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+    <section className="bg-card rounded-xl p-5 min-w-0 overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
       <div className="mb-3">
         <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#16181D' }}>{title}</h3>
         <p style={{ fontSize: '12px', color: '#8A8F98', marginTop: 2 }}>{description}</p>
@@ -146,12 +146,12 @@ function DashboardLoading() {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="animate-pulse rounded-xl bg-white" style={{ height: 112, border: '1px solid #E5E8EC' }} />
+          <div key={index} className="animate-pulse rounded-xl bg-card" style={{ height: 112, border: '1px solid #E5E8EC' }} />
         ))}
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-white rounded-xl p-5" style={{ border: '1px solid #E5E8EC' }}>
+          <div key={index} className="bg-card rounded-xl p-5" style={{ border: '1px solid #E5E8EC' }}>
             <div className="animate-pulse h-4 w-32 rounded bg-border mb-4" />
             <ChartSkeleton />
           </div>
@@ -238,7 +238,7 @@ export function TeacherAnalyticsDashboard() {
             disabled={!stageId && !subjectId}
             onChange={setChapterId}
           />
-          <div className="flex items-center gap-1 rounded-lg bg-white p-1" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="flex items-center gap-1 rounded-lg bg-card p-1" style={{ border: '1px solid #E5E8EC' }}>
             {RANGE_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -262,7 +262,7 @@ export function TeacherAnalyticsDashboard() {
       {loading ? (
         <DashboardLoading />
       ) : error ? (
-        <div className="bg-white rounded-xl flex flex-col items-center justify-center gap-3 py-10" style={{ border: '1px solid #E5E8EC' }}>
+        <div className="bg-card rounded-xl flex flex-col items-center justify-center gap-3 py-10" style={{ border: '1px solid #E5E8EC' }}>
           <AlertTriangle size={24} style={{ color: '#D97706' }} />
           <p style={{ fontSize: '13px', color: '#5A6270' }}>{error}</p>
           <button
@@ -332,7 +332,7 @@ export function TeacherAnalyticsDashboard() {
             </ChartCard>
           </div>
 
-          <section className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+          <section className="bg-card rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
             <div className="flex items-center gap-2 px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <AlertTriangle size={15} style={{ color: '#D97706' }} />
               <div>

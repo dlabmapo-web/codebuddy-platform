@@ -537,7 +537,7 @@ finally:
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#1E1E1E' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-white" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
+      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
         <Link href="/students" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[#F6F7F9]" style={{ color: '#5A6270', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 학생 현황
         </Link>
@@ -597,7 +597,7 @@ finally:
       </header>
 
       <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-white overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
+        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
           {problem ? (
             <div className="p-5">
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#16181D', marginBottom: 8 }}>문제</h3>
@@ -762,7 +762,7 @@ finally:
             </div>
           )}
 
-          <div className="flex-shrink-0 bg-white" style={{ borderTop: '1px solid #E5E8EC', height: feedbackOpen ? 180 : 44 }}>
+          <div className="flex-shrink-0 bg-card" style={{ borderTop: '1px solid #E5E8EC', height: feedbackOpen ? 180 : 44 }}>
             <button onClick={() => setFeedbackOpen(o => !o)} className="flex items-center gap-2 w-full px-4" style={{ height: 44, borderBottom: feedbackOpen ? '1px solid #E5E8EC' : 'none' }}>
               <Send size={14} style={{ color: '#1B64DA' }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#16181D' }}>피드백 작성</span>

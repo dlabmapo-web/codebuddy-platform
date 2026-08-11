@@ -87,10 +87,10 @@ function StateIcon({
     return <CheckCircle2 className="text-success" size={42} />;
   }
   if (iconKind === 'suspended') {
-    return <Ban className="text-slate-600" size={42} />;
+    return <Ban className="text-retired" size={42} />;
   }
   if (iconKind === 'none') {
-    return <CircleOff className="text-slate-500" size={42} />;
+    return <CircleOff className="text-retired" size={42} />;
   }
   if (iconKind === 'rejected') {
     return <XCircle className="text-danger" size={42} />;

@@ -38,7 +38,7 @@ export const NAVIGATOR_WIDTH_PX = 320;
  */
 export function navigatorPanelClass(dockAt: 'md' | 'lg'): string {
   const base = [
-    'flex min-h-0 flex-col overflow-hidden border-r border-border bg-white',
+    'flex min-h-0 flex-col overflow-hidden border-r border-border bg-card',
     // Single-pane widths: an overlay that does not dim, blur, or inert what is
     // behind it. Underscores preserve the whitespace CSS requires around `-`.
     'absolute inset-y-0 left-0 z-30 w-[calc(100%_-_3rem)] max-w-[20rem] shadow-xl',

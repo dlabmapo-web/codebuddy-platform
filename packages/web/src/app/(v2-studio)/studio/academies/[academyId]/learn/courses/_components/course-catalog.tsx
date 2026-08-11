@@ -35,7 +35,7 @@ export function CourseCatalog({
       />
 
       {catalog.courses.length === 0 ? (
-        <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-white px-6 py-16 text-center">
+        <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-card px-6 py-16 text-center">
           <BookOpen className="size-8 text-sub/40" />
           <h2 className="mt-3 text-[15px] font-bold">
             {t('catalog.empty_title')}

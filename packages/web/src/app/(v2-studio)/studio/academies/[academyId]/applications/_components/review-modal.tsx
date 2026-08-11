@@ -70,7 +70,7 @@ export function ReviewModal({
               </span>
             </span>
             <textarea
-              className="min-h-20 w-full resize-y rounded-lg border border-border bg-white px-3 py-2.5 text-[15px] leading-6 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="min-h-20 w-full resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-[15px] leading-6 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
               maxLength={2000}
               onChange={(event) => setReason(event.target.value)}
               placeholder={t('reason_placeholder')}
@@ -81,14 +81,14 @@ export function ReviewModal({
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
-            className="h-11 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
+            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
             onClick={onClose}
             type="button"
           >
             {t('common:action.cancel')}
           </button>
           <button
-            className="h-11 rounded-lg border border-danger/40 bg-white px-4 text-[14.5px] font-bold text-danger transition-colors hover:bg-danger/5 disabled:opacity-40"
+            className="h-11 rounded-lg border border-danger/40 bg-card px-4 text-[14.5px] font-bold text-danger transition-colors hover:bg-danger/5 disabled:opacity-40"
             disabled={disabled || !reason.trim()}
             onClick={() => onReject(reason)}
             title={reason.trim() ? undefined : t('reject_needs_reason')}
@@ -97,7 +97,7 @@ export function ReviewModal({
             {t('reject')}
           </button>
           <button
-            className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+            className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
             disabled={disabled}
             onClick={() => onApprove(role, reason || undefined)}
             type="button"

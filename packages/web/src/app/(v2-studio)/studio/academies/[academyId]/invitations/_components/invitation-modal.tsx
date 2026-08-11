@@ -39,7 +39,7 @@ export function InvitationModal({
               </span>
               <input
                 autoFocus
-                className="h-11 w-full rounded-lg border border-border bg-white px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="h-11 w-full rounded-lg border border-border bg-card px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
                 onChange={(event) => manager.setEmail(event.target.value)}
                 placeholder={t('email_placeholder')}
                 required
@@ -66,12 +66,12 @@ export function InvitationModal({
                 </p>
                 <div className="mt-2 flex gap-2">
                   <input
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-white px-3 py-2 font-mono text-[12px]"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 font-mono text-[12px]"
                     readOnly
                     value={manager.invitationLink}
                   />
                   <button
-                    className="shrink-0 rounded-lg bg-brand px-4 text-[13.5px] font-bold text-white transition-colors hover:bg-brand-deep"
+                    className="shrink-0 rounded-lg bg-brand px-4 text-[13.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep"
                     onClick={() => void manager.copyInvitationLink()}
                     type="button"
                   >
@@ -90,7 +90,7 @@ export function InvitationModal({
 
           <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
             <button
-              className="h-11 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
+              className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
               onClick={manager.closeForm}
               type="button"
             >
@@ -99,7 +99,7 @@ export function InvitationModal({
                 : t('common:action.cancel')}
             </button>
             <button
-              className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+              className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
               disabled={!ready || manager.createPending}
               type="submit"
             >

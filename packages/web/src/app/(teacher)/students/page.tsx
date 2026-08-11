@@ -134,7 +134,7 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-6 px-5 py-3 bg-white rounded-xl" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex items-center gap-6 px-5 py-3 bg-card rounded-xl" style={{ border: '1px solid #E5E8EC' }}>
         <div>
           <span style={{ fontSize: '12px', color: '#8A8F98' }}>전체</span>
           <span style={{ fontSize: '22px', fontWeight: 700, color: '#16181D', marginLeft: 8 }}>{students.length}</span>
@@ -154,7 +154,7 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="bg-card rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="animate-pulse" style={{ height: 64, borderBottom: i < 4 ? '1px solid #F3F4F6' : 'none', margin: '0 20px' }} />

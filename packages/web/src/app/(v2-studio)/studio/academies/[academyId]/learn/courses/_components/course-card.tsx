@@ -22,7 +22,7 @@ export function CourseCard({
 
   return (
     <Link
-      className="group flex flex-col rounded-card border border-border bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+      className="group flex flex-col rounded-card border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       href={`/studio/academies/${academyId}/learn/courses/${course.courseId}`}
     >
       <div className="flex items-start gap-3">

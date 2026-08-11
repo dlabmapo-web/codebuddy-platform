@@ -24,7 +24,7 @@ export function InvitationAcceptance() {
       </p>
       {state.message ? <p className="text-sm text-danger">{state.message}</p> : null}
       <button
-        className="h-12 w-full rounded-xl bg-brand font-bold text-white hover:bg-brand-deep disabled:opacity-60"
+        className="h-12 w-full rounded-xl bg-brand font-bold text-on-brand hover:bg-brand-deep disabled:opacity-60"
         disabled={pending}
         type="submit"
       >

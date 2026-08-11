@@ -136,7 +136,7 @@ export function RosterTable({
           row.original.canOpenLive ? (
             <div className="flex justify-end">
               <Link
-                className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                 href={`/studio/academies/${academyId}/teach/classes/${classId}/students/${row.original.membershipId}/live`}
               >
                 {t('roster.open_live')}

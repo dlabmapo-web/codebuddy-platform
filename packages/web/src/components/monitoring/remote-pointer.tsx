@@ -113,7 +113,7 @@ export function RemotePointer({
       <p
         aria-hidden
         data-testid="peer-pointer-elsewhere"
-        className="pointer-events-none fixed left-1/2 top-3 z-[95] -translate-x-1/2 rounded-full border border-peer/30 bg-white px-3 py-1 text-[12px] font-semibold text-peer shadow-md"
+        className="pointer-events-none fixed left-1/2 top-3 z-[95] -translate-x-1/2 rounded-full border border-peer/30 bg-card px-3 py-1 text-[12px] font-semibold text-peer shadow-md"
       >
         {t('peer.looking_at', {
           name,
@@ -147,7 +147,7 @@ export function RemotePointer({
           strokeWidth="1.3"
         />
       </svg>
-      <span className="absolute left-[15px] top-4 whitespace-nowrap rounded-[2px_8px_8px_8px] bg-peer px-1.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+      <span className="absolute left-[15px] top-4 whitespace-nowrap rounded-[2px_8px_8px_8px] bg-peer px-1.5 py-0.5 text-[11px] font-bold text-on-peer shadow-sm">
         {name}
       </span>
     </span>,

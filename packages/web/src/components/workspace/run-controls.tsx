@@ -27,7 +27,7 @@ export function RunControls({
   if (running) {
     return (
       <button
-        className="inline-flex items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-white transition-colors hover:bg-danger"
+        className="inline-flex items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger"
         onClick={onStop}
         type="button"
       >
@@ -57,7 +57,7 @@ export function RunControls({
         </button>
       ))}
       <button
-        className="inline-flex items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[12px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[12px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-50"
         disabled={!ready}
         onClick={onRun}
         type="button"

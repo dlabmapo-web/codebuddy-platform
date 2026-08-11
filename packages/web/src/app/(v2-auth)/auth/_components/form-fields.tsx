@@ -6,7 +6,7 @@ import { useId, useState } from 'react';
 import { useLayoutTranslation } from '@/i18n';
 
 const baseInput =
-  'h-14 w-full rounded-xl border border-border bg-white text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
+  'h-14 w-full rounded-xl border border-border bg-card text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
 
 const labelClass = 'mb-2 block text-[15px] font-semibold text-ink';
 const iconClass = 'pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sub';

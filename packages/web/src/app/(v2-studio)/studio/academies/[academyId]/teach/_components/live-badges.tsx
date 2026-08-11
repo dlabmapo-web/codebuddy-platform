@@ -53,7 +53,7 @@ const stateIcons: Record<MonitoringLiveState, LucideIcon> = {
  * of Idle would send a teacher to the wrong person.
  */
 const stateTones: Record<MonitoringLiveState, string> = {
-  SOLVING: 'bg-brand text-white',
+  SOLVING: 'bg-brand text-on-brand',
   IDLE: 'bg-draft-soft text-draft',
   ONLINE: 'bg-present-soft text-present',
   RECONNECTING: 'bg-unstable-soft text-unstable',

@@ -287,7 +287,7 @@ export function LiveWorkspace({
         </p>
       ) : null}
       {live.denied === 'MONITORING_STUDENT_UNAVAILABLE' ? (
-        <p className="shrink-0 border-b border-border bg-white px-4 py-2 text-[13px] text-sub">
+        <p className="shrink-0 border-b border-border bg-card px-4 py-2 text-[13px] text-sub">
           {t('workspace.not_solving_body')}
         </p>
       ) : null}
@@ -325,7 +325,7 @@ export function LiveWorkspace({
       {/* Below the supported editor viewport the roster still works, but two
           people cannot usefully share one column of code — say so instead of
           rendering an unusable editor. */}
-      <p className="border-b border-border bg-white px-4 py-3 text-[13.5px] text-sub lg:hidden">
+      <p className="border-b border-border bg-card px-4 py-3 text-[13.5px] text-sub lg:hidden">
         <span className="font-bold">{t('workspace.narrow_title')}</span>{' '}
         {t('workspace.narrow_body')}
       </p>
@@ -363,7 +363,7 @@ export function LiveWorkspace({
           ref={paneContainerRef}
         >
           <div
-            className="@container min-w-0 shrink-0 overflow-x-hidden overflow-y-auto bg-white"
+            className="@container min-w-0 shrink-0 overflow-x-hidden overflow-y-auto bg-card"
             style={{ flexBasis: `${statementWidth}%` }}
             {...surfaceProps('statement')}
           >
@@ -398,7 +398,9 @@ export function LiveWorkspace({
 
           <section className="flex min-w-0 flex-1 flex-col">
             <div className="flex min-h-0 flex-1 flex-col" ref={editorContainerRef}>
+              {/* theme-lint-ignore — editor chrome, dark in both themes */}
               <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
+                {/* theme-lint-ignore */}
                 <span className="font-mono text-[11.5px] text-[#a5a5a5]">
                   {tl('workspace.language_python')}
                 </span>

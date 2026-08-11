@@ -236,7 +236,7 @@ function HintReveal({
         <div className="flex shrink-0 flex-wrap items-center gap-2 @sm:ml-auto">
           {canReveal ? (
             <button
-              className="inline-flex h-8 w-auto shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand-soft px-3 text-[13px] font-bold text-brand transition-colors hover:border-brand hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="inline-flex h-8 w-auto shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand-soft px-3 text-[13px] font-bold text-brand transition-colors hover:border-brand hover:bg-brand hover:text-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
               data-testid="reveal-hint"
               onClick={onRevealHint}
               type="button"
@@ -272,7 +272,7 @@ function HintReveal({
               const isFinal = index === revealed - 1;
               return (
                 <li
-                  className={`relative rounded-lg border border-border bg-white px-3.5 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+                  className={`relative rounded-lg border border-border bg-card px-3.5 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
                     isFinal && onRevealHint ? 'cove-hint-in' : ''
                   }`}
                   // Positions come from the authored order, but a malformed

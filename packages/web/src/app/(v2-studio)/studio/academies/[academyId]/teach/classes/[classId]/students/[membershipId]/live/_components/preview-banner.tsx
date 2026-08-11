@@ -30,7 +30,7 @@ export function PreviewBanner({
       aria-live="polite"
       className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-brand/25 bg-brand-soft px-4 py-2"
     >
-      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-card px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
         <Eye aria-hidden className="size-3" />
         {t('preview.badge')}
       </span>
@@ -41,7 +41,7 @@ export function PreviewBanner({
       </p>
       {liveTitle ? (
         <button
-          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 text-[12.5px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 text-[12.5px] font-bold text-on-brand transition-opacity hover:opacity-90 disabled:opacity-60"
           disabled={returning}
           onClick={onReturn}
           type="button"

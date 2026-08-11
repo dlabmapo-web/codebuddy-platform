@@ -157,7 +157,7 @@ function ResultModal({ result, onClose, onRetry, onHint, aiFeedbackEnabled, aiFe
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className={`bg-white rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-card rounded-2xl p-8 w-full mx-4 ${showAiBox ? 'max-w-md' : 'max-w-sm'}`} style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-center mb-5">
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }}>
             {isPass
@@ -943,7 +943,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#F6F7F9' }}>
-      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-white" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
+      <header className="flex items-center px-4 gap-3 flex-shrink-0 bg-card" style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}>
         <Link href="/problems" className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-[#F6F7F9]" style={{ color: '#5A6270', fontSize: '13px' }}>
           <ChevronLeft size={16} /> 목록
         </Link>
@@ -994,7 +994,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
                 <span className="flex items-center justify-center rounded-full text-white" style={{ width: 18, height: 18, fontSize: 10, backgroundColor: CURSOR_COLORS.teacher }}>{feedbacks.length}</span>
               </button>
               {feedbackPanelOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg overflow-hidden" style={{ width: 340, maxHeight: 400, overflowY: 'auto', zIndex: 50, border: `1px solid #E5E8EC` }}>
+                <div className="absolute right-0 top-full mt-1 bg-card rounded-2xl shadow-lg overflow-hidden" style={{ width: 340, maxHeight: 400, overflowY: 'auto', zIndex: 50, border: `1px solid #E5E8EC` }}>
                   <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC', position: 'sticky', top: 0, backgroundColor: '#FFFFFF' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: '#16181D' }}>선생님 피드백</span>
                     <button onClick={() => setFeedbackPanelOpen(false)} className="flex items-center justify-center rounded" style={{ width: 24, height: 24, color: '#BCC0C7' }}><X size={14} /></button>
@@ -1051,7 +1051,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
       </header>
 
       <div ref={containerRef} className="flex flex-1 overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="flex flex-col bg-white overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
+        <div className="flex flex-col bg-card overflow-auto flex-shrink-0" style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}>
           <div className="p-5">
             <div className="flex gap-5 mb-5 pb-4" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <div>
@@ -1133,7 +1133,7 @@ export default function ProblemSolveClient({ problemId, submissionId }: { proble
           onMouseLeave={handlePaneMouseLeave}
         >
           <PointerOverlay pointers={remotePointers} />
-          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E8EC' }}>
+          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card" style={{ borderBottom: '1px solid #E5E8EC' }}>
             <span style={{ fontSize: '12px', color: '#5A6270', fontFamily: 'monospace' }}>Python 3</span>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-0.5 rounded-lg overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>

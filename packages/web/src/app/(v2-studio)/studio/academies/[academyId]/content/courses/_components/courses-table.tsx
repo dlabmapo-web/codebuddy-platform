@@ -142,7 +142,7 @@ export function CoursesTable({
           return (
             <div className="flex items-center justify-end gap-1">
               <Link
-                className="group inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3.5 text-[13.5px] font-bold text-brand transition-colors hover:bg-brand hover:text-white"
+                className="group inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3.5 text-[13.5px] font-bold text-brand transition-colors hover:bg-brand hover:text-on-brand"
                 href={href}
               >
                 {t('open')}

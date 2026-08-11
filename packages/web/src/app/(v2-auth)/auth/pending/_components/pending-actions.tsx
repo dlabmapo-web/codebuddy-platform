@@ -20,14 +20,14 @@ export function PendingActions({
     <>
       {manager.state.kind === 'active' ? (
         <Link
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-5 font-bold text-white hover:bg-brand-deep"
+          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-5 font-bold text-on-brand hover:bg-brand-deep"
           href={`/studio/academies/${manager.state.membership.academy.id}`}
         >
           {t('pending.enter_academy')}
         </Link>
       ) : null}
       <button
-        className="h-12 w-full rounded-xl bg-brand font-bold text-white hover:bg-brand-deep disabled:opacity-60"
+        className="h-12 w-full rounded-xl bg-brand font-bold text-on-brand hover:bg-brand-deep disabled:opacity-60"
         disabled={manager.checking}
         onClick={() => void manager.checkStatus()}
         type="button"

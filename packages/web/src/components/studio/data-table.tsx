@@ -55,7 +55,7 @@ function PageButton({
   return (
     <button
       aria-label={label}
-      className="grid size-8 place-items-center rounded-md border border-border bg-white text-sub transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-border disabled:hover:text-sub"
+      className="grid size-8 place-items-center rounded-md border border-border bg-card text-sub transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-border disabled:hover:text-sub"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -162,7 +162,7 @@ export function DataTable<TData, TValue>({
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub" />
               <input
                 aria-label={searchPlaceholder}
-                className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-3 text-[14px] outline-none transition-colors placeholder:text-sub/60 focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-[14px] outline-none transition-colors placeholder:text-sub/60 focus:border-brand focus:ring-2 focus:ring-brand/20"
                 onChange={(event) => setGlobalFilter(event.target.value)}
                 placeholder={searchPlaceholder}
                 value={globalFilter}
@@ -201,7 +201,7 @@ export function DataTable<TData, TValue>({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3.5 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand data-[state=open]:border-brand data-[state=open]:text-brand"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-3.5 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand data-[state=open]:border-brand data-[state=open]:text-brand"
                   type="button"
                 >
                   <SlidersHorizontal className="size-4" />
@@ -243,7 +243,7 @@ export function DataTable<TData, TValue>({
 
       <div
         className={cn(
-          'overflow-x-auto rounded-card border border-border bg-white',
+          'overflow-x-auto rounded-card border border-border bg-card',
           frameless && 'rounded-none border-0 bg-transparent',
         )}
       >
@@ -266,7 +266,7 @@ export function DataTable<TData, TValue>({
                             {/* Preflight resets text-transform on buttons, so
                                 headers restate it to match the rest. */}
                             <button
-                              className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 uppercase tracking-wider transition-colors hover:bg-white hover:text-ink data-[state=open]:bg-white data-[state=open]:text-ink"
+                              className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 uppercase tracking-wider transition-colors hover:bg-card hover:text-ink data-[state=open]:bg-card data-[state=open]:text-ink"
                               type="button"
                             >
                               {flexRender(

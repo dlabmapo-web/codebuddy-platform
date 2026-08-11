@@ -16,7 +16,7 @@ export function AiFeedbackPanel({
 }) {
   return (
     <div
-      className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg overflow-hidden"
+      className="absolute right-0 top-full mt-1 bg-card rounded-2xl shadow-lg overflow-hidden"
       style={{ width: 360, maxHeight: 420, overflowY: 'auto', zIndex: 50, border: '1px solid #E5E8EC' }}
     >
       <div

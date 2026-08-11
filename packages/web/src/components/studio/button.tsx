@@ -9,12 +9,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-brand text-white hover:bg-brand-deep',
-        ink: 'bg-ink text-white hover:bg-ink/90',
+        default: 'bg-brand text-on-brand hover:bg-brand-deep',
+        // `text-canvas`, not a fixed light: `ink` and `canvas` swap places
+        // between themes, so the pair stays inverted in both.
+        ink: 'bg-ink text-canvas hover:bg-ink/90',
         outline:
-          'border border-border bg-white text-ink hover:border-brand hover:text-brand',
+          'border border-border bg-card text-ink hover:border-brand hover:text-brand',
         ghost: 'text-sub hover:bg-accent hover:text-ink',
-        danger: 'bg-danger text-white hover:bg-danger/90',
+        danger: 'bg-danger text-on-danger hover:bg-danger/90',
         link: 'text-brand underline-offset-4 hover:underline',
       },
       size: {

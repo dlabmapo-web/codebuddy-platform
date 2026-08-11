@@ -60,7 +60,7 @@ export function Gnb({ user }: GnbProps) {
 
   return (
     <>
-      <header className="h-14 flex items-center justify-between px-6 bg-white border-b border-border">
+      <header className="h-14 flex items-center justify-between px-6 bg-card border-b border-border">
         <Link href={homeHref} className="flex items-center gap-2 tracking-tight">
           <LogoBadge size={28} />
           <span className="text-[17px] font-bold text-primary">페어코드</span>
@@ -97,7 +97,7 @@ export function Gnb({ user }: GnbProps) {
 
           {dropdownOpen && (
             <div
-              className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg overflow-hidden z-40"
+              className="absolute right-0 top-full mt-1 w-44 bg-card rounded-lg overflow-hidden z-40"
               style={{ border: '1px solid #E5E8EC', boxShadow: '0 4px 16px rgba(22,24,29,0.12)' }}
             >
               <button

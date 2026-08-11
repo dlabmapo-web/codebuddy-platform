@@ -90,14 +90,14 @@ export function StudentEnrollmentDialog({
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
-            className="h-11 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
+            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
             onClick={manager.closeEnroll}
             type="button"
           >
             {t('common:action.cancel')}
           </button>
           <button
-            className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+            className="h-11 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
             disabled={selectedIds.length === 0 || manager.addPending}
             onClick={manager.addStudents}
             type="button"

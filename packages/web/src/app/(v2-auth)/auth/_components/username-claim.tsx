@@ -49,7 +49,7 @@ export function UsernameClaim() {
         ) : null}
 
         <button
-          className="h-12 w-full rounded-xl bg-brand text-[16px] font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          className="h-12 w-full rounded-xl bg-brand text-[16px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
           disabled={pending}
           type="submit"
         >

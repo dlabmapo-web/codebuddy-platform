@@ -18,7 +18,7 @@ export function ExerciseHeader({
   const title = authoring.draft.title.trim();
 
   return (
-    <header className="rounded-card border border-border bg-white p-5 sm:p-6">
+    <header className="rounded-card border border-border bg-card p-5 sm:p-6">
       <button
         className="inline-flex items-center gap-1.5 text-[14px] font-bold text-sub transition-colors hover:text-ink"
         onClick={leave}

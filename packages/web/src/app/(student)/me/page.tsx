@@ -88,7 +88,7 @@ function formatDate(iso: string) {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color?: string }) {
   return (
-    <div className="bg-white rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="bg-card rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
       <div className="rounded-2xl flex items-center justify-center shrink-0" style={{ width: 52, height: 52, backgroundColor: '#F6F7F9' }}>
         {icon}
       </div>
@@ -102,7 +102,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl px-6 py-5 animate-pulse" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="bg-card rounded-2xl px-6 py-5 animate-pulse" style={{ border: '1px solid #E5E8EC' }}>
       <div className="flex items-center gap-4">
         <div className="rounded-xl" style={{ width: 52, height: 52, backgroundColor: '#F0F1F3' }} />
         <div className="flex-1 flex flex-col gap-2">
@@ -220,7 +220,7 @@ export default function MyHistoryPage() {
         )}
       </div>
 
-      <section className="rounded-2xl bg-white p-4" style={{ border: '1px solid #E5E8EC' }}>
+      <section className="rounded-2xl bg-card p-4" style={{ border: '1px solid #E5E8EC' }}>
         <div className="mb-3 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-light text-primary">
             <Layers3 size={16} />
@@ -280,7 +280,7 @@ export default function MyHistoryPage() {
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl flex flex-col items-center justify-center py-20 gap-3" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="bg-card rounded-2xl flex flex-col items-center justify-center py-20 gap-3" style={{ border: '1px solid #E5E8EC' }}>
             <BookOpen size={40} style={{ color: '#E5E8EC' }} />
             <p style={{ fontSize: '17px', fontWeight: 700, color: '#16181D' }}>아직 제출 기록이 없어요</p>
             <p style={{ fontSize: '14px', color: '#5A6270' }}>문제를 풀고 제출하면 여기에 기록이 남아요!</p>
@@ -303,7 +303,7 @@ export default function MyHistoryPage() {
               <div
                 key={s.id}
                 onClick={() => href && router.push(href)}
-                className="bg-white rounded-2xl flex items-center gap-5 group transition-all"
+                className="bg-card rounded-2xl flex items-center gap-5 group transition-all"
                 style={{
                   border: '1px solid #E5E8EC',
                   padding: '18px 24px',

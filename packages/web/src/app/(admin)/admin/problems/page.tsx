@@ -124,7 +124,7 @@ function Tooltip({ text, direction = 'right' }: { text: string; direction?: 'rig
 function DeleteConfirmModal({ title, onConfirm, onCancel }: { title: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onCancel}>
-      <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>문제 삭제</h3>
         <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>
           <span style={{ fontWeight: 600, color: '#16181D' }}>{title}</span> 문제를 삭제하시겠습니까?<br />
@@ -163,7 +163,7 @@ function HierarchyModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl p-6 w-full max-w-md mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#16181D', marginBottom: 4 }}>
           {initial ? `${label} 수정` : `새 ${label}`}
         </h3>
@@ -665,7 +665,7 @@ export default function AdminProblemsPage() {
 
       <div className="flex gap-5 items-start">
         <div
-          className="flex flex-col bg-white rounded-2xl overflow-hidden"
+          className="flex flex-col bg-card rounded-2xl overflow-hidden"
           style={{
             flex: '0 0 auto',
             width: panelMode !== 'closed' ? '460px' : '100%',
@@ -753,9 +753,9 @@ export default function AdminProblemsPage() {
                     </button>
                     {currentKind && (
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, -1)} disabled={idx === 0} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70 disabled:opacity-30"><ArrowUp size={13} style={{ color: '#5A6270' }} /></button>
-                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, 1)} disabled={idx === arr.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70 disabled:opacity-30"><ArrowDown size={13} style={{ color: '#5A6270' }} /></button>
-                        <button onClick={() => toggleHierPublish(currentKind, row)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70">{row.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}</button>
+                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, -1)} disabled={idx === 0} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-card/70 disabled:opacity-30"><ArrowUp size={13} style={{ color: '#5A6270' }} /></button>
+                        <button onClick={() => moveHierarchy(currentKind, row, currentRows, 1)} disabled={idx === arr.length - 1} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-card/70 disabled:opacity-30"><ArrowDown size={13} style={{ color: '#5A6270' }} /></button>
+                        <button onClick={() => toggleHierPublish(currentKind, row)} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-card/70">{row.is_published ? <Eye size={14} style={{ color: '#1B64DA' }} /> : <EyeOff size={14} style={{ color: '#BCC0C7' }} />}</button>
                         <button
                           onClick={() => setHierModal({
                             kind: currentKind,
@@ -766,11 +766,11 @@ export default function AdminProblemsPage() {
                             is_published: row.is_published,
                             order_no: row.order_no,
                           })}
-                          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70"
+                          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-card/70"
                         >
                           <Pencil size={13} style={{ color: '#5A6270' }} />
                         </button>
-                        <button onClick={() => setDeleteHierTarget({ kind: currentKind, row })} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/70"><Trash2 size={13} style={{ color: '#DC2626' }} /></button>
+                        <button onClick={() => setDeleteHierTarget({ kind: currentKind, row })} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-card/70"><Trash2 size={13} style={{ color: '#DC2626' }} /></button>
                       </div>
                     )}
                   </div>
@@ -781,7 +781,7 @@ export default function AdminProblemsPage() {
         </div>
 
         {panelMode !== 'closed' && (
-          <div className="bg-white rounded-2xl flex flex-col min-w-0 overflow-hidden" style={{ flex: '1', border: '1px solid #E5E8EC', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 80px)' }}>
+          <div className="bg-card rounded-2xl flex flex-col min-w-0 overflow-hidden" style={{ flex: '1', border: '1px solid #E5E8EC', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 80px)' }}>
             <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D' }}>
                 {panelMode === 'create' ? '문제 등록' : '문제 수정'}
@@ -992,7 +992,7 @@ export default function AdminProblemsPage() {
 
       {deleteHierTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={() => setDeleteHierTarget(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-xl p-6 w-full max-w-xs mx-4" style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#16181D', marginBottom: 8 }}>{KIND_LABEL[deleteHierTarget.kind]} 삭제</h3>
             <p style={{ fontSize: '14px', color: '#5A6270', marginBottom: 20 }}>
               <span style={{ fontWeight: 600, color: '#16181D' }}>{deleteHierTarget.row.title}</span>을(를) 삭제하시겠습니까?<br />

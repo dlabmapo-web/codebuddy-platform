@@ -86,7 +86,7 @@ async function StudentUnavailable({
           {t('workspace.unavailable_body')}
         </p>
         <Link
-          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-[13.5px] font-bold text-white"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-[13.5px] font-bold text-on-brand"
           href={`/studio/academies/${academyId}/teach/classes/${classId}`}
         >
           <ArrowLeft aria-hidden className="size-4" />

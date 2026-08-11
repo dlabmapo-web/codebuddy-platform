@@ -11,7 +11,7 @@ export function HintPanel({ hints, onClose }: { hints: string[]; onClose: () => 
         onClick={onClose}
       />
       <div
-        className="fixed right-0 top-0 h-full z-50 flex flex-col bg-white"
+        className="fixed right-0 top-0 h-full z-50 flex flex-col bg-card"
         style={{ width: 360, borderLeft: '1px solid #E5E8EC', boxShadow: '-4px 0 16px rgba(22,24,29,0.08)' }}
       >
         <div

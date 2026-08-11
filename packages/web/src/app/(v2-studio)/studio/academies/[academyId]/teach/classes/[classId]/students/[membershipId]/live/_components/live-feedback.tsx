@@ -110,7 +110,7 @@ export function FeedbackDock({
   };
 
   return (
-    <section className="shrink-0 border-t border-border bg-white">
+    <section className="shrink-0 border-t border-border bg-card">
       <h2>
         <button
           aria-expanded={open}
@@ -140,7 +140,7 @@ export function FeedbackDock({
           <label className="block">
             <span className="sr-only">{t('feedback.note_label')}</span>
             <textarea
-              className="h-16 w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-[13.5px] leading-[1.55] outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:bg-canvas disabled:opacity-70"
+              className="h-16 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-[13.5px] leading-[1.55] outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:bg-canvas disabled:opacity-70"
               disabled={!canSend}
               maxLength={monitoringLimits.feedbackMaxLength}
               onChange={(event) => onDraftChange(event.target.value)}

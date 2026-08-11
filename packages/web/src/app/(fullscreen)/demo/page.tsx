@@ -281,7 +281,7 @@ export default function DemoPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: '#F6F7F9' }}>
       <header
-        className="flex items-center px-4 gap-3 flex-shrink-0 bg-white"
+        className="flex items-center px-4 gap-3 flex-shrink-0 bg-card"
         style={{ height: 48, borderBottom: '1px solid #E5E8EC', zIndex: 10 }}
       >
         <Link
@@ -377,7 +377,7 @@ export default function DemoPage() {
         onMouseLeave={handleMouseUp}
       >
         <div
-          className="flex flex-col bg-white overflow-auto flex-shrink-0"
+          className="flex flex-col bg-card overflow-auto flex-shrink-0"
           style={{ width: `${leftWidth}%`, borderRight: '1px solid #E5E8EC' }}
         >
           <div className="p-5">
@@ -474,7 +474,7 @@ export default function DemoPage() {
 
         <div className="flex flex-col flex-1 overflow-hidden">
           <div
-            className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-white"
+            className="flex items-center justify-between px-4 py-2 flex-shrink-0 bg-card"
             style={{ borderBottom: '1px solid #E5E8EC' }}
           >
             <span style={{ fontSize: '13px', fontFamily: 'monospace', color: '#5A6270' }}>Python 3</span>

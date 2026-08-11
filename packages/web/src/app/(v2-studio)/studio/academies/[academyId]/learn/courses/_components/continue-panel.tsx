@@ -28,7 +28,7 @@ export function ContinuePanel({
   return (
     <section className="overflow-hidden rounded-card border border-brand/25 bg-brand-soft/40">
       <header className="flex items-center gap-2.5 px-4 py-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-brand">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-card text-brand">
           <PenLine className="size-4" />
         </span>
         <h2 className="text-[14px] font-bold">{t('continue.title')}</h2>
@@ -39,7 +39,7 @@ export function ContinuePanel({
 
       <ul className="grid gap-px bg-border sm:grid-cols-2">
         {drafts.map((draft) => (
-          <li className="flex items-center gap-3 bg-white px-4 py-3" key={draft.materialId}>
+          <li className="flex items-center gap-3 bg-card px-4 py-3" key={draft.materialId}>
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-sub">
               <Code2 className="size-4" />
             </span>

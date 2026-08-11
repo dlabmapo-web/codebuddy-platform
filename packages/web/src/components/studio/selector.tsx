@@ -75,7 +75,7 @@ export type ResponsiveMultiSelectorProps<TItem extends SelectorItem> =
 /* ------------------------------------------------------- default triggers */
 
 const triggerClass =
-  'flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3 text-[14px] font-medium text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50';
+  'flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 text-[14px] font-medium text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50';
 
 export const SelectorTrigger = React.forwardRef<
   HTMLButtonElement,

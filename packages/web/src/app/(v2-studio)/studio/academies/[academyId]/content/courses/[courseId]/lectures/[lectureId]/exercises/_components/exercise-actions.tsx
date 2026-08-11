@@ -31,7 +31,7 @@ export function ExerciseActions({
   const blocked = editable && !saveReady;
 
   return (
-    <div className="rounded-card border border-border bg-white p-5 sm:p-6">
+    <div className="rounded-card border border-border bg-card p-5 sm:p-6">
       {saveError ? (
         <p className="mb-4 rounded-lg bg-danger/5 px-3.5 py-2.5 text-[14px] font-semibold text-danger">
           {errorText(saveError, t('exercise.save_failed_detail'))}
@@ -58,7 +58,7 @@ export function ExerciseActions({
           {t('exercise.back')}
         </button>
         <button
-          className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-brand transition-colors hover:border-brand hover:text-brand-deep"
+          className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-brand transition-colors hover:border-brand hover:text-brand-deep"
           onClick={openPreview}
           type="button"
         >
@@ -67,7 +67,7 @@ export function ExerciseActions({
         </button>
         {editable ? (
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-white transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!dirty || !saveReady || savePending}
             onClick={save}
             type="button"

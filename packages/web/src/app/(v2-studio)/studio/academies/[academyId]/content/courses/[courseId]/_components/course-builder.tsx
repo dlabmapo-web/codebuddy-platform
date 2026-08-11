@@ -40,7 +40,7 @@ export function CourseBuilder({
       <div>
         <section className="space-y-3">
           {builder.tree.modules.length === 0 ? (
-            <div className="rounded-card border border-dashed border-border bg-white px-6 py-12 text-center">
+            <div className="rounded-card border border-dashed border-border bg-card px-6 py-12 text-center">
               <h3 className="text-[17px] font-bold">{t('empty.heading')}</h3>
               <p className="mx-auto mt-2 max-w-md text-[14.5px] leading-[1.6] text-sub">
                 {t('empty.body')}
@@ -59,21 +59,21 @@ export function CourseBuilder({
 
           {builder.editable ? (
             <form
-              className="flex flex-wrap gap-2 rounded-card border border-dashed border-border bg-white p-3"
+              className="flex flex-wrap gap-2 rounded-card border border-dashed border-border bg-card p-3"
               onSubmit={(event) => {
                 event.preventDefault();
                 builder.createModule();
               }}
             >
               <input
-                className="h-11 min-w-48 flex-1 rounded-lg border border-border bg-white px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="h-11 min-w-48 flex-1 rounded-lg border border-border bg-card px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
                 maxLength={200}
                 onChange={(event) => builder.setModuleTitle(event.target.value)}
                 placeholder={t('module.title_placeholder')}
                 value={builder.moduleTitle}
               />
               <button
-                className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-brand px-5 text-[15px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+                className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-brand px-5 text-[15px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
                 disabled={
                   builder.createModulePending || !builder.moduleTitle.trim()
                 }

@@ -27,7 +27,7 @@ export function ResultModal({ result, onClose, onRetry, onHint }: ResultModalPro
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl p-8 w-full max-w-sm mx-4"
+        className="bg-card rounded-xl p-8 w-full max-w-sm mx-4"
         style={{ boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -133,7 +133,7 @@ export function ClassTeacherPanel({
             // destructive, but it is not the action the panel is asking for.
             // Filling it red would out-shout the primary button above it.
             <button
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-danger/20 bg-danger/5 px-3.5 text-[13.5px] font-bold text-danger transition-colors hover:bg-danger hover:border-danger hover:text-white disabled:opacity-40"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-danger/20 bg-danger/5 px-3.5 text-[13.5px] font-bold text-danger transition-colors hover:bg-danger hover:border-danger hover:text-on-danger disabled:opacity-40"
               disabled={manager.removalPending}
               onClick={() => manager.askRemoveTeacher(teacher, name)}
               type="button"

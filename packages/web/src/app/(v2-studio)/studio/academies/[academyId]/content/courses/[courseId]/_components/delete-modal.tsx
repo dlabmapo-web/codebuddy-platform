@@ -65,14 +65,14 @@ export function DeleteModal({
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
-            className="h-11 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
+            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
             onClick={onCancel}
             type="button"
           >
             {t('common:action.cancel')}
           </button>
           <button
-            className="h-11 rounded-lg bg-danger px-5 text-[14.5px] font-bold text-white transition-colors hover:brightness-95"
+            className="h-11 rounded-lg bg-danger px-5 text-[14.5px] font-bold text-on-danger transition-colors hover:brightness-95"
             onClick={onConfirm}
             type="button"
           >

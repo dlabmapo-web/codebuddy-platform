@@ -141,7 +141,7 @@ export function LiveRoster({
                     'h-10 rounded-lg border px-3 text-[13.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
                     filter === option
                       ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-border bg-white text-sub hover:border-brand hover:text-brand',
+                      : 'border-border bg-card text-sub hover:border-brand hover:text-brand',
                   )}
                   key={option}
                   onClick={() => setFilter(option)}

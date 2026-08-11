@@ -58,7 +58,7 @@ export function FacetedFilter<TData, TValue>({
             'inline-flex h-10 items-center gap-2 rounded-lg border border-dashed px-3.5 text-[13.5px] font-bold transition-colors',
             active
               ? 'border-brand bg-brand-soft text-brand'
-              : 'border-border bg-white text-sub hover:border-brand hover:text-brand',
+              : 'border-border bg-card text-sub hover:border-brand hover:text-brand',
           )}
           type="button"
         >
@@ -70,7 +70,7 @@ export function FacetedFilter<TData, TValue>({
               <span className="flex gap-1">
                 {selected.size > 2
                   ? (
-                    <span className="rounded bg-white px-1.5 py-0.5 text-[12px] font-bold">
+                    <span className="rounded bg-card px-1.5 py-0.5 text-[12px] font-bold">
                       {t('filter.selected', { count: selected.size })}
                     </span>
                   )
@@ -78,7 +78,7 @@ export function FacetedFilter<TData, TValue>({
                       .filter((option) => selected.has(option.value))
                       .map((option) => (
                         <span
-                          className="rounded bg-white px-1.5 py-0.5 text-[12px] font-bold"
+                          className="rounded bg-card px-1.5 py-0.5 text-[12px] font-bold"
                           key={option.value}
                         >
                           {option.label}
@@ -115,7 +115,7 @@ export function FacetedFilter<TData, TValue>({
                       className={cn(
                         'grid size-4 shrink-0 place-items-center rounded border',
                         isSelected
-                          ? 'border-brand bg-brand text-white'
+                          ? 'border-brand bg-brand text-on-brand'
                           : 'border-border',
                       )}
                     >

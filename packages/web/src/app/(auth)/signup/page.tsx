@@ -78,7 +78,7 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F7F9' }}>
         <div
-          className="w-full max-w-md rounded-xl bg-white p-8 text-center"
+          className="w-full max-w-md rounded-xl bg-card p-8 text-center"
           style={{ border: '1px solid #E5E8EC', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
         >
           <div
@@ -97,7 +97,7 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F6F7F9' }}>
       <div
-        className="w-full max-w-md rounded-xl bg-white p-8"
+        className="w-full max-w-md rounded-xl bg-card p-8"
         style={{ border: '1px solid #E5E8EC', boxShadow: '0 4px 16px rgba(22,24,29,0.08)' }}
       >
         <div className="mb-6">

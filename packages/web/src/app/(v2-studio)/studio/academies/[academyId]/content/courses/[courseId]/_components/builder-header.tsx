@@ -41,7 +41,7 @@ export function BuilderHeader({
         />
         {builder.tree.modules.length > 0 ? (
           <button
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
             onClick={builder.toggleAll}
             type="button"
           >

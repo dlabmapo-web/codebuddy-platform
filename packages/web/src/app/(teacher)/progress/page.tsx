@@ -270,7 +270,7 @@ export default function ProgressPage() {
         <p style={{ fontSize: '13px', color: '#8A8F98', marginTop: 2 }}>학생별·문제별 제출 현황을 과목/단계/챕터 단위로 확인하세요.</p>
       </div>
 
-      <div className="flex gap-1 bg-white rounded-xl p-1 w-fit" style={{ border: '1px solid #E5E8EC' }}>
+      <div className="flex gap-1 bg-card rounded-xl p-1 w-fit" style={{ border: '1px solid #E5E8EC' }}>
         {(['student', 'problem'] as const).map(t => (
           <button
             key={t}
@@ -289,7 +289,7 @@ export default function ProgressPage() {
 
       {tab === 'student' ? (
         <div className="flex gap-4 min-w-0" style={{ minHeight: 480 }}>
-          <div className="bg-white rounded-xl overflow-hidden shrink-0" style={{ width: 176, border: '1px solid #E5E8EC' }}>
+          <div className="bg-card rounded-xl overflow-hidden shrink-0" style={{ width: 176, border: '1px solid #E5E8EC' }}>
             <div className="px-4 py-3" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#8A8F98' }}>학생 목록</span>
             </div>
@@ -320,7 +320,7 @@ export default function ProgressPage() {
             )}
           </div>
 
-          <div className="flex-1 min-w-0 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="flex-1 min-w-0 bg-card rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
             <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid #E5E8EC' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: '#16181D' }}>
                 {selectedStudent ? `${selectedStudent.name}님의 제출 기록` : '학생을 선택하세요'}
@@ -353,7 +353,7 @@ export default function ProgressPage() {
                     <div key={problemId}>
                       <button
                         onClick={() => toggleExpand(problemId)}
-                        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted transition-colors"
                       >
                         {isExpanded ? <ChevronDown size={15} style={{ color: '#8A8F98', flexShrink: 0 }} /> : <ChevronRight size={15} style={{ color: '#8A8F98', flexShrink: 0 }} />}
                         <div className="flex-1 min-w-0">
@@ -466,7 +466,7 @@ export default function ProgressPage() {
           </div>
 
           {groupedChapters.length === 0 ? (
-            <div className="bg-white rounded-xl flex flex-col items-center justify-center py-16" style={{ border: '1px solid #E5E8EC' }}>
+            <div className="bg-card rounded-xl flex flex-col items-center justify-center py-16" style={{ border: '1px solid #E5E8EC' }}>
               <p style={{ fontSize: '14px', color: '#BCC0C7' }}>표시할 문제가 없습니다</p>
             </div>
           ) : (
@@ -474,7 +474,7 @@ export default function ProgressPage() {
               {groupedChapters.map((group) => {
                 const collapsed = collapsedChapters.has(group.chapterId);
                 return (
-                  <div key={group.chapterId} className="bg-white rounded-xl overflow-hidden min-w-0" style={{ border: '1px solid #E5E8EC' }}>
+                  <div key={group.chapterId} className="bg-card rounded-xl overflow-hidden min-w-0" style={{ border: '1px solid #E5E8EC' }}>
                     <button
                       onClick={() => toggleChapter(group.chapterId)}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left"
@@ -567,7 +567,7 @@ export default function ProgressPage() {
 
       {codeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="bg-white rounded-2xl flex flex-col overflow-hidden" style={{ width: '60vw', height: '80vh', maxWidth: 900 }}>
+          <div className="bg-card rounded-2xl flex flex-col overflow-hidden" style={{ width: '60vw', height: '80vh', maxWidth: 900 }}>
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #E5E8EC', flexShrink: 0 }}>
               <div className="flex items-center gap-3 min-w-0">
                 <FileCode2 size={18} style={{ color: '#1B64DA' }} />
@@ -593,7 +593,7 @@ export default function ProgressPage() {
               </div>
               <button
                 onClick={() => setCodeModal(null)}
-                className="flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100 shrink-0"
+                className="flex items-center justify-center rounded-lg transition-colors hover:bg-accent shrink-0"
                 style={{ width: 32, height: 32, color: '#8A8F98' }}
               >
                 <X size={16} />

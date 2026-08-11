@@ -354,7 +354,7 @@ export function Workspace({
 
       {/* Below `md` the panes stack behind tabs: a split pane on a phone gives
           neither side enough room to be usable. */}
-      <div className="flex shrink-0 gap-1 border-b border-border bg-white px-3 py-1.5 md:hidden">
+      <div className="flex shrink-0 gap-1 border-b border-border bg-card px-3 py-1.5 md:hidden">
         {(['problem', 'code'] as const).map((tab) => (
           <button
             className={`rounded-md px-3 py-1 text-[12.5px] font-semibold transition-colors ${
@@ -396,7 +396,7 @@ export function Workspace({
           ref={paneContainerRef}
         >
           <section
-            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-white md:block md:flex-none ${
+            className={`@container min-w-0 overflow-x-hidden overflow-y-auto bg-card md:block md:flex-none ${
               mobileTab === 'problem' ? 'flex-1' : 'hidden'
             }`}
             // Inline deliberately: older Safari releases can discard the

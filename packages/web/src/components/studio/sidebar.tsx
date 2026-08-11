@@ -439,7 +439,7 @@ export function SidebarMenuBadge({ className, ...props }: React.ComponentProps<'
     <div
       className={cn(
         'pointer-events-none absolute right-2 flex h-5 min-w-5 select-none items-center justify-center rounded-full bg-brand-soft px-1.5 text-[11px] font-bold tabular-nums text-brand',
-        'peer-hover/menu-button:bg-white group-data-[collapsible=icon]:hidden',
+        'peer-hover/menu-button:bg-card group-data-[collapsible=icon]:hidden',
         className,
       )}
       {...props}

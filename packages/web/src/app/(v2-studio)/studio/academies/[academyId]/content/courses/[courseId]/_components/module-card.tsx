@@ -42,14 +42,14 @@ export function ModuleCard({
       onOpenChange={() => builder.toggleCollapsed(courseModule.id)}
       open={open}
     >
-    <article className="overflow-hidden rounded-card border border-border bg-white">
+    <article className="overflow-hidden rounded-card border border-border bg-card">
       {/* The module header is tinted so it reads as the group it owns, never as
           a sibling of the lecture rows beneath it. */}
       <header className="flex items-center gap-2.5 border-b border-border bg-canvas px-4 py-3.5">
         <Collapsible.Trigger asChild>
           <button
             aria-label={t('outline.toggle', { title: courseModule.title })}
-            className="grid size-7 shrink-0 place-items-center rounded-md text-sub transition-colors hover:bg-white hover:text-ink"
+            className="grid size-7 shrink-0 place-items-center rounded-md text-sub transition-colors hover:bg-card hover:text-ink"
             type="button"
           >
             <ChevronRight
@@ -59,7 +59,7 @@ export function ModuleCard({
             />
           </button>
         </Collapsible.Trigger>
-        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-brand font-mono text-[14px] font-bold tabular-nums text-white">
+        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-brand font-mono text-[14px] font-bold tabular-nums text-on-brand">
           {courseModule.position}
         </span>
         <div
@@ -130,14 +130,14 @@ export function ModuleCard({
           >
             <input
               autoFocus
-              className="h-11 min-w-40 flex-1 rounded-lg border border-border bg-white px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
+              className="h-11 min-w-40 flex-1 rounded-lg border border-border bg-card px-3 text-[15px] outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
               maxLength={200}
               onChange={(event) => builder.setLectureTitle(event.target.value)}
               placeholder={t('lecture.title_placeholder')}
               value={builder.lectureTitle}
             />
             <button
-              className="h-11 rounded-lg bg-brand px-4 text-[14px] font-bold text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+              className="h-11 rounded-lg bg-brand px-4 text-[14px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
               disabled={
                 builder.createLecturePending || !builder.lectureTitle.trim()
               }

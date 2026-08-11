@@ -61,7 +61,7 @@ export function LiveHeader({
     context.student.membershipId;
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-white px-3 py-2">
+    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2">
       <Link
         aria-label={t('workspace.back')}
         className="grid size-8 shrink-0 place-items-center rounded-lg text-sub transition-colors hover:bg-canvas hover:text-ink"

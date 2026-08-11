@@ -64,7 +64,7 @@ export function VisibilityConfirmModal({
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {visibleAffected.map(({ label, value }) => (
                   <span
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-[13px] text-sub"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] text-sub"
                     key={label}
                   >
                     <strong className="font-mono text-ink tabular-nums">
@@ -85,14 +85,14 @@ export function VisibilityConfirmModal({
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
-            className="h-11 rounded-lg border border-border bg-white px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
+            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
             onClick={onCancel}
             type="button"
           >
             {t('common:action.cancel')}
           </button>
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-white transition-colors hover:bg-brand-deep"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep"
             onClick={onConfirm}
             type="button"
           >

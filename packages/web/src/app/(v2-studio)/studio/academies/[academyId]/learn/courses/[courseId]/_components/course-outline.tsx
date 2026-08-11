@@ -79,7 +79,7 @@ export function CourseOutline({
       </div>
 
       {empty ? (
-        <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-white px-6 py-16 text-center">
+        <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-card px-6 py-16 text-center">
           <BookOpen className="size-8 text-sub/40" />
           <h2 className="mt-3 text-[15px] font-bold">
             {t('outline.empty_title')}
@@ -89,7 +89,7 @@ export function CourseOutline({
           </p>
         </div>
       ) : outline.modules.length === 0 ? (
-        <div className="flex flex-col items-center rounded-card border border-border bg-white px-6 py-14 text-center">
+        <div className="flex flex-col items-center rounded-card border border-border bg-card px-6 py-14 text-center">
           <Search className="size-7 text-sub/40" />
           <p className="mt-3 text-[13.5px] text-sub">
             {t('outline.no_results')}

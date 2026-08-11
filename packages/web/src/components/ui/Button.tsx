@@ -12,10 +12,10 @@ const base =
   'inline-flex items-center justify-center font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-hover',
+  primary: 'bg-primary text-on-primary hover:bg-primary-hover',
   secondary: 'border border-primary text-primary bg-transparent hover:bg-primary-light',
   ghost: 'text-sub hover:text-ink hover:bg-surface',
-  danger: 'bg-danger text-white hover:opacity-90',
+  danger: 'bg-danger text-on-primary hover:opacity-90',
 };
 
 const sizes: Record<Size, string> = {

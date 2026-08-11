@@ -36,7 +36,7 @@ export function ModuleSection({
 
   return (
     <section
-      className={`overflow-hidden rounded-card border bg-white transition-colors ${
+      className={`overflow-hidden rounded-card border bg-card transition-colors ${
         expanded ? 'border-brand/30' : 'border-border'
       }`}
     >
@@ -83,7 +83,7 @@ export function ModuleSection({
                   id={`lecture-${lecture.id}`}
                   // A deep link needs a scroll target that survives the
                   // collapse state, so the anchor lives on the lecture.
-                  className={`overflow-hidden rounded-lg border bg-white transition-colors ${
+                  className={`overflow-hidden rounded-lg border bg-card transition-colors ${
                     lecture.id === requestedLectureId
                       ? 'border-brand/40 ring-2 ring-brand/20'
                       : 'border-border'

@@ -126,7 +126,7 @@ function StageCard({ stage, onClick }: { stage: StageItem; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="group overflow-hidden rounded-2xl bg-white text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+      className="group overflow-hidden rounded-2xl bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
       style={{ border: '1px solid #E5E8EC', boxShadow: '0 2px 8px rgba(22,24,29,0.04)' }}
     >
       <div
@@ -195,7 +195,7 @@ function PageSkeleton({ cards = true }: { cards?: boolean }) {
       {Array.from({ length: cards ? 6 : 5 }).map((_, index) => (
         <div
           key={index}
-          className="animate-pulse rounded-2xl bg-white"
+          className="animate-pulse rounded-2xl bg-card"
           style={{ height: cards ? 258 : 74, border: '1px solid #E5E8EC' }}
         />
       ))}
@@ -346,7 +346,7 @@ export default function ProblemsPageInner() {
             <div className="flex items-start gap-4">
               <button
                 onClick={goToCatalog}
-                className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sub shadow-sm transition-colors hover:text-primary"
+                className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card text-sub shadow-sm transition-colors hover:text-primary"
                 aria-label="전체 단계로 돌아가기"
               >
                 <ArrowLeft size={17} />
@@ -365,7 +365,7 @@ export default function ProblemsPageInner() {
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-4 rounded-2xl bg-white/85 px-5 py-3 shadow-sm backdrop-blur">
+            <div className="flex shrink-0 items-center gap-4 rounded-2xl bg-card/85 px-5 py-3 shadow-sm backdrop-blur">
               <div>
                 <p style={{ fontSize: '11px', color: '#8A8F98' }}>학습 진행률</p>
                 <p className="mt-0.5" style={{ fontSize: '18px', fontWeight: 800, color: '#1B64DA' }}>
@@ -397,7 +397,7 @@ export default function ProblemsPageInner() {
       )}
 
       {drafts.length > 0 && (
-        <section className="overflow-hidden rounded-2xl bg-white" style={{ border: '1px solid #BFDBFE' }}>
+        <section className="overflow-hidden rounded-2xl bg-card" style={{ border: '1px solid #BFDBFE' }}>
           <button
             onClick={() => setDraftsOpen((open) => !open)}
             className="flex w-full items-center gap-2.5 px-4 py-3 text-left"
@@ -423,7 +423,7 @@ export default function ProblemsPageInner() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') router.push(`/problems/${draft.problem_id}`);
                   }}
-                  className="flex items-center gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-[#FAFBFC]"
+                  className="flex items-center gap-3 bg-card px-4 py-3 text-left transition-colors hover:bg-[#FAFBFC]"
                 >
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface text-sub">
                     <Code2 size={16} />
@@ -447,7 +447,7 @@ export default function ProblemsPageInner() {
       )}
 
       {error ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16" style={{ border: '1px solid #E5E8EC' }}>
+        <div className="flex flex-col items-center justify-center rounded-2xl bg-card py-16" style={{ border: '1px solid #E5E8EC' }}>
           <BookOpen size={36} style={{ color: '#D1D5DB' }} />
           <p className="mt-3" style={{ fontSize: '14px', color: '#5A6270' }}>{error}</p>
         </div>
@@ -455,7 +455,7 @@ export default function ProblemsPageInner() {
         <PageSkeleton cards={!stageId} />
       ) : !stageId ? (
         subjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-card py-20" style={{ border: '1px solid #E5E8EC' }}>
             <BookOpen size={38} style={{ color: '#D1D5DB' }} />
             <p className="mt-3" style={{ fontSize: '15px', fontWeight: 700, color: '#16181D' }}>공개된 커리큘럼이 없습니다</p>
           </div>
@@ -508,7 +508,7 @@ export default function ProblemsPageInner() {
                 챕터를 펼쳐 문제를 확인하고 학습을 이어가세요.
               </p>
             </div>
-            <label className="flex h-10 w-full items-center gap-2 rounded-xl bg-white px-3 sm:w-72" style={{ border: '1px solid #E5E8EC' }}>
+            <label className="flex h-10 w-full items-center gap-2 rounded-xl bg-card px-3 sm:w-72" style={{ border: '1px solid #E5E8EC' }}>
               <Search size={15} style={{ color: '#BCC0C7' }} />
               <input
                 value={query}
@@ -526,7 +526,7 @@ export default function ProblemsPageInner() {
           </div>
 
           {visibleChapters.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16" style={{ border: '1px solid #E5E8EC' }}>
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-card py-16" style={{ border: '1px solid #E5E8EC' }}>
               <Search size={32} style={{ color: '#D1D5DB' }} />
               <p className="mt-3" style={{ fontSize: '14px', color: '#8A8F98' }}>검색 결과가 없습니다</p>
             </div>
@@ -542,7 +542,7 @@ export default function ProblemsPageInner() {
                 return (
                   <section
                     key={chapter.id}
-                    className="overflow-hidden rounded-2xl bg-white"
+                    className="overflow-hidden rounded-2xl bg-card"
                     style={{ border: expanded ? '1px solid #C7D9F7' : '1px solid #E5E8EC', boxShadow: expanded ? '0 5px 18px rgba(27,100,218,0.06)' : 'none' }}
                   >
                     <button
@@ -584,7 +584,7 @@ export default function ProblemsPageInner() {
                     {expanded && (
                       <div className="border-t border-[#EEF0F3] bg-[#FAFBFC] p-2 sm:p-3">
                         {chapter.problems.length === 0 ? (
-                          <div className="rounded-xl bg-white px-4 py-7 text-center" style={{ fontSize: '13px', color: '#8A8F98' }}>
+                          <div className="rounded-xl bg-card px-4 py-7 text-center" style={{ fontSize: '13px', color: '#8A8F98' }}>
                             이 챕터에는 아직 문제가 없습니다.
                           </div>
                         ) : (
@@ -598,7 +598,7 @@ export default function ProblemsPageInner() {
                                 <button
                                   key={problem.id}
                                   onClick={() => router.push(`/problems/${problem.id}`)}
-                                  className="group flex w-full items-center gap-3 rounded-xl bg-white px-3 py-3 text-left transition-all hover:border-[#9EBDEC] hover:shadow-sm sm:px-4"
+                                  className="group flex w-full items-center gap-3 rounded-xl bg-card px-3 py-3 text-left transition-all hover:border-[#9EBDEC] hover:shadow-sm sm:px-4"
                                   style={{ border: hasDraft ? '1px solid #BFDBFE' : '1px solid #E5E8EC' }}
                                 >
                                   <span

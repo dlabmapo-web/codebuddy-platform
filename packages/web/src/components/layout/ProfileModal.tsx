@@ -173,7 +173,7 @@ export function ProfileModal({ open, onClose, currentName, onUpdated }: ProfileM
       onClick={(e) => { if (e.currentTarget === e.target) onClose(); }}
     >
       <div
-        className="bg-white w-full max-w-sm mx-4"
+        className="bg-card w-full max-w-sm mx-4"
         style={{ borderRadius: 12, boxShadow: '0 8px 32px rgba(22,24,29,0.18)' }}
         onClick={(e) => e.stopPropagation()}
       >

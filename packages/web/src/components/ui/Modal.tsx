@@ -31,7 +31,7 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
-      <div className="bg-white rounded-modal shadow-[0_8px_32px_rgba(22,24,29,0.18)] w-full max-w-md mx-4">
+      <div className="bg-card rounded-modal shadow-modal border border-border w-full max-w-md mx-4">
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <span className="text-[16px] font-semibold text-ink">{title}</span>

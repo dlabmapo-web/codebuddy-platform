@@ -88,7 +88,7 @@ export function FeedbackPanel({
         <span className="hidden sm:inline">{t('feedback.trigger')}</span>
         {/* The count, as v1 showed it. */}
         <span
-          className="grid place-items-center rounded-full text-[10px] font-bold tabular-nums text-white"
+          className="grid place-items-center rounded-full text-[10px] font-bold tabular-nums text-on-peer"
           style={{ minWidth: 18, height: 18, backgroundColor: PEER }}
         >
           {messages.length}
@@ -107,7 +107,7 @@ export function FeedbackPanel({
       {open ? (
         <div
           aria-label={t('feedback.student_title')}
-          className="cove-pop absolute right-0 top-full z-50 mt-1.5 origin-top-right overflow-hidden rounded-2xl border border-border bg-white shadow-lg"
+          className="cove-pop absolute right-0 top-full z-50 mt-1.5 origin-top-right overflow-hidden rounded-2xl border border-border bg-card shadow-lg"
           data-state="open"
           role="dialog"
           // Sized inline, as v1 sized it. Twice now a Tailwind arbitrary value
@@ -150,7 +150,7 @@ export function FeedbackPanel({
                         speaking rather than as a system string. */}
                     <span
                       aria-hidden
-                      className="grid shrink-0 place-items-center rounded-full font-bold text-white"
+                      className="grid shrink-0 place-items-center rounded-full font-bold text-on-peer"
                       style={{
                         width: 22,
                         height: 22,
@@ -168,7 +168,7 @@ export function FeedbackPanel({
                     </span>
                     {isNew ? (
                       <span
-                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-on-peer"
                         style={{ backgroundColor: PEER }}
                       >
                         {t('feedback.new')}

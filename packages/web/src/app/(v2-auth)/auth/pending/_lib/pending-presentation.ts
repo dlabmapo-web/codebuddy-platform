@@ -60,7 +60,7 @@ export function statusToneClass(
     case 'red':
       return 'text-danger';
     case 'slate':
-      return 'text-slate-600';
+      return 'text-retired';
     case 'amber':
       return 'text-amber-700';
   }

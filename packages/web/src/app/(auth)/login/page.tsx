@@ -112,7 +112,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-white">
+      <div className="flex-1 flex items-center justify-center bg-card">
         <div className="w-full max-w-sm px-8">
           <div className="mb-8">
             <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#16181D' }}>로그인</h2>

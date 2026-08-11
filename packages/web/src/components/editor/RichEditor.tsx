@@ -273,7 +273,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
 
       {/* ── Main Toolbar ─────────────────────────────────────────────────── */}
       <div
-        className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-white"
+        className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-card"
         style={{ borderBottom: '1px solid #E5E8EC' }}
       >
         <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소 (Ctrl+Z)"><Undo size={14} /></ToolBtn>
@@ -400,7 +400,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
 
-      <div className="bg-white">
+      <div className="bg-card">
         <EditorContent editor={editor} />
       </div>
 

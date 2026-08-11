@@ -13,7 +13,7 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   return (
     <input
       className={cn(
-        'h-10 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-[14px] text-ink outline-none transition-colors placeholder:text-sub/60',
+        'h-10 w-full min-w-0 rounded-lg border border-border bg-card px-3 text-[14px] text-ink outline-none transition-colors placeholder:text-sub/60',
         'focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,
@@ -76,7 +76,9 @@ function TooltipContent({
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         className={cn(
-          'z-50 w-fit rounded-md bg-ink px-2.5 py-1.5 text-[13px] font-medium text-white',
+          // `text-canvas` inverts with `bg-ink`, so the tooltip stays readable
+          // in dark, where `ink` is the near-white end of the scale.
+          'z-50 w-fit rounded-md bg-ink px-2.5 py-1.5 text-[13px] font-medium text-canvas',
           className,
         )}
         data-slot="tooltip-content"
@@ -170,7 +172,7 @@ function ModalContent({
       <DialogPrimitive.Overlay className="cove-overlay fixed inset-0 z-50 bg-ink/45" />
       <DialogPrimitive.Content
         className={cn(
-          'cove-pop fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-modal bg-white shadow-2xl',
+          'cove-pop fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-modal bg-card shadow-2xl',
           className,
         )}
         {...props}

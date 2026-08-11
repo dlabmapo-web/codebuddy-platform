@@ -30,7 +30,7 @@ export async function AcademyOverview({ academyId }: { academyId: string }) {
           {t('manager_hint')}
         </p>
       ) : (
-        <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+        <p className="rounded-xl bg-muted p-4 text-sm text-ink">
           {t('member_hint')}
         </p>
       )}

@@ -58,7 +58,7 @@ function isOnline(iso: string | null) {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color?: string }) {
   return (
-    <div className="bg-white rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
+    <div className="bg-card rounded-2xl flex items-center gap-4 px-6 py-5" style={{ border: '1px solid #E5E8EC' }}>
       <div className="rounded-2xl flex items-center justify-center" style={{ width: 52, height: 52, backgroundColor: '#F6F7F9' }}>
         {icon}
       </div>
@@ -123,7 +123,7 @@ function EditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(22,24,29,0.5)' }} onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full mx-4" style={{ maxWidth: 440, boxShadow: '0 8px 40px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl w-full mx-4" style={{ maxWidth: 440, boxShadow: '0 8px 40px rgba(22,24,29,0.18)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #E5E8EC' }}>
           <div>
             <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#16181D' }}>사용자 정보 수정</h2>
@@ -181,7 +181,7 @@ function EditModal({
               }}
             >
               <span
-                className="absolute top-0.5 rounded-full bg-white transition-all"
+                className="absolute top-0.5 rounded-full bg-card transition-all"
                 style={{ width: 20, height: 20, left: form.is_active ? 22 : 2 }}
               />
             </button>
@@ -306,7 +306,7 @@ export default function AdminUsersPage() {
 
       <div className="flex items-center gap-3 flex-wrap">
         <form onSubmit={(e) => { e.preventDefault(); fetchUsers(); }} className="flex-1" style={{ minWidth: 200, maxWidth: 320 }}>
-          <div className="flex items-center gap-2 rounded-2xl px-4 bg-white" style={{ border: '1px solid #E5E8EC', height: 46 }}>
+          <div className="flex items-center gap-2 rounded-2xl px-4 bg-card" style={{ border: '1px solid #E5E8EC', height: 46 }}>
             <Search size={16} style={{ color: '#BCC0C7', flexShrink: 0 }} />
             <input
               className="flex-1 focus:outline-none"
@@ -318,7 +318,7 @@ export default function AdminUsersPage() {
           </div>
         </form>
 
-        <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-white" style={{ border: '1px solid #E5E8EC' }}>
+        <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-card" style={{ border: '1px solid #E5E8EC' }}>
           {ROLE_TABS.map(({ key, label }) => (
             <button
               key={key}
@@ -337,7 +337,7 @@ export default function AdminUsersPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-white" style={{ border: '1px solid #E5E8EC' }}>
+        <div className="flex items-center gap-1.5 rounded-2xl p-1 bg-card" style={{ border: '1px solid #E5E8EC' }}>
           {STATUS_TABS.map(({ key, label }) => (
             <button
               key={key}
@@ -362,10 +362,10 @@ export default function AdminUsersPage() {
       <div className="flex flex-col gap-3">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl animate-pulse" style={{ height: 82, border: '1px solid #E5E8EC' }} />
+            <div key={i} className="bg-card rounded-2xl animate-pulse" style={{ height: 82, border: '1px solid #E5E8EC' }} />
           ))
         ) : users.length === 0 ? (
-          <div className="bg-white rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid #E5E8EC' }}>
+          <div className="bg-card rounded-2xl flex flex-col items-center justify-center py-20 gap-2" style={{ border: '1px solid #E5E8EC' }}>
             <Users size={40} style={{ color: '#E5E8EC' }} />
             <p style={{ fontSize: '16px', fontWeight: 600, color: '#16181D' }}>
               {q ? '검색 결과가 없습니다' : '등록된 사용자가 없습니다'}
@@ -381,7 +381,7 @@ export default function AdminUsersPage() {
             return (
               <div
                 key={u.id}
-                className="bg-white rounded-2xl flex items-center gap-5"
+                className="bg-card rounded-2xl flex items-center gap-5"
                 style={{ border: `1px solid ${u.is_active ? '#E5E8EC' : '#F0F1F3'}`, padding: '16px 22px', opacity: u.is_active ? 1 : 0.65 }}
               >
                 <div className="relative flex-shrink-0">
@@ -391,7 +391,7 @@ export default function AdminUsersPage() {
                     </span>
                   </div>
                   <span
-                    className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-white"
+                    className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-card"
                     style={{ backgroundColor: online ? '#16A34A' : '#BCC0C7' }}
                   />
                 </div>

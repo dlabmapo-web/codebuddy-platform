@@ -11,7 +11,8 @@
     "test": "vitest run",
     "i18n:extract": "i18next --config i18next-parser.config.mjs",
     "i18n:check": "pnpm --filter @cove/i18n test && node scripts/check-i18n.mjs",
-    "i18n:lint": "eslint 'src/app/(v2-auth)/**/*.{ts,tsx}' 'src/app/(v2-studio)/**/*.{ts,tsx}' 'src/components/studio/**/*.{ts,tsx}'"
+    "i18n:lint": "eslint 'src/app/(v2-auth)/**/*.{ts,tsx}' 'src/app/(v2-studio)/**/*.{ts,tsx}' 'src/components/studio/**/*.{ts,tsx}'",
+    "theme:lint": "node scripts/check-theme.mjs"
   },
   "dependencies": {
     "@cove/i18n": "workspace:^",

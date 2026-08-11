@@ -10,7 +10,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   if (user.role !== 'student') redirect('/login');
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="theme-light flex flex-col h-screen">
       <Heartbeat />
       <Gnb user={user} />
       <div className="flex flex-1 overflow-hidden">

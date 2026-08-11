@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (user.role !== 'admin') redirect('/login');
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="theme-light flex flex-col h-screen">
       <Gnb user={user} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar role="admin" />

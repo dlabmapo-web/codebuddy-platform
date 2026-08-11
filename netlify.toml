@@ -1,0 +1,34 @@
+# Netlify build for @cove/home — the COVE Edu marketing site.
+#
+# Only this one package deploys. The rest of the monorepo (api, web,
+# judge-worker) is never built here.
+#
+# Kept at the repo root, with `base` left at its default, because that is what
+# lets pnpm resolve the workspace: the site depends on `@cove/i18n`, and a
+# build rooted at `packages/home` cannot see it.
+
+[build]
+  # Two steps, and the order is load-bearing. `@cove/i18n` is consumed through
+  # its `dist/` — `@cove/i18n/settings` resolves to `dist/settings.js` — and
+  # `dist/` is gitignored. On a clean clone it does not exist, so building the
+  # site first fails with an unresolved import. This is the same order
+  # .github/workflows/ci.yml uses.
+  command = "pnpm --filter @cove/i18n build && pnpm --filter @cove/home build"
+
+  publish = "packages/home/.next"
+
+  # Skip the build when a push touched neither the site nor the copy it reads.
+  # Exit 0 means "nothing to do"; exit 1 means "build".
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- packages/home packages/i18n"
+
+[build.environment]
+  # The workspace requires >=22 (root package.json `engines`), and pnpm is
+  # pinned by the root `packageManager` field, which Netlify honours through
+  # corepack.
+  NODE_VERSION = "22"
+
+# The Next.js adapter. Deliberately unpinned: Netlify maintains it against
+# current Next releases and pinning is how a site silently stops building
+# after a framework upgrade.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

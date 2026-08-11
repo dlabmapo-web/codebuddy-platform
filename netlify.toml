@@ -8,12 +8,20 @@
 # build rooted at `packages/home` cannot see it.
 
 [build]
-  # Two steps, and the order is load-bearing. `@cove/i18n` is consumed through
-  # its `dist/` — `@cove/i18n/settings` resolves to `dist/settings.js` — and
-  # `dist/` is gitignored. On a clean clone it does not exist, so building the
-  # site first fails with an unresolved import. This is the same order
-  # .github/workflows/ci.yml uses.
-  command = "pnpm --filter @cove/i18n build && pnpm --filter @cove/home build"
+  # The trailing `...` is load-bearing: it selects @cove/home *and its
+  # dependencies*, and pnpm runs them in topological order — shared, then
+  # i18n, then the site.
+  #
+  # Without it this fails. @cove/i18n is consumed through its `dist/`
+  # (`@cove/i18n/settings` resolves to `dist/settings.js`) and `dist/` is
+  # gitignored, so on a clean clone the site cannot resolve the import.
+  # Verified by deleting dist/ and running this; a bare
+  # `pnpm --filter @cove/home run build` fails with module-not-found.
+  #
+  # This is also exactly what Netlify's own UI generates when you pick
+  # `packages/home` as the project to deploy, so the two agree and it does not
+  # matter which one wins.
+  command = "pnpm --filter \"@cove/home...\" run build"
 
   publish = "packages/home/.next"
 

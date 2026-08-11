@@ -38,4 +38,20 @@ describe('activeNavHref', () => {
   it('returns null when nothing matches', () => {
     expect(activeNavHref('/auth/login', hrefs)).toBeNull();
   });
+
+  // The Learning group holds two sibling entries. They must never light up
+  // together: a student on a class page is not also in the course catalog.
+  it('keeps the two learning entries mutually exclusive', () => {
+    const learning = [`${base}/learn/courses`, `${base}/learn/classes`];
+
+    expect(activeNavHref(`${base}/learn/classes`, learning)).toBe(
+      `${base}/learn/classes`,
+    );
+    expect(activeNavHref(`${base}/learn/classes/c1`, learning)).toBe(
+      `${base}/learn/classes`,
+    );
+    expect(activeNavHref(`${base}/learn/courses/c1`, learning)).toBe(
+      `${base}/learn/courses`,
+    );
+  });
 });

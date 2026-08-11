@@ -23,21 +23,31 @@ export function assignedCourseWhere(
   return {
     academyId,
     classAssignments: {
+      some: { class: enrolledClassWhere(academyId, userId) },
+    },
+  };
+}
+
+/**
+ * The first half of that chain on its own: a class this student currently
+ * learns through.
+ *
+ * Both the class and the membership are pinned to the requested academy, so a
+ * class id or a membership from somewhere else cannot satisfy the relation —
+ * the join is the check, not a step before one. The student class pages select
+ * on this directly; `assignedCourseWhere` composes it rather than restating
+ * it, which is what keeps "a class I am in" from meaning two things.
+ */
+export function enrolledClassWhere(
+  academyId: string,
+  userId: string,
+): Prisma.ClassWhereInput {
+  return {
+    academyId,
+    status: "ACTIVE",
+    enrollments: {
       some: {
-        class: {
-          academyId,
-          status: "ACTIVE",
-          enrollments: {
-            some: {
-              membership: {
-                academyId,
-                userId,
-                status: "ACTIVE",
-                role: "STUDENT",
-              },
-            },
-          },
-        },
+        membership: { academyId, userId, status: "ACTIVE", role: "STUDENT" },
       },
     },
   };

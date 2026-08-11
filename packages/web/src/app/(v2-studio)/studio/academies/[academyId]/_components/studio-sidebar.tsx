@@ -10,6 +10,7 @@ import {
   LogOut,
   Mail,
   MonitorPlay,
+  School,
   UserCheck,
   Users,
   type LucideIcon,
@@ -68,6 +69,7 @@ export function StudioSidebar({
   canManageClasses,
   canManageContent,
   canMonitor,
+  isStudent,
 }: {
   academies: StudioAcademy[];
   academyId: string;
@@ -76,6 +78,7 @@ export function StudioSidebar({
   canManageClasses: boolean;
   canManageContent: boolean;
   canMonitor: boolean;
+  isStudent: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
   const pathname = usePathname();
@@ -86,6 +89,7 @@ export function StudioSidebar({
     canManageClasses,
     canManageContent,
     canMonitor,
+    isStudent,
   });
   // Decided across every group: the Overview link prefixes all the others, so
   // only the most specific match can be the active one.
@@ -250,6 +254,7 @@ function studioNavGroups({
   canManageClasses,
   canManageContent,
   canMonitor,
+  isStudent,
 }: {
   academyId: string;
   canLearn: boolean;
@@ -257,6 +262,7 @@ function studioNavGroups({
   canManageClasses: boolean;
   canManageContent: boolean;
   canMonitor: boolean;
+  isStudent: boolean;
 }): NavGroup[] {
   const base = `/studio/academies/${academyId}`;
   const groups: NavGroup[] = [
@@ -268,17 +274,25 @@ function studioNavGroups({
   ];
 
   if (canLearn) {
-    groups.push({
-      id: 'learning',
-      labelKey: 'group.learning',
-      items: [
-        {
-          href: `${base}/learn/courses`,
-          labelKey: 'link.my_courses',
-          icon: GraduationCap,
-        },
-      ],
-    });
+    const learning: NavLink[] = [
+      {
+        href: `${base}/learn/courses`,
+        labelKey: 'link.my_courses',
+        icon: GraduationCap,
+      },
+    ];
+    // My Courses stays first and stays the landing destination: it is the
+    // fastest route into work. My Classes is the context behind it, and it is
+    // a student's alone — staff hold `curriculum.read` so they can preview the
+    // curriculum they wrote, and that is not a class to belong to.
+    if (isStudent) {
+      learning.push({
+        href: `${base}/learn/classes`,
+        labelKey: 'link.my_classes',
+        icon: School,
+      });
+    }
+    groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });
   }
 
   if (canManageContent) {

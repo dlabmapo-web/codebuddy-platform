@@ -15,6 +15,16 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.learnService.getCourseOutline(context.identity, input)
       ),
+    listClasses: os.learn.listClasses
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.learnClassService.listClasses(context.identity, input.academyId)
+      ),
+    getClass: os.learn.getClass
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.learnClassService.getClass(context.identity, input)
+      ),
     getExerciseWorkspace: os.learn.getExerciseWorkspace
       .use(access.authenticated)
       .handler(({ context, input }) =>

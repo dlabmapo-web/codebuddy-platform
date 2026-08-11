@@ -13,6 +13,7 @@ import {
   canManageClasses,
   canMonitorClasses,
   canReviewContent,
+  isStudent,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
@@ -66,6 +67,7 @@ export async function StudioShell({
         canManageClasses={canManageClasses(role)}
         canManageContent={canReviewContent(role)}
         canMonitor={canMonitorClasses(role)}
+        isStudent={isStudent(role)}
       />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">

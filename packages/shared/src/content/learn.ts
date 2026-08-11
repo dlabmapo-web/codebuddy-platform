@@ -97,6 +97,60 @@ export const learnCourseSummarySchema = z.object({
 });
 export type LearnCourseSummary = z.infer<typeof learnCourseSummarySchema>;
 
+/* ------------------------------------------------------- student classes */
+
+/**
+ * A class as the student it delivers to may see it.
+ *
+ * Deliberately not a narrowed `ClassSummary`. The management shapes in
+ * `classes/class.ts` carry the roster, membership ids, emails, statuses, and
+ * timestamps a manager arranges a class with; a student surface has no
+ * business holding any of them. Redeclaring the student view here means a
+ * field added to the management schema later cannot reach a student, because
+ * there is nowhere in these shapes to put it — the same structural guarantee
+ * `learnExerciseSchema` gives against hidden test cases.
+ *
+ * `.strict()` is what makes that testable: an extra key is rejected at the
+ * boundary rather than quietly stripped, so a service that selects too much
+ * fails loudly instead of shipping.
+ *
+ * See §6 of the student class pages design.
+ */
+export const learnClassTeacherSchema = z
+  .object({
+    /**
+     * The assigned teacher's own display name, and only that. Never an email,
+     * username, or id: those identify an account, and a student is being told
+     * who teaches them, not who to contact. An absent or blank name makes the
+     * whole teacher `null` rather than producing an empty label.
+     */
+    displayName: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type LearnClassTeacher = z.infer<typeof learnClassTeacherSchema>;
+
+export const learnClassSummarySchema = z
+  .object({
+    classId: z.uuid(),
+    name: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(2_000),
+    /** A class may run unassigned; the card says so rather than hiding it. */
+    teacher: learnClassTeacherSchema.nullable(),
+    /**
+     * Courses this student can actually open through this class — assigned,
+     * visible, and holding at least one visible exercise. Never the raw
+     * assignment count, which would promise cards the detail page cannot show.
+     */
+    availableCourseCount: z.number().int().nonnegative(),
+  })
+  .strict();
+export type LearnClassSummary = z.infer<typeof learnClassSummarySchema>;
+
+export const learnClassDetailSchema = learnClassSummarySchema
+  .extend({ courses: z.array(learnCourseSummarySchema) })
+  .strict();
+export type LearnClassDetail = z.infer<typeof learnClassDetailSchema>;
+
 export const learnCourseOutlineSchema = z.object({
   course: z.object({
     id: z.uuid(),
@@ -252,6 +306,10 @@ export const learnCourseInputSchema = learnAcademyInputSchema.extend({
 
 export const learnMaterialInputSchema = learnAcademyInputSchema.extend({
   materialId: z.uuid(),
+});
+
+export const learnClassInputSchema = learnAcademyInputSchema.extend({
+  classId: z.uuid(),
 });
 
 /**

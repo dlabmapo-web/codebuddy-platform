@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   DRAFT_MAX_BYTES,
   flattenOutlineExercises,
+  learnClassDetailSchema,
+  learnClassSummarySchema,
   learnExerciseWorkspaceSchema,
   progressStatusFromDraft,
   resolveExerciseNeighbors,
@@ -203,5 +205,91 @@ describe("learnExerciseWorkspaceSchema", () => {
 
     expect(JSON.stringify(parsed)).not.toContain("SECRET_OUT");
     expect(parsed.exercise).not.toHaveProperty("testCases");
+  });
+});
+
+describe("student class schemas", () => {
+  const classId = "55555555-5555-4555-8555-555555555555";
+  const courseId = "66666666-6666-4666-8666-666666666666";
+
+  const summary = {
+    classId,
+    name: "Algorithms A",
+    description: "Weekly problem solving.",
+    teacher: { displayName: "Kim Minji" },
+    availableCourseCount: 2,
+  };
+
+  const course = {
+    courseId,
+    title: "Python Foundations",
+    description: "Start here.",
+    counts: { modules: 2, lectures: 4, exercises: 12 },
+    progress: { total: 12, started: 3, solved: 1 },
+  };
+
+  it("accepts a class with an assigned teacher", () => {
+    expect(learnClassSummarySchema.parse(summary)).toEqual(summary);
+  });
+
+  it("accepts an unassigned class with no available courses", () => {
+    const parsed = learnClassSummarySchema.parse({
+      ...summary,
+      teacher: null,
+      availableCourseCount: 0,
+    });
+    expect(parsed.teacher).toBeNull();
+    expect(parsed.availableCourseCount).toBe(0);
+  });
+
+  it("rejects a negative available-course count", () => {
+    expect(
+      learnClassSummarySchema.safeParse({ ...summary, availableCourseCount: -1 })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects a teacher whose display name is blank", () => {
+    // The projection reports `teacher: null` instead, so the UI has one
+    // fallback rather than an empty label that reads as a missing render.
+    expect(
+      learnClassSummarySchema.safeParse({
+        ...summary,
+        teacher: { displayName: "   " },
+      }).success,
+    ).toBe(false);
+  });
+
+  // §11: the student shapes are allowlists. A field added to the management
+  // schemas later must fail here rather than reach a student surface.
+  it.each([
+    ["a teacher account id", { teacher: { displayName: "Kim", userId: "u1" } }],
+    [
+      "a teacher email",
+      { teacher: { displayName: "Kim", email: "kim@example.com" } },
+    ],
+    ["a membership id", { teacherMembershipId: "m1" }],
+    ["a roster", { students: [{ displayName: "Student" }] }],
+    ["a student count", { studentCount: 12 }],
+    ["a class status", { status: "ACTIVE" }],
+    ["an archived timestamp", { archivedAt: "2026-08-11T00:00:00.000Z" }],
+    ["a management timestamp", { updatedAt: "2026-08-11T00:00:00.000Z" }],
+  ])("rejects %s", (_label, extra) => {
+    expect(learnClassSummarySchema.safeParse({ ...summary, ...extra }).success)
+      .toBe(false);
+  });
+
+  it("validates detail courses through the shared course summary", () => {
+    const detail = learnClassDetailSchema.parse({ ...summary, courses: [course] });
+    expect(detail.courses).toEqual([course]);
+  });
+
+  it("rejects a detail course that is not a course summary", () => {
+    expect(
+      learnClassDetailSchema.safeParse({
+        ...summary,
+        courses: [{ courseId, title: "Python Foundations" }],
+      }).success,
+    ).toBe(false);
   });
 });

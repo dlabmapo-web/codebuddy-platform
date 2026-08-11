@@ -164,6 +164,19 @@ export function canLearn(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'curriculum.read') : false;
 }
 
+/**
+ * Who sees the student class pages.
+ *
+ * Deliberately the effective academy role rather than `curriculum.read`. Every
+ * role holds that permission so staff can preview the curriculum they wrote,
+ * and a class is a delivery relationship a Team Lead simply does not have. The
+ * server refuses them either way; this keeps the nav from offering a page that
+ * would only turn them away.
+ */
+export function isStudent(role: AcademyRole | null | undefined): boolean {
+  return role === 'STUDENT';
+}
+
 export function canManageContent(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'curriculum.manage') : false;
 }

@@ -5,9 +5,9 @@ import { BookOpen } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
+import { CourseCard } from '../../_components/course-card';
 import { useCourseCatalog } from '../_hooks/use-course-catalog';
 import { ContinuePanel } from './continue-panel';
-import { CourseCard } from './course-card';
 
 export function CourseCatalog({
   academyId,

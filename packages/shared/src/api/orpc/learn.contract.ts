@@ -10,6 +10,9 @@ import {
 } from "../../content/submission.js";
 import {
   learnAcademyInputSchema,
+  learnClassDetailSchema,
+  learnClassInputSchema,
+  learnClassSummarySchema,
   learnCourseInputSchema,
   learnCourseOutlineSchema,
   learnCourseSummarySchema,
@@ -36,6 +39,17 @@ export const learnContract = {
   getCourseOutline: oc
     .input(learnCourseInputSchema)
     .output(learnCourseOutlineSchema),
+  /**
+   * The classes a student learns through, and one of them in full.
+   *
+   * Read-only by construction. The management mutations stay in
+   * `academyClassesContract` and are deliberately not re-exported here: a
+   * student namespace that cannot name a mutation cannot grow one by accident.
+   */
+  listClasses: oc
+    .input(learnAcademyInputSchema)
+    .output(z.object({ classes: z.array(learnClassSummarySchema) })),
+  getClass: oc.input(learnClassInputSchema).output(learnClassDetailSchema),
   getExerciseWorkspace: oc
     .input(learnMaterialInputSchema)
     .output(learnExerciseWorkspaceSchema),

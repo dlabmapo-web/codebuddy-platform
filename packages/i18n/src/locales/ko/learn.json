@@ -11,6 +11,23 @@
     "progress_none": "아직 시작하지 않음",
     "open": "코스 열기"
   },
+  "classes": {
+    "title": "내 반",
+    "description": "내가 속한 반과 각 반에서 들을 수 있는 코스입니다.",
+    "empty_title": "아직 속한 반이 없습니다",
+    "empty_body": "코스는 반을 통해 제공됩니다. 관리자가 반에 등록하면 여기에 표시됩니다.",
+    "unavailable_title": "반을 불러오지 못했습니다",
+    "unavailable_body": "페이지를 새로고침하거나 잠시 후 다시 시도하세요.",
+    "taught_by": "담당 선생님",
+    "teacher_unassigned": "담당 선생님 미배정",
+    "course_count_zero": "코스 없음",
+    "course_count_other": "코스 {{count}}개",
+    "open": "반 열기",
+    "back": "내 반 목록으로",
+    "courses_title": "수강 가능한 코스",
+    "courses_empty_title": "아직 코스가 없습니다",
+    "courses_empty_body": "이 반에 공개된 코스가 아직 없습니다. 공개되면 여기에 표시됩니다."
+  },
   "continue": {
     "title": "이어서 풀기",
     "subtitle_other": "저장된 코드 {{count}}개",

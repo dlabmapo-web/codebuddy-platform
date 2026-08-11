@@ -3,6 +3,7 @@ import {
   progressStatusFromDraft,
   type ExerciseProgressStatus,
   type LearnCourseOutline,
+  type LearnCourseSummary,
 } from "@cove/shared";
 
 import { PrismaService } from "../database/prisma.service.js";
@@ -117,11 +118,8 @@ export class CurriculumOutlineService {
   async statusByMaterial(
     userId: string,
     materialIds: string[],
-  ): Promise<Map<string, { status: ExerciseProgressStatus; bestScore: number }>> {
-    const statuses = new Map<
-      string,
-      { status: ExerciseProgressStatus; bestScore: number }
-    >();
+  ): Promise<ProgressByMaterial> {
+    const statuses: ProgressByMaterial = new Map();
     if (materialIds.length === 0) return statuses;
     const [drafts, progress] = await Promise.all([
       this.prisma.exerciseDraft.findMany({
@@ -151,6 +149,49 @@ export class CurriculumOutlineService {
   }
 }
 
+export type ProgressByMaterial = Map<
+  string,
+  { status: ExerciseProgressStatus; bestScore: number }
+>;
+
+/**
+ * One course as a catalog card, or nothing.
+ *
+ * `null` means the course is visible but unopenable — every module, lecture,
+ * or exercise beneath it is hidden — and a card for it would send a student to
+ * an empty outline. Returning the absence rather than a zero-count summary is
+ * what lets the caller drop the course from a list and from its own count in
+ * the same step.
+ *
+ * The single projection behind both **My Courses** and a class detail page.
+ * Two copies would be two ideas of what "12 problems" or "3 started" means,
+ * and the same course would then read differently depending on which page a
+ * student arrived from.
+ */
+export function courseSummaryFor(
+  course: VisibleCourse,
+  statuses: ProgressByMaterial,
+): LearnCourseSummary | null {
+  const modules = nonemptyModules(course);
+  const exercises = exerciseMaterialIds({ modules });
+  if (exercises.length === 0) return null;
+
+  return {
+    courseId: course.id,
+    title: course.title,
+    description: course.description,
+    counts: {
+      modules: modules.length,
+      lectures: modules.reduce(
+        (total, courseModule) => total + courseModule.lectures.length,
+        0,
+      ),
+      exercises: exercises.length,
+    },
+    progress: countProgress(exercises, statuses),
+  };
+}
+
 /** A lecture with no exercise is a heading; a module of those is not a module. */
 export function nonemptyModules(course: VisibleCourse): VisibleCourse["modules"] {
   return course.modules.flatMap((courseModule) => {
@@ -175,7 +216,7 @@ export function exerciseMaterialIds(
 
 export function countProgress(
   materialIds: string[],
-  statuses: Map<string, { status: ExerciseProgressStatus; bestScore: number }>,
+  statuses: ProgressByMaterial,
 ) {
   let started = 0;
   let solved = 0;

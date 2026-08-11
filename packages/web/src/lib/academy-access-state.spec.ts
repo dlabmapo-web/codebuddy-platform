@@ -12,6 +12,7 @@ import {
   canManageExercises,
   canPublishContent,
   canReviewContent,
+  isStudent,
   pendingStateView,
   resolveAcademyAccessState,
 } from './academy-access-state';
@@ -158,6 +159,23 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageClassTeachers('TEACHER')).toBe(false);
     expect(canManageClassTeachers('STUDENT')).toBe(false);
     expect(canManageClassTeachers(null)).toBe(false);
+  });
+
+  it('treats only a Student as a student', () => {
+    // The gate behind the My Classes nav entry. Staff hold `curriculum.read`
+    // so they can preview curriculum, and that must not read as enrollment.
+    expect(isStudent('STUDENT')).toBe(true);
+    expect(isStudent('TEACHER')).toBe(false);
+    expect(isStudent('TEAM_LEAD')).toBe(false);
+    expect(isStudent('MANAGER')).toBe(false);
+    expect(isStudent(null)).toBe(false);
+  });
+
+  it('keeps My Courses as the academy landing destination for a student', () => {
+    const destination = authDestination(account({
+      memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE' }],
+    }));
+    expect(destination).toBe(`/studio/academies/${academy.id}/learn/courses`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

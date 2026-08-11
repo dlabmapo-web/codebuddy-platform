@@ -21,7 +21,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import {
-  countProgress,
+  courseSummaryFor,
   CurriculumOutlineService,
   exerciseMaterialIds,
   nonemptyModules,
@@ -84,25 +84,9 @@ export class LearnService {
     const statuses = await this.curriculum.statusByMaterial(userId, materialIds);
 
     return {
-      courses: courses.flatMap((course) => {
-        const modules = nonemptyModules(course);
-        const exercises = exerciseMaterialIds({ ...course, modules });
-        if (exercises.length === 0) return [];
-        return [{
-          courseId: course.id,
-          title: course.title,
-          description: course.description,
-          counts: {
-            modules: modules.length,
-            lectures: modules.reduce(
-              (total, courseModule) => total + courseModule.lectures.length,
-              0,
-            ),
-            exercises: exercises.length,
-          },
-          progress: countProgress(exercises, statuses),
-        }];
-      }),
+      courses: courses.flatMap(
+        (course) => courseSummaryFor(course, statuses) ?? [],
+      ),
     };
   }
 

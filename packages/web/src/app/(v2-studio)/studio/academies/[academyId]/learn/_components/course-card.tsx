@@ -6,6 +6,16 @@ import Link from 'next/link';
 
 import { useLayoutTranslation } from '@/i18n';
 
+/**
+ * One course, wherever a student meets it.
+ *
+ * Shared by **My Courses** and a class detail page rather than owned by the
+ * catalog route. Both show the same course, and a second copy is how the two
+ * surfaces would start reporting different counts or progress for it. The
+ * destination is the academy-level course route on purpose: access means
+ * access through any eligible class, so the URL a student remembers keeps
+ * working when one class path goes away and another still grants the course.
+ */
 export function CourseCard({
   academyId,
   course,

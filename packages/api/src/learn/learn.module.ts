@@ -6,6 +6,7 @@ import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
+import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
 import { SubmissionController } from "./submission.controller.js";
 import { SubmissionService } from "./submission.service.js";
@@ -20,6 +21,7 @@ import { SubmissionService } from "./submission.service.js";
   controllers: [SubmissionController],
   providers: [
     CurriculumOutlineService,
+    LearnClassService,
     LearnService,
     SubmissionService,
     {
@@ -36,6 +38,7 @@ import { SubmissionService } from "./submission.service.js";
   // is exactly what the teacher's navigator must not introduce.
   exports: [
     CurriculumOutlineService,
+    LearnClassService,
     LearnService,
     SubmissionService,
     JudgeQueue,

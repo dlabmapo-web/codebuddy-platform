@@ -12,6 +12,24 @@
     "progress_none": "Not started yet",
     "open": "Open course"
   },
+  "classes": {
+    "title": "My classes",
+    "description": "The classes you are in, and the courses each one opens up.",
+    "empty_title": "You are not in a class yet",
+    "empty_body": "Courses reach you through a class. Once a manager enrolls you in one, it appears here.",
+    "unavailable_title": "Your classes could not be loaded",
+    "unavailable_body": "Reload the page, or try again in a moment.",
+    "taught_by": "Taught by",
+    "teacher_unassigned": "Teacher not assigned",
+    "course_count_zero": "No courses yet",
+    "course_count_one": "{{count}} course",
+    "course_count_other": "{{count}} courses",
+    "open": "Open class",
+    "back": "Back to my classes",
+    "courses_title": "Available courses",
+    "courses_empty_title": "No courses in this class yet",
+    "courses_empty_body": "Nothing has been made available through this class. It shows up here when it is."
+  },
   "continue": {
     "title": "Continue solving",
     "subtitle_one": "{{count}} saved draft",

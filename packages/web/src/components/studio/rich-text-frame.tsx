@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
+import { useTheme } from '@/lib/theme/theme-provider';
 
 import { withAnonymousImageCors } from './rich-text-html';
 
@@ -29,6 +30,9 @@ export function RichTextFrame({
 }) {
   const frameRef = React.useRef<HTMLIFrameElement>(null);
   const [measured, setMeasured] = React.useState<number | null>(null);
+  // The shell is rebuilt when the theme changes, which reloads the frame. That
+  // is the point: a separate document cannot be restyled from out here.
+  const { theme } = useTheme();
 
   React.useEffect(() => {
     const frame = frameRef.current;
@@ -106,7 +110,7 @@ export function RichTextFrame({
       observer?.disconnect();
       detachPointerBridge();
     };
-  }, [content, minHeight]);
+  }, [content, minHeight, theme]);
 
   return (
     <iframe
@@ -115,7 +119,7 @@ export function RichTextFrame({
       ref={frameRef}
       sandbox="allow-same-origin"
       scrolling="no"
-      srcDoc={previewDocument(content, padding)}
+      srcDoc={previewDocument(content, padding, theme)}
       style={{ height: measured ?? fallbackHeight }}
       title={title}
     />
@@ -123,16 +127,55 @@ export function RichTextFrame({
 }
 
 /**
+ * The palette the inner document draws with.
+ *
+ * The frame is a separate document, so it inherits none of the studio's CSS
+ * variables — the theme has to be handed across the boundary and written into
+ * the shell as literal values. `color-scheme` matters as much as the colours:
+ * without it the browser paints the frame's canvas white before a single rule
+ * of ours applies, which is what put a white slab behind every problem
+ * statement in dark mode.
+ */
+const framePalettes = {
+  light: {
+    scheme: 'light',
+    text: '#16181d',
+    link: '#1b64da',
+    codeBackground: '#f1f5f9',
+    rule: '#e5e8ec',
+    quote: '#5a6270',
+    tableHeader: '#f6f7f9',
+  },
+  dark: {
+    scheme: 'dark',
+    text: '#e6e9ef',
+    link: '#5b93f5',
+    codeBackground: '#1e2532',
+    rule: '#262d3a',
+    quote: '#99a1b0',
+    tableHeader: '#12161f',
+  },
+} as const;
+
+export type FrameTheme = keyof typeof framePalettes;
+
+/**
  * The document shell authored HTML renders inside. Styling lives with the
  * component that injects it rather than with the draft model, so the two
  * features sharing this frame cannot drift apart.
  */
-export function previewDocument(content: string, padding = 16) {
+export function previewDocument(
+  content: string,
+  padding = 16,
+  theme: FrameTheme = 'light',
+) {
   const body = content.trim().length > 0 ? withAnonymousImageCors(content) : '';
+  const palette = framePalettes[theme];
   return `<!doctype html><html><head><meta charset="utf-8"><style>
+:root{color-scheme:${palette.scheme}}
 *{box-sizing:border-box}
-html,body{margin:0}
-body{padding:${padding}px;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;color:#16181d;font-size:14.5px;line-height:1.75;letter-spacing:-0.006em;word-break:break-word}
+html,body{margin:0;background:transparent}
+body{padding:${padding}px;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;color:${palette.text};font-size:14.5px;line-height:1.75;letter-spacing:-0.006em;word-break:break-word}
 body>:first-child{margin-top:0}
 body>:last-child{margin-bottom:0}
 p{margin:0 0 0.75em}
@@ -140,18 +183,18 @@ h1,h2,h3,h4{margin:1.25em 0 0.5em;font-weight:700;line-height:1.35}
 h1{font-size:1.4em}h2{font-size:1.2em}h3{font-size:1.05em}h4{font-size:1em}
 ul,ol{margin:0 0 0.75em;padding-left:1.35em}
 li{margin:0.2em 0}
-a{color:#1b64da;text-decoration:underline;text-underline-offset:2px}
+a{color:${palette.link};text-decoration:underline;text-underline-offset:2px}
 strong,b{font-weight:700}
 em,i{font-style:italic}
 s{text-decoration:line-through}
 img{max-width:100%;height:auto;border-radius:8px;display:block;margin:0.5em 0}
-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.9em;background:#f1f5f9;padding:0.15em 0.35em;border-radius:4px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.9em;background:${palette.codeBackground};padding:0.15em 0.35em;border-radius:4px}
 pre{margin:0 0 0.75em;padding:12px 14px;background:#0f172a;color:#e2e8f0;border-radius:8px;overflow-x:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.85em;line-height:1.6}
 pre code{background:none;padding:0;color:inherit;font-size:1em}
-blockquote{margin:0 0 0.75em;padding:0.1em 0 0.1em 0.9em;border-left:3px solid #e5e8ec;color:#5a6270}
+blockquote{margin:0 0 0.75em;padding:0.1em 0 0.1em 0.9em;border-left:3px solid ${palette.rule};color:${palette.quote}}
 table{border-collapse:collapse;width:100%;margin:0 0 0.75em;font-size:0.95em}
-th,td{border:1px solid #e5e8ec;padding:6px 9px;text-align:left}
-th{background:#f6f7f9;font-weight:700}
-hr{border:0;border-top:1px solid #e5e8ec;margin:1.2em 0}
+th,td{border:1px solid ${palette.rule};padding:6px 9px;text-align:left}
+th{background:${palette.tableHeader};font-weight:700}
+hr{border:0;border-top:1px solid ${palette.rule};margin:1.2em 0}
 </style></head><body>${body}</body></html>`;
 }

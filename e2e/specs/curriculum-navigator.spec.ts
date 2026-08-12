@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * The fullscreen curriculum navigator's geometry.
  *
@@ -19,11 +21,11 @@ const COURSE_TITLE = 'E2E Python Basics';
 const EXERCISE_TITLE = 'Echo the input';
 
 async function openWorkspace(page: Page) {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(STUDENT_USERNAME);
-  await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
+  await signInAs({
+    page,
+    identifier: STUDENT_USERNAME,
+    password: STUDENT_PASSWORD,
+  });
 
   await page
     .getByRole('link')

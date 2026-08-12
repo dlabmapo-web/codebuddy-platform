@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * Assigning the one teacher responsible for a class.
  *
@@ -32,14 +34,7 @@ let firstClassId = '';
 let secondClassId = '';
 
 async function signIn(page: Page, email: string) {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(email);
-  await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
-  academyId =
-    /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? academyId;
-  expect(academyId).not.toBe('');
+  academyId = await signInAs({ page, identifier: email, password: PASSWORD });
 }
 
 function classesUrl() {

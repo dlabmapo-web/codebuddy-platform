@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 const STUDENT_EMAIL = process.env.E2E_STUDENT_EMAIL ?? 'student@cove.test';
 const STUDENT_PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const ECHO_ID = 'e0000000-0000-4000-8000-000000000030';
@@ -10,14 +12,11 @@ async function signIn(page: Page): Promise<string> {
   expect(response?.headers()['cross-origin-embedder-policy']).toBe('require-corp');
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
-  await page.locator('input[name="identifier"]').fill(STUDENT_EMAIL);
-  await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
-
-  const academyId = /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1];
-  expect(academyId).toBeTruthy();
-  return academyId!;
+  return signInAs({
+    page,
+    identifier: STUDENT_EMAIL,
+    password: STUDENT_PASSWORD,
+  });
 }
 
 async function replaceEditorCode(page: Page, code: string) {

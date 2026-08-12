@@ -13,6 +13,7 @@ const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${webPort}`;
  */
 export default defineConfig({
   testDir: './specs',
+  globalSetup: './global-setup.ts',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

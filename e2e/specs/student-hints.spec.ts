@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * Progressive hint reveal in the student workspace.
  *
@@ -30,11 +32,11 @@ const HINTS = [
 const UNHINTED_TITLE = 'Sum two numbers';
 
 async function signIn(page: Page) {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(STUDENT_USERNAME);
-  await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
+  await signInAs({
+    page,
+    identifier: STUDENT_USERNAME,
+    password: STUDENT_PASSWORD,
+  });
 }
 
 /** Walks the outline to an exercise, as a student would. */

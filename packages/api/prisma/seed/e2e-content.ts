@@ -33,6 +33,8 @@ export const e2eContent = {
   courseTitle: "E2E Python Basics",
   echoTitle: "Echo the input",
   sumTitle: "Sum two numbers",
+  /** Printed on the guided lecture card the course outline now renders. */
+  lectureOneDescription: "Read a line of input and print it back out.",
   hiddenExerciseTitle: "Never visible to students",
   /** Authored order matters: the workspace reveals this list front to back. */
   echoHints: [
@@ -78,10 +80,32 @@ export async function seedE2eContent(prisma: PrismaClient) {
   }
 
   const lectures = [
-    { id: e2eContent.lectureOneId, moduleId: e2eContent.moduleOneId, title: "Reading input", position: 1, isVisible: true },
-    { id: e2eContent.lectureTwoId, moduleId: e2eContent.moduleTwoId, title: "Adding numbers", position: 1, isVisible: true },
+    {
+      id: e2eContent.lectureOneId,
+      moduleId: e2eContent.moduleOneId,
+      title: "Reading input",
+      // The guided lecture card prints this, so the fixture authors one.
+      description: e2eContent.lectureOneDescription,
+      position: 1,
+      isVisible: true,
+    },
+    {
+      id: e2eContent.lectureTwoId,
+      moduleId: e2eContent.moduleTwoId,
+      title: "Adding numbers",
+      description: "Combine two numbers you have read from input.",
+      position: 1,
+      isVisible: true,
+    },
     // Present in the version, invisible to students. Proves the filter.
-    { id: e2eContent.hiddenLectureId, moduleId: e2eContent.moduleTwoId, title: "Hidden lecture", position: 2, isVisible: false },
+    {
+      id: e2eContent.hiddenLectureId,
+      moduleId: e2eContent.moduleTwoId,
+      title: "Hidden lecture",
+      description: "",
+      position: 2,
+      isVisible: false,
+    },
   ];
   for (const lecture of lectures) {
     await prisma.lecture.upsert({
@@ -90,11 +114,15 @@ export async function seedE2eContent(prisma: PrismaClient) {
         id: lecture.id,
         courseModuleId: lecture.moduleId,
         title: lecture.title,
-        description: "",
+        description: lecture.description,
         position: lecture.position,
         isVisible: lecture.isVisible,
       },
-      update: { title: lecture.title, isVisible: lecture.isVisible },
+      update: {
+        title: lecture.title,
+        description: lecture.description,
+        isVisible: lecture.isVisible,
+      },
     });
   }
 

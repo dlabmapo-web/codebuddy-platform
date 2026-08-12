@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * Grading behaviours from §15 of the design that the happy-path submit test in
  * `student-journey.spec.ts` does not reach: the failure paths, the untrusted
@@ -39,12 +41,11 @@ const VERDICT_BUDGET_MS = 8_000;
 let academyId = '';
 
 async function signIn(page: Page) {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(STUDENT_EMAIL);
-  await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
-  academyId = /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? '';
+  academyId = await signInAs({
+    page,
+    identifier: STUDENT_EMAIL,
+    password: STUDENT_PASSWORD,
+  });
 }
 
 function catalogUrl() {

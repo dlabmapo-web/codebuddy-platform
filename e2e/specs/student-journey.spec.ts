@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * The student journey against seeded content.
  *
@@ -32,15 +34,11 @@ const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
 let academyId = '';
 
 async function signIn(page: Page) {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(STUDENT_USERNAME);
-  await page.locator('input[type="password"]').fill(STUDENT_PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
-
-  const match = /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url());
-  academyId = match?.[1] ?? '';
-  expect(academyId).not.toBe('');
+  academyId = await signInAs({
+    page,
+    identifier: STUDENT_USERNAME,
+    password: STUDENT_PASSWORD,
+  });
 }
 
 function catalogUrl() {

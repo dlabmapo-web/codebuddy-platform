@@ -1,5 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
+import { signInAs } from '../support/auth';
+
 /**
  * Live teacher monitoring, from both sides at once.
  *
@@ -34,14 +36,7 @@ let studentPage: Page;
 let teacherPage: Page;
 
 async function signIn(page: Page, email: string): Promise<string> {
-  await page.goto('/auth/login');
-  await page.locator('input[name="identifier"]').fill(email);
-  await page.locator('input[type="password"]').fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
-  const id = /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? '';
-  expect(id).not.toBe('');
-  return id;
+  return signInAs({ page, identifier: email, password: PASSWORD });
 }
 
 /**

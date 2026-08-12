@@ -20,6 +20,7 @@ import type { LearnClassService } from "../learn/learn-class.service.js";
 import type { LearnService } from "../learn/learn.service.js";
 import type { SubmissionService } from "../learn/submission.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
+import type { TeacherProgressService } from "../teach/teacher-progress.service.js";
 
 export type ORPCContext = { req: Request };
 export type ORPCImplementer = ReturnType<
@@ -43,6 +44,7 @@ export type ORPCDeps = {
   learnService: LearnService;
   submissionService: SubmissionService;
   monitoringService: MonitoringService;
+  teacherProgressService: TeacherProgressService;
 };
 
 export function requestAddress(req: Request): string {

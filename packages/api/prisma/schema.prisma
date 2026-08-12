@@ -689,6 +689,10 @@ model Submission {
   /// Serves the academy-wide answer records page: one student's history,
   /// newest first, with the id tiebreak the default ordering pages on.
   @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  /// Serves teacher Solution status, which reads from the problem's side: the
+  /// user-first indexes above all need a student to start from, and the
+  /// By-problem views start from a set of materials.
+  @@index([materialId, userId, createdAt(sort: Desc)])
   @@map("submissions")
 }
 
@@ -769,6 +773,8 @@ model StudentExerciseProgress {
 
   @@unique([userId, materialId])
   @@index([userId, status])
+  /// "Who in this class has solved this exercise", for teacher analytics.
+  @@index([materialId, status, userId])
   @@map("student_exercise_progress")
 }
 

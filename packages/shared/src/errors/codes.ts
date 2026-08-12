@@ -60,6 +60,8 @@ export const appErrorCodes = [
   "MONITORING_PAYLOAD_TOO_LARGE",
   "MONITORING_REALTIME_UNAVAILABLE",
   "MONITORING_FEEDBACK_INVALID",
+  "TEACHER_PROGRESS_ACCESS_DENIED",
+  "TEACHER_PROGRESS_NOT_FOUND",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -142,4 +144,12 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   MONITORING_PAYLOAD_TOO_LARGE: "That change was too large to send.",
   MONITORING_REALTIME_UNAVAILABLE: "Live monitoring is temporarily unavailable.",
   MONITORING_FEEDBACK_INVALID: "Feedback must be between 1 and 2,000 characters.",
+  // The same one message for every access failure, for the same reason as
+  // monitoring: a teacher must not be able to map another academy's classes
+  // by reading which error comes back.
+  TEACHER_PROGRESS_ACCESS_DENIED:
+    "You are not the assigned teacher for this class.",
+  // Never existed, no longer in this class, or no longer visible — one answer,
+  // so the API cannot be used as an existence oracle.
+  TEACHER_PROGRESS_NOT_FOUND: "That is no longer part of this class.",
 };

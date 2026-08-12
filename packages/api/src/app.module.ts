@@ -11,6 +11,7 @@ import { DatabaseModule } from "./database/database.module.js";
 import { ContentModule } from "./content/content.module.js";
 import { LearnModule } from "./learn/learn.module.js";
 import { MonitoringModule } from "./monitoring/monitoring.module.js";
+import { TeachModule } from "./teach/teach.module.js";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MonitoringModule } from "./monitoring/monitoring.module.js";
     ContentModule,
     LearnModule,
     MonitoringModule,
+    TeachModule,
   ],
   controllers: [AppController],
 })

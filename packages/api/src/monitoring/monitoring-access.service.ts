@@ -3,9 +3,13 @@ import { roleCanMonitor } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import {
+  assignedClassWhere,
+  classStudentWhere,
+  classTaughtMaterialWhere,
+} from "../classes/assigned-class-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
-import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 /**
@@ -232,64 +236,11 @@ export class MonitoringAccessService {
 }
 
 /**
- * Every fact `grantsLiveMonitoring` states, expressed as joins.
- *
- * The shared predicate is the canonical definition and this is its mirror;
- * both are tested against the same denial cases so the mirror cannot drift
- * into granting something the predicate refuses.
+ * The assigned-class, student, and curriculum predicates all live in
+ * `classes/assigned-class-access.ts` — they are the same facts Solution status
+ * authorizes on, and one definition is what keeps the two features from
+ * drifting apart. `grantsLiveMonitoring` in `@cove/shared` is the canonical
+ * statement of the rule; both are tested against the same denial cases.
  */
-function assignedClassWhere(
-  actor: MonitoringTeacherActor,
-): Prisma.ClassWhereInput {
-  return {
-    academyId: actor.academyId,
-    status: "ACTIVE",
-    teacherMembershipId: actor.membershipId,
-    assignedTeacher: {
-      academyId: actor.academyId,
-      userId: actor.userId,
-      role: "TEACHER",
-      status: "ACTIVE",
-      user: { status: "ACTIVE" },
-    },
-  };
-}
-
-/** An active student membership of this academy, enrolled in this class. */
-function monitorableStudentWhere(
-  academyId: string,
-  classId: string,
-): Prisma.AcademyMembershipWhereInput {
-  return {
-    academyId,
-    role: "STUDENT",
-    status: "ACTIVE",
-    user: { status: "ACTIVE" },
-    classEnrollments: { some: { classId } },
-  };
-}
-
-/**
- * Effectively visible curriculum that this class is actually taught.
- *
- * Deliberately narrower than the student's own `assignedMaterialWhere`, which
- * spans every class they sit in. Removing the course from the class removes
- * the teacher's view of it in the same step.
- */
-function monitoredMaterialWhere(
-  academyId: string,
-  classId: string,
-): Prisma.MaterialWhereInput {
-  return {
-    AND: [
-      effectivelyVisibleMaterialWhere(academyId),
-      {
-        lecture: {
-          courseModule: {
-            course: { classAssignments: { some: { classId } } },
-          },
-        },
-      },
-    ],
-  };
-}
+const monitorableStudentWhere = classStudentWhere;
+const monitoredMaterialWhere = classTaughtMaterialWhere;

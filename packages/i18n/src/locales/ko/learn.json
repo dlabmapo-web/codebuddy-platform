@@ -52,7 +52,8 @@
     "expand": "모듈 펼치기",
     "collapse": "모듈 접기",
     "version": "버전 {{number}}",
-    "score": "{{score}} / 100"
+    "score": "{{score}} / 100",
+    "lecture_progress_label": "{{title}} 진도"
   },
   "status": {
     "NOT_STARTED": "미시작",
@@ -115,7 +116,10 @@
     },
     "resize_terminal": "터미널 크기 조절",
     "submit": "제출",
-    "elapsed_time": "이 문제를 푼 시간"
+    "elapsed_time": "이 문제를 푼 시간",
+    "reviewing": "{{submitted}} 제출",
+    "submission_unavailable": "해당 제출을 불러오지 못했습니다. 현재 버전의 문제를 보고 있습니다.",
+    "back_to_records": "제출 기록으로 돌아가기"
   },
   "submit": {
     "empty": "코드를 제출하면 채점 결과가 여기에 표시됩니다.",
@@ -215,5 +219,56 @@
     "footer_student": "코스로 돌아가기",
     "transition_failed": "해당 문제를 열지 못했습니다. 작성한 코드는 그대로입니다.",
     "transition_retry": "다시 시도"
+  },
+  "records": {
+    "title": "제출 기록",
+    "description": "이 아카데미에서 제출한 모든 답안을 최신순으로 보여 줍니다.",
+    "summary": {
+      "total": "전체 제출",
+      "solved": "해결한 문제",
+      "rate": "정답률",
+      "total_caption": "채점이 끝난 제출만",
+      "solved_caption": "문제당 한 번만 집계",
+      "rate_label": "정답률 {{percent}}"
+    },
+    "column": {
+      "problem": "문제",
+      "result": "결과",
+      "score": "점수",
+      "tests": "테스트",
+      "solve_time": "풀이 시간",
+      "submitted": "제출 시각"
+    },
+    "tests_value": "{{passed}} / {{total}}",
+    "result": {
+      "ACCEPTED": "정답",
+      "NOT_ACCEPTED": "오답",
+      "JUDGE_ERROR": "채점 오류",
+      "CANCELLED": "취소됨",
+      "IN_PROGRESS": "진행 중"
+    },
+    "facet": {
+      "class": "반",
+      "course": "코스",
+      "module": "모듈",
+      "lecture": "강의"
+    },
+    "search_placeholder": "문제 검색",
+    "review": "다시 보기",
+    "unavailable_problem": "더 이상 열 수 없는 문제",
+    "solve_time_missing": "기록 없음",
+    "solve_time_label": "풀이 시간 {{duration}}",
+    "duration": {
+      "hours": "{{hours}}시간 {{minutes}}분",
+      "minutes": "{{minutes}}분 {{seconds}}초",
+      "seconds": "{{seconds}}초"
+    },
+    "empty_title": "아직 제출한 답안이 없습니다",
+    "empty_body": "제출한 답안이 결과와 풀이에 걸린 시간과 함께 여기에 표시됩니다.",
+    "empty_action": "내 코스로 가기",
+    "no_results": "조건에 맞는 기록이 없습니다.",
+    "unavailable_title": "제출 기록을 불러오지 못했습니다",
+    "unavailable_body": "페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.",
+    "refresh_failed": "기록을 새로 불러오지 못했습니다. 마지막으로 불러온 목록을 계속 보고 있습니다."
   }
 }

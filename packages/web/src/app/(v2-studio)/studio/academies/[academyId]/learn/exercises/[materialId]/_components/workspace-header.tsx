@@ -1,17 +1,19 @@
 'use client';
 
 import type { LearnExerciseWorkspace } from '@cove/shared';
+import { formatDateTime } from '@cove/i18n/format';
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  History,
   LoaderCircle,
   RotateCcw,
   Send,
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { useLayoutTranslation } from '@/i18n';
+import { useLayoutTranslation, useLocale } from '@/i18n';
 
 import type { DraftSaveState } from '../_lib/draft-store';
 import { ExerciseTimer } from './exercise-timer';
@@ -31,7 +33,6 @@ const saveStateStyles: Record<Exclude<DraftSaveState, 'idle'>, string> = {
 };
 
 export function WorkspaceHeader({
-  academyId,
   curriculum,
   workspace,
   saveState,
@@ -39,11 +40,14 @@ export function WorkspaceHeader({
   navigationDisabled,
   onSubmit,
   onReset,
+  reviewing,
+  solveStartedAt,
+  backHref,
+  backToRecords = false,
   submitting,
   indicator,
   feedback,
 }: {
-  academyId: string;
   /**
    * The curriculum trigger, owned by the page so focus can return to it.
    *
@@ -65,17 +69,34 @@ export function WorkspaceHeader({
   navigationDisabled: boolean;
   onSubmit: () => void;
   onReset: () => void;
+  /**
+   * The historical attempt this workspace was opened on, if any. Named in the
+   * header so the reader knows which code they are looking at; everything
+   * else about the workspace stays exactly as it always is.
+   */
+  reviewing?: { createdAt: string } | null;
+  /** The server-issued origin the visible clock counts from. */
+  solveStartedAt: string | null;
+  /** Where Back goes — the validated records location, or the course. */
+  backHref: string;
+  /** True when Back returns to Answer records, so the label says so. */
+  backToRecords?: boolean;
   submitting: boolean;
 }) {
   const { t } = useLayoutTranslation(['learn', 'content']);
-  const { breadcrumb, exercise, neighbors } = workspace;
+  const locale = useLocale();
+  const { exercise, neighbors } = workspace;
 
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
       <Link
-        aria-label={t('learn:workspace.back')}
+        aria-label={
+          backToRecords
+            ? t('learn:workspace.back_to_records')
+            : t('learn:workspace.back')
+        }
         className="grid size-8 shrink-0 place-items-center rounded-lg text-sub transition-colors hover:bg-canvas hover:text-ink"
-        href={`/studio/academies/${academyId}/learn/courses/${breadcrumb.course.id}?lecture=${breadcrumb.lecture.id}`}
+        href={backHref}
       >
         <ArrowLeft className="size-4" />
       </Link>
@@ -94,6 +115,16 @@ export function WorkspaceHeader({
           >
             {t(`content:exercise.difficulty.${exercise.difficulty}`)}
           </span>
+          {/* Compact and factual: which attempt is on screen. Nothing here
+              disables anything — the workspace stays fully editable. */}
+          {reviewing ? (
+            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-bold text-brand lg:inline-flex">
+              <History className="size-3" />
+              {t('learn:workspace.reviewing', {
+                submitted: formatDateTime(reviewing.createdAt, locale),
+              })}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -103,7 +134,7 @@ export function WorkspaceHeader({
       {indicator}
       {feedback}
 
-      <ExerciseTimer key={exercise.materialId} />
+      <ExerciseTimer startedAt={solveStartedAt} />
 
       {saveState === 'idle' ? null : (
         <span

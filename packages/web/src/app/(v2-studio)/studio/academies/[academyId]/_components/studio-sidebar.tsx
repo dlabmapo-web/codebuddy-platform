@@ -4,6 +4,7 @@ import type { AcademyRole } from '@cove/shared';
 import {
   BookOpen,
   ChevronsUpDown,
+  ClipboardList,
   GraduationCap,
   Presentation,
   LayoutDashboard,
@@ -285,11 +286,18 @@ function studioNavGroups({
     // fastest route into work. My Classes is the context behind it, and it is
     // a student's alone — staff hold `curriculum.read` so they can preview the
     // curriculum they wrote, and that is not a class to belong to.
+    // Answer records is a student's own history and nothing else, so staff
+    // previewing curriculum do not gain it either.
     if (isStudent) {
       learning.push({
         href: `${base}/learn/classes`,
         labelKey: 'link.my_classes',
         icon: School,
+      });
+      learning.push({
+        href: `${base}/learn/records`,
+        labelKey: 'link.answer_records',
+        icon: ClipboardList,
       });
     }
     groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });

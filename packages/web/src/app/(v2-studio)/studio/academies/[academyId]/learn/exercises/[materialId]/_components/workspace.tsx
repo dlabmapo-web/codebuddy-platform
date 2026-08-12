@@ -19,6 +19,7 @@ import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
+import { useSolveSession } from '../_hooks/use-solve-session';
 import {
   useExerciseNavigation,
   type ExerciseTransitionLifecycle,
@@ -32,9 +33,19 @@ import { WorkspaceHeader } from './workspace-header';
 export function Workspace({
   academyId,
   bootstrap,
+  returnTo,
+  submissionRequested = false,
 }: {
   academyId: string;
   bootstrap: LearnExerciseBootstrap;
+  /**
+   * The validated Answer records location to return to, or null when the
+   * student arrived through My Courses. Never a caller-supplied URL: the
+   * server has already reduced it to this academy's own records path.
+   */
+  returnTo: string | null;
+  /** The route asked for an attempt. It may still have failed to load. */
+  submissionRequested?: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
   // The monitoring copy is mounted by this page for the indicator; the peer
@@ -42,7 +53,11 @@ export function Workspace({
   const { t: tm } = useTranslation('monitoring');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
-  const [outputTab, setOutputTab] = React.useState<OutputTab>('terminal');
+  // Entering on a historical attempt opens on its verdict; ordinary entry
+  // still opens on the terminal.
+  const [outputTab, setOutputTab] = React.useState<OutputTab>(
+    bootstrap.selectedSubmission ? 'result' : 'terminal',
+  );
   const [lastReadSubmissionId, setLastReadSubmissionId] = React.useState<
     string | null
   >(null);
@@ -71,15 +86,31 @@ export function Workspace({
   } = useNavigatorPanel('workspace-curriculum');
 
   const { exercise } = workspace;
+  // A transition inside the workspace leaves the reviewed attempt behind: it
+  // described the problem the student entered on, not the one they moved to.
+  const selected =
+    navigation.workspace.exercise.materialId ===
+    bootstrap.workspace.exercise.materialId
+      ? (bootstrap.selectedSubmission ?? null)
+      : null;
+
+  const solveSession = useSolveSession({
+    academyId,
+    materialId: exercise.materialId,
+  });
   const submission = useSubmission({
     academyId,
     materialId: exercise.materialId,
+    initialResult: selected?.result ?? null,
+    solveSessionId: solveSession.solveSessionId,
+    reopenSolveSession: solveSession.reopen,
   });
   const draft = useDraftAutosave({
     academyId,
     materialId: exercise.materialId,
     serverDraft: workspace.draft,
     starterCode: exercise.starterCode,
+    historicalCode: selected?.code ?? null,
   });
 
   // The student's own half of monitoring: signals out, a generic indicator
@@ -299,7 +330,6 @@ export function Workspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader
-          academyId={academyId}
           feedback={
             <FeedbackPanel
               isHighlighted={feedback.isHighlighted}
@@ -327,11 +357,30 @@ export function Workspace({
             draft.resetTo(exercise.starterCode);
           }}
           onSubmit={handleSubmit}
+          backToRecords={returnTo !== null}
+          backHref={
+            returnTo ??
+            `/studio/academies/${academyId}/learn/courses/${workspace.breadcrumb.course.id}?lecture=${workspace.breadcrumb.lecture.id}`
+          }
+          reviewing={selected ? { createdAt: selected.createdAt } : null}
           saveState={draft.saveState}
+          solveStartedAt={solveSession.startedAt}
           submitting={submission.submitting}
           workspace={workspace}
         />
       </div>
+
+      {/* Asked for, and not loaded. The ordinary workspace below is intact,
+          including whatever draft was already saved, so this is a focused
+          message rather than a failed page. */}
+      {submissionRequested && !bootstrap.selectedSubmission ? (
+        <p
+          className="shrink-0 border-b border-warning/25 bg-warning/5 px-4 py-2 text-[13px] font-semibold text-warning"
+          role="status"
+        >
+          {t('workspace.submission_unavailable')}
+        </p>
+      ) : null}
 
       {/* A destination that would not open. Said here, above work that is
           still entirely intact, rather than by routing away to an error page

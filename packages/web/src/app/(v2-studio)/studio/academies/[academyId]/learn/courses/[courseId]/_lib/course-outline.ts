@@ -48,3 +48,27 @@ export function formatProblemOutlineNumber(
 ) {
   return `${modulePosition}-${lecturePosition}-${problemPosition}`;
 }
+
+/**
+ * How far through one lecture a student is.
+ *
+ * Derived from the progress already on the outline's exercises rather than
+ * aggregated from submissions on read: the course page is one query, and a
+ * lecture card must not turn it into one query per lecture.
+ *
+ * `percent` is `null` for a lecture with no problems. A heading lecture is not
+ * 0% complete, and drawing an empty bar for it would say it is.
+ */
+export function lectureProgress(lecture: {
+  exercises: ReadonlyArray<{ status: string }>;
+}): { total: number; solved: number; percent: number | null } {
+  const total = lecture.exercises.length;
+  const solved = lecture.exercises.filter(
+    (exercise) => exercise.status === 'SOLVED',
+  ).length;
+  return {
+    total,
+    solved,
+    percent: total === 0 ? null : Math.round((solved / total) * 100),
+  };
+}

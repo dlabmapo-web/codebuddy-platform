@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
-import { formatProblemOutlineNumber } from '../_lib/course-outline';
+import { formatProblemOutlineNumber, lectureProgress } from '../_lib/course-outline';
 import { ExerciseRow } from './exercise-row';
 
 type Module = LearnCourseOutline['modules'][number];
@@ -96,31 +96,40 @@ export function ModuleSection({
                           aria-label={t('outline.toggle_lecture', {
                             title: lecture.title,
                           })}
-                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-canvas/70"
+                          className="flex w-full items-start gap-2.5 px-3 py-3 text-left transition-colors hover:bg-canvas/70"
                           type="button"
                         >
                           <ChevronDown
                             aria-hidden
-                            className={`size-4 shrink-0 text-sub transition-transform duration-200 ${
+                            className={`mt-0.5 size-4 shrink-0 text-sub transition-transform duration-200 motion-reduce:transition-none ${
                               isLectureExpanded(lecture.id)
                                 ? 'rotate-180 text-brand'
                                 : ''
                             }`}
                           />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[10.5px] font-bold uppercase tracking-[0.07em] text-sub">
-                              {t('outline.lecture_label', {
-                                position: lecture.position,
-                              })}
+                          {/* One column on a phone: the progress block below
+                              needs its own line before the title starts
+                              truncating to nothing. */}
+                          <span className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[10.5px] font-bold uppercase tracking-[0.07em] text-sub">
+                                {t('outline.lecture_label', {
+                                  position: lecture.position,
+                                })}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[13.5px] font-bold text-ink">
+                                {lecture.title}
+                              </span>
+                              {lecture.description ? (
+                                // Two lines: enough to say what the lecture
+                                // covers, never enough to push the next one
+                                // off the screen.
+                                <span className="mt-1 line-clamp-2 text-[12.5px] leading-[1.5] text-sub">
+                                  {lecture.description}
+                                </span>
+                              ) : null}
                             </span>
-                            <span className="mt-0.5 block truncate text-[13.5px] font-bold text-ink">
-                              {lecture.title}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-[12px] font-semibold text-sub">
-                            {t('outline.problem_count', {
-                              count: lecture.exercises.length,
-                            })}
+                            <LectureProgress lecture={lecture} />
                           </span>
                         </button>
                       </Collapsible.Trigger>
@@ -167,5 +176,48 @@ export function ModuleSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * The lecture card's scan line: how many problems, how many solved, and a bar.
+ *
+ * The count is always printed beside the bar rather than replaced by it —
+ * width alone is not a number, and a bar is the first thing to become
+ * unreadable at narrow widths or in high contrast.
+ */
+function LectureProgress({
+  lecture,
+}: {
+  lecture: Module['lectures'][number];
+}) {
+  const { t } = useLayoutTranslation('learn');
+  const progress = lectureProgress(lecture);
+  if (progress.percent === null) return null;
+
+  return (
+    <span className="flex shrink-0 items-center gap-2 sm:w-44">
+      <span className="whitespace-nowrap text-[12px] font-semibold text-sub">
+        {t('outline.progress', {
+          solved: progress.solved,
+          total: progress.total,
+        })}
+      </span>
+      <span
+        aria-label={t('outline.lecture_progress_label', {
+          title: lecture.title,
+        })}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={progress.percent}
+        className="hidden h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border sm:block"
+        role="progressbar"
+      >
+        <span
+          className="block h-full rounded-full bg-brand transition-[width] duration-300 motion-reduce:transition-none"
+          style={{ width: `${progress.percent}%` }}
+        />
+      </span>
+    </span>
   );
 }

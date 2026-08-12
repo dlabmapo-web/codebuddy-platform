@@ -11,6 +11,7 @@ import {
   useReactTable,
   type ColumnDef,
   type SortingState,
+  type TableOptions,
   type VisibilityState,
 } from '@tanstack/react-table';
 import {
@@ -31,6 +32,17 @@ import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
+import {
+  applyUpdater,
+  facetSelection,
+  hideableColumnsOf,
+  isTableFiltered,
+  showsFacetCounts,
+  singleSort,
+  tableModelFlags,
+  withFacetSelection,
+  type DataTableManualMode,
+} from './data-table-state';
 import { FacetedFilter, type TableFacet } from './faceted-filter';
 import {
   DropdownMenu,
@@ -83,7 +95,19 @@ export type DataTableProps<TData, TValue> = {
   toolbarFilters?: React.ReactNode;
   /** Page-level actions ("New course") placed at the end of the toolbar. */
   toolbarActions?: React.ReactNode;
+  /** Hides the column-visibility menu for pages with a fixed table layout. */
+  showColumnVisibility?: boolean;
   onRowClick?: (row: TData) => void;
+  /**
+   * Server-owned sorting, filtering, and paging.
+   *
+   * Omit it — as every existing consumer does — and the table keeps its
+   * uncontrolled client behavior exactly. Supplying it hands all three to the
+   * caller; see `data-table-state.ts` for why it is all three or none.
+   */
+  manual?: DataTableManualMode;
+  /** Announced beside a pending server query, for the polite live region. */
+  loadingLabel?: string;
   /**
    * Drops the table's own card, for a table rendered inside one already. The
    * header rule and row dividers stay, so it still reads as a table.
@@ -101,40 +125,81 @@ export function DataTable<TData, TValue>({
   facets,
   toolbarFilters,
   toolbarActions,
+  showColumnVisibility = true,
   onRowClick,
+  manual,
+  loadingLabel,
   frameless = false,
   className,
 }: DataTableProps<TData, TValue>) {
   const { t } = useLayoutTranslation('common');
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [clientSorting, setClientSorting] = React.useState<SortingState>([]);
+  const [clientGlobalFilter, setClientGlobalFilter] = React.useState('');
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
 
-  const table = useReactTable({
+  const sorting = manual ? manual.sorting : clientSorting;
+  const globalFilter = manual ? manual.globalFilter : clientGlobalFilter;
+  const flags = tableModelFlags(manual);
+  // Fixed while a server owns the page: the caller's contract already names
+  // the size, and a local override would slice the page it was handed.
+  const serverPageSize = data.length > 0 ? data.length : 1;
+
+  // Assembled rather than spread inline: the conditional shapes below would
+  // make the argument a union and cost `TData` its inference, which the column
+  // definitions a caller passes are typed against.
+  const options: TableOptions<TData> = {
     data,
     columns,
     state: { sorting, globalFilter, columnVisibility },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    onSortingChange: (updater) => {
+      const next = singleSort(applyUpdater(updater, sorting));
+      if (manual) manual.onSortingChange(next);
+      else setClientSorting(next);
+    },
+    onGlobalFilterChange: (updater) => {
+      const next = applyUpdater(updater, globalFilter);
+      if (manual) manual.onGlobalFilterChange(next);
+      else setClientGlobalFilter(next);
+    },
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    ...(pageSize
-      ? {
-          getPaginationRowModel: getPaginationRowModel(),
-          initialState: { pagination: { pageSize } },
-        }
-      : {}),
-  });
+  };
+
+  if (flags.clientSorting) options.getSortedRowModel = getSortedRowModel();
+  if (flags.clientFiltering) options.getFilteredRowModel = getFilteredRowModel();
+  if (flags.clientFaceting) {
+    options.getFacetedRowModel = getFacetedRowModel();
+    options.getFacetedUniqueValues = getFacetedUniqueValues();
+  }
+
+  if (manual) {
+    const pagination = {
+      pageIndex: manual.pageIndex,
+      pageSize: pageSize ?? serverPageSize,
+    };
+    // Deliberately without `columnFilters`: in manual mode those ids name
+    // facets, not columns, and handing them to a table that has no filtering
+    // to do only makes it warn about columns that were never meant to exist.
+    options.state = { ...options.state, pagination };
+    options.manualPagination = true;
+    options.manualSorting = true;
+    options.manualFiltering = true;
+    // At least one, so an empty result still renders "Page 1 of 1" rather
+    // than a paginator that reads as broken.
+    options.pageCount = Math.max(manual.pageCount, 1);
+    options.rowCount = manual.rowCount;
+    options.onPaginationChange = (updater) =>
+      manual.onPageIndexChange(applyUpdater(updater, pagination).pageIndex);
+  } else if (pageSize) {
+    options.getPaginationRowModel = getPaginationRowModel();
+    options.initialState = { pagination: { pageSize } };
+  }
+
+  const table = useReactTable(options);
 
   const rows = table.getRowModel().rows;
-  const hideableColumns = table
-    .getAllLeafColumns()
-    .filter((column) => column.getCanHide() && column.getCanSort());
+  const hideableColumns = hideableColumnsOf(table.getAllLeafColumns());
 
   /** Header definitions are plain strings here, so they double as labels. */
   const columnLabel = (id: string) => {
@@ -142,13 +207,17 @@ export function DataTable<TData, TValue>({
     return typeof header === 'string' ? header : id;
   };
 
-  const filtered =
-    table.getState().columnFilters.length > 0 || globalFilter.length > 0;
+  const filtered = isTableFiltered({
+    globalFilter,
+    columnFilters: manual
+      ? manual.columnFilters
+      : table.getState().columnFilters,
+  });
   const showToolbar = Boolean(
     searchPlaceholder ||
       facets?.length ||
       toolbarFilters ||
-      hideableColumns.length > 0 ||
+      (showColumnVisibility && hideableColumns.length > 0) ||
       toolbarActions,
   );
 
@@ -163,7 +232,7 @@ export function DataTable<TData, TValue>({
               <input
                 aria-label={searchPlaceholder}
                 className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-[14px] outline-none transition-colors placeholder:text-sub/60 focus:border-brand focus:ring-2 focus:ring-brand/20"
-                onChange={(event) => setGlobalFilter(event.target.value)}
+                onChange={(event) => table.setGlobalFilter(event.target.value)}
                 placeholder={searchPlaceholder}
                 value={globalFilter}
               />
@@ -174,9 +243,29 @@ export function DataTable<TData, TValue>({
 
           {facets?.map((facet) => (
             <FacetedFilter
-              column={table.getColumn(facet.columnId)}
+              // Controlled by the owner in manual mode, where a facet id names
+              // a server-side filter rather than a rendered column.
+              column={manual ? undefined : table.getColumn(facet.columnId)}
               key={facet.columnId}
+              onSelectedChange={
+                manual
+                  ? (values) =>
+                      manual.onColumnFiltersChange(
+                        withFacetSelection(
+                          manual.columnFilters,
+                          facet.columnId,
+                          values,
+                        ),
+                      )
+                  : undefined
+              }
               options={facet.options}
+              selected={
+                manual
+                  ? facetSelection(manual.columnFilters, facet.columnId)
+                  : undefined
+              }
+              showCounts={showsFacetCounts(manual)}
               title={facet.title}
             />
           ))}
@@ -185,8 +274,9 @@ export function DataTable<TData, TValue>({
             <button
               className="inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-[13.5px] font-bold text-sub transition-colors hover:text-ink"
               onClick={() => {
-                table.resetColumnFilters();
-                setGlobalFilter('');
+                if (manual) manual.onColumnFiltersChange([]);
+                else table.resetColumnFilters();
+                table.setGlobalFilter('');
               }}
               type="button"
             >
@@ -197,7 +287,7 @@ export function DataTable<TData, TValue>({
 
           <div className="ml-auto flex items-center gap-2">
           {/* Without this, hiding a column from its header would be one-way. */}
-          {hideableColumns.length > 0 ? (
+          {showColumnVisibility && hideableColumns.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -241,10 +331,25 @@ export function DataTable<TData, TValue>({
         </div>
       ) : null}
 
+      {/* Kept out of the table so a results-count change is announced without
+          moving focus away from the control that caused it. */}
+      {manual ? (
+        <p aria-live="polite" className="sr-only">
+          {manual.pending
+            ? (loadingLabel ?? t('state.loading'))
+            : t('pagination.rows', { count: manual.rowCount })}
+        </p>
+      ) : null}
+
       <div
+        // Pending keeps the current rows on screen rather than swapping them
+        // for a spinner: a table that empties on every page turn jumps, and
+        // the reader loses the row they were reading.
+        aria-busy={manual?.pending || undefined}
         className={cn(
-          'overflow-x-auto rounded-card border border-border bg-card',
+          'overflow-x-auto rounded-card border border-border bg-card transition-opacity motion-reduce:transition-none',
           frameless && 'rounded-none border-0 bg-transparent',
+          manual?.pending && 'opacity-60',
         )}
       >
         <table className="w-full border-collapse text-left">
@@ -364,11 +469,13 @@ export function DataTable<TData, TValue>({
         </table>
       </div>
 
-      {pageSize && rows.length > 0 ? (
+      {(manual ? manual.rowCount > 0 : pageSize && rows.length > 0) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 px-1">
           <p className="text-[13px] text-sub">
             {t('pagination.rows', {
-              count: table.getFilteredRowModel().rows.length,
+              count: manual
+                ? manual.rowCount
+                : table.getFilteredRowModel().rows.length,
             })}
           </p>
           <div className="flex items-center gap-4">

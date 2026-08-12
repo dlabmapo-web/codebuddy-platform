@@ -26,7 +26,14 @@ export type FacetOption = {
 };
 
 export type TableFacet = {
-  /** Column this filter narrows. Must use an `arrIncludesSome` filter. */
+  /**
+   * Identifies the facet.
+   *
+   * In the default client mode this is the column it narrows, which must use
+   * an `arrIncludesSome` filter. In a table's manual mode it is only a key
+   * into the owner's facet selections — a server-side facet like Course has
+   * no column to point at.
+   */
   columnId: string;
   title: string;
   options: FacetOption[];
@@ -38,16 +45,42 @@ export type TableFacet = {
  */
 export function FacetedFilter<TData, TValue>({
   column,
+  onSelectedChange,
   options,
+  selected: controlledSelection,
+  showCounts = true,
   title,
 }: {
-  column: Column<TData, TValue> | undefined;
+  /** The column this narrows, when the table filters in the browser. */
+  column?: Column<TData, TValue> | undefined;
+  /**
+   * Controlled selection, for a table whose server does the filtering.
+   *
+   * Supplied together with `onSelectedChange`, and instead of `column`: a
+   * server-side facet such as Course or Lecture narrows rows without being a
+   * column, so asking TanStack for one would only produce a warning and an
+   * inert chip.
+   */
+  selected?: string[];
+  onSelectedChange?: (values: string[]) => void;
   options: FacetOption[];
+  /**
+   * Off for a server-paged table. The faceted row model only ever sees the
+   * page in hand, so a count taken from it would describe twenty rows while
+   * reading as a fact about the whole history.
+   */
+  showCounts?: boolean;
   title: string;
 }) {
   const { t } = useLayoutTranslation('common');
-  const selected = new Set((column?.getFilterValue() as string[]) ?? []);
-  const counts = column?.getFacetedUniqueValues();
+  const selected = new Set(
+    controlledSelection ?? (column?.getFilterValue() as string[]) ?? [],
+  );
+  const counts = showCounts ? column?.getFacetedUniqueValues() : undefined;
+  const commit = (values: string[]) => {
+    if (onSelectedChange) onSelectedChange(values);
+    else column?.setFilterValue(values.length > 0 ? values : undefined);
+  };
   const active = selected.size > 0;
 
   return (
@@ -104,10 +137,7 @@ export function FacetedFilter<TData, TValue>({
                       const next = new Set(selected);
                       if (isSelected) next.delete(option.value);
                       else next.add(option.value);
-                      const values = Array.from(next);
-                      column?.setFilterValue(
-                        values.length > 0 ? values : undefined,
-                      );
+                      commit(Array.from(next));
                     }}
                     value={option.label}
                   >
@@ -138,7 +168,7 @@ export function FacetedFilter<TData, TValue>({
               <CommandGroup className="border-t border-border">
                 <CommandItem
                   className="justify-center text-[13px] font-bold text-sub"
-                  onSelect={() => column?.setFilterValue(undefined)}
+                  onSelect={() => commit([])}
                   value="__clear__"
                 >
                   {t('filter.clear')}

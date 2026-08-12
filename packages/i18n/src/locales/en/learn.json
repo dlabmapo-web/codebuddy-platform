@@ -57,7 +57,8 @@
     "expand": "Expand module",
     "collapse": "Collapse module",
     "version": "Version {{number}}",
-    "score": "{{score}} / 100"
+    "score": "{{score}} / 100",
+    "lecture_progress_label": "Progress in {{title}}"
   },
   "status": {
     "NOT_STARTED": "Not started",
@@ -123,7 +124,10 @@
     },
     "resize_terminal": "Resize terminal",
     "submit": "Submit",
-    "elapsed_time": "Time on this problem"
+    "elapsed_time": "Time on this problem",
+    "reviewing": "Submitted {{submitted}}",
+    "submission_unavailable": "That submission could not be loaded. This is the current version of the problem.",
+    "back_to_records": "Back to answer records"
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",
@@ -224,5 +228,56 @@
     "footer_student": "Back to the course",
     "transition_failed": "That problem could not be opened. Your code is untouched.",
     "transition_retry": "Try again"
+  },
+  "records": {
+    "title": "Answer records",
+    "description": "Every solution you have submitted in this academy, newest first.",
+    "summary": {
+      "total": "Total submissions",
+      "solved": "Problems solved",
+      "rate": "Accepted rate",
+      "total_caption": "Graded attempts only",
+      "solved_caption": "Each problem counted once",
+      "rate_label": "Accepted rate {{percent}}"
+    },
+    "column": {
+      "problem": "Problem",
+      "result": "Result",
+      "score": "Score",
+      "tests": "Tests",
+      "solve_time": "Solve time",
+      "submitted": "Submitted"
+    },
+    "tests_value": "{{passed}} / {{total}}",
+    "result": {
+      "ACCEPTED": "Accepted",
+      "NOT_ACCEPTED": "Not accepted",
+      "JUDGE_ERROR": "Judge error",
+      "CANCELLED": "Cancelled",
+      "IN_PROGRESS": "In progress"
+    },
+    "facet": {
+      "class": "Class",
+      "course": "Course",
+      "module": "Module",
+      "lecture": "Lecture"
+    },
+    "search_placeholder": "Search problems",
+    "review": "Review",
+    "unavailable_problem": "Problem no longer available",
+    "solve_time_missing": "Not recorded",
+    "solve_time_label": "Solve time {{duration}}",
+    "duration": {
+      "hours": "{{hours}}h {{minutes}}m",
+      "minutes": "{{minutes}}m {{seconds}}s",
+      "seconds": "{{seconds}}s"
+    },
+    "empty_title": "No submissions yet",
+    "empty_body": "Solutions you submit appear here, with the result and the time you spent on each one.",
+    "empty_action": "Go to my courses",
+    "no_results": "No record matches these filters.",
+    "unavailable_title": "Your answer records could not be loaded",
+    "unavailable_body": "Reload the page, or try again in a moment.",
+    "refresh_failed": "Those records could not be refreshed. You are still looking at the last ones that loaded."
   }
 }

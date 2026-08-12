@@ -49,6 +49,7 @@
   "SUBMISSION_IN_FLIGHT": "This problem is already being graded. Wait for the result.",
   "SUBMISSION_RATE_LIMITED": "Too many submissions. Wait a moment and try again.",
   "SUBMISSION_NOT_FOUND": "That submission was not found.",
+  "SOLVE_SESSION_INVALID": "This problem session expired. Please submit again.",
   "GRADING_UNAVAILABLE": "Grading is temporarily unavailable. Your code is saved.",
   "MONITORING_DISABLED": "Live monitoring is not enabled for this academy.",
   "MONITORING_ACCESS_DENIED": "You are not the assigned teacher for this class.",

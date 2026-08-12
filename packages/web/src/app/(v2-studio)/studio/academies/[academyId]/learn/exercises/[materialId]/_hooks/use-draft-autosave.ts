@@ -7,7 +7,9 @@ import { orpc } from '@/lib/orpc';
 
 import {
   readLocalDraft,
+  resolveReviewBuffer,
   resolveSaveState,
+  shouldPersistOnHide,
   shouldSyncDraft,
   writeLocalDraft,
   type DraftSaveState,
@@ -21,15 +23,38 @@ export function useDraftAutosave({
   materialId,
   serverDraft,
   starterCode,
+  historicalCode = null,
 }: {
   academyId: string;
   materialId: string;
   serverDraft: { code: string; updatedAt: string } | null;
   starterCode: string;
+  /**
+   * A historical submission's code, opened for review.
+   *
+   * It seeds the editor without becoming the draft: merely opening an old
+   * attempt and leaving must not overwrite whatever the student had saved.
+   * The first edit — or a Submit, which flushes first — promotes this buffer
+   * into the ordinary draft flow, and autosave takes over from there.
+   */
+  historicalCode?: string | null;
 }) {
   const [code, setCode] = React.useState(
     () =>
-      resolveInitialCode({ localDraft: null, serverDraft, starterCode }).code,
+      resolveReviewBuffer({
+        historicalCode,
+        draftCode: resolveInitialCode({
+          localDraft: null,
+          serverDraft,
+          starterCode,
+        }).code,
+        starterCode,
+      }).code,
+  );
+  // Until the buffer is touched it is a view of an immutable submission, not
+  // work in progress, so nothing syncs and the header reports nothing.
+  const [reviewingUntouched, setReviewingUntouched] = React.useState(
+    historicalCode !== null,
   );
   const [syncing, setSyncing] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
@@ -44,6 +69,8 @@ export function useDraftAutosave({
   const lastSyncedRef = React.useRef<string | null>(serverDraft?.code ?? null);
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedRef = React.useRef(false);
+  // Mirrored for the teardown handler, where a state read would be stale.
+  const reviewingUntouchedRef = React.useRef(reviewingUntouched);
 
   /**
    * Previous/Next swaps the exercise without remounting this component, so the
@@ -51,9 +78,20 @@ export function useDraftAutosave({
    * React's documented pattern for reacting to a changed prop — an effect would
    * paint the previous problem's code for a frame first.
    */
+  const [trackedHistorical, setTrackedHistorical] = React.useState(historicalCode);
+  if (trackedHistorical !== historicalCode && historicalCode !== null) {
+    // A different attempt was selected for the same problem. Seed the editor
+    // with it, still without touching the saved draft.
+    setTrackedHistorical(historicalCode);
+    setCode(historicalCode);
+    setReviewingUntouched(true);
+  }
+
   const [trackedMaterialId, setTrackedMaterialId] = React.useState(materialId);
   if (trackedMaterialId !== materialId) {
     setTrackedMaterialId(materialId);
+    // A transition leaves the reviewed attempt behind: the destination is an
+    // ordinary workspace with its own draft.
     const initial = resolveInitialCode({
       localDraft: null,
       serverDraft,
@@ -62,6 +100,8 @@ export function useDraftAutosave({
     setCode(initial.code);
     setLastSyncedCode(serverDraft?.code ?? null);
     setEverSynced(serverDraft !== null);
+    setReviewingUntouched(false);
+    setTrackedHistorical(null);
     setFailed(false);
     setSyncing(false);
   }
@@ -69,6 +109,10 @@ export function useDraftAutosave({
   React.useEffect(() => {
     codeRef.current = code;
   }, [code]);
+
+  React.useEffect(() => {
+    reviewingUntouchedRef.current = reviewingUntouched;
+  }, [reviewingUntouched]);
 
   /**
    * The beacon handler runs during teardown, where reading state would be
@@ -87,6 +131,9 @@ export function useDraftAutosave({
    * it fixes.
    */
   React.useEffect(() => {
+    // Skipped while reviewing: the student asked for this submission, and a
+    // newer local draft replacing it would answer a question nobody asked.
+    if (historicalCode !== null) return;
     let cancelled = false;
     hydratedRef.current = false;
     void readLocalDraft(materialId).then((localDraft) => {
@@ -102,7 +149,7 @@ export function useDraftAutosave({
     return () => {
       cancelled = true;
     };
-  }, [materialId, serverDraft, starterCode]);
+  }, [historicalCode, materialId, serverDraft, starterCode]);
 
   const sync = React.useCallback(
     async (nextCode: string) => {
@@ -132,6 +179,8 @@ export function useDraftAutosave({
   const onChange = React.useCallback(
     (nextCode: string) => {
       hydratedRef.current = true;
+      // The first edit is what promotes a reviewed submission into a draft.
+      setReviewingUntouched(false);
       setCode(nextCode);
       // Local first: this is what makes typing free.
       void writeLocalDraft(materialId, {
@@ -148,11 +197,19 @@ export function useDraftAutosave({
     [materialId, sync],
   );
 
+  /**
+   * Persist now rather than on the idle timer.
+   *
+   * Submit calls this, which is also what promotes a reviewed submission the
+   * student never edited: the code they are about to submit becomes their
+   * draft, matching the ordinary submit rule exactly.
+   */
   const flushNow = React.useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    setReviewingUntouched(false);
     return sync(codeRef.current);
   }, [sync]);
 
@@ -163,8 +220,16 @@ export function useDraftAutosave({
   React.useEffect(() => {
     const onHide = () => {
       if (document.visibilityState !== 'hidden') return;
+      // Closing the tab on a submission nobody edited saves nothing: the
+      // student's own draft is still what belongs on the server.
       const current = codeRef.current;
-      if (!shouldSyncDraft({ code: current, lastSyncedCode: lastSyncedRef.current })) {
+      if (
+        !shouldPersistOnHide({
+          reviewing: reviewingUntouchedRef.current,
+          code: current,
+          lastSyncedCode: lastSyncedRef.current,
+        })
+      ) {
         return;
       }
       const payload = JSON.stringify({ academyId, materialId, code: current });
@@ -182,7 +247,10 @@ export function useDraftAutosave({
     };
   }, [academyId, materialId, sync]);
 
-  const dirty = shouldSyncDraft({ code, lastSyncedCode });
+  // An untouched reviewed submission is not unsaved work, so the header stays
+  // quiet rather than claiming the student has changes they never made.
+  const dirty =
+    !reviewingUntouched && shouldSyncDraft({ code, lastSyncedCode });
   const saveState: DraftSaveState = resolveSaveState({
     dirty,
     syncing,
@@ -190,5 +258,14 @@ export function useDraftAutosave({
     everSynced,
   });
 
-  return { code, setCode: onChange, resetTo: setCode, flushNow, saveState };
+  return {
+    code,
+    setCode: onChange,
+    resetTo: (nextCode: string) => {
+      setReviewingUntouched(false);
+      setCode(nextCode);
+    },
+    flushNow,
+    saveState,
+  };
 }

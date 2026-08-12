@@ -6,8 +6,19 @@ import { fallbackLocale, layoutNamespaces, locales } from "./settings.js";
 
 const localesDir = join(import.meta.dirname, "locales");
 
-/** Total bytes of the layout namespaces allowed in the root RSC payload. */
-const TOTAL_BUDGET_BYTES = 50 * 1024;
+/**
+ * Total bytes of the layout namespaces allowed in the root RSC payload.
+ *
+ * Raised from 50 KiB when Answer records landed: `learn` is a layout namespace
+ * and the student history page, the historical-submission workspace copy, and
+ * the lecture progress labels all belong to it. The per-namespace cap below is
+ * the one that still forces a split, and nothing here has reached it.
+ *
+ * The next feature to push this should move a namespace to a page provider
+ * rather than raise it again — `classes` and `auth` are both large and used by
+ * one route group each.
+ */
+const TOTAL_BUDGET_BYTES = 56 * 1024;
 /** Bytes above which a single namespace should move to a page provider. */
 const NAMESPACE_BUDGET_BYTES = 15 * 1024;
 

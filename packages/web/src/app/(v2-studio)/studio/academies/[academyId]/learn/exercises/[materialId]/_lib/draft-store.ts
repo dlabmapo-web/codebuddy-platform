@@ -114,3 +114,49 @@ export function resolveSaveState(input: {
   if (input.dirty) return 'local';
   return input.everSynced ? 'saved' : 'idle';
 }
+
+/**
+ * Which code the editor opens with when the route selected an old attempt.
+ *
+ * The submission wins over the saved draft, but only as a view: `reviewing`
+ * says the buffer is not work in progress yet. Nothing about the workspace is
+ * disabled by it — it decides autosave, not editing.
+ */
+export function resolveReviewBuffer(input: {
+  historicalCode: string | null;
+  draftCode: string | null;
+  starterCode: string;
+}): { code: string; reviewing: boolean } {
+  if (input.historicalCode !== null) {
+    return { code: input.historicalCode, reviewing: true };
+  }
+  return { code: input.draftCode ?? input.starterCode, reviewing: false };
+}
+
+/**
+ * Whether a hidden tab should push its buffer to the server.
+ *
+ * An untouched reviewed submission must not: the student's own draft is still
+ * what belongs there, and closing a tab is not a decision to replace it.
+ */
+export function shouldPersistOnHide(input: {
+  reviewing: boolean;
+  code: string;
+  lastSyncedCode: string | null;
+}): boolean {
+  if (input.reviewing) return false;
+  return shouldSyncDraft(input);
+}
+
+/**
+ * What a reviewed buffer becomes after the student acts on it.
+ *
+ * Editing it and submitting it are the same promotion: from here on it is an
+ * ordinary draft with ordinary autosave. Reset is also an edit — it replaces
+ * the submission with the starter code, which is the student's own work.
+ */
+export function promotesReviewBuffer(
+  action: 'edit' | 'submit' | 'reset' | 'open' | 'navigate',
+): boolean {
+  return action === 'edit' || action === 'submit' || action === 'reset';
+}

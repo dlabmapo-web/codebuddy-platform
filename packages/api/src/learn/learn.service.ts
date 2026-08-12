@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import {
+  SOLVE_SESSION_MAX_SECONDS,
   flattenOutlineExercises,
   progressStatusFromDraft,
   toNavigatorContext,
@@ -9,6 +10,7 @@ import {
   type LearnCourseSummary,
   type LearnExerciseBootstrap,
   type LearnExerciseWorkspace,
+  type SolveSession,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -28,6 +30,7 @@ import {
   visibleCurriculumInclude,
 } from "./curriculum-outline.service.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+import { SubmissionService } from "./submission.service.js";
 
 /** The material graph one authorized workspace read produces. */
 const workspaceMaterialInclude = {
@@ -68,6 +71,7 @@ export class LearnService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly curriculum: CurriculumOutlineService,
+    private readonly submissions: SubmissionService,
   ) {}
 
   async listCourses(
@@ -109,15 +113,28 @@ export class LearnService {
    */
   async getExerciseBootstrap(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string },
+    input: { academyId: string; materialId: string; submissionId?: string },
   ): Promise<LearnExerciseBootstrap> {
     const learner = await this.requireLearner(identity, input.academyId);
     const material = await this.requireWorkspaceMaterial(input, learner.scope);
     const course = material.lecture.courseModule.course;
 
-    const [workspace, outline] = await Promise.all([
+    // The historical attempt is loaded beside the workspace, not instead of
+    // it. A submission that does not resolve leaves the ordinary workspace
+    // exactly as it was — including whatever draft is already saved.
+    const [workspace, outline, selectedSubmission] = await Promise.all([
       this.buildWorkspace(material, learner.userId),
       this.curriculum.outlineFor(course, learner.userId),
+      input.submissionId
+        ? this.submissions.findSelected(
+            {
+              userId: learner.userId,
+              academyId: input.academyId,
+              scope: learner.scope,
+            },
+            { materialId: material.id, submissionId: input.submissionId },
+          )
+        : Promise.resolve(null),
     ]);
     const navigator = toNavigatorContext(outline, material.id);
     if (!navigator) {
@@ -126,7 +143,33 @@ export class LearnService {
       // rather than a missing exercise, and it must not render half a page.
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
-    return { workspace, navigator };
+    return { workspace, navigator, selectedSubmission };
+  }
+
+  /**
+   * Opens a sitting with one problem.
+   *
+   * Behind the ordinary learning gate, and pinned to the material it was asked
+   * for: the timer a student watches and the solve time their history reports
+   * both read the `startedAt` this returns, so the two cannot disagree.
+   */
+  async startSolveSession(
+    identity: SupabaseIdentity,
+    input: { academyId: string; materialId: string },
+  ): Promise<SolveSession> {
+    const { userId, scope } = await this.requireLearner(identity, input.academyId);
+    await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
+    const session = await this.prisma.exerciseSolveSession.create({
+      data: { userId, materialId: input.materialId },
+      select: { id: true, startedAt: true },
+    });
+    return {
+      solveSessionId: session.id,
+      startedAt: session.startedAt.toISOString(),
+      expiresAt: new Date(
+        session.startedAt.getTime() + SOLVE_SESSION_MAX_SECONDS * 1_000,
+      ).toISOString(),
+    };
   }
 
   async getExerciseWorkspace(

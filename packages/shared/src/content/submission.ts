@@ -88,6 +88,15 @@ export const submitExerciseSchema = z.object({
   academyId: z.uuid(),
   materialId: z.uuid(),
   code: z.string().min(1).max(100_000),
+  /**
+   * Which sitting this attempt belongs to. The server owns the elapsed value
+   * and derives it from the session's own `startedAt`, so the browser names a
+   * session and never reports a duration.
+   *
+   * Optional so a client that predates solve sessions still submits; the
+   * attempt simply records no solve time rather than being refused.
+   */
+  solveSessionId: z.uuid().optional(),
 });
 
 export const submissionAcceptedSchema = z.object({

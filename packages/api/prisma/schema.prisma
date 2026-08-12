@@ -173,6 +173,7 @@ model User {
   exerciseDrafts        ExerciseDraft[]
   submissions           Submission[]
   exerciseProgress      StudentExerciseProgress[]
+  solveSessions         ExerciseSolveSession[]
 
   @@index([status])
   @@map("users")
@@ -518,6 +519,7 @@ model Material {
   progress            StudentExerciseProgress[]
   monitoringVisits    TeacherMonitoringVisit[]
   teacherFeedback     TeacherFeedback[]
+  solveSessions       ExerciseSolveSession[]
 
   @@unique([lectureId, position])
   @@index([lectureId])
@@ -652,15 +654,63 @@ model Submission {
   gradedAt         DateTime?        @map("graded_at") @db.Timestamptz(6)
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  /// The solve session this attempt was made in, and the time it took.
+  ///
+  /// Deliberately not derived from `createdAt`/`gradedAt`: that interval is
+  /// queue and judge latency, which is a fact about the platform rather than
+  /// about the student. Null for every row written before solve sessions
+  /// existed — old latency is never relabelled as study time.
+  solveSessionId  String? @map("solve_session_id") @db.Uuid
+  solveElapsedSec Int?    @map("solve_elapsed_sec")
+
+  /// The student-visible labels this row printed when it was written.
+  ///
+  /// History has to stay readable after ordinary curriculum edits — a renamed
+  /// module must not rewrite what a student solved last term. The live
+  /// relations still drive filtering, so a hidden course cannot reappear as a
+  /// selectable facet; only the printed text is frozen.
+  problemTitle    String @map("problem_title")
+  courseTitle     String @map("course_title")
+  moduleTitle     String @map("module_title")
+  lectureTitle    String @map("lecture_title")
+  modulePosition  Int    @map("module_position")
+  lecturePosition Int    @map("lecture_position")
+  problemPosition Int    @map("problem_position")
+
   user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   material     Material?               @relation(fields: [materialId], references: [id], onDelete: SetNull)
   course       Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  solveSession ExerciseSolveSession?   @relation(fields: [solveSessionId], references: [id], onDelete: SetNull)
   gradingCases SubmissionGradingCase[]
   cases        SubmissionCase[]
 
   @@index([userId, materialId, createdAt(sort: Desc)])
   @@index([status, createdAt])
+  /// Serves the academy-wide answer records page: one student's history,
+  /// newest first, with the id tiebreak the default ordering pages on.
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("submissions")
+}
+
+/// One sitting with one problem, opened by the server.
+///
+/// The workspace timer and the solve time stored on a submission both read
+/// from `startedAt`, so what a student watched while working and what their
+/// history reports are the same measurement. The browser never supplies the
+/// elapsed value; it only names the session it was working in.
+model ExerciseSolveSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  materialId String   @map("material_id") @db.Uuid
+  startedAt  DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material    Material     @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@index([userId, materialId, startedAt(sort: Desc)])
+  @@map("exercise_solve_sessions")
 }
 
 /// Immutable grading inputs captured before a submission enters the queue.
@@ -770,15 +820,15 @@ model TeacherMonitoringVisit {
 /// The body lives here and nowhere else: it is excluded from audit payloads
 /// and operational logs on purpose.
 model TeacherFeedback {
-  id                   String   @id @default(uuid()) @db.Uuid
-  academyId            String   @map("academy_id") @db.Uuid
-  classId              String   @map("class_id") @db.Uuid
-  teacherMembershipId  String?  @map("teacher_membership_id") @db.Uuid
-  studentMembershipId  String?  @map("student_membership_id") @db.Uuid
-  teacherMembershipRef String   @map("teacher_membership_ref") @db.Uuid
-  studentMembershipRef String   @map("student_membership_ref") @db.Uuid
-  materialId           String?  @map("material_id") @db.Uuid
-  monitoringVisitId    String?  @map("monitoring_visit_id") @db.Uuid
+  id                   String    @id @default(uuid()) @db.Uuid
+  academyId            String    @map("academy_id") @db.Uuid
+  classId              String    @map("class_id") @db.Uuid
+  teacherMembershipId  String?   @map("teacher_membership_id") @db.Uuid
+  studentMembershipId  String?   @map("student_membership_id") @db.Uuid
+  teacherMembershipRef String    @map("teacher_membership_ref") @db.Uuid
+  studentMembershipRef String    @map("student_membership_ref") @db.Uuid
+  materialId           String?   @map("material_id") @db.Uuid
+  monitoringVisitId    String?   @map("monitoring_visit_id") @db.Uuid
   /// Client-generated per send. Scoped to the author, so two teachers cannot
   /// collide and one teacher's retry cannot overwrite another's message.
   idempotencyKey       String    @map("idempotency_key") @db.Uuid

@@ -9,6 +9,11 @@ import {
   submitExerciseSchema,
 } from "../../content/submission.js";
 import {
+  answerRecordsResultSchema,
+  listAnswerRecordsInputSchema,
+  solveSessionSchema,
+} from "../../content/answer-records.js";
+import {
   learnAcademyInputSchema,
   learnClassDetailSchema,
   learnClassInputSchema,
@@ -17,6 +22,7 @@ import {
   learnCourseOutlineSchema,
   learnCourseSummarySchema,
   learnDraftSummarySchema,
+  learnExerciseBootstrapInputSchema,
   learnExerciseBootstrapSchema,
   learnExerciseWorkspaceSchema,
   learnMaterialInputSchema,
@@ -62,8 +68,29 @@ export const learnContract = {
    * whole curriculum on every step is what this split exists to avoid.
    */
   getExerciseBootstrap: oc
-    .input(learnMaterialInputSchema)
+    .input(learnExerciseBootstrapInputSchema)
     .output(learnExerciseBootstrapSchema),
+  /**
+   * Opens a sitting with one problem, and returns when it started.
+   *
+   * A procedure rather than a side effect of the bootstrap: reopening the same
+   * problem starts a new session, while stepping between exercises inside the
+   * workspace has to start one per destination. Making that explicit is what
+   * keeps "how long did this take" from quietly measuring a browser tab's age.
+   */
+  startSolveSession: oc
+    .input(learnMaterialInputSchema)
+    .output(solveSessionSchema),
+  /**
+   * Every attempt this student has made in this academy, newest first.
+   *
+   * Server-paged by construction: the input carries the filters and the page,
+   * and the output carries the totals, so no caller can accumulate a whole
+   * history in the browser and no caller-supplied user id is ever consulted.
+   */
+  listAnswerRecords: oc
+    .input(listAnswerRecordsInputSchema)
+    .output(answerRecordsResultSchema),
   listDrafts: oc
     .input(learnAcademyInputSchema)
     .output(z.object({ drafts: z.array(learnDraftSummarySchema) })),

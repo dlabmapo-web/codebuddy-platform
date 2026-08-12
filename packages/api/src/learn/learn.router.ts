@@ -60,6 +60,16 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.submissionService.get(context.identity, input)
       ),
+    startSolveSession: os.learn.startSolveSession
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.learnService.startSolveSession(context.identity, input)
+      ),
+    listAnswerRecords: os.learn.listAnswerRecords
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.answerRecordsService.listAnswerRecords(context.identity, input)
+      ),
     listSubmissions: os.learn.listSubmissions
       .use(access.authenticated)
       .handler(({ context, input }) =>

@@ -51,6 +51,7 @@ export const appErrorCodes = [
   "SUBMISSION_IN_FLIGHT",
   "SUBMISSION_RATE_LIMITED",
   "SUBMISSION_NOT_FOUND",
+  "SOLVE_SESSION_INVALID",
   "GRADING_UNAVAILABLE",
   "MONITORING_DISABLED",
   "MONITORING_ACCESS_DENIED",
@@ -128,6 +129,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   SUBMISSION_IN_FLIGHT: "This problem is already being graded. Wait for the result.",
   SUBMISSION_RATE_LIMITED: "Too many submissions. Wait a moment and try again.",
   SUBMISSION_NOT_FOUND: "That submission was not found.",
+  SOLVE_SESSION_INVALID:
+    "This problem session expired. Please submit again.",
   GRADING_UNAVAILABLE: "Grading is temporarily unavailable. Your code is saved.",
   MONITORING_DISABLED: "Live monitoring is not enabled for this academy.",
   // One message for every access failure — not assigned, wrong academy,

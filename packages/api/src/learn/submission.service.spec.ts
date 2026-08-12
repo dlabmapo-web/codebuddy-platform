@@ -22,15 +22,20 @@ const academyId = "20000000-0000-4000-8000-000000000001";
 const userId = "30000000-0000-4000-8000-000000000001";
 const materialId = "40000000-0000-4000-8000-000000000001";
 const submissionId = "50000000-0000-4000-8000-000000000001";
+const solveSessionId = "70000000-0000-4000-8000-000000000001";
 const SECRET = "HIDDEN_EXPECTATION_SENTINEL";
 
 function createService(options?: {
   allowed?: boolean;
   material?: unknown;
   createError?: unknown;
+  solveSession?: { id: string; startedAt: Date } | null;
+  now?: string;
 }) {
   const material = (options?.material ?? {
     id: materialId,
+    title: "Sum two numbers",
+    position: 3,
     programmingExercise: {
       gradingRevision: 3,
       language: "PYTHON",
@@ -46,27 +51,22 @@ function createService(options?: {
         },
       ],
     },
-    lecture: { courseModule: { courseId: "60000000-0000-4000-8000-000000000001" } },
-  }) as {
-    id: string;
-    programmingExercise: {
-      gradingRevision: number;
-      language: "PYTHON";
-      timeLimitMs: number;
-      memoryLimitMb: number;
-      testCases: Array<{
-        position: number;
-        visibility: string;
-        input: string;
-        expectedOutput: string;
-      }>;
-    };
-    lecture: { courseModule: { courseId: string } };
-  };
+    lecture: {
+      title: "Addition",
+      position: 2,
+      courseModule: {
+        courseId: "60000000-0000-4000-8000-000000000001",
+        title: "Basics",
+        position: 1,
+        course: { title: "Python Foundations" },
+      },
+    },
+  }) as never;
   const submission = {
     id: submissionId,
     materialId,
     sourceMaterialId: materialId,
+    code: "print(1)",
     gradingRevision: 3,
     status: "FAILED",
     passedCount: 1,
@@ -105,9 +105,16 @@ function createService(options?: {
   const submissionCreate = options?.createError
     ? vi.fn().mockRejectedValue(options.createError)
     : vi.fn().mockResolvedValue({ id: submissionId });
+  const solveSession =
+    options?.solveSession === undefined
+      ? { id: solveSessionId, startedAt: new Date("2026-07-31T00:00:00Z") }
+      : options.solveSession;
   const transaction = {
     material: { findFirst: vi.fn().mockResolvedValue(material) },
     submission: { create: submissionCreate },
+    exerciseSolveSession: {
+      findFirst: vi.fn().mockResolvedValue(solveSession),
+    },
   };
   const prisma = {
     material: { findFirst: vi.fn().mockResolvedValue(material) },
@@ -278,5 +285,212 @@ describe("SubmissionService result disclosure and ownership", () => {
         where: expect.objectContaining({ id: submissionId, userId }),
       }),
     );
+  });
+});
+
+/**
+ * Solve time is a fact about the student, so it is measured from a server
+ * origin the browser cannot choose and can only be attributed to a sitting the
+ * student actually owns.
+ */
+describe("SubmissionService solve sessions", () => {
+  it("computes elapsed seconds from the session's server-side origin", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-31T00:01:35Z"));
+    try {
+      const { service, prisma } = createService();
+
+      await service.submit(identity, {
+        academyId,
+        materialId,
+        code: "print(1)",
+        solveSessionId,
+      });
+
+      expect(prisma.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            solveSessionId,
+            solveElapsedSec: 95,
+          }),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("accepts only a session owned by the actor for this same problem", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-31T00:00:30Z"));
+    try {
+      const { service, transaction } = createService();
+
+      await service.submit(identity, {
+        academyId,
+        materialId,
+        code: "print(1)",
+        solveSessionId,
+      });
+
+      expect(transaction.exerciseSolveSession.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: solveSessionId, userId, materialId },
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * Repeated submissions in one sitting share the origin, so the reported
+   * solve time grows rather than restarting at zero.
+   */
+  it("shares one origin across repeated submissions", async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, prisma } = createService();
+      vi.setSystemTime(new Date("2026-07-31T00:00:30Z"));
+      await service.submit(identity, {
+        academyId,
+        materialId,
+        code: "print(1)",
+        solveSessionId,
+      });
+      vi.setSystemTime(new Date("2026-07-31T00:02:00Z"));
+      await service.submit(identity, {
+        academyId,
+        materialId,
+        code: "print(2)",
+        solveSessionId,
+      });
+
+      const elapsed = vi
+        .mocked(prisma.submission.create)
+        .mock.calls.map((call) => (call[0] as { data: { solveElapsedSec: number } }).data.solveElapsedSec);
+      expect(elapsed).toEqual([30, 120]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a session that does not belong to the actor", async () => {
+    const { service } = createService({ solveSession: null });
+
+    await expect(
+      service.submit(identity, {
+        academyId,
+        materialId,
+        code: "print(1)",
+        solveSessionId,
+      }),
+    ).rejects.toMatchObject({ code: "SOLVE_SESSION_INVALID" });
+  });
+
+  it("rejects a session older than the 24-hour bound", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T00:00:00Z"));
+    try {
+      const { service } = createService();
+
+      await expect(
+        service.submit(identity, {
+          academyId,
+          materialId,
+          code: "print(1)",
+          solveSessionId,
+        }),
+      ).rejects.toMatchObject({ code: "SOLVE_SESSION_INVALID" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** A row without a session is valid: it simply records no solve time. */
+  it("records no solve time when the client names no session", async () => {
+    const { service, prisma, transaction } = createService();
+
+    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+
+    expect(transaction.exerciseSolveSession.findFirst).not.toHaveBeenCalled();
+    expect(prisma.submission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          solveSessionId: null,
+          solveElapsedSec: null,
+        }),
+      }),
+    );
+  });
+});
+
+describe("SubmissionService record labels", () => {
+  it("freezes the printed labels in the grading snapshot transaction", async () => {
+    const { service, prisma } = createService();
+
+    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+
+    expect(prisma.submission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          problemTitle: "Sum two numbers",
+          courseTitle: "Python Foundations",
+          moduleTitle: "Basics",
+          lectureTitle: "Addition",
+          modulePosition: 1,
+          lecturePosition: 2,
+          problemPosition: 3,
+        }),
+      }),
+    );
+  });
+});
+
+describe("SubmissionService.findSelected", () => {
+  const actor = {
+    userId,
+    academyId,
+    scope: { course: { academyId }, material: {} },
+  };
+
+  it("returns the submitted code with its student-safe verdict", async () => {
+    const { service } = createService();
+
+    const selected = await service.findSelected(actor, {
+      materialId,
+      submissionId,
+    });
+
+    expect(selected?.code).toBe("print(1)");
+    expect(selected?.result.score).toBe(50);
+    expect(JSON.stringify(selected)).not.toContain(SECRET);
+  });
+
+  it("pins the read to the actor, the academy, and the route's problem", async () => {
+    const { service, prisma } = createService();
+
+    await service.findSelected(actor, { materialId, submissionId });
+
+    expect(prisma.submission.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: submissionId,
+          userId,
+          sourceMaterialId: materialId,
+          course: { academyId },
+        }),
+      }),
+    );
+  });
+
+  /** Somebody else's id must be indistinguishable from one that never was. */
+  it("answers with nothing rather than a distinguishable refusal", async () => {
+    const { service, prisma } = createService();
+    vi.mocked(prisma.submission.findFirst).mockResolvedValue(null);
+
+    await expect(
+      service.findSelected(actor, { materialId, submissionId }),
+    ).resolves.toBeNull();
   });
 });

@@ -1,15 +1,56 @@
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { SubmissionResult, SubmissionSummary } from "@cove/shared";
+import {
+  isSolveSessionExpired,
+  solveElapsedSeconds,
+  type LearnSelectedSubmission,
+  type SubmissionResult,
+  type SubmissionSummary,
+} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
-import { learningScopeFor } from "../classes/assigned-course-access.js";
+import {
+  learningScopeFor,
+  type LearningScope,
+} from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+
+/** The grading data a student's own read may join. Never a hidden expectation. */
+const ownedSubmissionInclude = {
+  cases: { orderBy: { position: "asc" } },
+  gradingCases: { orderBy: { position: "asc" } },
+} as const satisfies Prisma.SubmissionInclude;
+
+type OwnedSubmission = Prisma.SubmissionGetPayload<{
+  include: typeof ownedSubmissionInclude;
+}>;
+
+/**
+ * The one "this submission is mine, here, and still reachable" predicate.
+ *
+ * Ownership, academy, and current curriculum access in one place: a second
+ * copy in a new endpoint is how a remembered submission id turns into a way
+ * to read somebody else's code.
+ */
+function ownedSubmissionWhere(input: {
+  academyId: string;
+  userId: string;
+  scope: LearningScope;
+  submissionId: string;
+}): Prisma.SubmissionWhereInput {
+  return {
+    id: input.submissionId,
+    userId: input.userId,
+    course: { academyId: input.academyId },
+    material: { is: reachableMaterialWhere(input.academyId, input.scope) },
+  };
+}
 
 @Injectable()
 export class SubmissionService {
@@ -27,7 +68,12 @@ export class SubmissionService {
 
   async submit(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string; code: string },
+    input: {
+      academyId: string;
+      materialId: string;
+      code: string;
+      solveSessionId?: string;
+    },
   ): Promise<{ submissionId: string; totalCount: number }> {
     const actor = await this.access.requirePermission(
       identity.authUserId,
@@ -60,7 +106,11 @@ export class SubmissionService {
                 },
               },
             },
-            lecture: { include: { courseModule: true } },
+            // The course title is joined because the record labels are frozen
+            // here, in the transaction that owns the grading snapshot.
+            lecture: {
+              include: { courseModule: { include: { course: true } } },
+            },
           },
         });
         const exercise = material?.programmingExercise;
@@ -70,12 +120,25 @@ export class SubmissionService {
             HttpStatus.NOT_FOUND,
           );
         }
+
+        // Read inside the same transaction as the snapshot, and against the
+        // server clock. The browser names a session; it never reports how long
+        // it took, so a patched client cannot post an impressive solve time.
+        const solveSession = input.solveSessionId
+          ? await this.requireSolveSession(tx, {
+              solveSessionId: input.solveSessionId,
+              userId,
+              materialId: material.id,
+            })
+          : null;
+
+        const courseModule = material.lecture.courseModule;
         const created = await tx.submission.create({
           data: {
             userId,
             materialId: material.id,
             sourceMaterialId: material.id,
-            courseId: material.lecture.courseModule.courseId,
+            courseId: courseModule.courseId,
             gradingRevision: exercise.gradingRevision,
             language: exercise.language,
             timeLimitMs: exercise.timeLimitMs,
@@ -83,6 +146,20 @@ export class SubmissionService {
             code: input.code,
             totalCount: exercise.testCases.length,
             engineVersion: this.config.get("PYODIDE_VERSION", { infer: true }),
+            solveSessionId: solveSession?.id ?? null,
+            solveElapsedSec: solveSession
+              ? solveElapsedSeconds(solveSession.startedAt, new Date())
+              : null,
+            // Written with the grading snapshot, not derived on read: a later
+            // rename must not rewrite what this student's history says they
+            // solved. See §9 of the answer records design.
+            problemTitle: material.title,
+            courseTitle: courseModule.course.title,
+            moduleTitle: courseModule.title,
+            lectureTitle: material.lecture.title,
+            modulePosition: courseModule.position,
+            lecturePosition: material.lecture.position,
+            problemPosition: material.position,
             gradingCases: {
               create: exercise.testCases.map((testCase, index) => ({
                 position: index + 1,
@@ -124,22 +201,65 @@ export class SubmissionService {
     const { userId } = actor;
     const scope = learningScopeFor(input.academyId, actor);
     const submission = await this.prisma.submission.findFirst({
-      where: {
-        id: input.submissionId,
+      where: ownedSubmissionWhere({
+        academyId: input.academyId,
         userId,
-        course: { academyId: input.academyId },
-        material: {
-          is: reachableMaterialWhere(input.academyId, scope),
-        },
-      },
-      include: {
-        cases: { orderBy: { position: "asc" } },
-        gradingCases: { orderBy: { position: "asc" } },
-      },
+        scope,
+        submissionId: input.submissionId,
+      }),
+      include: ownedSubmissionInclude,
     });
     if (!submission) {
       throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
+    return this.toResult(userId, submission);
+  }
+
+  /**
+   * One of the student's own attempts, for reopening it in the workspace.
+   *
+   * Takes an already-authorized actor rather than an identity: the caller is
+   * the exercise bootstrap, which has resolved the learner and their scope in
+   * order to load the workspace this submission is being opened beside.
+   *
+   * Returns `null` for a submission that is not this student's, not this
+   * academy's, or not this route's problem. All three are the same answer on
+   * purpose — telling them apart would confirm that somebody else's submission
+   * exists.
+   */
+  async findSelected(
+    actor: { userId: string; academyId: string; scope: LearningScope },
+    input: { materialId: string; submissionId: string },
+  ): Promise<LearnSelectedSubmission | null> {
+    const submission = await this.prisma.submission.findFirst({
+      where: {
+        ...ownedSubmissionWhere({
+          academyId: actor.academyId,
+          userId: actor.userId,
+          scope: actor.scope,
+          submissionId: input.submissionId,
+        }),
+        // The route decides which problem is open; a submission for a
+        // different one would put somebody else's code under this statement.
+        sourceMaterialId: input.materialId,
+      },
+      include: ownedSubmissionInclude,
+    });
+    if (!submission) return null;
+
+    return {
+      submissionId: submission.id,
+      code: submission.code,
+      createdAt: submission.createdAt.toISOString(),
+      result: await this.toResult(actor.userId, submission),
+    };
+  }
+
+  /** The one student-safe projection. Both reads above go through it. */
+  private async toResult(
+    userId: string,
+    submission: OwnedSubmission,
+  ): Promise<SubmissionResult> {
     const progress = submission.materialId
       ? await this.prisma.studentExerciseProgress.findUnique({
           where: {
@@ -260,6 +380,32 @@ export class SubmissionService {
     if (!owned) {
       throw new AppException("SUBMISSION_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
+  }
+
+  /**
+   * The sitting this attempt belongs to, or a refusal.
+   *
+   * A session someone else owns, one opened against a different problem, and
+   * one older than the 24-hour bound are all rejected the same way. The
+   * workspace answers by opening a fresh session and asking for the submission
+   * again, which is cheaper than storing a duration nobody can justify.
+   */
+  private async requireSolveSession(
+    tx: Prisma.TransactionClient,
+    input: { solveSessionId: string; userId: string; materialId: string },
+  ): Promise<{ id: string; startedAt: Date }> {
+    const session = await tx.exerciseSolveSession.findFirst({
+      where: {
+        id: input.solveSessionId,
+        userId: input.userId,
+        materialId: input.materialId,
+      },
+      select: { id: true, startedAt: true },
+    });
+    if (!session || isSolveSessionExpired(session.startedAt, new Date())) {
+      throw new AppException("SOLVE_SESSION_INVALID", HttpStatus.CONFLICT);
+    }
+    return session;
   }
 
   private async consumeRateLimit(userId: string) {

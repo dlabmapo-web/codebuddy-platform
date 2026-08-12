@@ -4,6 +4,7 @@ import {
   exerciseDifficultySchema,
   exerciseLanguageSchema,
 } from "./course.js";
+import { submissionResultSchema } from "./submission.js";
 
 /**
  * Student-facing content schemas.
@@ -273,6 +274,28 @@ export type WorkspaceNavigatorContext = z.infer<
 >;
 
 /**
+ * One historical attempt, opened in the ordinary editable workspace.
+ *
+ * The submitted code and the verdict it earned, and nothing else. There is no
+ * field here for a grading input, so reopening an old attempt cannot disclose
+ * more than the attempt itself already did — the `cases` are the same
+ * student-safe shape the Result panel always renders.
+ *
+ * Immutable: a new submission inserts a new row and leaves this one alone.
+ */
+export const learnSelectedSubmissionSchema = z
+  .object({
+    submissionId: z.uuid(),
+    code: z.string(),
+    createdAt: z.iso.datetime(),
+    result: submissionResultSchema,
+  })
+  .strict();
+export type LearnSelectedSubmission = z.infer<
+  typeof learnSelectedSubmissionSchema
+>;
+
+/**
  * The workspace and its course, in one authorized read.
  *
  * The initial fullscreen entry needs both; an in-place transition inside the
@@ -281,6 +304,12 @@ export type WorkspaceNavigatorContext = z.infer<
 export const learnExerciseBootstrapSchema = z.object({
   workspace: learnExerciseWorkspaceSchema,
   navigator: workspaceNavigatorContextSchema,
+  /**
+   * Present only when the route asked for one and it resolved. A requested
+   * submission that cannot be loaded leaves this absent rather than failing
+   * the page — the ordinary workspace is still perfectly good.
+   */
+  selectedSubmission: learnSelectedSubmissionSchema.nullish(),
 });
 export type LearnExerciseBootstrap = z.infer<
   typeof learnExerciseBootstrapSchema
@@ -311,6 +340,19 @@ export const learnMaterialInputSchema = learnAcademyInputSchema.extend({
 export const learnClassInputSchema = learnAcademyInputSchema.extend({
   classId: z.uuid(),
 });
+
+/**
+ * The workspace, optionally positioned on one of the student's own attempts.
+ *
+ * Optional rather than a second procedure: entry from Answer records is the
+ * same authorized read as entry from My Courses, and splitting it would make
+ * the historical path a route that could drift out of step with the ordinary
+ * one's authorization.
+ */
+export const learnExerciseBootstrapInputSchema =
+  learnMaterialInputSchema.extend({
+    submissionId: z.uuid().optional(),
+  });
 
 /**
  * 256 KiB. Large enough that no realistic solution hits it, small enough that a

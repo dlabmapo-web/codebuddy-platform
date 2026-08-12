@@ -5,6 +5,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
+import { AnswerRecordsService } from "./answer-records.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
@@ -20,6 +21,7 @@ import { SubmissionService } from "./submission.service.js";
   imports: [AcademiesModule, AuthModule, AuthorizationModule],
   controllers: [SubmissionController],
   providers: [
+    AnswerRecordsService,
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
@@ -37,6 +39,7 @@ import { SubmissionService } from "./submission.service.js";
   // curriculum through it. Two implementations of "what a course looks like"
   // is exactly what the teacher's navigator must not introduce.
   exports: [
+    AnswerRecordsService,
     CurriculumOutlineService,
     LearnClassService,
     LearnService,

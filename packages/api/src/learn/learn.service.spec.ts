@@ -1,4 +1,4 @@
-import type { AcademyRole } from "@cove/shared";
+import type { AcademyRole, LearnSelectedSubmission } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -6,6 +6,7 @@ import type { AcademyAccessService } from "../authorization/academy-access.servi
 import type { PrismaService } from "../database/prisma.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
+import type { SubmissionService } from "./submission.service.js";
 
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
@@ -24,6 +25,8 @@ const moduleId = "50000000-0000-4000-8000-000000000001";
 const lectureId = "60000000-0000-4000-8000-000000000001";
 const materialId = "70000000-0000-4000-8000-000000000001";
 const nextMaterialId = "70000000-0000-4000-8000-000000000002";
+const submissionId = "a0000000-0000-4000-8000-000000000001";
+const solveSessionId = "b0000000-0000-4000-8000-000000000001";
 
 function programmingExercise() {
   return {
@@ -156,6 +159,8 @@ function createService(options?: {
   draft?: { code: string; updatedAt: Date } | null;
   progress?: { status: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED"; gradingRevision: number } | null;
   role?: AcademyRole;
+  selectedSubmission?: LearnSelectedSubmission | null;
+  solveSessionStartedAt?: Date;
 }) {
   const course = options?.course === undefined ? visibleCourse() : options.course;
   const material =
@@ -178,6 +183,12 @@ function createService(options?: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(options?.progress ?? null),
     },
+    exerciseSolveSession: {
+      create: vi.fn().mockResolvedValue({
+        id: solveSessionId,
+        startedAt: options?.solveSessionStartedAt ?? new Date("2026-08-12T09:00:00Z"),
+      }),
+    },
   } as unknown as PrismaService;
   const access = {
     requirePermission: vi.fn().mockResolvedValue({
@@ -187,10 +198,16 @@ function createService(options?: {
     }),
   } as unknown as AcademyAccessService;
   const curriculum = new CurriculumOutlineService(prisma);
+  const submissions = {
+    findSelected: vi
+      .fn()
+      .mockResolvedValue(options?.selectedSubmission ?? null),
+  } as unknown as SubmissionService;
   return {
     prisma,
     access,
-    service: new LearnService(prisma, access, curriculum),
+    submissions,
+    service: new LearnService(prisma, access, curriculum, submissions),
   };
 }
 
@@ -452,5 +469,145 @@ describe("getExerciseBootstrap", () => {
     await expect(
       service.getExerciseBootstrap(identity, { academyId, materialId }),
     ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
+  });
+});
+
+/**
+ * Entering the workspace on a historical attempt is the ordinary authorized
+ * read plus one owned submission. Nothing about it may widen what a student
+ * can reach, and a submission that does not resolve may not cost them the
+ * workspace they asked for.
+ */
+describe("getExerciseBootstrap with a selected submission", () => {
+  const selected: LearnSelectedSubmission = {
+    submissionId,
+    code: "print(3)",
+    createdAt: "2026-08-12T09:00:00.000Z",
+    result: {
+      submissionId,
+      materialId,
+      status: "FAILED",
+      passedCount: 1,
+      totalCount: 2,
+      score: 50,
+      runtimeMs: 12,
+      failureReason: null,
+      elapsedSec: 3,
+      attemptCount: 2,
+      createdAt: "2026-08-12T09:00:00.000Z",
+      gradedAt: "2026-08-12T09:00:03.000Z",
+      cases: [],
+    },
+  };
+
+  it("returns the submitted code and its verdict beside the workspace", async () => {
+    const { service, submissions } = createService({ selectedSubmission: selected });
+
+    const bootstrap = await service.getExerciseBootstrap(identity, {
+      academyId,
+      materialId,
+      submissionId,
+    });
+
+    expect(bootstrap.selectedSubmission?.code).toBe("print(3)");
+    expect(bootstrap.selectedSubmission?.result.score).toBe(50);
+    expect(submissions.findSelected).toHaveBeenCalledWith(
+      expect.objectContaining({ userId, academyId }),
+      { materialId, submissionId },
+    );
+  });
+
+  it("does not read a submission when the route did not name one", async () => {
+    const { service, submissions } = createService();
+
+    const bootstrap = await service.getExerciseBootstrap(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(bootstrap.selectedSubmission).toBeNull();
+    expect(submissions.findSelected).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Another student's id, another problem's submission, and a deleted one all
+   * arrive here as `null`. The workspace still opens — with its own draft
+   * untouched — rather than failing the page.
+   */
+  it("renders the ordinary workspace when the submission does not resolve", async () => {
+    const { service } = createService({
+      draft: { code: "my own draft", updatedAt: new Date("2026-08-12T08:00:00Z") },
+      selectedSubmission: null,
+    });
+
+    const bootstrap = await service.getExerciseBootstrap(identity, {
+      academyId,
+      materialId,
+      submissionId,
+    });
+
+    expect(bootstrap.selectedSubmission).toBeNull();
+    expect(bootstrap.workspace.draft?.code).toBe("my own draft");
+  });
+
+  it("refuses the whole read when the problem itself is unreachable", async () => {
+    const { service } = createService({ material: null });
+
+    await expect(
+      service.getExerciseBootstrap(identity, {
+        academyId,
+        materialId,
+        submissionId,
+      }),
+    ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
+  });
+});
+
+describe("startSolveSession", () => {
+  it("opens a session behind the same learning gate as the workspace", async () => {
+    const { service, prisma, access } = createService();
+
+    const session = await service.startSolveSession(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "curriculum.read",
+    );
+    expect(prisma.material.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: materialId }),
+      }),
+    );
+    expect(prisma.exerciseSolveSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { userId, materialId } }),
+    );
+    expect(session.solveSessionId).toBe(solveSessionId);
+  });
+
+  it("refuses a problem the student cannot reach", async () => {
+    const { service } = createService({ material: null });
+
+    await expect(
+      service.startSolveSession(identity, { academyId, materialId }),
+    ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
+  });
+
+  /** The timer stops at the cap rather than counting an abandoned tab. */
+  it("expires a session 24 hours after the server issued it", async () => {
+    const startedAt = new Date("2026-08-12T09:00:00Z");
+    const { service } = createService({ solveSessionStartedAt: startedAt });
+
+    const session = await service.startSolveSession(identity, {
+      academyId,
+      materialId,
+    });
+
+    expect(Date.parse(session.expiresAt) - Date.parse(session.startedAt)).toBe(
+      24 * 60 * 60 * 1_000,
+    );
   });
 });

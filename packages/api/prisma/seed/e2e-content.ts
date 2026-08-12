@@ -8,6 +8,7 @@ import { seedClassFixture } from "./class-fixtures.js";
 import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 import { seedMonitoringFixture } from "./monitoring-fixtures.js";
+import { progressFixture, seedProgressFixture } from "./progress-fixtures.js";
 
 /**
  * A visible course for end-to-end tests.
@@ -44,6 +45,9 @@ export const e2eContent = {
   ],
   /** Must never appear in any student-facing response. */
   hiddenSentinel: "E2E_HIDDEN_SENTINEL",
+  /** The problem the teacher Solution status journey reads. */
+  progressMaterialId: progressFixture.materialId,
+  progressTitle: progressFixture.title,
 } as const;
 
 const teamLead = developmentUsers.find((user) => user.academyRole === "TEAM_LEAD")!;
@@ -258,7 +262,18 @@ export async function seedE2eContent(prisma: PrismaClient) {
     materialId: e2eContent.sumMaterialId,
   });
 
-  return { academyId: academy.id, enrolled, teacherAssigned, monitoring };
+  // A problem with three failed attempts behind it, so the teacher's
+  // Solution status page has an attention state to read rather than a class
+  // that has never submitted anything.
+  const progress = await seedProgressFixture(prisma, {
+    academyId: academy.id,
+    classId: e2eContent.classId,
+    courseId: e2eContent.courseId,
+    lectureId: e2eContent.lectureTwoId,
+    position: 2,
+  });
+
+  return { academyId: academy.id, enrolled, teacherAssigned, monitoring, progress };
 }
 
 if (process.argv[1]?.endsWith("e2e-content.ts")) {
@@ -267,7 +282,7 @@ if (process.argv[1]?.endsWith("e2e-content.ts")) {
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
   seedE2eContent(prisma)
-    .then(({ academyId, enrolled, teacherAssigned, monitoring }) => {
+    .then(({ academyId, enrolled, teacherAssigned, monitoring, progress }) => {
       console.log(`🌱 E2E content seeded for academy ${academyId}`);
       console.log(`   class:    ${e2eContent.className} (${enrolled} enrolled)`);
       console.log(
@@ -275,6 +290,9 @@ if (process.argv[1]?.endsWith("e2e-content.ts")) {
       );
       console.log(
         `   monitoring: enabled for ${monitoring.studentMembershipId}`,
+      );
+      console.log(
+        `   progress: ${progress.attempts} failed attempts on "${progressFixture.title}"`,
       );
     })
     .catch((error: unknown) => {

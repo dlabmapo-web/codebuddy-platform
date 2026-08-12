@@ -10,4 +10,15 @@ export { layoutNamespaces, type LayoutNamespace } from "@cove/i18n/settings";
  */
 export const monitoringNamespaces = ["monitoring", "errors"] as const;
 
-export type PageNamespace = (typeof monitoringNamespaces)[number];
+/**
+ * The teaching routes: live monitoring plus Solution status.
+ *
+ * `teach` is a large namespace used by one role and two routes, so it stays
+ * out of `layoutNamespaces` and is paid for here. Both teaching surfaces mount
+ * the same list because a teacher moves between them through the class header.
+ */
+export const teachNamespaces = ["monitoring", "teach", "errors"] as const;
+
+export type PageNamespace =
+  | (typeof monitoringNamespaces)[number]
+  | (typeof teachNamespaces)[number];

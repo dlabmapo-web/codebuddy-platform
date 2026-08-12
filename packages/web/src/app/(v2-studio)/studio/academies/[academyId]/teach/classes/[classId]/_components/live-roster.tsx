@@ -2,7 +2,7 @@
 
 import type { MonitoringClassRoster } from '@cove/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +75,19 @@ export function LiveRoster({
           <ChevronLeft aria-hidden className="size-4" />
           {t('roster.back')}
         </Link>
-        <ConnectionBadge state={denied === 'MONITORING_ACCESS_DENIED' ? 'revoked' : state} />
+        <div className="flex items-center gap-2">
+          {/* The class's other destination, and a peer of this one: this page
+              is what is happening now, that one is what has happened. Local
+              to the class rather than a second global teaching-nav item. */}
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-semibold text-sub transition-colors hover:border-brand hover:text-brand"
+            href={`/studio/academies/${academyId}/teach/classes/${classId}/progress`}
+          >
+            <ClipboardList aria-hidden className="size-3.5" />
+            {t('roster.solution_status')}
+          </Link>
+          <ConnectionBadge state={denied === 'MONITORING_ACCESS_DENIED' ? 'revoked' : state} />
+        </div>
       </div>
 
       {denied === 'MONITORING_ACCESS_DENIED' ? (

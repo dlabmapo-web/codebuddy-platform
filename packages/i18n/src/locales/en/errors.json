@@ -58,5 +58,7 @@
   "MONITORING_PAYLOAD_TOO_LARGE": "That change was too large to send. It will be synchronized in full.",
   "MONITORING_REALTIME_UNAVAILABLE": "Live monitoring is temporarily unavailable.",
   "MONITORING_FEEDBACK_INVALID": "Feedback must be between 1 and 2,000 characters.",
+  "TEACHER_PROGRESS_ACCESS_DENIED": "You are not the assigned teacher for this class.",
+  "TEACHER_PROGRESS_NOT_FOUND": "That is no longer part of this class.",
   "UNKNOWN": "Something went wrong. Try again."
 }

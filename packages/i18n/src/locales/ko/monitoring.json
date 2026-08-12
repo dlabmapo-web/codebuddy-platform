@@ -40,7 +40,8 @@
     "no_exercise": "문제 풀이 중이 아님",
     "never_seen": "없음",
     "membership_inactive": "비활성 멤버십",
-    "in_exercise": "문제 풀이 중"
+    "in_exercise": "문제 풀이 중",
+    "solution_status": "풀이 현황"
   },
   "state": {
     "ONLINE": "접속",

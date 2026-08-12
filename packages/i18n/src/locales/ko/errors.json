@@ -58,5 +58,7 @@
   "MONITORING_PAYLOAD_TOO_LARGE": "변경 내용이 너무 커서 전송할 수 없습니다. 전체 동기화로 처리됩니다.",
   "MONITORING_REALTIME_UNAVAILABLE": "실시간 모니터링을 일시적으로 사용할 수 없습니다.",
   "MONITORING_FEEDBACK_INVALID": "피드백은 1자 이상 2,000자 이하로 입력해 주세요.",
+  "TEACHER_PROGRESS_ACCESS_DENIED": "이 반의 담당 강사가 아닙니다.",
+  "TEACHER_PROGRESS_NOT_FOUND": "이 반에서 더 이상 볼 수 없는 항목입니다.",
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요."
 }

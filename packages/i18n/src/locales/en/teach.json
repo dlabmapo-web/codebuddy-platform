@@ -1,0 +1,189 @@
+{
+  "progress": {
+    "title": "Solution status",
+    "description": "How this class is doing, read by student or by problem.",
+    "back_to_classes": "My classes",
+    "live_roster": "Live roster",
+    "view_label": "Reading this class",
+    "view_students": "By student",
+    "view_problems": "By problem",
+    "reset_filters": "Reset filters",
+    "retry": "Try again",
+    "loading": "Loading",
+    "search_students": "Search students",
+    "search_curriculum": "Search courses, lectures, or problems",
+    "summary": {
+      "students": "Students",
+      "students_caption": "Active in this class",
+      "completion": "Class completion",
+      "completion_caption": "{{solved}} of {{total}} required problems solved",
+      "attention": "Need a look",
+      "attention_caption": "Students with at least one reason",
+      "completion_label": "Class completion, {{percent}}"
+    },
+    "roster": {
+      "ordering_note": "Students who may need a look are listed first. This is a reading order, not a ranking.",
+      "column_student": "Student",
+      "column_progress": "Progress",
+      "column_attempts": "Attempts",
+      "column_accepted": "Accepted",
+      "column_activity": "Last activity",
+      "column_attention": "Needs a look",
+      "open": "Open",
+      "close": "Close",
+      "never": "Never",
+      "progress_value": "{{solved}}/{{total}}",
+      "progress_label": "{{name}} has solved {{solved}} of {{total}} required problems",
+      "attention_problems_one": "{{count}} problem",
+      "attention_problems_other": "{{count}} problems",
+      "no_attention": "Nothing flagged"
+    },
+    "student": {
+      "heading": "{{name}}",
+      "attention_heading": "Currently flagged",
+      "exercises_heading": "Problems",
+      "column_problem": "Problem",
+      "column_status": "Status",
+      "column_score": "Best score",
+      "column_attempts": "Attempts",
+      "column_last": "Last attempt",
+      "column_attention": "Needs a look",
+      "optional": "Optional",
+      "show_attempts": "Show attempts",
+      "hide_attempts": "Hide attempts",
+      "close": "Close student"
+    },
+    "attempts": {
+      "heading": "Attempts",
+      "column_result": "Result",
+      "column_score": "Score",
+      "column_tests": "Tests",
+      "column_solve_time": "Solve time",
+      "column_submitted": "Submitted",
+      "review": "Review",
+      "empty": "No graded attempts yet.",
+      "tests_value": "{{passed}}/{{total}}"
+    },
+    "curriculum": {
+      "modules_one": "{{count}} module",
+      "modules_other": "{{count}} modules",
+      "problems_one": "{{count}} problem",
+      "problems_other": "{{count}} problems",
+      "open_course": "Open course",
+      "close_course": "Close course",
+      "open_lecture": "Open lecture",
+      "close_lecture": "Close lecture",
+      "completion_label": "{{title}}, {{percent}} complete",
+      "pairs_value": "{{solved}}/{{total}}"
+    },
+    "problem": {
+      "column_problem": "Problem",
+      "column_difficulty": "Difficulty",
+      "column_attempted": "Attempted",
+      "column_solved": "Solved",
+      "column_attempts": "Attempts",
+      "column_solved_rate": "Solved rate",
+      "column_median": "Median solve",
+      "column_attention": "Needs a look",
+      "open": "Open problem",
+      "close": "Close problem",
+      "students_heading": "Students on {{title}}",
+      "column_student": "Student",
+      "column_status": "Status",
+      "column_score": "Best score",
+      "column_activity": "Last activity",
+      "column_solve_time": "Latest solve time"
+    },
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "solved": "Solved"
+    },
+    "result": {
+      "accepted": "Accepted",
+      "not_accepted": "Not accepted"
+    },
+    "difficulty": {
+      "EASY": "Easy",
+      "MEDIUM": "Medium",
+      "HARD": "Hard"
+    },
+    "facet": {
+      "course": "Course",
+      "status": "Progress",
+      "attention": "Needs a look",
+      "difficulty": "Difficulty"
+    },
+    "attention": {
+      "heading": "Needs a look",
+      "repeated_failures": "Failed {{count}} times in a row",
+      "stalled": "No attempt for {{count}} days",
+      "long_solve": "Spent {{duration}} on the last failed attempt",
+      "short_repeated_failures": "Repeated failures",
+      "short_stalled": "Stalled",
+      "short_long_solve": "Long solve",
+      "on_problem": "on {{title}}",
+      "none": "Nothing is flagged in this class right now."
+    },
+    "duration": {
+      "hours": "{{hours}}h {{minutes}}m",
+      "minutes": "{{minutes}}m {{seconds}}s",
+      "seconds": "{{seconds}}s",
+      "missing": "Not recorded",
+      "label": "Solve time {{duration}}"
+    },
+    "empty": {
+      "no_students_title": "Nobody is enrolled yet",
+      "no_students_body": "Ask a manager to enroll students in this class, then their work will appear here.",
+      "no_courses_title": "No courses assigned",
+      "no_courses_body": "This class has no curriculum yet. A manager assigns courses to a class.",
+      "no_exercises_title": "No graded problems yet",
+      "no_exercises_body": "The assigned courses have no problems students can open, so there is nothing to measure.",
+      "no_submissions_title": "Not started",
+      "no_submissions_body": "There are no graded attempts here yet.",
+      "no_results_title": "No matches",
+      "no_results_body": "No student or problem matches these filters."
+    },
+    "error": {
+      "title": "Could not load solution status",
+      "body": "The service did not respond. Try again in a moment.",
+      "refresh_failed": "Could not refresh. Showing the last result.",
+      "revoked_title": "This class is no longer yours",
+      "revoked_body": "Solution status is for the teacher currently assigned to a class.",
+      "not_found_title": "Not part of this class",
+      "not_found_body": "That student, problem, or attempt is no longer part of this class."
+    },
+    "review": {
+      "back": "Back to solution status",
+      "title": "Attempt review",
+      "read_only": "Read-only. This attempt cannot be changed, rerun, or regraded.",
+      "editor_label": "Submitted code, read-only",
+      "code_heading": "Submitted code",
+      "result_heading": "Result",
+      "statement_heading": "Problem",
+      "statement_missing": "This problem is no longer available to read.",
+      "cases_heading": "Sample cases",
+      "hidden_heading": "Hidden cases",
+      "hidden_summary": "{{passed}} of {{total}} hidden cases passed",
+      "hidden_note": "Hidden case inputs and outputs are never shown.",
+      "case": "Case {{position}}",
+      "case_input": "Input",
+      "case_expected": "Expected",
+      "case_actual": "Received",
+      "score": "Score",
+      "tests": "Tests",
+      "runtime": "Runtime",
+      "solve_time": "Solve time",
+      "submitted": "Submitted",
+      "runtime_value": "{{ms}} ms",
+      "outcome": {
+        "PASSED": "Passed",
+        "WRONG_OUTPUT": "Wrong output",
+        "RUNTIME_ERROR": "Runtime error",
+        "TIME_LIMIT": "Time limit",
+        "MEMORY_LIMIT": "Memory limit",
+        "SKIPPED": "Not run"
+      }
+    }
+  }
+}

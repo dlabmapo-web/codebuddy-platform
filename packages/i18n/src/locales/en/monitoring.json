@@ -42,7 +42,8 @@
     "no_exercise": "Not in an exercise",
     "never_seen": "Never",
     "membership_inactive": "Inactive membership",
-    "in_exercise": "In an exercise"
+    "in_exercise": "In an exercise",
+    "solution_status": "Solution status"
   },
   "state": {
     "ONLINE": "Online",

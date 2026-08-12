@@ -17,6 +17,7 @@ import type learn from '@cove/i18n/locales/en/learn.json';
 import type members from '@cove/i18n/locales/en/members.json';
 import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
+import type teach from '@cove/i18n/locales/en/teach.json';
 import type validation from '@cove/i18n/locales/en/validation.json';
 
 declare module 'i18next' {
@@ -36,6 +37,7 @@ declare module 'i18next' {
       members: typeof members;
       monitoring: typeof monitoring;
       nav: typeof nav;
+      teach: typeof teach;
       validation: typeof validation;
     };
   }

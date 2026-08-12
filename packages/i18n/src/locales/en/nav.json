@@ -19,7 +19,8 @@
     "invitations": "Invitations",
     "my_courses": "My courses",
     "my_classes": "My classes",
-    "answer_records": "Answer records"
+    "answer_records": "Answer records",
+    "solution_status": "Solution status"
   },
   "academy_switcher": {
     "select": "Select academy",

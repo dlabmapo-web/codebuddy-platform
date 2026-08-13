@@ -484,24 +484,67 @@ Older progress and score analytics remain available.
 
 ### 8.1 Technology choice
 
-Use the established V2 stack:
+Use the established V2 stack and its currently installed major versions:
 
-- **PostgreSQL + Prisma 7** for source data and aggregate queries;
-- **NestJS 11 service + oRPC 1.14 contracts** for authorization, validation,
+- **PostgreSQL + Prisma 7.9** for source data and aggregate queries;
+- **NestJS 11.1 service + oRPC 1.14 contracts** for authorization, validation,
   and typed responses;
 - **Redis + BullMQ**, already installed, only for bounded activity accumulation
   and retry—not as the analytics source of truth;
-- **Next.js 16 App Router + React 19** for the server page and small interactive
-  client islands;
-- **TanStack Query 5** for filter-driven client refetch, cancellation, and
+- **Next.js 16.2 App Router + React 19.2** for the server page and small
+  interactive client islands;
+- **TanStack Query 5.100** for filter-driven client refetch, cancellation, and
   retained previous data; and
-- **Recharts 3** for charts, accompanied by semantic tables.
+- **Recharts 3.9** for charts, accompanied by semantic tables.
 
 Do not add PostHog, ClickHouse, Kafka, Timescale, a second chart system, or a
 new client state library. The expected academy/class scale and existing domain
 projections do not justify another operational system.
 
-### 8.2 Shared contract
+The chart mapping is explicit:
+
+- Recharts `ComposedChart` renders daily active students as a line together
+  with solved and unsuccessful submission bars;
+- `ScatterChart` renders active learning time against concept mastery;
+- grouped `BarChart` renders submissions and distinct solved exercises per
+  student;
+- horizontal `BarChart` renders curriculum readiness, difficult lectures, and
+  difficult problems; and
+- ordinary Studio React components render summary cards, the weekly brief,
+  class momentum, attention lists, filters, and accessible data tables.
+
+Every chart uses the V2 Studio color tokens and a shared V2 chart primitive for
+axes, tooltip, legend, empty state, loading skeleton, responsive sizing, and
+semantic-table fallback. Recharts is a rendering dependency only; calculation,
+classification, sorting, and authorization never live in chart components.
+
+### 8.2 V2-only implementation boundary
+
+The new overview must be implemented inside the V2 domain and route structure.
+The older dashboard is research input, not a code foundation.
+
+Do not import, wrap, extend, or copy implementation from:
+
+- `app/api/teacher/dashboard/route.ts`;
+- `components/dashboard/TeacherAnalyticsDashboard.tsx`;
+- the existing V1-specific files under `components/charts`;
+- `lib/types/teacherDashboard.ts`;
+- the V1 `teacher_student`, global `users.role`, subjects/stages/chapters, or
+  legacy problem hierarchy; or
+- Supabase client/admin queries used by the old dashboard.
+
+The implementation may study the old screen's observable behavior and chart
+labels, but all new data comes through current V2 class assignment,
+enrollment, course, curriculum, progress, submission, and activity models. New
+chart primitives belong under the Studio/V2 component boundary and accept
+shared oRPC contract types rather than legacy dashboard types.
+
+This boundary prevents the new page from inheriting V1's academy-wide access,
+client-side aggregation, mixed data models, and inconsistent statistics. Once
+the V2 overview is accepted in production, removing the old dashboard becomes
+a separate migration with its own usage and route audit.
+
+### 8.3 Shared contract
 
 Add an `academyTeacherOverview` contract with one bounded query:
 
@@ -528,7 +571,7 @@ Shared Zod schemas bound every array. Student references use membership IDs,
 not raw user IDs. The response has no code, hidden test data, email, auth ID,
 or private AI-feedback text.
 
-### 8.3 Service boundaries
+### 8.4 Service boundaries
 
 - `TeacherOverviewAccessService` resolves the teacher's authorized active
   classes, enrollments, assigned courses, and visible curriculum. It should
@@ -549,7 +592,7 @@ The service executes independent aggregates concurrently after one access
 scope is established. It must not fetch all submissions and aggregate them in
 the browser or application process.
 
-### 8.4 Rendering and client state
+### 8.5 Rendering and client state
 
 The Next.js page remains a Server Component that authenticates, selects the
 role-specific overview, parses/canonicalizes search parameters, and renders the
@@ -564,7 +607,7 @@ are dynamically loaded client islands with stable skeleton dimensions.
 Do not add a Next Route Handler proxy. The V2 web client and server both use the
 existing oRPC boundary.
 
-### 8.5 Query and performance budget
+### 8.6 Query and performance budget
 
 - One overview response returns at most 250 unique participation students, the
   existing supported aggregate teacher scope. The chart renders every returned

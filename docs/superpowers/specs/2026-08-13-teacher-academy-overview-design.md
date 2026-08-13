@@ -759,7 +759,56 @@ student names, curriculum answers, or chart coordinates.
 - a reassigned teacher loses access without signing out; and
 - student and manager roles never receive teacher analytics.
 
-## 14. Delivery sequence
+## 14. Correctness amendments from implementation review
+
+These constraints make explicit the boundaries that the initial implementation
+review found could otherwise be interpreted too broadly.
+
+### 14.1 Pair-preserving analytics scope
+
+An overview scope is not two independent sets of students and materials. It is
+a collection of authorized class relationships. Every aggregate preserves the
+relationship between the selected class, its enrolled membership, its assigned
+course, and that course's visible materials. A submission or progress row is
+counted only when that exact relationship is present.
+
+Repository queries receive pair-preserving scope rows and join against them;
+they do not combine `user_id IN (...)` with `material_id IN (...)`. Class
+momentum uses only that class's rows, and curriculum readiness uses the roster
+eligible for the lecture's assigned class or classes. Regression fixtures use
+two disjoint classes and courses and prove that work cannot cross between them.
+
+### 14.2 Durable activity increments
+
+Pending activity state owns a stable flush ID. The same ID and increment are
+retried until the transaction is known to have committed; generating a new ID
+for an ambiguous retry is forbidden. A failed close retains or queues the
+pending increment rather than clearing it. Redis state transitions are atomic,
+so concurrent tabs or API instances cannot overwrite each other's accepted
+heartbeats.
+
+Tracked activity covers authenticated interaction throughout assigned learning
+surfaces, including course and lecture navigation, feedback, and exercises. An
+exercise remains the most specific course context, but it is not the only place
+where activity can be earned. Labels describe the actual measured scope.
+
+### 14.3 Totals, denials, and drill-down failures
+
+The participation contract carries a distinct count of students needing
+attention. Counts by reason remain a non-exclusive breakdown and are never
+summed to produce a student denominator.
+
+Every overview authorization failure, including permission resolution and a
+missing active teacher membership, returns
+`TEACHER_OVERVIEW_ACCESS_DENIED`. Solution status renders not-found only for an
+explicit access/not-found response; unexpected transport, validation, and
+server failures propagate to the route error boundary and remain observable.
+
+End-to-end locators target stable test IDs, explicit labels, or native element
+semantics. The serial suite must not rely on a broad text match or an ARIA role
+that the rendered element does not expose.
+
+## 15. Delivery sequence
 
 1. Add shared overview measurement functions, schemas, and contract.
 2. Add daily activity projection, accumulator, idempotent flush, and tests.
@@ -772,7 +821,7 @@ student names, curriculum answers, or chart coordinates.
 8. Remove the Teacher path's dependency on the placeholder overview. Keep the
    legacy V1 dashboard route untouched until its separate retirement decision.
 
-## 15. Acceptance criteria
+## 16. Acceptance criteria
 
 - A teacher opening the academy overview sees all active assigned classes by
   default and can filter to one class/course and 7/30/all time.
@@ -784,6 +833,10 @@ student names, curriculum answers, or chart coordinates.
   historical time and discloses its tracking boundary.
 - Score, mastery, completion, solve, and attention numbers match their defined
   denominators and the class Solution status projection.
+- Multi-class views never attribute a student's work to a class/course pair in
+  which that student is not enrolled.
+- Activity flush retries are idempotent after an ambiguous commit and do not
+  discard pending time after a failed close.
 - No chart ranks children, and every attention label includes its factual
   reason.
 - Every drill-down repeats current authorization and lands in an existing V2

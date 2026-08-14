@@ -1,6 +1,8 @@
 {
   "AUTHENTICATION_REQUIRED": "로그인이 필요합니다.",
   "TOKEN_INVALID": "세션이 유효하지 않거나 만료되었습니다.",
+  "STUDENT_SESSION_EXPIRED": "학습 세션이 만료되었습니다. 다시 로그인하세요.",
+  "STUDENT_SESSION_UNAVAILABLE": "학습 세션을 일시적으로 사용할 수 없습니다. 잠시 후 다시 로그인하세요.",
   "PROFILE_INCOMPLETE": "계속하려면 프로필을 완성하세요.",
   "USER_SUSPENDED": "정지된 계정입니다.",
   "EMAIL_VERIFICATION_REQUIRED": "계속하려면 이메일을 인증하세요.",
@@ -60,5 +62,6 @@
   "MONITORING_FEEDBACK_INVALID": "피드백은 1자 이상 2,000자 이하로 입력해 주세요.",
   "TEACHER_PROGRESS_ACCESS_DENIED": "이 반의 담당 강사가 아닙니다.",
   "TEACHER_PROGRESS_NOT_FOUND": "이 반에서 더 이상 볼 수 없는 항목입니다.",
+  "TEACHER_OVERVIEW_ACCESS_DENIED": "이 학원의 수업 현황을 볼 수 있는 권한이 없습니다.",
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요."
 }

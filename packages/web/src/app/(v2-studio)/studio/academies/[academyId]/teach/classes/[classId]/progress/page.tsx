@@ -2,6 +2,7 @@ import type { TeacherStudentsResult } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { isExplicitAccessDeniedError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { StudioShell } from '../../../../_components/studio-shell';
@@ -44,23 +45,26 @@ export default async function ClassProgressPage({
       ...(query.sort ? { sort: query.sort, direction: query.direction } : {}),
       page: query.page,
     });
-  } catch {
-    // Not assigned, archived, suspended, or no such class — one answer.
-    notFound();
+  } catch (error) {
+    // Only an expected access/scope answer is a 404. Transport, validation,
+    // and server faults belong to the route error boundary and observability.
+    if (isExplicitAccessDeniedError(error)) notFound();
+    students = null;
   }
-  if (!students) notFound();
+
+  const className = students?.summary.className ?? t('progress.title');
 
   return (
     <StudioShell
       academyId={academyId}
       bleed
       description={t('progress.description')}
-      title={`${students.summary.className} · ${t('progress.title')}`}
+      title={students ? `${className} · ${t('progress.title')}` : className}
     >
       <ProgressWorkspace
         academyId={academyId}
         classId={classId}
-        className={students.summary.className}
+        className={className}
         initialData={students}
         // The exact state the server rendered for. Anything else refetches
         // rather than showing one query's rows under another query's filters.

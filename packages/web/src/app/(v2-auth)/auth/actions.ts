@@ -68,11 +68,15 @@ export async function loginAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: input.data.password,
   });
   if (error) return { message: t('error.credentials_rejected') };
+  if (!data.session || !(await beginStudentSession(data.session.access_token))) {
+    await supabase.auth.signOut();
+    return { message: t('error.sign_in_failed') };
+  }
   if ((await cookies()).has('cove_invitation')) redirect('/auth/invitation');
   redirect('/auth/welcome');
 }
@@ -130,6 +134,10 @@ export async function signupAction(
   });
   if (error) return { message: t('error.signup_failed') };
   if (data.session) {
+    if (!(await beginStudentSession(data.session.access_token))) {
+      await supabase.auth.signOut();
+      return { message: t('error.signup_failed') };
+    }
     redirect(hasInvitation ? '/auth/invitation' : '/auth/welcome');
   }
 
@@ -238,4 +246,14 @@ async function clientAddress(): Promise<string | undefined> {
     requestHeaders.get('x-real-ip') ||
     undefined
   );
+}
+
+async function beginStudentSession(accessToken: string): Promise<boolean> {
+  try {
+    await createServerORPCClient(accessToken, await clientAddress())
+      .studentSession.begin({});
+    return true;
+  } catch {
+    return false;
+  }
 }

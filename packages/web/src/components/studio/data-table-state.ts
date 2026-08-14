@@ -18,6 +18,14 @@ declare module '@tanstack/react-table' {
      * here rather than by loosening that rule for every table.
      */
     hideable?: boolean;
+    /**
+     * The column's name in the Columns menu.
+     *
+     * Needed once a header renders more than a bare string — an icon beside a
+     * label is still one column with one name, and without this the menu falls
+     * back to the column id and offers a teacher "activeTime" to hide.
+     */
+    label?: string;
   }
 }
 

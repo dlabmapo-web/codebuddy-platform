@@ -12,9 +12,13 @@ import type {
   ConnectionEvent,
   MonitoringConnectionState,
 } from './connection';
+import {
+  LEARNING_ACTIVITY_EVENTS,
+  isPlayingMedia,
+} from './student-activity';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
-type OpenMaterial = { materialId: string; courseId: string | null };
+type OpenMaterial = { materialId: string | null; courseId: string };
 
 type StudentPresence = {
   /**
@@ -91,13 +95,25 @@ export function StudentPresenceProvider({
     }
   }, []);
 
+  const closeActivity = React.useCallback(() => {
+    activeRef.current = false;
+    // A stop signal is never throttled: leaving a tab or pausing a lesson must
+    // close the server's interval before another cadence can be billed.
+    publishRef.current();
+  }, []);
+
   const setOpenMaterial = React.useCallback(
     (material: OpenMaterial | null) => {
-      const previous = materialRef.current?.materialId ?? null;
+      const previous = materialRef.current;
       materialRef.current = material;
       // Opening or leaving an exercise moves the student between Solving and
       // Online, so it goes out immediately rather than waiting for a beat.
-      if (previous !== (material?.materialId ?? null)) publishRef.current();
+      if (
+        previous?.materialId !== material?.materialId ||
+        previous?.courseId !== material?.courseId
+      ) {
+        publishRef.current();
+      }
     },
     [],
   );
@@ -123,11 +139,14 @@ export function StudentPresenceProvider({
       publish();
     };
 
-    // Any interaction with the page, not only with the editor. A student
-    // reading the question and moving their cursor over the samples is
-    // working, and calling that idle libels them.
-    const onPointerMove = () => {
-      markActive();
+    const onActivity = () => markActive();
+    const onVideoProgress = (event: Event) => {
+      const video = event.target;
+      if (!(video instanceof HTMLMediaElement)) return;
+      if (isPlayingMedia(video)) markActive();
+    };
+    const onVideoStop = (event: Event) => {
+      if (event.target instanceof HTMLMediaElement) closeActivity();
     };
 
     // Publishing to a disconnected Socket.IO client relies on its temporary
@@ -138,15 +157,31 @@ export function StudentPresenceProvider({
     if (socket.connected) publish();
     const timer = setInterval(publish, monitoringTiming.presenceHeartbeatMs);
     globalThis.document?.addEventListener('visibilitychange', onVisibility);
-    globalThis.addEventListener('pointermove', onPointerMove, { passive: true });
+    for (const type of LEARNING_ACTIVITY_EVENTS) {
+      globalThis.addEventListener(type, onActivity, {
+        capture: true,
+        passive: true,
+      });
+    }
+    // Media events do not bubble consistently, so delegation uses capture.
+    globalThis.document?.addEventListener('playing', onVideoProgress, true);
+    globalThis.document?.addEventListener('timeupdate', onVideoProgress, true);
+    globalThis.document?.addEventListener('pause', onVideoStop, true);
+    globalThis.document?.addEventListener('ended', onVideoStop, true);
     return () => {
       clearInterval(timer);
       globalThis.document?.removeEventListener('visibilitychange', onVisibility);
-      globalThis.removeEventListener('pointermove', onPointerMove);
+      for (const type of LEARNING_ACTIVITY_EVENTS) {
+        globalThis.removeEventListener(type, onActivity, { capture: true });
+      }
+      globalThis.document?.removeEventListener('playing', onVideoProgress, true);
+      globalThis.document?.removeEventListener('timeupdate', onVideoProgress, true);
+      globalThis.document?.removeEventListener('pause', onVideoStop, true);
+      globalThis.document?.removeEventListener('ended', onVideoStop, true);
       socket.off('connect', publish);
       publishRef.current = () => undefined;
     };
-  }, [academyId, markActive, socket]);
+  }, [academyId, closeActivity, markActive, socket]);
 
   const value = React.useMemo(
     () => ({ markActive, report, setOpenMaterial, socket, state }),

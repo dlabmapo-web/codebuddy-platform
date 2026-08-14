@@ -9,5 +9,9 @@
     "label": "Select role",
     "drawer_title": "Academy role",
     "search": "Search roles…"
-  }
+  },
+  "teaching_overview_title": "Teaching overview",
+  "teaching_overview_description": "See who needs support and what to teach next.",
+  "student_analytics_title": "Student analytics",
+  "student_analytics_description": "Every student in your assigned classes, with the measurements behind each figure."
 }

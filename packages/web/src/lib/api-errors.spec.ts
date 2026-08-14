@@ -5,6 +5,7 @@ import {
   extractAppErrorCode,
   extractIssues,
   isAccessDeniedError,
+  isExplicitAccessDeniedError,
   toApiError,
 } from './api-errors';
 
@@ -67,6 +68,22 @@ describe('API error normalization', () => {
           status: 409,
           data: { code: 'CONTENT_EDIT_CONFLICT' },
         }),
+      ),
+    ).toBe(false);
+  });
+
+  it('requires an application code before a server page renders not-found', () => {
+    expect(
+      isExplicitAccessDeniedError(
+        new ORPCError('NOT_FOUND', {
+          status: 404,
+          data: { code: 'TEACHER_OVERVIEW_ACCESS_DENIED' },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isExplicitAccessDeniedError(
+        new ORPCError('NOT_FOUND', { status: 404 }),
       ),
     ).toBe(false);
   });

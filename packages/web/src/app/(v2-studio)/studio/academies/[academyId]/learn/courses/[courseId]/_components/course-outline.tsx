@@ -7,6 +7,7 @@ import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { Input } from '@/components/studio/primitives';
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
 
 import { useCourseOutline } from '../_hooks/use-course-outline';
 import { ModuleSection } from './module-section';
@@ -21,7 +22,14 @@ export function CourseOutline({
   initialOutline: LearnCourseOutline;
 }) {
   const { t } = useLayoutTranslation('learn');
+  const { markActive, setOpenMaterial } = useStudentPresence();
   const outline = useCourseOutline({ academyId, courseId, initialOutline });
+
+  React.useEffect(() => {
+    setOpenMaterial({ materialId: null, courseId });
+    markActive();
+    return () => setOpenMaterial(null);
+  }, [courseId, markActive, setOpenMaterial]);
 
   // A deep-linked lecture is only in the DOM once its module is expanded, which
   // the hook arranges on first render — so the scroll waits for paint.

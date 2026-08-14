@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
       .auth.completeOAuthOnboarding({
         ...(intentToken ? { intentToken } : {}),
       });
+    await createServerORPCClient(
+      data.session.access_token,
+      clientAddress(request),
+    ).studentSession.begin({});
     cookieStore.delete('cove_oauth_intent');
 
     return NextResponse.redirect(
@@ -48,6 +52,14 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/auth/signup?error=oauth', request.url));
   }
+}
+
+function clientAddress(request: NextRequest): string | undefined {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    undefined
+  );
 }
 
 function getErrorCode(error: unknown): string | null {

@@ -1,0 +1,16 @@
+{
+  "inactivity": {
+    "banner": "You will be signed out in",
+    "continue": "Continue session",
+    "sign_out_now": "Sign out now",
+    "announce": "You will be signed out in {{time}}. Press any key to stay signed in.",
+    "dialog_title": "Still there?",
+    "dialog_body": "Your session is about to end because there has been no activity. Continue to stay signed in — your work is saved either way.",
+    "draft_unconfirmed": "Your latest changes could not be confirmed as saved. They are still on this device and will sync the next time you sign in."
+  },
+  "resume": {
+    "body": "You were signed out for inactivity.",
+    "action": "Go back to where you left off",
+    "dismiss": "Dismiss"
+  }
+}

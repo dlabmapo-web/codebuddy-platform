@@ -19,6 +19,28 @@ export const monitoringNamespaces = ["monitoring", "errors"] as const;
  */
 export const teachNamespaces = ["monitoring", "teach", "errors"] as const;
 
+/**
+ * The academy overview, which the Teacher's own landing page mounts.
+ *
+ * `teaching` is separate from `teach` rather than folded into it: the two
+ * surfaces have different entry points — one is the academy root, the other is
+ * a class — and a single namespace holding both would push past the per-file
+ * budget in `@cove/i18n`'s `locales.spec.ts` and be paid for by whichever page
+ * loaded first.
+ */
+export const teachingNamespaces = ["teaching", "errors"] as const;
+
+/**
+ * The student inactivity countdown, mounted by the academy layout.
+ *
+ * Its own list, and a very small one: it is the only copy every authenticated
+ * student page needs regardless of what they are doing, and folding it into a
+ * larger namespace would make a warning banner cost a teacher's analytics copy.
+ */
+export const sessionNamespaces = ["session"] as const;
+
 export type PageNamespace =
   | (typeof monitoringNamespaces)[number]
-  | (typeof teachNamespaces)[number];
+  | (typeof teachNamespaces)[number]
+  | (typeof teachingNamespaces)[number]
+  | (typeof sessionNamespaces)[number];

@@ -2,6 +2,7 @@
 
 import type { AcademyRole } from '@cove/shared';
 import {
+  BarChart3,
   BookOpen,
   ChevronsUpDown,
   ClipboardList,
@@ -335,6 +336,15 @@ function studioNavGroups({
       href: `${base}/teach/classes`,
       labelKey: 'link.my_classes',
       icon: MonitorPlay,
+    });
+    // §5.1 — the detailed roster the overview's previews all link into. It sits
+    // under Teaching rather than beside the Overview link because it is scoped
+    // to assigned classes, exactly as My classes is, and a teacher looking for
+    // "my students" looks where "my classes" already is.
+    teaching.push({
+      href: `${base}/teach/students`,
+      labelKey: 'link.student_analytics',
+      icon: BarChart3,
     });
   }
   if (teaching.length > 0) {

@@ -97,6 +97,14 @@ export type DataTableProps<TData, TValue> = {
   toolbarActions?: React.ReactNode;
   /** Hides the column-visibility menu for pages with a fixed table layout. */
   showColumnVisibility?: boolean;
+  /**
+   * Columns hidden until a reader asks for them, by id.
+   *
+   * For a wide table whose last columns would otherwise be cut off at the card
+   * edge with nothing saying so. The column still exists and still appears in
+   * the Columns menu — this only decides where it starts.
+   */
+  initialColumnVisibility?: VisibilityState;
   onRowClick?: (row: TData) => void;
   /**
    * Server-owned sorting, filtering, and paging.
@@ -126,6 +134,7 @@ export function DataTable<TData, TValue>({
   toolbarFilters,
   toolbarActions,
   showColumnVisibility = true,
+  initialColumnVisibility,
   onRowClick,
   manual,
   loadingLabel,
@@ -135,8 +144,9 @@ export function DataTable<TData, TValue>({
   const { t } = useLayoutTranslation('common');
   const [clientSorting, setClientSorting] = React.useState<SortingState>([]);
   const [clientGlobalFilter, setClientGlobalFilter] = React.useState('');
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
+    () => initialColumnVisibility ?? {},
+  );
 
   const sorting = manual ? manual.sorting : clientSorting;
   const globalFilter = manual ? manual.globalFilter : clientGlobalFilter;
@@ -201,10 +211,11 @@ export function DataTable<TData, TValue>({
   const rows = table.getRowModel().rows;
   const hideableColumns = hideableColumnsOf(table.getAllLeafColumns());
 
-  /** Header definitions are plain strings here, so they double as labels. */
+  /** A plain-string header doubles as its own label; anything else says so. */
   const columnLabel = (id: string) => {
-    const header = table.getColumn(id)?.columnDef.header;
-    return typeof header === 'string' ? header : id;
+    const column = table.getColumn(id)?.columnDef;
+    if (column?.meta?.label) return column.meta.label;
+    return typeof column?.header === 'string' ? column.header : id;
   };
 
   const filtered = isTableFiltered({

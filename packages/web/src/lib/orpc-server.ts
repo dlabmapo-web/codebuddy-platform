@@ -23,9 +23,11 @@ export function createServerORPCClient(
         }
       }
       const bffSecret = process.env.BFF_SHARED_SECRET;
-      if (bffSecret && forwardedClientAddress) {
+      if (bffSecret) {
         headers['X-Cove-Bff-Secret'] = bffSecret;
-        headers['X-Cove-Client-Ip'] = forwardedClientAddress;
+        if (forwardedClientAddress) {
+          headers['X-Cove-Client-Ip'] = forwardedClientAddress;
+        }
       }
       return headers;
     },

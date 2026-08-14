@@ -1,6 +1,8 @@
 {
   "AUTHENTICATION_REQUIRED": "Authentication is required.",
   "TOKEN_INVALID": "The session is invalid or expired.",
+  "STUDENT_SESSION_EXPIRED": "Your learning session expired. Sign in again.",
+  "STUDENT_SESSION_UNAVAILABLE": "Learning sessions are temporarily unavailable. Sign in again shortly.",
   "PROFILE_INCOMPLETE": "Complete your profile to continue.",
   "USER_SUSPENDED": "This account is suspended.",
   "EMAIL_VERIFICATION_REQUIRED": "Verify your email to continue.",
@@ -60,5 +62,6 @@
   "MONITORING_FEEDBACK_INVALID": "Feedback must be between 1 and 2,000 characters.",
   "TEACHER_PROGRESS_ACCESS_DENIED": "You are not the assigned teacher for this class.",
   "TEACHER_PROGRESS_NOT_FOUND": "That is no longer part of this class.",
+  "TEACHER_OVERVIEW_ACCESS_DENIED": "You do not have a teaching overview for this academy.",
   "UNKNOWN": "Something went wrong. Try again."
 }

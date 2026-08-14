@@ -4,6 +4,7 @@ import { resolveInitialCode } from '@cove/shared';
 import * as React from 'react';
 
 import { orpc } from '@/lib/orpc';
+import { registerDraftFlush } from '@/lib/session/draft-flush';
 
 import {
   readLocalDraft,
@@ -212,6 +213,16 @@ export function useDraftAutosave({
     setReviewingUntouched(false);
     return sync(codeRef.current);
   }, [sync]);
+
+  /**
+   * §9.3 — an automatic sign-out saves the draft before it ends the session.
+   *
+   * Registered rather than called from the guard directly: the guard lives in
+   * the academy layout and has no way to reach an editor several routes below
+   * it, and the registration lasting exactly as long as this hook is mounted
+   * means an unmounted editor can never be asked to save.
+   */
+  React.useEffect(() => registerDraftFlush(flushNow), [flushNow]);
 
   /**
    * A closing tab never runs an async handler to completion, so the last edit

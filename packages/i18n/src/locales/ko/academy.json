@@ -9,5 +9,9 @@
     "label": "역할 선택",
     "drawer_title": "학원 역할",
     "search": "역할 검색…"
-  }
+  },
+  "teaching_overview_title": "수업 현황",
+  "teaching_overview_description": "도움이 필요한 학생과 다음에 가르칠 내용을 확인하세요.",
+  "student_analytics_title": "학생 분석",
+  "student_analytics_description": "담당 학급의 모든 학생과 각 수치의 근거가 되는 측정값입니다."
 }

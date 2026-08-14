@@ -96,6 +96,21 @@
   --peer: #7C3AED;
   --peer-soft: #F3EEFE;
 
+  /*
+   * Measured time.
+   *
+   * Its own hue because duration is the one measurement on the teaching
+   * surfaces that is neither a status nor an outcome: hours in the app are not
+   * good or bad, they are context for the score beside them. Borrowing green
+   * would say more time is better and borrowing amber would say it is a
+   * warning, and the page means neither.
+   *
+   * Dark enough to carry a word on a white card at 4.9:1, so it can label as
+   * well as fill.
+   */
+  --teal: #0F766E;
+  --teal-soft: #E4F5F2;
+
   /* Content lifecycle: draft is in progress, brand blue is live, slate is retired */
   --draft: #A45A08;
   --draft-soft: #FDF4E3;
@@ -130,6 +145,7 @@
   --on-brand: #FFFFFF;
   --on-primary: #FFFFFF;
   --on-peer: #FFFFFF;
+  --on-teal: #FFFFFF;
   --on-success: #FFFFFF;
   --on-danger: #FFFFFF;
   --on-warning: #FFFFFF;
@@ -186,6 +202,9 @@
   --peer: #A78BFA;
   --peer-soft: #221B3A;
 
+  --teal: #2DD4BF;
+  --teal-soft: #0E2422;
+
   --draft: #E0A34A;
   --draft-soft: #2A2011;
   --retired: #94A3B8;
@@ -204,6 +223,7 @@
   --on-brand: #0B1017;
   --on-primary: #0B1017;
   --on-peer: #0B1017;
+  --on-teal: #0B1017;
   --on-success: #0B1017;
   --on-danger: #0B1017;
   --on-warning: #0B1017;
@@ -242,6 +262,9 @@
   --color-peer: var(--peer);
   --color-peer-soft: var(--peer-soft);
 
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+
   --color-draft: var(--draft);
   --color-draft-soft: var(--draft-soft);
   --color-retired: var(--retired);
@@ -260,6 +283,7 @@
   --color-on-brand: var(--on-brand);
   --color-on-primary: var(--on-primary);
   --color-on-peer: var(--on-peer);
+  --color-on-teal: var(--on-teal);
   --color-on-success: var(--on-success);
   --color-on-danger: var(--on-danger);
   --color-on-warning: var(--on-warning);

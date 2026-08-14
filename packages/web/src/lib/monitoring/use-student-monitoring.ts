@@ -83,7 +83,7 @@ export function useStudentMonitoring({
    * exercise is open, and marking activity while it is.
    */
   React.useEffect(() => {
-    if (!materialId) return;
+    if (!materialId || !courseId) return;
     setOpenMaterial({ materialId, courseId });
     return () => setOpenMaterial(null);
   }, [courseId, materialId, setOpenMaterial]);

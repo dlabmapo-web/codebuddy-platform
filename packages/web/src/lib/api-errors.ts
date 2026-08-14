@@ -54,6 +54,9 @@ const accessDeniedCodes = new Set<AppErrorCode>([
   'CLASS_NOT_FOUND',
   'EXERCISE_NOT_FOUND',
   'CONTENT_PARENT_MISMATCH',
+  'TEACHER_PROGRESS_ACCESS_DENIED',
+  'TEACHER_PROGRESS_NOT_FOUND',
+  'TEACHER_OVERVIEW_ACCESS_DENIED',
 ]);
 
 export function isAccessDeniedError(error: unknown): boolean {
@@ -61,6 +64,19 @@ export function isAccessDeniedError(error: unknown): boolean {
   if (code) return accessDeniedCodes.has(code);
   // An untyped transport error only counts when the status itself says so.
   return status === 401 || status === 403 || status === 404;
+}
+
+/**
+ * True only when the API named the authorization failure itself.
+ *
+ * Server-rendered drill-down routes use this stricter predicate before calling
+ * `notFound()`. A proxy or transport can also answer with an untyped 404, and
+ * hiding that outage behind a not-found page prevents the client query from
+ * retrying a request that may be perfectly authorized.
+ */
+export function isExplicitAccessDeniedError(error: unknown): boolean {
+  const { code } = toApiError(error);
+  return code !== null && accessDeniedCodes.has(code);
 }
 
 export function extractAppErrorCode(

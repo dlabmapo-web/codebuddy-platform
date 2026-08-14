@@ -1,3 +1,7 @@
+import { HttpStatus } from "@nestjs/common";
+import type { AppErrorCode } from "@cove/shared";
+
+import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 
@@ -21,6 +25,60 @@ export type AssignedClassActor = {
   membershipId: string;
 };
 
+/**
+ * The acting teacher, or a refusal — once, for every teacher-facing read.
+ *
+ * `classes.assigned.manage` alone is not enough: Team Leads hold it for other
+ * operational reasons. The explicit `TEACHER` conjunction is what stops a
+ * future change to the role map from quietly handing one class's student
+ * history to another role.
+ *
+ * The denial code is a parameter because each surface answers with its own,
+ * and every surface uses one code for every failure — not assigned, archived,
+ * wrong academy, suspended membership, no such class — so a caller cannot map
+ * another academy by reading which error came back.
+ */
+export async function requireAssignedTeacherActor(input: {
+  prisma: {
+    academyMembership: {
+      findUnique: (args: {
+        where: { academyId_userId: { academyId: string; userId: string } };
+        select: { id: true };
+      }) => Promise<{ id: string } | null>;
+    };
+  };
+  resolveActor: () => Promise<{ userId: string; role: string }>;
+  academyId: string;
+  deniedCode: AppErrorCode;
+}): Promise<AssignedClassActor> {
+  let actor: { userId: string; role: string };
+  try {
+    actor = await input.resolveActor();
+  } catch (error) {
+    if (error instanceof AppException) {
+      throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
+    }
+    throw error;
+  }
+  if (actor.role !== "TEACHER") {
+    throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
+  }
+  const membership = await input.prisma.academyMembership.findUnique({
+    where: {
+      academyId_userId: { academyId: input.academyId, userId: actor.userId },
+    },
+    select: { id: true },
+  });
+  if (!membership) {
+    throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
+  }
+  return {
+    userId: actor.userId,
+    academyId: input.academyId,
+    membershipId: membership.id,
+  };
+}
+
 export function assignedClassWhere(
   actor: AssignedClassActor,
 ): Prisma.ClassWhereInput {
@@ -38,17 +96,28 @@ export function assignedClassWhere(
   };
 }
 
-/** An active student membership of this academy, enrolled in this class. */
+/**
+ * An active student membership of this academy, enrolled in these classes.
+ *
+ * Takes one class or several so the academy overview's `class=all` union and a
+ * single class's roster are the same predicate. A separate "across my classes"
+ * version is exactly how one of the two would later forget to check that the
+ * membership is still ACTIVE.
+ */
 export function classStudentWhere(
   academyId: string,
-  classId: string,
+  classId: string | string[],
 ): Prisma.AcademyMembershipWhereInput {
   return {
     academyId,
     role: "STUDENT",
     status: "ACTIVE",
     user: { status: "ACTIVE" },
-    classEnrollments: { some: { classId } },
+    classEnrollments: {
+      some: {
+        classId: Array.isArray(classId) ? { in: classId } : classId,
+      },
+    },
   };
 }
 
@@ -62,7 +131,7 @@ export function classStudentWhere(
  */
 export function classTaughtMaterialWhere(
   academyId: string,
-  classId: string,
+  classId: string | string[],
 ): Prisma.MaterialWhereInput {
   return {
     AND: [
@@ -70,7 +139,13 @@ export function classTaughtMaterialWhere(
       {
         lecture: {
           courseModule: {
-            course: { classAssignments: { some: { classId } } },
+            course: {
+              classAssignments: {
+                some: {
+                  classId: Array.isArray(classId) ? { in: classId } : classId,
+                },
+              },
+            },
           },
         },
       },

@@ -47,8 +47,10 @@ import type { z } from "zod";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
+import { StudentSessionService } from "../auth/student-session.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
+import { LearningActivityAccumulator } from "../teach/learning-activity.accumulator.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
 import { ActiveWatchRegistry } from "./active-watch.registry.js";
 import {
@@ -139,6 +141,13 @@ type StudentState = {
   membershipId: string;
   classes: StudentClassMembership[];
   materialId: string | null;
+  /**
+   * The course the last verified material belonged to.
+   *
+   * Kept so a disconnect can close the open activity interval. The heartbeat
+   * verifies it; nothing here trusts a client's own course id.
+   */
+  courseId: string | null;
   draftId: string | null;
   /** Throttles the durable `lastLearningSeenAt` write. */
   lastSeenPersistedAt: number | null;
@@ -192,6 +201,7 @@ export class MonitoringGateway
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: SupabaseAuthService,
+    private readonly studentSessions: StudentSessionService,
     private readonly access: MonitoringAccessService,
     private readonly presence: PresenceRegistry,
     private readonly documents: CollaborationDocumentService,
@@ -201,6 +211,14 @@ export class MonitoringGateway
     private readonly feedbackBroadcaster: MonitoringFeedbackBroadcaster,
     private readonly revocation: MonitoringRevocationService,
     private readonly metrics: MonitoringMetricsService,
+    /**
+     * The one consumer of monitoring signals that outlives the lesson.
+     *
+     * Presence is ephemeral by design; the overview needs a durable daily
+     * total, and this is the only path between the two. Analytics never reads
+     * live presence back as historical time.
+     */
+    private readonly activity: LearningActivityAccumulator,
   ) {}
 
   afterInit(server: Server): void {
@@ -267,6 +285,15 @@ export class MonitoringGateway
     if (!data) return;
 
     if (data.student) {
+      // Best effort, and deliberately before the presence work: a clean tab
+      // close should keep the minute the student earned, while a crash simply
+      // lets the key lapse and undercounts by it.
+      if (data.student.courseId) {
+        await this.activity.close(
+          data.student.membershipId,
+          data.student.courseId,
+        );
+      }
       // Interrupted, not gone: the roster shows reconnecting for the grace
       // window, because a tunnel is not a student going home.
       await Promise.all(
@@ -528,6 +555,14 @@ export class MonitoringGateway
 
     const student = await this.resolveStudent(socket, parsed.data.academyId);
     if (!student) return;
+    try {
+      await this.studentSessions.requireActive(socket.data.identity);
+    } catch {
+      // The HTTP guard will preserve the draft and sign the page out. The
+      // socket must stop accepting learning signals immediately meanwhile.
+      socket.disconnect(true);
+      return;
+    }
     // The same verification the roster needs, selecting the titles the
     // watch-context event needs as well: a movement event has to name where
     // the student went, and re-reading the curriculum to find out would put a
@@ -558,14 +593,15 @@ export class MonitoringGateway
           },
         })
       : null;
-    const verifiedCourseId = material?.lecture.courseModule.courseId ?? null;
-    student.materialId = verifiedCourseId ? parsed.data.materialId : null;
-    const eligibleClassIds = verifiedCourseId
+    const requestedCourseId = parsed.data.materialId
+      ? material?.lecture.courseModule.courseId ?? null
+      : parsed.data.courseId;
+    const eligibleClassIds = requestedCourseId
       ? new Set(
           (
             await this.prisma.classCourse.findMany({
               where: {
-                courseId: verifiedCourseId,
+                courseId: requestedCourseId,
                 classId: { in: student.classes.map((entry) => entry.classId) },
                 class: { status: "ACTIVE" },
               },
@@ -574,6 +610,15 @@ export class MonitoringGateway
           ).map((assignment) => assignment.classId),
         )
       : new Set<string>();
+    const verifiedCourseId =
+      requestedCourseId && eligibleClassIds.size > 0 ? requestedCourseId : null;
+    student.materialId = material && verifiedCourseId ? material.id : null;
+    // Moving to another course closes the interval that belonged to the last
+    // one, so time is attributed to the course the student was actually in.
+    if (student.courseId && student.courseId !== verifiedCourseId) {
+      await this.activity.close(student.membershipId, student.courseId);
+    }
+    student.courseId = verifiedCourseId;
 
     for (const entry of student.classes) {
       const visibleInClass =
@@ -583,7 +628,7 @@ export class MonitoringGateway
         classId: entry.classId,
         studentMembershipId: entry.membershipId,
         socketGeneration: socket.data.generation,
-        materialId: visibleInClass ? parsed.data.materialId : null,
+        materialId: visibleInClass ? material?.id ?? null : null,
         courseId: visibleInClass ? verifiedCourseId : null,
         visibility: parsed.data.visibility,
         active: parsed.data.active,
@@ -591,7 +636,7 @@ export class MonitoringGateway
       await this.publishPresence(student.academyId, entry.classId, state);
       this.publishWatchContext(student, entry.classId, {
         available: visibleInClass,
-        materialId: visibleInClass ? material!.id : null,
+        materialId: visibleInClass ? material?.id ?? null : null,
         courseId: visibleInClass ? verifiedCourseId : null,
         path:
           visibleInClass && material
@@ -611,6 +656,21 @@ export class MonitoringGateway
                 exercise: { materialId: material.id, title: material.title },
               }
             : null,
+      });
+    }
+
+    // Counted active learning time, §7.1.
+    //
+    // Interaction earns time only while the learning page is foreground-visible.
+    // A hidden signal closes the open interval instead of billing a background
+    // tab for an interaction that happened before the visibility transition.
+    if (verifiedCourseId) {
+      await this.activity.record({
+        academyId: student.academyId,
+        membershipId: student.membershipId,
+        courseId: verifiedCourseId,
+        active:
+          parsed.data.active && parsed.data.visibility === "VISIBLE",
       });
     }
 
@@ -1307,6 +1367,7 @@ export class MonitoringGateway
         membershipId: membership.id,
       })),
       materialId: null,
+      courseId: null,
       draftId: null,
       lastSeenPersistedAt: null,
       terminal: null,

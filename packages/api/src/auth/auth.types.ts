@@ -1,5 +1,7 @@
 export type SupabaseIdentity = {
   authUserId: string;
+  /** Stable across access-token refreshes, new for every Supabase login. */
+  sessionId?: string | null;
   email: string | null;
   emailVerified: boolean;
   /** The name chosen at signup, claimed once by `bootstrap`. */

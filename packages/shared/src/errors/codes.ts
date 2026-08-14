@@ -3,6 +3,8 @@ import { z } from "zod";
 export const appErrorCodes = [
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
+  "STUDENT_SESSION_EXPIRED",
+  "STUDENT_SESSION_UNAVAILABLE",
   "PROFILE_INCOMPLETE",
   "USER_SUSPENDED",
   "EMAIL_VERIFICATION_REQUIRED",
@@ -62,6 +64,7 @@ export const appErrorCodes = [
   "MONITORING_FEEDBACK_INVALID",
   "TEACHER_PROGRESS_ACCESS_DENIED",
   "TEACHER_PROGRESS_NOT_FOUND",
+  "TEACHER_OVERVIEW_ACCESS_DENIED",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -81,6 +84,9 @@ export function isAppErrorCode(value: unknown): value is AppErrorCode {
 export const appErrorFallbacks: Record<AppErrorCode, string> = {
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",
+  STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",
+  STUDENT_SESSION_UNAVAILABLE:
+    "Student sessions are temporarily unavailable. Sign in again shortly.",
   PROFILE_INCOMPLETE: "Complete your profile to continue.",
   USER_SUSPENDED: "This account is suspended.",
   EMAIL_VERIFICATION_REQUIRED: "Verify your email to continue.",
@@ -152,4 +158,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // Never existed, no longer in this class, or no longer visible — one answer,
   // so the API cannot be used as an existence oracle.
   TEACHER_PROGRESS_NOT_FOUND: "That is no longer part of this class.",
+  // The academy overview reads across every assigned class at once, so its
+  // denial says nothing about which of them exist either.
+  TEACHER_OVERVIEW_ACCESS_DENIED:
+    "You do not have a teaching overview for this academy.",
 };

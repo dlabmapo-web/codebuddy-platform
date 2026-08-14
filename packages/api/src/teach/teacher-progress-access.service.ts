@@ -6,6 +6,7 @@ import {
   assignedClassWhere,
   classStudentWhere,
   classTaughtMaterialWhere,
+  requireAssignedTeacherActor,
 } from "../classes/assigned-class-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -83,37 +84,25 @@ export class TeacherProgressAccessService {
   /**
    * Resolves the acting teacher, or refuses.
    *
-   * `classes.assigned.manage` alone is not enough: Team Leads hold it for
-   * other operational reasons. The explicit `TEACHER` conjunction is what
-   * stops a future change to the role map from quietly handing one class's
-   * student history to another role.
+   * The rule itself lives beside the assigned-class predicate, so this surface
+   * and the academy overview cannot end up with two versions of "is this
+   * person a teacher here" that drift apart.
    */
   async requireTeacher(
     identity: SupabaseIdentity,
     academyId: string,
   ): Promise<TeacherProgressActor> {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
+    return requireAssignedTeacherActor({
+      prisma: this.prisma,
       academyId,
-      "classes.assigned.manage",
-    );
-    if (actor.role !== "TEACHER") {
-      throw new AppException(
-        "TEACHER_PROGRESS_ACCESS_DENIED",
-        HttpStatus.FORBIDDEN,
-      );
-    }
-    const membership = await this.prisma.academyMembership.findUnique({
-      where: { academyId_userId: { academyId, userId: actor.userId } },
-      select: { id: true },
+      deniedCode: "TEACHER_PROGRESS_ACCESS_DENIED",
+      resolveActor: () =>
+        this.access.requirePermission(
+          identity.authUserId,
+          academyId,
+          "classes.assigned.manage",
+        ),
     });
-    if (!membership) {
-      throw new AppException(
-        "ACADEMY_MEMBERSHIP_REQUIRED",
-        HttpStatus.FORBIDDEN,
-      );
-    }
-    return { userId: actor.userId, academyId, membershipId: membership.id };
   }
 
   /**

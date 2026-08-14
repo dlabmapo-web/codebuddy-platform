@@ -14,6 +14,8 @@ import { RateLimitService } from "../academies/rate-limit.service.js";
 import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
+import { StudentSessionService } from "../auth/student-session.service.js";
+import { createStudentSessionRouter } from "../auth/student-session.router.js";
 import { createAuthRouter } from "../auth/auth.router.js";
 import { ClassesService } from "../classes/classes.service.js";
 import { createClassesRouters } from "../classes/classes.router.js";
@@ -26,6 +28,10 @@ import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
+import { TeacherOverviewService } from "../teach/teacher-overview.service.js";
+import { createAcademyTeacherOverviewRouter } from "../teach/teacher-overview.router.js";
+import { TeacherStudentsService } from "../teach/teacher-students.service.js";
+import { createAcademyTeacherStudentsRouter } from "../teach/teacher-students.router.js";
 import { TeacherProgressService } from "../teach/teacher-progress.service.js";
 import { createTeacherProgressRouter } from "../teach/teacher-progress.router.js";
 import type { ORPCContext, ORPCDeps } from "./context.js";
@@ -38,6 +44,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     supabaseAuthService: app.get(SupabaseAuthService, { strict: false }),
+    studentSessionService: app.get(StudentSessionService, { strict: false }),
     academyDiscoveryService: app.get(AcademyDiscoveryService, { strict: false }),
     academyInvitationService: app.get(AcademyInvitationService, {
       strict: false,
@@ -60,6 +67,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     submissionService: app.get(SubmissionService, { strict: false }),
     monitoringService: app.get(MonitoringService, { strict: false }),
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
+    teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
+    teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -92,11 +101,14 @@ function createORPCRouter(deps: ORPCDeps) {
   const classesRouters = createClassesRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
+    studentSession: createStudentSessionRouter(os, deps),
     ...academyRouters,
     ...contentRouters,
     ...classesRouters,
     learn: createLearnRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),
+    academyTeacherOverview: createAcademyTeacherOverviewRouter(os, deps),
+    academyTeacherStudents: createAcademyTeacherStudentsRouter(os, deps),
   });
 }

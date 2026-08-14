@@ -1,3 +1,7 @@
+import {
+  academyTeacherOverviewContract,
+  academyTeacherStudentsContract,
+} from "./orpc/academy-teacher-overview.contract.js";
 import { authContract } from "./orpc/auth.contract.js";
 import {
   academiesContract,
@@ -10,6 +14,7 @@ import { academyClassesContract } from "./orpc/classes.contract.js";
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
 import { monitoringContract } from "./orpc/monitoring.contract.js";
+import { studentSessionContract } from "./orpc/student-session.contract.js";
 import { teacherProgressContract } from "./orpc/teacher-progress.contract.js";
 
 export const appContract = {
@@ -23,7 +28,10 @@ export const appContract = {
   academyClasses: academyClassesContract,
   learn: learnContract,
   monitoring: monitoringContract,
+  studentSession: studentSessionContract,
   teacherProgress: teacherProgressContract,
+  academyTeacherOverview: academyTeacherOverviewContract,
+  academyTeacherStudents: academyTeacherStudentsContract,
 };
 
 export type AppContract = typeof appContract;

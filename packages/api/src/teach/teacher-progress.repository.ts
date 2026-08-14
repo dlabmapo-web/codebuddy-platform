@@ -7,6 +7,10 @@ import {
 
 import { PrismaService } from "../database/prisma.service.js";
 import { Prisma, type SubmissionStatus } from "../generated/prisma/client.js";
+import {
+  authorizedOverviewWorkPredicate,
+  type OverviewAggregateScope,
+} from "./teacher-overview.repository.js";
 
 /**
  * Every database read Solution status makes, and nothing else.
@@ -210,6 +214,8 @@ export class TeacherProgressRepository {
     userIds: string[];
     materialIds: string[];
     now: Date;
+    /** Pair-preserving scope for the academy-wide overview. */
+    overviewScope?: OverviewAggregateScope;
   }): Promise<AttentionCandidate[]> {
     if (isEmptyScope(input)) return [];
     const stalledBefore = new Date(
@@ -228,7 +234,13 @@ export class TeacherProgressRepository {
             ORDER BY s.created_at DESC, s.id DESC
           ) AS rn
         FROM submissions s
-        WHERE ${countedScope(input)}
+        WHERE ${
+          input.overviewScope
+            ? Prisma.sql`${authorizedOverviewWorkPredicate(input.overviewScope, "s")}
+                AND s.source_material_id = s.material_id
+                AND s.status IN ('PASSED', 'FAILED')`
+            : countedScope(input)
+        }
       ),
       newest_pass AS (
         SELECT user_id, material_id, MIN(rn) AS pass_rn

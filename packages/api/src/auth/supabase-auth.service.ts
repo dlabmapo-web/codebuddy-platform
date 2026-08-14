@@ -42,6 +42,7 @@ export class SupabaseAuthService {
 
     return {
       authUserId: claims.sub,
+      sessionId: firstUuid(claims.session_id),
       email,
       emailVerified: email !== null && emailVerified,
       // User metadata is client-writable, so this is untrusted input and is

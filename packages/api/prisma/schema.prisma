@@ -212,6 +212,7 @@ model Academy {
   featureFlags           AcademyFeatureFlag[]
   monitoringVisits       TeacherMonitoringVisit[]
   teacherFeedback        TeacherFeedback[]
+  learningDays           StudentCourseLearningDay[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -278,6 +279,7 @@ model AcademyMembership {
   monitoringVisitsAsStudent TeacherMonitoringVisit[] @relation("MonitoringVisitStudent")
   feedbackAuthored          TeacherFeedback[]        @relation("TeacherFeedbackAuthor")
   feedbackReceived          TeacherFeedback[]        @relation("TeacherFeedbackRecipient")
+  learningDays              StudentCourseLearningDay[]
 
   @@unique([academyId, userId])
   @@index([userId, status])
@@ -371,6 +373,7 @@ model Course {
   exerciseDrafts   ExerciseDraft[]
   submissions      Submission[]
   classAssignments ClassCourse[]
+  learningDays     StudentCourseLearningDay[]
 
   @@index([academyId, isVisible, updatedAt])
   @@map("courses")
@@ -882,4 +885,65 @@ model ExerciseHint {
 
   @@unique([exerciseMaterialId, position])
   @@map("exercise_hints")
+}
+
+/// One student's counted active learning time, in one course, on one
+/// academy-local day.
+///
+/// A projection, not an event log. The alternative — keeping every heartbeat —
+/// would store a child's minute-by-minute movements to answer a question that
+/// only ever needs a daily total, and the overview has no use for the detail
+/// that would make it worth the risk.
+///
+/// Course rather than class, because the learning route knows the academy and
+/// the course and not which class motivated the work. A class counts a row only
+/// when the student is enrolled and the course is currently assigned to it, so
+/// removing either stops the time from being attributed without deleting it.
+///
+/// Increments are idempotent through `LearningActivityFlush`: a retried flush
+/// finds its receipt already present and adds nothing.
+model StudentCourseLearningDay {
+  academyId       String   @map("academy_id") @db.Uuid
+  membershipId    String   @map("membership_id") @db.Uuid
+  courseId        String   @map("course_id") @db.Uuid
+  /// The academy-local calendar day, not a UTC one. An evening class must not
+  /// be split across two dates.
+  localDate       DateTime @map("local_date") @db.Date
+  activeSeconds   Int      @default(0) @map("active_seconds")
+  /// How many separate intervals those seconds came from, so a total can be
+  /// read as one long session or twelve short ones.
+  activeIntervals Int      @default(0) @map("active_intervals")
+  firstActiveAt   DateTime @map("first_active_at") @db.Timestamptz(6)
+  lastActiveAt    DateTime @map("last_active_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy    Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  course     Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([academyId, membershipId, courseId, localDate])
+  /// The academy-wide daily momentum series.
+  @@index([academyId, localDate])
+  /// One student's own time in one course, for the participation scatter.
+  @@index([membershipId, courseId, localDate])
+  @@map("student_course_learning_days")
+}
+
+/// A receipt for one accepted activity flush.
+///
+/// The row is the idempotency key. A queued flush carries a UUID generated
+/// before the write; the transaction inserts the receipt and increments the
+/// daily projection together, so a retry after a timeout collides on the
+/// primary key and adds nothing rather than adding the minute twice.
+///
+/// Receipts are deleted after a week — longer than the queue's retry horizon,
+/// short enough that the table stays small.
+model LearningActivityFlush {
+  id           String   @id @db.Uuid
+  academyId    String   @map("academy_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("learning_activity_flushes")
 }

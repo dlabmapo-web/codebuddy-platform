@@ -94,6 +94,11 @@ function createGateway(overrides?: {
     isActive: vi.fn().mockResolvedValue(true),
   };
   const metrics = { increment: vi.fn(), incrementWithReason: vi.fn() };
+  const activity = {
+    record: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  };
+  const studentSessions = { requireActive: vi.fn().mockResolvedValue(undefined) };
 
   // Only the collaborators these two paths reach are stubbed; the rest are
   // absent on purpose, so a call that starts touching them fails loudly here.
@@ -101,6 +106,7 @@ function createGateway(overrides?: {
   const gateway = new MonitoringGateway(
     (overrides?.prisma ?? absent) as never,
     absent,
+    studentSessions as never,
     absent,
     presence as never,
     documents as never,
@@ -110,6 +116,7 @@ function createGateway(overrides?: {
     absent,
     absent,
     metrics as never,
+    activity as never,
   );
   gateway.server = server;
   return {
@@ -120,6 +127,7 @@ function createGateway(overrides?: {
     visits,
     activeWatches,
     metrics,
+    activity,
   };
 }
 
@@ -982,12 +990,16 @@ describe("student movement", () => {
         publishedContext: new Map(),
       },
     });
-    const publish = (material: string | null) =>
+    const publish = (
+      material: string | null,
+      openCourseId: string | null = material ? courseId : null,
+      visibility: "VISIBLE" | "HIDDEN" = "VISIBLE",
+    ) =>
       harness.gateway.presencePublish(socket, {
         academyId,
         materialId: material,
-        courseId,
-        visibility: "VISIBLE",
+        courseId: openCourseId,
+        visibility,
         active: true,
       });
     return { ...harness, socket, publish, prisma };
@@ -1058,6 +1070,32 @@ describe("student movement", () => {
       path: null,
       available: false,
     });
+  });
+
+  it("counts an assigned course page without pretending an exercise is open", async () => {
+    const { activity, emissions, publish } = createStudent();
+
+    await publish(null, courseId);
+
+    expect(movements(emissions).at(-1)?.payload).toMatchObject({
+      materialId: null,
+      courseId,
+      path: null,
+      available: true,
+    });
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({ courseId, active: true }),
+    );
+  });
+
+  it("closes activity instead of counting an interaction from a hidden tab", async () => {
+    const { activity, publish } = createStudent();
+
+    await publish(null, courseId, "HIDDEN");
+
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({ courseId, active: false }),
+    );
   });
 
   /**

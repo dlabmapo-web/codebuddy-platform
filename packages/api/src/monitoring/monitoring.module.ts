@@ -11,6 +11,7 @@ import { MonitoringGateway } from "./monitoring.gateway.js";
 import { MonitoringRevocationModule } from "./monitoring-revocation.module.js";
 import { MonitoringService } from "./monitoring.service.js";
 import { PresenceRegistry } from "./presence.registry.js";
+import { TeachModule } from "../teach/teach.module.js";
 
 /**
  * Live teacher monitoring: composition only.
@@ -33,6 +34,9 @@ import { PresenceRegistry } from "./presence.registry.js";
     // is the student's own outline, read through a teacher's claim.
     LearnModule,
     MonitoringRevocationModule,
+    // For the activity accumulator alone. The gateway produces heartbeats; the
+    // teaching module owns what they durably become.
+    TeachModule,
   ],
   providers: [
     MonitoringAccessService,

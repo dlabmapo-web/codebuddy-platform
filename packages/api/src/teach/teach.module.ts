@@ -1,25 +1,50 @@
 import { Module } from "@nestjs/common";
 
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
+import { LearningActivityAccumulator } from "./learning-activity.accumulator.js";
+import { TeacherOverviewAccessService } from "./teacher-overview-access.service.js";
+import { TeacherOverviewRepository } from "./teacher-overview.repository.js";
+import { TeacherOverviewService } from "./teacher-overview.service.js";
+import { TeacherStudentsService } from "./teacher-students.service.js";
 import { TeacherProgressAccessService } from "./teacher-progress-access.service.js";
 import { TeacherProgressRepository } from "./teacher-progress.repository.js";
 import { TeacherProgressService } from "./teacher-progress.service.js";
 
 /**
- * The teacher's own read surface over a class they are assigned to.
+ * The teacher's own read surfaces: one class's solution history, and the
+ * academy-wide overview above it.
  *
  * Deliberately separate from `MonitoringModule`: live monitoring needs Redis,
  * sockets, and a rollout flag, and none of that may become a precondition for
- * reading solution history. The two share only the assigned-class predicate in
- * `classes/assigned-class-access.ts`.
+ * reading progress. The two share the assigned-class predicate in
+ * `classes/assigned-class-access.ts` and nothing else.
+ *
+ * `MonitoringRevocationModule` is imported for its Redis handle alone, which
+ * the activity accumulator uses to hold one open interval per student. That
+ * handle resolves to null without a configured Redis, so the accumulator keeps
+ * counting in process memory and every durable read is unaffected.
+ *
+ * The accumulator is exported because the monitoring gateway is its only
+ * producer: heartbeats arrive there, and counted time is written here.
  */
 @Module({
-  imports: [AuthorizationModule],
+  imports: [AuthorizationModule, MonitoringRevocationModule],
   providers: [
+    LearningActivityAccumulator,
     TeacherProgressAccessService,
     TeacherProgressRepository,
     TeacherProgressService,
+    TeacherOverviewAccessService,
+    TeacherOverviewRepository,
+    TeacherOverviewService,
+    TeacherStudentsService,
   ],
-  exports: [TeacherProgressService],
+  exports: [
+    TeacherProgressService,
+    TeacherOverviewService,
+    TeacherStudentsService,
+    LearningActivityAccumulator,
+  ],
 })
 export class TeachModule {}

@@ -7,6 +7,7 @@ import type { appContract } from "@cove/shared";
 import type { AuthService } from "../auth/auth.service.js";
 import type { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import type { SupabaseAuthService } from "../auth/supabase-auth.service.js";
+import type { StudentSessionService } from "../auth/student-session.service.js";
 import type { AcademyDiscoveryService } from "../academies/academy-discovery.service.js";
 import type { AcademyInvitationService } from "../academies/academy-invitation.service.js";
 import type { AcademyJoinRequestService } from "../academies/academy-join-request.service.js";
@@ -20,6 +21,8 @@ import type { LearnClassService } from "../learn/learn-class.service.js";
 import type { LearnService } from "../learn/learn.service.js";
 import type { SubmissionService } from "../learn/submission.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
+import type { TeacherOverviewService } from "../teach/teacher-overview.service.js";
+import type { TeacherStudentsService } from "../teach/teacher-students.service.js";
 import type { TeacherProgressService } from "../teach/teacher-progress.service.js";
 
 export type ORPCContext = { req: Request };
@@ -31,6 +34,7 @@ export type ORPCDeps = {
   authService: AuthService;
   oauthOnboardingIntentService: OAuthOnboardingIntentService;
   supabaseAuthService: SupabaseAuthService;
+  studentSessionService: StudentSessionService;
   academyDiscoveryService: AcademyDiscoveryService;
   academyInvitationService: AcademyInvitationService;
   academyJoinRequestService: AcademyJoinRequestService;
@@ -45,6 +49,8 @@ export type ORPCDeps = {
   submissionService: SubmissionService;
   monitoringService: MonitoringService;
   teacherProgressService: TeacherProgressService;
+  teacherOverviewService: TeacherOverviewService;
+  teacherStudentsService: TeacherStudentsService;
 };
 
 export function requestAddress(req: Request): string {
@@ -83,4 +89,18 @@ export function bearerToken(req: Request): string | null {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return null;
   return header.slice("Bearer ".length).trim() || null;
+}
+
+/** A mutation that may only originate from Cove's server-side auth flow. */
+export function isTrustedBffRequest(req: Request): boolean {
+  const expected = process.env.BFF_SHARED_SECRET;
+  const supplied = singleHeader(req.headers["x-cove-bff-secret"]);
+  if (expected) return Boolean(supplied && safeEqual(expected, supplied));
+
+  // Production configuration requires the secret. Local development keeps the
+  // same boundary by accepting only the loopback call from the Next server.
+  if (process.env.NODE_ENV === "production") return false;
+  const address = req.ip || req.socket.remoteAddress || "";
+  return address === "127.0.0.1" || address === "::1" ||
+    address === "::ffff:127.0.0.1";
 }

@@ -50,12 +50,58 @@ export const e2eContent = {
   progressTitle: progressFixture.title,
 } as const;
 
+/** A second membership used only to exercise My Page academy switching. */
+export const e2eProfileAcademy = {
+  academyId: "e1000000-0000-4000-8000-000000000001",
+  membershipId: "e1000000-0000-4000-8000-000000000002",
+  name: "E2E Profile Academy",
+  slug: "e2e-profile-academy",
+} as const;
+
 const teamLead = developmentUsers.find((user) => user.academyRole === "TEAM_LEAD")!;
 
 export async function seedE2eContent(prisma: PrismaClient) {
   const academy = await prisma.academy.findFirstOrThrow({
     where: { organization: { slug: developmentOrganization.slug } },
     select: { id: true },
+  });
+
+  await prisma.academy.upsert({
+    where: { id: e2eProfileAcademy.academyId },
+    create: {
+      id: e2eProfileAcademy.academyId,
+      organizationId: developmentOrganization.id,
+      name: e2eProfileAcademy.name,
+      slug: e2eProfileAcademy.slug,
+      status: "ACTIVE",
+    },
+    update: {
+      name: e2eProfileAcademy.name,
+      slug: e2eProfileAcademy.slug,
+      status: "ACTIVE",
+    },
+  });
+  const student = developmentUsers.find((user) => user.academyRole === "STUDENT")!;
+  await prisma.academyMembership.upsert({
+    where: {
+      academyId_userId: {
+        academyId: e2eProfileAcademy.academyId,
+        userId: student.id,
+      },
+    },
+    create: {
+      id: e2eProfileAcademy.membershipId,
+      academyId: e2eProfileAcademy.academyId,
+      userId: student.id,
+      role: "STUDENT",
+      status: "ACTIVE",
+      joinedAt: new Date("2026-08-14T00:00:00.000Z"),
+    },
+    update: {
+      role: "STUDENT",
+      status: "ACTIVE",
+      suspendedAt: null,
+    },
   });
 
   await prisma.course.upsert({

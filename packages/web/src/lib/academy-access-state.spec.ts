@@ -32,6 +32,7 @@ function account(overrides: Partial<AuthMeResponse['user']> = {}): AuthMeRespons
       username: 'cove-user',
       displayName: 'Cove User',
       avatarUrl: null,
+      imageUrl: null,
       platformRole: 'USER',
       status: 'ACTIVE',
       memberships: [],
@@ -56,19 +57,19 @@ function application(status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') 
 describe('resolveAcademyAccessState', () => {
   it('prioritizes an active membership over historical applications', () => {
     const result = resolveAcademyAccessState(account({
-      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE' }],
+      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE', imageUrl: null }],
       applications: [application('APPROVED')],
     }));
 
     expect(result.kind).toBe('active');
     expect(authDestination(account({
-      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE' }],
+      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE', imageUrl: null }],
     }))).toBe(`/studio/academies/${academy.id}`);
   });
 
   it('routes a suspended membership to the pending access surface', () => {
     const input = account({
-      memberships: [{ academy, role: 'STUDENT', status: 'SUSPENDED' }],
+      memberships: [{ academy, role: 'STUDENT', status: 'SUSPENDED', imageUrl: null }],
       applications: [application('APPROVED')],
     });
 
@@ -173,14 +174,14 @@ describe('resolveAcademyAccessState', () => {
 
   it('keeps My Courses as the academy landing destination for a student', () => {
     const destination = authDestination(account({
-      memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE' }],
+      memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null }],
     }));
     expect(destination).toBe(`/studio/academies/${academy.id}/learn/courses`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {
     const input = account({
-      memberships: [{ academy, role: 'MANAGER', status: 'ACTIVE' }],
+      memberships: [{ academy, role: 'MANAGER', status: 'ACTIVE', imageUrl: null }],
     });
     expect(academyRoleFor(input, academy.id)).toBe('MANAGER');
     expect(

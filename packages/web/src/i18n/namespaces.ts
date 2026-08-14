@@ -39,8 +39,18 @@ export const teachingNamespaces = ["teaching", "errors"] as const;
  */
 export const sessionNamespaces = ["session"] as const;
 
+/**
+ * My Page and the manager's member-profile route.
+ *
+ * Its own list rather than a layout namespace: the copy covers six form
+ * sections plus four controlled vocabularies, and every page in the product
+ * would otherwise carry the labels for a form most readers open twice a year.
+ */
+export const profileNamespaces = ["profile", "errors"] as const;
+
 export type PageNamespace =
   | (typeof monitoringNamespaces)[number]
   | (typeof teachNamespaces)[number]
   | (typeof teachingNamespaces)[number]
-  | (typeof sessionNamespaces)[number];
+  | (typeof sessionNamespaces)[number]
+  | (typeof profileNamespaces)[number];

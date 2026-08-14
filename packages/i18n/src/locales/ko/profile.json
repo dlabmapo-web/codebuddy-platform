@@ -1,0 +1,286 @@
+{
+  "title": "마이 페이지",
+  "description": "Cove 계정과 학원별로 보이는 내 모습입니다.",
+  "open": "마이 페이지",
+  "back_to_studio": "스튜디오로 돌아가기",
+  "loading": "프로필을 불러오는 중",
+  "load_failed": "프로필을 불러오지 못했습니다. 페이지를 새로고침해 주세요.",
+  "identity": {
+    "joined": "{{date}} 가입",
+    "also_known_as": "전체 이름: {{name}}",
+    "switch_label": "학원",
+    "switch_hint": "{{count}}개 학원에 속해 있습니다. 선택한 학원만 표시됩니다.",
+    "no_academy_title": "아직 소속 학원이 없습니다",
+    "no_academy_body": "계정, 환경 설정, 로그인 설정은 아래에서 관리할 수 있습니다. 학원 멤버십이 활성화되면 학원 프로필이 여기에 나타납니다.",
+    "unsaved_title": "저장하지 않은 변경 사항",
+    "unsaved_body": "{{section}}에 저장하지 않은 내용이 있습니다. 학원을 바꾸면 사라집니다.",
+    "unsaved_discard": "버리고 전환",
+    "unsaved_stay": "계속 편집"
+  },
+  "image": {
+    "label": "프로필 사진",
+    "alt": "{{name}}의 프로필 사진",
+    "change": "사진 변경",
+    "choose": "사진 선택",
+    "remove": "사진 삭제",
+    "uploading": "업로드 중",
+    "preparing": "사진 준비 중",
+    "crop_preview": "프로필 사진 자르기 미리보기",
+    "crop_controls": "사진 자르기 조절",
+    "zoom": "확대",
+    "horizontal": "좌우",
+    "vertical": "상하",
+    "crop_help": "슬라이더나 방향키로 원 안의 사진 위치를 조절하세요.",
+    "crop_failed": "사진을 준비하지 못했습니다. 다른 이미지를 선택해 주세요.",
+    "hint": "JPEG, PNG, WebP 형식, 5MB 이하. Cove가 정사각형으로 잘라 비공개로 저장합니다.",
+    "source_label": "현재 사진",
+    "source": {
+      "academy": "학원 사진",
+      "global": "Cove 사진",
+      "external": "로그인 계정의 사진",
+      "initials": "이니셜"
+    },
+    "fallback_note": "학원 사진을 삭제하면 Cove 사진이 다시 표시됩니다. Cove 사진이 지워지지는 않습니다."
+  },
+  "owner": {
+    "you": "본인만 수정",
+    "shared": "본인과 학원 관리자",
+    "academy": "학원이 관리",
+    "read_only": "읽기 전용"
+  },
+  "section": {
+    "academy": {
+      "title": "학원 프로필",
+      "description": "{{academy}}에서 보이는 내 모습입니다. 비워 두면 전체 계정 값이 사용됩니다."
+    },
+    "student_details": {
+      "title": "학생 정보",
+      "description": "학원이 학생을 돌보는 데 필요한 학교·연락처 정보입니다. 본인과 학원 관리자만 볼 수 있습니다."
+    },
+    "student_expression": {
+      "title": "만들고 싶은 것",
+      "description": "학생이 직접 쓰는 내용입니다. 관리자는 읽을 수만 있습니다."
+    },
+    "staff": {
+      "title": "강사 프로필",
+      "description": "무엇을 가르치는지, 학원이 어떻게 소개하는지입니다."
+    },
+    "learning": {
+      "title": "반과 코스",
+      "description": "지금 학습 중인 곳입니다."
+    },
+    "teaching": {
+      "title": "담당 반",
+      "description": "현재 담당하고 있는 반입니다."
+    },
+    "authority": {
+      "title": "이 학원에서 할 수 있는 일",
+      "description": "역할에 따라 정해집니다. 이 페이지에서는 바꿀 수 없습니다."
+    },
+    "account": {
+      "title": "계정",
+      "description": "모든 학원에 공통으로 적용되는 이름과 연락처입니다."
+    },
+    "global_photo": {
+      "title": "Cove 프로필 사진",
+      "description": "Cove 전체에서 사용하는 기본 사진입니다. 학원 사진은 해당 학원 안에서만 우선 표시됩니다."
+    },
+    "preferences": {
+      "title": "환경 설정",
+      "description": "Cove가 화면에 표시되는 방식입니다."
+    },
+    "security": {
+      "title": "로그인과 보안",
+      "description": "본인만 변경할 수 있습니다. 학원 관리자는 변경할 수 없습니다."
+    }
+  },
+  "field": {
+    "academy_display_name": "이 학원에서 사용할 이름",
+    "academy_display_name_help": "비워 두면 전체 이름이 사용됩니다.",
+    "academy_contact_phone": "이 학원용 연락처",
+    "academy_contact_phone_help": "로그인 정보가 아닙니다.",
+    "display_name": "표시 이름",
+    "contact_phone": "연락처",
+    "contact_phone_help": "저장만 하며 아직 인증하지는 않습니다.",
+    "email": "로그인 이메일",
+    "username": "아이디",
+    "username_help": "한 번 정하면 바꿀 수 없습니다.",
+    "platform_role": "플랫폼 역할",
+    "date_of_birth": "생년월일",
+    "school_name": "학교",
+    "school_grade": "학년",
+    "school_grade_custom": "직접 입력",
+    "guardian_name": "보호자 이름",
+    "guardian_relationship": "관계",
+    "guardian_phone": "보호자 연락처",
+    "emergency_contact_name": "비상 연락처 이름",
+    "emergency_contact_phone": "비상 연락처 번호",
+    "student_number": "학생 번호",
+    "coding_interests": "관심 분야",
+    "coding_interests_help": "최대 {{count}}개까지 선택할 수 있습니다.",
+    "learning_goal": "배우고 싶은 것",
+    "learning_goal_placeholder": "이루고 싶은 목표를 한 문장으로 적어 주세요.",
+    "bio": "간단한 소개",
+    "bio_placeholder": "학생과 학부모가 읽을 한두 문장을 적어 주세요.",
+    "specialties": "전문 분야",
+    "teaching_languages": "강의 가능 언어",
+    "academy_title": "학원 내 직함",
+    "employee_number": "직원 번호",
+    "preferred_locale": "언어",
+    "theme": "테마",
+    "timezone": "시간대",
+    "timezone_help": "비워 두면 브라우저 설정을 따릅니다.",
+    "timezone_reset": "브라우저 설정 따르기",
+    "role": "역할",
+    "status": "멤버십",
+    "academy": "학원",
+    "none": "설정 안 함",
+    "optional": "선택",
+    "characters_left": "{{count}}자 남음"
+  },
+  "action": {
+    "save": "변경 사항 저장",
+    "saving": "저장 중",
+    "saved": "저장됨",
+    "cancel": "취소",
+    "reload": "현재 값 불러오기",
+    "open_class": "반 열기",
+    "open_course": "코스 열기",
+    "manage_members": "멤버 관리",
+    "manage_classes": "반 관리"
+  },
+  "conflict": {
+    "title": "다른 곳에서 이 항목이 변경되었습니다",
+    "body": "편집하는 동안 학원에서 이 항목을 저장했습니다. 입력한 내용은 그대로 두었습니다. 현재 값을 불러와 확인한 뒤 어느 쪽을 남길지 정해 주세요."
+  },
+  "security": {
+    "password": "비밀번호",
+    "password_set": "이 계정에는 비밀번호가 설정되어 있습니다.",
+  "password_none": "연결된 계정으로 로그인하고 있습니다. 변경할 Cove 비밀번호가 없습니다.",
+  "change_password": "비밀번호 변경",
+  "current_password": "현재 비밀번호",
+  "new_password": "새 비밀번호",
+  "confirm_password": "새 비밀번호 확인",
+  "current_password_required": "현재 비밀번호를 입력해 주세요.",
+  "new_password_required": "새 비밀번호를 입력해 주세요.",
+  "current_password_incorrect": "현재 비밀번호가 올바르지 않습니다.",
+  "password_mismatch": "두 비밀번호가 서로 다릅니다.",
+  "password_too_short": "8자 이상으로 입력해 주세요.",
+  "password_same": "현재 비밀번호와 다른 새 비밀번호를 입력해 주세요.",
+  "password_weak": "보안 요구 사항을 충족하지 않습니다. 더 강한 비밀번호를 사용해 주세요.",
+  "password_rate_limited": "비밀번호 변경 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+  "password_changed": "비밀번호를 변경하고 다른 기기에서 로그아웃했습니다.",
+  "password_sessions_failed": "비밀번호는 변경했지만 다른 기기에서 로그아웃하지 못했습니다. 잠시 후 보안 메뉴에서 다시 시도해 주세요.",
+  "password_failed": "비밀번호를 변경하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.",
+    "email_verified": "인증됨",
+    "email_unverified": "인증 안 됨",
+    "change_email": "로그인 이메일 변경",
+    "new_email": "새 로그인 이메일",
+    "email_sent": "{{email}}으로 보낸 확인 링크를 열어 주세요. 확인 전까지는 기존 주소가 계속 사용됩니다.",
+    "email_failed": "이메일 변경을 시작하지 못했습니다. 다시 시도해 주세요.",
+    "providers": "연결된 계정",
+    "providers_none": "연결된 계정이 없습니다.",
+    "sessions": "활성 세션",
+  "sessions_unavailable": "아직 세션 목록은 지원하지 않습니다. 비밀번호를 변경하면 다른 기기에서 로그아웃됩니다.",
+    "phone_unverified": "연락처를 저장만 하며 아직 인증하지는 않습니다.",
+    "last_sign_in": "마지막 로그인 {{date}}"
+  },
+  "learning": {
+    "class_meta": "코스 {{courses}}개 · 학생 {{students}}명",
+    "course_in": "{{className}} 소속",
+    "classes_empty": "아직 등록된 반이 없습니다.",
+    "courses_empty": "아직 열람할 수 있는 코스가 없습니다.",
+    "teaching_empty": "지금 담당하고 있는 반이 없습니다."
+  },
+  "authority": {
+    "TEAM_LEAD": "커리큘럼을 검토하고 공개하며, 반과 강사 배정을 관리합니다.",
+    "MANAGER": "멤버와 멤버십, 학원 설정을 관리합니다.",
+    "note": "역할과 멤버십 상태는 프로필이 아니라 멤버 관리에서 변경합니다."
+  },
+  "manager": {
+    "title": "멤버 프로필",
+    "description": "{{academy}}의 {{name}} 프로필을 수정합니다. 변경 내용은 감사 로그에 기록됩니다.",
+    "back": "멤버 목록으로",
+    "not_allowed": "이 학원의 활성 관리자만 멤버 프로필을 열 수 있습니다.",
+    "self_note": "본인의 멤버십입니다. 계정과 보안 설정은 마이 페이지에 있습니다.",
+    "ownership_note": "로그인 이메일, 비밀번호, 연결된 계정, 전체 이름은 본인만 변경할 수 있습니다. 이 페이지에서는 바꿀 수 없습니다.",
+    "expression_read_only": "학생이 직접 쓴 내용입니다. 읽을 수만 있습니다.",
+    "open_profile": "프로필 열기"
+  },
+  "role": {
+    "STUDENT": "학생",
+    "TEACHER": "강사",
+    "TEAM_LEAD": "팀 리드",
+    "MANAGER": "관리자"
+  },
+  "membership_status": {
+    "INVITED": "초대됨",
+    "ACTIVE": "활성",
+    "SUSPENDED": "정지",
+    "LEFT": "탈퇴"
+  },
+  "platform_role": {
+    "USER": "일반",
+    "ADMIN": "플랫폼 관리자"
+  },
+  "interest": {
+    "GAME_DEVELOPMENT": "게임",
+    "WEB_DEVELOPMENT": "웹",
+    "APP_DEVELOPMENT": "앱",
+    "ARTIFICIAL_INTELLIGENCE": "인공지능",
+    "DATA_ANALYSIS": "데이터",
+    "ALGORITHMS": "알고리즘",
+    "ROBOTICS": "로봇",
+    "GRAPHICS_AND_DESIGN": "그래픽",
+    "COMPETITIVE_PROGRAMMING": "대회"
+  },
+  "specialty": {
+    "PYTHON": "파이썬",
+    "JAVASCRIPT": "자바스크립트",
+    "SCRATCH": "스크래치",
+    "ALGORITHMS": "알고리즘",
+    "DATA_SCIENCE": "데이터 사이언스",
+    "GAME_DEVELOPMENT": "게임 개발",
+    "WEB_DEVELOPMENT": "웹 개발",
+    "ARTIFICIAL_INTELLIGENCE": "인공지능",
+    "ROBOTICS": "로보틱스"
+  },
+  "teaching_language": {
+    "KO": "한국어",
+    "EN": "영어",
+    "ZH": "중국어",
+    "JA": "일본어",
+    "RU": "러시아어",
+    "UZ": "우즈베크어"
+  },
+  "relationship": {
+    "MOTHER": "어머니",
+    "FATHER": "아버지",
+    "GRANDPARENT": "조부모",
+    "SIBLING": "형제자매",
+    "LEGAL_GUARDIAN": "법정 보호자",
+    "OTHER": "기타"
+  },
+  "theme": {
+    "light": "라이트",
+    "dark": "다크"
+  },
+  "locale": {
+    "en": "영어",
+    "ko": "한국어"
+  },
+  "grade": {
+    "ELEMENTARY_1": "초등 1학년",
+    "ELEMENTARY_2": "초등 2학년",
+    "ELEMENTARY_3": "초등 3학년",
+    "ELEMENTARY_4": "초등 4학년",
+    "ELEMENTARY_5": "초등 5학년",
+    "ELEMENTARY_6": "초등 6학년",
+    "MIDDLE_1": "중등 1학년",
+    "MIDDLE_2": "중등 2학년",
+    "MIDDLE_3": "중등 3학년",
+    "HIGH_1": "고등 1학년",
+    "HIGH_2": "고등 2학년",
+    "HIGH_3": "고등 3학년"
+  }
+}

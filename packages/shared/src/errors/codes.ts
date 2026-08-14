@@ -65,6 +65,14 @@ export const appErrorCodes = [
   "TEACHER_PROGRESS_ACCESS_DENIED",
   "TEACHER_PROGRESS_NOT_FOUND",
   "TEACHER_OVERVIEW_ACCESS_DENIED",
+  "PROFILE_NOT_FOUND",
+  "PROFILE_CHANGED",
+  "PROFILE_VALIDATION_FAILED",
+  "PROFILE_NUMBER_CONFLICT",
+  "PROFILE_IMAGE_TYPE_INVALID",
+  "PROFILE_IMAGE_TOO_LARGE",
+  "PROFILE_IMAGE_DECODE_FAILED",
+  "PROFILE_IMAGE_STORAGE_FAILED",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -162,4 +170,22 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // denial says nothing about which of them exist either.
   TEACHER_OVERVIEW_ACCESS_DENIED:
     "You do not have a teaching overview for this academy.",
+  // One answer for "no such membership", "not yours", and "not in your
+  // academy": a manager must not be able to enumerate another academy's
+  // members by reading which failure comes back.
+  PROFILE_NOT_FOUND: "That profile is not available to you.",
+  // The draft is kept in the browser when this arrives — a student and their
+  // manager can be editing the same row, and neither one should lose work.
+  PROFILE_CHANGED:
+    "This profile changed somewhere else. Reload it before saving again.",
+  PROFILE_VALIDATION_FAILED: "Check the highlighted fields and try again.",
+  // Deliberately silent about who holds the number: uniqueness is academy-
+  // local, and the message must not leak a roster.
+  PROFILE_NUMBER_CONFLICT: "That number is already used in this academy.",
+  PROFILE_IMAGE_TYPE_INVALID: "Choose a JPEG, PNG, or WebP image.",
+  PROFILE_IMAGE_TOO_LARGE: "Choose an image smaller than 5 MB.",
+  PROFILE_IMAGE_DECODE_FAILED: "That image could not be read. Try another file.",
+  // The previous photo is still in place when this arrives; nothing was lost.
+  PROFILE_IMAGE_STORAGE_FAILED:
+    "The image could not be saved. Your previous photo is unchanged.",
 };

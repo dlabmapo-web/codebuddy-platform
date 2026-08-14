@@ -39,6 +39,12 @@ export async function StudioShell({
 }) {
   let academies: StudioAcademy[] = [];
   let role = null;
+  let viewer: {
+    academyImageUrl: string | null;
+    imageUrl: string | null;
+    avatarUrl: string | null;
+    name: string | null;
+  } | null = null;
   try {
     const account = await createServerORPCClient().auth.me({});
     const active = account.user.memberships.filter(
@@ -49,8 +55,18 @@ export async function StudioShell({
       name: membership.academy.name,
       role: membership.role,
     }));
-    role = active.find((membership) => membership.academy.id === academyId)?.role
-      ?? null;
+    const selectedMembership = active.find(
+      (membership) => membership.academy.id === academyId,
+    );
+    role = selectedMembership?.role ?? null;
+    // Feeds the header's way into My Page. The name is only for the initials
+    // fallback, so the global one is right even inside an academy.
+    viewer = {
+      academyImageUrl: selectedMembership?.imageUrl ?? null,
+      imageUrl: account.user.imageUrl,
+      avatarUrl: account.user.avatarUrl,
+      name: account.user.displayName ?? account.user.username,
+    };
   } catch {
     redirect('/auth/login');
   }
@@ -77,7 +93,7 @@ export async function StudioShell({
           </span>
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
-          <HeaderControls className="ml-auto" />
+          <HeaderControls account={viewer ?? undefined} className="ml-auto" />
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">

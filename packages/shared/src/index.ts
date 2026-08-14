@@ -6,3 +6,4 @@ export * from "./errors/index.js";
 export * from "./health.js";
 export * from "./memberships/index.js";
 export * from "./monitoring/index.js";
+export * from "./profile/index.js";

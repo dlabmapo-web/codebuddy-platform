@@ -25,6 +25,23 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   );
 }
 
+/* --------------------------------------------------------------- textarea */
+
+function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
+  return (
+    <textarea
+      className={cn(
+        'min-h-24 w-full min-w-0 resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-[14px] leading-[1.6] text-ink outline-none transition-colors placeholder:text-sub/60',
+        'focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        className,
+      )}
+      data-slot="textarea"
+      {...props}
+    />
+  );
+}
+
 /* -------------------------------------------------------------- separator */
 
 function Separator({
@@ -205,6 +222,7 @@ export {
   Sheet,
   SheetContent,
   Skeleton,
+  Textarea,
   Tooltip,
   TooltipContent,
   TooltipProvider,

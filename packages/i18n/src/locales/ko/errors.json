@@ -63,5 +63,13 @@
   "TEACHER_PROGRESS_ACCESS_DENIED": "이 반의 담당 강사가 아닙니다.",
   "TEACHER_PROGRESS_NOT_FOUND": "이 반에서 더 이상 볼 수 없는 항목입니다.",
   "TEACHER_OVERVIEW_ACCESS_DENIED": "이 학원의 수업 현황을 볼 수 있는 권한이 없습니다.",
+  "PROFILE_NOT_FOUND": "해당 프로필에 접근할 수 없습니다.",
+  "PROFILE_CHANGED": "다른 곳에서 이 프로필이 변경되었습니다. 다시 불러온 뒤 저장해 주세요.",
+  "PROFILE_VALIDATION_FAILED": "표시된 항목을 확인한 뒤 다시 시도해 주세요.",
+  "PROFILE_NUMBER_CONFLICT": "이 학원에서 이미 사용 중인 번호입니다.",
+  "PROFILE_IMAGE_TYPE_INVALID": "JPEG, PNG 또는 WebP 이미지를 선택해 주세요.",
+  "PROFILE_IMAGE_TOO_LARGE": "5MB보다 작은 이미지를 선택해 주세요.",
+  "PROFILE_IMAGE_DECODE_FAILED": "이미지를 읽을 수 없습니다. 다른 파일을 선택해 주세요.",
+  "PROFILE_IMAGE_STORAGE_FAILED": "이미지를 저장하지 못했습니다. 기존 사진은 그대로 유지됩니다.",
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요."
 }

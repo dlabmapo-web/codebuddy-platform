@@ -7,7 +7,8 @@
   },
   "action": {
     "suspend": "Suspend",
-    "restore": "Restore"
+    "restore": "Restore",
+    "profile": "Profile"
   },
   "search_placeholder": "Search by name or email",
   "empty": "No members yet. Invite someone to get started.",

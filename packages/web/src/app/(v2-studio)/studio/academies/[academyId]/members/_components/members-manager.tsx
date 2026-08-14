@@ -32,7 +32,7 @@ export function MembersManager({ academyId }: { academyId: string }) {
 
   return (
     <div className="space-y-3">
-      <MembersTable manager={manager} />
+      <MembersTable academyId={academyId} manager={manager} />
       {manager.updateError ? (
         <p className="rounded-lg border border-danger/25 bg-danger/5 px-4 py-3 text-[13.5px] text-danger">
           {errorText(manager.updateError, t('update_failed'))}

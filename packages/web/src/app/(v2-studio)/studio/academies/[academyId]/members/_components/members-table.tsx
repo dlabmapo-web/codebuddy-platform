@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { academyRoles, membershipStatuses } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
@@ -13,8 +14,10 @@ import type {
 } from '../_hooks/use-members-manager';
 
 export function MembersTable({
+  academyId,
   manager,
 }: {
+  academyId: string;
   manager: MembersManagerState;
 }) {
   const { t } = useLayoutTranslation(['members', 'common']);
@@ -80,15 +83,27 @@ export function MembersTable({
           const member = row.original;
           if (member.status === 'ACTIVE') {
             return (
-              <Button
-                className="hover:border-danger hover:text-danger"
-                disabled={manager.updatePending}
-                onClick={() => manager.suspend(member.id)}
-                size="sm"
-                variant="outline"
-              >
-                {t('action.suspend')}
-              </Button>
+              <div className="flex justify-end gap-2">
+                {/* Only for an active membership: a suspended or departed one
+                    stays readable in this table and is not editable, which is
+                    exactly what the profile endpoint answers too. */}
+                <Button asChild size="sm" variant="ghost">
+                  <Link
+                    href={`/studio/academies/${academyId}/members/${member.id}/profile`}
+                  >
+                    {t('action.profile')}
+                  </Link>
+                </Button>
+                <Button
+                  className="hover:border-danger hover:text-danger"
+                  disabled={manager.updatePending}
+                  onClick={() => manager.suspend(member.id)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {t('action.suspend')}
+                </Button>
+              </div>
             );
           }
           if (member.status === 'SUSPENDED') {
@@ -110,7 +125,7 @@ export function MembersTable({
         },
       },
     ],
-    [manager, t],
+    [academyId, manager, t],
   );
 
   const facets = useMemo(

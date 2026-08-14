@@ -2,8 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import type { ProfileMediaService } from "../profile/profile-media.service.js";
 import { AuthService } from "./auth.service.js";
 import type { SupabaseIdentity } from "./auth.types.js";
+
+/**
+ * No account in these fixtures holds a Cove image, so signing is never
+ * reached. The stub exists to satisfy the constructor, not to be exercised.
+ */
+const media = {} as ProfileMediaService;
 
 const academyId = "20000000-0000-4000-8000-000000000001";
 const authUserId = "90000000-0000-4000-8000-000000000001";
@@ -83,7 +90,7 @@ function createCompletionService(provider = "google") {
   return {
     prisma,
     transaction,
-    service: new AuthService(prisma, onboarding),
+    service: new AuthService(prisma, onboarding, media),
   };
 }
 
@@ -115,7 +122,7 @@ describe("AuthService.bootstrap username claim", () => {
     const onboarding = {
       ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
     } as unknown as AcademyOnboardingService;
-    return { create, update, service: new AuthService(prisma, onboarding) };
+    return { create, update, service: new AuthService(prisma, onboarding, media) };
   }
 
   it("stores the signup username on the new profile", async () => {
@@ -180,7 +187,7 @@ describe("AuthService.bootstrap username claim", () => {
       ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
     } as unknown as AcademyOnboardingService;
 
-    const result = await new AuthService(prisma, onboarding).bootstrap({
+    const result = await new AuthService(prisma, onboarding, media).bootstrap({
       ...identity,
       username: "somebody-else",
     });
@@ -191,13 +198,65 @@ describe("AuthService.bootstrap username claim", () => {
   });
 });
 
+describe("AuthService.me profile images", () => {
+  it("returns global and academy image URLs in one signed batch", async () => {
+    const globalAsset = {
+      id: "global-asset",
+      bucket: "profile-images",
+      objectKey: "global/user/global-asset.webp",
+    };
+    const academyAsset = {
+      id: "academy-asset",
+      bucket: "profile-images",
+      objectKey: "academy/a/member/academy-asset.webp",
+    };
+    const record = {
+      ...userRecord(),
+      avatarAsset: globalAsset,
+      memberships: [{
+        academy: {
+          id: academyId,
+          name: "Cove Academy",
+          slug: "cove-academy",
+        },
+        role: "MANAGER",
+        status: "ACTIVE",
+        memberProfile: {
+          avatarAssetId: academyAsset.id,
+          avatarAsset: academyAsset,
+        },
+      }],
+    };
+    const prisma = {
+      user: { findUnique: vi.fn().mockResolvedValue(record) },
+    } as unknown as PrismaService;
+    const signMany = vi.fn().mockResolvedValue([
+      { assetId: globalAsset.id, url: "https://images.test/global", expiresAt: "later" },
+      { assetId: academyAsset.id, url: "https://images.test/academy", expiresAt: "later" },
+    ]);
+    const service = new AuthService(
+      prisma,
+      {} as AcademyOnboardingService,
+      { signMany } as unknown as ProfileMediaService,
+    );
+
+    const result = await service.me(identity);
+
+    expect(signMany).toHaveBeenCalledOnce();
+    expect(result.user.imageUrl).toBe("https://images.test/global");
+    expect(result.user.memberships[0]?.imageUrl).toBe(
+      "https://images.test/academy",
+    );
+  });
+});
+
 describe("AuthService.resolveSignInEmail", () => {
   function service(owner: { email: string | null } | null) {
     const findUnique = vi.fn().mockResolvedValue(owner);
     const prisma = { user: { findUnique } } as unknown as PrismaService;
     return {
       findUnique,
-      service: new AuthService(prisma, {} as AcademyOnboardingService),
+      service: new AuthService(prisma, {} as AcademyOnboardingService, media),
     };
   }
 
@@ -253,7 +312,7 @@ describe("AuthService.setUsername", () => {
     } as unknown as PrismaService;
     return {
       update,
-      service: new AuthService(prisma, {} as AcademyOnboardingService),
+      service: new AuthService(prisma, {} as AcademyOnboardingService, media),
     };
   }
 
@@ -301,7 +360,7 @@ describe("AuthService.completeOAuthOnboarding", () => {
     const prisma = {
       user: { findUnique: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
-    const service = new AuthService(prisma, {} as AcademyOnboardingService);
+    const service = new AuthService(prisma, {} as AcademyOnboardingService, media);
 
     await expect(service.completeOAuthOnboarding(identity)).rejects.toMatchObject({
       code: "OAUTH_ONBOARDING_INTENT_REQUIRED",

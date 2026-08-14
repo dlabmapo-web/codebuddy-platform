@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-14
 
-**Status:** Draft for review
+**Status:** Implemented for the first-release scope. Phone verification,
+connected-provider management, and session listing/revocation remain the
+explicitly deferred capabilities described in §17.
 
 **Scope:** A role-aware My Page for all Cove Studio users, academy-scoped
 student and staff profiles, manager editing, account security entry points, and
@@ -653,6 +655,10 @@ values.
 - Password changes require the correct current password, a valid new password,
   and matching confirmation; success revokes other sessions and preserves the
   current one.
+- Every deployed Supabase Auth project enables **Require current password**
+  (`GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD`). The web client
+  supplies `current_password`; without that provider setting, the UI must not
+  be considered production-ready even though the request field is present.
 - Wrong-current-password, weak-password, rate-limit, and network failures use
   localized, actionable messages and never expose credential values.
 - Image selection, crop, progress, removal, and fallback are keyboard and screen

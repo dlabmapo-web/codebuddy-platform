@@ -7,7 +7,8 @@
   },
   "action": {
     "suspend": "정지",
-    "restore": "복구"
+    "restore": "복구",
+    "profile": "프로필"
   },
   "search_placeholder": "이름 또는 이메일로 검색",
   "empty": "아직 멤버가 없습니다. 먼저 누군가를 초대해 보세요.",

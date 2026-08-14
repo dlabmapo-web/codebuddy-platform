@@ -29,6 +29,21 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {
+      name: 'webkit-my-page',
+      testMatch: /my-page\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'firefox-my-page',
+      testMatch: /my-page\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'mobile-my-page',
+      testMatch: /my-page\.spec\.ts/,
+      use: { ...devices['Pixel 7'] },
+    },
+    {
       // The curriculum dock changes the containing block for a percentage-
       // sized split pane. Safari has historically resolved flex percentages
       // differently here, so the reported student layout stays covered by

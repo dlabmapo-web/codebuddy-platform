@@ -22,6 +22,8 @@ export const academyMembershipSummarySchema = z.object({
   academy: academySummarySchema,
   role: academyRoleSchema,
   status: z.enum(["INVITED", "ACTIVE", "SUSPENDED", "LEFT"]),
+  /** Signed academy-scoped avatar URL for the current viewer. */
+  imageUrl: z.string().nullable(),
 });
 
 export const authUserSchema = z.object({
@@ -31,6 +33,13 @@ export const authUserSchema = z.object({
   username: z.string().nullable(),
   displayName: z.string().nullable(),
   avatarUrl: z.url().nullable(),
+  /**
+   * The Cove-owned profile image, as a short-lived signed URL, or null when
+   * the account has none. Present here so the header avatar on every studio
+   * page shows the picture the person actually uploaded rather than the
+   * external one they never chose.
+   */
+  imageUrl: z.string().nullable(),
   platformRole: platformRoleSchema,
   status: userStatusSchema,
   memberships: z.array(academyMembershipSummarySchema),

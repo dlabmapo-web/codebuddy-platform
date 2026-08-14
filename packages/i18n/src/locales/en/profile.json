@@ -1,0 +1,286 @@
+{
+  "title": "My page",
+  "description": "Your Cove account, and how you appear in each academy.",
+  "open": "My page",
+  "back_to_studio": "Back to Studio",
+  "loading": "Loading your profile",
+  "load_failed": "Your profile could not be loaded. Reload the page to try again.",
+  "identity": {
+    "joined": "Joined {{date}}",
+    "also_known_as": "Known globally as {{name}}",
+    "switch_label": "Academy",
+    "switch_hint": "You belong to {{count}} academies. Only the one you choose is shown.",
+    "no_academy_title": "No academy yet",
+    "no_academy_body": "Your account, preferences, and sign-in settings are below. An academy profile appears here once a membership is active.",
+    "unsaved_title": "Unsaved changes",
+    "unsaved_body": "You have edits in {{section}} that are not saved. Switching academy discards them.",
+    "unsaved_discard": "Discard and switch",
+    "unsaved_stay": "Keep editing"
+  },
+  "image": {
+    "label": "Profile photo",
+    "alt": "Profile photo of {{name}}",
+    "change": "Change photo",
+    "choose": "Choose a photo",
+    "remove": "Remove photo",
+    "uploading": "Uploading",
+    "preparing": "Preparing photo",
+    "crop_preview": "Profile photo crop preview",
+    "crop_controls": "Photo crop controls",
+    "zoom": "Zoom",
+    "horizontal": "Left / right",
+    "vertical": "Up / down",
+    "crop_help": "Use the sliders or arrow keys to position the photo inside the circle.",
+    "crop_failed": "Cove could not prepare this photo. Try a different image.",
+    "hint": "JPEG, PNG, or WebP, up to 5 MB. Cove crops it to a square and stores it privately.",
+    "source_label": "Showing",
+    "source": {
+      "academy": "Academy photo",
+      "global": "Cove photo",
+      "external": "Photo from your sign-in provider",
+      "initials": "Your initials"
+    },
+    "fallback_note": "Removing the academy photo reveals your Cove photo again. It does not delete it."
+  },
+  "owner": {
+    "you": "You control this",
+    "shared": "You and academy staff",
+    "academy": "The academy maintains this",
+    "read_only": "Read only"
+  },
+  "section": {
+    "academy": {
+      "title": "Academy profile",
+      "description": "How you appear inside {{academy}}. Leave a field empty to use your global value."
+    },
+    "student_details": {
+      "title": "Student details",
+      "description": "School and contact information the academy needs to look after you. Only you and academy managers can read it."
+    },
+    "student_expression": {
+      "title": "What you want to build",
+      "description": "Your own words. Managers can read this and cannot change it."
+    },
+    "staff": {
+      "title": "Teaching profile",
+      "description": "What you teach, and how the academy introduces you."
+    },
+    "learning": {
+      "title": "Classes and courses",
+      "description": "Where you are learning right now."
+    },
+    "teaching": {
+      "title": "Classes you teach",
+      "description": "The classes you are currently responsible for."
+    },
+    "authority": {
+      "title": "What you can do here",
+      "description": "Your role decides this. It is not changed from this page."
+    },
+    "account": {
+      "title": "Account",
+      "description": "Your name and contact details across every academy."
+    },
+    "global_photo": {
+      "title": "Cove profile photo",
+      "description": "Your default photo across Cove. Academy photos override it only inside that academy."
+    },
+    "preferences": {
+      "title": "Preferences",
+      "description": "How Cove presents itself to you."
+    },
+    "security": {
+      "title": "Sign-in and security",
+      "description": "Only you can change these. No academy manager can."
+    }
+  },
+  "field": {
+    "academy_display_name": "Name in this academy",
+    "academy_display_name_help": "Empty means your global name is used.",
+    "academy_contact_phone": "Contact number for this academy",
+    "academy_contact_phone_help": "Not a sign-in credential.",
+    "display_name": "Display name",
+    "contact_phone": "Contact phone",
+    "contact_phone_help": "Cove stores this and does not verify it yet.",
+    "email": "Sign-in email",
+    "username": "Username",
+    "username_help": "Chosen once, and permanent.",
+    "platform_role": "Platform role",
+    "date_of_birth": "Date of birth",
+    "school_name": "School",
+    "school_grade": "Year or grade",
+    "school_grade_custom": "Something else",
+    "guardian_name": "Guardian's name",
+    "guardian_relationship": "Relationship",
+    "guardian_phone": "Guardian's phone",
+    "emergency_contact_name": "Emergency contact",
+    "emergency_contact_phone": "Emergency phone",
+    "student_number": "Student number",
+    "coding_interests": "Coding interests",
+    "coding_interests_help": "Choose up to {{count}}.",
+    "learning_goal": "What I want to learn",
+    "learning_goal_placeholder": "One sentence about what you are working towards.",
+    "bio": "Short introduction",
+    "bio_placeholder": "A sentence or two students and parents will read.",
+    "specialties": "Specialties",
+    "teaching_languages": "Teaching languages",
+    "academy_title": "Title at this academy",
+    "employee_number": "Employee number",
+    "preferred_locale": "Language",
+    "theme": "Theme",
+    "timezone": "Time zone",
+    "timezone_help": "Empty means Cove follows your browser.",
+    "timezone_reset": "Follow my browser",
+    "role": "Role",
+    "status": "Membership",
+    "academy": "Academy",
+    "none": "Not set",
+    "optional": "Optional",
+    "characters_left": "{{count}} characters left"
+  },
+  "action": {
+    "save": "Save changes",
+    "saving": "Saving",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "reload": "Load current values",
+    "open_class": "Open class",
+    "open_course": "Open course",
+    "manage_members": "Manage members",
+    "manage_classes": "Manage classes"
+  },
+  "conflict": {
+    "title": "This section changed somewhere else",
+    "body": "Someone at the academy saved this section while you were editing. Your draft is kept. Load the current values to see theirs, then decide what to keep."
+  },
+  "security": {
+    "password": "Password",
+    "password_set": "A password is set for this account.",
+  "password_none": "You sign in with a connected account. There is no Cove password to change.",
+  "change_password": "Change password",
+  "current_password": "Current password",
+  "new_password": "New password",
+  "confirm_password": "Confirm new password",
+  "current_password_required": "Enter your current password.",
+  "new_password_required": "Enter a new password.",
+  "current_password_incorrect": "The current password is incorrect.",
+  "password_mismatch": "The two passwords do not match.",
+  "password_too_short": "Use at least 8 characters.",
+  "password_same": "Choose a new password that is different from your current password.",
+  "password_weak": "That password does not meet the security requirements. Choose a stronger password.",
+  "password_rate_limited": "Too many password attempts. Wait a moment and try again.",
+  "password_changed": "Password changed. Other devices have been signed out.",
+  "password_sessions_failed": "Password changed, but Cove could not sign out other devices. Try again later from Security.",
+  "password_failed": "The password could not be changed. Sign in again and retry.",
+    "email_verified": "Verified",
+    "email_unverified": "Not verified",
+    "change_email": "Change sign-in email",
+    "new_email": "New sign-in email",
+    "email_sent": "Check {{email}} for a confirmation link. Your current address keeps working until you confirm.",
+    "email_failed": "The email change could not be started. Try again.",
+    "providers": "Connected accounts",
+    "providers_none": "No connected accounts.",
+    "sessions": "Active sessions",
+  "sessions_unavailable": "Cove does not yet list sessions. Changing your password signs out other devices.",
+    "phone_unverified": "Cove stores your contact number but does not verify it yet.",
+    "last_sign_in": "Last signed in {{date}}"
+  },
+  "learning": {
+    "class_meta": "{{courses}} courses · {{students}} students",
+    "course_in": "In {{className}}",
+    "classes_empty": "You are not enrolled in a class yet.",
+    "courses_empty": "No courses are open to you yet.",
+    "teaching_empty": "No classes are assigned to you right now."
+  },
+  "authority": {
+    "TEAM_LEAD": "You review and publish curriculum, and you run classes and teacher assignments.",
+    "MANAGER": "You manage members, memberships, and academy settings.",
+    "note": "Roles and membership status are changed from member management, never from a profile."
+  },
+  "manager": {
+    "title": "Member profile",
+    "description": "Correct {{name}}'s profile for {{academy}}. Changes are recorded in the audit log.",
+    "back": "Back to members",
+    "not_allowed": "Only an active manager of this academy can open a member profile.",
+    "self_note": "This is your own membership. Your account and security settings live on My page.",
+    "ownership_note": "Sign-in email, password, connected accounts, and the person's global name are theirs alone. This page cannot change them.",
+    "expression_read_only": "The student wrote this. You can read it and cannot change it.",
+    "open_profile": "Open profile"
+  },
+  "role": {
+    "STUDENT": "Student",
+    "TEACHER": "Teacher",
+    "TEAM_LEAD": "Team lead",
+    "MANAGER": "Manager"
+  },
+  "membership_status": {
+    "INVITED": "Invited",
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "LEFT": "Left"
+  },
+  "platform_role": {
+    "USER": "Member",
+    "ADMIN": "Platform admin"
+  },
+  "interest": {
+    "GAME_DEVELOPMENT": "Games",
+    "WEB_DEVELOPMENT": "Websites",
+    "APP_DEVELOPMENT": "Apps",
+    "ARTIFICIAL_INTELLIGENCE": "AI",
+    "DATA_ANALYSIS": "Data",
+    "ALGORITHMS": "Algorithms",
+    "ROBOTICS": "Robotics",
+    "GRAPHICS_AND_DESIGN": "Graphics",
+    "COMPETITIVE_PROGRAMMING": "Contests"
+  },
+  "specialty": {
+    "PYTHON": "Python",
+    "JAVASCRIPT": "JavaScript",
+    "SCRATCH": "Scratch",
+    "ALGORITHMS": "Algorithms",
+    "DATA_SCIENCE": "Data science",
+    "GAME_DEVELOPMENT": "Game development",
+    "WEB_DEVELOPMENT": "Web development",
+    "ARTIFICIAL_INTELLIGENCE": "AI",
+    "ROBOTICS": "Robotics"
+  },
+  "teaching_language": {
+    "KO": "Korean",
+    "EN": "English",
+    "ZH": "Chinese",
+    "JA": "Japanese",
+    "RU": "Russian",
+    "UZ": "Uzbek"
+  },
+  "relationship": {
+    "MOTHER": "Mother",
+    "FATHER": "Father",
+    "GRANDPARENT": "Grandparent",
+    "SIBLING": "Sibling",
+    "LEGAL_GUARDIAN": "Legal guardian",
+    "OTHER": "Other"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "locale": {
+    "en": "English",
+    "ko": "Korean"
+  },
+  "grade": {
+    "ELEMENTARY_1": "Elementary 1",
+    "ELEMENTARY_2": "Elementary 2",
+    "ELEMENTARY_3": "Elementary 3",
+    "ELEMENTARY_4": "Elementary 4",
+    "ELEMENTARY_5": "Elementary 5",
+    "ELEMENTARY_6": "Elementary 6",
+    "MIDDLE_1": "Middle 1",
+    "MIDDLE_2": "Middle 2",
+    "MIDDLE_3": "Middle 3",
+    "HIGH_1": "High 1",
+    "HIGH_2": "High 2",
+    "HIGH_3": "High 3"
+  }
+}

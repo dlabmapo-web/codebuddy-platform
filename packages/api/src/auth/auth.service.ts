@@ -7,6 +7,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 import type { SupabaseIdentity } from "./auth.types.js";
 import { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import { hashOAuthOnboardingToken } from "./oauth-onboarding-intent.service.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 
 /**
  * Returned for a username nobody holds. `.invalid` is reserved by RFC 2606 and
@@ -18,8 +19,12 @@ import { hashOAuthOnboardingToken } from "./oauth-onboarding-intent.service.js";
 const unresolvedEmailDomain = "unresolved.invalid";
 
 const userInclude = {
+  avatarAsset: true,
   memberships: {
-    include: { academy: true },
+    include: {
+      academy: true,
+      memberProfile: { include: { avatarAsset: true } },
+    },
     orderBy: { createdAt: "asc" as const },
   },
   joinRequests: {
@@ -33,6 +38,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly onboarding: AcademyOnboardingService,
+    private readonly media: ProfileMediaService,
   ) {}
 
   async bootstrap(identity: SupabaseIdentity): Promise<AuthMeResponse> {
@@ -64,7 +70,7 @@ export class AuthService {
         identity.requestedAcademyId,
         identity.emailVerified,
       );
-      return toAuthMe(await this.requireUser(updated.id));
+      return this.present(await this.requireUser(updated.id));
     }
 
     if (identity.email) {
@@ -84,7 +90,7 @@ export class AuthService {
       identity.requestedAcademyId,
       identity.emailVerified,
     );
-    return toAuthMe(await this.requireUser(created.id));
+    return this.present(await this.requireUser(created.id));
   }
 
   async completeOAuthOnboarding(
@@ -240,7 +246,7 @@ export class AuthService {
       return user.id;
     });
 
-    return toAuthMe(await this.requireUser(userId));
+    return this.present(await this.requireUser(userId));
   }
 
   /**
@@ -355,7 +361,43 @@ export class AuthService {
       throw new AppException("USERNAME_TAKEN", HttpStatus.CONFLICT);
     }
 
-    return toAuthMe(await this.requireUser(user.id));
+    return this.present(await this.requireUser(user.id));
+  }
+
+  /**
+   * One response shape, one place that mints the avatar URL.
+   *
+   * The signing call is skipped entirely for an account with no Cove image,
+   * which is every account until someone uploads one — so the common path
+   * costs nothing and only a person who chose a photo pays for it.
+   */
+  private async present(user: AuthUserRecord): Promise<AuthMeResponse> {
+    const assets = [
+      user.avatarAsset,
+      ...user.memberships.map(
+        (membership) => membership.status === "ACTIVE"
+          ? membership.memberProfile?.avatarAsset ?? null
+          : null,
+      ),
+    ].filter((asset) => asset !== null && asset !== undefined);
+    if (assets.length === 0) return toAuthMe(user);
+
+    // One storage request for the global photo and every academy override.
+    // The header can then choose the current academy without an extra profile
+    // query (which also loads classes and courses).
+    const signed = await this.media.signMany(
+      assets.map((asset) => ({
+        id: asset.id,
+        bucket: asset.bucket,
+        objectKey: asset.objectKey,
+      })),
+    );
+    const urls = new Map(signed.map((image) => [image.assetId, image.url]));
+    return toAuthMe(
+      user,
+      user.avatarAsset ? urls.get(user.avatarAsset.id) ?? null : null,
+      urls,
+    );
   }
 
   private async requireUser(id: string): Promise<AuthUserRecord> {
@@ -380,7 +422,7 @@ export class AuthService {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }
 
-    return toAuthMe(user);
+    return this.present(user);
   }
 }
 
@@ -409,7 +451,11 @@ function isUsernameConflict(error: unknown): boolean {
   );
 }
 
-function toAuthMe(user: AuthUserRecord): AuthMeResponse {
+function toAuthMe(
+  user: AuthUserRecord,
+  imageUrl: string | null = null,
+  imageUrls: ReadonlyMap<string, string> = new Map(),
+): AuthMeResponse {
   return authMeResponseSchema.parse({
     user: {
       id: user.id,
@@ -418,6 +464,7 @@ function toAuthMe(user: AuthUserRecord): AuthMeResponse {
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      imageUrl,
       platformRole: user.platformRole,
       status: user.status,
       memberships: user.memberships.map((membership) => ({
@@ -428,6 +475,9 @@ function toAuthMe(user: AuthUserRecord): AuthMeResponse {
         },
         role: membership.role,
         status: membership.status,
+        imageUrl: membership.memberProfile?.avatarAssetId
+          ? imageUrls.get(membership.memberProfile.avatarAssetId) ?? null
+          : null,
       })),
       applications: user.joinRequests.map((request) => ({
         id: request.id,

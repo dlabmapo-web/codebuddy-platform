@@ -28,6 +28,9 @@ import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
+import { AcademyProfileService } from "../profile/academy-profile.service.js";
+import { ProfileService } from "../profile/profile.service.js";
+import { createProfileRouters } from "../profile/profile.router.js";
 import { TeacherOverviewService } from "../teach/teacher-overview.service.js";
 import { createAcademyTeacherOverviewRouter } from "../teach/teacher-overview.router.js";
 import { TeacherStudentsService } from "../teach/teacher-students.service.js";
@@ -66,6 +69,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     learnService: app.get(LearnService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
     monitoringService: app.get(MonitoringService, { strict: false }),
+    profileService: app.get(ProfileService, { strict: false }),
+    academyProfileService: app.get(AcademyProfileService, { strict: false }),
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
     teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
@@ -99,12 +104,14 @@ function createORPCRouter(deps: ORPCDeps) {
   const academyRouters = createAcademiesRouters(os, deps);
   const contentRouters = createContentRouters(os, deps);
   const classesRouters = createClassesRouters(os, deps);
+  const profileRouters = createProfileRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
     ...academyRouters,
     ...contentRouters,
     ...classesRouters,
+    ...profileRouters,
     learn: createLearnRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),

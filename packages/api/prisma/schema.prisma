@@ -133,6 +133,26 @@ enum CaseOutcome {
   SKIPPED
 }
 
+/// What a stored image is *for*. The purpose decides which relation may own
+/// the asset and which authorization rule delivers it, so it is an enum rather
+/// than a free string: a typo must not silently create a fourth category that
+/// no read rule covers.
+enum MediaAssetPurpose {
+  USER_AVATAR
+  ACADEMY_MEMBER_AVATAR
+}
+
+/// How a guardian relates to a student. `OTHER` exists so the alternative is
+/// not a free-text column that quietly collects names and phone numbers.
+enum GuardianRelationship {
+  MOTHER
+  FATHER
+  GRANDPARENT
+  SIBLING
+  LEGAL_GUARDIAN
+  OTHER
+}
+
 enum ExerciseProgressStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -147,7 +167,21 @@ model User {
   /// handle. Null for accounts that arrived through OAuth or predate it.
   username           String?      @unique
   displayName        String?      @map("display_name")
+  /// The external OAuth photo, kept as a fallback only. Once a Cove image
+  /// exists, `avatarAssetId` is authoritative and this is never consulted.
+  /// A signed delivery URL is never written here — it would outlive the
+  /// authorization that produced it.
   avatarUrl          String?      @map("avatar_url")
+  /// The Cove-owned, privately stored profile image.
+  avatarAssetId      String?      @map("avatar_asset_id") @db.Uuid
+  /// Not a sign-in credential. Stored in canonical international form; the
+  /// client formats it for the reader's locale.
+  contactPhone       String?      @map("contact_phone")
+  /// The locale the account reads Cove in, independent of any academy.
+  preferredLocale    String       @default("ko") @map("preferred_locale")
+  /// An IANA zone name. Null means "follow the browser", which is the right
+  /// default for a student who has never thought about it.
+  timezone           String?
   platformRole       PlatformRole @default(USER) @map("platform_role")
   status             UserStatus   @default(PENDING_PROFILE)
   legacyUserId       String?      @unique @map("legacy_user_id")
@@ -174,9 +208,129 @@ model User {
   submissions           Submission[]
   exerciseProgress      StudentExerciseProgress[]
   solveSessions         ExerciseSolveSession[]
+  avatarAsset           MediaAsset?               @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  mediaUploaded         MediaAsset[]              @relation("MediaUploader")
 
   @@index([status])
   @@map("users")
+}
+
+/// One stored object in the private profile-image bucket.
+///
+/// The row is metadata and ownership; the bytes live in Supabase Storage and
+/// the delivery URL is minted per request. `uploaderUserId` records who
+/// performed the upload and decides nothing about who may view it — a manager
+/// who uploads a student's photo does not thereby own it, and the student does
+/// not lose it when that manager leaves.
+model MediaAsset {
+  id             String            @id @default(uuid()) @db.Uuid
+  bucket         String
+  /// Immutable, and scoped by business identity. Replacing a photo writes a
+  /// new object and repoints the relation; it never overwrites in place, so a
+  /// failed upload cannot destroy the picture already on the profile.
+  objectKey      String            @unique @map("object_key")
+  purpose        MediaAssetPurpose
+  uploaderUserId String            @map("uploader_user_id") @db.Uuid
+  contentType    String            @map("content_type")
+  sizeBytes      Int               @map("size_bytes")
+  width          Int
+  height         Int
+  checksumSha256 String            @map("checksum_sha256")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Set when a newer asset replaced this one. Cleanup deletes the object
+  /// after the grace period, so a transient failure stays recoverable.
+  supersededAt   DateTime?         @map("superseded_at") @db.Timestamptz(6)
+  deletedAt      DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  uploader      User                   @relation("MediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  userAvatars   User[]                 @relation("UserAvatar")
+  memberAvatars AcademyMemberProfile[] @relation("AcademyMemberAvatar")
+
+  /// The cleanup sweep: superseded and orphaned objects, oldest first.
+  @@index([supersededAt, createdAt])
+  @@index([purpose, createdAt])
+  @@map("media_assets")
+}
+
+/// The academy-scoped presentation of one member, whatever their role.
+///
+/// Keyed by membership rather than user, which is the boundary the whole
+/// feature rests on: one account can be a student in Mapo and a teacher in
+/// Gangnam, and neither academy's manager may edit the other's view of them.
+/// Every field here is an *override* — a null reveals the global value rather
+/// than blanking it.
+model AcademyMemberProfile {
+  membershipId       String   @id @map("membership_id") @db.Uuid
+  academyDisplayName String?  @map("academy_display_name")
+  avatarAssetId      String?  @map("avatar_asset_id") @db.Uuid
+  contactPhone       String?  @map("contact_phone")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  membership  AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  avatarAsset MediaAsset?       @relation("AcademyMemberAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+
+  @@map("academy_member_profiles")
+}
+
+/// A student's academy record.
+///
+/// Created lazily on first edit, and never deleted by a role change: a member
+/// promoted to teacher and later corrected back must not have lost their
+/// guardian details in between. Endpoints return only the shape matching the
+/// membership's current role, so a stale row is invisible until it is relevant
+/// again.
+model StudentAcademyProfile {
+  membershipId          String                @id @map("membership_id") @db.Uuid
+  /// Denormalized from the membership so academy-local uniqueness is a
+  /// database constraint rather than a service that remembers to check.
+  academyId             String                @map("academy_id") @db.Uuid
+  dateOfBirth           DateTime?             @map("date_of_birth") @db.Date
+  schoolName            String?               @map("school_name")
+  schoolGrade           String?               @map("school_grade")
+  guardianName          String?               @map("guardian_name")
+  guardianRelationship  GuardianRelationship? @map("guardian_relationship")
+  guardianPhone         String?               @map("guardian_phone")
+  emergencyContactName  String?               @map("emergency_contact_name")
+  emergencyContactPhone String?               @map("emergency_contact_phone")
+  /// The student's own words. A manager reads these and does not rewrite them.
+  codingInterests       String[]              @map("coding_interests")
+  learningGoal          String?               @map("learning_goal")
+  /// Manager-owned, and unique only inside one academy.
+  studentNumber         String?               @map("student_number")
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  /// Postgres treats NULLs as distinct, so every student without a number
+  /// coexists and only two identical numbers collide.
+  @@unique([academyId, studentNumber])
+  @@map("student_academy_profiles")
+}
+
+/// One shape for `TEACHER`, `TEAM_LEAD`, and `MANAGER`.
+///
+/// Those roles differ in authority, not in biography. Three near-identical
+/// models would only give a field three places to drift, and the profile never
+/// implies a permission — the authorization map still decides that.
+model StaffAcademyProfile {
+  membershipId      String   @id @map("membership_id") @db.Uuid
+  /// Denormalized for the same reason as the student profile's copy.
+  academyId         String   @map("academy_id") @db.Uuid
+  bio               String?
+  specialties       String[]
+  teachingLanguages String[] @map("teaching_languages")
+  /// Manager-owned: what the academy says this person is responsible for.
+  academyTitle      String?  @map("academy_title")
+  employeeNumber    String?  @map("employee_number")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([academyId, employeeNumber])
+  @@map("staff_academy_profiles")
 }
 
 model Organization {
@@ -201,7 +355,7 @@ model Academy {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization           Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships            AcademyMembership[]
   invitations            AcademyInvitation[]
   joinRequests           AcademyJoinRequest[]
@@ -275,11 +429,14 @@ model AcademyMembership {
   classEnrollments ClassEnrollment[]
   assignedClasses  Class[]           @relation("ClassTeacher")
 
-  monitoringVisitsAsTeacher TeacherMonitoringVisit[] @relation("MonitoringVisitTeacher")
-  monitoringVisitsAsStudent TeacherMonitoringVisit[] @relation("MonitoringVisitStudent")
-  feedbackAuthored          TeacherFeedback[]        @relation("TeacherFeedbackAuthor")
-  feedbackReceived          TeacherFeedback[]        @relation("TeacherFeedbackRecipient")
+  monitoringVisitsAsTeacher TeacherMonitoringVisit[]   @relation("MonitoringVisitTeacher")
+  monitoringVisitsAsStudent TeacherMonitoringVisit[]   @relation("MonitoringVisitStudent")
+  feedbackAuthored          TeacherFeedback[]          @relation("TeacherFeedbackAuthor")
+  feedbackReceived          TeacherFeedback[]          @relation("TeacherFeedbackRecipient")
   learningDays              StudentCourseLearningDay[]
+  memberProfile             AcademyMemberProfile?
+  studentProfile            StudentAcademyProfile?
+  staffProfile              StaffAcademyProfile?
 
   @@unique([academyId, userId])
   @@index([userId, status])
@@ -367,8 +524,8 @@ model Course {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy          Academy         @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy        User            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  academy          Academy                    @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy        User                       @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   modules          CourseModule[]
   exerciseDrafts   ExerciseDraft[]
   submissions      Submission[]

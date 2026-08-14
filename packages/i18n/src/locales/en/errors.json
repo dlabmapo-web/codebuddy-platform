@@ -63,5 +63,13 @@
   "TEACHER_PROGRESS_ACCESS_DENIED": "You are not the assigned teacher for this class.",
   "TEACHER_PROGRESS_NOT_FOUND": "That is no longer part of this class.",
   "TEACHER_OVERVIEW_ACCESS_DENIED": "You do not have a teaching overview for this academy.",
+  "PROFILE_NOT_FOUND": "That profile is not available to you.",
+  "PROFILE_CHANGED": "This profile changed somewhere else. Reload it before saving again.",
+  "PROFILE_VALIDATION_FAILED": "Check the highlighted fields and try again.",
+  "PROFILE_NUMBER_CONFLICT": "That number is already used in this academy.",
+  "PROFILE_IMAGE_TYPE_INVALID": "Choose a JPEG, PNG, or WebP image.",
+  "PROFILE_IMAGE_TOO_LARGE": "Choose an image smaller than 5 MB.",
+  "PROFILE_IMAGE_DECODE_FAILED": "That image could not be read. Try another file.",
+  "PROFILE_IMAGE_STORAGE_FAILED": "The image could not be saved. Your previous photo is unchanged.",
   "UNKNOWN": "Something went wrong. Try again."
 }

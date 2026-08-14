@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Languages, Moon, Sun } from 'lucide-react';
 import { locales, type Locale } from '@cove/i18n/settings';
 
@@ -10,6 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { setBrowserLocale } from '@/i18n/client/set-locale';
 import { useTheme } from '@/lib/theme/theme-provider';
@@ -106,12 +108,76 @@ export function LanguageControl({ className }: { className?: string }) {
   );
 }
 
-/** The pair, in the order they appear at the top right of every page. */
-export function HeaderControls({ className }: { className?: string }) {
+/**
+ * The way into My Page, from anywhere in Studio.
+ *
+ * A face rather than a gear: the destination is the person's own account, and
+ * an avatar is the one control on this bar whose meaning nobody has to be
+ * taught. It sits beside theme and language because all three are about the
+ * reader rather than about the page they are on.
+ */
+export function ProfileControl({
+  className,
+  academyImageUrl,
+  imageUrl,
+  avatarUrl,
+  name,
+}: {
+  className?: string;
+  /** The current membership's academy override. */
+  academyImageUrl?: string | null;
+  /** The Cove image, when the account has uploaded one. */
+  imageUrl?: string | null;
+  /** The external OAuth photo, as the fallback beneath it. */
+  avatarUrl?: string | null;
+  name?: string | null;
+}) {
+  const { t } = useLayoutTranslation('nav');
+
+  return (
+    <Link
+      aria-label={t('my_page')}
+      className={cn(trigger, 'w-9 px-0', className)}
+      href="/studio/my-page"
+      title={t('my_page')}
+    >
+      <ProfileAvatar
+        academyImageUrl={academyImageUrl}
+        globalImageUrl={imageUrl}
+        externalAvatarUrl={avatarUrl}
+        name={name}
+        size="sm"
+      />
+    </Link>
+  );
+}
+
+/** The set, in the order they appear at the top right of every page. */
+export function HeaderControls({
+  className,
+  account,
+}: {
+  className?: string;
+  /** Absent on surfaces that have no session to describe. */
+  account?: {
+    academyImageUrl?: string | null;
+    imageUrl: string | null;
+    avatarUrl: string | null;
+    name: string | null;
+  };
+}) {
   return (
     <div className={cn('flex items-center gap-0.5', className)}>
       <LanguageControl />
       <ThemeControl />
+      {account ? (
+        <ProfileControl
+          academyImageUrl={account.academyImageUrl}
+          avatarUrl={account.avatarUrl}
+          imageUrl={account.imageUrl}
+          name={account.name}
+        />
+      ) : null}
     </div>
   );
 }

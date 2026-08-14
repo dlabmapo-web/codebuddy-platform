@@ -54,6 +54,38 @@ export class SupabaseAuthService {
       requestedAcademyId: firstUuid(metadata.requested_academy_id),
     };
   }
+
+  /**
+   * What sign-in methods this account actually has.
+   *
+   * Read from Supabase rather than inferred in the browser: an OAuth-only
+   * account has no password to change, and My Page must not render a form
+   * that fails only after the person has typed a new password twice.
+   *
+   * A failure here is reported as "no identities known" rather than thrown.
+   * The security section degrades to read-only status; the rest of My Page has
+   * nothing to do with Supabase and must still load.
+   */
+  async describeIdentities(
+    authUserId: string,
+  ): Promise<{ providers: string[]; hasPasswordIdentity: boolean }> {
+    const empty = { providers: [], hasPasswordIdentity: false };
+    try {
+      const { data, error } = await this.client.auth.admin.getUserById(
+        authUserId,
+      );
+      if (error || !data?.user) return empty;
+      const providers = (data.user.identities ?? [])
+        .map((identity) => identity.provider)
+        .filter((provider): provider is string => Boolean(provider));
+      return {
+        providers: providers.filter((provider) => provider !== "email"),
+        hasPasswordIdentity: providers.includes("email"),
+      };
+    } catch {
+      return empty;
+    }
+  }
 }
 
 function firstUuid(value: unknown): string | null {

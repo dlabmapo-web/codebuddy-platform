@@ -170,6 +170,17 @@ render the member's global account/security forms. The academy members table
 links to this route. My Page is opened from a profile control in the persistent
 Studio header, next to the existing theme and language controls.
 
+On academy-scoped Studio routes, that profile control represents the current
+membership and uses the same visible avatar fallback as other academy surfaces:
+
+```text
+academy image -> global Cove image -> external OAuth image -> generated initials
+```
+
+On global routes it begins at the global Cove image. A successful image change
+must update or refresh the persistent header immediately; navigating away must
+not leave a cached initials fallback visible.
+
 ### 6.2 Page order
 
 My Page uses one narrow reading column, approximately the Kichkintoy
@@ -564,6 +575,10 @@ that academy access changed.
 - Role, status, verification, and ownership never rely on color alone.
 - Mobile uses the same vertical section order with full-width primary actions.
 - Long academy, school, and user names wrap without hiding actions.
+- Avatar wrappers have explicit width and height at every size. The image is
+  absolutely contained with `object-fit: cover` so its intrinsic dimensions
+  cannot resize a flex item in Safari or turn a circular avatar into a large
+  oval.
 - Dates, phone display, and grade labels are localized; stored values remain
   locale-independent.
 - Light and dark themes use existing Studio tokens.
@@ -626,6 +641,10 @@ values.
 - OAuth-only and password-capable security states render correctly.
 - Image selection, crop, progress, removal, and fallback are keyboard and screen
   reader usable.
+- Uploaded avatars stay circular and at their intended `sm`, `md`, `lg`, or
+  `xl` dimensions in current Safari, Chromium, and Firefox.
+- Academy headers show the academy image first and update after upload without
+  requiring a hard reload.
 - English/Korean, narrow mobile, desktop, light theme, and dark theme receive
   component or end-to-end coverage proportional to risk.
 

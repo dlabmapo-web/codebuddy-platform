@@ -221,6 +221,17 @@ Changing email or phone requires re-verification. The old verified value stays
 effective until the new value is verified. OAuth-only accounts see provider-
 appropriate controls instead of a nonfunctional password form.
 
+Password-capable accounts change their password with three fields: current
+password, new password, and new-password confirmation. The browser validates
+required values, the configured minimum strength, confirmation equality, and
+that the new password differs from the current password. Supabase Auth receives
+the current and new passwords in one `updateUser` request, so the credential
+owner—not Cove application code—verifies the current password. After a
+successful change, Cove revokes every other session while keeping the current
+browser signed in, clears all three fields, and announces success. A failed
+change leaves the fields available for correction and never writes password
+values to Cove logs, application tables, audit rows, or analytics.
+
 ### 7.2 Academy member profile: common fields
 
 | Field | Member | Manager | Notes |
@@ -639,6 +650,11 @@ values.
 - Academy switching handles unsaved changes and unauthorized query values.
 - Each section saves independently and retains drafts on failure.
 - OAuth-only and password-capable security states render correctly.
+- Password changes require the correct current password, a valid new password,
+  and matching confirmation; success revokes other sessions and preserves the
+  current one.
+- Wrong-current-password, weak-password, rate-limit, and network failures use
+  localized, actionable messages and never expose credential values.
 - Image selection, crop, progress, removal, and fallback are keyboard and screen
   reader usable.
 - Uploaded avatars stay circular and at their intended `sm`, `md`, `lg`, or

@@ -853,3 +853,107 @@ delete before edits begin.
   presentation is replaced only through an explicit implementation plan.
 - English/Korean, accessibility, dark mode, responsive behavior, empty/error
   states, observability, and the specified tests ship with the redesign.
+
+## 18. Corrective implementation decisions
+
+The first implementation review found that the overview rendered correctly but
+two drill-down routes could turn recoverable server-rendering failures into a
+not-found page, active-learning signals covered only part of §8.2, and the
+inactivity deadline existed only in the browser. The following decisions close
+those gaps without changing the approved information architecture.
+
+### 18.1 Server-rendered route failures
+
+Student analytics and Solution status render `notFound()` only for a typed
+application error whose code explicitly represents authentication, role,
+academy, class, or teacher-scope denial. A generic HTTP 404, an untyped oRPC
+error, a transport failure, or an internal error is not proof of denied access.
+Those failures render the route with `initialData = null`; the existing client
+query retries and presents its visible error state if the retry also fails.
+
+Destination tests must assert page content after navigation. Merely observing a
+`/teach/students` or `/progress` URL is not proof that the destination opened.
+
+### 18.2 Server-authoritative inactivity lease
+
+The authoritative inactivity state is a Redis lease keyed by the Supabase
+`session_id` claim, not by user, browser tab, academy, or access-token refresh.
+All tokens refreshed within one Supabase login therefore share one deadline,
+while signing in again creates a new independent lease.
+
+The lease contains its absolute deadline and an active/expired state. Its
+operations are atomic:
+
+1. a trusted authentication-completion path begins the lease for the new
+   Supabase session;
+2. a qualifying student action extends an active, unexpired lease to 30 minutes
+   from the server's current time and returns that server-issued deadline;
+3. checking an elapsed lease changes it to an expired tombstone and refuses the
+   request; and
+4. begin or extend never revives an expired tombstone. A new login is required.
+
+Lease creation is not a public "reset" operation. The Next.js authentication
+completion path calls it through the existing trusted BFF boundary. A missing
+lease or unavailable Redis is fail-closed for protected student-learning reads,
+writes, and monitoring connections; it must not silently become a new session.
+An expired lease may become a missing key because absence is also fail-closed;
+only the trusted completion of a new sign-in may create a lease. Redis loss
+therefore signs existing students out rather than allowing an old access token
+to recreate its deadline.
+
+The browser reads the returned absolute deadline and continues to coordinate
+its presentation through `BroadcastChannel` with the storage-event fallback.
+Local activity updates the visible deadline immediately, but the server reply
+reconciles it after focus, visibility change, wake, reconnect, and navigation.
+The client signs out and preserves work as already specified when the server
+reports expiry.
+
+Protected student-learning oRPC operations and the monitoring socket handshake
+apply the lease check after token verification and before domain work. Teacher
+and manager operations do not use this middleware. This keeps the student
+policy role-scoped and prevents a teacher who also works in an academy from
+receiving the student timeout policy on teaching pages.
+
+### 18.3 Activity signals and throttling
+
+One student-activity bridge owns the qualifying signals. On an authorized,
+foreground learning surface it forwards navigation, scroll, keyboard, pointer,
+editor, run, submission, hint, feedback, and playing-video activity to both the
+learning-time heartbeat and the inactivity lease. Paused, ended, hidden, and
+background video closes activity rather than extending it.
+
+The bridge updates in-memory state immediately but publishes at most once per
+15-second activity cadence. The same throttle covers Redis lease extension,
+`BroadcastChannel`, and local-storage fallback writes. A final visibility-hidden
+or disconnect signal is not throttled because it must close the open learning
+interval. Repeated `timeupdate`, scroll, wheel, pointer, or keyboard events must
+not cause per-event network calls or cross-tab storage writes.
+
+### 18.4 Score ordering
+
+Score direction affects scored students only. Null placement is a separate
+rule: students without a scored attempt always follow every scored student in
+both ascending and descending order. Deterministic coverage, solved, recency,
+and membership-ID tie-breakers remain unchanged within the scored and unscored
+groups.
+
+### 18.5 Corrective test gate
+
+The redesign is not complete until automated coverage proves all of the
+following:
+
+- Student analytics and Solution status render their expected destination
+  content from every overview link;
+- an untyped transport failure produces a retry/error state rather than 404;
+- typed access denial still produces 404 and no protected payload;
+- the server lease begins only through the trusted authentication path;
+- activity at 29:59 extends the server deadline, while activity after expiry
+  cannot revive it;
+- a missing lease and unavailable Redis fail closed on student learning APIs;
+- warning, continuation, automatic logout, cross-tab reconciliation, video
+  play/pause, and draft preservation run in browser tests;
+- navigation, scrolling, keyboard, pointer, editor, run, submission, hint, and
+  feedback activity each reach the bounded heartbeat path;
+- high-frequency browser events produce no more than one publish per cadence;
+  and
+- unscored students remain after scored students in both score directions.

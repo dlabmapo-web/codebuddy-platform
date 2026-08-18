@@ -49,6 +49,15 @@ export type StudentWorkTotals = {
   lastSubmissionAt: Date;
 };
 
+export type StudentMaterialWorkTotals = {
+  userId: string;
+  materialId: string;
+  submissions: number;
+  solved: boolean;
+  bestScore: number;
+  lastSubmissionAt: Date;
+};
+
 export type LectureSolvedRow = {
   lectureId: string;
   userId: string;
@@ -221,6 +230,26 @@ export class TeacherOverviewRepository {
         MAX(pairs.last_at) AS "lastSubmissionAt"
       FROM pairs
       GROUP BY pairs.user_id
+    `;
+  }
+
+  /** One period-scoped row per student/exercise for class-local comparisons. */
+  async workByStudentMaterial(
+    scope: Scope,
+    period: Period,
+  ): Promise<StudentMaterialWorkTotals[]> {
+    if (isEmptyScope(scope)) return [];
+    return this.prisma.$queryRaw<StudentMaterialWorkTotals[]>`
+      SELECT
+        s.user_id AS "userId",
+        s.material_id AS "materialId",
+        COUNT(*)::int AS submissions,
+        bool_or(s.status = 'PASSED') AS solved,
+        MAX(s.score)::int AS "bestScore",
+        MAX(s.created_at) AS "lastSubmissionAt"
+      FROM submissions s
+      WHERE ${countedScope(scope, period)}
+      GROUP BY s.user_id, s.material_id
     `;
   }
 

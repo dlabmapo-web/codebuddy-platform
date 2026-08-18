@@ -26,6 +26,13 @@ import { LearnClassService } from "../learn/learn-class.service.js";
 import { LearnService } from "../learn/learn.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
+import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
+import { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
+import { PeopleBulkService } from "../manage/people-bulk.service.js";
+import { PeopleImportService } from "../manage/people-import.service.js";
+import { ManagerOverviewService } from "../manage/manager-overview.service.js";
+import { PeopleDirectoryService } from "../manage/people-directory.service.js";
+import { createManageRouters } from "../manage/manage.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
 import { AcademyProfileService } from "../profile/academy-profile.service.js";
@@ -74,6 +81,16 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
     teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
+    managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
+    academyOperationsProfileService: app.get(AcademyOperationsProfileService, {
+      strict: false,
+    }),
+    peopleDirectoryService: app.get(PeopleDirectoryService, { strict: false }),
+    peopleImportService: app.get(PeopleImportService, { strict: false }),
+    peopleBulkService: app.get(PeopleBulkService, { strict: false }),
+    invitationDeliveryService: app.get(InvitationDeliveryService, {
+      strict: false,
+    }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -105,6 +122,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const contentRouters = createContentRouters(os, deps);
   const classesRouters = createClassesRouters(os, deps);
   const profileRouters = createProfileRouters(os, deps);
+  const manageRouters = createManageRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
@@ -112,6 +130,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...contentRouters,
     ...classesRouters,
     ...profileRouters,
+    ...manageRouters,
     learn: createLearnRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),

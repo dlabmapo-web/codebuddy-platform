@@ -45,6 +45,13 @@ import { TeacherProgressService } from "./teacher-progress.service.js";
     TeacherOverviewService,
     TeacherStudentsService,
     LearningActivityAccumulator,
+    // §7.4 of the manager control tower design: the manager surfaces are a
+    // second adapter at this seam and reuse the measurement rather than
+    // reimplementing it. The repositories are scope-driven and hold no
+    // authorization of their own, which is what makes exporting them safe —
+    // `TeacherOverviewAccessService` deliberately stays unexported.
+    TeacherOverviewRepository,
+    TeacherProgressRepository,
   ],
 })
 export class TeachModule {}

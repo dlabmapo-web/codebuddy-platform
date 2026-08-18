@@ -140,6 +140,58 @@ enum CaseOutcome {
 enum MediaAssetPurpose {
   USER_AVATAR
   ACADEMY_MEMBER_AVATAR
+  /// Academy presentation images. Separate values so upload validation cannot
+  /// confuse a member's avatar with the academy's own cover — the two have
+  /// different aspect ratios and, more importantly, different readers.
+  ACADEMY_COVER
+  ACADEMY_GALLERY
+}
+
+/// Which academy image a media asset is.
+enum AcademyMediaKind {
+  COVER
+  GALLERY
+}
+
+/// Where an import session is in its life.
+///
+/// `PREVIEW_READY` is the only state a commit may start from, and `COMMITTING`
+/// is what stops two tabs committing the same workbook twice.
+enum PeopleImportStatus {
+  PREVIEW_READY
+  COMMITTING
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+/// What a bulk operation does. Named rather than free text so a new kind is a
+/// migration and a decision, not a string somebody passed.
+enum PeopleBulkKind {
+  ENROLL
+  ROLE_CHANGE
+  SUSPEND
+  RESTORE
+}
+
+enum PeopleBulkStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+/// How far one email got.
+///
+/// Deliberately distinct from `InvitationStatus`: an invitation can be pending
+/// while its email bounced, and accepted while its email is still only
+/// `SENT`. Collapsing the two would make the interface claim provider evidence
+/// it does not have.
+enum InvitationDeliveryState {
+  QUEUED
+  SENT
+  DELIVERED
+  BOUNCED
+  FAILED
 }
 
 /// How a guardian relates to a student. `OTHER` exists so the alternative is
@@ -210,6 +262,8 @@ model User {
   solveSessions         ExerciseSolveSession[]
   avatarAsset           MediaAsset?               @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
   mediaUploaded         MediaAsset[]              @relation("MediaUploader")
+  peopleImports         PeopleImportSession[]     @relation("PeopleImportActor")
+  peopleBulkOperations  PeopleBulkOperation[]     @relation("PeopleBulkActor")
 
   @@index([status])
   @@map("users")
@@ -245,6 +299,7 @@ model MediaAsset {
   uploader      User                   @relation("MediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
   userAvatars   User[]                 @relation("UserAvatar")
   memberAvatars AcademyMemberProfile[] @relation("AcademyMemberAvatar")
+  academyMedia  AcademyMedia[]         @relation("AcademyMedia")
 
   /// The cleanup sweep: superseded and orphaned objects, oldest first.
   @@index([supersededAt, createdAt])
@@ -352,8 +407,46 @@ model Academy {
   name           String
   slug           String
   status         AcademyStatus @default(ACTIVE)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Where the academy is, as a manager would write it on a letter. Every
+  /// part is nullable because an academy exists before anyone fills its
+  /// profile in, and a required column would have to be backfilled with a
+  /// placeholder that reads like an answer.
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  locality     String?
+  region       String?
+  postalCode   String? @map("postal_code")
+  /// ISO 3166-1 alpha-2, upper case. Stored rather than assumed so an academy
+  /// outside Korea is a data change and not a code change.
+  countryCode  String? @map("country_code") @db.Char(2)
+
+  contactPhone String? @map("contact_phone")
+  contactEmail String? @map("contact_email")
+
+  /// The authoritative academy-local day boundary.
+  ///
+  /// `ACADEMY_TIME_ZONE` in `@cove/shared` was the placeholder for exactly
+  /// this column: every period, growth bucket, and "today" on a manager or
+  /// teacher surface is drawn here. Defaulted to Seoul so existing rows keep
+  /// the behaviour they already had.
+  timeZone String @default("Asia/Seoul") @map("time_zone")
+
+  /// When a manager last edited the profile above. Null means never — which
+  /// is what the completion prompt on the overview asks about.
+  profileUpdatedAt DateTime? @map("profile_updated_at") @db.Timestamptz(6)
+
+  /// Bumped inside the transaction of every membership, invitation, and
+  /// enrollment change.
+  ///
+  /// A directory selection or an import preview carries the revision it was
+  /// built against, so a bulk mutation raised against a roster that has since
+  /// moved is a visible conflict rather than a silent overwrite of whoever
+  /// arrived in between.
+  peopleRevision Int @default(0) @map("people_revision")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships            AcademyMembership[]
@@ -367,6 +460,9 @@ model Academy {
   monitoringVisits       TeacherMonitoringVisit[]
   teacherFeedback        TeacherFeedback[]
   learningDays           StudentCourseLearningDay[]
+  media                  AcademyMedia[]
+  importSessions         PeopleImportSession[]
+  bulkOperations         PeopleBulkOperation[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -441,6 +537,10 @@ model AcademyMembership {
   @@unique([academyId, userId])
   @@index([userId, status])
   @@index([academyId, role, status])
+  /// The people directory's default order, inside one academy.
+  @@index([academyId, updatedAt(sort: Desc), id], map: "academy_memberships_academy_updated_idx")
+  /// Student growth, bucketed by the local day a membership became active.
+  @@index([academyId, role, status, joinedAt], map: "academy_memberships_academy_joined_idx")
   @@map("academy_memberships")
 }
 
@@ -450,6 +550,13 @@ model AcademyInvitation {
   email            String
   role             AcademyRole
   tokenHash        String           @unique @map("token_hash")
+  /// The name an import suggested for this person, if one did.
+  ///
+  /// A hint, never an instruction: import must not rename a global account,
+  /// because the account belongs to the person and not to the academy. On
+  /// acceptance it seeds the academy-scoped display-name override, and only
+  /// when the recipient has not set one themselves.
+  displayNameHint  String?          @map("display_name_hint")
   status           InvitationStatus @default(PENDING)
   expiresAt        DateTime         @map("expires_at") @db.Timestamptz(6)
   invitedByUserId  String           @map("invited_by_user_id") @db.Uuid
@@ -459,13 +566,150 @@ model AcademyInvitation {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy    Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
-  invitedBy  User    @relation("InvitationCreator", fields: [invitedByUserId], references: [id], onDelete: Restrict)
-  acceptedBy User?   @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  academy          Academy                     @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  invitedBy        User                        @relation("InvitationCreator", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  acceptedBy       User?                       @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  deliveryAttempts InvitationDeliveryAttempt[]
 
   @@index([academyId, email, status])
   @@index([expiresAt, status])
   @@map("academy_invitations")
+}
+
+/// One academy presentation image, in its slot.
+///
+/// A join row rather than a column on `Academy` because a gallery is a list
+/// and a cover is a list of one, and both want the same replacement behaviour:
+/// point at a new immutable asset, mark the old one superseded, let the sweep
+/// delete it after the grace period.
+model AcademyMedia {
+  id           String           @id @default(uuid()) @db.Uuid
+  academyId    String           @map("academy_id") @db.Uuid
+  assetId      String           @map("asset_id") @db.Uuid
+  kind         AcademyMediaKind
+  /// Gallery order. Always 0 for a cover, which is what makes the unique
+  /// constraint below enforce "at most one cover" without a second rule.
+  position     Int              @default(0)
+  /// Required unless the manager explicitly marked the image decorative.
+  altText      String?          @map("alt_text")
+  isDecorative Boolean          @default(false) @map("is_decorative")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy    @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  asset   MediaAsset @relation("AcademyMedia", fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([academyId, kind, position])
+  @@map("academy_media")
+}
+
+/// One uploaded member workbook, from parse to commit.
+///
+/// The normalized preview is stored rather than recomputed so the rows a
+/// manager acknowledged are exactly the rows that commit — re-parsing at commit
+/// would silently apply a different normalization if the code changed between
+/// the two requests.
+///
+/// `capturedPeopleRevision` is the concurrency check: a roster that moved while
+/// the preview sat on screen produces a conflict and a fresh preview rather
+/// than a commit against people who arrived in between.
+model PeopleImportSession {
+  id                     String             @id @default(uuid()) @db.Uuid
+  academyId              String             @map("academy_id") @db.Uuid
+  actorUserId            String             @map("actor_user_id") @db.Uuid
+  originalFilename       String             @map("original_filename")
+  /// SHA-256 of the uploaded bytes. Two uploads of the same file inside one
+  /// session window are the same session rather than two.
+  checksumSha256         String             @map("checksum_sha256")
+  status                 PeopleImportStatus @default(PREVIEW_READY)
+  totalRows              Int                @map("total_rows")
+  readyRows              Int                @map("ready_rows")
+  warningRows            Int                @map("warning_rows")
+  errorRows              Int                @map("error_rows")
+  /// The normalized rows and their verdicts. Bounded by the 500-row cap.
+  preview                Json
+  capturedPeopleRevision Int                @map("captured_people_revision")
+  expiresAt              DateTime           @map("expires_at") @db.Timestamptz(6)
+  /// Unique per academy: a retried commit returns the original result rather
+  /// than inviting everybody twice.
+  idempotencyKey         String             @map("idempotency_key")
+  committedAt            DateTime?          @map("committed_at") @db.Timestamptz(6)
+  /// Row-level outcomes, written at commit and downloadable as CSV.
+  result                 Json?
+  failureCode            String?            @map("failure_code")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  actor   User    @relation("PeopleImportActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([academyId, idempotencyKey])
+  @@index([academyId, status, createdAt])
+  @@index([expiresAt])
+  @@map("people_import_sessions")
+}
+
+/// One bulk mutation, and what it actually did.
+///
+/// Durable because §12 makes bulk operations idempotent: a retry with the same
+/// key returns this row rather than running again, which is the only safe
+/// answer when the first response was lost on the wire after the transaction
+/// committed.
+model PeopleBulkOperation {
+  id             String           @id @default(uuid()) @db.Uuid
+  academyId      String           @map("academy_id") @db.Uuid
+  actorUserId    String           @map("actor_user_id") @db.Uuid
+  kind           PeopleBulkKind
+  /// The normalized selection: explicit ids, or a filter plus exclusions.
+  selection      Json
+  requestedCount Int              @map("requested_count")
+  succeededCount Int              @default(0) @map("succeeded_count")
+  failedCount    Int              @default(0) @map("failed_count")
+  status         PeopleBulkStatus @default(PENDING)
+  idempotencyKey String           @map("idempotency_key")
+  /// Per-target outcomes, for the downloadable result.
+  result         Json?
+  failureCode    String?          @map("failure_code")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  actor   User    @relation("PeopleBulkActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([academyId, kind, idempotencyKey])
+  @@index([academyId, createdAt])
+  @@map("people_bulk_operations")
+}
+
+/// One attempt to deliver one invitation email.
+///
+/// Attempts accumulate rather than being overwritten: a resend is a new
+/// attempt, and the history of a bounced address is what tells a manager the
+/// address is wrong rather than the system being slow.
+model InvitationDeliveryAttempt {
+  id                String                  @id @default(uuid()) @db.Uuid
+  invitationId      String                  @map("invitation_id") @db.Uuid
+  attemptNumber     Int                     @map("attempt_number")
+  /// The provider's own id, once it has accepted the message.
+  providerMessageId String?                 @map("provider_message_id")
+  state             InvitationDeliveryState @default(QUEUED)
+  failureCode       String?                 @map("failure_code")
+  queuedAt          DateTime                @default(now()) @map("queued_at") @db.Timestamptz(6)
+  sentAt            DateTime?               @map("sent_at") @db.Timestamptz(6)
+  deliveredAt       DateTime?               @map("delivered_at") @db.Timestamptz(6)
+  failedAt          DateTime?               @map("failed_at") @db.Timestamptz(6)
+  /// The provider event that last moved this attempt. Unique, so a webhook
+  /// delivered twice — which every provider does — advances the state once.
+  lastEventKey      String?                 @unique @map("last_event_key")
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  invitation AcademyInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, attemptNumber])
+  @@index([state, queuedAt])
+  @@index([providerMessageId])
+  @@map("invitation_delivery_attempts")
 }
 
 model AcademyJoinRequest {

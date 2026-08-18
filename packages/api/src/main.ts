@@ -11,7 +11,13 @@ import { MONITORING_REDIS } from "./monitoring/monitoring.tokens.js";
 import { registerORPCRoutes } from "./orpc/router.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // The delivery webhook verifies the signature over the exact bytes the
+    // provider signed.
+    // Re-serializing a parsed body changes key order and whitespace, so the
+    // signature would never match — the raw buffer has to survive parsing.
+    rawBody: true,
+  });
   const configService = app.get(ConfigService<ApiEnvironment, true>);
 
   app.setGlobalPrefix("api");

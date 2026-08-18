@@ -74,6 +74,24 @@ export const apiEnvironmentSchema = z.object({
   /** Pinned, and shared with the browser so run and submit agree. */
   PYODIDE_VERSION: z.string().default("0.27.5"),
   SUBMISSION_RATE_LIMIT: z.coerce.number().int().min(1).max(120).default(10),
+  /**
+   * Invitation email. Both optional, and both required together: without them
+   * the delivery seam resolves to the local sink, which records every state
+   * transition and sends nothing. That is the right default for development and
+   * a visible, honest failure mode for a deployment that forgot to configure a
+   * provider — invitations are logged rather than silently dropped.
+   */
+  EMAIL_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(3).max(200).optional(),
+  /**
+   * The shared secret a provider signs its webhooks with.
+   *
+   * Without it the webhook endpoint refuses every request rather than trusting
+   * unsigned ones — §17. An unauthenticated delivery webhook lets anyone mark
+   * any invitation delivered, which is a way to hide a failed invitation from
+   * the manager who needs to chase it.
+   */
+  EMAIL_WEBHOOK_SECRET: z.string().min(16).optional(),
 }).superRefine((environment, context) => {
   if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {
     context.addIssue({
@@ -81,6 +99,17 @@ export const apiEnvironmentSchema = z.object({
       path: ["BFF_SHARED_SECRET"],
       message: "is required in production",
     });
+  }
+  if (environment.NODE_ENV === "production") {
+    for (const key of ["EMAIL_API_KEY", "EMAIL_FROM", "EMAIL_WEBHOOK_SECRET"] as const) {
+      if (!environment[key]) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: "is required in production",
+        });
+      }
+    }
   }
 });
 

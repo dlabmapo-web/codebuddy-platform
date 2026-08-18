@@ -55,6 +55,19 @@ describe("validateEnvironment", () => {
       ...validEnvironment,
       NODE_ENV: "production",
       BFF_SHARED_SECRET: "a-production-secret-with-at-least-32-bytes",
+      EMAIL_API_KEY: "re_test",
+      EMAIL_FROM: "Cove <hello@example.com>",
+      EMAIL_WEBHOOK_SECRET: "whsec_test-secret-value",
     })).toMatchObject({ NODE_ENV: "production" });
+  });
+
+  it("requires provider email configuration in production", () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        NODE_ENV: "production",
+        BFF_SHARED_SECRET: "a-production-secret-with-at-least-32-bytes",
+      }),
+    ).toThrowError(/EMAIL_API_KEY.*EMAIL_FROM.*EMAIL_WEBHOOK_SECRET/);
   });
 });

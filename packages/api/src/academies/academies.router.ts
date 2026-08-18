@@ -54,9 +54,27 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
     academyInvitations: {
       create: os.academyInvitations.create
         .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.academyInvitationService.create(context.identity, input)
-        ),
+        .handler(async ({ context, input }) => {
+          const created = await deps.academyInvitationService.create(
+            context.identity,
+            input,
+          );
+          // §13 — the email is queued *after* the invitation has committed,
+          // and its failure never fails this call. The invitation is valid
+          // either way; the attempt row records what happened to the message,
+          // and the manager can resend from the invitations table.
+          //
+          // Composed here rather than inside the service so the invitation
+          // module keeps no dependency on delivery — §7.6 makes an invitation's
+          // lifecycle and an email's delivery state two separate things.
+          await deps.invitationDeliveryService.queueForInvitation({
+            invitationId: created.invitation.id,
+            academyId: input.academyId,
+            email: created.invitation.email,
+            token: created.token,
+          });
+          return created;
+        }),
       list: os.academyInvitations.list
         .use(access.authenticated)
         .handler(({ context, input }) =>

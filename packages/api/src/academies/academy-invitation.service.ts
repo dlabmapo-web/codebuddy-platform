@@ -7,6 +7,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { bumpPeopleRevision } from "../manage/people-revision.js";
 import { AuditService } from "./audit.service.js";
 import { toAcademyMember } from "./academy-membership.service.js";
 
@@ -89,6 +90,9 @@ export class AcademyInvitationService {
         targetId: created.id,
         after: { email, role: created.role, status: created.status },
       });
+      // §8.1 — a pending invitation is a seat that is spoken for, so it counts
+      // as a change to the academy's people even before anybody accepts it.
+      await bumpPeopleRevision(transaction, input.academyId);
       return created;
     });
 
@@ -150,6 +154,7 @@ export class AcademyInvitationService {
         before: { status: invitation.status },
         after: { status: revoked.status },
       });
+      await bumpPeopleRevision(transaction, input.academyId);
       return toInvitationDetail(revoked);
     });
   }
@@ -259,6 +264,24 @@ export class AcademyInvitationService {
           },
         },
       });
+
+      // §8.1 — the name an import suggested seeds the *academy-scoped*
+      // override, never the global account name. The account belongs to the
+      // person; what one academy calls them does not follow them elsewhere.
+      //
+      // Only on creation, and only when the profile does not already exist: a
+      // recipient who has set their own academy name has said what they want to
+      // be called, and a spreadsheet does not overrule them.
+      if (invitation.displayNameHint) {
+        await transaction.academyMemberProfile.upsert({
+          where: { membershipId: membership.id },
+          create: {
+            membershipId: membership.id,
+            academyDisplayName: invitation.displayNameHint,
+          },
+          update: {},
+        });
+      }
       await transaction.academyInvitation.update({
         where: { id: invitation.id },
         data: {
@@ -283,6 +306,7 @@ export class AcademyInvitationService {
         targetId: membership.id,
         after: { role: membership.role, status: membership.status },
       });
+      await bumpPeopleRevision(transaction, invitation.academyId);
       return toAcademyMember(membership);
     });
   }

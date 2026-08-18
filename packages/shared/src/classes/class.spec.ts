@@ -257,6 +257,11 @@ describe("assigned teacher output", () => {
       userId: "55555555-5555-4555-8555-555555555555",
       displayName: "Ada",
       email: "ada@example.com",
+      // A picker renders a face, so the three avatar sources travel with an
+      // eligible summary like they do with every other person on the wire.
+      academyImageUrl: null,
+      globalImageUrl: null,
+      externalAvatarUrl: null,
       membershipStatus: "ACTIVE",
     });
     expect(parsed).not.toHaveProperty("membershipStatus");

@@ -1,4 +1,5 @@
 export * from "./academy-profile.js";
+export * from "./avatar.js";
 export * from "./image.js";
 export * from "./phone.js";
 export * from "./profile.js";

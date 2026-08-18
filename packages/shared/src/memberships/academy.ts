@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
+import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
   invitationStatusSchema,
   joinRequestStatusSchema,
@@ -30,6 +31,7 @@ export const academyJoinRequestDetailSchema = z.object({
     id: z.uuid(),
     email: z.email().nullable(),
     displayName: z.string().nullable(),
+    ...memberAvatarUrlsShape,
   }),
   message: z.string().nullable(),
   status: joinRequestStatusSchema,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { academyRoleSchema } from "../auth/roles.js";
 import { userStatusSchema } from "../auth/session.js";
 import { membershipStatusSchema } from "../memberships/status.js";
+import { memberAvatarUrlsShape } from "../profile/avatar.js";
 
 export const classStatuses = ["ACTIVE", "ARCHIVED"] as const;
 export const classStatusSchema = z.enum(classStatuses);
@@ -36,6 +37,7 @@ export const enrolledStudentSummarySchema = z.object({
   membershipStatus: membershipStatusSchema,
   role: academyRoleSchema,
   enrolledAt: z.iso.datetime(),
+  ...memberAvatarUrlsShape,
 });
 export type EnrolledStudentSummary = z.infer<
   typeof enrolledStudentSummarySchema
@@ -46,6 +48,7 @@ export const eligibleStudentSummarySchema = z.object({
   userId: z.uuid(),
   displayName: z.string().nullable(),
   email: z.email().nullable(),
+  ...memberAvatarUrlsShape,
 });
 export type EligibleStudentSummary = z.infer<
   typeof eligibleStudentSummarySchema
@@ -80,6 +83,7 @@ export const eligibleTeacherSummarySchema = z.object({
   userId: z.uuid(),
   displayName: z.string().nullable(),
   email: z.email().nullable(),
+  ...memberAvatarUrlsShape,
 });
 export type EligibleTeacherSummary = z.infer<
   typeof eligibleTeacherSummarySchema

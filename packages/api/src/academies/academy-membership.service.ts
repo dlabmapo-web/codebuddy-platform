@@ -7,6 +7,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
+import { bumpPeopleRevision } from "../manage/people-revision.js";
 import { AuditService } from "./audit.service.js";
 
 const membershipInclude = {
@@ -84,6 +85,10 @@ export class AcademyMembershipService {
         before: { role: membership.role, status: membership.status },
         after: { role: updated.role, status: updated.status },
       });
+      // §8.1 — every membership change moves the academy's people revision,
+      // inside the same transaction, so a bulk selection or an import preview
+      // built before this cannot silently commit over it.
+      await bumpPeopleRevision(transaction, input.academyId);
       return { member: toAcademyMember(updated), changed: true };
     });
     if (changed) {
@@ -130,6 +135,11 @@ export class AcademyMembershipService {
         before: { role: membership.role, status: membership.status },
         after: { role: updated.role, status: updated.status },
       });
+
+      // §8.1 — every membership change moves the academy's people
+      // revision, inside the same transaction, so a bulk selection or an import
+      // preview built before this cannot silently commit over it.
+      await bumpPeopleRevision(transaction, input.academyId);
       return toAcademyMember(updated);
     });
     await this.revocation.revokeMembership(
@@ -170,6 +180,11 @@ export class AcademyMembershipService {
         before: { role: membership.role, status: membership.status },
         after: { role: updated.role, status: updated.status },
       });
+
+      // §8.1 — every membership change moves the academy's people
+      // revision, inside the same transaction, so a bulk selection or an import
+      // preview built before this cannot silently commit over it.
+      await bumpPeopleRevision(transaction, input.academyId);
       return toAcademyMember(updated);
     });
   }

@@ -5,14 +5,17 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { bumpPeopleRevision } from "../manage/people-revision.js";
+import {
+  noMemberAvatar,
+  resolveMemberAvatars,
+} from "../profile/member-avatars.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 import { AuditService } from "./audit.service.js";
-import { toJoinRequestDetail } from "./academy-onboarding.service.js";
-
-const requestInclude = {
-  user: {
-    select: { id: true, email: true, displayName: true },
-  },
-} as const;
+import {
+  requestInclude,
+  toJoinRequestDetail,
+} from "./academy-onboarding.service.js";
 
 @Injectable()
 export class AcademyJoinRequestService {
@@ -20,6 +23,8 @@ export class AcademyJoinRequestService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
+    /** The applications table shows faces, like every other people surface. */
+    private readonly profileMedia: ProfileMediaService,
   ) {}
 
   async list(identity: SupabaseIdentity, academyId: string) {
@@ -33,7 +38,22 @@ export class AcademyJoinRequestService {
       include: requestInclude,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
-    return { requests: requests.map(toJoinRequestDetail) };
+    // Applicants have no academy photo — they are not members yet — so only
+    // their own account image is signed. `map(toJoinRequestDetail)` would pass
+    // the array index as the avatar argument, hence the explicit arrow.
+    const avatars = await resolveMemberAvatars(
+      this.profileMedia,
+      requests.map((request) => ({
+        user: request.user,
+        memberProfile: null,
+        key: request.id,
+      })),
+    );
+    return {
+      requests: requests.map((request) =>
+        toJoinRequestDetail(request, avatars.get(request.id) ?? noMemberAvatar),
+      ),
+    };
   }
 
   async review(identity: SupabaseIdentity, input: ReviewAcademyJoinRequest) {
@@ -147,6 +167,10 @@ export class AcademyJoinRequestService {
         },
         reason: input.reason,
       });
+
+      // §8.1 — an approved application is a new member, so the revision
+      // moves with it.
+      await bumpPeopleRevision(transaction, request.academyId);
       return toJoinRequestDetail(approved);
     });
   }

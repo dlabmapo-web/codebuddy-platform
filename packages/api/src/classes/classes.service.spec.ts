@@ -6,6 +6,7 @@ import type { AcademyAccessService } from "../authorization/academy-access.servi
 import { AppException } from "../common/app-exception.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
+import type { ProfileMediaService } from "../profile/profile-media.service.js";
 import { ClassesService } from "./classes.service.js";
 
 const identity: SupabaseIdentity = {
@@ -108,6 +109,12 @@ function createService(options?: {
     record?.enrollments.map((enrollment) => enrollment.membershipId) ?? [],
   );
   const transaction = {
+    // Enrolment changes bump the academy's people revision in the same
+    // transaction — §8.1 of the manager control tower design — so the double
+    // has to answer for the academy row as well as the class.
+    academy: {
+      update: vi.fn().mockResolvedValue({ peopleRevision: 1 }),
+    },
     class: {
       create: vi.fn().mockResolvedValue(record),
       update: vi.fn().mockResolvedValue(record),
@@ -228,7 +235,16 @@ function createService(options?: {
     audit,
     revocation: revocation as unknown as Record<string, ReturnType<typeof vi.fn>>,
     transaction,
-    service: new ClassesService(prisma, access, audit, revocation),
+    service: new ClassesService(
+      prisma,
+      access,
+      audit,
+      revocation,
+      // Rosters and pickers carry faces now. Signing nothing is the honest
+      // double: these tests are about authorization and audit, and an avatar
+      // that fails to sign degrades to the placeholder rather than to an error.
+      { signMany: vi.fn().mockResolvedValue([]) } as unknown as ProfileMediaService,
+    ),
   };
 }
 

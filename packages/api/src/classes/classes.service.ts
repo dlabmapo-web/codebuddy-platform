@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type {
+  AcademyAuditAction,
   ClassDetail,
   ClassStatus,
   ClassSummary,
@@ -11,6 +12,13 @@ import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
+import { bumpPeopleRevision } from "../manage/people-revision.js";
+import {
+  memberAvatarSelect,
+  noMemberAvatar,
+  resolveMemberAvatars,
+} from "../profile/member-avatars.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
@@ -64,7 +72,15 @@ const classDetailInclude = {
           id: true,
           role: true,
           status: true,
-          user: { select: { id: true, displayName: true, email: true } },
+          user: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              ...memberAvatarSelect.user.select,
+            },
+          },
+          memberProfile: memberAvatarSelect.memberProfile,
         },
       },
     },
@@ -88,6 +104,8 @@ export class ClassesService {
      * revalidation.
      */
     private readonly revocation: MonitoringRevocationService,
+    /** Rosters and pickers show people, and a person has a face. */
+    private readonly profileMedia: ProfileMediaService,
   ) {}
 
   async list(
@@ -111,7 +129,7 @@ export class ClassesService {
     input: { academyId: string; classId: string },
   ): Promise<ClassDetail> {
     await this.requireClassManager(identity, input.academyId);
-    return toClassDetail(await this.requireClass(input.academyId, input.classId));
+    return this.presentDetail(await this.requireClass(input.academyId, input.classId));
   }
 
   async create(
@@ -144,7 +162,7 @@ export class ClassesService {
       });
       return record;
     });
-    return toClassDetail(created);
+    return this.presentDetail(created);
   }
 
   async update(
@@ -189,7 +207,7 @@ export class ClassesService {
       });
       return record;
     });
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
   }
 
   async setStatus(
@@ -240,7 +258,7 @@ export class ClassesService {
     if (archiving && updated.status === "ARCHIVED") {
       await this.revocation.revokeClass(input.classId, "CLASS_ARCHIVED");
     }
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
   }
 
   /**
@@ -323,7 +341,26 @@ export class ClassesService {
     if (removed.length > 0) {
       await this.revocation.revokeClass(input.classId, "MATERIAL_UNAVAILABLE");
     }
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
+  }
+
+  /**
+   * A class detail, with its roster's faces.
+   *
+   * Every public method returns through here rather than calling the mapper
+   * directly, because signing is async and the mapper is not — and a second
+   * presenter that forgot the avatars is exactly how one endpoint would quietly
+   * return a faceless roster while the rest showed photos.
+   */
+  private async presentDetail(record: ClassRecord): Promise<ClassDetail> {
+    const avatars = await resolveMemberAvatars(
+      this.profileMedia,
+      record.enrollments.map((enrollment) => ({
+        ...enrollment.membership,
+        key: enrollment.membershipId,
+      })),
+    );
+    return toClassDetail(record, avatars);
   }
 
   /**
@@ -345,16 +382,29 @@ export class ClassesService {
       },
       select: {
         id: true,
-        user: { select: { id: true, displayName: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            ...memberAvatarSelect.user.select,
+          },
+        },
+        memberProfile: memberAvatarSelect.memberProfile,
       },
       orderBy: [{ user: { displayName: "asc" } }, { id: "asc" }],
     });
+    const avatars = await resolveMemberAvatars(
+      this.profileMedia,
+      memberships.map((membership) => ({ ...membership, key: membership.id })),
+    );
     return {
       students: memberships.map((membership) => ({
         membershipId: membership.id,
         userId: membership.user.id,
         displayName: membership.user.displayName,
         email: membership.user.email,
+        ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),
     };
   }
@@ -425,9 +475,12 @@ export class ClassesService {
         requestId: context.requestId,
         after: { membershipIds: added },
       });
+      // §8.1 — enrolment changes who is in this academy's classes, which is
+      // what a bulk enrolment selection was resolved against.
+      await bumpPeopleRevision(tx, input.academyId);
       return record;
     });
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
   }
 
   /**
@@ -474,13 +527,14 @@ export class ClassesService {
         requestId: context.requestId,
         before: { membershipId: input.membershipId },
       });
+      await bumpPeopleRevision(tx, input.academyId);
       return record;
     });
     await this.revocation.revokeScope(
       { classId: input.classId, studentMembershipRef: input.membershipId },
       "ENROLLMENT_REMOVED",
     );
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
   }
 
   /**
@@ -501,16 +555,29 @@ export class ClassesService {
       where: eligibleTeacherWhere(input.academyId),
       select: {
         id: true,
-        user: { select: { id: true, displayName: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            ...memberAvatarSelect.user.select,
+          },
+        },
+        memberProfile: memberAvatarSelect.memberProfile,
       },
       orderBy: [{ user: { displayName: "asc" } }, { id: "asc" }],
     });
+    const avatars = await resolveMemberAvatars(
+      this.profileMedia,
+      memberships.map((membership) => ({ ...membership, key: membership.id })),
+    );
     return {
       teachers: memberships.map((membership) => ({
         membershipId: membership.id,
         userId: membership.user.id,
         displayName: membership.user.displayName,
         email: membership.user.email,
+        ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),
     };
   }
@@ -598,7 +665,7 @@ export class ClassesService {
         "ASSIGNMENT_CHANGED",
       );
     }
-    return toClassDetail(updated);
+    return this.presentDetail(updated);
   }
 
   private requireClassManager(identity: SupabaseIdentity, academyId: string) {
@@ -672,7 +739,7 @@ function eligibleTeacherWhere(academyId: string) {
 function teacherAuditAction(
   previous: string | null,
   next: string | null,
-): "class.teacher.assigned" | "class.teacher.replaced" | "class.teacher.removed" {
+): Extract<AcademyAuditAction, `class.teacher.${string}`> {
   if (next === null) return "class.teacher.removed";
   return previous === null ? "class.teacher.assigned" : "class.teacher.replaced";
 }
@@ -754,7 +821,10 @@ function toClassSummary(record: ClassRecord): ClassSummary {
   return classSummaryFields(record, record.enrollments.length);
 }
 
-function toClassDetail(record: ClassRecord): ClassDetail {
+function toClassDetail(
+  record: ClassRecord,
+  avatars: Map<string, typeof noMemberAvatar>,
+): ClassDetail {
   const summary = toClassSummary(record);
   return {
     ...summary,
@@ -773,6 +843,7 @@ function toClassDetail(record: ClassRecord): ClassDetail {
       membershipStatus: enrollment.membership.status,
       role: enrollment.membership.role,
       enrolledAt: enrollment.enrolledAt.toISOString(),
+      ...(avatars.get(enrollment.membershipId) ?? noMemberAvatar),
     })),
   };
 }

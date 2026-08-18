@@ -6,6 +6,7 @@ import { useLayoutTranslation } from '@/i18n';
 
 import {
   acceptInvitationAction,
+  dismissInvitationAction,
   type InvitationActionState,
 } from '../actions';
 
@@ -29,6 +30,17 @@ export function InvitationAcceptance() {
         type="submit"
       >
         {pending ? t('invitation.submitting') : t('invitation.submit')}
+      </button>
+      {/* The way out. This page is reached by having *seen* an invitation link,
+          not by being the person invited, so it must never be a room with one
+          door that only opens for somebody else. */}
+      <button
+        className="h-11 w-full rounded-xl border border-border font-semibold text-sub transition-colors hover:text-ink disabled:opacity-60"
+        disabled={pending}
+        formAction={dismissInvitationAction}
+        type="submit"
+      >
+        {t('invitation.dismiss')}
       </button>
     </form>
   );

@@ -92,6 +92,10 @@ enum MonitoringVisitEndReason {
   MATERIAL_UNAVAILABLE
   CONNECTION_EXPIRED
   FEATURE_DISABLED
+  /// The platform suspended the whole academy. The connection guard runs once
+  /// at connect time, so an open watch outlives a suspension unless the
+  /// lifecycle service closes it explicitly.
+  ACADEMY_SUSPENDED
 }
 
 enum MaterialType {
@@ -264,6 +268,7 @@ model User {
   mediaUploaded         MediaAsset[]              @relation("MediaUploader")
   peopleImports         PeopleImportSession[]     @relation("PeopleImportActor")
   peopleBulkOperations  PeopleBulkOperation[]     @relation("PeopleBulkActor")
+  academiesCreated      Academy[]                 @relation("AcademyCreator")
 
   @@index([status])
   @@map("users")
@@ -436,6 +441,22 @@ model Academy {
   /// is what the completion prompt on the overview asks about.
   profileUpdatedAt DateTime? @map("profile_updated_at") @db.Timestamptz(6)
 
+  /// When the platform last moved this academy between ACTIVE, SUSPENDED, and
+  /// ARCHIVED. Null means it has been ACTIVE since it was created.
+  ///
+  /// One column rather than the `archivedAt` shape `Class` uses: a class has a
+  /// single terminal state, whereas an academy has two plus a reversible one,
+  /// so a timestamp per state would need a rule about which one wins after a
+  /// suspend-then-archive. The *reason* for the move lives on the audit record.
+  statusChangedAt DateTime? @map("status_changed_at") @db.Timestamptz(6)
+
+  /// The platform admin who onboarded this academy.
+  ///
+  /// Nullable because every academy that predates platform administration was
+  /// seeded and has no creator. SetNull so removing a departed operator's
+  /// account never blocks on an academy they once created.
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+
   /// Bumped inside the transaction of every membership, invitation, and
   /// enrollment change.
   ///
@@ -449,6 +470,7 @@ model Academy {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy              User?                      @relation("AcademyCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   memberships            AcademyMembership[]
   invitations            AcademyInvitation[]
   joinRequests           AcademyJoinRequest[]
@@ -466,6 +488,8 @@ model Academy {
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
+  /// The platform academy list's default ordering, newest first within a state.
+  @@index([status, createdAt(sort: Desc)])
   @@map("academies")
 }
 

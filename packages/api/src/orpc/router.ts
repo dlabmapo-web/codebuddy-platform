@@ -35,6 +35,9 @@ import { PeopleDirectoryService } from "../manage/people-directory.service.js";
 import { createManageRouters } from "../manage/manage.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
+import { PlatformAcademyService } from "../platform/platform-academy.service.js";
+import { PlatformLifecycleService } from "../platform/platform-lifecycle.service.js";
+import { createPlatformRouters } from "../platform/platform.router.js";
 import { AcademyProfileService } from "../profile/academy-profile.service.js";
 import { ProfileService } from "../profile/profile.service.js";
 import { createProfileRouters } from "../profile/profile.router.js";
@@ -91,6 +94,10 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     invitationDeliveryService: app.get(InvitationDeliveryService, {
       strict: false,
     }),
+    platformAcademyService: app.get(PlatformAcademyService, { strict: false }),
+    platformLifecycleService: app.get(PlatformLifecycleService, {
+      strict: false,
+    }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -123,6 +130,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const classesRouters = createClassesRouters(os, deps);
   const profileRouters = createProfileRouters(os, deps);
   const manageRouters = createManageRouters(os, deps);
+  const platformRouters = createPlatformRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
@@ -131,6 +139,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...classesRouters,
     ...profileRouters,
     ...manageRouters,
+    ...platformRouters,
     learn: createLearnRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),

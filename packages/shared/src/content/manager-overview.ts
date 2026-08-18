@@ -737,6 +737,12 @@ export const academyAuditActions = [
   "class.teacher.assigned",
   "class.teacher.replaced",
   "class.teacher.removed",
+  // Platform acts that land on an academy-scoped invitation row, and so reach
+  // the manager's Recent changes panel through its `AcademyInvitation`
+  // allow-list. Named here because the first thing a new manager sees would
+  // otherwise be their own invitation printed as a raw dotted code.
+  "platform.academy.first_manager_invited",
+  "platform.academy.first_manager_invitation_resent",
 ] as const;
 
 export type AcademyAuditAction = (typeof academyAuditActions)[number];

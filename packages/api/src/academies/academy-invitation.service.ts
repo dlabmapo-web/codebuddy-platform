@@ -11,7 +11,13 @@ import { bumpPeopleRevision } from "../manage/people-revision.js";
 import { AuditService } from "./audit.service.js";
 import { toAcademyMember } from "./academy-membership.service.js";
 
-const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
+/**
+ * Shared with the platform's first-manager invitation rather than copied.
+ * A new customer's first manager may be slower to arrive than an ordinary
+ * member, but the answer to that is the resend, not a second lifetime
+ * constant that drifts from this one.
+ */
+export const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
 const invitationInclude = {} as const;
 
 @Injectable()

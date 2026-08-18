@@ -27,6 +27,8 @@ import type { PeopleImportService } from "../manage/people-import.service.js";
 import type { ManagerOverviewService } from "../manage/manager-overview.service.js";
 import type { PeopleDirectoryService } from "../manage/people-directory.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
+import type { PlatformAcademyService } from "../platform/platform-academy.service.js";
+import type { PlatformLifecycleService } from "../platform/platform-lifecycle.service.js";
 import type { AcademyProfileService } from "../profile/academy-profile.service.js";
 import type { ProfileService } from "../profile/profile.service.js";
 import type { TeacherOverviewService } from "../teach/teacher-overview.service.js";
@@ -67,6 +69,8 @@ export type ORPCDeps = {
   peopleImportService: PeopleImportService;
   peopleBulkService: PeopleBulkService;
   invitationDeliveryService: InvitationDeliveryService;
+  platformAcademyService: PlatformAcademyService;
+  platformLifecycleService: PlatformLifecycleService;
 };
 
 export function requestAddress(req: Request): string {

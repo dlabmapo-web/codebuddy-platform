@@ -27,6 +27,8 @@
     "class.teacher.assigned": "담당 선생님 배정",
     "class.teacher.replaced": "담당 선생님 교체",
     "class.teacher.removed": "담당 선생님 해제",
+    "platform.academy.first_manager_invited": "Cove가 첫 매니저를 초대했습니다",
+    "platform.academy.first_manager_invitation_resent": "Cove가 첫 매니저 초대를 다시 보냈습니다",
     "fallback": "{{action}}"
   }
 }

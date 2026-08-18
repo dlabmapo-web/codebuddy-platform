@@ -765,6 +765,7 @@ export const monitoringVisitEndReasons = [
   "MATERIAL_UNAVAILABLE",
   "CONNECTION_EXPIRED",
   "FEATURE_DISABLED",
+  "ACADEMY_SUSPENDED",
 ] as const;
 export const monitoringVisitEndReasonSchema = z.enum(monitoringVisitEndReasons);
 export type MonitoringVisitEndReason = z.infer<
@@ -780,6 +781,9 @@ const revocationEndReasons = new Set<MonitoringVisitEndReason>([
   "ROLE_CHANGED",
   "MATERIAL_UNAVAILABLE",
   "FEATURE_DISABLED",
+  // The platform switched the whole academy off. As total a revocation as
+  // there is, and the teacher is owed the reason rather than a dead socket.
+  "ACADEMY_SUSPENDED",
 ]);
 
 export function isAccessRevocation(reason: MonitoringVisitEndReason): boolean {

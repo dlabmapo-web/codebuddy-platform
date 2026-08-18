@@ -268,8 +268,25 @@ export class InvitationDeliveryService {
   }) {
     const academy = await this.prisma.academy.findUnique({
       where: { id: input.academyId },
-      select: { name: true },
+      select: { name: true, status: true },
     });
+
+    // An invitation into an academy that is switched off leads to a wall:
+    // acceptance is refused downstream, so the message could only confuse its
+    // recipient. Recorded as a permanent failure rather than dropped, so the
+    // invitation's delivery history says why nothing arrived — and so the
+    // retry sweep does not keep trying while the academy stays suspended.
+    if (academy && academy.status !== "ACTIVE") {
+      return this.prisma.invitationDeliveryAttempt.update({
+        where: { id: input.attemptId },
+        data: {
+          state: "FAILED",
+          failureCode: "academy_unavailable",
+          failedAt: new Date(),
+        },
+      });
+    }
+
     const result = await this.sender.send({
       to: input.email,
       subject: `You have been invited to ${academy?.name ?? "an academy"} on Cove`,

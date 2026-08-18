@@ -65,6 +65,22 @@ export class MonitoringRevocationService {
     await this.revoke({ studentMembershipRef: studentMembershipId }, reason);
   }
 
+  /**
+   * The platform suspended or archived the whole academy: nobody keeps
+   * watching anybody in it.
+   *
+   * The connection guard runs once, when a teacher joins, so an open watch
+   * outlives a suspension until something closes it. Without this, suspending
+   * an academy would leave every live session already in flight streaming a
+   * student's code to a teacher who is no longer allowed to see it.
+   */
+  async revokeAcademy(
+    academyId: string,
+    reason: MonitoringVisitEndReason,
+  ): Promise<void> {
+    await this.revoke({ academyId }, reason);
+  }
+
   /** Revokes only the relationship that changed, preserving unrelated classes. */
   async revokeScope(
     scope: {
@@ -100,6 +116,7 @@ export class MonitoringRevocationService {
    */
   private async revoke(
     scope: {
+      academyId?: string;
       classId?: string;
       teacherMembershipRef?: string;
       studentMembershipRef?: string;

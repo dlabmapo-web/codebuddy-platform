@@ -148,7 +148,8 @@
     "ROLE_CHANGED": "The role changed.",
     "MATERIAL_UNAVAILABLE": "The exercise is no longer available.",
     "CONNECTION_EXPIRED": "The connection was lost.",
-    "FEATURE_DISABLED": "Live monitoring was turned off."
+    "FEATURE_DISABLED": "Live monitoring was turned off.",
+    "ACADEMY_SUSPENDED": "This academy is unavailable."
   },
   "navigator": {
     "footer_teacher": "Back to the class"

@@ -86,6 +86,7 @@ export class MonitoringVisitService {
    */
   async endOpenVisits(
     scope: {
+      academyId?: string;
       classId?: string;
       teacherMembershipRef?: string;
       studentMembershipRef?: string;
@@ -102,6 +103,7 @@ export class MonitoringVisitService {
   > {
     const where = {
       endedAt: null,
+      ...(scope.academyId ? { academyId: scope.academyId } : {}),
       ...(scope.classId ? { classId: scope.classId } : {}),
       ...(scope.teacherMembershipRef
         ? { teacherMembershipRef: scope.teacherMembershipRef }

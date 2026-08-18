@@ -92,6 +92,32 @@ export const apiEnvironmentSchema = z.object({
    * the manager who needs to chase it.
    */
   EMAIL_WEBHOOK_SECRET: z.string().min(16).optional(),
+  /**
+   * The organization every academy is created inside.
+   *
+   * One platform-owned organization rather than one per academy: an academy's
+   * slug is unique per organization, so a single organization makes it
+   * effectively global — which is what an operator assumes anyway — and a
+   * franchise wanting several branches grouped later is then a re-point of
+   * `organizationId` rather than a merge of throwaway rows.
+   */
+  PLATFORM_ORGANIZATION_SLUG: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase slug")
+    .default("cove"),
+  /**
+   * The one-time first-admin bootstrap, per the authorization design §16.
+   *
+   * Both optional and both required together. Absent, the command refuses to
+   * run — which is how it stays disabled in every environment that is not
+   * being bootstrapped right now, including production after the fact.
+   * `PLATFORM_BOOTSTRAP_ENV` must match the running `NODE_ENV`: it exists so a
+   * `.env` copied from staging cannot promote anybody in production.
+   */
+  PLATFORM_BOOTSTRAP_ADMIN_EMAIL: z.string().min(3).max(200).optional(),
+  PLATFORM_BOOTSTRAP_ENV: z
+    .enum(["development", "test", "production"])
+    .optional(),
 }).superRefine((environment, context) => {
   if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {
     context.addIssue({

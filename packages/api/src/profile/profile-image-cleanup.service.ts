@@ -71,6 +71,7 @@ export class ProfileImageCleanupService implements OnModuleInit, OnModuleDestroy
             createdAt: { lt: cutoff },
             userAvatars: { none: {} },
             memberAvatars: { none: {} },
+            academyMedia: { none: {} },
           },
         ],
       },

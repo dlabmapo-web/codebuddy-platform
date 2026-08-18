@@ -71,6 +71,24 @@ export class ProfileMediaService {
    * GPS coordinates of a child's home inside it, do not survive re-encoding.
    */
   async normalize(input: Buffer): Promise<NormalizedImage> {
+    return this.normalizeTo(input, profileImageEdge, profileImageEdge);
+  }
+
+  /** Academy presentation images keep a landscape composition. */
+  async normalizeAcademy(
+    input: Buffer,
+    kind: "COVER" | "GALLERY",
+  ): Promise<NormalizedImage> {
+    return kind === "COVER"
+      ? this.normalizeTo(input, 1600, 600)
+      : this.normalizeTo(input, 1200, 800);
+  }
+
+  private async normalizeTo(
+    input: Buffer,
+    width: number,
+    height: number,
+  ): Promise<NormalizedImage> {
     if (input.byteLength === 0) {
       throw new AppException("PROFILE_IMAGE_DECODE_FAILED");
     }
@@ -99,7 +117,7 @@ export class ProfileMediaService {
         // that cropped somewhere else would make that preview a promise the
         // upload does not keep. A person choosing their own photo is a better
         // judge of what matters in it than an entropy heuristic.
-        .resize(profileImageEdge, profileImageEdge, {
+        .resize(width, height, {
           fit: "cover",
           position: "centre",
         })
@@ -119,8 +137,8 @@ export class ProfileMediaService {
     return {
       bytes,
       contentType: "image/webp",
-      width: profileImageEdge,
-      height: profileImageEdge,
+      width,
+      height,
       checksumSha256: createHash("sha256").update(bytes).digest("hex"),
     };
   }
@@ -143,6 +161,14 @@ export class ProfileMediaService {
     assetId: string,
   ): string {
     return `academy/${academyId}/${membershipId}/${assetId}.webp`;
+  }
+
+  academyMediaObjectKey(
+    academyId: string,
+    kind: "COVER" | "GALLERY",
+    assetId: string,
+  ): string {
+    return `academy/${academyId}/presentation/${kind.toLowerCase()}/${assetId}.webp`;
   }
 
   /** Uploads to the private bucket. The caller writes the metadata row. */

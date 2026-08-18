@@ -679,6 +679,20 @@ export const difficultProblemSchema = z
 export type DifficultProblem = z.infer<typeof difficultProblemSchema>;
 
 /**
+ * The fields the ordering actually reads.
+ *
+ * Stated as its own type so the manager overview can order academy-wide
+ * problems with this comparator rather than a near-copy of it. The two surfaces
+ * carry different rows — one is scoped to a class, the other is not — and a
+ * second implementation of "which problem is hardest" is how they would come to
+ * disagree about the same exercise on two pages of the same product.
+ */
+export type DifficultProblemOrder = Pick<
+  DifficultProblem,
+  "solveRate" | "attemptingStudents" | "submissions" | "materialId"
+> & { position: number };
+
+/**
  * §6.9's order, as a comparator.
  *
  * Repeated submissions by one student raise `submissions` but never
@@ -686,8 +700,8 @@ export type DifficultProblem = z.infer<typeof difficultProblemSchema>;
  * outrank a problem twenty children each failed once.
  */
 export function compareDifficultProblems(
-  left: DifficultProblem & { position: number },
-  right: DifficultProblem & { position: number },
+  left: DifficultProblemOrder,
+  right: DifficultProblemOrder,
 ): number {
   return (
     left.solveRate - right.solveRate ||

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 
 import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 
 import type {
@@ -51,12 +52,24 @@ export function ApplicationsTable({
         header: t('column.applicant'),
         cell: ({ row }) => {
           const { user } = row.original;
+          const name =
+            user.displayName ?? user.email ?? t('common:fallback.user');
           return (
-            <div className="min-w-0">
-              <p className="font-semibold">
-                {user.displayName ?? user.email ?? t('common:fallback.user')}
-              </p>
-              <p className="truncate text-[13px] text-sub">{user.email}</p>
+            <div className="flex min-w-0 items-center gap-2.5">
+              {/* An applicant is not a member yet, so only their own account
+                  photo exists to show — the chain falls through to the
+                  placeholder, which is the honest picture of somebody the
+                  academy has not met. */}
+              <ProfileAvatar
+                externalAvatarUrl={user.externalAvatarUrl}
+                globalImageUrl={user.globalImageUrl}
+                name={name}
+                size="sm"
+              />
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{name}</p>
+                <p className="truncate text-[13px] text-sub">{user.email}</p>
+              </div>
             </div>
           );
         },

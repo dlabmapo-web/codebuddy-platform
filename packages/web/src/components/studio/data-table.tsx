@@ -121,6 +121,21 @@ export type DataTableProps<TData, TValue> = {
    * header rule and row dividers stay, so it still reads as a table.
    */
   frameless?: boolean;
+  /**
+   * Sizes columns from their declared `size` instead of from their content.
+   *
+   * Opt-in, because it changes what a table does when it runs out of room. The
+   * default `auto` layout widens columns to fit their longest unbreakable token
+   * — a 35-character email address, a date set `whitespace-nowrap` — and once
+   * the sum of those exceeds the container the table grows a horizontal
+   * scrollbar, which on a people directory is the worst outcome: the reader
+   * loses the name column the moment they go looking for the last column.
+   *
+   * With `fixed`, declared widths are honoured and the one unsized column
+   * absorbs the slack and truncates. Every column must then declare a `size`
+   * except that one.
+   */
+  layout?: 'auto' | 'fixed';
   className?: string;
 };
 
@@ -139,6 +154,7 @@ export function DataTable<TData, TValue>({
   manual,
   loadingLabel,
   frameless = false,
+  layout = 'auto',
   className,
 }: DataTableProps<TData, TValue>) {
   const { t } = useLayoutTranslation('common');
@@ -363,7 +379,12 @@ export function DataTable<TData, TValue>({
           manual?.pending && 'opacity-60',
         )}
       >
-        <table className="w-full border-collapse text-left">
+        <table
+          className={cn(
+            'w-full border-collapse text-left',
+            layout === 'fixed' && 'table-fixed',
+          )}
+        >
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr className="border-b border-border bg-canvas" key={headerGroup.id}>
@@ -372,7 +393,10 @@ export function DataTable<TData, TValue>({
                   const sorted = header.column.getIsSorted();
                   return (
                     <th
-                      className="whitespace-nowrap px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-sub"
+                      className={cn(
+                        'whitespace-nowrap px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-sub',
+                        layout === 'fixed' && 'overflow-hidden',
+                      )}
                       key={header.id}
                       style={{ width: header.getSize() === 150 ? undefined : header.getSize() }}
                     >
@@ -469,7 +493,17 @@ export function DataTable<TData, TValue>({
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td className="px-4 py-3 align-middle text-[14px]" key={cell.id}>
+                    <td
+                      className={cn(
+                        'px-4 py-3 align-middle text-[14px]',
+                        // Without this a fixed-layout cell still paints its
+                        // content past its own box, so `truncate` on the child
+                        // would ellipsise nothing and the column would overlap
+                        // the next one.
+                        layout === 'fixed' && 'overflow-hidden',
+                      )}
+                      key={cell.id}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

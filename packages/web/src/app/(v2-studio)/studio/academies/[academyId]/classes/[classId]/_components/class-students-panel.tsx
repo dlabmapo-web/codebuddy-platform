@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 
 import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation } from '@/i18n';
 
 import { useContentDate } from '../../../content/_components/content-date';
@@ -53,9 +54,18 @@ export function ClassStudentsPanel({
           const learning = enrollmentGrantsAccess(student);
           return (
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-canvas text-[13px] font-bold text-sub">
-                {name.trim().charAt(0).toUpperCase()}
-              </span>
+              {/* The shared avatar, not a hand-rolled initial disc: this
+                  roster and the people directory show the same person, and two
+                  drawings of them is how one page ends up showing a photo the
+                  other does not. */}
+              <ProfileAvatar
+                academyImageUrl={student.academyImageUrl}
+                className="mt-0.5"
+                externalAvatarUrl={student.externalAvatarUrl}
+                globalImageUrl={student.globalImageUrl}
+                name={name}
+                size="sm"
+              />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[14.5px] font-bold">{name}</span>

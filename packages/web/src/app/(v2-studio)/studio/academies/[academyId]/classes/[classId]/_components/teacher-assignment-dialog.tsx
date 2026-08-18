@@ -3,6 +3,7 @@
 import { AlertTriangle } from 'lucide-react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { ResponsiveSelector } from '@/components/studio/selector';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -42,6 +43,9 @@ export function TeacherAssignmentDialog({
       t('detail.teacher_panel.no_name'),
     displayName: teacher.displayName,
     email: teacher.email,
+    academyImageUrl: teacher.academyImageUrl,
+    globalImageUrl: teacher.globalImageUrl,
+    externalAvatarUrl: teacher.externalAvatarUrl,
   }));
 
   const currentId = current?.membershipId ?? null;
@@ -99,14 +103,26 @@ export function TeacherAssignmentDialog({
                 placeholder={t('teacher_dialog.search')}
                 popoverClassName="w-[24rem]"
                 renderItem={(teacher) => (
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">
-                      {teacher.displayName ??
-                        teacher.email ??
-                        t('detail.teacher_panel.no_name')}
-                    </span>
-                    <span className="truncate text-[12px] text-sub">
-                      {teacher.email ?? t('detail.teacher_panel.no_email')}
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    {/* A picker is where a manager is choosing between people
+                        who may share a name, so the face is worth more here
+                        than anywhere else on the page. */}
+                    <ProfileAvatar
+                      academyImageUrl={teacher.academyImageUrl}
+                      externalAvatarUrl={teacher.externalAvatarUrl}
+                      globalImageUrl={teacher.globalImageUrl}
+                      name={teacher.displayName}
+                      size="sm"
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-semibold">
+                        {teacher.displayName ??
+                          teacher.email ??
+                          t('detail.teacher_panel.no_name')}
+                      </span>
+                      <span className="truncate text-[12px] text-sub">
+                        {teacher.email ?? t('detail.teacher_panel.no_email')}
+                      </span>
                     </span>
                   </span>
                 )}

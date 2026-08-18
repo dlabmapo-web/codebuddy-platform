@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils';
  *
  * The fallback chain lives in `@cove/shared` so the roster, the header, and
  * My Page cannot disagree about which picture is the right one. When nothing
- * has been uploaded anywhere, initials are the answer — never an empty frame,
- * because a row nobody can identify is a row nobody can act on.
+ * has been uploaded anywhere the answer is the placeholder below — never an
+ * empty frame, because an avatar-shaped hole reads as a page that failed to
+ * load rather than as a person who has not chosen a photo.
  */
 export type ProfileAvatarProps = {
   academyImageUrl?: string | null;
@@ -46,7 +47,10 @@ export function ProfileAvatar({
         dimensions.text,
         className,
       )}
-      data-avatar={resolved.kind}
+      // `initials` is the *chain's* name for "nothing was uploaded"; what that
+      // renders is this component's decision, so the attribute says what is
+      // actually on screen. Tests and probes read it.
+      data-avatar={resolved.kind === 'initials' ? 'placeholder' : resolved.kind}
       // Explicit physical dimensions avoid Safari's cyclic percentage sizing:
       // an image's intrinsic dimensions must never be allowed to size its
       // avatar wrapper.
@@ -58,7 +62,7 @@ export function ProfileAvatar({
       }}
     >
       {resolved.kind === 'initials' ? (
-        <span aria-hidden>{resolved.initials}</span>
+        <PlaceholderPerson />
       ) : (
         // Signed URLs and external OAuth photos both point off-origin and
         // expire, so the optimizer would cache a URL that stops resolving.
@@ -73,6 +77,34 @@ export function ProfileAvatar({
         />
       )}
     </span>
+  );
+}
+
+/**
+ * The stand-in for a member who has not uploaded a photo.
+ *
+ * Inline SVG rather than an image file, for three reasons that all matter here.
+ * It is drawn from the wrapper's own box, so one component serves every size
+ * from the 32px roster disc to the 96px profile header without a set of raster
+ * assets that are each wrong at three of the four. It costs no request, which
+ * on a page of twenty-five members is twenty-five requests not made. And it
+ * takes its colour from a token, so it recedes correctly on a dark page — a
+ * fixed grey PNG would glow.
+ *
+ * Decorative by construction: the name is always written beside it, so the
+ * figure is hidden from assistive technology rather than described twice.
+ */
+function PlaceholderPerson() {
+  return (
+    <svg
+      aria-hidden
+      className="absolute inset-0 h-full w-full fill-sub opacity-40"
+      viewBox="0 0 40 40"
+
+    >
+      <circle cx="20" cy="13.2" r="7.2" />
+      <path d="M20 22.6c-6.7 0-12.1 4.7-12.1 10.4 0 1.2 1 2.2 2.2 2.2h19.8c1.2 0 2.2-1 2.2-2.2 0-5.7-5.4-10.4-12.1-10.4Z" />
+    </svg>
   );
 }
 

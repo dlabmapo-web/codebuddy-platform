@@ -6,6 +6,7 @@
  */
 import type academy from '@cove/i18n/locales/en/academy.json';
 import type applications from '@cove/i18n/locales/en/applications.json';
+import type audit from '@cove/i18n/locales/en/audit.json';
 import type auth from '@cove/i18n/locales/en/auth.json';
 import type classes from '@cove/i18n/locales/en/classes.json';
 import type common from '@cove/i18n/locales/en/common.json';
@@ -14,9 +15,11 @@ import type courses from '@cove/i18n/locales/en/courses.json';
 import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
 import type learn from '@cove/i18n/locales/en/learn.json';
+import type manager from '@cove/i18n/locales/en/manager.json';
 import type members from '@cove/i18n/locales/en/members.json';
 import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
+import type peopleOps from '@cove/i18n/locales/en/people-ops.json';
 import type profile from '@cove/i18n/locales/en/profile.json';
 import type session from '@cove/i18n/locales/en/session.json';
 import type teach from '@cove/i18n/locales/en/teach.json';
@@ -29,6 +32,7 @@ declare module 'i18next' {
     resources: {
       academy: typeof academy;
       applications: typeof applications;
+      audit: typeof audit;
       auth: typeof auth;
       classes: typeof classes;
       common: typeof common;
@@ -37,9 +41,11 @@ declare module 'i18next' {
       errors: typeof errors;
       invitations: typeof invitations;
       learn: typeof learn;
+      manager: typeof manager;
       members: typeof members;
       monitoring: typeof monitoring;
       nav: typeof nav;
+      'people-ops': typeof peopleOps;
       profile: typeof profile;
       session: typeof session;
       teach: typeof teach;

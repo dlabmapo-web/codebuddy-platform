@@ -26,6 +26,15 @@ declare module '@tanstack/react-table' {
      * back to the column id and offers a teacher "activeTime" to hide.
      */
     label?: string;
+    /**
+     * Right-aligns the header and every cell in the column.
+     *
+     * For measurements. A column of figures aligned left forces the eye to
+     * re-find the digits on every row, and a manager comparing ten class rates
+     * down a column is doing exactly that comparison — the decimal points have
+     * to line up for it to be one glance rather than ten readings.
+     */
+    align?: 'right';
   }
 }
 

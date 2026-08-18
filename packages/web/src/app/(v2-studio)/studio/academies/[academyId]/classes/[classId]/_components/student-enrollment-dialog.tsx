@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { ResponsiveMultiSelector } from '@/components/studio/selector';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -28,6 +29,9 @@ export function StudentEnrollmentDialog({
       t('detail.students_panel.no_name'),
     email: student.email,
     displayName: student.displayName,
+    academyImageUrl: student.academyImageUrl,
+    globalImageUrl: student.globalImageUrl,
+    externalAvatarUrl: student.externalAvatarUrl,
   }));
 
   return (
@@ -62,14 +66,26 @@ export function StudentEnrollmentDialog({
                 placeholder={t('enroll_dialog.search')}
                 popoverClassName="w-[24rem]"
                 renderItem={(student) => (
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">
-                      {student.displayName ??
-                        student.email ??
-                        t('detail.students_panel.no_name')}
-                    </span>
-                    <span className="truncate text-[12px] text-sub">
-                      {student.email ?? t('detail.students_panel.no_email')}
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    {/* A picker is where a manager is choosing between people
+                        who may share a name, so the face is worth more here
+                        than anywhere else on the page. */}
+                    <ProfileAvatar
+                      academyImageUrl={student.academyImageUrl}
+                      externalAvatarUrl={student.externalAvatarUrl}
+                      globalImageUrl={student.globalImageUrl}
+                      name={student.displayName}
+                      size="sm"
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-semibold">
+                        {student.displayName ??
+                          student.email ??
+                          t('detail.students_panel.no_name')}
+                      </span>
+                      <span className="truncate text-[12px] text-sub">
+                        {student.email ?? t('detail.students_panel.no_email')}
+                      </span>
                     </span>
                   </span>
                 )}

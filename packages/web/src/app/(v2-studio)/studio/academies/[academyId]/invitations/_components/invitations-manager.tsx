@@ -2,6 +2,8 @@
 
 import { Plus } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/components/studio/button';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -12,6 +14,7 @@ import { InvitationsTable } from './invitations-table';
 
 export function InvitationsManager({ academyId }: { academyId: string }) {
   const { t } = useLayoutTranslation('invitations');
+  const { t: tOps } = useTranslation('people-ops');
   const errorText = useErrorText();
   const manager = useInvitationsManager(academyId);
 
@@ -39,8 +42,14 @@ export function InvitationsManager({ academyId }: { academyId: string }) {
         }
       />
 
+      {manager.resendError ? (
+        <p className="text-[14px] font-semibold text-danger" role="alert">
+          {errorText(manager.resendError, tOps('delivery.resend_failed'))}
+        </p>
+      ) : null}
+
       {manager.revokeError ? (
-        <p className="text-[14px] font-semibold text-danger">
+        <p className="text-[14px] font-semibold text-danger" role="alert">
           {errorText(manager.revokeError, t('revoke_failed'))}
         </p>
       ) : null}

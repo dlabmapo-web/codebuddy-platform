@@ -85,6 +85,9 @@ export const appErrorCodes = [
   "ACADEMY_MEDIA_ALT_REQUIRED",
   "ACADEMY_MEDIA_LIMIT_REACHED",
   "ACADEMY_MEDIA_NOT_FOUND",
+  "PLATFORM_ACCESS_DENIED",
+  "ACADEMY_SLUG_CONFLICT",
+  "ACADEMY_STATE_CONFLICT",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -223,5 +226,9 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
     "The image could not be saved. Your previous photo is unchanged.",
   ACADEMY_MEDIA_ALT_REQUIRED: "Describe the image or mark it as decorative.",
   ACADEMY_MEDIA_LIMIT_REACHED: "The academy gallery already has six images.",
+  PLATFORM_ACCESS_DENIED: "This area is not available for your account.",
+  ACADEMY_SLUG_CONFLICT: "That academy address is already taken.",
+  ACADEMY_STATE_CONFLICT:
+    "This academy cannot move to that state from its current one.",
   ACADEMY_MEDIA_NOT_FOUND: "That academy image is not available.",
 };

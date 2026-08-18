@@ -83,5 +83,8 @@
   "ACADEMY_MEDIA_ALT_REQUIRED": "Describe the image or mark it as decorative.",
   "ACADEMY_MEDIA_LIMIT_REACHED": "The academy gallery already has six images.",
   "ACADEMY_MEDIA_NOT_FOUND": "That academy image is not available.",
+  "PLATFORM_ACCESS_DENIED": "This area is not available for your account.",
+  "ACADEMY_SLUG_CONFLICT": "That academy address is already taken. Choose another.",
+  "ACADEMY_STATE_CONFLICT": "This academy cannot move to that state from its current one.",
   "UNKNOWN": "Something went wrong. Try again."
 }

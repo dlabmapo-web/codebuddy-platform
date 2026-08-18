@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { roleHasPermission } from "./roles.js";
+import {
+  academyPermissions,
+  platformPermissions,
+  platformRoleHasPermission,
+  roleHasPermission,
+} from "./roles.js";
 
 describe("roleHasPermission", () => {
   it("allows managers to manage academy members", () => {
@@ -78,6 +83,33 @@ describe("roleHasPermission", () => {
       expect(roleHasPermission(role, "content.import")).toBe(false);
       expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(false);
       expect(roleHasPermission(role, "curriculum.review")).toBe(false);
+    }
+  });
+});
+
+describe("platformRoleHasPermission", () => {
+  it("gives a platform admin the academy lifecycle capabilities", () => {
+    expect(platformRoleHasPermission("ADMIN", "platform.academies.read"))
+      .toBe(true);
+    expect(platformRoleHasPermission("ADMIN", "platform.academies.create"))
+      .toBe(true);
+    expect(platformRoleHasPermission("ADMIN", "platform.academies.lifecycle"))
+      .toBe(true);
+  });
+
+  it("gives an ordinary user nothing at all", () => {
+    for (const permission of platformPermissions) {
+      expect(platformRoleHasPermission("USER", permission)).toBe(false);
+    }
+  });
+
+  it("keeps the two permission axes disjoint", () => {
+    // The academy map must never be reachable through a platform role, and the
+    // platform map never through an academy one. Overlapping names are how a
+    // support role would quietly acquire academy data access later.
+    const academyNames = new Set<string>(academyPermissions);
+    for (const permission of platformPermissions) {
+      expect(academyNames.has(permission)).toBe(false);
     }
   });
 });

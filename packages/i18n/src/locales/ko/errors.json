@@ -83,5 +83,8 @@
   "ACADEMY_MEDIA_ALT_REQUIRED": "이미지를 설명하거나 장식용으로 표시해 주세요.",
   "ACADEMY_MEDIA_LIMIT_REACHED": "학원 갤러리에는 이미 이미지가 6개 있습니다.",
   "ACADEMY_MEDIA_NOT_FOUND": "해당 학원 이미지를 사용할 수 없습니다.",
+  "PLATFORM_ACCESS_DENIED": "이 영역은 사용할 수 없는 계정입니다.",
+  "ACADEMY_SLUG_CONFLICT": "이미 사용 중인 학원 주소입니다. 다른 주소를 입력해 주세요.",
+  "ACADEMY_STATE_CONFLICT": "현재 상태에서는 해당 상태로 변경할 수 없습니다.",
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요."
 }

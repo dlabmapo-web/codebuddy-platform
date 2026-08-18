@@ -1,0 +1,32 @@
+{
+  "action": {
+    "academy.invitation.created": "Sent an invitation",
+    "academy.invitation.resent": "Resent an invitation",
+    "academy.invitation.revoked": "Revoked an invitation",
+    "academy.invitation.accepted": "Accepted an invitation",
+    "academy.join_request.approved": "Approved an application",
+    "academy.join_request.rejected": "Declined an application",
+    "academy.membership.role_changed": "Changed a role",
+    "academy.membership.suspended": "Suspended a membership",
+    "academy.membership.restored": "Restored a membership",
+    "academy.member_profile.updated": "Updated a member profile",
+    "academy.member_profile.image_replaced": "Replaced a member photo",
+    "academy.member_profile.image_removed": "Removed a member photo",
+    "academy.people.imported": "Imported members",
+    "academy.people.bulk.enroll": "Enrolled members in bulk",
+    "academy.people.bulk.role_change": "Changed roles in bulk",
+    "academy.people.bulk.suspend": "Suspended members in bulk",
+    "academy.people.bulk.restore": "Restored members in bulk",
+    "class.created": "Created a class",
+    "class.updated": "Updated a class",
+    "class.archived": "Archived a class",
+    "class.restored": "Restored a class",
+    "class.courses.updated": "Changed a class's courses",
+    "class.students.enrolled": "Enrolled students",
+    "class.student.removed": "Removed a student",
+    "class.teacher.assigned": "Assigned a teacher",
+    "class.teacher.replaced": "Replaced the teacher",
+    "class.teacher.removed": "Removed the teacher",
+    "fallback": "{{action}}"
+  }
+}

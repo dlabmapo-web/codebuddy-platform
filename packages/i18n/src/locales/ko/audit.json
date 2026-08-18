@@ -1,0 +1,32 @@
+{
+  "action": {
+    "academy.invitation.created": "초대 발송",
+    "academy.invitation.resent": "초대 다시 발송",
+    "academy.invitation.revoked": "초대 취소",
+    "academy.invitation.accepted": "초대 수락",
+    "academy.join_request.approved": "가입 신청 승인",
+    "academy.join_request.rejected": "가입 신청 거절",
+    "academy.membership.role_changed": "역할 변경",
+    "academy.membership.suspended": "구성원 정지",
+    "academy.membership.restored": "구성원 복구",
+    "academy.member_profile.updated": "구성원 프로필 수정",
+    "academy.member_profile.image_replaced": "구성원 사진 교체",
+    "academy.member_profile.image_removed": "구성원 사진 삭제",
+    "academy.people.imported": "구성원 가져오기",
+    "academy.people.bulk.enroll": "일괄 반 등록",
+    "academy.people.bulk.role_change": "일괄 역할 변경",
+    "academy.people.bulk.suspend": "일괄 정지",
+    "academy.people.bulk.restore": "일괄 복구",
+    "class.created": "반 생성",
+    "class.updated": "반 수정",
+    "class.archived": "반 보관",
+    "class.restored": "반 복구",
+    "class.courses.updated": "반 과정 변경",
+    "class.students.enrolled": "학생 등록",
+    "class.student.removed": "학생 제외",
+    "class.teacher.assigned": "담당 선생님 배정",
+    "class.teacher.replaced": "담당 선생님 교체",
+    "class.teacher.removed": "담당 선생님 해제",
+    "fallback": "{{action}}"
+  }
+}

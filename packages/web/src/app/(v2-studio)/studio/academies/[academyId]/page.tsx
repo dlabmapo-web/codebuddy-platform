@@ -5,6 +5,7 @@ import { academyRoleFor } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { AcademyOverview } from './_components/academy-overview';
+import { ManagerAcademyOverview } from './_components/manager-academy-overview';
 import { StudioShell } from './_components/studio-shell';
 import { TeacherAcademyOverview } from './_components/teacher-academy-overview';
 
@@ -21,7 +22,15 @@ import { TeacherAcademyOverview } from './_components/teacher-academy-overview';
  * a management role has no path to teacher analytics even if the API were to
  * answer them — and it does not.
  *
- * Managers keep the management-oriented overview they already had.
+ * A Manager gets the control tower: the academy's own identity, what is waiting
+ * on a decision, and whether the place is growing and learning. Chosen here for
+ * the same reason — the manager surfaces read across every class in the academy,
+ * and a shared dashboard that branched internally would be one edit away from
+ * handing that reach to a role the API would refuse.
+ *
+ * Anyone else with an academy membership and neither role — a Team Lead —
+ * falls through to the plain membership summary, which is all their permissions
+ * authorize.
  */
 export default async function AcademyPage({
   params,
@@ -52,6 +61,22 @@ export default async function AcademyPage({
         title={t('teaching_overview_title')}
       >
         <TeacherAcademyOverview
+          academyId={academyId}
+          searchParams={await searchParams}
+        />
+      </StudioShell>
+    );
+  }
+
+  if (role === 'MANAGER') {
+    return (
+      <StudioShell
+        academyId={academyId}
+        bleed
+        description={t('control_tower_description')}
+        title={t('control_tower_title')}
+      >
+        <ManagerAcademyOverview
           academyId={academyId}
           searchParams={await searchParams}
         />

@@ -22,14 +22,25 @@ export default async function MyPage() {
   const { t } = await getServerTranslation(['profile']);
 
   let firstAcademyId: string | null = null;
+  let isPlatformAdmin = false;
   try {
     const account = await createServerORPCClient().auth.me({});
     firstAcademyId = account.user.memberships.find(
       (membership) => membership.status === 'ACTIVE',
     )?.academy.id ?? null;
+    isPlatformAdmin = account.user.platformRole === 'ADMIN';
   } catch {
     redirect('/auth/login');
   }
+
+  // Where "back" goes for someone with no academy. A platform operator has one
+  // by design, and pointing them at the sign-in page — the previous answer for
+  // anyone membership-less — would read as though their session had lapsed.
+  const backHref = firstAcademyId
+    ? `/studio/academies/${firstAcademyId}`
+    : isPlatformAdmin
+      ? '/platform'
+      : '/auth/login';
 
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, profileNamespaces);
@@ -41,9 +52,7 @@ export default async function MyPage() {
       resources={resources}
     >
       <MyPageShell
-        backHref={
-          firstAcademyId ? `/studio/academies/${firstAcademyId}` : '/auth/login'
-        }
+        backHref={backHref}
         backLabel={t('back_to_studio')}
         title={t('title')}
       >

@@ -70,6 +70,16 @@ export const peopleOpsNamespaces = [
  */
 
 /**
+ * The platform operator's console.
+ *
+ * Its own list, and never a layout namespace: this copy is read by a handful
+ * of Cove staff, and a student's RSC payload should not carry the vocabulary
+ * for suspending their academy. `errors` travels with it because every action
+ * on this surface is a mutation that can be refused.
+ */
+export const platformNamespaces = ['platform', 'errors'] as const;
+
+/**
  * The student inactivity countdown, mounted by the academy layout.
  *
  * Its own list, and a very small one: it is the only copy every authenticated
@@ -93,5 +103,6 @@ export type PageNamespace =
   | (typeof teachingNamespaces)[number]
   | (typeof managerNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
+  | (typeof platformNamespaces)[number]
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number];

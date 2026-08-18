@@ -110,6 +110,27 @@ describe('resolveAcademyAccessState', () => {
     expect(authDestination(input)).toBe('/auth/welcome');
   });
 
+  it('sends a platform operator to the console rather than the welcome page', () => {
+    // Belonging to no academy is the design for an operator, not an unfinished
+    // signup — so the screen telling them to ask a manager for an invitation is
+    // the one place they must never land.
+    expect(authDestination(account({ platformRole: 'ADMIN' }))).toBe('/platform');
+  });
+
+  it('lets a real academy membership outrank the console', () => {
+    // An operator who is also a manager somewhere is arriving as that manager.
+    expect(
+      authDestination(
+        account({
+          platformRole: 'ADMIN',
+          memberships: [
+            { academy, role: 'MANAGER', status: 'ACTIVE', imageUrl: null },
+          ],
+        }),
+      ),
+    ).toBe(`/studio/academies/${academy.id}`);
+  });
+
   it('exposes academy management only to managers', () => {
     expect(canManageAcademy('MANAGER')).toBe(true);
     expect(canManageAcademy('TEAM_LEAD')).toBe(false);

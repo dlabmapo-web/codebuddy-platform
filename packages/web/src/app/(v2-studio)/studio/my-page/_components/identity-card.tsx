@@ -5,6 +5,9 @@ import type {
   MyProfileResponse,
   ProfileMembership,
 } from '@cove/shared';
+import { ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
+
 import { avatarSourceOf } from '@/components/studio/profile-avatar';
 import { useLocale } from '@/i18n';
 import { useTranslation } from 'react-i18next';
@@ -133,10 +136,18 @@ export function IdentityCard({
             </p>
           )}
 
+          {/* The only entrance to the platform console, and deliberately the
+              quietest thing on this card. It is rendered for nobody else: an
+              operator already knows where it is, and a link a non-admin can see
+              but not open is an invitation to wonder what is behind it. */}
           {profile.profile.platformRole === 'ADMIN' ? (
-            <p className="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-sub">
+            <Link
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-sub transition-colors hover:text-ink focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              href="/platform"
+            >
               {t('platform_role.ADMIN')}
-            </p>
+              <ArrowUpRight aria-hidden className="size-3.5" />
+            </Link>
           ) : null}
         </div>
       </div>

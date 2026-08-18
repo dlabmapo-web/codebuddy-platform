@@ -74,6 +74,16 @@ export function authDestination(account: AuthMeResponse): string {
       ? `/studio/academies/${academy.id}/learn/courses`
       : `/studio/academies/${academy.id}`;
   }
+  // A platform operator belongs to no academy — that is the design, not an
+  // incomplete signup — so every screen below this line would tell them to ask
+  // a manager for an invitation they do not need. They have somewhere to be.
+  //
+  // Checked after the active membership rather than before it: an operator who
+  // is also a real member of a real academy is arriving as that member, and the
+  // console is one click away from My Page either way.
+  if (account.user.platformRole === 'ADMIN') {
+    return '/platform';
+  }
   if (state.kind === 'welcome') {
     return '/auth/welcome';
   }

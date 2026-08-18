@@ -20,10 +20,18 @@ export async function signInAs({
   page,
   identifier,
   password,
+  landing = /\/studio\/academies\//,
 }: {
   page: Page;
   identifier: string;
   password: string;
+  /**
+   * Where this account is expected to arrive. Overridable because not every
+   * account lands in an academy: a platform operator belongs to none by
+   * design and is routed to the console instead, so the default pattern would
+   * wait out its timeout on a page that is already correct.
+   */
+  landing?: RegExp;
 }): Promise<string> {
   const key = `${identifier}\u0000${password}`;
   const cached = sessions.get(key);
@@ -39,8 +47,10 @@ export async function signInAs({
   await page.locator('input[name="identifier"]').fill(identifier);
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//, { timeout: 30_000 });
+  await page.waitForURL(landing, { timeout: 30_000 });
 
+  // Empty for an account with no academy. Callers that need one pass a landing
+  // pattern that guarantees it.
   const academyId = academyIdFrom(page);
   sessions.set(key, {
     academyId,
@@ -51,7 +61,5 @@ export async function signInAs({
 }
 
 function academyIdFrom(page: Page): string {
-  const academyId = /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1];
-  if (!academyId) throw new Error(`Sign-in did not resolve an academy: ${page.url()}`);
-  return academyId;
+  return /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? '';
 }

@@ -20,6 +20,7 @@ import type members from '@cove/i18n/locales/en/members.json';
 import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
 import type peopleOps from '@cove/i18n/locales/en/people-ops.json';
+import type platform from '@cove/i18n/locales/en/platform.json';
 import type profile from '@cove/i18n/locales/en/profile.json';
 import type session from '@cove/i18n/locales/en/session.json';
 import type teach from '@cove/i18n/locales/en/teach.json';
@@ -46,6 +47,7 @@ declare module 'i18next' {
       monitoring: typeof monitoring;
       nav: typeof nav;
       'people-ops': typeof peopleOps;
+      platform: typeof platform;
       profile: typeof profile;
       session: typeof session;
       teach: typeof teach;

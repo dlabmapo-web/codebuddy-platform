@@ -1,15 +1,29 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import type {
-  CreateAcademyJoinRequest,
-} from "@cove/shared";
+import type { CreateAcademyJoinRequest, MemberAvatarUrls } from "@cove/shared";
 
+import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { SupabaseIdentity } from "../auth/auth.types.js";
+import {
+  memberAvatarSelect,
+  noMemberAvatar,
+} from "../profile/member-avatars.js";
 
-const requestInclude = {
+/**
+ * An applicant, with the photo they set on their own account.
+ *
+ * No academy-scoped image is selected because there is no membership yet — the
+ * whole point of a join request is that they are not in the academy. The
+ * fallback chain handles the absence.
+ */
+export const requestInclude = {
   user: {
-    select: { id: true, email: true, displayName: true },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      ...memberAvatarSelect.user.select,
+    },
   },
 } as const;
 
@@ -166,11 +180,14 @@ export function toJoinRequestDetail(request: {
   createdAt: Date;
   reviewedAt: Date | null;
   user: { id: string; email: string | null; displayName: string | null };
-}) {
+}, avatar: MemberAvatarUrls = noMemberAvatar) {
   return {
     id: request.id,
     academyId: request.academyId,
-    user: request.user,
+    // An applicant is not a member yet, so there is no academy-scoped photo to
+    // find — only whatever they set on their own account. The three fields
+    // still travel, so the same avatar component renders here as everywhere.
+    user: { ...request.user, ...avatar },
     message: request.message,
     status: request.status,
     approvedRole: request.approvedRole,

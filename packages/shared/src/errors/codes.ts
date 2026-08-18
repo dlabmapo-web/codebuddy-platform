@@ -65,6 +65,15 @@ export const appErrorCodes = [
   "TEACHER_PROGRESS_ACCESS_DENIED",
   "TEACHER_PROGRESS_NOT_FOUND",
   "TEACHER_OVERVIEW_ACCESS_DENIED",
+  "MANAGER_OPERATIONS_ACCESS_DENIED",
+  "IMPORT_FILE_REJECTED",
+  "IMPORT_SESSION_NOT_FOUND",
+  "IMPORT_PREVIEW_EXPIRED",
+  "IMPORT_NOT_COMMITTABLE",
+  "IMPORT_IN_PROGRESS",
+  "PEOPLE_REVISION_CONFLICT",
+  "BULK_OPERATION_IN_PROGRESS",
+  "BULK_SELECTION_EMPTY",
   "PROFILE_NOT_FOUND",
   "PROFILE_CHANGED",
   "PROFILE_VALIDATION_FAILED",
@@ -73,6 +82,9 @@ export const appErrorCodes = [
   "PROFILE_IMAGE_TOO_LARGE",
   "PROFILE_IMAGE_DECODE_FAILED",
   "PROFILE_IMAGE_STORAGE_FAILED",
+  "ACADEMY_MEDIA_ALT_REQUIRED",
+  "ACADEMY_MEDIA_LIMIT_REACHED",
+  "ACADEMY_MEDIA_NOT_FOUND",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -170,6 +182,27 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // denial says nothing about which of them exist either.
   TEACHER_OVERVIEW_ACCESS_DENIED:
     "You do not have a teaching overview for this academy.",
+  // The manager surfaces read across the whole academy, so one code covers no
+  // membership, a suspended one, the wrong role, and another academy's id.
+  MANAGER_OPERATIONS_ACCESS_DENIED:
+    "You are not an active manager of this academy.",
+  // The workbook itself, before any row was judged. The specific reason
+  // travels as the exception's detail so the interface can name it.
+  IMPORT_FILE_REJECTED: "That file could not be read as a member list.",
+  // One code for "no such session" and "another academy's session", so a
+  // manager cannot confirm another academy's imports exist.
+  IMPORT_SESSION_NOT_FOUND: "That import is no longer available.",
+  IMPORT_PREVIEW_EXPIRED:
+    "This preview has expired. Upload the file again to see current results.",
+  IMPORT_NOT_COMMITTABLE:
+    "Fix the errors and acknowledge the warnings before importing.",
+  IMPORT_IN_PROGRESS: "This import is already running.",
+  // The roster moved while a preview or a selection was on screen. Never
+  // resolved by overwriting: the manager re-reads and decides again.
+  PEOPLE_REVISION_CONFLICT:
+    "The member list changed while you were working. Reload and try again.",
+  BULK_OPERATION_IN_PROGRESS: "That bulk operation is already running.",
+  BULK_SELECTION_EMPTY: "Nobody in the current selection can be changed.",
   // One answer for "no such membership", "not yours", and "not in your
   // academy": a manager must not be able to enumerate another academy's
   // members by reading which failure comes back.
@@ -188,4 +221,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // The previous photo is still in place when this arrives; nothing was lost.
   PROFILE_IMAGE_STORAGE_FAILED:
     "The image could not be saved. Your previous photo is unchanged.",
+  ACADEMY_MEDIA_ALT_REQUIRED: "Describe the image or mark it as decorative.",
+  ACADEMY_MEDIA_LIMIT_REACHED: "The academy gallery already has six images.",
+  ACADEMY_MEDIA_NOT_FOUND: "That academy image is not available.",
 };

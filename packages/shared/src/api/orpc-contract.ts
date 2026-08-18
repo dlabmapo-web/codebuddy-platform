@@ -13,7 +13,17 @@ import {
 import { academyClassesContract } from "./orpc/classes.contract.js";
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
+import {
+  academyOperationsOverviewContract,
+  academyOperationsProfileContract,
+  academyPeopleContract,
+} from "./orpc/manager-overview.contract.js";
 import { monitoringContract } from "./orpc/monitoring.contract.js";
+import {
+  academyInvitationDeliveryContract,
+  academyPeopleBulkContract,
+  academyPeopleImportContract,
+} from "./orpc/people-operations.contract.js";
 import {
   academyProfileContract,
   profileContract,
@@ -36,6 +46,12 @@ export const appContract = {
   monitoring: monitoringContract,
   studentSession: studentSessionContract,
   teacherProgress: teacherProgressContract,
+  academyOperationsOverview: academyOperationsOverviewContract,
+  academyOperationsProfile: academyOperationsProfileContract,
+  academyPeople: academyPeopleContract,
+  academyPeopleImport: academyPeopleImportContract,
+  academyPeopleBulk: academyPeopleBulkContract,
+  academyInvitationDelivery: academyInvitationDeliveryContract,
   academyTeacherOverview: academyTeacherOverviewContract,
   academyTeacherStudents: academyTeacherStudentsContract,
 };

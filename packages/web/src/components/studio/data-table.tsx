@@ -107,6 +107,19 @@ export type DataTableProps<TData, TValue> = {
   initialColumnVisibility?: VisibilityState;
   onRowClick?: (row: TData) => void;
   /**
+   * Emphasis one row carries because of what it *is*, not what it holds.
+   *
+   * For the rare table where one row is the reader's own — their position in a
+   * class standing, their entry in a list of many — and losing it in a sorted
+   * page defeats the point of showing the page at all. Returns classes for
+   * that row's `<tr>`; every other row is untouched.
+   *
+   * Deliberately not a per-row style hook in general. A table that colours
+   * rows by their values is a table that has started grading them, and the
+   * cells are where a value belongs.
+   */
+  rowClassName?: (row: TData) => string | undefined;
+  /**
    * Server-owned sorting, filtering, and paging.
    *
    * Omit it — as every existing consumer does — and the table keeps its
@@ -151,6 +164,7 @@ export function DataTable<TData, TValue>({
   showColumnVisibility = true,
   initialColumnVisibility,
   onRowClick,
+  rowClassName,
   manual,
   loadingLabel,
   frameless = false,
@@ -488,6 +502,7 @@ export function DataTable<TData, TValue>({
                   className={cn(
                     'transition-colors hover:bg-canvas/70',
                     onRowClick && 'cursor-pointer',
+                    rowClassName?.(row.original),
                   )}
                   key={row.id}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}

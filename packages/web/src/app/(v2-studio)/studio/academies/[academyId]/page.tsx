@@ -1,20 +1,22 @@
-import { redirect } from 'next/navigation';
-
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { academyRoleFor } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { AcademyOverview } from './_components/academy-overview';
 import { ManagerAcademyOverview } from './_components/manager-academy-overview';
+import { StudentAcademyOverview } from './_components/student-academy-overview';
 import { StudioShell } from './_components/studio-shell';
 import { TeacherAcademyOverview } from './_components/teacher-academy-overview';
 
 /**
  * One route, three answers.
  *
- * A Student is redirected to their catalog — `authDestination` already routes
- * them there on sign-in, and this covers every other way of arriving: a
- * bookmark, a shared link, a typed path.
+ * A Student gets their own overview: the work they left open, what the period
+ * measured, what their teacher wrote, and — where the academy enables it —
+ * where that puts them in their class. Chosen here rather than branched inside
+ * a shared dashboard for the same reason as the two below: this page is about
+ * exactly one person, and a component that decided its audience internally
+ * would be one edit away from letting it be about somebody else.
  *
  * A Teacher gets the teaching overview: their assigned classes, how those
  * classes are learning, and where help is most useful. Nobody else does. The
@@ -49,7 +51,22 @@ export default async function AcademyPage({
     // Leave an unreadable session to the shell, which redirects to login.
   }
   if (role === 'STUDENT') {
-    redirect(`/studio/academies/${academyId}/learn/courses`);
+    return (
+      <StudioShell
+        academyId={academyId}
+        bleed
+        // The overview owns its own heading: it greets the student by name and
+        // carries the period control, and the shell's static title above it
+        // repeated the sentence the first panel already says.
+        showPageHeading={false}
+        title={t('learning_overview_title')}
+      >
+        <StudentAcademyOverview
+          academyId={academyId}
+          searchParams={await searchParams}
+        />
+      </StudioShell>
+    );
   }
 
   if (role === 'TEACHER') {

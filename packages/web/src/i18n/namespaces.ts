@@ -40,6 +40,18 @@ export const teachingNamespaces = ["teaching", "errors"] as const;
 export const managerNamespaces = ["manager", "audit", "errors"] as const;
 
 /**
+ * The student's own academy overview.
+ *
+ * Its own list for the same reason `teaching` and `manager` have one. `learn`
+ * is already a layout namespace carrying the catalog, the workspace, and
+ * Answer records, and folding a whole dashboard's copy into it would push both
+ * the per-namespace and the root-payload budgets in `@cove/i18n`'s
+ * `locales.spec.ts`. This copy belongs to one role on one route and is paid
+ * for there.
+ */
+export const learningNamespaces = ["learning", "errors"] as const;
+
+/**
  * The people-operations surfaces: the directory, import, bulk changes, and
  * invitation delivery.
  *
@@ -102,6 +114,7 @@ export type PageNamespace =
   | (typeof teachNamespaces)[number]
   | (typeof teachingNamespaces)[number]
   | (typeof managerNamespaces)[number]
+  | (typeof learningNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof sessionNamespaces)[number]

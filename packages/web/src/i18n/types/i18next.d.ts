@@ -15,6 +15,7 @@ import type courses from '@cove/i18n/locales/en/courses.json';
 import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
 import type learn from '@cove/i18n/locales/en/learn.json';
+import type learning from '@cove/i18n/locales/en/learning.json';
 import type manager from '@cove/i18n/locales/en/manager.json';
 import type members from '@cove/i18n/locales/en/members.json';
 import type monitoring from '@cove/i18n/locales/en/monitoring.json';
@@ -42,6 +43,7 @@ declare module 'i18next' {
       errors: typeof errors;
       invitations: typeof invitations;
       learn: typeof learn;
+      learning: typeof learning;
       manager: typeof manager;
       members: typeof members;
       monitoring: typeof monitoring;

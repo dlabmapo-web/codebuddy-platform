@@ -65,6 +65,7 @@ export const appErrorCodes = [
   "TEACHER_PROGRESS_ACCESS_DENIED",
   "TEACHER_PROGRESS_NOT_FOUND",
   "TEACHER_OVERVIEW_ACCESS_DENIED",
+  "STUDENT_OVERVIEW_ACCESS_DENIED",
   "MANAGER_OPERATIONS_ACCESS_DENIED",
   "IMPORT_FILE_REJECTED",
   "IMPORT_SESSION_NOT_FOUND",
@@ -185,6 +186,11 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // denial says nothing about which of them exist either.
   TEACHER_OVERVIEW_ACCESS_DENIED:
     "You do not have a teaching overview for this academy.",
+  // The student overview is about one person, and that person is always the
+  // caller. Staff keep their own overview rather than receiving a narrower
+  // version of this one, so the denial says nothing about the academy either.
+  STUDENT_OVERVIEW_ACCESS_DENIED:
+    "You do not have a learning overview for this academy.",
   // The manager surfaces read across the whole academy, so one code covers no
   // membership, a suspended one, the wrong role, and another academy's id.
   MANAGER_OPERATIONS_ACCESS_DENIED:

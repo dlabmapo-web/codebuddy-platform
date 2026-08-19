@@ -14,6 +14,10 @@ import {
   solveSessionSchema,
 } from "../../content/answer-records.js";
 import {
+  getStudentOverviewInputSchema,
+  studentAcademyOverviewSchema,
+} from "../../content/student-overview.js";
+import {
   learnAcademyInputSchema,
   learnClassDetailSchema,
   learnClassInputSchema,
@@ -39,6 +43,21 @@ import {
  * remembered filter.
  */
 export const learnContract = {
+  /**
+   * The student's own academy overview, as one bounded read.
+   *
+   * §10.1 — one procedure and one instant. Eight independently clocked reads
+   * would let the ledger, the chart beneath it, and the class standing below
+   * that describe three different moments while sitting on one screen.
+   *
+   * The input names an academy, a period, and which class a standing should
+   * describe. It cannot name a student: the subject is resolved from the
+   * caller's identity, and a membership parameter here would be an
+   * authorization hole shaped exactly like a teacher's endpoint.
+   */
+  getOverview: oc
+    .input(getStudentOverviewInputSchema)
+    .output(studentAcademyOverviewSchema),
   listCourses: oc
     .input(learnAcademyInputSchema)
     .output(z.object({ courses: z.array(learnCourseSummarySchema) })),

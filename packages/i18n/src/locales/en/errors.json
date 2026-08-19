@@ -63,6 +63,7 @@
   "TEACHER_PROGRESS_ACCESS_DENIED": "You are not the assigned teacher for this class.",
   "TEACHER_PROGRESS_NOT_FOUND": "That is no longer part of this class.",
   "TEACHER_OVERVIEW_ACCESS_DENIED": "You do not have a teaching overview for this academy.",
+  "STUDENT_OVERVIEW_ACCESS_DENIED": "You do not have a learning overview for this academy.",
   "MANAGER_OPERATIONS_ACCESS_DENIED": "You are not an active manager of this academy.",
   "IMPORT_FILE_REJECTED": "That file could not be read as a member list.",
   "IMPORT_SESSION_NOT_FOUND": "That import is no longer available.",

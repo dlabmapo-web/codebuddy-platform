@@ -67,12 +67,13 @@ export function resolveAcademyAccessState(
 export function authDestination(account: AuthMeResponse): string {
   const state = resolveAcademyAccessState(account);
   if (state.kind === 'active') {
-    const { academy, role } = state.membership;
-    // A Student has no management surface, so the academy overview would be an
-    // empty page for them. Send them where their work is.
-    return role === 'STUDENT'
-      ? `/studio/academies/${academy.id}/learn/courses`
-      : `/studio/academies/${academy.id}`;
+    const { academy } = state.membership;
+    // Every role lands on the academy root, which answers to each of them
+    // differently: a teaching overview, a control tower, or — since the
+    // student overview shipped — the work that student left open. Sending a
+    // student past it to the catalog would skip the one section that knows
+    // which problem they were in the middle of.
+    return `/studio/academies/${academy.id}`;
   }
   // A platform operator belongs to no academy — that is the design, not an
   // incomplete signup — so every screen below this line would tell them to ask

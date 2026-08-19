@@ -193,11 +193,13 @@ describe('resolveAcademyAccessState', () => {
     expect(isStudent(null)).toBe(false);
   });
 
-  it('keeps My Courses as the academy landing destination for a student', () => {
+  it('lands a student on the academy overview, not the catalog', () => {
+    // The overview is the one surface that knows which problem they stopped
+    // in the middle of. Sending them past it to My Courses would skip it.
     const destination = authDestination(account({
       memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null }],
     }));
-    expect(destination).toBe(`/studio/academies/${academy.id}/learn/courses`);
+    expect(destination).toBe(`/studio/academies/${academy.id}`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

@@ -75,6 +75,13 @@ enum ClassStatus {
 /// cannot read as "off" for every academy at once.
 enum AcademyFeature {
   TEACHER_LIVE_MONITORING
+  /// Whether students may see where they sit in their class.
+  ///
+  /// Off unless an academy turns it on. §9.7 of the student academy overview
+  /// design — this is the only student surface that says anything about
+  /// another student, and an academy that has not asked for it should not have
+  /// to discover it after the fact.
+  STUDENT_CLASS_STANDING
 }
 
 /// Why one teacher's watch of one student ended. Recorded on the visit and

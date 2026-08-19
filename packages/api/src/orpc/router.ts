@@ -24,6 +24,7 @@ import { createContentRouters } from "../content/content.router.js";
 import { AnswerRecordsService } from "../learn/answer-records.service.js";
 import { LearnClassService } from "../learn/learn-class.service.js";
 import { LearnService } from "../learn/learn.service.js";
+import { StudentOverviewService } from "../learn/student-overview.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
 import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
@@ -77,6 +78,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     answerRecordsService: app.get(AnswerRecordsService, { strict: false }),
     learnClassService: app.get(LearnClassService, { strict: false }),
     learnService: app.get(LearnService, { strict: false }),
+    studentOverviewService: app.get(StudentOverviewService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
     monitoringService: app.get(MonitoringService, { strict: false }),
     profileService: app.get(ProfileService, { strict: false }),

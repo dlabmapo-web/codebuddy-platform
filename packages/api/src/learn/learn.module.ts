@@ -4,11 +4,15 @@ import { ConfigService } from "@nestjs/config";
 import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { TeachModule } from "../teach/teach.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { AnswerRecordsService } from "./answer-records.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
+import { StudentOverviewAccessService } from "./student-overview-access.service.js";
+import { StudentOverviewRepository } from "./student-overview.repository.js";
+import { StudentOverviewService } from "./student-overview.service.js";
 import { SubmissionController } from "./submission.controller.js";
 import { SubmissionService } from "./submission.service.js";
 
@@ -18,13 +22,20 @@ import { SubmissionService } from "./submission.service.js";
  * boots and every read keeps working when grading is unavailable.
  */
 @Module({
-  imports: [AcademiesModule, AuthModule, AuthorizationModule],
+  // `TeachModule` is imported for `TeacherProgressRepository` alone. The
+  // student overview suggests the same exercises a teacher is told to check,
+  // and §7.8 requires one rule for both — the repository holds no
+  // authorization of its own, which is what makes the seam safe to cross.
+  imports: [AcademiesModule, AuthModule, AuthorizationModule, TeachModule],
   controllers: [SubmissionController],
   providers: [
     AnswerRecordsService,
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
+    StudentOverviewAccessService,
+    StudentOverviewRepository,
+    StudentOverviewService,
     SubmissionService,
     {
       provide: JudgeQueue,
@@ -43,6 +54,7 @@ import { SubmissionService } from "./submission.service.js";
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
+    StudentOverviewService,
     SubmissionService,
     JudgeQueue,
   ],

@@ -5,6 +5,16 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    /**
+     * The student's own overview. Authorized by the same student middleware as
+     * every other read here; the subject is resolved from the identity, and no
+     * input names a student.
+     */
+    getOverview: os.learn.getOverview
+      .use(access.studentAuthenticated)
+      .handler(({ context, input }) =>
+        deps.studentOverviewService.get(context.identity, input)
+      ),
     listCourses: os.learn.listCourses
       .use(access.studentAuthenticated)
       .handler(({ context, input }) =>

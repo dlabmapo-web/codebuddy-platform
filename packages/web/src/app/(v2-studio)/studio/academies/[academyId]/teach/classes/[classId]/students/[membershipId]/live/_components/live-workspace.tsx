@@ -22,6 +22,10 @@ import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
+import {
+  STATEMENT_CANVAS_MIN_WIDTH,
+  STATEMENT_PANE,
+} from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useTeacherDisplay } from '../_hooks/use-teacher-display';
@@ -194,7 +198,15 @@ export function LiveWorkspace({
     dragging: draggingStatement,
     containerRef: paneContainerRef,
     dividerProps: statementDividerProps,
-  } = useSplitPane({ axis: 'horizontal', initial: 44, min: 24, max: 66 });
+  } = useSplitPane({
+    axis: 'horizontal',
+    initial: STATEMENT_PANE.initialPercent,
+    min: STATEMENT_PANE.minPercent,
+    // Matches the student's floor: the canvas is only a shared coordinate
+    // space if both panes can actually render it.
+    minPx: live.collaborating ? STATEMENT_CANVAS_MIN_WIDTH : undefined,
+    max: STATEMENT_PANE.maxPercent,
+  });
   const {
     size: outputHeight,
     dragging: draggingOutput,
@@ -373,6 +385,7 @@ export function LiveWorkspace({
               // renders through exactly the same presentation, because a public
               // statement is a public statement whichever mode fetched it.
               <ProblemStatement
+                collaborating={live.collaborating}
                 exercise={shown.exercise}
                 revealedHints={shown.exercise.hints.length}
               />

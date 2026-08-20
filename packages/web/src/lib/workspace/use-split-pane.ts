@@ -16,12 +16,23 @@ export function useSplitPane({
   axis,
   initial,
   min,
+  minPx,
   max,
 }: {
   axis: 'horizontal' | 'vertical';
   /** Percent for horizontal, pixels for vertical. */
   initial: number;
   min: number;
+  /**
+   * A floor in pixels, for a horizontal pane whose content cannot honestly
+   * render below a width — the statement canvas, whose scale is clamped and
+   * whose pane must not be draggable narrower than that clamp can represent.
+   *
+   * Applied on top of `min` rather than instead of it, and re-applied when it
+   * appears: a pane already dragged below the floor when collaboration begins
+   * has to widen, not stay narrow until the next drag.
+   */
+  minPx?: number;
   max: number;
 }) {
   const [size, setSize] = React.useState(initial);
@@ -62,10 +73,40 @@ export function useSplitPane({
           ? Math.min(max, Math.max(min, rect.height - MIN_OPPOSITE_PX))
           : max;
 
-      setSize(Math.max(min, Math.min(ceiling, next)));
+      const floor =
+        axis === 'horizontal' && minPx && rect.width > 0
+          ? Math.max(min, Math.min(max, (minPx / rect.width) * 100))
+          : min;
+
+      setSize(Math.max(floor, Math.min(ceiling, next)));
     },
-    [axis, max, min],
+    [axis, max, min, minPx],
   );
+
+  /**
+   * Re-applies the pixel floor when it appears or the container changes width.
+   *
+   * Without this, entering collaboration would leave a pane that was already
+   * narrower than the floor exactly where it was, and only a drag would ever
+   * correct it.
+   */
+  React.useEffect(() => {
+    if (axis !== 'horizontal' || !minPx) return;
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+
+    const apply = () => {
+      const width = container.clientWidth;
+      if (width <= 0) return;
+      const floor = Math.max(min, Math.min(max, (minPx / width) * 100));
+      setSize((current) => (current < floor ? floor : current));
+    };
+
+    const observer = new ResizeObserver(apply);
+    observer.observe(container);
+    apply();
+    return () => observer.disconnect();
+  }, [axis, max, min, minPx]);
 
   const finishDragging = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {

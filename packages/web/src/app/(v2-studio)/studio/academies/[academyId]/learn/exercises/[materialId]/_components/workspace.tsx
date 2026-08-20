@@ -16,6 +16,10 @@ import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
+import {
+  STATEMENT_CANVAS_MIN_WIDTH,
+  STATEMENT_PANE,
+} from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
@@ -62,7 +66,6 @@ export function Workspace({
     string | null
   >(null);
   const [revealedHints, setRevealedHints] = React.useState(0);
-  const [hintsExpanded, setHintsExpanded] = React.useState(true);
   const beforeTransitionRef =
     React.useRef<ExerciseTransitionLifecycle | null>(null);
 
@@ -148,7 +151,15 @@ export function Workspace({
     dragging: draggingStatement,
     containerRef: paneContainerRef,
     dividerProps: statementDividerProps,
-  } = useSplitPane({ axis: 'horizontal', initial: 46, min: 28, max: 68 });
+  } = useSplitPane({
+    axis: 'horizontal',
+    initial: STATEMENT_PANE.initialPercent,
+    min: STATEMENT_PANE.minPercent,
+    // While collaborating the statement lays out on a fixed canvas, which
+    // cannot be scaled below its floor and stay readable.
+    minPx: monitoring.collaborating ? STATEMENT_CANVAS_MIN_WIDTH : undefined,
+    max: STATEMENT_PANE.maxPercent,
+  });
   const handleRunSample = React.useCallback(
     async (index: number) => {
       const sample = exercise.sampleTestCases[index];
@@ -290,7 +301,6 @@ export function Workspace({
         submission.reset();
         setActiveSample(null);
         setRevealedHints(0);
-        setHintsExpanded(true);
         setOutputTab('terminal');
         setLastReadSubmissionId(null);
       },
@@ -456,9 +466,8 @@ export function Workspace({
             {...surfaceProps('statement')}
           >
             <ProblemStatement
+              collaborating={monitoring.collaborating}
               exercise={exercise}
-              hintsExpanded={hintsExpanded}
-              onHintsExpandedChange={setHintsExpanded}
               onRevealHint={handleRevealHint}
               revealedHints={revealedHints}
             />

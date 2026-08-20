@@ -32,10 +32,19 @@ export function useNavigatorPanel(panelId: string) {
     const onKeyDown = (event: KeyboardEvent) => {
       // Escape closes the panel and changes nothing else: not the displayed
       // exercise, not a teacher's preview, not the live watch.
-      if (event.key === 'Escape') close();
+      if (event.key !== 'Escape') return;
+      // ...and not a dialog's Escape. A modal owns that key while it is open,
+      // and dismissing one must not also dismiss the panel behind it — which
+      // the reader cannot see past, so the panel's disappearance reads as the
+      // workspace rearranging itself for no reason.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+      close();
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    // Capture, so this runs before the dialog's own handler on `document` and
+    // can still see it open. On the bubble path the dialog has already begun
+    // closing and the check above would miss it.
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [close, open]);
 
   return { close, open, panelId, toggle, triggerRef };

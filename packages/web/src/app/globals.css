@@ -387,6 +387,51 @@ h1, h2, h3, h4 {
   .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse, .cove-hint-in { animation: none !important; }
 }
 
+/* The curriculum navigator's geometry.
+   Hand-written rather than Tailwind arbitrary values. Safari discards
+   `.lg\:w-\[18rem\]`-style selectors, and without a width the panel keeps
+   `flex-shrink: 0` and an auto basis — max-content wide, crushing the
+   workspace beside it. `workspace.tsx` works the same bug around inline for
+   the statement pane; this is the panel's half of it.
+   `--cove-navigator-width` is the single value both modes read. */
+.cove-navigator {
+  --cove-navigator-width: 18rem;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: 30;
+  /* Single pane: an overlay that leaves a margin the workspace shows through,
+     never a cover. */
+  width: calc(100% - 3rem);
+  max-width: var(--cove-navigator-width);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Docked: the panel takes width from the row instead of covering it, as soon
+   as the workspace has two panes to show. The teacher's row appears at `lg`,
+   the student's at `md`, which is the only thing the two modes differ in. */
+@media (min-width: 48rem) {
+  .cove-navigator[data-dock="md"] {
+    position: static;
+    z-index: auto;
+    width: var(--cove-navigator-width);
+    max-width: none;
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 64rem) {
+  .cove-navigator[data-dock="lg"] {
+    position: static;
+    z-index: auto;
+    width: var(--cove-navigator-width);
+    max-width: none;
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+}
+
 .tiptap-render p { margin: 0.4em 0; }
 .tiptap-render h1 { font-size: 1.5em; font-weight: 700; margin: 0.8em 0 0.4em; }
 .tiptap-render h2 { font-size: 1.25em; font-weight: 700; margin: 0.7em 0 0.3em; }

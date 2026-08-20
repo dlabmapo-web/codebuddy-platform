@@ -21,7 +21,7 @@ import * as React from 'react';
 import { useLayoutTranslation } from '@/i18n';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import {
-  navigatorPanelClass,
+  navigatorPanelProps,
   navigatorScroll,
 } from '@/lib/workspace/navigator-geometry';
 
@@ -134,8 +134,8 @@ export function WorkspaceCurriculumNavigator({
   return (
     <aside
       aria-label={t('navigator.title')}
-      className={navigatorPanelClass(dockAt)}
       id={panelId}
+      {...navigatorPanelProps(dockAt)}
       // A peer pointing at the outline is pointing at a place both people can
       // name, so the panel declares itself as that place rather than being
       // wrapped in something that has no box to measure.

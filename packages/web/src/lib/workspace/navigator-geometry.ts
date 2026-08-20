@@ -12,20 +12,21 @@
 /**
  * Wide enough for a numbered row and a status word without wrapping.
  *
- * Written out in the class strings below rather than interpolated: Tailwind
- * finds utilities by scanning source text, and a class assembled at runtime is
- * a class that never gets generated.
+ * The value itself lives in `--cove-navigator-width` in `globals.css`, which
+ * is what actually sizes the panel. This constant exists for code that needs
+ * the number rather than the class.
  */
-export const NAVIGATOR_WIDTH_PX = 320;
+export const NAVIGATOR_WIDTH_PX = 288;
 
 /**
  * The panel is a column, not a cover.
  *
  * The threshold is the one the workspace itself uses to show two panes at
- * once, which is `md` and not `lg`. That distinction is the whole rule: as
- * soon as the statement and the editor are on screen together, a panel that
- * floats over them hides the problem the reader opened it to navigate. It
- * takes width instead, and nothing it opens beside becomes unreadable.
+ * once — `md` for the student, `lg` for the teacher, whose row of panes does
+ * not exist below it. That distinction is the whole rule: as soon as the
+ * statement and the editor are on screen together, a panel that floats over
+ * them hides the problem the reader opened it to navigate. It takes width
+ * instead, and nothing it opens beside becomes unreadable.
  *
  * Below that the workspace is a single pane behind tabs, so there is no width
  * to take and nothing to cover but the one pane being read. There the panel
@@ -33,21 +34,21 @@ export const NAVIGATOR_WIDTH_PX = 320;
  * is visible and operable, and dismissed with Escape, the trigger, or its own
  * close button.
  *
- * Between `md` and `lg` the column is narrower, because 320px out of 768px is
- * most of the room the statement had.
+ * Position, width and shadow all come from `.cove-navigator` in `globals.css`
+ * rather than from utilities. Safari discards Tailwind's arbitrary-value
+ * selectors, and a panel that loses its width while keeping `shrink-0` grows
+ * to max-content and crushes the workspace beside it — which is what a teacher
+ * on Safari saw. Only the parts with no arbitrary values stay as classes.
  */
-export function navigatorPanelClass(dockAt: 'md' | 'lg'): string {
-  const base = [
-    'flex min-h-0 flex-col overflow-hidden border-r border-border bg-card',
-    // Single-pane widths: an overlay that does not dim, blur, or inert what is
-    // behind it. Underscores preserve the whitespace CSS requires around `-`.
-    'absolute inset-y-0 left-0 z-30 w-[calc(100%_-_3rem)] max-w-[20rem] shadow-xl',
-  ];
-  const dock =
-    dockAt === 'md'
-      ? 'md:static md:z-auto md:w-[20rem] md:max-w-none md:shrink-0 md:shadow-none'
-      : 'lg:static lg:z-auto lg:w-[20rem] lg:max-w-none lg:shrink-0 lg:shadow-none';
-  return [...base, dock].join(' ');
+export function navigatorPanelProps(dockAt: 'md' | 'lg'): {
+  className: string;
+  'data-dock': 'md' | 'lg';
+} {
+  return {
+    className:
+      'cove-navigator flex min-h-0 flex-col overflow-hidden border-r border-border bg-card',
+    'data-dock': dockAt,
+  };
 }
 
 /**

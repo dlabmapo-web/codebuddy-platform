@@ -185,12 +185,79 @@ export type CollaborationSurface = z.infer<typeof collaborationSurfaceSchema>;
  */
 const normalizedCoordinateSchema = z.number().min(0).max(1);
 
+/**
+ * Which box the fraction below is a fraction *of*.
+ *
+ * `surface` is the pane's visible box, which is a scroll container for most
+ * surfaces — the same fraction means a different place to a reader who has
+ * scrolled elsewhere. `canvas` is the fixed-width logical canvas the statement
+ * renders into while collaborating, whose layout is a function of the content
+ * alone and is therefore identical on both screens.
+ *
+ * Both are numbers in `0..1`, and mixing them silently is exactly the bug this
+ * discriminator exists to make unrepresentable. A receiver that is not in the
+ * sender's space names the region instead of drawing an arrow.
+ */
+export const pointerSpaces = ["surface", "canvas"] as const;
+export const pointerSpaceSchema = z.enum(pointerSpaces);
+export type PointerSpace = z.infer<typeof pointerSpaceSchema>;
+
+/**
+ * How far down a canvas position may reach.
+ *
+ * Canvas coordinates are measured in *canvas widths*, on both axes, so `x` is
+ * a fraction but `y` is not: a statement three times taller than it is wide
+ * has a `y` of 3. Deliberately not a fraction of the content's height — the
+ * two people can be rendering statements of different heights (a teacher sees
+ * every hint, a student only what they have opened), and dividing by a number
+ * that differs between them is what put the two arrows on different lines.
+ * The width is fixed by `STATEMENT_CANVAS_WIDTH` and identical on both.
+ */
+export const canvasOrdinateMax = 64;
+const canvasOrdinateSchema = z.number().min(0).max(canvasOrdinateMax);
+
 export const collaborationPointerSchema = z.object({
   surface: collaborationSurfaceSchema,
   x: normalizedCoordinateSchema,
-  y: normalizedCoordinateSchema,
+  y: canvasOrdinateSchema,
+  /** Absent means `surface`: a client from before canvas mode existed. */
+  space: pointerSpaceSchema.default("surface"),
+  /**
+   * The material this position was measured against.
+   *
+   * A teacher previewing another exercise renders a different document under
+   * an unchanged `draftId`, and its fractions map perfectly onto the student's
+   * — producing a confident arrow on unrelated text. The receiver drops any
+   * position whose material is not the one it is rendering. Null from clients
+   * that predate the field, which are handled as unverifiable.
+   */
+  material: z.string().max(64).nullable().default(null),
 });
 export type CollaborationPointer = z.infer<typeof collaborationPointerSchema>;
+
+/**
+ * Whether a received position can be drawn against what this reader renders.
+ *
+ * These are refusals, not corrections: a mismatch has no truthful placement, so
+ * the caller names the region rather than guessing.
+ *
+ * The material is proved only in canvas space. A canvas fraction is an exact
+ * claim about a piece of content, so it has to say which content — a teacher
+ * previewing another exercise renders a different document under an unchanged
+ * draft, and its fractions would land perfectly and wrongly. A surface fraction
+ * never claimed that much, and demanding a material of it would refuse every
+ * pointer on the terminal, the editor, and the curriculum, none of which have
+ * one. Null in canvas space is unverifiable rather than matching: a guard that
+ * passes by default is not a guard.
+ */
+export function pointerIsPlaceable(
+  pointer: Pick<CollaborationPointer, "space" | "material">,
+  local: { space: PointerSpace; material: string | null },
+): boolean {
+  if (pointer.space !== local.space) return false;
+  if (pointer.space !== "canvas") return true;
+  return pointer.material !== null && pointer.material === local.material;
+}
 
 /** A Monaco selection, in editor coordinates both peers agree on. */
 export const collaborationCursorSchema = z.object({
@@ -216,6 +283,23 @@ export function normalizePointerPosition(
   return {
     x: Math.min(1, Math.max(0, position.x)),
     y: Math.min(1, Math.max(0, position.y)),
+  };
+}
+
+/**
+ * The same clamp for canvas space, where only `x` is a fraction.
+ *
+ * `y` is allowed past 1 because it is measured in canvas widths (see
+ * `canvasOrdinateMax`); clamping it at 1 would fold the whole statement below
+ * its first screenful onto one line.
+ */
+export function normalizeCanvasPosition(
+  position: { x: number; y: number },
+): { x: number; y: number } | null {
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return null;
+  return {
+    x: Math.min(1, Math.max(0, position.x)),
+    y: Math.min(canvasOrdinateMax, Math.max(0, position.y)),
   };
 }
 

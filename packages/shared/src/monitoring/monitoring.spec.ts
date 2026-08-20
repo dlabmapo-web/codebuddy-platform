@@ -416,7 +416,38 @@ describe("collaborationPointerSchema", () => {
   it("accepts a supported surface with normalized coordinates", () => {
     expect(
       collaborationPointerSchema.parse({ surface: "editor", x: 0.5, y: 1 }),
-    ).toEqual({ surface: "editor", x: 0.5, y: 1 });
+    ).toEqual({
+      surface: "editor",
+      x: 0.5,
+      y: 1,
+      space: "surface",
+      material: null,
+    });
+  });
+
+  it("reads a position from before canvas mode as a surface fraction", () => {
+    // A client that predates the field measured against the pane, so that is
+    // what the absent field has to mean. Reading it as a canvas fraction would
+    // draw it against a box it was never taken from.
+    const parsed = collaborationPointerSchema.parse({
+      surface: "statement",
+      x: 0.5,
+      y: 0.5,
+    });
+    expect(parsed.space).toBe("surface");
+    expect(parsed.material).toBeNull();
+  });
+
+  it("carries the document a canvas position was measured against", () => {
+    const parsed = collaborationPointerSchema.parse({
+      surface: "statement",
+      x: 0.5,
+      y: 0.5,
+      space: "canvas",
+      material: "20000000-0000-4000-8000-000000000001",
+    });
+    expect(parsed.space).toBe("canvas");
+    expect(parsed.material).toBe("20000000-0000-4000-8000-000000000001");
   });
 
   it("rejects an unsupported surface", () => {
@@ -450,7 +481,13 @@ describe("collaborationPointerSchema", () => {
       selector: "#code",
       text: "print(1)",
     });
-    expect(parsed).toEqual({ surface: "editor", x: 0.1, y: 0.2 });
+    expect(parsed).toEqual({
+      surface: "editor",
+      x: 0.1,
+      y: 0.2,
+      space: "surface",
+      material: null,
+    });
   });
 });
 

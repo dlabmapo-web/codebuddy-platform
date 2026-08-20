@@ -55,8 +55,8 @@ supabase/.temp/
 # docs/*
 # !docs/design/
 # !docs/design/**
-# test-results/
-# playwright-report/
+test-results/
+playwright-report/
 
 # Local Superpowers design-preview sessions
 .superpowers/

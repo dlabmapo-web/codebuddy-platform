@@ -169,6 +169,15 @@ function SheetContent({
 /* ------------------------------------------------------------------ modal */
 
 const Modal = DialogPrimitive.Root;
+/**
+ * The control that opens a `Modal`.
+ *
+ * Worth using rather than an ordinary button with an `onClick`: Radix returns
+ * focus to the element it knows as the trigger when the dialog closes, and a
+ * button it has never been told about leaves the caret on `body` — which drops
+ * a keyboard reader out of the page at exactly the moment they came back to it.
+ */
+const ModalTrigger = DialogPrimitive.Trigger;
 
 /**
  * A centered dialog for focused edits — naming a course, renaming a lecture,
@@ -218,6 +227,7 @@ export {
   Input,
   Modal,
   ModalContent,
+  ModalTrigger,
   Separator,
   Sheet,
   SheetContent,

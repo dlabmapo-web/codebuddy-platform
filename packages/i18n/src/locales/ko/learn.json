@@ -119,7 +119,9 @@
     "elapsed_time": "이 문제를 푼 시간",
     "reviewing": "{{submitted}} 제출",
     "submission_unavailable": "해당 제출을 불러오지 못했습니다. 현재 버전의 문제를 보고 있습니다.",
-    "back_to_records": "제출 기록으로 돌아가기"
+    "back_to_records": "제출 기록으로 돌아가기",
+    "hints_description": "하나씩 열어 보세요. 앞의 힌트부터 확인하는 편이 좋습니다.",
+    "hints_none_yet": "아직 공개한 힌트가 없습니다."
   },
   "submit": {
     "empty": "코드를 제출하면 채점 결과가 여기에 표시됩니다.",

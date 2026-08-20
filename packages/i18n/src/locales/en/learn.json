@@ -127,7 +127,9 @@
     "elapsed_time": "Time on this problem",
     "reviewing": "Submitted {{submitted}}",
     "submission_unavailable": "That submission could not be loaded. This is the current version of the problem.",
-    "back_to_records": "Back to answer records"
+    "back_to_records": "Back to answer records",
+    "hints_description": "Open them one at a time — try the earlier ones first.",
+    "hints_none_yet": "No hints opened yet."
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",

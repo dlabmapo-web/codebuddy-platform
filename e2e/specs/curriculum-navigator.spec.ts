@@ -21,12 +21,16 @@ const COURSE_TITLE = 'E2E Python Basics';
 const EXERCISE_TITLE = 'Echo the input';
 
 async function openWorkspace(page: Page) {
-  await signInAs({
+  const academyId = await signInAs({
     page,
     identifier: STUDENT_USERNAME,
     password: STUDENT_PASSWORD,
   });
 
+  // Start from the course list explicitly rather than from wherever signing in
+  // happens to land. A student now arrives on their academy overview, which
+  // has no course link for this filter to find.
+  await page.goto(`/studio/academies/${academyId}/learn/courses`);
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })

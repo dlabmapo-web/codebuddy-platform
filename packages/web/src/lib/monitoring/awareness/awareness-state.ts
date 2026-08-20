@@ -93,6 +93,13 @@ function samePointer(
   if (left === right) return true;
   if (!left || !right) return false;
   return (
-    left.surface === right.surface && left.x === right.x && left.y === right.y
+    left.surface === right.surface &&
+    left.x === right.x &&
+    left.y === right.y &&
+    // A peer entering or leaving canvas mode, or moving to another material,
+    // changes what the same fraction means. Treating that as "unchanged" would
+    // hold the previous placement and its activity timestamp.
+    left.space === right.space &&
+    left.material === right.material
   );
 }

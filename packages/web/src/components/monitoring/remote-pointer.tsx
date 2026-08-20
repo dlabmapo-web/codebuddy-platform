@@ -1,25 +1,40 @@
 'use client';
 
-import type { CollaborationPointer } from '@cove/shared';
+import { pointerIsPlaceable, type CollaborationPointer } from '@cove/shared';
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import {
+  findCanvasElement,
   findSurfaceElement,
+  fromCanvasPosition,
   isBoxVisible,
+  localPointerSpace,
+  pointDirection,
   toViewportPoint,
 } from '@/lib/monitoring/awareness/surfaces';
 
+/**
+ * What this reader can honestly be shown, in descending order of precision.
+ *
+ * `arrow` is the exact place. `direction` is exact but off the visible pane,
+ * so the reader is told which way rather than having the arrow pinned to an
+ * edge. `elsewhere` is everything that cannot be placed at all — the pane is
+ * not on this screen, or the position was measured in a space or against a
+ * document this reader is not rendering.
+ */
 type Placement = {
   /** The pointer this measurement belongs to. */
   key: string;
-  /** Null when the surface is not on this screen to point at. */
-  point: { left: number; top: number } | null;
+  view:
+    | { kind: 'arrow'; left: number; top: number }
+    | { kind: 'direction'; direction: 'above' | 'below' }
+    | { kind: 'elsewhere' };
 };
 
 const placementKey = (pointer: CollaborationPointer) =>
-  `${pointer.surface}:${pointer.x}:${pointer.y}`;
+  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}`;
 
 const noStore = () => () => undefined;
 
@@ -74,17 +89,7 @@ export function RemotePointer({
       // One placement per frame: scroll and resize fire far faster than the
       // screen can show, and `getBoundingClientRect` forces layout.
       frame = requestAnimationFrame(() => {
-        const box = findSurfaceElement(pointer.surface)?.getBoundingClientRect();
-        const visible =
-          box &&
-          isBoxVisible(box, {
-            width: window.innerWidth,
-            height: window.innerHeight,
-          });
-        setPlacement({
-          key,
-          point: visible && box ? toViewportPoint(pointer, box) : null,
-        });
+        setPlacement({ key, view: measure(pointer) });
       });
     };
 
@@ -108,7 +113,7 @@ export function RemotePointer({
     placement && placement.key === placementKey(pointer) ? placement : null;
   if (!current) return null;
 
-  if (!current.point) {
+  if (current.view.kind === 'elsewhere') {
     return createPortal(
       <p
         aria-hidden
@@ -124,13 +129,38 @@ export function RemotePointer({
     );
   }
 
+  if (current.view.kind === 'direction') {
+    const { direction } = current.view;
+    // A button, not a label: the position is exact and reachable, so the one
+    // useful action is to go there. Keyboard readers get the same offer.
+    return createPortal(
+      <button
+        className={`fixed left-1/2 z-[95] -translate-x-1/2 rounded-full border border-peer/30 bg-card px-3 py-1 text-[12px] font-semibold text-peer shadow-md ${
+          direction === 'above' ? 'top-3' : 'bottom-3'
+        }`}
+        data-testid="peer-pointer-direction"
+        onClick={() => scrollPointerIntoView(pointer)}
+        type="button"
+      >
+        <span aria-hidden>{direction === 'above' ? '↑ ' : '↓ '}</span>
+        {t(
+          direction === 'above' ? 'peer.pointing_above' : 'peer.pointing_below',
+          { name },
+        )}
+      </button>,
+      document.body,
+    );
+  }
+
+  const { left, top } = current.view;
+
   return createPortal(
     <span
       aria-hidden
       data-peer-surface={pointer.surface}
       data-testid="peer-pointer"
       className="pointer-events-none fixed z-[95] block motion-safe:transition-[left,top] motion-safe:duration-100 motion-safe:ease-linear"
-      style={{ left: current.point.left, top: current.point.top }}
+      style={{ left, top }}
     >
       <svg
         className="block drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
@@ -153,4 +183,71 @@ export function RemotePointer({
     </span>,
     document.body,
   );
+}
+
+/**
+ * Where the peer's position lands on this reader's own layout, or why it does
+ * not land anywhere.
+ *
+ * The order matters and is the whole guard. A position is refused before it is
+ * measured whenever it was taken in a space this reader is not in, or against a
+ * document this reader is not showing — a canvas fraction from one exercise
+ * maps perfectly onto another, and drawing it would be a confident lie rather
+ * than the diffuse error this design set out to remove.
+ */
+function measure(pointer: CollaborationPointer): Placement['view'] {
+  const surfaceElement = findSurfaceElement(pointer.surface);
+  if (!surfaceElement) return { kind: 'elsewhere' };
+
+  if (!pointerIsPlaceable(pointer, localPointerSpace(pointer.surface))) {
+    return { kind: 'elsewhere' };
+  }
+
+  const surfaceBox = surfaceElement.getBoundingClientRect();
+  if (
+    !isBoxVisible(surfaceBox, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })
+  ) {
+    return { kind: 'elsewhere' };
+  }
+
+  // The canvas when there is one: its box is the box both screens agree on,
+  // and because `getBoundingClientRect` reports it after the scale, the scale
+  // divides out of the position and multiplies back in here.
+  const canvas =
+    pointer.space === 'canvas' ? findCanvasElement(pointer.surface) : null;
+  const box = canvas ? canvas.getBoundingClientRect() : surfaceBox;
+  if (box.width <= 0 || box.height <= 0) return { kind: 'elsewhere' };
+
+  const point = canvas
+    ? fromCanvasPosition(pointer, box)
+    : toViewportPoint(pointer, box);
+  const direction = pointDirection(point, surfaceBox);
+  return direction
+    ? { kind: 'direction', direction }
+    : { kind: 'arrow', ...point };
+}
+
+/**
+ * Scrolls the peer's position into the reader's pane, on request only.
+ *
+ * Following is offered, never imposed: a pane that moves itself while someone
+ * is reading takes the page away from the person whose screen it is.
+ */
+function scrollPointerIntoView(pointer: CollaborationPointer): void {
+  const surfaceElement = findSurfaceElement(pointer.surface);
+  const canvas = findCanvasElement(pointer.surface);
+  if (!surfaceElement || !canvas) return;
+
+  const surfaceBox = surfaceElement.getBoundingClientRect();
+  const { top } = fromCanvasPosition(pointer, canvas.getBoundingClientRect());
+  // Centred rather than flush to the edge: the sentence around the position is
+  // what makes it legible, and an edge-aligned target arrives with half of it
+  // still off screen.
+  surfaceElement.scrollBy({
+    behavior: 'smooth',
+    top: top - (surfaceBox.top + surfaceBox.height / 2),
+  });
 }

@@ -1,10 +1,20 @@
 import { isCollaborationSurface, type CollaborationSurface } from '@cove/shared';
 
-import { collaborationSurfaceAttribute, type Box } from './surfaces';
+import {
+  collaborationSurfaceAttribute,
+  resolvePointerCanvas,
+  type Box,
+} from './surfaces';
 
 export type PointerCaptureSurface = {
   element: HTMLElement;
   surface: CollaborationSurface;
+  /**
+   * Resolved from the frame, not from the point inside it: events do not cross
+   * the document boundary, so the inner target has no view of the canvas its
+   * frame is laid out in.
+   */
+  canvas: HTMLElement | null;
 };
 
 export type PointerViewportPoint = { clientX: number; clientY: number };
@@ -12,15 +22,38 @@ export type PointerViewportPoint = { clientX: number; clientY: number };
 /** Generic bridge emitted by `RichTextFrame` from its loaded inner document. */
 export const iframePointerMoveEvent = 'cove:iframe-pointer-move';
 
-/** Maps an iframe-local pointer into the viewport shared with its frame. */
+/**
+ * Maps an iframe-local pointer into the viewport shared with its frame.
+ *
+ * The inner document reports coordinates in its own, untransformed space,
+ * while the frame's box is reported after any transform an ancestor applies.
+ * Inside the statement canvas that transform is a scale, and adding logical
+ * pixels to a scaled origin is wrong by exactly that factor. `scale` divides
+ * it back out, and is 1 wherever nothing is scaled — every surface but this
+ * one.
+ */
 export function iframePointToViewport(
   point: PointerViewportPoint,
   frameBox: Box,
+  scale = 1,
 ): PointerViewportPoint {
   return {
-    clientX: frameBox.left + point.clientX,
-    clientY: frameBox.top + point.clientY,
+    clientX: frameBox.left + point.clientX * scale,
+    clientY: frameBox.top + point.clientY * scale,
   };
+}
+
+/**
+ * The scale an ancestor is applying to a frame, read from the element itself.
+ *
+ * Derived from the two boxes rather than threaded down from React: the
+ * transform belongs to a component that knows nothing about monitoring, and a
+ * number passed through the tree would be one render stale during a drag.
+ */
+export function frameScale(frame: HTMLIFrameElement, frameBox: Box): number {
+  const logical = frame.offsetWidth;
+  if (logical <= 0 || frameBox.width <= 0) return 1;
+  return frameBox.width / logical;
 }
 
 function frameSurface(frame: HTMLIFrameElement): PointerCaptureSurface | null {
@@ -29,7 +62,7 @@ function frameSurface(frame: HTMLIFrameElement): PointerCaptureSurface | null {
   );
   const surface = element?.getAttribute(collaborationSurfaceAttribute);
   if (!element || !isCollaborationSurface(surface)) return null;
-  return { element, surface };
+  return { element, surface, canvas: resolvePointerCanvas(frame) };
 }
 
 /**
@@ -74,10 +107,12 @@ export function observeSurfaceIframes({
     }
     const resolved = frameSurface(frame);
     if (!resolved) return;
+    const frameBox = frame.getBoundingClientRect();
     onPointerMove(
       iframePointToViewport(
         { clientX: detail.clientX, clientY: detail.clientY },
-        frame.getBoundingClientRect(),
+        frameBox,
+        frameScale(frame, frameBox),
       ),
       resolved,
     );
@@ -107,8 +142,9 @@ export function observeSurfaceIframes({
       const move = (event: MouseEvent) => {
         const resolved = frameSurface(frame);
         if (!resolved) return;
+        const frameBox = frame.getBoundingClientRect();
         onPointerMove(
-          iframePointToViewport(event, frame.getBoundingClientRect()),
+          iframePointToViewport(event, frameBox, frameScale(frame, frameBox)),
           resolved,
         );
       };

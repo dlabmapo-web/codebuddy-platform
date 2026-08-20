@@ -317,6 +317,14 @@ export function useStudentMonitoring({
   );
 
   return {
+    /**
+     * Whether a shared document exists right now.
+     *
+     * The same condition that gates awareness publishing, exposed so the
+     * statement can switch onto its fixed canvas for exactly as long as there
+     * is a peer to share coordinates with — and not one render longer.
+     */
+    collaborating: draftId !== null,
     indicator:
       indicator !== 'NONE' && state === 'reconnecting' ? 'RECONNECTING' : indicator,
     markActive,

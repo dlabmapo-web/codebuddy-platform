@@ -9,11 +9,19 @@ import {
   staysUntilCleared,
 } from './pointer-lifecycle';
 
-const overEditor: CollaborationPointer = { surface: 'editor', x: 0.4, y: 0.6 };
+const overEditor: CollaborationPointer = {
+  surface: 'editor',
+  x: 0.4,
+  y: 0.6,
+  space: 'surface',
+  material: null,
+};
 const overStatement: CollaborationPointer = {
   surface: 'statement',
   x: 0.1,
   y: 0.2,
+  space: 'canvas',
+  material: '20000000-0000-4000-8000-000000000001',
 };
 
 describe('idleExpiryFor', () => {

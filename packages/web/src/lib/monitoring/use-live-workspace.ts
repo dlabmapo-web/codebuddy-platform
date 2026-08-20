@@ -467,6 +467,13 @@ export function useLiveWorkspace({
      * socket would rejoin the watch's rooms and double every event.
      */
     socket,
+    /**
+     * Whether a shared document exists right now.
+     *
+     * The same condition that gates awareness publishing, so the statement
+     * enters and leaves its fixed canvas in step with the student's.
+     */
+    collaborating: session?.draftId != null,
     // Editing and feedback stay disabled until the watch and the first
     // document sync are both confirmed.
     canEdit: canEditSynchronizedDraft({

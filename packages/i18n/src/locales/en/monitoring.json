@@ -123,6 +123,8 @@
   "peer": {
     "teacher": "Teacher",
     "looking_at": "{{name}} is looking at {{surface}}",
+    "pointing_above": "{{name}} is pointing above — click to follow",
+    "pointing_below": "{{name}} is pointing below — click to follow",
     "surface": {
       "header": "the toolbar",
       "curriculum": "the course outline",

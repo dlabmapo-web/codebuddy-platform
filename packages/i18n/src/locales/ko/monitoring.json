@@ -121,6 +121,8 @@
   "peer": {
     "teacher": "선생님",
     "looking_at": "{{name}}이 {{surface}} 보고 있습니다",
+    "pointing_above": "{{name}}이 위쪽을 가리키고 있습니다 — 눌러서 이동",
+    "pointing_below": "{{name}}이 아래쪽을 가리키고 있습니다 — 눌러서 이동",
     "surface": {
       "header": "상단 메뉴를",
       "curriculum": "교육과정을",

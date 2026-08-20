@@ -15,7 +15,13 @@ const cursor = {
   selectionEndLine: null,
   selectionEndColumn: null,
 };
-const pointer = { surface: 'editor' as const, x: 0.4, y: 0.6 };
+const pointer = {
+  surface: 'editor' as const,
+  x: 0.4,
+  y: 0.6,
+  space: 'surface' as const,
+  material: null,
+};
 
 const event = (
   next: Partial<AwarenessChangedEvent>,

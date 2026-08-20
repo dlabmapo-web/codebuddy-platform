@@ -27,7 +27,12 @@ import {
   scheduleRemoteAwarenessExpiry,
   type RemoteAwarenessLifecycle,
 } from './pointer-lifecycle';
-import { resolvePointerSurface, toSurfaceFraction } from './surfaces';
+import {
+  pointerBoxFor,
+  resolvePointerSurface,
+  toCanvasPosition,
+  toSurfaceFraction,
+} from './surfaces';
 
 /**
  * One sequence across every exercise hook that reuses an academy socket.
@@ -262,12 +267,17 @@ export function useAwareness({
         // lifecycle decides whether it fades or remains until session end.
         return;
       }
-      const position = toSurfaceFraction(
-        point,
-        resolved.element.getBoundingClientRect(),
-      );
+      // The canvas when the point is inside one, the pane otherwise. A canvas
+      // box is the same box on both screens; a pane box is not, and the space
+      // travels with the position so a receiver in the other mode names the
+      // region instead of drawing somewhere plausible and wrong.
+      const { box, material, space } = pointerBoxFor(resolved);
+      const position =
+        space === 'canvas'
+          ? toCanvasPosition(point, box)
+          : toSurfaceFraction(point, box);
       if (!position) return;
-      publishPointer({ surface: resolved.surface, ...position });
+      publishPointer({ surface: resolved.surface, space, material, ...position });
     };
 
     const onPointerMove = (event: PointerEvent) => {

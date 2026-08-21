@@ -44,7 +44,7 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   test.setTimeout(120_000);
   const academyId = await signIn(page);
 
-  const workerResponse = await page.request.get('/pyodide-worker.js?v=5');
+  const workerResponse = await page.request.get('/pyodide-worker.js?v=6');
   expect(workerResponse.headers()['cross-origin-resource-policy']).toBe('same-origin');
   expect(workerResponse.headers()['cache-control']).toContain('immutable');
 
@@ -69,4 +69,55 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
     timeout: 30_000,
   });
   await expect(run).toBeEnabled();
+});
+
+test('a failing run opens the error coach', async ({ page }) => {
+  test.setTimeout(120_000);
+  const academyId = await signIn(page);
+
+  await page.goto(`/studio/academies/${academyId}/learn/exercises/${ECHO_ID}`);
+
+  const run = page.getByRole('button', { name: /^run$|^실행$/i });
+  const coachTab = page.getByRole('tab', {
+    name: /error interpretation|오류 해석/i,
+  });
+  const coach = page.getByTestId('error-coach');
+  const terminal = page.getByTestId('terminal');
+
+  await expect(coachTab).toHaveCount(0);
+
+  await replaceEditorCode(page, 'if True\nprint("hello" 2)');
+  await expect(run).toBeEnabled({ timeout: 90_000 });
+  await run.click();
+
+  // Opens itself: the student does not have to find it.
+  await expect(coach).toBeVisible({ timeout: 30_000 });
+  await expect(coachTab).toHaveAttribute('aria-selected', 'true');
+
+  // The lesson is the actual mistake, not the exception class.
+  await expect(coach).toContainText(/colon|콜론/i);
+  // Line and column, their own code, and a caret under the character.
+  await expect(coach).toContainText(/\b1:8\b/);
+  await expect(coach).toContainText('if True');
+  await expect(coach).toContainText('^');
+  // A correct example, and what to do next.
+  await expect(coach).toContainText(/temperature/);
+  await expect(coach).toContainText(/run it again|다시 실행/i);
+
+  // The editor marks the line it stopped on, so "line 1" needs no counting.
+  await expect(page.locator('.cove-error-line')).toHaveCount(1);
+  await expect(page.locator('.cove-error-glyph')).toHaveCount(1);
+
+  // The terminal keeps Python's own line, without the traceback wall.
+  await expect(terminal).toContainText('SyntaxError');
+  await expect(terminal).not.toContainText('Traceback (most recent call last)');
+
+  // A run that succeeds takes all of it away.
+  await replaceEditorCode(page, 'print("hi")');
+  await run.click();
+  await expect(terminal).toContainText('hi', { timeout: 30_000 });
+  await expect(run).toBeEnabled();
+  await expect(coachTab).toHaveCount(0);
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(page.locator('.cove-error-line')).toHaveCount(0);
 });

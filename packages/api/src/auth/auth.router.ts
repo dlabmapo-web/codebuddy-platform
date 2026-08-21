@@ -1,6 +1,8 @@
 import type { ORPCDeps, ORPCImplementer } from "../orpc/context.js";
 import { createAccess } from "../orpc/access.js";
 import { requestAddress } from "../orpc/context.js";
+import { AppException } from "../common/app-exception.js";
+import { PasswordRecoveryService } from "./password-recovery.service.js";
 
 export function createAuthRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
@@ -35,6 +37,48 @@ export function createAuthRouter(os: ORPCImplementer, deps: ORPCDeps) {
           10 * 60_000,
         );
         return deps.authService.resolveSignInEmail(input.identifier);
+      }),
+    requestPasswordRecovery: os.auth.requestPasswordRecovery
+      .use(access.trustedBff)
+      .handler(async ({ context, input }) => {
+        const accepted = { accepted: true } as const;
+
+        // Being limited is not a failure the caller may see. A 429 here would
+        // answer a question the body refuses to: hitting the per-username
+        // ceiling means somebody else is already asking about that username,
+        // which is only true for a name worth asking about.
+        try {
+          deps.rateLimitService.assert(
+            `auth:recovery:ip:${requestAddress(context.req)}`,
+            5,
+            15 * 60_000,
+          );
+          deps.rateLimitService.assert(
+            `auth:recovery:user:${
+              PasswordRecoveryService.usernameDigest(input.username)
+            }`,
+            3,
+            60 * 60_000,
+          );
+        } catch (error) {
+          if (error instanceof AppException && error.code === "RATE_LIMITED") {
+            return accepted;
+          }
+          throw error;
+        }
+
+        // A provider outage must not become an availability oracle either:
+        // the service already swallows delivery failure, and anything it
+        // rethrows is answered with the same page as a delivered email.
+        try {
+          await deps.passwordRecoveryService.request(
+            input.username,
+            input.captchaToken,
+          );
+        } catch {
+          // Recorded inside the service, without the username.
+        }
+        return accepted;
       }),
     setUsername: os.auth.setUsername
       .use(access.authenticated)

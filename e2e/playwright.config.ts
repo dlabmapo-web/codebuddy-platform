@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${webPort}`;
+// Cloudflare's documented always-pass key keeps CAPTCHA enabled in browser
+// coverage without tying the test suite to a production widget or secret.
+const turnstileTestSiteKey =
+  process.env.E2E_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA';
 
 /**
  * Runs against the development Supabase project and the users created by
@@ -103,6 +107,7 @@ export default defineConfig({
         },
         {
           command: `pnpm --filter @cove/web exec next dev -p ${webPort}`,
+          env: { NEXT_PUBLIC_TURNSTILE_SITE_KEY: turnstileTestSiteKey },
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

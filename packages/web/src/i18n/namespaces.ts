@@ -11,6 +11,18 @@ export { layoutNamespaces, type LayoutNamespace } from "@cove/i18n/settings";
 export const monitoringNamespaces = ["monitoring", "errors"] as const;
 
 /**
+ * The signed-out screens: sign in, sign up, invitations, approval, and the
+ * three-screen password recovery route.
+ *
+ * Moved out of `layoutNamespaces` rather than raising the root-payload budget,
+ * which is what that budget's note asks the next feature to do. Nobody reads
+ * this copy after they are signed in, and the shell above these pages —
+ * the theme switch, the language switch, the sign-out control — keeps using
+ * `common` from the layout instance, so it is unaffected.
+ */
+export const authNamespaces = ["auth"] as const;
+
+/**
  * The student exercise workspace.
  *
  * `monitoring` because a teacher may join at any moment and the indicator's
@@ -137,6 +149,7 @@ export const sessionNamespaces = ["session"] as const;
 export const profileNamespaces = ["profile", "errors"] as const;
 
 export type PageNamespace =
+  | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]
   | (typeof exerciseNamespaces)[number]
   | (typeof teachNamespaces)[number]

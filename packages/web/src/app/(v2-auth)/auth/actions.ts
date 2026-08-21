@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 import type { Provider } from '@supabase/supabase-js';
 import {
@@ -16,7 +16,29 @@ import { publicConfig } from '@/lib/config';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { createClient } from '@/lib/supabase/server';
 
+import { isSocialProviderAvailable } from './_components/social-providers';
+import { clientAddress } from './_lib/client-address';
+
 export type AuthFormState = { message?: string; success?: boolean };
+
+type CaptchaInput =
+  | { valid: true; token?: string }
+  | { valid: false };
+
+function captchaInput(formData: FormData): CaptchaInput {
+  const raw = formData.get('captchaToken');
+  if (typeof raw !== 'string') {
+    return publicConfig.turnstileSiteKey ? { valid: false } : { valid: true };
+  }
+
+  const token = raw.trim();
+  if (!token) {
+    return publicConfig.turnstileSiteKey ? { valid: false } : { valid: true };
+  }
+  return token.length <= 4096
+    ? { valid: true, token }
+    : { valid: false };
+}
 
 /**
  * Deliberately not `usernameSchema`. The field is labelled as a username and
@@ -55,6 +77,9 @@ export async function loginAction(
     return { message: t('validation:credentials_invalid') };
   }
 
+  const captcha = captchaInput(formData);
+  if (!captcha.valid) return { message: t('error.captcha_failed') };
+
   // Supabase authenticates a password against an address, never a name, so the
   // username is exchanged for one first. An unknown name resolves to an address
   // that cannot exist, which is what makes the rejection below identical
@@ -71,8 +96,17 @@ export async function loginAction(
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: input.data.password,
+    ...(captcha.token ? { options: { captchaToken: captcha.token } } : {}),
   });
-  if (error) return { message: t('error.credentials_rejected') };
+  if (error) {
+    return {
+      message: t(
+        error.code === 'captcha_failed'
+          ? 'error.captcha_failed'
+          : 'error.credentials_rejected',
+      ),
+    };
+  }
   if (!data.session || !(await beginStudentSession(data.session.access_token))) {
     await supabase.auth.signOut();
     return { message: t('error.sign_in_failed') };
@@ -104,6 +138,9 @@ export async function signupAction(
     };
   }
 
+  const captcha = captchaInput(formData);
+  if (!captcha.valid) return { message: t('error.captcha_failed') };
+
   // Advisory only — the unique index decides. Checking here is what keeps a
   // taken name from being discovered after the Supabase account already exists.
   try {
@@ -130,9 +167,18 @@ export async function signupAction(
           : { requested_academy_id: input.data.academyId }),
       },
       emailRedirectTo: `${publicConfig.siteUrl}/auth/callback`,
+      ...(captcha.token ? { captchaToken: captcha.token } : {}),
     },
   });
-  if (error) return { message: t('error.signup_failed') };
+  if (error) {
+    return {
+      message: t(
+        error.code === 'captcha_failed'
+          ? 'error.captcha_failed'
+          : 'error.signup_failed',
+      ),
+    };
+  }
   if (data.session) {
     if (!(await beginStudentSession(data.session.access_token))) {
       await supabase.auth.signOut();
@@ -155,6 +201,14 @@ export async function startSocialAuthAction(input: {
   const parsed = socialAuthSchema.safeParse(input);
   if (!parsed.success) {
     return { message: t('validation:social_request_invalid') };
+  }
+
+  // Before the intent and before Supabase. A provider whose credentials this
+  // deployment does not hold has no button, so reaching here means the request
+  // was written by hand — and it must not leave an onboarding intent behind or
+  // reach a provider whose consent screen would fail halfway through.
+  if (!isSocialProviderAvailable(parsed.data.provider)) {
+    return { message: t('error.social_unavailable') };
   }
 
   const cookieStore = await cookies();
@@ -235,18 +289,6 @@ export async function logoutAction(): Promise<void> {
   redirect('/auth/login');
 }
 
-/**
- * The address the rate limiter should count against. Server Actions run
- * behind the BFF, so without this every caller looks like one machine.
- */
-async function clientAddress(): Promise<string | undefined> {
-  const requestHeaders = await headers();
-  return (
-    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    requestHeaders.get('x-real-ip') ||
-    undefined
-  );
-}
 
 async function beginStudentSession(accessToken: string): Promise<boolean> {
   try {

@@ -4,6 +4,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { MediaModule } from "../profile/media.module.js";
 import { AuthService } from "./auth.service.js";
 import { OAuthOnboardingIntentService } from "./oauth-onboarding-intent.service.js";
+import { PasswordRecoveryService } from "./password-recovery.service.js";
 import { SupabaseAuthService } from "./supabase-auth.service.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { StudentSessionService } from "./student-session.service.js";
@@ -13,12 +14,14 @@ import { StudentSessionService } from "./student-session.service.js";
   providers: [
     AuthService,
     OAuthOnboardingIntentService,
+    PasswordRecoveryService,
     SupabaseAuthService,
     StudentSessionService,
   ],
   exports: [
     AuthService,
     OAuthOnboardingIntentService,
+    PasswordRecoveryService,
     SupabaseAuthService,
     StudentSessionService,
   ],

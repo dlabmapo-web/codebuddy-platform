@@ -1,19 +1,23 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SocialAuthProvider } from '@cove/shared';
-
-import { useLayoutTranslation } from '@/i18n';
 
 import { startSocialAuthAction } from '../actions';
 
-import { GoogleIcon, KakaoIcon, NaverIcon } from './provider-icons';
+import { availableSocialProviders } from './social-providers';
 
-const providers = [
-  { id: 'google', label: 'Google', Icon: GoogleIcon },
-  { id: 'kakao', label: 'Kakao', Icon: KakaoIcon },
-  { id: 'custom:naver', label: 'Naver', Icon: NaverIcon },
-] as const;
+/**
+ * The row is sized to what it renders. Tailwind needs the whole class name in
+ * the source, so the counts Cove can actually offer are spelled out; anything
+ * wider than three wraps rather than shrinking each target below a thumb.
+ */
+const columnsForCount: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+};
 
 /** Ring spinner shown while a provider redirect is being negotiated. */
 function Spinner() {
@@ -32,9 +36,10 @@ export function SocialLoginButtons({
   requestedAcademyId?: string;
   academyRequired?: boolean;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState<string>();
+  const providers = availableSocialProviders();
 
   async function signIn(provider: SocialAuthProvider) {
     if (academyRequired && !requestedAcademyId) {
@@ -55,9 +60,13 @@ export function SocialLoginButtons({
     }
   }
 
+  if (providers.length === 0) return null;
+
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3">
+      <div
+        className={`grid gap-3 ${columnsForCount[providers.length] ?? 'grid-cols-3'}`}
+      >
         {providers.map(({ id, label, Icon }) => {
           const isPending = pending === id;
           const isBusy = Boolean(pending);
@@ -98,7 +107,11 @@ export function SocialLoginButtons({
           );
         })}
       </div>
-      {error ? <p className="mt-3 text-[14px] text-danger">{error}</p> : null}
+      {error ? (
+        <p aria-live="polite" className="mt-3 text-[14px] text-danger" role="status">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

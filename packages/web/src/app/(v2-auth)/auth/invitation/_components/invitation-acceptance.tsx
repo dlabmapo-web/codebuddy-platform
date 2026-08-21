@@ -1,8 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-
-import { useLayoutTranslation } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 import {
   acceptInvitationAction,
@@ -13,7 +12,7 @@ import {
 const initialState: InvitationActionState = {};
 
 export function InvitationAcceptance() {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(
     acceptInvitationAction,
     initialState,

@@ -5,6 +5,7 @@ import {
   Clock3,
   XCircle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 
@@ -20,7 +21,10 @@ export function PendingStatusCard({
 }: {
   manager: PendingApprovalState;
 }) {
-  const { t } = useLayoutTranslation(['auth', 'common']);
+  const { t } = useTranslation('auth');
+  // `common` belongs to the app shell, which is still the layout's instance:
+  // the role vocabulary is the same word here and in every roster.
+  const { t: tCommon } = useLayoutTranslation('common');
   const copy = stateCopy[manager.view.state];
 
   return (
@@ -54,14 +58,14 @@ export function PendingStatusCard({
           <div className="mt-2 flex justify-between gap-4">
             <span className="text-sub">{t('pending.status')}</span>
             <strong className={statusToneClass(manager.view.statusTone)}>
-              {t(copy.status)}
+              {tCommon(copy.status)}
             </strong>
           </div>
           {manager.view.role ? (
             <div className="mt-2 flex justify-between gap-4">
               <span className="text-sub">{t('pending.role')}</span>
               <strong className="text-right text-ink">
-                {t(`common:role.${manager.view.role}`)}
+                {tCommon(`role.${manager.view.role}`)}
               </strong>
             </div>
           ) : null}

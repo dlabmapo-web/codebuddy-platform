@@ -1,8 +1,8 @@
 'use client';
 
 import type { AuthMeResponse } from '@cove/shared';
+import { useTranslation } from 'react-i18next';
 
-import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { SignOutControl } from '../../_components/sign-out-control';
@@ -15,7 +15,7 @@ export function PendingApproval({
 }: {
   initialAccount: AuthMeResponse;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const errorText = useErrorText();
   const manager = usePendingApproval(initialAccount);
 

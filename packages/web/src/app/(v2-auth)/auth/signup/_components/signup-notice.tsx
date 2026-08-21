@@ -1,7 +1,7 @@
-import { useLayoutTranslation } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 export function SignupNotice() {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
 
   return (
     <div className="mt-5 flex gap-3 rounded-xl border border-border bg-canvas px-4 py-3.5 text-[14px] leading-6 text-sub">

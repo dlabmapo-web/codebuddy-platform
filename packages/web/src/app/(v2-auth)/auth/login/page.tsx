@@ -6,7 +6,7 @@ import { LoginForm } from './_components/login-form';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
   const query = await searchParams;
   const { t } = await getServerTranslation(['auth']);
@@ -20,7 +20,10 @@ export default async function LoginPage({
       description={t('login.description')}
       title={t('login.title')}
     >
-      <LoginForm initialError={initialError} />
+      <LoginForm
+        initialError={initialError}
+        passwordReset={query.reset === 'success'}
+      />
     </AuthCard>
   );
 }

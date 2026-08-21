@@ -1,9 +1,8 @@
 'use client';
 
 import { Eye, EyeOff, Lock, type LucideIcon } from 'lucide-react';
-import { useId, useState } from 'react';
-
-import { useLayoutTranslation } from '@/i18n';
+import { useId, useState, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const baseInput =
   'h-14 w-full rounded-xl border border-border bg-card text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
@@ -20,6 +19,8 @@ export function TextField({
   required,
   icon: Icon,
   hint,
+  inputRef,
+  describedBy,
 }: {
   label: string;
   name: string;
@@ -29,6 +30,9 @@ export function TextField({
   required?: boolean;
   icon?: LucideIcon;
   hint?: string;
+  /** For moving focus to the first field a submission was rejected on. */
+  inputRef?: RefObject<HTMLInputElement | null>;
+  describedBy?: string;
 }) {
   const id = useId();
   return (
@@ -39,11 +43,13 @@ export function TextField({
       <div className="relative">
         {Icon ? <Icon className={iconClass} size={20} strokeWidth={1.75} /> : null}
         <input
+          aria-describedby={describedBy}
           autoComplete={autoComplete}
           className={`${baseInput} ${Icon ? 'pl-12' : 'px-4'} pr-4`}
           id={id}
           name={name}
           placeholder={placeholder}
+          ref={inputRef}
           required={required}
           type={type}
         />
@@ -59,6 +65,9 @@ export function PasswordField({
   autoComplete = 'current-password',
   hint,
   minLength,
+  inputRef,
+  onValueChange,
+  describedBy,
 }: {
   /** Pass '' to hide the label when the caller renders its own. */
   label?: string;
@@ -66,8 +75,13 @@ export function PasswordField({
   autoComplete?: string;
   hint?: string;
   minLength?: number;
+  /** For moving focus to the first field a submission was rejected on. */
+  inputRef?: RefObject<HTMLInputElement | null>;
+  /** Set by callers that show live requirements as the password is typed. */
+  onValueChange?: (value: string) => void;
+  describedBy?: string;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const id = useId();
   const [visible, setVisible] = useState(false);
   const fieldLabel = label ?? t('field.password');
@@ -81,13 +95,16 @@ export function PasswordField({
       <div className="relative">
         <Lock className={iconClass} size={20} strokeWidth={1.75} />
         <input
+          aria-describedby={describedBy}
           aria-label={fieldLabel || t('field.password')}
           autoComplete={autoComplete}
           className={`${baseInput} pl-12 pr-12`}
           id={id}
           minLength={minLength}
           name={name}
+          onChange={onValueChange ? (event) => onValueChange(event.target.value) : undefined}
           placeholder="••••••••"
+          ref={inputRef}
           required
           type={visible ? 'text' : 'password'}
         />

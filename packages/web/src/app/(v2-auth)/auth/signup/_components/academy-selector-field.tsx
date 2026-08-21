@@ -1,19 +1,20 @@
 import { ChevronsUpDown, School } from 'lucide-react';
 import { forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   ResponsiveSelector,
   type SelectorItem,
   type TriggerProps,
 } from '@/components/studio/selector';
-import { useLayoutTranslation } from '@/i18n';
+
 import { useErrorText } from '@/i18n/client/use-error-text';
 
 import type { SignupAcademiesState } from '../_hooks/use-signup-academies';
 
 const AcademyTrigger = forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>(
   function AcademyTrigger({ className, selectedItem, ...props }, ref) {
-    const { t } = useLayoutTranslation('auth');
+    const { t } = useTranslation('auth');
     const placeholder =
       props.disabled && !selectedItem
         ? t('field.academy_loading')
@@ -49,7 +50,7 @@ export function AcademySelectorField({
   academies: SignupAcademiesState;
   socialError?: string;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const errorText = useErrorText();
 
   return (

@@ -39,11 +39,15 @@ export function isLocale(value: string | undefined | null): value is Locale {
  * stays out of it and is loaded by that route through
  * `PageTranslationsProvider`, so a feature used by one role does not cost
  * every page its payload.
+ *
+ * `auth` left this list when password recovery landed: it is read on six
+ * signed-out screens and by nobody afterwards, so a student in the middle of
+ * an exercise was carrying the copy for a password they were not resetting.
+ * The `(v2-auth)` layout mounts it instead.
  */
 export const layoutNamespaces = [
   "common",
   "nav",
-  "auth",
   "academy",
   "members",
   "applications",

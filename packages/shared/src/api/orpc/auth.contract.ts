@@ -22,6 +22,18 @@ export const authContract = {
   resolveSignInEmail: oc
     .input(z.object({ identifier: z.string().min(1).max(320) }))
     .output(z.object({ email: z.string() })),
+  /**
+   * BFF-only. Answers `{ accepted: true }` for every well-formed username so
+   * that a known name, an unknown name, an OAuth-only account, and a suspended
+   * one are indistinguishable from the browser. Nothing about the account —
+   * email, identity list, user id, existence — comes back.
+   */
+  requestPasswordRecovery: oc
+    .input(z.object({
+      username: usernameSchema,
+      captchaToken: z.string().min(1).max(4096).optional(),
+    }))
+    .output(z.object({ accepted: z.literal(true) })),
   setUsername: oc
     .input(z.object({ username: usernameSchema }))
     .output(authMeResponseSchema),

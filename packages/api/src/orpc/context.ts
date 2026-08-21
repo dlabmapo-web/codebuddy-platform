@@ -6,6 +6,7 @@ import type { appContract } from "@cove/shared";
 
 import type { AuthService } from "../auth/auth.service.js";
 import type { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
+import type { PasswordRecoveryService } from "../auth/password-recovery.service.js";
 import type { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import type { StudentSessionService } from "../auth/student-session.service.js";
 import type { AcademyDiscoveryService } from "../academies/academy-discovery.service.js";
@@ -45,6 +46,7 @@ export type ORPCImplementer = ReturnType<
 export type ORPCDeps = {
   authService: AuthService;
   oauthOnboardingIntentService: OAuthOnboardingIntentService;
+  passwordRecoveryService: PasswordRecoveryService;
   supabaseAuthService: SupabaseAuthService;
   studentSessionService: StudentSessionService;
   academyDiscoveryService: AcademyDiscoveryService;

@@ -2,8 +2,7 @@
 
 import { AtSign } from 'lucide-react';
 import { useActionState } from 'react';
-
-import { useLayoutTranslation } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 import { setUsernameAction, type AuthFormState } from '../actions';
 import { TextField } from './form-fields';
@@ -18,7 +17,7 @@ const initialState: AuthFormState = {};
  * their email.
  */
 export function UsernameClaim() {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(
     setUsernameAction,
     initialState,

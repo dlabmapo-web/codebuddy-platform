@@ -7,6 +7,8 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import type { SupabaseIdentity } from "./auth.types.js";
 
+export type PasswordIdentityStatus = "present" | "absent" | "unavailable";
+
 @Injectable()
 export class SupabaseAuthService {
   private readonly client: SupabaseClient;
@@ -84,6 +86,63 @@ export class SupabaseAuthService {
       };
     } catch {
       return empty;
+    }
+  }
+
+  /**
+   * Whether an auth user can recover an email/password credential.
+   *
+   * Unlike `describeIdentities`, this preserves provider unavailability. My
+   * Page may safely degrade to read-only identity copy, but password recovery
+   * must alert when an outage would silently suppress every legitimate email.
+   */
+  async passwordIdentityStatus(
+    authUserId: string,
+  ): Promise<PasswordIdentityStatus> {
+    try {
+      const { data, error } = await this.client.auth.admin.getUserById(
+        authUserId,
+      );
+      if (error) {
+        return error.status === 404 || error.code === "user_not_found"
+          ? "absent"
+          : "unavailable";
+      }
+      if (!data?.user) return "unavailable";
+      return (data.user.identities ?? []).some(
+        (identity) => identity.provider === "email",
+      )
+        ? "present"
+        : "absent";
+    } catch {
+      return "unavailable";
+    }
+  }
+
+  /**
+   * Asks Supabase to send a recovery email, and reports only whether the call
+   * itself completed.
+   *
+   * The caller passes a real address for an account that can recover and a
+   * synthetic one for every other case, so this must behave identically for
+   * both: no branch here may depend on whether the address belongs to anyone.
+   * The client is the secret-key client, which neither persists nor refreshes
+   * a session, so the requester's browser gains no PKCE state from a recovery
+   * request.
+   */
+  async sendPasswordRecoveryEmail(
+    email: string,
+    redirectTo: string,
+    captchaToken?: string,
+  ): Promise<{ delivered: boolean }> {
+    try {
+      const { error } = await this.client.auth.resetPasswordForEmail(email, {
+        redirectTo,
+        ...(captchaToken ? { captchaToken } : {}),
+      });
+      return { delivered: !error };
+    } catch {
+      return { delivered: false };
     }
   }
 }

@@ -1,7 +1,8 @@
 import { formatTime } from '@cove/i18n/format';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 
-import { useLayoutTranslation, useLocale } from '@/i18n';
+import { useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { SignOutControl } from '../../_components/sign-out-control';
@@ -12,7 +13,7 @@ export function PendingActions({
 }: {
   manager: PendingApprovalState;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const errorText = useErrorText();
   const locale = useLocale();
 

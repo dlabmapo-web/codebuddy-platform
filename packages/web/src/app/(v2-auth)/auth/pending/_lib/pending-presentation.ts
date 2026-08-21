@@ -11,18 +11,22 @@ export const stateCopy: Record<
   {
     heading: TranslationKey<'auth'>;
     description: TranslationKey<'auth'>;
-    status: `common:${TranslationKey<'common'>}` | null;
+    /**
+     * Resolved against the layout instance, not the page's `auth` one: the
+     * membership vocabulary is the same word here and on every roster.
+     */
+    status: TranslationKey<'common'> | null;
   }
 > = {
   approved: {
     heading: 'pending.state.approved_heading',
     description: 'pending.state.approved_description',
-    status: 'common:membership_status.ACTIVE',
+    status: 'membership_status.ACTIVE',
   },
   suspended: {
     heading: 'pending.state.suspended_heading',
     description: 'pending.state.suspended_description',
-    status: 'common:membership_status.SUSPENDED',
+    status: 'membership_status.SUSPENDED',
   },
   none: {
     heading: 'pending.state.none_heading',
@@ -32,22 +36,22 @@ export const stateCopy: Record<
   pending: {
     heading: 'pending.state.pending_heading',
     description: 'pending.state.pending_description',
-    status: 'common:join_request_status.PENDING',
+    status: 'join_request_status.PENDING',
   },
   application_approved: {
     heading: 'pending.state.application_approved_heading',
     description: 'pending.state.application_approved_description',
-    status: 'common:join_request_status.APPROVED',
+    status: 'join_request_status.APPROVED',
   },
   rejected: {
     heading: 'pending.state.rejected_heading',
     description: 'pending.state.rejected_description',
-    status: 'common:join_request_status.REJECTED',
+    status: 'join_request_status.REJECTED',
   },
   cancelled: {
     heading: 'pending.state.cancelled_heading',
     description: 'pending.state.cancelled_description',
-    status: 'common:join_request_status.CANCELLED',
+    status: 'join_request_status.CANCELLED',
   },
 };
 

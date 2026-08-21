@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import { expect, type BrowserContext, type Page } from '@playwright/test';
 
 type StoredState = Awaited<ReturnType<BrowserContext['storageState']>>;
 type StoredSession = {
@@ -46,7 +46,9 @@ export async function signInAs({
   await page.goto('/auth/login');
   await page.locator('input[name="identifier"]').fill(identifier);
   await page.locator('input[type="password"]').fill(password);
-  await page.getByRole('button', { name: /sign in|로그인/i }).click();
+  const submit = page.getByRole('button', { name: /sign in|로그인/i });
+  await expect(submit).toBeEnabled();
+  await submit.click();
   await page.waitForURL(landing, { timeout: 30_000 });
 
   // Empty for an account with no academy. Callers that need one pass a landing

@@ -13,6 +13,7 @@ import { createAcademiesRouters } from "../academies/academies.router.js";
 import { RateLimitService } from "../academies/rate-limit.service.js";
 import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
+import { PasswordRecoveryService } from "../auth/password-recovery.service.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { StudentSessionService } from "../auth/student-session.service.js";
 import { createStudentSessionRouter } from "../auth/student-session.router.js";
@@ -57,6 +58,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
   const router = createORPCRouter({
     authService: app.get(AuthService, { strict: false }),
     oauthOnboardingIntentService: app.get(OAuthOnboardingIntentService, {
+      strict: false,
+    }),
+    passwordRecoveryService: app.get(PasswordRecoveryService, {
       strict: false,
     }),
     supabaseAuthService: app.get(SupabaseAuthService, { strict: false }),

@@ -30,6 +30,25 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: crossOriginIsolationHeaders,
       },
+      // The recovery confirmation carries a one-time token in its query string,
+      // and the reset page is reached with a live recovery session in cookies.
+      // A referrer carrying that query to any resource the page loads is the
+      // token leaving the person it was sent to; the pages load no third-party
+      // resource for the same reason.
+      //
+      // Storage is already covered and is deliberately not repeated here: both
+      // routes read cookies or search params, so Next renders them dynamically
+      // and sends `private, no-cache, no-store, max-age=0, must-revalidate`
+      // itself, overriding anything configured at this layer. `next dev` sends
+      // `no-cache, must-revalidate` because development never caches a page.
+      {
+        source: "/auth/recovery/confirm",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+      {
+        source: "/auth/reset-password",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
       // 워커/파이오다이드 자원은 같은 출처 하위 리소스로 로드되도록 CORP 추가
       {
         source: "/pyodide-worker.js",

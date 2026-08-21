@@ -2,14 +2,16 @@
 
 import { AtSign, Mail, User } from 'lucide-react';
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { useLayoutTranslation } from '@/i18n';
+import { publicConfig } from '@/lib/config';
 
 import { signupAction, type AuthFormState } from '../../actions';
 import { AuthDivider } from '../../_components/auth-divider';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
+import { TurnstileChallenge } from '../../_components/turnstile-challenge';
 import { useSignupAcademies } from '../_hooks/use-signup-academies';
 import { AcademySelectorField } from './academy-selector-field';
 import { SignupNotice } from './signup-notice';
@@ -23,9 +25,17 @@ export function SignupForm({
   invitedAcademyId?: string;
   socialError?: string;
 }) {
-  const { t } = useLayoutTranslation('auth');
+  const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(signupAction, initialState);
   const academies = useSignupAcademies(invitedAcademyId);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [challengeKey, setChallengeKey] = useState(0);
+
+  function submit(formData: FormData) {
+    setCaptchaToken(null);
+    setChallengeKey((current) => current + 1);
+    action(formData);
+  }
 
   return (
     <div>
@@ -34,7 +44,7 @@ export function SignupForm({
         socialError={socialError}
       />
 
-      <form action={action} className="space-y-5">
+      <form action={submit} className="space-y-5">
         <input
           name="academyId"
           type="hidden"
@@ -72,6 +82,22 @@ export function SignupForm({
           minLength={8}
         />
 
+        {publicConfig.turnstileSiteKey ? (
+          <>
+            <input
+              name="captchaToken"
+              type="hidden"
+              value={captchaToken ?? ''}
+            />
+            <TurnstileChallenge
+              action="signup"
+              key={challengeKey}
+              onTokenChange={setCaptchaToken}
+              siteKey={publicConfig.turnstileSiteKey}
+            />
+          </>
+        ) : null}
+
         {state.message ? (
           <p
             className={
@@ -86,7 +112,12 @@ export function SignupForm({
 
         <button
           className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          disabled={pending || state.success || !academies.academyId}
+          disabled={
+            pending ||
+            state.success ||
+            !academies.academyId ||
+            Boolean(publicConfig.turnstileSiteKey && !captchaToken)
+          }
           type="submit"
         >
           {pending ? t('signup.submitting') : t('signup.submit')}

@@ -42,6 +42,8 @@ import { createPlatformRouters } from "../platform/platform.router.js";
 import { AcademyProfileService } from "../profile/academy-profile.service.js";
 import { ProfileService } from "../profile/profile.service.js";
 import { createProfileRouters } from "../profile/profile.router.js";
+import { TeamLeadOverviewService } from "../lead/team-lead-overview.service.js";
+import { createAcademyCurriculumOverviewRouter } from "../lead/lead.router.js";
 import { TeacherOverviewService } from "../teach/teacher-overview.service.js";
 import { createAcademyTeacherOverviewRouter } from "../teach/teacher-overview.router.js";
 import { TeacherStudentsService } from "../teach/teacher-students.service.js";
@@ -85,6 +87,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     academyProfileService: app.get(AcademyProfileService, { strict: false }),
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
     teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
+    teamLeadOverviewService: app.get(TeamLeadOverviewService, { strict: false }),
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
     managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
     academyOperationsProfileService: app.get(AcademyOperationsProfileService, {
@@ -145,6 +148,7 @@ function createORPCRouter(deps: ORPCDeps) {
     learn: createLearnRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),
+    academyCurriculumOverview: createAcademyCurriculumOverviewRouter(os, deps),
     academyTeacherOverview: createAcademyTeacherOverviewRouter(os, deps),
     academyTeacherStudents: createAcademyTeacherStudentsRouter(os, deps),
   });

@@ -9,6 +9,7 @@ import { ClassesModule } from "./classes/classes.module.js";
 import { validateEnvironment } from "./config/env.schema.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { ContentModule } from "./content/content.module.js";
+import { LeadModule } from "./lead/lead.module.js";
 import { LearnModule } from "./learn/learn.module.js";
 import { MonitoringModule } from "./monitoring/monitoring.module.js";
 import { ProfileModule } from "./profile/profile.module.js";
@@ -30,6 +31,7 @@ import { TeachModule } from "./teach/teach.module.js";
     AuthorizationModule,
     ClassesModule,
     ContentModule,
+    LeadModule,
     LearnModule,
     MonitoringModule,
     ProfileModule,

@@ -101,6 +101,7 @@
     "tab_code": "코드",
     "tab_terminal": "터미널",
     "tab_result": "결과",
+    "tab_coach": "오류 해석",
     "language_python": "Python 3",
     "font_smaller": "에디터 글꼴 크기 줄이기",
     "font_larger": "에디터 글꼴 크기 늘리기",

@@ -1,0 +1,114 @@
+{
+  "family": {
+    "shape": "Shape of the code",
+    "missing": "Not found",
+    "value": "Value doesn’t fit",
+    "limit": "Ran out",
+    "unknown": "Unexpected"
+  },
+  "explanation": {
+    "SyntaxError": "Python could not read this line as Python. Look for a missing bracket or quote, or a colon at the end of the line.",
+    "IndentationError": "The spacing at the start of these lines does not line up. Give every line in the same block the same number of spaces.",
+    "TabError": "This code mixes tabs and spaces for indentation. Pick one of them and use it on every line.",
+    "NameError": "Python does not recognise this name. Check the spelling, and make sure it was given a value before it was used.",
+    "TypeError": "These values are different types, and Python cannot combine them this way. Check whether a number and a piece of text are being mixed.",
+    "ValueError": "The type is right but the value is not. Check what went in — int() raises this when the text is not a number.",
+    "IndexError": "This position is past the end of the list or text. The first position is 0, so the last one is one less than the length.",
+    "KeyError": "The dictionary has no key by that name. Check how the key is spelled, and which keys were actually stored.",
+    "ZeroDivisionError": "Something was divided by zero. Check the value you are dividing by, especially when it is calculated.",
+    "AttributeError": "This value does not have the thing asked for after the dot. Check what sits before the dot and how the name after it is spelled.",
+    "ModuleNotFoundError": "Python cannot find the module being imported. Check the spelling of the name after import.",
+    "ImportError": "The module was found, but not the name being imported from it. Check the name after from … import.",
+    "EOFError": "The program asked for input and there was none left. Type a value in the terminal, or add another line to the test input.",
+    "RecursionError": "A function kept calling itself and never stopped. Add a condition that returns without calling again.",
+    "unknown": "Something went wrong while the code was running. Go through the values and commands on the line the error points at."
+  },
+  "source_caption": "In your code",
+  "line_label": "Line {{line}}",
+  "coach": {
+    "my_code": "My code",
+    "why_heading": "Why did this happen?",
+    "example_heading": "You can write it like this",
+    "location": "{{line}}:{{column}}",
+    "location_line_only": "Line {{line}}",
+    "goto": "Go to this spot in the editor",
+    "where_with_column": "Line {{line}}, around character {{column}} — {{detail}}",
+    "where_line_only": "Line {{line}} — {{detail}}",
+    "where_no_line": "{{detail}}",
+    "terminal_pointer": "See the Error interpretation tab for what to do next."
+  },
+  "lesson": {
+    "missing-colon": {
+      "title": "This line needs a colon (:) at the end",
+      "what": "Python could not find where the indented block was meant to start.",
+      "why": "Statements that carry indented code beneath them — if, for, while, def — take a colon after the condition or the name.",
+      "where": "check for a colon (:) at the end of the line.",
+      "example": "if temperature > 30:\n    print(\"It's hot\")",
+      "next": "Add a colon to the end of the highlighted line and run it again."
+    },
+    "expected-indented-block": {
+      "title": "The code inside this block needs indenting",
+      "what": "Python reached a block that had no statements in it.",
+      "why": "Whatever belongs to an if, a loop, or a function is written four spaces further in than the line that opened it.",
+      "where": "check whether the line needs spaces in front of it.",
+      "example": "if is_ready:\n    print(\"Starting\")",
+      "next": "Move the highlighted line four spaces further in than the line above it, and run it again."
+    },
+    "unexpected-indent": {
+      "title": "This line is indented further than it should be",
+      "what": "Python found indentation where no new block had been opened.",
+      "why": "A statement that is not inside a block has to start in the same column as the statements around it.",
+      "where": "check whether this line starts further in than its neighbours.",
+      "example": "name = \"Mina\"\nprint(name)",
+      "next": "Line the highlighted row up with the code around it and run it again."
+    },
+    "tabs-and-spaces": {
+      "title": "Tabs and spaces are mixed in the indentation",
+      "what": "Two kinds of indentation that look alike on screen are being used together.",
+      "why": "Python may count a tab and a run of spaces as different widths, so one file has to pick one and stay with it.",
+      "where": "delete the indentation on this line and type it again with spaces.",
+      "example": "for item in items:\n    print(item)",
+      "next": "Clear the indentation on the highlighted line, retype it as four spaces, and run it again."
+    },
+    "unclosed-delimiter": {
+      "title": "An opening bracket has no closing partner",
+      "what": "A parenthesis, square bracket, or brace was opened and never closed.",
+      "why": "Every ( [ { needs its matching ) ] }, and Python keeps reading until it finds one.",
+      "where": "count the brackets here and on the line above — the opening one may be earlier than the error.",
+      "example": "print(total + tax)\ncolors = [\"red\", \"blue\"]",
+      "next": "Compare the opening and closing brackets on the highlighted line and the one above it."
+    },
+    "unterminated-string": {
+      "title": "This text is missing its closing quote",
+      "what": "Python could not find where the piece of text was meant to end.",
+      "why": "Text that opens with a single or double quote has to close with the same kind of quote.",
+      "where": "check that the quotes on this line come in pairs.",
+      "example": "message = \"Hello\"\nprint(message)",
+      "next": "Close the quote on the highlighted line and run it again."
+    },
+    "assignment-in-condition": {
+      "title": "Storing a value and comparing values are different",
+      "what": "Python found the assignment sign in a place that cannot take one.",
+      "why": "A single = stores a value; == is what asks whether two values are the same.",
+      "where": "check whether a condition here uses = where it means ==.",
+      "example": "score = 90\nif score == 90:\n    print(\"Equal\")",
+      "next": "Decide whether this line stores a value or asks a question, then use the matching sign."
+    },
+    "missing-separator": {
+      "title": "Values here need something between them",
+      "what": "Two values are written next to each other with nothing to separate them.",
+      "why": "Arguments to a function and items in a list are divided by commas.",
+      "where": "check whether a comma is missing between two values.",
+      "example": "print(\"name\", \"age\")\nnums = [1, 2, 3]",
+      "next": "Add the missing comma on the highlighted line and run it again."
+    },
+    "generic-syntax": {
+      "title": "Python could not read this line",
+      "what": "A symbol, quote, bracket, or keyword may be missing or in the wrong place.",
+      "why": "Python only runs code that follows its sentence shapes exactly, one line at a time.",
+      "where": "read the highlighted line and the one above it together.",
+      "example": "if is_sunny:\n    print(\"Let's walk\")",
+      "next": "Check the colons, brackets, quotes, and indentation in turn, then run it again."
+    }
+  }
+}

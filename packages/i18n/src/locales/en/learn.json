@@ -109,6 +109,7 @@
     "tab_code": "Code",
     "tab_terminal": "Terminal",
     "tab_result": "Result",
+    "tab_coach": "Error interpretation",
     "language_python": "Python 3",
     "font_smaller": "Decrease editor font size",
     "font_larger": "Increase editor font size",

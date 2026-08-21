@@ -1,10 +1,6 @@
 {
   "title": "학원",
   "no_access": "이 학원에 대한 활성 접근 권한이 없습니다.",
-  "signed_in_as": "{{academy}}에 로그인했습니다.",
-  "role": "역할",
-  "manager_hint": "사이드바의 가입 신청, 멤버, 초대 메뉴에서 학원 접근 권한을 관리하세요.",
-  "member_hint": "역할별 학습 기능은 코브 스튜디오 개발이 진행되면서 이곳에 추가됩니다.",
   "role_selector": {
     "label": "역할 선택",
     "drawer_title": "학원 역할",
@@ -16,5 +12,6 @@
   "student_analytics_description": "담당 학급의 모든 학생과 각 수치의 근거가 되는 측정값입니다.",
   "learning_overview_title": "학습 현황",
   "control_tower_title": "학원 관제탑",
-  "control_tower_description": "결정을 기다리는 일과 수업이 잘 굴러가는지 한 화면에서 확인합니다."
+  "control_tower_description": "결정을 기다리는 일과 수업이 잘 굴러가는지 한 화면에서 확인합니다.",
+  "curriculum_overview_title": "커리큘럼 현황"
 }

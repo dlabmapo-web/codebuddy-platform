@@ -1,0 +1,271 @@
+{
+  "eyebrow": "커리큘럼",
+  "heading": "{{academy}}이(가) 가르치는 내용",
+  "as_of": "{{stamp}} {{zone}} 기준",
+  "retry": "다시 시도",
+  "effectiveness_title": "커리큘럼이 작동하는 방식",
+  "difficulty": {
+    "EASY": "쉬움",
+    "MEDIUM": "보통",
+    "HARD": "어려움"
+  },
+  "catalog": {
+    "title": "전체 콘텐츠",
+    "description": "이 학원을 위해 만든 모든 콘텐츠와, 그중 학생이 실제로 볼 수 있는 양입니다.",
+    "spine_title": "학생이 볼 수 있는 콘텐츠",
+    "spine_live": "공개",
+    "spine_hidden": "숨김",
+    "spine_buried": "가려짐",
+    "courses": "코스",
+    "modules": "모듈",
+    "lectures": "강의",
+    "exercises": "문제",
+    "of_visible": "{{total}}개 중 {{visible}}개 공개",
+    "difficulty_mix": "쉬움 {{easy}} · 보통 {{medium}} · 어려움 {{hard}}",
+    "meta_one": "코스 {{count}}개",
+    "meta_other": "코스 {{count}}개",
+    "spine_total_one": "작성한 문제 {{count}}개",
+    "spine_total_other": "작성한 문제 {{count}}개",
+    "buried_hint_one": "문제 {{count}}개는 공개로 설정되어 있지만, 상위 강의·모듈·코스가 숨김이라 학생이 열 수 없습니다.",
+    "buried_hint_other": "문제 {{count}}개는 공개로 설정되어 있지만, 상위 강의·모듈·코스가 숨김이라 학생이 열 수 없습니다.",
+    "shelved_one": "공개되었지만 어느 학급에도 배정되지 않은 코스 {{count}}개",
+    "shelved_other": "공개되었지만 어느 학급에도 배정되지 않은 코스 {{count}}개",
+    "taught_one": "학습 중인 코스 {{count}}개",
+    "taught_other": "학습 중인 코스 {{count}}개",
+    "students_reached_one": "학생 {{count}}명에게 전달",
+    "students_reached_other": "학생 {{count}}명에게 전달"
+  },
+  "first_course": {
+    "title": "여기서 시작하세요",
+    "empty_title": "아직 코스가 없습니다",
+    "body": "코스에는 학급이 학습할 모듈, 강의, 문제가 담깁니다. 코스를 하나 만들면 이 페이지의 나머지 항목이 채워지기 시작합니다.",
+    "action": "코스 만들기"
+  },
+  "blockers": {
+    "title": "고쳐야 할 항목",
+    "description": "팀 리드만 해결할 수 있는 문제를, 영향이 큰 순서로 보여줍니다.",
+    "empty_title": "학생을 막고 있는 문제가 없습니다",
+    "empty_body": "공개된 코스에는 콘텐츠가 있고, 공개된 문제는 채점할 수 있으며, 진행 중인 학급에는 교사와 학습할 코스가 있습니다.",
+    "students_none": "아직 영향을 받는 학생 없음",
+    "kind": {
+      "hidden_course_assigned": {
+        "title": "숨김 코스가 배정된 학급",
+        "body": "학급은 진행 중이지만 코스가 숨김이라 학생이 열 수 있는 내용이 없습니다. 코스를 공개하거나 다른 코스를 배정하세요."
+      },
+      "empty_visible_course": {
+        "title": "문제가 없는 공개 코스",
+        "body": "학생이 코스를 열면 아무 내용도 없습니다. 문제를 추가하거나, 준비될 때까지 코스를 숨기세요."
+      },
+      "ungradeable_exercise": {
+        "title": "채점할 수 없는 문제",
+        "body": "공개된 문제에 숨김 테스트 케이스가 없어, 학생이 풀지 않고도 통과할 수 있습니다. 숨김 케이스를 최소 하나 추가하세요."
+      },
+      "unfinished_exercise": {
+        "title": "설명이 없는 문제",
+        "body": "공개된 문제에 무엇을 풀어야 하는지 적혀 있지 않습니다. 설명을 쓰거나, 쓸 때까지 숨기세요."
+      },
+      "class_without_teacher": {
+        "title": "교사가 없는 학급",
+        "body": "이 학급을 책임지는 사람이 없고 모니터링할 수도 없습니다. 교사를 배정하세요."
+      },
+      "class_teacher_unavailable": {
+        "title": "배정된 교사를 쓸 수 없음",
+        "body": "배정된 교사의 계정이 정지·삭제되었거나 더 이상 이 학원의 교사가 아닙니다. 교체하거나 배정을 해제하세요."
+      },
+      "class_without_course": {
+        "title": "코스가 없는 학급",
+        "body": "학급은 있지만 학습할 내용이 없습니다. 코스를 최소 하나 배정하세요."
+      }
+    },
+    "meta_one": "{{count}}건",
+    "meta_other": "{{count}}건",
+    "students_affected_one": "현재 학생 {{count}}명에게 영향",
+    "students_affected_other": "현재 학생 {{count}}명에게 영향",
+    "row_students_one": "학생 {{count}}명",
+    "row_students_other": "학생 {{count}}명",
+    "more_one": "{{count}}건 더 있음",
+    "more_other": "{{count}}건 더 있음"
+  },
+  "changes": {
+    "title": "최근 변경",
+    "description": "누가 무엇을 바꿨는지, 그리고 그때 학생이 보고 있었는지를 보여줍니다.",
+    "empty_title": "아직 커리큘럼 변경이 없습니다",
+    "empty_body": "코스, 강의, 문제를 수정하면 이곳에 바로 나타납니다.",
+    "by": "{{name}}",
+    "by_unknown": "삭제된 계정",
+    "was_live": "공개 중이었음",
+    "was_hidden": "숨김이었음",
+    "action": {
+      "content.course.created": "생성함",
+      "content.course.updated": "수정함",
+      "content.course.visibility_changed": "공개 상태 변경",
+      "content.course_module.created": "모듈 추가",
+      "content.course_module.updated": "모듈 수정",
+      "content.course_module.visibility_changed": "모듈 공개 상태 변경",
+      "content.course_module.deleted": "모듈 삭제",
+      "content.course_module.reordered": "모듈 순서 변경",
+      "content.lecture.created": "강의 추가",
+      "content.lecture.updated": "강의 수정",
+      "content.lecture.visibility_changed": "강의 공개 상태 변경",
+      "content.lecture.deleted": "강의 삭제",
+      "content.lecture.reordered": "강의 순서 변경",
+      "content.programming_exercise.created": "문제 추가",
+      "content.programming_exercise.updated": "문제 수정",
+      "content.programming_exercise.visibility_changed": "문제 공개 상태 변경",
+      "content.programming_exercise.deleted": "문제 삭제",
+      "content.programming_exercise.reordered": "문제 순서 변경"
+    }
+  },
+  "period": {
+    "legend": "측정 기간",
+    "range_7d": "7일",
+    "range_30d": "30일",
+    "range_all": "전체 기간",
+    "window": "{{from}} – {{to}}",
+    "window_all": "{{to}}까지"
+  },
+  "problems": {
+    "title": "가장 어려운 문제",
+    "description": "모든 학급을 통틀어 학생이 가장 풀지 못하는 문제입니다.",
+    "empty_title": "두드러지는 문제가 없습니다",
+    "empty_body": "이 기간에 충분한 시도가 쌓이면 가장 어려운 문제가 여기에 나타납니다.",
+    "solve_rate": "{{percent}}% · {{attempting}}명 중 {{solved}}명",
+    "solve_rate_label": "{{attempting}}명 중 {{solved}}명이 해결"
+  },
+  "calibration": {
+    "title": "맞지 않는 난이도 표시",
+    "description": "측정된 정답률이 지정한 난이도와 어긋나는 문제입니다.",
+    "empty_title": "모든 난이도가 맞습니다",
+    "empty_body": "시도가 충분한 문제 중 표시된 난이도에서 벗어난 정답률을 보이는 문제는 없습니다.",
+    "measured": "{{attempting}}명 중 {{percent}}%",
+    "verdict": {
+      "harder_than_labelled": "표시보다 어려움",
+      "easier_than_labelled": "표시보다 쉬움"
+    },
+    "meta_one": "확인 {{count}}건",
+    "meta_other": "확인 {{count}}건"
+  },
+  "grind": {
+    "title": "반복 시도로 푸는 문제",
+    "description": "학생이 결국 풀긴 하지만 여러 번 시도해야 하는 문제입니다. 대개 설명이 불명확하거나 테스트 케이스가 설명과 어긋납니다.",
+    "empty_title": "반복 시도로 푸는 문제가 없습니다",
+    "empty_body": "학생이 문제를 풀 때 합리적인 시도 횟수 안에 해결하고 있습니다.",
+    "per_solver": "회씩 시도",
+    "evidence": "시도 {{submissions}}회 · 해결 {{solved}}명 · {{percent}}%"
+  },
+  "never_attempted": {
+    "title": "공개했지만 아무도 열지 않음",
+    "description": "학습 중인 학생 앞에 공개되어 있지만 이 기간에 아무도 열지 않은 문제입니다.",
+    "empty_title": "공개된 문제를 모두 시도했습니다",
+    "empty_body": "학습 중인 학생이 있는 코스의 공개 문제는 모두 이 기간에 시도가 있습니다.",
+    "meta_one": "{{count}}개",
+    "meta_other": "{{count}}개",
+    "reachable_one": "{{count}}명이 열 수 있음",
+    "reachable_other": "{{count}}명이 열 수 있음",
+    "more_one": "{{count}}개 더 있음",
+    "more_other": "{{count}}개 더 있음"
+  },
+  "reach": {
+    "title": "코스별 도달 범위",
+    "description": "각 코스가 어디까지 전달되고, 학생이 어디서 멈추는지 보여줍니다.",
+    "empty_title": "비교할 코스가 없습니다",
+    "empty_body": "이 학원에 코스가 생기면 도달 범위가 나타납니다.",
+    "table_label": "코스별 도달 범위와 완료율",
+    "truncated": "처음 100개 코스만 표시합니다.",
+    "tag_hidden": "숨김",
+    "tag_shelved": "미배정",
+    "no_students": "학생 없음",
+    "no_exercises": "문제 없음",
+    "no_drop_off": "이탈 지점 없음",
+    "no_time": "측정된 시간 없음",
+    "drop_off_value": "{{from}}% → {{to}}%",
+    "minutes": "{{minutes}}분",
+    "hours": "{{hours}}시간 {{minutes}}분",
+    "column": {
+      "course": "코스",
+      "content": "공개 콘텐츠",
+      "classes": "학급",
+      "students": "학생",
+      "completion": "완료율",
+      "median_time": "중앙 학습 시간",
+      "drop_off": "이탈 지점"
+    },
+    "meta_one": "코스 {{count}}개",
+    "meta_other": "코스 {{count}}개",
+    "sort_asc": "오름차순 정렬됨",
+    "sort_desc": "내림차순 정렬됨",
+    "sort_none": "정렬 안 됨",
+    "content_figure": "{{live}}/{{total}}",
+    "content_sub": "공개",
+    "completion_percent": "{{percent}}%",
+    "completion_sub": "{{solved}}/{{possible}}",
+    "students_sub": "활동 {{active}}명"
+  },
+  "actions": {
+    "label": "시작할 작업",
+    "course": {
+      "title": "코스 작성",
+      "body": "모듈, 강의, 문제를 추가합니다."
+    },
+    "class": {
+      "title": "학급 구성",
+      "body": "코스와 교사를 배정합니다."
+    }
+  },
+  "unavailable": {
+    "page_title": "커리큘럼 현황을 불러오지 못했습니다",
+    "page_body": "학원의 전체 집계를 읽지 못해, 그 아래 수치도 신뢰할 수 없습니다.",
+    "section_body": "이 섹션을 측정하지 못했습니다. 페이지의 나머지 내용은 현재 상태입니다."
+  },
+  "nav": {
+    "label": "섹션으로 이동",
+    "catalog": "전체 콘텐츠",
+    "blockers": "고칠 항목",
+    "effectiveness": "작동 현황",
+    "reach": "도달 범위",
+    "changes": "변경",
+    "roster": "학급"
+  },
+  "tabs": {
+    "problems": "어려운 문제",
+    "calibration": "난이도",
+    "grind": "반복 시도",
+    "never_attempted": "열지 않음"
+  },
+  "scope": {
+    "now": "현재"
+  },
+  "roster": {
+    "title": "학급과 구성원",
+    "description": "이 커리큘럼을 누가 가르치고, 학생 몇 명에게 전달되는지 보여줍니다.",
+    "meta_one": "학급 {{count}}개",
+    "meta_other": "학급 {{count}}개",
+    "classes": "학급",
+    "teachers": "교사",
+    "students": "학생",
+    "classes_loose_one": "{{count}}개에 교사 필요",
+    "classes_loose_other": "{{count}}개에 교사 필요",
+    "teachers_loose_one": "{{count}}명이 담당 학급 없음",
+    "teachers_loose_other": "{{count}}명이 담당 학급 없음",
+    "students_loose_one": "{{count}}명이 학급 미배정",
+    "students_loose_other": "{{count}}명이 학급 미배정",
+    "all_placed": "모두 배정됨",
+    "teacher_none": "교사 없음",
+    "teacher_unavailable": "교사 배정 불가",
+    "teacher_unknown": "삭제된 계정",
+    "no_courses": "배정된 코스 없음",
+    "more_courses_one": "외 {{count}}개",
+    "more_courses_other": "외 {{count}}개",
+    "tag_archived": "보관됨",
+    "archived_one": "보관된 학급 {{count}}개는 표시하지 않습니다.",
+    "archived_other": "보관된 학급 {{count}}개는 표시하지 않습니다.",
+    "truncated": "학급은 처음 50개만 표시합니다.",
+    "empty_title": "아직 학급이 없습니다",
+    "empty_body": "학급은 코스와 학생이 만나는 곳입니다. 학급을 만들고 교사를 배정하면 위의 커리큘럼이 학생에게 전달되기 시작합니다.",
+    "empty_action": "학급 만들기",
+    "students_count_one": "학생 {{count}}명",
+    "students_count_other": "학생 {{count}}명",
+    "exercises_count_one": "공개 문제 {{count}}개",
+    "exercises_count_other": "공개 문제 {{count}}개"
+  }
+}

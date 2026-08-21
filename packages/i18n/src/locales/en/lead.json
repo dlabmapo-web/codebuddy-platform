@@ -1,0 +1,271 @@
+{
+  "eyebrow": "Curriculum",
+  "heading": "What {{academy}} teaches",
+  "as_of": "As of {{stamp}} {{zone}}",
+  "retry": "Try again",
+  "effectiveness_title": "How the curriculum is working",
+  "difficulty": {
+    "EASY": "Easy",
+    "MEDIUM": "Medium",
+    "HARD": "Hard"
+  },
+  "catalog": {
+    "title": "The catalog",
+    "description": "Everything written for this academy, and how much of it students can reach.",
+    "spine_title": "What students can reach",
+    "spine_live": "live",
+    "spine_hidden": "hidden",
+    "spine_buried": "buried",
+    "courses": "Courses",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "exercises": "Exercises",
+    "of_visible": "{{visible}} of {{total}} visible",
+    "difficulty_mix": "{{easy}} easy · {{medium}} medium · {{hard}} hard",
+    "meta_one": "{{count}} course",
+    "meta_other": "{{count}} courses",
+    "spine_total_one": "{{count}} exercise written",
+    "spine_total_other": "{{count}} exercises written",
+    "buried_hint_one": "{{count}} exercise is set to show, but a lecture, module, or course above it is hidden. Students cannot open it.",
+    "buried_hint_other": "{{count}} exercises are set to show, but a lecture, module, or course above them is hidden. Students cannot open them.",
+    "shelved_one": "{{count}} visible course is not assigned to any class",
+    "shelved_other": "{{count}} visible courses are not assigned to any class",
+    "taught_one": "{{count}} course taught",
+    "taught_other": "{{count}} courses taught",
+    "students_reached_one": "reaching {{count}} student",
+    "students_reached_other": "reaching {{count}} students"
+  },
+  "first_course": {
+    "title": "Start here",
+    "empty_title": "No courses yet",
+    "body": "A course holds the modules, lectures, and exercises your classes learn. Everything else on this page starts describing itself once one exists.",
+    "action": "Create a course"
+  },
+  "blockers": {
+    "title": "Needs fixing",
+    "description": "Defects only you can clear, most consequential first.",
+    "empty_title": "Nothing is blocking students",
+    "empty_body": "Every visible course has content, every live exercise can be graded, and every active class has a teacher and something to learn.",
+    "students_none": "Reaches no students yet",
+    "kind": {
+      "hidden_course_assigned": {
+        "title": "Class assigned a hidden course",
+        "body": "The class is running, but the course is hidden, so there is nothing for students to open. Show the course, or assign a different one."
+      },
+      "empty_visible_course": {
+        "title": "Visible course with no exercises",
+        "body": "Students can open the course and find nothing inside. Add exercises, or hide the course until it is ready."
+      },
+      "ungradeable_exercise": {
+        "title": "Exercise that cannot be graded",
+        "body": "The exercise is live with no hidden test cases, so a student can pass it without solving it. Add at least one hidden case."
+      },
+      "unfinished_exercise": {
+        "title": "Exercise with no description",
+        "body": "The exercise is live and says nothing about what to solve. Write the description, or hide it until you have."
+      },
+      "class_without_teacher": {
+        "title": "Class with no teacher",
+        "body": "Nobody is responsible for this class and nobody can monitor it. Assign a teacher."
+      },
+      "class_teacher_unavailable": {
+        "title": "Class teacher unavailable",
+        "body": "The assigned teacher's account is suspended, removed, or no longer a teacher here. Replace them, or clear the assignment."
+      },
+      "class_without_course": {
+        "title": "Class with no course",
+        "body": "The class exists and has nothing to learn. Assign at least one course."
+      }
+    },
+    "meta_one": "{{count}} to fix",
+    "meta_other": "{{count}} to fix",
+    "students_affected_one": "Reaches {{count}} student today",
+    "students_affected_other": "Reaches {{count}} students today",
+    "row_students_one": "{{count}} student",
+    "row_students_other": "{{count}} students",
+    "more_one": "{{count}} more",
+    "more_other": "{{count}} more"
+  },
+  "changes": {
+    "title": "Recent changes",
+    "description": "Who changed what, and whether students were watching when it happened.",
+    "empty_title": "No curriculum changes yet",
+    "empty_body": "Edits to courses, lectures, and exercises appear here as soon as somebody makes one.",
+    "by": "by {{name}}",
+    "by_unknown": "by a removed account",
+    "was_live": "Was live",
+    "was_hidden": "Was hidden",
+    "action": {
+      "content.course.created": "created",
+      "content.course.updated": "edited",
+      "content.course.visibility_changed": "shown or hidden",
+      "content.course_module.created": "module added",
+      "content.course_module.updated": "module edited",
+      "content.course_module.visibility_changed": "module shown or hidden",
+      "content.course_module.deleted": "module deleted",
+      "content.course_module.reordered": "modules reordered",
+      "content.lecture.created": "lecture added",
+      "content.lecture.updated": "lecture edited",
+      "content.lecture.visibility_changed": "lecture shown or hidden",
+      "content.lecture.deleted": "lecture deleted",
+      "content.lecture.reordered": "lectures reordered",
+      "content.programming_exercise.created": "exercise added",
+      "content.programming_exercise.updated": "exercise edited",
+      "content.programming_exercise.visibility_changed": "exercise shown or hidden",
+      "content.programming_exercise.deleted": "exercise deleted",
+      "content.programming_exercise.reordered": "exercises reordered"
+    }
+  },
+  "period": {
+    "legend": "Measurement period",
+    "range_7d": "7 days",
+    "range_30d": "30 days",
+    "range_all": "All time",
+    "window": "{{from}} – {{to}}",
+    "window_all": "Up to {{to}}"
+  },
+  "problems": {
+    "title": "Hardest problems",
+    "description": "The exercises students are least able to solve, across every class.",
+    "empty_title": "No problem is standing out",
+    "empty_body": "Once students have attempted enough exercises in this period, the hardest of them appear here.",
+    "solve_rate": "{{percent}}% · {{solved}} of {{attempting}}",
+    "solve_rate_label": "{{solved}} of {{attempting}} students solved it"
+  },
+  "calibration": {
+    "title": "Difficulty labels that no longer fit",
+    "description": "Exercises whose measured solve rate contradicts the label you gave them.",
+    "empty_title": "Every label fits",
+    "empty_body": "No exercise with enough attempts is solved at a rate its difficulty label rules out.",
+    "measured": "{{percent}}% of {{attempting}}",
+    "verdict": {
+      "harder_than_labelled": "Harder than labelled",
+      "easier_than_labelled": "Easier than labelled"
+    },
+    "meta_one": "{{count}} to review",
+    "meta_other": "{{count}} to review"
+  },
+  "grind": {
+    "title": "Solved by brute force",
+    "description": "Exercises students do pass, but only after many tries — usually an unclear description or a test case that disagrees with it.",
+    "empty_title": "Nothing is being brute-forced",
+    "empty_body": "Where students are solving exercises, they are getting there in a reasonable number of attempts.",
+    "per_solver": "tries each",
+    "evidence": "{{submissions}} attempts · {{solved}} solved · {{percent}}%"
+  },
+  "never_attempted": {
+    "title": "Live but untouched",
+    "description": "Exercises in front of active students that nobody has opened in this period.",
+    "empty_title": "Everything live has been tried",
+    "empty_body": "Every visible exercise in a course with active students has at least one attempt in this period.",
+    "meta_one": "{{count}} untouched",
+    "meta_other": "{{count}} untouched",
+    "reachable_one": "{{count}} could reach it",
+    "reachable_other": "{{count}} could reach it",
+    "more_one": "{{count}} more",
+    "more_other": "{{count}} more"
+  },
+  "reach": {
+    "title": "Course reach",
+    "description": "How far each course travels, and where students stop.",
+    "empty_title": "No courses to compare",
+    "empty_body": "Course reach appears once this academy has a course.",
+    "table_label": "Courses, with reach and completion",
+    "truncated": "Only the first 100 courses are shown.",
+    "tag_hidden": "Hidden",
+    "tag_shelved": "Shelved",
+    "no_students": "No students",
+    "no_exercises": "No exercises",
+    "no_drop_off": "No drop-off",
+    "no_time": "No time measured",
+    "drop_off_value": "{{from}}% → {{to}}%",
+    "minutes": "{{minutes}}m",
+    "hours": "{{hours}}h {{minutes}}m",
+    "column": {
+      "course": "Course",
+      "content": "Live content",
+      "classes": "Classes",
+      "students": "Students",
+      "completion": "Completion",
+      "median_time": "Median time",
+      "drop_off": "Drops off at"
+    },
+    "meta_one": "{{count}} course",
+    "meta_other": "{{count}} courses",
+    "sort_asc": "Sorted ascending",
+    "sort_desc": "Sorted descending",
+    "sort_none": "Not sorted",
+    "content_figure": "{{live}}/{{total}}",
+    "content_sub": "live",
+    "completion_percent": "{{percent}}%",
+    "completion_sub": "{{solved}}/{{possible}}",
+    "students_sub": "{{active}} active"
+  },
+  "actions": {
+    "label": "Where to start",
+    "course": {
+      "title": "Write a course",
+      "body": "Add modules, lectures, and exercises."
+    },
+    "class": {
+      "title": "Arrange a class",
+      "body": "Assign courses and a teacher."
+    }
+  },
+  "unavailable": {
+    "page_title": "The curriculum overview could not be loaded",
+    "page_body": "The academy's own totals could not be read, so nothing below them can be trusted either.",
+    "section_body": "This section could not be measured. Everything else on the page is current."
+  },
+  "nav": {
+    "label": "Jump to section",
+    "catalog": "Catalog",
+    "blockers": "To fix",
+    "effectiveness": "How it works",
+    "reach": "Reach",
+    "changes": "Changes",
+    "roster": "Classes"
+  },
+  "tabs": {
+    "problems": "Hardest",
+    "calibration": "Labels",
+    "grind": "Brute force",
+    "never_attempted": "Untouched"
+  },
+  "scope": {
+    "now": "Now"
+  },
+  "roster": {
+    "title": "Classes and people",
+    "description": "Who teaches this curriculum, and how many students it reaches.",
+    "meta_one": "{{count}} class",
+    "meta_other": "{{count}} classes",
+    "classes": "Classes",
+    "teachers": "Teachers",
+    "students": "Students",
+    "classes_loose_one": "{{count}} needs a teacher",
+    "classes_loose_other": "{{count}} need a teacher",
+    "teachers_loose_one": "{{count}} runs no class",
+    "teachers_loose_other": "{{count}} run no class",
+    "students_loose_one": "{{count}} is in no class",
+    "students_loose_other": "{{count}} are in no class",
+    "all_placed": "All placed",
+    "teacher_none": "No teacher",
+    "teacher_unavailable": "Teacher unavailable",
+    "teacher_unknown": "Removed account",
+    "no_courses": "No course assigned",
+    "more_courses_one": "and {{count}} more",
+    "more_courses_other": "and {{count}} more",
+    "tag_archived": "Archived",
+    "archived_one": "{{count}} archived class is not shown.",
+    "archived_other": "{{count}} archived classes are not shown.",
+    "truncated": "Only the first 50 classes are shown.",
+    "empty_title": "No classes yet",
+    "empty_body": "A class is where a course meets students. Arrange one, assign a teacher, and the curriculum above starts reaching somebody.",
+    "empty_action": "Arrange a class",
+    "students_count_one": "{{count}} student",
+    "students_count_other": "{{count}} students",
+    "exercises_count_one": "{{count}} live exercise",
+    "exercises_count_other": "{{count}} live exercises"
+  }
+}

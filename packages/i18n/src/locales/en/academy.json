@@ -1,10 +1,6 @@
 {
   "title": "Academy",
   "no_access": "You do not have active access to this academy.",
-  "signed_in_as": "Signed in to {{academy}}.",
-  "role": "Role",
-  "manager_hint": "Use Applications, Members, and Invitations in the sidebar to manage academy access.",
-  "member_hint": "Role-specific learning features will appear here as Cove Studio development continues.",
   "role_selector": {
     "label": "Select role",
     "drawer_title": "Academy role",
@@ -16,5 +12,6 @@
   "student_analytics_description": "Every student in your assigned classes, with the measurements behind each figure.",
   "learning_overview_title": "Overview",
   "control_tower_title": "Control tower",
-  "control_tower_description": "One picture of the academy: what needs a decision, and whether the classes are alive."
+  "control_tower_description": "One picture of the academy: what needs a decision, and whether the classes are alive.",
+  "curriculum_overview_title": "Curriculum overview"
 }

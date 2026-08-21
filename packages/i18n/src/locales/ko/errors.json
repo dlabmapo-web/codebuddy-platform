@@ -65,6 +65,7 @@
   "TEACHER_OVERVIEW_ACCESS_DENIED": "이 학원의 수업 현황을 볼 수 있는 권한이 없습니다.",
   "STUDENT_OVERVIEW_ACCESS_DENIED": "이 학원의 학습 현황을 볼 수 있는 권한이 없습니다.",
   "MANAGER_OPERATIONS_ACCESS_DENIED": "이 학원의 활성 관리자가 아닙니다.",
+  "CURRICULUM_OVERVIEW_ACCESS_DENIED": "이 학원의 활성 팀 리드가 아닙니다.",
   "IMPORT_FILE_REJECTED": "이 파일을 구성원 명단으로 읽을 수 없습니다.",
   "IMPORT_SESSION_NOT_FOUND": "이 가져오기를 더 이상 사용할 수 없습니다.",
   "IMPORT_PREVIEW_EXPIRED": "미리보기가 만료되었습니다. 파일을 다시 올려 현재 결과를 확인하세요.",

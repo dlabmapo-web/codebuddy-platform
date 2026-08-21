@@ -236,6 +236,39 @@ Do not log raw usernames or email addresses for recovery. Operational events
 may contain request ID, broad outcome category, latency, and whether a request
 was limited. Provider error bodies must be sanitized.
 
+### 5.2 Authentication-wide CAPTCHA integration
+
+Supabase's CAPTCHA protection toggle applies to password sign-in and sign-up as
+well as password-recovery requests. Cove therefore treats Turnstile as one
+shared authentication control rather than a forgot-password-only widget.
+
+When `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is configured:
+
+- login, signup, and forgot-password forms render the same explicitly managed
+  Turnstile challenge;
+- the primary submit button remains disabled until the challenge yields a
+  token;
+- each Server Action trims the token, bounds it to 4096 characters, and passes
+  it only to the corresponding Supabase Auth call as `captchaToken`;
+- every submission, whether accepted or rejected, invalidates the client copy
+  and remounts the challenge so a single-use token is never submitted twice;
+- expiry, timeout, script failure, and Turnstile error callbacks clear the
+  token and show localized security-check guidance; and
+- Supabase CAPTCHA failures are not translated as invalid credentials. Login
+  and signup return a localized security-check error without exposing provider
+  details.
+
+When the site key is absent, no CAPTCHA markup, hidden input, or disabled slot
+is rendered. This absence is allowed only for local development or a controlled
+rollback where Supabase CAPTCHA protection is also disabled. A deployment must
+never enable Supabase CAPTCHA while omitting the matching frontend site key.
+
+The widget remains presentation-only. Cove does not store the Turnstile secret
+or call Siteverify directly; Supabase owns server-side token validation using
+the secret configured in Authentication > Bot and Abuse Protection. The
+Turnstile secret must not appear in Cove environment files, logs, or client
+bundles.
+
 ## 6. Recovery Capability
 
 The Cove capability prevents an ordinary authenticated user from visiting the
@@ -314,7 +347,8 @@ Add matching English and Korean keys under `auth` for:
 - reset-password title, description, new password, confirmation, submit,
   pending, success, mismatch, weak/same password, rate limit, and generic
   failure; and
-- the login-page password-reset success message.
+- the login-page password-reset success message; and
+- shared CAPTCHA labels plus login/signup security-check failures.
 
 Requirements:
 
@@ -348,6 +382,9 @@ not need explanation to the user.
 | Supabase rejects password policy | Localized correction | Capability retained until expiry |
 | Password update succeeds | Login success state | Capability cleared; global sign-out attempted |
 | Revocation fails after update | Login success state | Local session cleared; operational error recorded |
+| CAPTCHA missing, expired, or rejected during login | Security-check error | No session started; credentials are not blamed |
+| CAPTCHA missing, expired, or rejected during signup | Security-check error | No account or onboarding state created |
+| CAPTCHA script/network failure | Retry security check guidance | Submit remains disabled; no auth request sent |
 | Kakao flag false | No Kakao UI | Crafted Kakao start rejected before side effects |
 | Kakao flag true but provider fails | Existing safe social error | No raw provider error shown |
 
@@ -369,6 +406,14 @@ not need explanation to the user.
 ### 10.2 Web unit/component tests
 
 - Forgot-password validation and accepted states are deterministic.
+- Login, signup, and forgot-password forms require a Turnstile token whenever
+  the public site key is configured and contain no CAPTCHA markup when it is
+  absent.
+- Login and signup actions trim and forward a CAPTCHA token to Supabase, reject
+  oversized tokens before the provider call, and distinguish CAPTCHA failure
+  from invalid credentials or generic signup failure.
+- A submission, expiry, timeout, or widget error clears the token and produces
+  a fresh challenge before another attempt.
 - Recovery-capability signing and verification cover expiry, signature
   tampering, issuer/audience mismatch, malformed subject, and subject mismatch.
 - The confirmation GET accepts only `type=recovery`, never consumes the token,
@@ -402,7 +447,13 @@ not need explanation to the user.
    not consume it, then submit it once and confirm a second submission fails.
 9. Confirm login and signup have no visual or accessible Kakao content when the
    flag is false.
-10. In staging only, enable Kakao after credentials are configured and run the
+10. Run browser automation with Cloudflare's documented always-pass test site
+    key and a dedicated Supabase test project configured with its matching test
+    secret. Confirm login, signup, and recovery cannot submit before a token,
+    submit once after verification, and require a new token for retry.
+11. Confirm CAPTCHA rejection produces security-check guidance rather than an
+    invalid-password message.
+12. In staging only, enable Kakao after credentials are configured and run the
    provider release-gate cases from Section 7.
 
 Required verification commands include web/API/shared unit tests, web and API
@@ -423,7 +474,11 @@ Before releasing password recovery:
 - disable click-tracking or link rewriting for authentication email;
 - configure edge and application logging to redact query strings for
   `/auth/recovery/confirm` and never record request bodies there;
-- enable and test CAPTCHA;
+- configure the public Turnstile site key in the web deployment and the
+  matching secret only in Supabase, then enable CAPTCHA and test login, signup,
+  and recovery together;
+- use a separate Turnstile widget and Supabase project for automated E2E, with
+  Cloudflare's matching test site-key/secret pair rather than production keys;
 - verify HTTPS, secure cookies, and `Cache-Control: no-store` at the deployed
   edge; and
 - alert on sustained recovery-provider failures and abnormal rate-limit volume
@@ -485,9 +540,11 @@ The feature is complete when:
    session, attempts global revocation, and requires a fresh login.
 9. Kakao is absent from login and signup and cannot be started while its flag is
    false, while its typed implementation and tests remain intact.
-10. Kakao becomes available by configuration only after its documented provider
-   release gate passes.
-11. Focused unit, integration, i18n, type-check, and Playwright verification is
+10. With Supabase CAPTCHA enabled, login, signup, and password recovery all
+    require fresh Turnstile tokens and report CAPTCHA failure accurately.
+11. Kakao becomes available by configuration only after its documented provider
+    release gate passes.
+12. Focused unit, integration, i18n, type-check, and Playwright verification is
     green.
 
 ## 15. Primary References

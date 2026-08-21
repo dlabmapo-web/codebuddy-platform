@@ -62,17 +62,40 @@ export type TerminalEvent =
 /** Batches worker chunks into one render per frame rather than one per write. */
 const FLUSH_INTERVAL_MS = 40;
 
-export function usePythonRunner() {
+/**
+ * How a raised exception is written into the transcript.
+ *
+ * A callback rather than something this hook does itself: the terminal shows
+ * the explanation in the reader's language, and the copy for that lives in a
+ * page-scoped i18n namespace the route mounts. Passing it in keeps this module
+ * free of translation and leaves the teacher's private runner — which mounts a
+ * different namespace — on the raw traceback.
+ */
+export type PythonErrorFormatter = (
+  error: PythonExecutionError,
+  /** The source that was run, so the failing line can be quoted. */
+  code: string,
+) => TerminalLine[];
+
+export function usePythonRunner(options?: {
+  formatError?: PythonErrorFormatter;
+}) {
   const [transcript, setTranscript] =
     React.useState<TerminalTranscript>(emptyTranscript);
   const [running, setRunning] = React.useState(false);
   const [awaitingInput, setAwaitingInput] = React.useState(false);
   const [ready, setReady] = React.useState(false);
+  /** The error the coach is explaining, until the next run replaces it. */
   const [lastError, setLastError] = React.useState<PythonExecutionError | null>(
     null,
   );
 
   const runnerRef = React.useRef<InteractiveRunner | null>(null);
+  // Read at error time rather than closed over: `ensureRunner` subscribes once
+  // and must not be rebuilt every time a new `t` arrives.
+  const formatErrorRef = React.useRef(options?.formatError);
+  /** The source of the run in flight, for the formatter to quote. */
+  const ranCodeRef = React.useRef('');
   const finishRef = React.useRef<((outcome: RunOutcome) => void) | null>(null);
   const stdoutRef = React.useRef('');
   const failedRef = React.useRef(false);
@@ -189,12 +212,21 @@ export function usePythonRunner() {
           append(event.text, event.type === 'stdout' ? 'out' : 'err');
           break;
         }
-        case 'pythonError':
+        case 'pythonError': {
           failedRef.current = true;
           errorRef.current = event.error;
           setLastError(event.error);
-          append(event.error.display, 'err');
+          const written = formatErrorRef.current?.(
+            event.error,
+            ranCodeRef.current,
+          );
+          if (written) {
+            for (const line of written) append(line.text, line.kind);
+          } else {
+            append(event.error.display, 'err');
+          }
           break;
+        }
         case 'stdin': {
           // A queued sample answers automatically; otherwise the student is
           // prompted, exactly as a terminal would.
@@ -274,6 +306,8 @@ export function usePythonRunner() {
       queueRef.current = options?.stdin
         ? createSampleInputQueue(options.stdin)
         : [];
+      ranCodeRef.current = code;
+      setLastError(null);
       const clientRunId = options?.clientRunId ?? crypto.randomUUID();
       const sampleCount = options?.sampleCount ?? 0;
       const banner = options?.banner ?? [];
@@ -293,7 +327,6 @@ export function usePythonRunner() {
         sampleCount,
         awaitingInput: false,
       });
-      setLastError(null);
       setAwaitingInput(false);
       setRunning(true);
 
@@ -328,6 +361,10 @@ export function usePythonRunner() {
   React.useEffect(() => {
     stopRef.current = stop;
   }, [stop]);
+
+  React.useEffect(() => {
+    formatErrorRef.current = options?.formatError;
+  }, [options?.formatError]);
 
   const submitInput = React.useCallback(
     (value: string) => {
@@ -387,6 +424,14 @@ export function usePythonRunner() {
   const clear = React.useCallback(() => {
     bufferRef.current = [];
     runRef.current = null;
+    // The error goes with the transcript it belongs to. Navigating to another
+    // exercise clears the terminal, and an explanation left behind would offer
+    // to explain code that is no longer on screen.
+    // The error goes with the transcript it belongs to: navigating to another
+    // exercise must not leave the coach explaining code that is gone.
+    failedRef.current = false;
+    errorRef.current = null;
+    setLastError(null);
     commit(emptyTranscript);
     publish({ type: 'clear' });
   }, [commit, publish]);

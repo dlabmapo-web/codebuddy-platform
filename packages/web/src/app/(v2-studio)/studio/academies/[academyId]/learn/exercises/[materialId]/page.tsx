@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
-import { monitoringNamespaces } from '@/i18n/namespaces';
+import { exerciseNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
@@ -48,15 +48,16 @@ export default async function ExerciseWorkspacePage({
   }
   if (!bootstrap) notFound();
 
-  // Only the monitoring indicator needs this namespace, and only while a
-  // teacher is present — but the copy has to be in hand before that happens.
+  // The monitoring indicator and the terminal's error explanations: neither is
+  // on screen when the page loads, and both have to render without a fetch the
+  // moment a teacher joins or a run raises.
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, monitoringNamespaces);
+  const { resources } = await initTranslations(locale, exerciseNamespaces);
 
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={monitoringNamespaces}
+      namespaces={exerciseNamespaces}
       resources={resources}
     >
       <Workspace

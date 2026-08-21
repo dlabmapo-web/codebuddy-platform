@@ -24,6 +24,7 @@ import type nav from '@cove/i18n/locales/en/nav.json';
 import type peopleOps from '@cove/i18n/locales/en/people-ops.json';
 import type platform from '@cove/i18n/locales/en/platform.json';
 import type profile from '@cove/i18n/locales/en/profile.json';
+import type pythonErrors from '@cove/i18n/locales/en/python-errors.json';
 import type session from '@cove/i18n/locales/en/session.json';
 import type teach from '@cove/i18n/locales/en/teach.json';
 import type teaching from '@cove/i18n/locales/en/teaching.json';
@@ -53,6 +54,7 @@ declare module 'i18next' {
       'people-ops': typeof peopleOps;
       platform: typeof platform;
       profile: typeof profile;
+      'python-errors': typeof pythonErrors;
       session: typeof session;
       teach: typeof teach;
       teaching: typeof teaching;

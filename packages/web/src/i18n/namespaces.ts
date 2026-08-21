@@ -11,6 +11,23 @@ export { layoutNamespaces, type LayoutNamespace } from "@cove/i18n/settings";
 export const monitoringNamespaces = ["monitoring", "errors"] as const;
 
 /**
+ * The student exercise workspace.
+ *
+ * `monitoring` because a teacher may join at any moment and the indicator's
+ * copy has to be in hand before that happens; `python-errors` because the
+ * terminal can raise one on any run. The sixteen explanation sentences are
+ * page-scoped rather than folded into `learn`: `learn` is a layout namespace,
+ * and the Korean root payload has a few hundred bytes of headroom against the
+ * budget in `@cove/i18n`'s `locales.spec.ts`, which asks the next feature to
+ * split rather than raise the cap.
+ */
+export const exerciseNamespaces = [
+  "monitoring",
+  "python-errors",
+  "errors",
+] as const;
+
+/**
  * The teaching routes: live monitoring plus Solution status.
  *
  * `teach` is a large namespace used by one role and two routes, so it stays
@@ -121,6 +138,7 @@ export const profileNamespaces = ["profile", "errors"] as const;
 
 export type PageNamespace =
   | (typeof monitoringNamespaces)[number]
+  | (typeof exerciseNamespaces)[number]
   | (typeof teachNamespaces)[number]
   | (typeof teachingNamespaces)[number]
   | (typeof managerNamespaces)[number]

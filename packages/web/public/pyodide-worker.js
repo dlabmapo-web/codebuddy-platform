@@ -93,6 +93,8 @@ except BaseException as _paircode_exc:
     _paircode_type = type(_paircode_exc).__name__
     _paircode_message = str(_paircode_exc)
     _paircode_line = getattr(_paircode_exc, 'lineno', None)
+    # SyntaxError carries the column; the coach's caret is drawn from it.
+    _paircode_offset = getattr(_paircode_exc, 'offset', None)
 
     if isinstance(_paircode_exc, SyntaxError):
         _paircode_display = ''.join(
@@ -115,6 +117,7 @@ except BaseException as _paircode_exc:
         'type': _paircode_type,
         'message': _paircode_message,
         'line': _paircode_line,
+        'offset': _paircode_offset,
         'display': _paircode_display,
     }, ensure_ascii=False)
 

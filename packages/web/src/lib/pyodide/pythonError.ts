@@ -2,6 +2,8 @@ export type PythonExecutionError = {
   type: string;
   message: string;
   line: number | null;
+  /** 1-based column, present on `SyntaxError` only. Drives the coach's caret. */
+  offset: number | null;
   display: string;
 };
 

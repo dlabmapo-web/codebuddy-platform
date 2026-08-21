@@ -455,6 +455,24 @@ h1, h2, h3, h4 {
 .tiptap-render th { background: var(--muted); font-weight: 600; padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
 .tiptap-render td { padding: 8px 12px; border: 1px solid var(--border); }
 
+/* The line a failed run stopped on.
+   Red because this is the one annotation in the editor that reports a failure —
+   the peer colours above mean "somebody else is here", which is not a problem.
+   The bar and the dot are both drawn from `--danger` so the mark keeps its
+   meaning if the palette is retuned. */
+.cove-error-line {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--danger);
+}
+.cove-error-glyph {
+  background: var(--danger);
+  border-radius: 999px;
+  width: 8px !important;
+  height: 8px !important;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
 /* The peer's caret, name, and selection inside a shared editor.
    Never interactive: none of it may swallow a click meant for the code
    beneath, and none of it may be reached by the caret or a screen reader —

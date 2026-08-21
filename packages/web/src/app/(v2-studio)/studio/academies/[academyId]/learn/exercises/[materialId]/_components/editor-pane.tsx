@@ -1,6 +1,8 @@
 'use client';
 
 import type { LearnSampleTestCase } from '@cove/shared';
+import { CircleHelp, ClipboardCheck, SquareTerminal } from 'lucide-react';
+import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
@@ -15,9 +17,16 @@ import type { SubmissionState } from '../_hooks/use-submission';
 import type { OnMount } from '@monaco-editor/react';
 
 import { CodeEditor } from './code-editor';
+import { ErrorCoachPanel } from './error-coach-panel';
 import { ResultPanel } from './result-panel';
 
-export type OutputTab = 'terminal' | 'result';
+export type OutputTab = 'terminal' | 'result' | 'coach';
+
+const tabIcon: Record<OutputTab, typeof SquareTerminal> = {
+  terminal: SquareTerminal,
+  result: ClipboardCheck,
+  coach: CircleHelp,
+};
 
 /**
  * Editor above, output below, with Terminal and Result as tabs in the same
@@ -39,6 +48,7 @@ export function EditorPane({
   tab,
   onTabChange,
   onEditorMount,
+  onFocusLine,
   unreadResult,
 }: {
   code: string;
@@ -55,6 +65,8 @@ export function EditorPane({
   tab: OutputTab;
   onTabChange: (tab: OutputTab) => void;
   unreadResult: boolean;
+  /** Puts the editor caret on the line the coach is pointing at. */
+  onFocusLine?: (line: number, column: number) => void;
 }) {
   const { t } = useLayoutTranslation('learn');
   const preferences = useEditorPreferences();
@@ -65,7 +77,40 @@ export function EditorPane({
     dividerProps,
   } = useSplitPane({ axis: 'vertical', initial: 260, min: 80, max: 1_200 });
 
-  const tabs: OutputTab[] = ['terminal', 'result'];
+  /**
+   * The coach exists only while an error is the latest thing that happened.
+   * Explaining the previous failure while new output streams in would describe
+   * the wrong program, so a run takes it away again.
+   */
+  const coached = runner.running ? null : runner.lastError;
+  const tabs: OutputTab[] = coached
+    ? ['terminal', 'result', 'coach']
+    : ['terminal', 'result'];
+
+  /**
+   * A failed run opens the coach rather than announcing itself and waiting.
+   * The student has just met a wall of red; making them notice a new tab and
+   * decide it is for them is three steps before any help arrives.
+   */
+  const coachedRef = React.useRef(coached);
+  React.useEffect(() => {
+    const previous = coachedRef.current;
+    coachedRef.current = coached;
+    if (coached && coached !== previous) onTabChange('coach');
+  }, [coached, onTabChange]);
+
+  /**
+   * A tab that can vanish must not take the selection — or the keyboard — with
+   * it. Runs already return to the terminal; this covers the rest, including
+   * navigating to another exercise.
+   */
+  React.useEffect(() => {
+    if (coached || tab !== 'coach') return;
+    const stranded = document.activeElement?.id === 'workspace-coach-tab';
+    onTabChange('terminal');
+    if (stranded) document.getElementById('workspace-terminal-tab')?.focus();
+  }, [coached, onTabChange, tab]);
+
   const selectRelativeTab = (current: OutputTab, direction: -1 | 1) => {
     const index = tabs.indexOf(current);
     const next = tabs[(index + direction + tabs.length) % tabs.length]!;
@@ -114,11 +159,13 @@ export function EditorPane({
       >
         <div className="flex shrink-0 items-center gap-1 border-b border-white/10 bg-[#2d2d2d] px-2">
           <div className="flex" role="tablist">
-            {tabs.map((name) => (
+            {tabs.map((name) => {
+              const Icon = tabIcon[name];
+              return (
               <button
                 aria-controls={`workspace-${name}-panel`}
                 aria-selected={tab === name}
-                className={`relative px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold transition-colors ${
                   tab === name
                     ? 'text-white'
                     : 'text-[#a5a5a5] hover:text-white'
@@ -139,6 +186,7 @@ export function EditorPane({
                 tabIndex={tab === name ? 0 : -1}
                 type="button"
               >
+                <Icon aria-hidden className="size-3.5" />
                 {t(`workspace.tab_${name}`)}
                 {name === 'result' &&
                 (submission.submitting || unreadResult) &&
@@ -149,7 +197,8 @@ export function EditorPane({
                   <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand" />
                 ) : null}
               </button>
-            ))}
+              );
+            })}
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 py-1">
@@ -177,6 +226,12 @@ export function EditorPane({
               lines={runner.lines}
               onSubmitInput={runner.submitInput}
               supported={runner.supported}
+            />
+          ) : tab === 'coach' && coached ? (
+            <ErrorCoachPanel
+              code={code}
+              error={coached}
+              onFocusLine={onFocusLine}
             />
           ) : (
             <ResultPanel submission={submission} />

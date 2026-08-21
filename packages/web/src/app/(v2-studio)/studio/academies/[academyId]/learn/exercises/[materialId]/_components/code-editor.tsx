@@ -47,6 +47,10 @@ export function CodeEditor({
           automaticLayout: true,
           fontFamily: "'Fira Code', Consolas, monospace",
           fontSize,
+          // Reserved so the failing-line dot has a gutter to sit in; without
+          // it the margin appears only when a decoration arrives and the code
+          // jumps sideways mid-read.
+          glyphMargin: true,
           lineNumbers: 'on',
           minimap: { enabled: false },
           padding: { bottom: 12, top: 12 },

@@ -24,6 +24,7 @@ const darkSurfaces = new Set(
     'app/(v2-studio)/studio/academies/[academyId]/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/starter-code-editor.tsx',
     'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/code-editor.tsx',
     'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/editor-pane.tsx',
+    'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/error-coach-panel.tsx',
     'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-hero.tsx',
     'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-metrics.tsx',
     'app/(v2-studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-panel.tsx',

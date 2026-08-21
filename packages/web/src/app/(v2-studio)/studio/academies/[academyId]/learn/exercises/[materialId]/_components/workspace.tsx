@@ -14,6 +14,7 @@ import { useStudentFeedback } from '@/lib/monitoring/use-student-feedback';
 import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
+import { markErrorLine } from '@/lib/workspace/error-line-decoration';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
@@ -29,6 +30,12 @@ import {
   type ExerciseTransitionLifecycle,
 } from '../_hooks/use-exercise-navigation';
 import { useSubmission } from '../_hooks/use-submission';
+import type { OnMount } from '@monaco-editor/react';
+
+import {
+  usePythonErrorHeadline,
+  usePythonErrorLines,
+} from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
 import { MonitoringIndicator } from './monitoring-indicator';
@@ -69,7 +76,20 @@ export function Workspace({
   const beforeTransitionRef =
     React.useRef<ExerciseTransitionLifecycle | null>(null);
 
-  const runner = usePythonRunner();
+  // Held so the coach's location chip can put the caret where Python pointed,
+  // and so a failed run can mark the line it stopped on.
+  const editorRef = React.useRef<Parameters<OnMount>[0] | null>(null);
+  const [editorReady, setEditorReady] = React.useState(false);
+  const handleFocusLine = React.useCallback((line: number, column: number) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.revealLineInCenterIfOutsideViewport(line);
+    editor.setPosition({ lineNumber: line, column });
+    editor.focus();
+  }, []);
+  const formatError = usePythonErrorLines();
+  const headline = usePythonErrorHeadline();
+  const runner = usePythonRunner({ formatError });
   const runSample = useSampleRunner(runner);
   const navigation = useExerciseNavigation({
     academyId,
@@ -252,11 +272,32 @@ export function Workspace({
           : 'COMPLETED',
       sampleCount: 0,
       passedCount: 0,
+      // The contract for this field is "already-visible output": the student no
+      // longer sees a traceback, so publishing one would describe a screen that
+      // does not exist. What goes out is what the terminal wrote.
       output: outcome.error
-        ? `${outcome.stdout}${outcome.error.display}`
+        ? outcome.stdout +
+          formatError(outcome.error, draft.code)
+            .map((line) => line.text)
+            .join('')
         : outcome.stdout,
     });
-  }, [draft.code, monitoring, runner]);
+  }, [draft.code, formatError, monitoring, runner]);
+
+  /**
+   * The mark lives exactly as long as the error does: a new run clears
+   * `lastError` and the cleanup takes the red line with it.
+   */
+  const runnerError = runner.lastError;
+  React.useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !editorReady) return;
+    return markErrorLine(
+      editor,
+      runnerError?.line ?? null,
+      runnerError ? headline(runnerError) : undefined,
+    );
+  }, [editorReady, headline, runnerError]);
 
   const handleSubmit = React.useCallback(() => {
     // The submitted code is the draft, so it is persisted before grading
@@ -493,7 +534,12 @@ export function Workspace({
                 monitoring.markActive();
                 draft.setCode(value);
               }}
-              onEditorMount={monitoring.registerEditor}
+              onEditorMount={(editor) => {
+                editorRef.current = editor;
+                setEditorReady(true);
+                monitoring.registerEditor(editor);
+              }}
+              onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
               onTabChange={handleOutputTabChange}

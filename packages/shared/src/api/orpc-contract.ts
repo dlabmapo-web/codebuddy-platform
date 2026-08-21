@@ -30,6 +30,7 @@ import {
   profileContract,
 } from "./orpc/profile.contract.js";
 import { studentSessionContract } from "./orpc/student-session.contract.js";
+import { academyCurriculumOverviewContract } from "./orpc/team-lead-overview.contract.js";
 import { teacherProgressContract } from "./orpc/teacher-progress.contract.js";
 
 export const appContract = {
@@ -54,6 +55,7 @@ export const appContract = {
   academyPeopleImport: academyPeopleImportContract,
   academyPeopleBulk: academyPeopleBulkContract,
   academyInvitationDelivery: academyInvitationDeliveryContract,
+  academyCurriculumOverview: academyCurriculumOverviewContract,
   academyTeacherOverview: academyTeacherOverviewContract,
   academyTeacherStudents: academyTeacherStudentsContract,
 };

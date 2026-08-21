@@ -67,6 +67,7 @@ export const appErrorCodes = [
   "TEACHER_OVERVIEW_ACCESS_DENIED",
   "STUDENT_OVERVIEW_ACCESS_DENIED",
   "MANAGER_OPERATIONS_ACCESS_DENIED",
+  "CURRICULUM_OVERVIEW_ACCESS_DENIED",
   "IMPORT_FILE_REJECTED",
   "IMPORT_SESSION_NOT_FOUND",
   "IMPORT_PREVIEW_EXPIRED",
@@ -195,6 +196,11 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // membership, a suspended one, the wrong role, and another academy's id.
   MANAGER_OPERATIONS_ACCESS_DENIED:
     "You are not an active manager of this academy.",
+  // The curriculum overview reads across every course and class in the academy,
+  // so one code covers no membership, a suspended one, the wrong role — a
+  // Manager included, who keeps the control tower — and another academy's id.
+  CURRICULUM_OVERVIEW_ACCESS_DENIED:
+    "You are not an active team lead of this academy.",
   // The workbook itself, before any row was judged. The specific reason
   // travels as the exception's detail so the interface can name it.
   IMPORT_FILE_REJECTED: "That file could not be read as a member list.",

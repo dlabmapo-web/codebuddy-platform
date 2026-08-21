@@ -5,6 +5,7 @@ export * from "./learn.js";
 export * from "./manager-overview.js";
 export * from "./student-overview.js";
 export * from "./submission.js";
+export * from "./team-lead-overview.js";
 export * from "./teacher-overview.js";
 export * from "./teacher-progress.js";
 export * from "./teacher-students.js";

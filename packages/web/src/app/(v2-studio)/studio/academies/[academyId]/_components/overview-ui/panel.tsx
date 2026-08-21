@@ -62,7 +62,17 @@ export type PanelTone =
  */
 export const toneStyles: Record<
   PanelTone,
-  { rail: string; chip: string; pill: string; text: string; meter: string }
+  {
+    rail: string;
+    chip: string;
+    pill: string;
+    text: string;
+    meter: string;
+    /** The header wash — the same hue at reading strength, behind a title. */
+    wash: string;
+    /** A solid plate, for the one icon per section that should carry weight. */
+    solid: string;
+  }
 > = {
   primary: {
     rail: 'bg-primary',
@@ -70,6 +80,8 @@ export const toneStyles: Record<
     pill: 'bg-primary/10 text-primary',
     text: 'text-primary',
     meter: 'bg-primary',
+    wash: 'bg-primary/[0.06]',
+    solid: 'bg-primary text-on-primary',
   },
   brand: {
     rail: 'bg-brand',
@@ -77,6 +89,8 @@ export const toneStyles: Record<
     pill: 'bg-brand/10 text-brand',
     text: 'text-brand',
     meter: 'bg-brand',
+    wash: 'bg-brand/[0.06]',
+    solid: 'bg-brand text-on-brand',
   },
   peer: {
     rail: 'bg-peer',
@@ -84,6 +98,8 @@ export const toneStyles: Record<
     pill: 'bg-peer/10 text-peer',
     text: 'text-peer',
     meter: 'bg-peer',
+    wash: 'bg-peer/[0.06]',
+    solid: 'bg-peer text-on-peer',
   },
   success: {
     rail: 'bg-success',
@@ -91,6 +107,8 @@ export const toneStyles: Record<
     pill: 'bg-success/10 text-success',
     text: 'text-success',
     meter: 'bg-success',
+    wash: 'bg-success/[0.06]',
+    solid: 'bg-success text-on-success',
   },
   teal: {
     rail: 'bg-teal',
@@ -98,6 +116,8 @@ export const toneStyles: Record<
     pill: 'bg-teal/10 text-teal',
     text: 'text-teal',
     meter: 'bg-teal',
+    wash: 'bg-teal/[0.06]',
+    solid: 'bg-teal text-on-teal',
   },
   warning: {
     rail: 'bg-warning',
@@ -105,6 +125,8 @@ export const toneStyles: Record<
     pill: 'bg-warning/10 text-warning',
     text: 'text-warning',
     meter: 'bg-warning',
+    wash: 'bg-warning/[0.06]',
+    solid: 'bg-warning text-on-warning',
   },
   danger: {
     rail: 'bg-danger',
@@ -112,6 +134,8 @@ export const toneStyles: Record<
     pill: 'bg-danger/10 text-danger',
     text: 'text-danger',
     meter: 'bg-danger',
+    wash: 'bg-danger/[0.06]',
+    solid: 'bg-danger text-on-danger',
   },
 };
 
@@ -137,7 +161,9 @@ export function Panel({
   icon: Icon,
   id,
   meta,
+  scope,
   testId,
+  tinted = false,
   title,
   tone = 'brand',
 }: {
@@ -148,7 +174,10 @@ export function Panel({
   icon?: LucideIcon;
   id?: string;
   meta?: React.ReactNode;
+  /** What window this section's numbers cover, stated in its own header. */
+  scope?: React.ReactNode;
   testId?: string;
+  tinted?: boolean;
   title: string;
   tone?: PanelTone;
 }) {
@@ -170,14 +199,22 @@ export function Panel({
           a long page this is what says which question is below it. */}
       <div aria-hidden className={cn('h-1 w-full', styles.rail)} />
 
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 border-b border-border px-4 py-3.5">
+      <header
+        className={cn(
+          'flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 border-b border-border px-4 py-3.5',
+          // Tinted, the hue reaches the whole header band instead of a rail
+          // most readers never register. Opt-in, because a page of tinted
+          // headers is a page with no hierarchy again.
+          tinted && styles.wash,
+        )}
+      >
         <div className="flex min-w-0 flex-1 items-start gap-3">
           {Icon ? (
             <span
               aria-hidden
               className={cn(
                 'mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl',
-                styles.chip,
+                tinted ? styles.solid : styles.chip,
               )}
             >
               <Icon className="size-[1.15rem]" strokeWidth={2.25} />
@@ -192,12 +229,13 @@ export function Panel({
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums',
-                    styles.pill,
+                    tinted ? styles.solid : styles.pill,
                   )}
                 >
                   {meta}
                 </span>
               ) : null}
+              {scope}
             </div>
             {description ? (
               <p className="mt-1 max-w-2xl text-[12.5px] leading-[1.55] text-sub">
@@ -214,6 +252,31 @@ export function Panel({
       </header>
       {children}
     </section>
+  );
+}
+
+/**
+ * The window a section's numbers cover, worn by the section itself.
+ *
+ * One period control at the top of a page where some sections are period-scoped
+ * and some are not is how a reader ends up believing the blocker count is a
+ * seven-day figure. Rather than splitting the control away from the sections it
+ * governs, every section states its own scope beside its title — so the claim
+ * and its window are never more than a few pixels apart, and the control can
+ * live where a control belongs.
+ */
+export function ScopeChip({
+  children,
+  icon: Icon,
+}: {
+  children: React.ReactNode;
+  icon?: LucideIcon;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-sub">
+      {Icon ? <Icon aria-hidden className="size-3" strokeWidth={2.5} /> : null}
+      {children}
+    </span>
   );
 }
 

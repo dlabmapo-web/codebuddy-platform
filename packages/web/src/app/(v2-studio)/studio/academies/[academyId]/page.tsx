@@ -2,7 +2,7 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { academyRoleFor } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
-import { AcademyOverview } from './_components/academy-overview';
+import { LeadAcademyOverview } from './_components/lead-academy-overview';
 import { ManagerAcademyOverview } from './_components/manager-academy-overview';
 import { StudentAcademyOverview } from './_components/student-academy-overview';
 import { StudioShell } from './_components/studio-shell';
@@ -30,9 +30,15 @@ import { TeacherAcademyOverview } from './_components/teacher-academy-overview';
  * and a shared dashboard that branched internally would be one edit away from
  * handing that reach to a role the API would refuse.
  *
- * Anyone else with an academy membership and neither role — a Team Lead —
- * falls through to the plain membership summary, which is all their permissions
- * authorize.
+ * A Team Lead gets the curriculum overview: what the academy teaches, what is
+ * broken in it, and whether any of it is working. Chosen here for the same
+ * reason as the three above — it reads across every course and class in the
+ * academy, and a shared dashboard that branched internally would be one edit
+ * away from handing that reach to a role the API would refuse.
+ *
+ * Four roles, four answers, and no fallback. `academyRoles` has exactly these
+ * members, so the exhaustiveness check below is what makes a fifth role a
+ * compile error rather than a blank page nobody notices.
  */
 export default async function AcademyPage({
   params,
@@ -101,9 +107,43 @@ export default async function AcademyPage({
     );
   }
 
+  if (role === 'TEAM_LEAD') {
+    return (
+      <StudioShell
+        academyId={academyId}
+        bleed
+        // The overview owns its own heading: it names the academy and carries
+        // the "as of" stamp, and the shell's static title above it repeated
+        // the sentence the first panel already says.
+        showPageHeading={false}
+        title={t('curriculum_overview_title')}
+      >
+        <LeadAcademyOverview
+          academyId={academyId}
+          searchParams={await searchParams}
+        />
+      </StudioShell>
+    );
+  }
+
+  // Every academy role is answered above, so this is reached only when the
+  // session holds no active membership for this academy — a state the shell
+  // itself usually redirects, and which says so plainly if it has not.
+  assertEveryRoleHandled(role);
   return (
     <StudioShell academyId={academyId} title={t('title')}>
-      <AcademyOverview academyId={academyId} />
+      <p className="text-sm text-danger">{t('no_access')}</p>
     </StudioShell>
   );
+}
+
+/**
+ * Every `AcademyRole` is branched above, so this parameter is `null`.
+ *
+ * A fifth role added to `academyRoles` without a branch here stops being a
+ * silently blank academy root and becomes a type error, which is the only
+ * place that mistake is cheap to catch.
+ */
+function assertEveryRoleHandled(role: null): void {
+  void role;
 }

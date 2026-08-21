@@ -52,6 +52,16 @@ export const managerNamespaces = ["manager", "audit", "errors"] as const;
 export const learningNamespaces = ["learning", "errors"] as const;
 
 /**
+ * The Team Lead's curriculum overview.
+ *
+ * Its own list for the same reason `teaching`, `manager`, and `learning` have
+ * one: it is a large namespace belonging to one role on one route, and a
+ * Student loading their catalog should not pay for the vocabulary of seven
+ * curriculum defects in their RSC payload.
+ */
+export const leadNamespaces = ["lead", "errors"] as const;
+
+/**
  * The people-operations surfaces: the directory, import, bulk changes, and
  * invitation delivery.
  *
@@ -115,6 +125,7 @@ export type PageNamespace =
   | (typeof teachingNamespaces)[number]
   | (typeof managerNamespaces)[number]
   | (typeof learningNamespaces)[number]
+  | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof sessionNamespaces)[number]

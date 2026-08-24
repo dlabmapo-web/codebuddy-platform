@@ -336,25 +336,62 @@ export function resolveComparisonSurface(
   return { points, standing: !points && on.has("STUDENT_CLASS_STANDING") };
 }
 
-/* ------------------------------------------------------------ the card */
+/* ------------------------------------------------ overview ranking preview */
 
-/**
- * The compact card the student overview carries. §6.1.
- *
- * Today's total, where it puts them, and a link. Deliberately not a board: the
- * overview answers "what should I work on now", and a ranked table of eighteen
- * classmates is the opposite of a hand-off. `position` is null whenever there
- * is no eligible board — a card that printed a rank out of nothing would be
- * inventing one.
- */
-export const pointsSummarySchema = z
+/** The overview is a preview, not a second full leaderboard. */
+export const OVERVIEW_RANKING_MAX_ROWS = 5;
+
+export const overviewPointsBoardInputSchema = z
   .object({
-    points: pointsSchema,
-    position: z.number().int().positive().nullable(),
-    participants: z.number().int().positive().nullable(),
+    academyId: z.uuid(),
+    /** Omitted means the first class this reader may rank. */
+    classId: z.uuid().optional(),
   })
   .strict();
-export type PointsSummary = z.infer<typeof pointsSummarySchema>;
+export type OverviewPointsBoardInput = z.infer<
+  typeof overviewPointsBoardInputSchema
+>;
+
+/**
+ * Today's first five rows on every role overview.
+ *
+ * The child-safe row is deliberate even for staff: this surface has no row
+ * action, so a membership id would expose an identifier without enabling any
+ * behavior. `viewer` is the student's own canonical row when it falls below
+ * the preview boundary; staff and a student already inside `rows` receive
+ * null.
+ */
+export const overviewLeaderboardSchema = z.discriminatedUnion("eligible", [
+  z
+    .object({
+      eligible: z.literal(false),
+      reason: leaderboardIneligibleReasonSchema,
+      classes: z.array(leaderboardClassSchema),
+      classId: z.uuid().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      eligible: z.literal(true),
+      classId: z.uuid(),
+      className: labelSchema,
+      classes: z.array(leaderboardClassSchema),
+      participants: z.number().int().positive(),
+      rows: z.array(leaderboardRowSchema).max(OVERVIEW_RANKING_MAX_ROWS),
+      viewer: leaderboardRowSchema.nullable(),
+    })
+    .strict(),
+]);
+export type OverviewLeaderboard = z.infer<typeof overviewLeaderboardSchema>;
+
+export const overviewPointsBoardSchema = z
+  .object({
+    /** Always the academy-local day. The input intentionally has no period. */
+    period: pointsPeriodSchema,
+    leaderboard: overviewLeaderboardSchema,
+  })
+  .strict();
+export type OverviewPointsBoard = z.infer<typeof overviewPointsBoardSchema>;
 
 /* ------------------------------------------------------------ page + input */
 
@@ -487,6 +524,7 @@ export const pointsLedgerInputSchema = z
   .object({
     academyId: z.uuid(),
     membershipId: z.uuid().optional(),
+    classId: z.uuid().optional(),
     /** 1-based. Absent means the first page. */
     page: z.number().int().positive().optional(),
     pageSize: z.number().int().positive().max(100).optional(),

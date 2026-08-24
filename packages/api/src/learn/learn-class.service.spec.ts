@@ -8,6 +8,7 @@ import type { PrismaService } from "../database/prisma.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
+import type { LearningClassContextService } from "./learning-class-context.service.js";
 import type { SubmissionService } from "./submission.service.js";
 
 const identity: SupabaseIdentity = {
@@ -156,6 +157,13 @@ function createService(options?: {
       access,
       curriculum,
       { findSelected: vi.fn().mockResolvedValue(null) } as unknown as SubmissionService,
+      {
+        resolve: vi.fn().mockResolvedValue({
+          membershipId: userId,
+          classId,
+          classes: [{ classId, name: "Algorithms A" }],
+        }),
+      } as unknown as LearningClassContextService,
     ),
   };
 }

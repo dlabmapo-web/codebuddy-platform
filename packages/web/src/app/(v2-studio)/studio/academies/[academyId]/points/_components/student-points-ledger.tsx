@@ -76,6 +76,7 @@ export function StudentPointsLedger({
 
       <PointLedger
         academyId={academyId}
+        classId={page.leaderboard?.classId ?? null}
         initialPage={page.ledger}
         membershipId={membershipId}
       />

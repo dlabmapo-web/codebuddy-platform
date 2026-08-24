@@ -70,6 +70,7 @@ export function ClassDetail({
             {detail.courses.map((course) => (
               <CourseCard
                 academyId={academyId}
+                classId={detail.classId}
                 course={course}
                 key={course.courseId}
               />

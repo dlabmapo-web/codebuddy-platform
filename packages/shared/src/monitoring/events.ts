@@ -116,6 +116,7 @@ export const presencePublishPayloadSchema = z.object({
   academyId: z.uuid(),
   materialId: z.uuid().nullable(),
   courseId: z.uuid().nullable(),
+  classId: z.uuid().nullable(),
   visibility: workspaceVisibilitySchema,
   /** True when the student edited, ran, pointed, or navigated since the last beat. */
   active: z.boolean(),

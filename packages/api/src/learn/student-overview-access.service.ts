@@ -69,11 +69,6 @@ export type StudentOverviewScopeInternal = {
   materialIds: string[];
   /** §9.7 — whether this academy shows students a class standing at all. */
   standingEnabled: boolean;
-  /**
-   * §18.2 — whether the points card replaces it. Never true at the same time
-   * as `standingEnabled`: two comparison surfaces must never both render.
-   */
-  pointsEnabled: boolean;
   /** The class the standing describes, after the request has been validated. */
   standingClass: StudentOverviewClassScope | null;
 };
@@ -156,7 +151,6 @@ export class StudentOverviewAccessService {
       ),
       materialIds: exercises.map((exercise) => exercise.materialId),
       standingEnabled: comparison.standingEnabled,
-      pointsEnabled: comparison.pointsEnabled,
       standingClass: comparison.standingEnabled
         ? selectStandingClass(classes, input.standingClassId)
         : null,
@@ -173,7 +167,8 @@ export class StudentOverviewAccessService {
    *
    * Resolution order, in one read:
    *
-   * 1. `STUDENT_CLASS_LEADERBOARD` on → the points card, no standing section.
+   * 1. `STUDENT_CLASS_LEADERBOARD` on → the shared ranking preview, no
+   *    standing section in the student overview payload.
    * 2. `STUDENT_CLASS_STANDING` on, leaderboard off → standing, unchanged.
    * 3. Neither → no comparison at all.
    *

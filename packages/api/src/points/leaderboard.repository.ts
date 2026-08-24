@@ -160,6 +160,7 @@ export class LeaderboardRepository {
    */
   async totals(
     academyId: string,
+    classId: string,
     membershipIds: string[],
     period: PointsPeriod,
   ): Promise<Map<string, LeaderboardTally>> {
@@ -169,6 +170,7 @@ export class LeaderboardRepository {
       by: ["membershipId", "reason", "difficulty"],
       where: {
         academyId,
+        classId,
         membershipId: { in: membershipIds },
         voidedAt: null,
         createdAt: { gte: period.startsAt, lt: period.endsAt },
@@ -259,15 +261,17 @@ export class LeaderboardRepository {
    */
   async withLearningMinutes(
     totals: Map<string, LeaderboardTally>,
+    classId: string,
     membershipIds: string[],
     period: PointsPeriod,
   ): Promise<Map<string, LeaderboardTally>> {
     if (membershipIds.length === 0) return totals;
 
-    const rows = await this.prisma.studentCourseLearningDay.groupBy({
+    const rows = await this.prisma.studentClassCourseLearningDay.groupBy({
       by: ["membershipId"],
       where: {
         membershipId: { in: membershipIds },
+        classId,
         localDate: {
           gte: new Date(`${period.startDate}T00:00:00.000Z`),
           lte: new Date(`${period.endDate}T00:00:00.000Z`),
@@ -298,6 +302,7 @@ export class LeaderboardRepository {
    * present on one day.
    */
   async activeDays(
+    classId: string,
     membershipIds: string[],
     period: PointsPeriod,
   ): Promise<Map<string, number>> {
@@ -305,10 +310,11 @@ export class LeaderboardRepository {
     for (const membershipId of membershipIds) counts.set(membershipId, 0);
     if (membershipIds.length === 0) return counts;
 
-    const rows = await this.prisma.studentCourseLearningDay.groupBy({
+    const rows = await this.prisma.studentClassCourseLearningDay.groupBy({
       by: ["membershipId", "localDate"],
       where: {
         membershipId: { in: membershipIds },
+        classId,
         localDate: {
           gte: new Date(`${period.startDate}T00:00:00.000Z`),
           lte: new Date(`${period.endDate}T00:00:00.000Z`),
@@ -332,6 +338,7 @@ export class LeaderboardRepository {
    */
   async improvedSince(
     academyId: string,
+    classId: string,
     members: LeaderboardMember[],
     period: PointsPeriod,
     current: Map<string, number>,
@@ -340,8 +347,8 @@ export class LeaderboardRepository {
     if (membershipIds.length === 0) return new Set();
 
     const previous = previousPointsPeriod(period);
-    const totals = await this.totals(academyId, membershipIds, previous);
-    const previousDays = await this.activeDays(membershipIds, previous);
+    const totals = await this.totals(academyId, classId, membershipIds, previous);
+    const previousDays = await this.activeDays(classId, membershipIds, previous);
 
     const previousRanked = rankEntries(
       members.map((member) => ({
@@ -367,11 +374,12 @@ export class LeaderboardRepository {
   /** The reader's own totals, whether or not any board is rendered. */
   async standingFor(
     academyId: string,
+    classId: string,
     membershipId: string,
     period: PointsPeriod,
   ): Promise<{ points: number; solvedProblems: number; activeDays: number }> {
-    const totals = await this.totals(academyId, [membershipId], period);
-    const days = await this.activeDays([membershipId], period);
+    const totals = await this.totals(academyId, classId, [membershipId], period);
+    const days = await this.activeDays(classId, [membershipId], period);
     const mine = totals.get(membershipId);
     return {
       points: mine?.points ?? 0,

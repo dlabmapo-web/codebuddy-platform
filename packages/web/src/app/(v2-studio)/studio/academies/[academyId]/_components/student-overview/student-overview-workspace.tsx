@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
+import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
 import {
   useStudentOverviewQuery,
   useStudentOverviewState,
@@ -19,13 +20,10 @@ import { ActivityChart } from './activity-chart';
 import { ClassStandingPanel } from './class-standing';
 import { CourseProgress } from './course-progress';
 import { LearningLedger } from './learning-ledger';
-import { PointsCard } from './points-card';
 import { OverviewHeader } from './overview-header';
-import { PracticeList } from './practice-list';
 import { RecentAttempts } from './recent-attempts';
 import { ResumePlate } from './resume-plate';
 import { EmptyState, Panel, SectionUnavailable } from './student-primitives';
-import { TeacherMessages } from './teacher-messages';
 
 /**
  * The student's academy overview.
@@ -36,12 +34,11 @@ import { TeacherMessages } from './teacher-messages';
  *
  * The order is an argument. Resume says what to open, because that is the
  * question a child arrives with. The ledger gives the rest of the page its
- * denominators. Course progress says where that work sits. The activity chart
- * shows the shape of it. The teacher's messages are the one thing on the page
- * another person wrote. Practice is what is unfinished. Standing is where that
- * puts them among the people doing the same work. Recent attempts is the
- * receipt. Each section is the evidence for the one above it, which is why
- * none of them sit beside each other as alternatives.
+ * denominators. Today's ranking gives comparison only when the academy enables
+ * it. Course progress says where that work sits. The activity chart shows the
+ * shape of it. Standing is the legacy comparison when points are disabled.
+ * Recent attempts is the receipt. Each section is the evidence for the one
+ * above it, which is why none of them sit beside each other as alternatives.
  *
  * A period change keeps the previous numbers on screen, marked as updating,
  * and disables drill-downs until the new window lands: a link opened from
@@ -54,10 +51,12 @@ import { TeacherMessages } from './teacher-messages';
  */
 export function StudentOverviewWorkspace({
   academyId,
+  hasLeaderboard,
   initialData,
   initialKey,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   initialData: StudentAcademyOverview | null;
   initialKey: string;
 }) {
@@ -154,20 +153,9 @@ export function StudentOverviewWorkspace({
             />,
           )}
 
-          {/*
-           * §6.1 — one compact card, immediately after the ledger, and the
-           * only thing about points on this page. Absent entirely when the
-           * academy does not run a point economy: a disabled section is
-           * silent, not an explanation of a feature this student's school
-           * chose not to use.
-           */}
-          {data.points
-            ? section(
-                'points',
-                t('points.title'),
-                <PointsCard academyId={academyId} points={data.points} />,
-              )
-            : null}
+          {hasLeaderboard ? (
+            <OverviewRankingCard academyId={academyId} audience="student" />
+          ) : null}
 
           {section(
             'courses',
@@ -183,27 +171,6 @@ export function StudentOverviewWorkspace({
             'activity',
             t('activity.title'),
             <ActivityChart activity={data.activity} scope={data.scope} />,
-          )}
-
-          {section(
-            'messages',
-            t('messages.title'),
-            <TeacherMessages
-              academyId={academyId}
-              isStale={isStale}
-              messages={data.messages}
-              unread={data.unreadMessages}
-            />,
-          )}
-
-          {section(
-            'practice',
-            t('practice.title'),
-            <PracticeList
-              academyId={academyId}
-              isStale={isStale}
-              rows={data.practice}
-            />,
           )}
 
           {/*

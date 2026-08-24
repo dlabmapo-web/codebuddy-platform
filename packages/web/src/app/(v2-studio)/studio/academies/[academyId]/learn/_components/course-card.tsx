@@ -18,9 +18,11 @@ import { useLayoutTranslation } from '@/i18n';
  */
 export function CourseCard({
   academyId,
+  classId,
   course,
 }: {
   academyId: string;
+  classId?: string;
   course: LearnCourseSummary;
 }) {
   const { t } = useLayoutTranslation('learn');
@@ -33,7 +35,7 @@ export function CourseCard({
   return (
     <Link
       className="group flex flex-col rounded-card border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-      href={`/studio/academies/${academyId}/learn/courses/${course.courseId}`}
+      href={`/studio/academies/${academyId}/learn/courses/${course.courseId}${classId ? `?classId=${classId}` : ''}`}
     >
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">

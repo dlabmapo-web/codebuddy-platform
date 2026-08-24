@@ -501,8 +501,8 @@ model Academy {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy              User?                      @relation("AcademyCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization           Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy              User?                           @relation("AcademyCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   memberships            AcademyMembership[]
   invitations            AcademyInvitation[]
   joinRequests           AcademyJoinRequest[]
@@ -514,6 +514,7 @@ model Academy {
   monitoringVisits       TeacherMonitoringVisit[]
   teacherFeedback        TeacherFeedback[]
   learningDays           StudentCourseLearningDay[]
+  classLearningDays      StudentClassCourseLearningDay[]
   media                  AcademyMedia[]
   importSessions         PeopleImportSession[]
   bulkOperations         PeopleBulkOperation[]
@@ -583,11 +584,12 @@ model AcademyMembership {
   classEnrollments ClassEnrollment[]
   assignedClasses  Class[]           @relation("ClassTeacher")
 
-  monitoringVisitsAsTeacher TeacherMonitoringVisit[]   @relation("MonitoringVisitTeacher")
-  monitoringVisitsAsStudent TeacherMonitoringVisit[]   @relation("MonitoringVisitStudent")
-  feedbackAuthored          TeacherFeedback[]          @relation("TeacherFeedbackAuthor")
-  feedbackReceived          TeacherFeedback[]          @relation("TeacherFeedbackRecipient")
+  monitoringVisitsAsTeacher TeacherMonitoringVisit[]        @relation("MonitoringVisitTeacher")
+  monitoringVisitsAsStudent TeacherMonitoringVisit[]        @relation("MonitoringVisitStudent")
+  feedbackAuthored          TeacherFeedback[]               @relation("TeacherFeedbackAuthor")
+  feedbackReceived          TeacherFeedback[]               @relation("TeacherFeedbackRecipient")
   learningDays              StudentCourseLearningDay[]
+  classLearningDays         StudentClassCourseLearningDay[]
   pointAwards               PointAward[]
   pointBalance              StudentPointBalance?
   memberProfile             AcademyMemberProfile?
@@ -828,13 +830,14 @@ model Course {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy          Academy                    @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy        User                       @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  modules          CourseModule[]
-  exerciseDrafts   ExerciseDraft[]
-  submissions      Submission[]
-  classAssignments ClassCourse[]
-  learningDays     StudentCourseLearningDay[]
+  academy           Academy                         @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy         User                            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  modules           CourseModule[]
+  exerciseDrafts    ExerciseDraft[]
+  submissions       Submission[]
+  classAssignments  ClassCourse[]
+  learningDays      StudentCourseLearningDay[]
+  classLearningDays StudentClassCourseLearningDay[]
 
   @@index([academyId, isVisible, updatedAt])
   @@map("courses")
@@ -865,17 +868,21 @@ model Class {
   /// the most recent change of any kind rather than only the last rename.
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy           Academy                  @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  createdBy         User                     @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  academy           Academy                         @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  createdBy         User                            @relation("ClassCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   /// SetNull, not Cascade: deleting a membership must leave the class intact
   /// and merely unassigned. Suspension and role changes delete nothing, so a
   /// stale assignment stays visible to managers as unavailable.
-  assignedTeacher   AcademyMembership?       @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  assignedTeacher   AcademyMembership?              @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
   courseAssignments ClassCourse[]
   enrollments       ClassEnrollment[]
   scheduleSlots     ClassScheduleSlot[]
   monitoringVisits  TeacherMonitoringVisit[]
   teacherFeedback   TeacherFeedback[]
+  submissions       Submission[]
+  solveSessions     ExerciseSolveSession[]
+  learningDays      StudentClassCourseLearningDay[]
+  pointAwards       PointAward[]
 
   @@index([academyId, status, updatedAt(sort: Desc)])
   @@index([academyId, name])
@@ -1098,6 +1105,9 @@ model Submission {
   materialId       String?          @map("material_id") @db.Uuid
   sourceMaterialId String           @map("source_material_id") @db.Uuid
   courseId         String           @map("course_id") @db.Uuid
+  /// The class learning context selected when this attempt was made. Null is
+  /// reserved for submissions written before class attribution existed.
+  classId          String?          @map("class_id") @db.Uuid
   gradingRevision  Int              @map("grading_revision")
   language         ExerciseLanguage
   timeLimitMs      Int              @map("time_limit_ms")
@@ -1145,6 +1155,7 @@ model Submission {
   user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   material     Material?               @relation(fields: [materialId], references: [id], onDelete: SetNull)
   course       Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  class        Class?                  @relation(fields: [classId], references: [id], onDelete: SetNull)
   solveSession ExerciseSolveSession?   @relation(fields: [solveSessionId], references: [id], onDelete: SetNull)
   gradingCases SubmissionGradingCase[]
   cases        SubmissionCase[]
@@ -1158,6 +1169,7 @@ model Submission {
   /// user-first indexes above all need a student to start from, and the
   /// By-problem views start from a set of materials.
   @@index([materialId, userId, createdAt(sort: Desc)])
+  @@index([classId, userId, createdAt(sort: Desc)])
   @@map("submissions")
 }
 
@@ -1171,11 +1183,14 @@ model ExerciseSolveSession {
   id         String   @id @default(uuid()) @db.Uuid
   userId     String   @map("user_id") @db.Uuid
   materialId String   @map("material_id") @db.Uuid
+  /// Null only for sessions created before class attribution existed.
+  classId    String?  @map("class_id") @db.Uuid
   startedAt  DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   material    Material     @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  class       Class?       @relation(fields: [classId], references: [id], onDelete: SetNull)
   submissions Submission[]
 
   @@index([userId, materialId, startedAt(sort: Desc)])
@@ -1357,10 +1372,8 @@ model ExerciseHint {
 /// only ever needs a daily total, and the overview has no use for the detail
 /// that would make it worth the risk.
 ///
-/// Course rather than class, because the learning route knows the academy and
-/// the course and not which class motivated the work. A class counts a row only
-/// when the student is enrolled and the course is currently assigned to it, so
-/// removing either stops the time from being attributed without deleting it.
+/// This academy/course projection remains the source for academy-wide learning
+/// reports. Class ranking reads the separate class-aware projection below.
 ///
 /// Increments are idempotent through `LearningActivityFlush`: a retried flush
 /// finds its receipt already present and adds nothing.
@@ -1389,6 +1402,34 @@ model StudentCourseLearningDay {
   /// One student's own time in one course, for the participation scatter.
   @@index([membershipId, courseId, localDate])
   @@map("student_course_learning_days")
+}
+
+/// The same accepted active-learning increments projected into the explicit
+/// class context selected by the student. It is intentionally separate from
+/// `StudentCourseLearningDay`: academy reports keep their established totals,
+/// while a class leaderboard never borrows time from another class that happens
+/// to use the same course.
+model StudentClassCourseLearningDay {
+  academyId       String   @map("academy_id") @db.Uuid
+  membershipId    String   @map("membership_id") @db.Uuid
+  classId         String   @map("class_id") @db.Uuid
+  courseId        String   @map("course_id") @db.Uuid
+  localDate       DateTime @map("local_date") @db.Date
+  activeSeconds   Int      @default(0) @map("active_seconds")
+  activeIntervals Int      @default(0) @map("active_intervals")
+  firstActiveAt   DateTime @map("first_active_at") @db.Timestamptz(6)
+  lastActiveAt    DateTime @map("last_active_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy    Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  class      Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course     Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([academyId, membershipId, classId, courseId, localDate])
+  @@index([classId, localDate, membershipId])
+  @@index([membershipId, classId, localDate])
+  @@map("student_class_course_learning_days")
 }
 
 /// A receipt for one accepted activity flush.
@@ -1500,13 +1541,14 @@ model PointAward {
 
   academy    Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
   membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  class      Class?            @relation(fields: [classId], references: [id], onDelete: SetNull)
 
   /// The period sum behind every leaderboard row.
-  @@index([academyId, membershipId, createdAt])
+  @@index([academyId, classId, membershipId, createdAt])
   /// One student's ledger, newest first, with the id tiebreak paging needs.
   @@index([membershipId, createdAt(sort: Desc), id(sort: Desc)])
   /// The daily cap, which is checked before every single award.
-  @@index([membershipId, localDate])
+  @@index([membershipId, classId, localDate])
   @@map("point_awards")
 }
 

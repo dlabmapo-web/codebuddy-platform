@@ -6,7 +6,6 @@ import {
   classStandingSchema,
   compareContinueTargets,
   compareCourseProgress,
-  comparePracticeExercises,
   compareStandingCandidates,
   periodAcceptedRate,
   projectStanding,
@@ -303,25 +302,5 @@ describe("compareCourseProgress", () => {
       course("a", "Python A", 1, 5, null),
     ].sort(compareCourseProgress);
     expect(rows.map((row) => row.title)).toEqual(["Python A", "Python B"]);
-  });
-});
-
-describe("comparePracticeExercises", () => {
-  it("puts the most recently attempted problem first", () => {
-    const row = (materialId: string, lastAttemptAt: string) => ({
-      materialId,
-      title: "Loops",
-      courseTitle: "Python A",
-      moduleTitle: "Basics",
-      lectureTitle: "While",
-      outlineNumber: "1-1-1",
-      bestScore: 40,
-      lastAttemptAt,
-    });
-    const rows = [
-      row("m1", "2026-08-10T09:00:00.000Z"),
-      row("m2", "2026-08-18T09:00:00.000Z"),
-    ].sort(comparePracticeExercises);
-    expect(rows[0].materialId).toBe("m2");
   });
 });

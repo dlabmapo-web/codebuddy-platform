@@ -67,6 +67,7 @@ describe("presencePublishPayloadSchema", () => {
   it("accepts signals rather than a state label", () => {
     const parsed = presencePublishPayloadSchema.parse({
       academyId,
+      classId,
       materialId: draftId,
       courseId: null,
       visibility: "VISIBLE",
@@ -80,6 +81,7 @@ describe("presencePublishPayloadSchema", () => {
     expect(
       presencePublishPayloadSchema.safeParse({
         academyId,
+        classId,
         materialId: null,
         courseId: null,
         visibility: "MINIMIZED",

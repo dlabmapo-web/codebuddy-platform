@@ -28,13 +28,18 @@ import { TeacherOverviewWorkspace } from './teacher-overview/teacher-overview-wo
  */
 export async function TeacherAcademyOverview({
   academyId,
+  hasLeaderboard,
   searchParams,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, teachingNamespaces);
+  const namespaces = hasLeaderboard
+    ? [...teachingNamespaces, 'points']
+    : teachingNamespaces;
+  const { resources } = await initTranslations(locale, namespaces);
   const query = parseOverviewQuery(searchParams);
 
   let overview: AcademyTeacherOverview | null = null;
@@ -53,11 +58,12 @@ export async function TeacherAcademyOverview({
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={teachingNamespaces}
+      namespaces={namespaces}
       resources={resources}
     >
       <TeacherOverviewWorkspace
         academyId={academyId}
+        hasLeaderboard={hasLeaderboard}
         initialData={overview}
         // The exact state the server rendered for. Anything else refetches
         // rather than showing one scope's numbers under another's filters.

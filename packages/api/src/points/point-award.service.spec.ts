@@ -20,6 +20,7 @@ const academyId = "10000000-0000-4000-8000-000000000001";
 const membershipId = "20000000-0000-4000-8000-000000000002";
 const materialId = "30000000-0000-4000-8000-000000000003";
 const userId = "40000000-0000-4000-8000-000000000004";
+const classId = "50000000-0000-4000-8000-000000000005";
 
 function createTx(options: {
   enabled?: boolean;
@@ -65,6 +66,7 @@ function createService() {
 const learningTimeInput = {
   academyId,
   membershipId,
+  classId,
   totalMinutes: 65,
   timeZone: "Asia/Seoul",
   localDate: "2026-08-21",
@@ -81,8 +83,8 @@ describe("PointAwardService.awardLearningTime", () => {
       (call) => call[0].data[0].dedupeKey,
     );
     expect(keys).toEqual([
-      `${membershipId}:2026-08-21:TIME:1`,
-      `${membershipId}:2026-08-21:TIME:2`,
+      `${membershipId}:${classId}:2026-08-21:TIME:1`,
+      `${membershipId}:${classId}:2026-08-21:TIME:2`,
     ]);
   });
 
@@ -159,6 +161,7 @@ describe("PointAwardService.awardLearningTime", () => {
 describe("PointAwardService.awardSolve", () => {
   const solveInput = {
     userId,
+    classId,
     materialId,
     courseId: "50000000-0000-4000-8000-000000000005",
     now: new Date("2026-08-21T09:00:00Z"),

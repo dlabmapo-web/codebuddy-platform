@@ -8,6 +8,7 @@ import { PrismaClient } from "../../../src/generated/prisma/client.js";
 import type { CaseOutcome, SubmissionStatus } from "../../../src/generated/prisma/enums.js";
 import type {
   ExerciseSolveSessionCreateManyInput,
+  StudentClassCourseLearningDayCreateManyInput,
   StudentCourseLearningDayCreateManyInput,
   StudentExerciseProgressCreateManyInput,
   SubmissionCaseCreateManyInput,
@@ -531,6 +532,7 @@ async function seedStudentWork(
       id: sessionId,
       userId: student.userId,
       materialId: material.materialId,
+      classId,
       startedAt,
       createdAt: startedAt,
     });
@@ -559,6 +561,7 @@ async function seedStudentWork(
         materialId: material.materialId,
         sourceMaterialId: material.materialId,
         courseId,
+        classId,
         gradingRevision: 1,
         language: "PYTHON",
         timeLimitMs: 3_000,
@@ -685,11 +688,13 @@ async function seedStudentWork(
 
   // Daily active time, so the overview's momentum chart has a real series.
   const learningDays: StudentCourseLearningDayCreateManyInput[] = [];
+  const classLearningDays: StudentClassCourseLearningDayCreateManyInput[] = [];
   for (let back = 1; back <= 45; back += 1) {
     const day = new Date(now.getTime() - back * dayMs);
     // Weekends off for weekday classes, and never every single day.
     if (random() > 0.42) continue;
     const seconds = 900 + Math.floor(random() * 4_500);
+    const activeIntervals = 1 + Math.floor(random() * 4);
     const firstActiveAt = new Date(day.getTime() - seconds * 1_000);
     if (firstActiveAt < student.joinedAt) continue;
     learningDays.push({
@@ -698,13 +703,28 @@ async function seedStudentWork(
       courseId,
       localDate: localDate(day),
       activeSeconds: seconds,
-      activeIntervals: 1 + Math.floor(random() * 4),
+      activeIntervals,
+      firstActiveAt,
+      lastActiveAt: day,
+    });
+    classLearningDays.push({
+      academyId,
+      membershipId: student.membershipId,
+      classId,
+      courseId,
+      localDate: localDate(day),
+      activeSeconds: seconds,
+      activeIntervals,
       firstActiveAt,
       lastActiveAt: day,
     });
   }
   await prisma.studentCourseLearningDay.createMany({
     data: learningDays,
+    skipDuplicates: true,
+  });
+  await prisma.studentClassCourseLearningDay.createMany({
+    data: classLearningDays,
     skipDuplicates: true,
   });
 }

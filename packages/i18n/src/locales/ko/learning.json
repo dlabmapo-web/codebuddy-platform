@@ -64,13 +64,6 @@
     "accepted_caption_empty": "이 기간에 제출 없음",
     "accepted_meter": "제출 중 {{value}}퍼센트 정답"
   },
-  "points": {
-    "title": "내 포인트",
-    "total": "{{points}}P",
-    "today": "오늘 모은 포인트",
-    "position": "오늘 {{participants}}명 중 {{position}}위",
-    "open": "순위 보기"
-  },
   "courses": {
     "title": "나의 코스",
     "description": "코스별 진행 상황과 다음에 풀 문제입니다.",
@@ -103,20 +96,6 @@
     "table_summary_other": "{{count}}일치를 표로 보기",
     "empty_title": "아직 기록된 시간이 없어요",
     "empty_body": "문제를 풀기 시작하면 시간이 여기에 표시됩니다."
-  },
-  "messages": {
-    "title": "선생님의 메시지",
-    "description": "선생님이 내 풀이에 남긴 메모입니다.",
-    "author": "선생님",
-    "new": "새 메시지",
-    "unread_other": "안 읽음 {{count}}개"
-  },
-  "practice": {
-    "title": "다시 볼 문제",
-    "description": "시작했지만 아직 끝내지 않은 문제입니다.",
-    "meta_other": "{{count}}문제",
-    "best_so_far": "지금까지 최고 점수",
-    "action": "다시 풀기"
   },
   "standing": {
     "title": "우리 반",

@@ -32,12 +32,14 @@ import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
  * keeps the everyday path exactly as it was.
  */
 export function useStudentMonitoring({
+  classId,
   courseId,
   materialId,
   onBeforeCollaborate,
   teacherLabel,
   terminal,
 }: {
+  classId: string;
   courseId: string | null;
   materialId: string | null;
   /** Flushes the local draft, so the server seeds the document from it. */
@@ -84,9 +86,9 @@ export function useStudentMonitoring({
    */
   React.useEffect(() => {
     if (!materialId || !courseId) return;
-    setOpenMaterial({ materialId, courseId });
+    setOpenMaterial({ materialId, courseId, classId });
     return () => setOpenMaterial(null);
-  }, [courseId, materialId, setOpenMaterial]);
+  }, [classId, courseId, materialId, setOpenMaterial]);
 
   /* ------------------------------------------------- the teacher's arrival */
 

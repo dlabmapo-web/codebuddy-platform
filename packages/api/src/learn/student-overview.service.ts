@@ -3,16 +3,13 @@ import {
   MIN_ATTEMPTED_TO_INTERPRET,
   MIN_STUDENTS_FOR_COMPARISON,
   STUDENT_MAX_CONTINUE_ROWS,
-  STUDENT_MAX_PRACTICE_ROWS,
   STUDENT_MAX_PREVIEW_ROWS,
   periodAcceptedRate,
   activityBucketFor,
   addLocalDays,
-  attentionReasonsFor,
   averageBestScore,
   compareContinueTargets,
   compareCourseProgress,
-  comparePracticeExercises,
   localDaysBetween,
   projectStanding,
   resolveOverviewPeriod,
@@ -21,21 +18,17 @@ import {
   type ContinueTarget,
   type GetStudentOverviewInput,
   type LocalDate,
-  type PracticeExercise,
   type StandingCandidate,
   type StudentAcademyOverview,
   type StudentActivityPoint,
   type StudentCourseProgress,
   type StudentLedger,
-  type StudentMessage,
   type StudentOverviewSection,
   type StudentRecord,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PrismaService } from "../database/prisma.service.js";
-import { PointsService } from "../points/points.service.js";
-import { TeacherProgressRepository } from "../teach/teacher-progress.repository.js";
 import {
   CurriculumOutlineService,
   nonemptyModules,
@@ -58,13 +51,13 @@ import {
  * timestamp, runs every independent aggregate concurrently against that
  * timestamp, and maps the results into the shared contract. It decides no rule
  * of its own — the score definition, the resume order, the standing
- * arithmetic, and the attention rules all live in `@cove/shared`, where they
- * can be tested at their boundaries without a database.
+ * arithmetic all live in `@cove/shared`, where they can be tested at their
+ * boundaries without a database.
  *
- * One timestamp for the whole response is not a detail. Eight independently
- * clocked aggregates would let the ledger, the chart beside it, and the
- * standing below it describe three different moments, and a student comparing
- * them would be right that they disagree.
+ * One timestamp for the whole response is not a detail. Independently clocked
+ * aggregates would let the ledger, the chart beside it, and the standing below
+ * it describe different moments, and a student comparing them would be right
+ * that they disagree.
  *
  * A failing aggregate marks its own section unavailable and leaves the rest
  * standing. §12 — a page that renders an outage as an empty week is worse than
@@ -80,20 +73,7 @@ export class StudentOverviewService {
     private readonly access: StudentOverviewAccessService,
     private readonly repository: StudentOverviewRepository,
     private readonly prisma: PrismaService,
-    /**
-     * Reused rather than reimplemented. The exercises this page suggests a
-     * student revisit and the ones their teacher is told to check have to be
-     * decided by the same rule, and one query is how that stays true.
-     */
-    private readonly progress: TeacherProgressRepository,
     private readonly curriculum: CurriculumOutlineService,
-    /**
-     * The overview's points card is computed by the points service itself, not
-     * reimplemented here. §6.1 gives this page one compact card; a second
-     * implementation of "where does this student stand" is exactly how the
-     * card and the board it links to would end up disagreeing.
-     */
-    private readonly points: PointsService,
   ) {}
 
   async get(
@@ -122,15 +102,11 @@ export class StudentOverviewService {
       activityDays,
       submissionDays,
       trackedSince,
-      messages,
-      unreadMessages,
       records,
-      attention,
       standing,
-      points,
     ] = await Promise.all([
       settle(
-        ["continue", "courses", "practice"],
+        ["continue", "courses"],
         () => this.curriculum.statusByMaterial(scope.userId, scope.materialIds),
         new Map() as ProgressByMaterial,
       ),
@@ -177,25 +153,6 @@ export class StudentOverviewService {
         null,
       ),
       settle(
-        ["messages"],
-        () =>
-          this.repository.messages({
-            membershipId: scope.membershipId,
-            academyId: scope.academyId,
-            limit: STUDENT_MAX_PREVIEW_ROWS,
-          }),
-        [],
-      ),
-      settle(
-        ["messages"],
-        () =>
-          this.repository.unreadMessageCount({
-            membershipId: scope.membershipId,
-            academyId: scope.academyId,
-          }),
-        0,
-      ),
-      settle(
         ["records"],
         () =>
           this.repository.recentRecords({
@@ -206,29 +163,8 @@ export class StudentOverviewService {
         [],
       ),
       settle(
-        ["practice"],
-        () =>
-          this.progress.attentionCandidates({
-            userIds: [scope.userId],
-            materialIds: scope.materialIds,
-            now,
-          }),
-        [],
-      ),
-      settle(
         ["standing"],
         () => this.resolveStanding(scope, periodBounds, window),
-        null,
-      ),
-      // §18.2 — never computed beside a standing. The scope has already
-      // resolved which of the two this academy shows, and it can never be
-      // both.
-      settle(
-        ["points"],
-        () =>
-          scope.pointsEnabled
-            ? this.points.getSummary(identity, { academyId: scope.academyId })
-            : Promise.resolve(null),
         null,
       ),
     ]);
@@ -317,20 +253,6 @@ export class StudentOverviewService {
           bucket,
         }),
       },
-      messages: messages.map(
-        (row): StudentMessage => ({
-          id: row.id,
-          body: row.body,
-          materialId: row.materialId,
-          exerciseTitle: row.materialId
-            ? (scope.exerciseById.get(row.materialId)?.title ?? null)
-            : null,
-          createdAt: row.createdAt.toISOString(),
-          readAt: row.readAt?.toISOString() ?? null,
-        }),
-      ),
-      unreadMessages,
-      practice: this.buildPractice(scope, statuses, attention, now),
       records: records.map(
         (row): StudentRecord => ({
           id: row.id,
@@ -344,7 +266,6 @@ export class StudentOverviewService {
         }),
       ),
       standing,
-      points,
       standingClasses: scope.standingEnabled
         ? scope.classes.map((entry) => ({
             classId: entry.classId,
@@ -466,77 +387,6 @@ export class StudentOverviewService {
         ];
       })
       .sort(compareCourseProgress);
-  }
-
-  /* -------------------------------------------------------------- practice */
-
-  /**
-   * Unfinished work worth returning to.
-   *
-   * The candidates and the rule are the teacher's — `attentionReasonsFor`
-   * decides which exercises qualify, so the child and the adult are looking at
-   * the same list. What is dropped on the way out is the evidence: the reason
-   * kind, the failure count, and the measured minutes never reach the student's
-   * schema. §7.8 — a teacher needs to know why, and a child needs the door.
-   */
-  private buildPractice(
-    scope: StudentOverviewScopeInternal,
-    statuses: ProgressByMaterial,
-    candidates: {
-      materialId: string;
-      consecutiveFailures: number;
-      lastAttemptAt: Date;
-      latestSolveSec: number | null;
-      latestAccepted: boolean;
-      progressStatus: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED" | null;
-      revisionMatches: boolean;
-    }[],
-    now: Date,
-  ): PracticeExercise[] {
-    const rows: PracticeExercise[] = [];
-    for (const candidate of candidates) {
-      const exercise = scope.exerciseById.get(candidate.materialId);
-      if (!exercise) continue;
-
-      const status =
-        !candidate.revisionMatches || candidate.progressStatus === null
-          ? "not_started"
-          : candidate.progressStatus === "SOLVED"
-            ? "solved"
-            : candidate.progressStatus === "IN_PROGRESS"
-              ? "in_progress"
-              : "not_started";
-
-      const reasons = attentionReasonsFor({
-        status,
-        latestAccepted: candidate.latestAccepted
-          ? [true]
-          : Array.from(
-              { length: Math.max(1, candidate.consecutiveFailures) },
-              () => false,
-            ),
-        lastAttemptAt: candidate.lastAttemptAt,
-        latestFailedSolveSec: candidate.latestAccepted
-          ? null
-          : candidate.latestSolveSec,
-        now,
-      });
-      if (reasons.length === 0) continue;
-
-      rows.push({
-        materialId: exercise.materialId,
-        title: exercise.title,
-        courseTitle: exercise.courseTitle,
-        moduleTitle: exercise.moduleTitle,
-        lectureTitle: exercise.lectureTitle,
-        outlineNumber: exercise.outlineNumber,
-        bestScore: statuses.get(exercise.materialId)?.bestScore ?? null,
-        lastAttemptAt: candidate.lastAttemptAt.toISOString(),
-      });
-    }
-    return rows
-      .sort(comparePracticeExercises)
-      .slice(0, STUDENT_MAX_PRACTICE_ROWS);
   }
 
   /* -------------------------------------------------------------- standing */

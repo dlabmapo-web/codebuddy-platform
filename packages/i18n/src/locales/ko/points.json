@@ -7,6 +7,21 @@
     "week": "이번 주",
     "month": "이번 달"
   },
+  "preview": {
+    "title": "오늘의 우리 반 랭킹",
+    "description": "오늘 우리 반의 상위 다섯 자리를 확인해요.",
+    "scope": "오늘 · {{date}}",
+    "participants_other": "{{count}}명",
+    "class_label": "반 선택",
+    "open": "전체 랭킹 보기",
+    "you": "나",
+    "your_place": "내 순위",
+    "list_label": "오늘의 상위 다섯 자리",
+    "row_label": "{{position}}위, {{name}}, {{points}}포인트",
+    "quiet_hint": "오늘 우리 반 세 명이 공부를 시작하면 랭킹이 열려요.",
+    "unavailable": "지금은 랭킹을 불러올 수 없어요. 다시 시도해 주세요.",
+    "retry": "다시 시도"
+  },
   "plate": {
     "total": "{{points}}P",
     "position": "{{position}}위 / {{participants}}명",

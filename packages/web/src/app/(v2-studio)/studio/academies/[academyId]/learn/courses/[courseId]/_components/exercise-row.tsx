@@ -25,10 +25,12 @@ const statusStyles: Record<
 
 export function ExerciseRow({
   academyId,
+  classId,
   exercise,
   label,
 }: {
   academyId: string;
+  classId: string;
   exercise: LearnExerciseSummary;
   /** Position within the course, e.g. `2-3`, shown as a stable handle. */
   label: string;
@@ -40,7 +42,7 @@ export function ExerciseRow({
     <li>
       <Link
         className="group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:border-brand/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-        href={`/studio/academies/${academyId}/learn/exercises/${exercise.materialId}`}
+        href={`/studio/academies/${academyId}/learn/exercises/${exercise.materialId}?classId=${classId}`}
       >
         <span className="grid h-7 min-w-11 shrink-0 place-items-center rounded-md bg-canvas px-1.5 font-mono text-[11.5px] font-bold text-sub">
           {label}

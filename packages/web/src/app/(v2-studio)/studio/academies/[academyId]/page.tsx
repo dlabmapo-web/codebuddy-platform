@@ -1,5 +1,4 @@
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { academyRoleFor } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { LeadAcademyOverview } from './_components/lead-academy-overview';
@@ -51,8 +50,18 @@ export default async function AcademyPage({
   const { t } = await getServerTranslation(['academy']);
 
   let role = null;
+  let hasLeaderboard = false;
   try {
-    role = academyRoleFor(await createServerORPCClient().auth.me({}), academyId);
+    const account = await createServerORPCClient().auth.me({});
+    const membership = account.user.memberships.find(
+      (entry) =>
+        entry.status === 'ACTIVE' && entry.academy.id === academyId,
+    );
+    role = membership?.role ?? null;
+    const features = new Set(membership?.features ?? []);
+    hasLeaderboard =
+      features.has('STUDENT_POINTS') &&
+      features.has('STUDENT_CLASS_LEADERBOARD');
   } catch {
     // Leave an unreadable session to the shell, which redirects to login.
   }
@@ -69,6 +78,7 @@ export default async function AcademyPage({
       >
         <StudentAcademyOverview
           academyId={academyId}
+          hasLeaderboard={hasLeaderboard}
           searchParams={await searchParams}
         />
       </StudioShell>
@@ -85,6 +95,7 @@ export default async function AcademyPage({
       >
         <TeacherAcademyOverview
           academyId={academyId}
+          hasLeaderboard={hasLeaderboard}
           searchParams={await searchParams}
         />
       </StudioShell>
@@ -101,6 +112,7 @@ export default async function AcademyPage({
       >
         <ManagerAcademyOverview
           academyId={academyId}
+          hasLeaderboard={hasLeaderboard}
           searchParams={await searchParams}
         />
       </StudioShell>
@@ -120,6 +132,7 @@ export default async function AcademyPage({
       >
         <LeadAcademyOverview
           academyId={academyId}
+          hasLeaderboard={hasLeaderboard}
           searchParams={await searchParams}
         />
       </StudioShell>

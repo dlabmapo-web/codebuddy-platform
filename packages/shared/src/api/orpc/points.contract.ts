@@ -3,6 +3,8 @@ import { oc } from "@orpc/contract";
 import {
   classPointsBoardInputSchema,
   classPointsBoardSchema,
+  overviewPointsBoardInputSchema,
+  overviewPointsBoardSchema,
   pointsLedgerInputSchema,
   pointsLedgerPageSchema,
   pointsPageInputSchema,
@@ -46,4 +48,8 @@ export const pointsContract = {
   getClassBoard: oc
     .input(classPointsBoardInputSchema)
     .output(classPointsBoardSchema),
+  /** Today's bounded top-five preview, shared by every role overview. */
+  getOverviewBoard: oc
+    .input(overviewPointsBoardInputSchema)
+    .output(overviewPointsBoardSchema),
 };

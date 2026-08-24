@@ -7,6 +7,22 @@
     "week": "This week",
     "month": "This month"
   },
+  "preview": {
+    "title": "Today's class ranking",
+    "description": "The first five places in this class today.",
+    "scope": "Today · {{date}}",
+    "participants_one": "{{count}} student",
+    "participants_other": "{{count}} students",
+    "class_label": "Choose a class",
+    "open": "See full ranking",
+    "you": "You",
+    "your_place": "Your place",
+    "list_label": "Today's first five places",
+    "row_label": "Position {{position}}, {{name}}, {{points}} points",
+    "quiet_hint": "The ranking opens after three classmates start working today.",
+    "unavailable": "The ranking could not be loaded. Try again.",
+    "retry": "Try again"
+  },
   "plate": {
     "total": "{{points}}P",
     "position": "{{position}} of {{participants}}",

@@ -20,10 +20,11 @@ import {
 import {
   learnAcademyInputSchema,
   learnClassDetailSchema,
+  learnClassMaterialInputSchema,
   learnClassInputSchema,
   learnClassSummarySchema,
   learnCourseInputSchema,
-  learnCourseOutlineSchema,
+  learnCourseOutlineResultSchema,
   learnCourseSummarySchema,
   learnDraftSummarySchema,
   learnExerciseBootstrapInputSchema,
@@ -63,7 +64,7 @@ export const learnContract = {
     .output(z.object({ courses: z.array(learnCourseSummarySchema) })),
   getCourseOutline: oc
     .input(learnCourseInputSchema)
-    .output(learnCourseOutlineSchema),
+    .output(learnCourseOutlineResultSchema),
   /**
    * The classes a student learns through, and one of them in full.
    *
@@ -76,7 +77,7 @@ export const learnContract = {
     .output(z.object({ classes: z.array(learnClassSummarySchema) })),
   getClass: oc.input(learnClassInputSchema).output(learnClassDetailSchema),
   getExerciseWorkspace: oc
-    .input(learnMaterialInputSchema)
+    .input(learnClassMaterialInputSchema)
     .output(learnExerciseWorkspaceSchema),
   /**
    * The fullscreen entry point: the exercise and the course it sits in.
@@ -98,7 +99,7 @@ export const learnContract = {
    * keeps "how long did this take" from quietly measuring a browser tab's age.
    */
   startSolveSession: oc
-    .input(learnMaterialInputSchema)
+    .input(learnClassMaterialInputSchema)
     .output(solveSessionSchema),
   /**
    * Every attempt this student has made in this academy, newest first.

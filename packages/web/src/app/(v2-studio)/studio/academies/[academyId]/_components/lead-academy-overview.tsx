@@ -28,13 +28,18 @@ import { LeadOverviewWorkspace } from './lead-overview/lead-overview-workspace';
  */
 export async function LeadAcademyOverview({
   academyId,
+  hasLeaderboard,
   searchParams,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, leadNamespaces);
+  const namespaces = hasLeaderboard
+    ? [...leadNamespaces, 'points']
+    : leadNamespaces;
+  const { resources } = await initTranslations(locale, namespaces);
   const range = readRange(searchParams.range);
 
   let overview: TeamLeadOverview | null = null;
@@ -51,11 +56,12 @@ export async function LeadAcademyOverview({
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={leadNamespaces}
+      namespaces={namespaces}
       resources={resources}
     >
       <LeadOverviewWorkspace
         academyId={academyId}
+        hasLeaderboard={hasLeaderboard}
         initialData={overview}
         initialRange={range}
       />

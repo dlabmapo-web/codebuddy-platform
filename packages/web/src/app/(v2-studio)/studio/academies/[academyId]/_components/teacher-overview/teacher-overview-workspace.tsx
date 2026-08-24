@@ -9,6 +9,7 @@ import {
   useOverviewState,
   useTeacherOverviewQuery,
 } from '../../_hooks/use-teacher-overview';
+import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
 import { CurriculumReadiness, DifficultProblems } from './curriculum-sections';
 import { MetricsLedger } from './metrics-ledger';
 import { OverviewFilters } from './overview-filters';
@@ -36,10 +37,12 @@ import { TeachingQueue } from './teaching-queue';
  */
 export function TeacherOverviewWorkspace({
   academyId,
+  hasLeaderboard,
   initialData,
   initialKey,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   initialData: AcademyTeacherOverview | null;
   initialKey: string;
 }) {
@@ -124,6 +127,14 @@ export function TeacherOverviewWorkspace({
             t('ledger.title'),
             <MetricsLedger ledger={data.ledger} />,
           )}
+
+          {hasLeaderboard ? (
+            <OverviewRankingCard
+              academyId={academyId}
+              audience="staff"
+              preferredClassId={query.classId}
+            />
+          ) : null}
 
           {section(
             'participation',

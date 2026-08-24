@@ -1,4 +1,10 @@
 {
+  "class_context": {
+    "title": "Choose your class",
+    "description": "This course is used by more than one of your classes. Choose where this learning session and its points should count.",
+    "choose": "Continue in {{name}}",
+    "label": "Learning class"
+  },
   "catalog": {
     "title": "My courses",
     "description": "Published courses from your academy. Open one to see its problems.",

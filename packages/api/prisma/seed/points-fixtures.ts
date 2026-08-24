@@ -8,6 +8,7 @@ import {
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { PointAwardCreateManyInput } from "../../src/generated/prisma/models/PointAward.js";
 import type { StudentCourseLearningDayCreateManyInput } from "../../src/generated/prisma/models/StudentCourseLearningDay.js";
+import type { StudentClassCourseLearningDayCreateManyInput } from "../../src/generated/prisma/models/StudentClassCourseLearningDay.js";
 
 /**
  * The points economy, switched on for one academy.
@@ -90,10 +91,9 @@ export async function seedPointsFixture(
  * index, so a rerun updates the same rows rather than stacking a second cohort
  * beside the first, and two developers comparing screens see the same board.
  *
- * Both classes a student belongs to are populated, each with its own cast, so
- * the class selector switches between two genuinely different boards rather
- * than the same names twice. §10.7 — awards are membership-scoped, so the
- * student's own total is the same on both; only the comparison changes.
+ * Both classes a student belongs to are populated, each with its own cast and
+ * class-scoped facts, so the selector switches both the comparison and every
+ * number used to build it. Work from one class never appears in the other.
  */
 export async function seedLeaderboardClassmates(
   prisma: PrismaClient,
@@ -304,6 +304,7 @@ async function seedClassmateAwards(
   const today = academyLocalDate(new Date(), input.timeZone);
   const rows: PointAwardCreateManyInput[] = [];
   const learningDays: StudentCourseLearningDayCreateManyInput[] = [];
+  const classLearningDays: StudentClassCourseLearningDayCreateManyInput[] = [];
 
   for (const [index, membershipId] of input.membershipIds.entries()) {
     // 0 = works nearly every day, 8 = turns up now and then. Spread across the
@@ -401,6 +402,19 @@ async function seedClassmateAwards(
           dayStart.getTime() + 16 * 3_600_000 + minutes * 60_000,
         ),
       });
+      classLearningDays.push({
+        academyId: input.academyId,
+        membershipId,
+        classId: input.classId,
+        courseId: input.courseId,
+        localDate: localDateValue,
+        activeSeconds: minutes * 60,
+        activeIntervals: Math.max(1, Math.round(minutes / 12)),
+        firstActiveAt: new Date(dayStart.getTime() + 16 * 3_600_000),
+        lastActiveAt: new Date(
+          dayStart.getTime() + 16 * 3_600_000 + minutes * 60_000,
+        ),
+      });
     }
   }
 
@@ -421,6 +435,17 @@ async function seedClassmateAwards(
     });
     await prisma.studentCourseLearningDay.createMany({
       data: learningDays,
+      skipDuplicates: true,
+    });
+    await prisma.studentClassCourseLearningDay.deleteMany({
+      where: {
+        membershipId: { in: input.membershipIds },
+        classId: input.classId,
+        courseId: input.courseId,
+      },
+    });
+    await prisma.studentClassCourseLearningDay.createMany({
+      data: classLearningDays,
       skipDuplicates: true,
     });
   }

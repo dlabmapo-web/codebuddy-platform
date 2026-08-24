@@ -9,6 +9,7 @@ import {
   useManagerOverviewState,
 } from '../../_hooks/use-manager-overview';
 import { Panel } from '../overview-ui/panel';
+import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
 import { AcademyPlate } from './academy-plate';
 import { AcademyProfileDialog } from './academy-profile-dialog';
 import { AttentionQueue } from './attention-queue';
@@ -39,10 +40,12 @@ import { QuickActions } from './quick-actions';
  */
 export function ManagerOverviewWorkspace({
   academyId,
+  hasLeaderboard,
   initialData,
   initialRange,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   initialData: ManagerOverview | null;
   initialRange: OverviewRange;
 }) {
@@ -153,6 +156,10 @@ export function ManagerOverviewWorkspace({
             truncated={data.classesTruncated}
           />,
         )}
+
+        {hasLeaderboard ? (
+          <OverviewRankingCard academyId={academyId} audience="staff" />
+        ) : null}
 
         {section(
           'problems',

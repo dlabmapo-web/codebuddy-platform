@@ -13,6 +13,7 @@ import { LearningActivityAccumulator } from "./learning-activity.accumulator.js"
 const academyId = "20000000-0000-4000-8000-000000000001";
 const membershipId = "80000000-0000-4000-8000-000000000001";
 const courseId = "40000000-0000-4000-8000-000000000001";
+const classId = "50000000-0000-4000-8000-000000000001";
 
 type Applied = {
   flushId: string;
@@ -71,6 +72,13 @@ function createPrisma() {
         _min: { firstActiveAt: new Date() },
       })),
     },
+    studentClassCourseLearningDay: {
+      upsert: vi.fn().mockResolvedValue(undefined),
+      aggregate: vi.fn(async () => ({
+        _sum: { activeSeconds: 0 },
+        _min: { firstActiveAt: new Date() },
+      })),
+    },
   };
 
   const prisma = {
@@ -108,6 +116,7 @@ function createAccumulator() {
 const signal = (now: number, active = true) => ({
   academyId,
   membershipId,
+  classId,
   courseId,
   active,
   now,
@@ -171,11 +180,11 @@ describe("LearningActivityAccumulator", () => {
     const { accumulator, days } = createAccumulator();
     await accumulator.record(signal(start));
     await accumulator.record(signal(start + 15_000));
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(15);
 
     // The state is gone, so closing twice cannot write the same seconds again.
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(15);
   });
 
@@ -185,7 +194,7 @@ describe("LearningActivityAccumulator", () => {
     for (const offset of [0, 15_000, 30_000, 45_000, 60_000]) {
       await accumulator.record(signal(start2320 + offset));
     }
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
 
     const dates = [...days.keys()].sort();
     expect(dates).toEqual([
@@ -203,6 +212,7 @@ describe("LearningActivityAccumulator", () => {
     const increment: Applied & {
       academyId: string;
       membershipId: string;
+      classId: string;
       courseId: string;
       firstActiveAt: Date;
       lastActiveAt: Date;
@@ -210,6 +220,7 @@ describe("LearningActivityAccumulator", () => {
       flushId: "10000000-0000-4000-8000-00000000000f",
       academyId,
       membershipId,
+      classId,
       courseId,
       localDate: "2026-08-13",
       seconds: 45,
@@ -237,6 +248,7 @@ describe("LearningActivityAccumulator", () => {
         flushId: "10000000-0000-4000-8000-00000000000e",
         academyId,
         membershipId,
+      classId,
         courseId,
         localDate: "2026-08-13",
         seconds: 30,
@@ -257,12 +269,12 @@ describe("LearningActivityAccumulator", () => {
 
     await accumulator.record(signal(start));
     await accumulator.record(signal(start + 15_000));
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(15);
 
     // The state survived close. Its second attempt finds the same receipt and
     // cannot add the already-committed seconds again.
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(15);
     expect(tx.studentCourseLearningDay.upsert).toHaveBeenCalledTimes(1);
   });
@@ -275,10 +287,10 @@ describe("LearningActivityAccumulator", () => {
 
     await accumulator.record(signal(start));
     await accumulator.record(signal(start + 15_000));
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(0);
 
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(15);
   });
 
@@ -292,7 +304,7 @@ describe("LearningActivityAccumulator", () => {
 
     await accumulator.record(signal(start));
     await accumulator.record(signal(start + 15_000));
-    await accumulator.close(membershipId, courseId);
+    await accumulator.close(membershipId, classId, courseId);
     expect(totalSeconds(days)).toBe(0);
 
     await vi.advanceTimersByTimeAsync(ACTIVITY_FLUSH_INTERVAL_MS);

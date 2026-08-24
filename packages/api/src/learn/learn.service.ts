@@ -6,7 +6,7 @@ import {
   progressStatusFromDraft,
   toNavigatorContext,
   resolveExerciseNeighbors,
-  type LearnCourseOutline,
+  type LearnCourseOutlineResult,
   type LearnCourseSummary,
   type LearnExerciseBootstrap,
   type LearnExerciseWorkspace,
@@ -31,6 +31,7 @@ import {
 } from "./curriculum-outline.service.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { SubmissionService } from "./submission.service.js";
+import { LearningClassContextService } from "./learning-class-context.service.js";
 
 /** The material graph one authorized workspace read produces. */
 const workspaceMaterialInclude = {
@@ -72,6 +73,7 @@ export class LearnService {
     private readonly access: AcademyAccessService,
     private readonly curriculum: CurriculumOutlineService,
     private readonly submissions: SubmissionService,
+    private readonly classContext: LearningClassContextService,
   ) {}
 
   async listCourses(
@@ -96,11 +98,20 @@ export class LearnService {
 
   async getCourseOutline(
     identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string },
-  ): Promise<LearnCourseOutline> {
+    input: { academyId: string; courseId: string; classId?: string },
+  ): Promise<LearnCourseOutlineResult> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const course = await this.requireVisibleCourse(input, scope);
-    return this.curriculum.outlineFor(course, userId);
+    const [outline, classContext] = await Promise.all([
+      this.curriculum.outlineFor(course, userId),
+      this.classContext.resolve({
+        academyId: input.academyId,
+        userId,
+        courseId: course.id,
+        requestedClassId: input.classId,
+      }),
+    ]);
+    return { ...outline, classContext };
   }
 
   /**
@@ -113,11 +124,22 @@ export class LearnService {
    */
   async getExerciseBootstrap(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string; submissionId?: string },
+    input: {
+      academyId: string;
+      materialId: string;
+      submissionId?: string;
+      classId?: string;
+    },
   ): Promise<LearnExerciseBootstrap> {
     const learner = await this.requireLearner(identity, input.academyId);
     const material = await this.requireWorkspaceMaterial(input, learner.scope);
     const course = material.lecture.courseModule.course;
+    const classContext = await this.classContext.resolve({
+      academyId: input.academyId,
+      userId: learner.userId,
+      courseId: course.id,
+      requestedClassId: input.classId,
+    });
 
     // The historical attempt is loaded beside the workspace, not instead of
     // it. A submission that does not resolve leaves the ordinary workspace
@@ -143,7 +165,7 @@ export class LearnService {
       // rather than a missing exercise, and it must not render half a page.
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
-    return { workspace, navigator, selectedSubmission };
+    return { workspace, navigator, selectedSubmission, classContext };
   }
 
   /**
@@ -155,12 +177,22 @@ export class LearnService {
    */
   async startSolveSession(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string },
+    input: { academyId: string; materialId: string; classId: string },
   ): Promise<SolveSession> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
-    await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
+    const material = await this.requireVisibleMaterial(
+      input.academyId,
+      input.materialId,
+      scope,
+    );
+    await this.classContext.resolve({
+      academyId: input.academyId,
+      userId,
+      courseId: material.lecture.courseModule.courseId,
+      requestedClassId: input.classId,
+    });
     const session = await this.prisma.exerciseSolveSession.create({
-      data: { userId, materialId: input.materialId },
+      data: { userId, materialId: input.materialId, classId: input.classId },
       select: { id: true, startedAt: true },
     });
     return {
@@ -174,13 +206,17 @@ export class LearnService {
 
   async getExerciseWorkspace(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string },
+    input: { academyId: string; materialId: string; classId: string },
   ): Promise<LearnExerciseWorkspace> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
-    return this.buildWorkspace(
-      await this.requireWorkspaceMaterial(input, scope),
+    const material = await this.requireWorkspaceMaterial(input, scope);
+    await this.classContext.resolve({
+      academyId: input.academyId,
       userId,
-    );
+      courseId: material.lecture.courseModule.courseId,
+      requestedClassId: input.classId,
+    });
+    return this.buildWorkspace(material, userId);
   }
 
   private async requireWorkspaceMaterial(

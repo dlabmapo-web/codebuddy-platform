@@ -67,14 +67,6 @@ export type RecordRow = {
   createdAt: Date;
 };
 
-export type MessageRow = {
-  id: string;
-  body: string;
-  materialId: string | null;
-  createdAt: Date;
-  readAt: Date | null;
-};
-
 @Injectable()
 export class StudentOverviewRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -210,52 +202,6 @@ export class StudentOverviewRepository {
       ORDER BY s.created_at DESC, s.id DESC
       LIMIT ${input.limit}
     `;
-  }
-
-  /* -------------------------------------------------------------- messages */
-
-  /**
-   * What this student's teachers have written to them, academy-wide.
-   *
-   * Scoped by the student's own membership reference, never by a parameter.
-   * The select carries no author name, author id, or monitoring visit — the
-   * anonymity the feedback delivery design chose deliberately is preserved by
-   * the columns this query does not read.
-   *
-   * Newest first, full stop. An earlier version sorted unread ahead of read so
-   * nothing could be missed, and it made a dated list read out of order — a
-   * student seeing Aug 5 above Aug 6 concludes the page is broken, which costs
-   * more than the guarantee bought. Unread messages are surfaced by the count
-   * in the section header and by the marker on each row instead.
-   */
-  async messages(input: {
-    membershipId: string;
-    academyId: string;
-    limit: number;
-  }): Promise<MessageRow[]> {
-    return this.prisma.$queryRaw<MessageRow[]>`
-      SELECT f.id, f.body, f.material_id AS "materialId",
-             f.created_at AS "createdAt", f.read_at AS "readAt"
-      FROM teacher_feedback f
-      WHERE f.student_membership_ref = ${input.membershipId}::uuid
-        AND f.academy_id = ${input.academyId}::uuid
-      ORDER BY f.created_at DESC, f.id DESC
-      LIMIT ${input.limit}
-    `;
-  }
-
-  async unreadMessageCount(input: {
-    membershipId: string;
-    academyId: string;
-  }): Promise<number> {
-    const rows = await this.prisma.$queryRaw<{ total: number }[]>`
-      SELECT COUNT(*)::int AS total
-      FROM teacher_feedback f
-      WHERE f.student_membership_ref = ${input.membershipId}::uuid
-        AND f.academy_id = ${input.academyId}::uuid
-        AND f.read_at IS NULL
-    `;
-    return rows[0]?.total ?? 0;
   }
 
   /* -------------------------------------------------------------- standing */

@@ -70,13 +70,6 @@
     "accepted_caption_empty": "No submissions in this period",
     "accepted_meter": "{{value}} percent of submissions passed"
   },
-  "points": {
-    "title": "Your points",
-    "total": "{{points}}P",
-    "today": "Earned today",
-    "position": "Position {{position}} of {{participants}} today",
-    "open": "See the ranking"
-  },
   "courses": {
     "title": "Your courses",
     "description": "How far through each course you are, and what comes next.",
@@ -112,22 +105,6 @@
     "table_summary_other": "Show {{count}} days as a table",
     "empty_title": "No time counted yet",
     "empty_body": "Once you start working on a problem, the time shows up here."
-  },
-  "messages": {
-    "title": "From your teacher",
-    "description": "Notes your teacher left on your work.",
-    "author": "Teacher",
-    "new": "New",
-    "unread_one": "{{count}} unread",
-    "unread_other": "{{count}} unread"
-  },
-  "practice": {
-    "title": "Worth another look",
-    "description": "Problems you started and have not finished yet.",
-    "meta_one": "{{count}} problem",
-    "meta_other": "{{count}} problems",
-    "best_so_far": "Best so far",
-    "action": "Try again"
   },
   "standing": {
     "title": "Your class",

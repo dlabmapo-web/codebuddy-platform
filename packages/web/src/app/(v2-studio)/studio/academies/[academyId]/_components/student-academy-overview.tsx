@@ -32,13 +32,18 @@ import { StudentOverviewWorkspace } from './student-overview/student-overview-wo
  */
 export async function StudentAcademyOverview({
   academyId,
+  hasLeaderboard,
   searchParams,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, learningNamespaces);
+  const namespaces = hasLeaderboard
+    ? [...learningNamespaces, 'points']
+    : learningNamespaces;
+  const { resources } = await initTranslations(locale, namespaces);
   const query = parseStudentOverviewQuery(searchParams);
 
   let overview: StudentAcademyOverview | null = null;
@@ -58,11 +63,12 @@ export async function StudentAcademyOverview({
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={learningNamespaces}
+      namespaces={namespaces}
       resources={resources}
     >
       <StudentOverviewWorkspace
         academyId={academyId}
+        hasLeaderboard={hasLeaderboard}
         initialData={overview}
         // The exact state the server rendered for. Anything else refetches
         // rather than showing one period's numbers under another's label.

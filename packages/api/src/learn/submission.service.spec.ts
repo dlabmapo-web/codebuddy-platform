@@ -6,6 +6,7 @@ import type { AcademyAccessService } from "../authorization/academy-access.servi
 import type { ApiEnvironment } from "../config/env.schema.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { JudgeQueue } from "../judge/judge.queue.js";
+import type { LearningClassContextService } from "./learning-class-context.service.js";
 import { SubmissionService } from "./submission.service.js";
 
 const identity: SupabaseIdentity = {
@@ -23,6 +24,7 @@ const userId = "30000000-0000-4000-8000-000000000001";
 const materialId = "40000000-0000-4000-8000-000000000001";
 const submissionId = "50000000-0000-4000-8000-000000000001";
 const solveSessionId = "70000000-0000-4000-8000-000000000001";
+const classId = "80000000-0000-4000-8000-000000000001";
 const SECRET = "HIDDEN_EXPECTATION_SENTINEL";
 
 function createService(options?: {
@@ -149,12 +151,19 @@ function createService(options?: {
     SUBMISSION_RATE_LIMIT: 10,
     PYODIDE_VERSION: "0.27.5",
   }) as ConfigService<ApiEnvironment, true>;
+  const classContext = {
+    resolveWith: vi.fn().mockResolvedValue({
+      membershipId: userId,
+      classId,
+      classes: [{ classId, name: "Class A" }],
+    }),
+  } as unknown as LearningClassContextService;
   return {
     prisma,
     access,
     queue,
     transaction,
-    service: new SubmissionService(prisma, access, config, queue),
+    service: new SubmissionService(prisma, access, config, classContext, queue),
   };
 }
 
@@ -163,7 +172,7 @@ describe("SubmissionService.submit", () => {
     const { service, queue, prisma } = createService({ allowed: false });
 
     await expect(
-      service.submit(identity, { academyId, materialId, code: "print(1)" }),
+      service.submit(identity, { academyId, classId, materialId, code: "print(1)" }),
     ).rejects.toMatchObject({ code: "SUBMISSION_RATE_LIMITED" });
     expect(queue.consumeSubmissionToken).toHaveBeenCalledWith(userId, 10, 60_000);
     expect(prisma.submission.create).not.toHaveBeenCalled();
@@ -175,14 +184,14 @@ describe("SubmissionService.submit", () => {
     });
 
     await expect(
-      service.submit(identity, { academyId, materialId, code: "print(1)" }),
+      service.submit(identity, { academyId, classId, materialId, code: "print(1)" }),
     ).rejects.toMatchObject({ code: "SUBMISSION_IN_FLIGHT" });
   });
 
   it("writes before enqueue and uses the submission id as the job identity", async () => {
     const { service, prisma, queue } = createService();
     await expect(
-      service.submit(identity, { academyId, materialId, code: "print(1)" }),
+      service.submit(identity, { academyId, classId, materialId, code: "print(1)" }),
     ).resolves.toEqual({ submissionId, totalCount: 2 });
 
     expect(prisma.submission.create).toHaveBeenCalled();
@@ -212,7 +221,7 @@ describe("SubmissionService.submit", () => {
   it("checks the complete visibility chain inside the snapshot transaction", async () => {
     const { service, prisma, transaction } = createService();
 
-    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
 
     expect(transaction.material.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -233,7 +242,7 @@ describe("SubmissionService.submit", () => {
   it("also requires an active class assignment before grading", async () => {
     const { service, transaction } = createService();
 
-    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
 
     expect(transaction.material.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -302,6 +311,7 @@ describe("SubmissionService solve sessions", () => {
 
       await service.submit(identity, {
         academyId,
+        classId,
         materialId,
         code: "print(1)",
         solveSessionId,
@@ -328,6 +338,7 @@ describe("SubmissionService solve sessions", () => {
 
       await service.submit(identity, {
         academyId,
+        classId,
         materialId,
         code: "print(1)",
         solveSessionId,
@@ -335,7 +346,7 @@ describe("SubmissionService solve sessions", () => {
 
       expect(transaction.exerciseSolveSession.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: solveSessionId, userId, materialId },
+          where: { id: solveSessionId, userId, materialId, classId },
         }),
       );
     } finally {
@@ -354,6 +365,7 @@ describe("SubmissionService solve sessions", () => {
       vi.setSystemTime(new Date("2026-07-31T00:00:30Z"));
       await service.submit(identity, {
         academyId,
+        classId,
         materialId,
         code: "print(1)",
         solveSessionId,
@@ -361,6 +373,7 @@ describe("SubmissionService solve sessions", () => {
       vi.setSystemTime(new Date("2026-07-31T00:02:00Z"));
       await service.submit(identity, {
         academyId,
+        classId,
         materialId,
         code: "print(2)",
         solveSessionId,
@@ -381,6 +394,7 @@ describe("SubmissionService solve sessions", () => {
     await expect(
       service.submit(identity, {
         academyId,
+        classId,
         materialId,
         code: "print(1)",
         solveSessionId,
@@ -397,6 +411,7 @@ describe("SubmissionService solve sessions", () => {
       await expect(
         service.submit(identity, {
           academyId,
+          classId,
           materialId,
           code: "print(1)",
           solveSessionId,
@@ -411,7 +426,7 @@ describe("SubmissionService solve sessions", () => {
   it("records no solve time when the client names no session", async () => {
     const { service, prisma, transaction } = createService();
 
-    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
 
     expect(transaction.exerciseSolveSession.findFirst).not.toHaveBeenCalled();
     expect(prisma.submission.create).toHaveBeenCalledWith(
@@ -429,7 +444,7 @@ describe("SubmissionService record labels", () => {
   it("freezes the printed labels in the grading snapshot transaction", async () => {
     const { service, prisma } = createService();
 
-    await service.submit(identity, { academyId, materialId, code: "print(1)" });
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
 
     expect(prisma.submission.create).toHaveBeenCalledWith(
       expect.objectContaining({

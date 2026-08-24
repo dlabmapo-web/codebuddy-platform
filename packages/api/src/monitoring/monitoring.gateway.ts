@@ -148,6 +148,7 @@ type StudentState = {
    * verifies it; nothing here trusts a client's own course id.
    */
   courseId: string | null;
+  classId: string | null;
   draftId: string | null;
   /** Throttles the durable `lastLearningSeenAt` write. */
   lastSeenPersistedAt: number | null;
@@ -288,9 +289,10 @@ export class MonitoringGateway
       // Best effort, and deliberately before the presence work: a clean tab
       // close should keep the minute the student earned, while a crash simply
       // lets the key lapse and undercounts by it.
-      if (data.student.courseId) {
+      if (data.student.courseId && data.student.classId) {
         await this.activity.close(
           data.student.membershipId,
+          data.student.classId,
           data.student.courseId,
         );
       }
@@ -612,17 +614,30 @@ export class MonitoringGateway
       : new Set<string>();
     const verifiedCourseId =
       requestedCourseId && eligibleClassIds.size > 0 ? requestedCourseId : null;
-    student.materialId = material && verifiedCourseId ? material.id : null;
+    const verifiedClassId =
+      verifiedCourseId && parsed.data.classId && eligibleClassIds.has(parsed.data.classId)
+        ? parsed.data.classId
+        : null;
+    student.materialId = material && verifiedClassId ? material.id : null;
     // Moving to another course closes the interval that belonged to the last
     // one, so time is attributed to the course the student was actually in.
-    if (student.courseId && student.courseId !== verifiedCourseId) {
-      await this.activity.close(student.membershipId, student.courseId);
+    if (
+      student.courseId &&
+      student.classId &&
+      (student.courseId !== verifiedCourseId || student.classId !== verifiedClassId)
+    ) {
+      await this.activity.close(
+        student.membershipId,
+        student.classId,
+        student.courseId,
+      );
     }
-    student.courseId = verifiedCourseId;
+    student.courseId = verifiedClassId ? verifiedCourseId : null;
+    student.classId = verifiedClassId;
 
     for (const entry of student.classes) {
       const visibleInClass =
-        verifiedCourseId !== null && eligibleClassIds.has(entry.classId);
+        verifiedCourseId !== null && verifiedClassId === entry.classId;
       const state = await this.presence.publish({
         academyId: student.academyId,
         classId: entry.classId,
@@ -664,10 +679,11 @@ export class MonitoringGateway
     // Interaction earns time only while the learning page is foreground-visible.
     // A hidden signal closes the open interval instead of billing a background
     // tab for an interaction that happened before the visibility transition.
-    if (verifiedCourseId) {
+    if (verifiedCourseId && verifiedClassId) {
       await this.activity.record({
         academyId: student.academyId,
         membershipId: student.membershipId,
+        classId: verifiedClassId,
         courseId: verifiedCourseId,
         active:
           parsed.data.active && parsed.data.visibility === "VISIBLE",
@@ -684,7 +700,7 @@ export class MonitoringGateway
       await this.prisma.classEnrollment.updateMany({
         where: {
           membershipId: student.membershipId,
-          classId: { in: student.classes.map((entry) => entry.classId) },
+          classId: verifiedClassId ?? "00000000-0000-0000-0000-000000000000",
         },
         data: { lastLearningSeenAt: new Date() },
       });
@@ -1368,6 +1384,7 @@ export class MonitoringGateway
       })),
       materialId: null,
       courseId: null,
+      classId: null,
       draftId: null,
       lastSeenPersistedAt: null,
       terminal: null,

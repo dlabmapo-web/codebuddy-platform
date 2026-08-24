@@ -28,5 +28,10 @@ export function createPointsRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.pointsService.getClassBoard(context.identity, input)
       ),
+    getOverviewBoard: os.points.getOverviewBoard
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.pointsService.getOverviewBoard(context.identity, input)
+      ),
   };
 }

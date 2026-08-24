@@ -29,6 +29,7 @@ import {
 } from '../../_hooks/use-lead-overview';
 import { catalogIsEmpty } from '../../_lib/lead-view';
 import { EmptyState, Panel, ScopeChip } from '../overview-ui/panel';
+import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
 import { BlockerQueue } from './blocker-queue';
 import { CatalogPlate } from './catalog-plate';
 import { ClassRoster } from './class-roster';
@@ -80,10 +81,12 @@ import { OverviewRail, type RailSection } from './overview-rail';
  */
 export function LeadOverviewWorkspace({
   academyId,
+  hasLeaderboard,
   initialData,
   initialRange,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   initialData: TeamLeadOverview | null;
   initialRange: OverviewRange;
 }) {
@@ -264,6 +267,10 @@ export function LeadOverviewWorkspace({
         </Panel>,
         t('roster.title'),
       )}
+
+      {hasLeaderboard ? (
+        <OverviewRankingCard academyId={academyId} audience="staff" />
+      ) : null}
 
       {empty ? (
         // Nothing below this can say anything about a curriculum that does not

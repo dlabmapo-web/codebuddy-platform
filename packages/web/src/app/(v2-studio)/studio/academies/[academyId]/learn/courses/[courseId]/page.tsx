@@ -1,22 +1,27 @@
-import type { LearnCourseOutline } from '@cove/shared';
+import type { LearnCourseOutlineResult } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { StudioShell } from '../../../_components/studio-shell';
 import { CourseOutline } from './_components/course-outline';
+import { LearningClassChoice } from '../../_components/learning-class-choice';
 
 export default async function LearnCoursePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ academyId: string; courseId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academyId, courseId } = await params;
-  let outline: LearnCourseOutline | null = null;
+  const requestedClassId = single((await searchParams).classId);
+  let outline: LearnCourseOutlineResult | null = null;
   try {
     outline = await createServerORPCClient().learn.getCourseOutline({
       academyId,
       courseId,
+      ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
     });
   } catch {
     // A hidden, missing, or out-of-academy course is indistinguishable to
@@ -32,11 +37,27 @@ export default async function LearnCoursePage({
       description={outline.course.description || undefined}
       title={outline.course.title}
     >
-      <CourseOutline
-        academyId={academyId}
-        courseId={courseId}
-        initialOutline={outline}
-      />
+      {outline.classContext.classId ? (
+        <CourseOutline
+          academyId={academyId}
+          classContext={outline.classContext}
+          courseId={courseId}
+          initialOutline={outline}
+        />
+      ) : (
+        <LearningClassChoice
+          context={outline.classContext}
+          path={`/studio/academies/${academyId}/learn/courses/${courseId}`}
+        />
+      )}
     </StudioShell>
   );
+}
+
+function single(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isUuid(value: string | undefined): value is string {
+  return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
 }

@@ -1,12 +1,14 @@
 'use client';
 
-import type { LearnCourseOutline } from '@cove/shared';
+import type { LearnCourseOutlineResult, LearningClassContext } from '@cove/shared';
 import { ArrowLeft, BookOpen, Search, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { Input } from '@/components/studio/primitives';
+import { ResponsiveSelector } from '@/components/studio/selector';
 import { useStudentPresence } from '@/lib/monitoring/student-presence';
 
 import { useCourseOutline } from '../_hooks/use-course-outline';
@@ -14,22 +16,30 @@ import { ModuleSection } from './module-section';
 
 export function CourseOutline({
   academyId,
+  classContext,
   courseId,
   initialOutline,
 }: {
   academyId: string;
+  classContext: LearningClassContext;
   courseId: string;
-  initialOutline: LearnCourseOutline;
+  initialOutline: LearnCourseOutlineResult;
 }) {
+  const router = useRouter();
   const { t } = useLayoutTranslation('learn');
   const { markActive, setOpenMaterial } = useStudentPresence();
-  const outline = useCourseOutline({ academyId, courseId, initialOutline });
+  const outline = useCourseOutline({
+    academyId,
+    classId: classContext.classId!,
+    courseId,
+    initialOutline,
+  });
 
   React.useEffect(() => {
-    setOpenMaterial({ materialId: null, courseId });
+    setOpenMaterial({ materialId: null, courseId, classId: classContext.classId! });
     markActive();
     return () => setOpenMaterial(null);
-  }, [courseId, markActive, setOpenMaterial]);
+  }, [classContext.classId, courseId, markActive, setOpenMaterial]);
 
   // A deep-linked lecture is only in the DOM once its module is expanded, which
   // the hook arranges on first render — so the scroll waits for paint.
@@ -86,6 +96,29 @@ export function CourseOutline({
         </label>
       </div>
 
+      <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <span className="text-[12.5px] font-semibold text-sub">
+          {t('class_context.label')}
+        </span>
+        <div className="ml-auto min-w-52">
+          <ResponsiveSelector
+            align="end"
+            drawerTitle={t('class_context.title')}
+            label={t('class_context.label')}
+            list={classContext.classes.map((item) => ({
+              id: item.classId,
+              name: item.name,
+            }))}
+            onSelect={(item) =>
+            router.replace(
+              `/studio/academies/${academyId}/learn/courses/${courseId}?classId=${item.id}`,
+            )
+            }
+            selectedId={classContext.classId}
+          />
+        </div>
+      </label>
+
       {empty ? (
         <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-card px-6 py-16 text-center">
           <BookOpen className="size-8 text-sub/40" />
@@ -108,6 +141,7 @@ export function CourseOutline({
           {outline.modules.map((module) => (
             <ModuleSection
               academyId={academyId}
+              classId={classContext.classId!}
               expanded={outline.isExpanded(module.id)}
               key={module.id}
               module={module}

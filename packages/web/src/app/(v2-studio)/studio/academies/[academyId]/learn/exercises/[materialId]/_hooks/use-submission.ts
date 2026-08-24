@@ -32,12 +32,14 @@ type ReportedCase = {
 
 export function useSubmission({
   academyId,
+  classId,
   materialId,
   initialResult = null,
   solveSessionId,
   reopenSolveSession,
 }: {
   academyId: string;
+  classId: string;
   materialId: string;
   /**
    * A historical attempt's verdict, shown until this sitting produces one.
@@ -125,6 +127,7 @@ export function useSubmission({
       try {
         accepted = await orpc.learn.submit({
           academyId,
+          classId,
           materialId,
           code,
           ...(solveSessionId ? { solveSessionId } : {}),
@@ -138,6 +141,7 @@ export function useSubmission({
           try {
             accepted = await orpc.learn.submit({
               academyId,
+              classId,
               materialId,
               code,
               ...(reopened ? { solveSessionId: reopened.solveSessionId } : {}),
@@ -198,6 +202,7 @@ export function useSubmission({
     },
     [
       academyId,
+      classId,
       loadResult,
       materialId,
       reopenSolveSession,

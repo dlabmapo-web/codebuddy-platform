@@ -9,6 +9,7 @@ import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { safeReturnTo } from '../../records/_lib/records-url';
 import { Workspace } from './_components/workspace';
+import { LearningClassChoice } from '../../_components/learning-class-choice';
 
 /**
  * Fullscreen: this page deliberately does not render `StudioShell`. The studio
@@ -24,6 +25,7 @@ export default async function ExerciseWorkspacePage({
   const { academyId, materialId } = await params;
   const search = await searchParams;
   const submissionId = single(search.submission);
+  const requestedClassId = single(search.classId);
   // Reduced to this academy's own records path before it reaches the client,
   // so a crafted `returnTo` cannot turn Back into an open redirect.
   const returnTo = search.returnTo
@@ -38,6 +40,7 @@ export default async function ExerciseWorkspacePage({
     bootstrap = await createServerORPCClient().learn.getExerciseBootstrap({
       academyId,
       materialId,
+      ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
       ...(isUuid(submissionId) ? { submissionId } : {}),
     });
   } catch {
@@ -47,6 +50,23 @@ export default async function ExerciseWorkspacePage({
     notFound();
   }
   if (!bootstrap) notFound();
+
+  if (!bootstrap.classContext.classId) {
+    const choiceQuery = new URLSearchParams();
+    if (isUuid(submissionId)) choiceQuery.set('submission', submissionId);
+    if (returnTo) choiceQuery.set('returnTo', returnTo);
+    const choicePath = `/studio/academies/${academyId}/learn/exercises/${materialId}${
+      choiceQuery.size > 0 ? `?${choiceQuery.toString()}` : ''
+    }`;
+    return (
+      <main className="grid min-h-screen place-items-center bg-canvas p-5">
+        <LearningClassChoice
+          context={bootstrap.classContext}
+          path={choicePath}
+        />
+      </main>
+    );
+  }
 
   // The monitoring indicator and the terminal's error explanations: neither is
   // on screen when the page loads, and both have to render without a fetch the
@@ -63,6 +83,7 @@ export default async function ExerciseWorkspacePage({
       <Workspace
         academyId={academyId}
         bootstrap={bootstrap}
+        classId={bootstrap.classContext.classId}
         returnTo={returnTo}
         submissionRequested={Boolean(submissionId)}
       />

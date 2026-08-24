@@ -46,6 +46,7 @@ import {
 type ActivityState = {
   academyId: string;
   membershipId: string;
+  classId: string;
   courseId: string;
   /** The academy-local day the pending seconds belong to. */
   localDate: string;
@@ -64,6 +65,8 @@ type ActivityState = {
 export type ActivitySignal = {
   academyId: string;
   membershipId: string;
+  /** The class the server verified for this course and student. */
+  classId: string;
   /** The course the server verified, never the one the client named. */
   courseId: string;
   /** True only when the student did something, not merely that a beat arrived. */
@@ -76,6 +79,7 @@ export type ActivityIncrement = {
   flushId: string;
   academyId: string;
   membershipId: string;
+  classId: string;
   courseId: string;
   localDate: string;
   seconds: number;
@@ -137,7 +141,7 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
    * decides what the beat is worth and whether a minute is due.
    */
   async record(signal: ActivitySignal): Promise<void> {
-    const key = stateKey(signal.membershipId, signal.courseId);
+    const key = stateKey(signal.membershipId, signal.classId, signal.courseId);
     await this.withStateLock(key, () => this.recordLocked(key, signal));
   }
 
@@ -197,6 +201,7 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
     const next: ActivityState = {
       academyId: signal.academyId,
       membershipId: signal.membershipId,
+      classId: signal.classId,
       courseId: signal.courseId,
       localDate,
       lastAcceptedAt: now,
@@ -238,8 +243,8 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
    * key then lapses with its unflushed seconds — an undercount, which is the
    * safe direction for a number a teacher reads as "at least this much".
    */
-  async close(membershipId: string, courseId: string): Promise<void> {
-    const key = stateKey(membershipId, courseId);
+  async close(membershipId: string, classId: string, courseId: string): Promise<void> {
+    const key = stateKey(membershipId, classId, courseId);
     await this.withStateLock(key, () => this.closeLocked(key));
   }
 
@@ -301,6 +306,34 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
           },
         });
 
+        await tx.studentClassCourseLearningDay.upsert({
+          where: {
+            academyId_membershipId_classId_courseId_localDate: {
+              academyId: increment.academyId,
+              membershipId: increment.membershipId,
+              classId: increment.classId,
+              courseId: increment.courseId,
+              localDate: new Date(`${increment.localDate}T00:00:00.000Z`),
+            },
+          },
+          create: {
+            academyId: increment.academyId,
+            membershipId: increment.membershipId,
+            classId: increment.classId,
+            courseId: increment.courseId,
+            localDate: new Date(`${increment.localDate}T00:00:00.000Z`),
+            activeSeconds: increment.seconds,
+            activeIntervals: increment.intervals,
+            firstActiveAt: increment.firstActiveAt,
+            lastActiveAt: increment.lastActiveAt,
+          },
+          update: {
+            activeSeconds: { increment: increment.seconds },
+            activeIntervals: { increment: increment.intervals },
+            lastActiveAt: increment.lastActiveAt,
+          },
+        });
+
         await this.awardPoints(tx, increment);
         return true;
       });
@@ -344,10 +377,11 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
     });
     if (!academy) return;
 
-    const day = await tx.studentCourseLearningDay.aggregate({
+    const day = await tx.studentClassCourseLearningDay.aggregate({
       where: {
         academyId: increment.academyId,
         membershipId: increment.membershipId,
+        classId: increment.classId,
         localDate: new Date(`${increment.localDate}T00:00:00.000Z`),
       },
       _sum: { activeSeconds: true },
@@ -360,6 +394,7 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
     await this.points.awardLearningTime(tx, {
       academyId: increment.academyId,
       membershipId: increment.membershipId,
+      classId: increment.classId,
       totalMinutes,
       timeZone: academy.timeZone,
       localDate: increment.localDate,
@@ -370,6 +405,7 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
     await this.points.awardAttendance(tx, {
       academyId: increment.academyId,
       membershipId: increment.membershipId,
+      classId: increment.classId,
       courseId: increment.courseId,
       timeZone: academy.timeZone,
       localDate: increment.localDate,
@@ -395,6 +431,7 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
       flushId: state.flushId,
       academyId: state.academyId,
       membershipId: state.membershipId,
+      classId: state.classId,
       courseId: state.courseId,
       localDate: state.localDate,
       seconds: state.pendingSeconds,
@@ -526,8 +563,8 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
 }
 
 /** One namespace, separate from presence, so a flush cannot read a roster. */
-function stateKey(membershipId: string, courseId: string): string {
-  return `${monitoringKeyPrefix}act:${membershipId}:${courseId}`;
+function stateKey(membershipId: string, classId: string, courseId: string): string {
+  return `${monitoringKeyPrefix}act:${membershipId}:${classId}:${courseId}`;
 }
 
 /**

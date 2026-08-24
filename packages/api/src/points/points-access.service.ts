@@ -42,7 +42,7 @@ export class PointsAccessService {
 
   async resolve(
     identity: SupabaseIdentity,
-    input: { academyId: string; membershipId?: string },
+    input: { academyId: string; membershipId?: string; classId?: string },
   ): Promise<PointsScope> {
     const reader = await this.prisma.academyMembership.findFirst({
       where: {
@@ -83,13 +83,24 @@ export class PointsAccessService {
             membershipId,
           );
 
+    const classes = await this.classesFor(
+      membershipId,
+      reader.role === "TEACHER" ? reader.id : null,
+    );
+    if (
+      input.classId &&
+      !classes.some((entry) => entry.classId === input.classId)
+    ) {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
+    }
+
     return {
       academyId: input.academyId,
       timeZone: reader.academy.timeZone,
       membershipId,
       subjectName,
       isSelf: membershipId === reader.id,
-      classes: await this.classesFor(membershipId, reader.role === "TEACHER" ? reader.id : null),
+      classes,
       leaderboardEnabled: enabled.has("STUDENT_CLASS_LEADERBOARD"),
     };
   }
@@ -179,6 +190,82 @@ export class PointsAccessService {
       subjectName: displayNameOf(reader),
       className: target?.name ?? null,
       leaderboardEnabled: enabled.has("STUDENT_CLASS_LEADERBOARD"),
+    };
+  }
+
+  /**
+   * The class-scoped preview shared by all four academy overviews.
+   *
+   * Students follow their enrollments; teachers follow their assignments;
+   * team leads and managers may choose any active class. The complete class
+   * list and the selected board come from this one scope so the picker can
+   * never offer a class the next request would reject.
+   */
+  async resolveOverviewBoard(
+    identity: SupabaseIdentity,
+    input: { academyId: string; classId?: string },
+  ): Promise<PointsScope> {
+    const reader = await this.prisma.academyMembership.findFirst({
+      where: {
+        academyId: input.academyId,
+        user: { authUserId: identity.authUserId },
+        status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        role: true,
+        user: { select: { displayName: true } },
+        memberProfile: { select: { academyDisplayName: true } },
+        academy: { select: { timeZone: true, status: true } },
+      },
+    });
+
+    if (!reader || reader.academy.status !== "ACTIVE") {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+
+    const enabled = await this.enabledFeatures(input.academyId);
+    if (
+      !enabled.has("STUDENT_POINTS") ||
+      !enabled.has("STUDENT_CLASS_LEADERBOARD")
+    ) {
+      throw new AppException("POINTS_UNAVAILABLE", HttpStatus.NOT_FOUND);
+    }
+
+    const classes =
+      reader.role === "STUDENT"
+        ? await this.classesFor(reader.id, null)
+        : (
+            await this.prisma.class.findMany({
+              where: {
+                academyId: input.academyId,
+                status: "ACTIVE",
+                ...(reader.role === "TEACHER"
+                  ? { teacherMembershipId: reader.id }
+                  : {}),
+              },
+              orderBy: { name: "asc" },
+              select: { id: true, name: true },
+            })
+          ).map((entry) => ({ classId: entry.id, name: entry.name }));
+
+    if (
+      input.classId &&
+      !classes.some((entry) => entry.classId === input.classId)
+    ) {
+      // Not-found for both an absent and an unauthorized id prevents class
+      // enumeration outside the reader's scope.
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
+    }
+
+    return {
+      academyId: input.academyId,
+      timeZone: reader.academy.timeZone,
+      membershipId: reader.id,
+      subjectName: displayNameOf(reader),
+      isSelf: reader.role === "STUDENT",
+      classes,
+      leaderboardEnabled: true,
     };
   }
 

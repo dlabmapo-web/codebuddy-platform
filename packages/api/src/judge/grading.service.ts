@@ -219,11 +219,12 @@ export class GradingService {
       // here rather than after the transaction is what makes a retried job
       // safe — the dedupe key absorbs the repeat, and a rolled-back verdict
       // takes its points with it.
-      if (progress.solvedNow) {
+      if (progress.solvedNow && submission.classId) {
         await this.points.awardSolve(tx, {
           userId: submission.userId,
           materialId,
           courseId: submission.courseId,
+          classId: submission.classId,
           now: new Date(),
         });
       }

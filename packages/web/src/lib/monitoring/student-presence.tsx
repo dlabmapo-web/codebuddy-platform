@@ -18,7 +18,11 @@ import {
 } from './student-activity';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
-type OpenMaterial = { materialId: string | null; courseId: string };
+type OpenMaterial = {
+  materialId: string | null;
+  courseId: string;
+  classId: string;
+};
 
 type StudentPresence = {
   /**
@@ -110,7 +114,8 @@ export function StudentPresenceProvider({
       // Online, so it goes out immediately rather than waiting for a beat.
       if (
         previous?.materialId !== material?.materialId ||
-        previous?.courseId !== material?.courseId
+        previous?.courseId !== material?.courseId ||
+        previous?.classId !== material?.classId
       ) {
         publishRef.current();
       }
@@ -127,6 +132,7 @@ export function StudentPresenceProvider({
         academyId,
         materialId: materialRef.current?.materialId ?? null,
         courseId: materialRef.current?.courseId ?? null,
+        classId: materialRef.current?.classId ?? null,
         visibility: visibilityRef.current,
         active: activeRef.current,
       });

@@ -15,10 +15,12 @@ import {
 
 export function useCourseOutline({
   academyId,
+  classId,
   courseId,
   initialOutline,
 }: {
   academyId: string;
+  classId: string;
   courseId: string;
   initialOutline: LearnCourseOutline;
 }) {
@@ -30,8 +32,8 @@ export function useCourseOutline({
   );
 
   const outlineQuery = useQuery({
-    queryKey: ['learn', academyId, 'outline', courseId],
-    queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId }),
+    queryKey: ['learn', academyId, 'outline', courseId, classId],
+    queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId, classId }),
     initialData: initialOutline,
     retry: false,
   });

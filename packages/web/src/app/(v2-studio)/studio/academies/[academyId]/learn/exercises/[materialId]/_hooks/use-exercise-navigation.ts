@@ -21,8 +21,8 @@ export type ExerciseTransitionLifecycle = {
   beforeCommit: () => void;
 };
 
-export function workspaceQueryKey(academyId: string, materialId: string) {
-  return ['learn', academyId, 'workspace', materialId];
+export function workspaceQueryKey(academyId: string, classId: string, materialId: string) {
+  return ['learn', academyId, 'workspace', classId, materialId];
 }
 
 /**
@@ -42,10 +42,12 @@ export function workspaceQueryKey(academyId: string, materialId: string) {
  */
 export function useExerciseNavigation({
   academyId,
+  classId,
   bootstrap,
   beforeTransitionRef,
 }: {
   academyId: string;
+  classId: string;
   bootstrap: LearnExerciseBootstrap;
   /**
    * The workspace-owned lifecycle that must run before every transition.
@@ -85,12 +87,12 @@ export function useExerciseNavigation({
   const fetchWorkspace = React.useCallback(
     (materialId: string) =>
       queryClient.fetchQuery({
-        queryKey: workspaceQueryKey(academyId, materialId),
+        queryKey: workspaceQueryKey(academyId, classId, materialId),
         queryFn: () =>
-          orpc.learn.getExerciseWorkspace({ academyId, materialId }),
+          orpc.learn.getExerciseWorkspace({ academyId, classId, materialId }),
         staleTime: WORKSPACE_STALE_MS,
       }),
-    [academyId, queryClient],
+    [academyId, classId, queryClient],
   );
 
   /**
@@ -112,7 +114,7 @@ export function useExerciseNavigation({
           window.history.replaceState(
             null,
             '',
-            `/studio/academies/${academyId}/learn/exercises/${workspace.exercise.materialId}`,
+            `/studio/academies/${academyId}/learn/exercises/${workspace.exercise.materialId}?classId=${classId}`,
           );
         }
         return;
@@ -138,7 +140,7 @@ export function useExerciseNavigation({
           window.history.pushState(
             null,
             '',
-            `/studio/academies/${academyId}/learn/exercises/${materialId}`,
+            `/studio/academies/${academyId}/learn/exercises/${materialId}?classId=${classId}`,
           );
         }
       } catch {
@@ -154,7 +156,7 @@ export function useExerciseNavigation({
           window.history.replaceState(
             null,
             '',
-            `/studio/academies/${academyId}/learn/exercises/${workspace.exercise.materialId}`,
+            `/studio/academies/${academyId}/learn/exercises/${workspace.exercise.materialId}?classId=${classId}`,
           );
         }
       } finally {
@@ -166,6 +168,7 @@ export function useExerciseNavigation({
     },
     [
       academyId,
+      classId,
       beforeTransitionRef,
       fetchWorkspace,
       queryClient,
@@ -201,9 +204,9 @@ export function useExerciseNavigation({
    * seeds it, so opening the workspace never pays for the outline twice.
    */
   const outlineQuery = useQuery({
-    queryKey: ['learn', academyId, 'navigator', courseId],
+    queryKey: ['learn', academyId, 'navigator', classId, courseId],
     queryFn: async () => {
-      const outline = await orpc.learn.getCourseOutline({ academyId, courseId });
+      const outline = await orpc.learn.getCourseOutline({ academyId, classId, courseId });
       const next = toNavigatorContext(outline, workspace.exercise.materialId);
       if (!next) throw new Error('COURSE_MISSING_EXERCISE');
       return next;
@@ -241,9 +244,9 @@ export function useExerciseNavigation({
    */
   const refreshProgress = React.useCallback(() => {
     void queryClient.invalidateQueries({
-      queryKey: ['learn', academyId, 'navigator', courseId],
+      queryKey: ['learn', academyId, 'navigator', classId, courseId],
     });
-  }, [academyId, courseId, queryClient]);
+  }, [academyId, classId, courseId, queryClient]);
 
   /* -------------------------------------------------------------- prefetch */
 
@@ -256,16 +259,17 @@ export function useExerciseNavigation({
     ]) {
       if (!neighbor) continue;
       void queryClient.prefetchQuery({
-        queryKey: workspaceQueryKey(academyId, neighbor.materialId),
+        queryKey: workspaceQueryKey(academyId, classId, neighbor.materialId),
         queryFn: () =>
           orpc.learn.getExerciseWorkspace({
             academyId,
+            classId,
             materialId: neighbor.materialId,
           }),
         staleTime: WORKSPACE_STALE_MS,
       });
     }
-  }, [academyId, queryClient, workspace.neighbors]);
+  }, [academyId, classId, queryClient, workspace.neighbors]);
 
   /* --------------------------------------------------------------- history */
 

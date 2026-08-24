@@ -22,9 +22,11 @@ import { orpc } from '@/lib/orpc';
  */
 export function useSolveSession({
   academyId,
+  classId,
   materialId,
 }: {
   academyId: string;
+  classId: string;
   materialId: string;
 }) {
   const [session, setSession] = React.useState<SolveSession | null>(null);
@@ -44,6 +46,7 @@ export function useSolveSession({
     try {
       const opened = await orpc.learn.startSolveSession({
         academyId,
+        classId,
         materialId,
       });
       setSession(opened);
@@ -52,12 +55,12 @@ export function useSolveSession({
       setSession(null);
       return null;
     }
-  }, [academyId, materialId]);
+  }, [academyId, classId, materialId]);
 
   React.useEffect(() => {
     let cancelled = false;
     void orpc.learn
-      .startSolveSession({ academyId, materialId })
+      .startSolveSession({ academyId, classId, materialId })
       .then((opened) => {
         if (!cancelled) setSession(opened);
       })
@@ -67,7 +70,7 @@ export function useSolveSession({
     return () => {
       cancelled = true;
     };
-  }, [academyId, materialId]);
+  }, [academyId, classId, materialId]);
 
   return {
     solveSessionId: session?.solveSessionId ?? null,

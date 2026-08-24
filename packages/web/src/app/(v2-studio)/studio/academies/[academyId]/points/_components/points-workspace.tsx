@@ -132,6 +132,7 @@ export function PointsWorkspace({
             header can honestly say so. */}
         <PointLedger
           academyId={academyId}
+          classId={data.leaderboard?.classId ?? null}
           initialPage={data.ledger}
           {...(data.period.kind === 'day' ? { today: data.period.endDate } : {})}
         />

@@ -29,13 +29,18 @@ import { ManagerOverviewWorkspace } from './manager-overview/manager-overview-wo
  */
 export async function ManagerAcademyOverview({
   academyId,
+  hasLeaderboard,
   searchParams,
 }: {
   academyId: string;
+  hasLeaderboard: boolean;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, managerNamespaces);
+  const namespaces = hasLeaderboard
+    ? [...managerNamespaces, 'points']
+    : managerNamespaces;
+  const { resources } = await initTranslations(locale, namespaces);
   const range = readRange(searchParams.range);
 
   let overview: ManagerOverview | null = null;
@@ -52,11 +57,12 @@ export async function ManagerAcademyOverview({
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={managerNamespaces}
+      namespaces={namespaces}
       resources={resources}
     >
       <ManagerOverviewWorkspace
         academyId={academyId}
+        hasLeaderboard={hasLeaderboard}
         initialData={overview}
         // The exact period the server rendered for. Anything else refetches
         // rather than showing one window's totals under another's label.

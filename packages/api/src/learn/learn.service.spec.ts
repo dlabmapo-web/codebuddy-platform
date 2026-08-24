@@ -6,6 +6,7 @@ import type { AcademyAccessService } from "../authorization/academy-access.servi
 import type { PrismaService } from "../database/prisma.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
+import type { LearningClassContextService } from "./learning-class-context.service.js";
 import type { SubmissionService } from "./submission.service.js";
 
 const identity: SupabaseIdentity = {
@@ -27,6 +28,7 @@ const materialId = "70000000-0000-4000-8000-000000000001";
 const nextMaterialId = "70000000-0000-4000-8000-000000000002";
 const submissionId = "a0000000-0000-4000-8000-000000000001";
 const solveSessionId = "b0000000-0000-4000-8000-000000000001";
+const classId = "c0000000-0000-4000-8000-000000000001";
 
 function programmingExercise() {
   return {
@@ -203,11 +205,24 @@ function createService(options?: {
       .fn()
       .mockResolvedValue(options?.selectedSubmission ?? null),
   } as unknown as SubmissionService;
+  const classContext = {
+    resolve: vi.fn().mockResolvedValue({
+      membershipId: "d0000000-0000-4000-8000-000000000001",
+      classId,
+      classes: [{ classId, name: "Class A" }],
+    }),
+  } as unknown as LearningClassContextService;
   return {
     prisma,
     access,
     submissions,
-    service: new LearnService(prisma, access, curriculum, submissions),
+    service: new LearnService(
+      prisma,
+      access,
+      curriculum,
+      submissions,
+      classContext,
+    ),
   };
 }
 
@@ -239,7 +254,7 @@ describe("LearnService visible curriculum", () => {
   it("requires all ancestors and the problem itself to be visible", async () => {
     const { service, prisma } = createService();
 
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
+    await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
 
     expect(prisma.material.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -267,6 +282,7 @@ describe("LearnService visible curriculum", () => {
 
     const result = await service.getExerciseWorkspace(identity, {
       academyId,
+      classId,
       materialId,
     });
 
@@ -285,6 +301,7 @@ describe("LearnService visible curriculum", () => {
 
     const result = await service.getExerciseWorkspace(identity, {
       academyId,
+      classId,
       materialId,
     });
 
@@ -300,6 +317,7 @@ describe("LearnService visible curriculum", () => {
 
     const result = await service.getExerciseWorkspace(identity, {
       academyId,
+      classId,
       materialId,
     });
 
@@ -389,7 +407,7 @@ describe("LearnService class-assigned access", () => {
   it("gates the workspace, draft save, and draft discard by direct URL", async () => {
     const { service, prisma } = createService();
 
-    await service.getExerciseWorkspace(identity, { academyId, materialId });
+    await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
     await service.saveDraft(identity, { academyId, materialId, code: "x" });
     await service.discardDraft(identity, { academyId, materialId });
 
@@ -569,6 +587,7 @@ describe("startSolveSession", () => {
 
     const session = await service.startSolveSession(identity, {
       academyId,
+      classId,
       materialId,
     });
 
@@ -583,7 +602,7 @@ describe("startSolveSession", () => {
       }),
     );
     expect(prisma.exerciseSolveSession.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { userId, materialId } }),
+      expect.objectContaining({ data: { userId, materialId, classId } }),
     );
     expect(session.solveSessionId).toBe(solveSessionId);
   });
@@ -592,7 +611,7 @@ describe("startSolveSession", () => {
     const { service } = createService({ material: null });
 
     await expect(
-      service.startSolveSession(identity, { academyId, materialId }),
+      service.startSolveSession(identity, { academyId, classId, materialId }),
     ).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
   });
 
@@ -603,6 +622,7 @@ describe("startSolveSession", () => {
 
     const session = await service.startSolveSession(identity, {
       academyId,
+      classId,
       materialId,
     });
 

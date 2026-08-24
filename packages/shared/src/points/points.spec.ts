@@ -11,7 +11,11 @@ import {
   previousPointsPeriod,
   resolvePointsPeriod,
 } from "./period.js";
-import { resolveComparisonSurface } from "./points.js";
+import {
+  overviewPointsBoardInputSchema,
+  overviewPointsBoardSchema,
+  resolveComparisonSurface,
+} from "./points.js";
 import { rankEntries, rankGap } from "./ranking.js";
 
 const seoul = "Asia/Seoul";
@@ -264,5 +268,91 @@ describe("resolveComparisonSurface", () => {
       const resolved = resolveComparisonSurface(flags);
       expect(resolved.standing && resolved.points).toBe(false);
     }
+  });
+});
+
+describe("overview points board contract", () => {
+  const row = (position: number) => ({
+    position,
+    displayName: `Student ${position}`,
+    avatar: {
+      academyImageUrl: null,
+      globalImageUrl: null,
+      externalAvatarUrl: null,
+    },
+    points: 100 - position,
+    solvedProblems: 0,
+    activeDays: 1,
+    breakdown: {
+      solvedEasy: 0,
+      solvedMedium: 0,
+      solvedHard: 0,
+      solvedEasyPoints: 0,
+      solvedMediumPoints: 0,
+      solvedHardPoints: 0,
+      solvePoints: 0,
+      lectures: 0,
+      modules: 0,
+      courses: 0,
+      finishPoints: 0,
+      attendance: 0,
+      attendancePoints: 0,
+      learningMinutes: 0,
+      learningPoints: 0,
+    },
+    improved: false,
+    isYou: false,
+  });
+  const period = {
+    kind: "day" as const,
+    timeZone: seoul,
+    startDate: "2026-08-24",
+    endDate: "2026-08-24",
+    startsAt: "2026-08-23T15:00:00.000Z",
+    endsAt: "2026-08-24T15:00:00.000Z",
+  };
+  const classId = "10000000-0000-4000-8000-000000000001";
+
+  it("does not accept a period input", () => {
+    expect(
+      overviewPointsBoardInputSchema.safeParse({
+        academyId: classId,
+        period: "week",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("bounds the preview at five rows", () => {
+    expect(
+      overviewPointsBoardSchema.safeParse({
+        period,
+        leaderboard: {
+          eligible: true,
+          classId,
+          className: "Python A",
+          classes: [{ classId, name: "Python A" }],
+          participants: 6,
+          rows: Array.from({ length: 6 }, (_, index) => row(index + 1)),
+          viewer: null,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a membership id on the child-safe row", () => {
+    expect(
+      overviewPointsBoardSchema.safeParse({
+        period,
+        leaderboard: {
+          eligible: true,
+          classId,
+          className: "Python A",
+          classes: [{ classId, name: "Python A" }],
+          participants: 1,
+          rows: [{ ...row(1), membershipId: classId }],
+          viewer: null,
+        },
+      }).success,
+    ).toBe(false);
   });
 });

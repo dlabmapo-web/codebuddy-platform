@@ -54,11 +54,13 @@ import { reasonIcons, reasonTones } from '../_lib/points-view';
  */
 export function PointLedger({
   academyId,
+  classId,
   initialPage,
   membershipId,
   today,
 }: {
   academyId: string;
+  classId?: string | null;
   initialPage: PointsLedgerPage | null;
   membershipId?: string;
   /** The academy's current local date, so one row can say so. */
@@ -69,10 +71,17 @@ export function PointLedger({
   const [pageIndex, setPageIndex] = React.useState(0);
 
   const ledger = useQuery({
-    queryKey: ['points-ledger', academyId, membershipId ?? 'self', pageIndex],
+    queryKey: [
+      'points-ledger',
+      academyId,
+      classId ?? 'first',
+      membershipId ?? 'self',
+      pageIndex,
+    ],
     queryFn: () =>
       orpc.points.listLedger({
         academyId,
+        ...(classId ? { classId } : {}),
         ...(membershipId ? { membershipId } : {}),
         page: pageIndex + 1,
         pageSize: POINTS_LEDGER_PAGE_SIZE,

@@ -13,6 +13,7 @@ type Module = LearnCourseOutline['modules'][number];
 
 export function ModuleSection({
   academyId,
+  classId,
   expanded,
   isLectureExpanded,
   module,
@@ -21,6 +22,7 @@ export function ModuleSection({
   requestedLectureId,
 }: {
   academyId: string;
+  classId: string;
   expanded: boolean;
   isLectureExpanded: (lectureId: string) => boolean;
   module: Module;
@@ -157,6 +159,7 @@ export function ModuleSection({
                         {lecture.exercises.map((exercise, index) => (
                           <ExerciseRow
                             academyId={academyId}
+                            classId={classId}
                             exercise={exercise}
                             key={exercise.materialId}
                             label={formatProblemOutlineNumber(

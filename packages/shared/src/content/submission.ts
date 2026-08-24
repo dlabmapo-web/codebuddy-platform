@@ -87,6 +87,7 @@ export type SubmissionSummary = z.infer<typeof submissionSummarySchema>;
 export const submitExerciseSchema = z.object({
   academyId: z.uuid(),
   materialId: z.uuid(),
+  classId: z.uuid(),
   code: z.string().min(1).max(100_000),
   /**
    * Which sitting this attempt belongs to. The server owns the elapsed value

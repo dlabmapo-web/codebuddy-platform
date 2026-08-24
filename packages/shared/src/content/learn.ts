@@ -152,6 +152,16 @@ export const learnClassDetailSchema = learnClassSummarySchema
   .strict();
 export type LearnClassDetail = z.infer<typeof learnClassDetailSchema>;
 
+export const learningClassOptionSchema = z.object({
+  classId: z.uuid(),
+  name: z.string().trim().min(1).max(120),
+});
+export const learningClassContextSchema = z.object({
+  classId: z.uuid().nullable(),
+  classes: z.array(learningClassOptionSchema).min(1),
+});
+export type LearningClassContext = z.infer<typeof learningClassContextSchema>;
+
 export const learnCourseOutlineSchema = z.object({
   course: z.object({
     id: z.uuid(),
@@ -162,6 +172,12 @@ export const learnCourseOutlineSchema = z.object({
   modules: z.array(learnModuleSchema),
 });
 export type LearnCourseOutline = z.infer<typeof learnCourseOutlineSchema>;
+export const learnCourseOutlineResultSchema = learnCourseOutlineSchema.extend({
+  classContext: learningClassContextSchema,
+});
+export type LearnCourseOutlineResult = z.infer<
+  typeof learnCourseOutlineResultSchema
+>;
 
 /** Where an exercise sits, for the workspace header and back-navigation. */
 export const learnExerciseRefSchema = z.object({
@@ -310,6 +326,7 @@ export const learnExerciseBootstrapSchema = z.object({
    * the page — the ordinary workspace is still perfectly good.
    */
   selectedSubmission: learnSelectedSubmissionSchema.nullish(),
+  classContext: learningClassContextSchema,
 });
 export type LearnExerciseBootstrap = z.infer<
   typeof learnExerciseBootstrapSchema
@@ -331,10 +348,15 @@ export const learnAcademyInputSchema = z.object({ academyId: z.uuid() });
 
 export const learnCourseInputSchema = learnAcademyInputSchema.extend({
   courseId: z.uuid(),
+  classId: z.uuid().optional(),
 });
 
 export const learnMaterialInputSchema = learnAcademyInputSchema.extend({
   materialId: z.uuid(),
+});
+
+export const learnClassMaterialInputSchema = learnMaterialInputSchema.extend({
+  classId: z.uuid(),
 });
 
 export const learnClassInputSchema = learnAcademyInputSchema.extend({
@@ -352,6 +374,7 @@ export const learnClassInputSchema = learnAcademyInputSchema.extend({
 export const learnExerciseBootstrapInputSchema =
   learnMaterialInputSchema.extend({
     submissionId: z.uuid().optional(),
+    classId: z.uuid().optional(),
   });
 
 /**

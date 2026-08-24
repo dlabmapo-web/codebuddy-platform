@@ -20,6 +20,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+import { LearningClassContextService } from "./learning-class-context.service.js";
 
 /** The grading data a student's own read may join. Never a hidden expectation. */
 const ownedSubmissionInclude = {
@@ -61,6 +62,7 @@ export class SubmissionService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly config: ConfigService<ApiEnvironment, true>,
+    private readonly classContext: LearningClassContextService,
     @Optional() private readonly queue?: JudgeQueue,
   ) {
     this.rateLimit = this.config.get("SUBMISSION_RATE_LIMIT", { infer: true });
@@ -71,6 +73,7 @@ export class SubmissionService {
     input: {
       academyId: string;
       materialId: string;
+      classId: string;
       code: string;
       solveSessionId?: string;
     },
@@ -121,6 +124,13 @@ export class SubmissionService {
           );
         }
 
+        await this.classContext.resolveWith(tx, {
+          academyId: input.academyId,
+          userId,
+          courseId: material.lecture.courseModule.courseId,
+          requestedClassId: input.classId,
+        });
+
         // Read inside the same transaction as the snapshot, and against the
         // server clock. The browser names a session; it never reports how long
         // it took, so a patched client cannot post an impressive solve time.
@@ -129,6 +139,7 @@ export class SubmissionService {
               solveSessionId: input.solveSessionId,
               userId,
               materialId: material.id,
+              classId: input.classId,
             })
           : null;
 
@@ -139,6 +150,7 @@ export class SubmissionService {
             materialId: material.id,
             sourceMaterialId: material.id,
             courseId: courseModule.courseId,
+            classId: input.classId,
             gradingRevision: exercise.gradingRevision,
             language: exercise.language,
             timeLimitMs: exercise.timeLimitMs,
@@ -392,13 +404,19 @@ export class SubmissionService {
    */
   private async requireSolveSession(
     tx: Prisma.TransactionClient,
-    input: { solveSessionId: string; userId: string; materialId: string },
+    input: {
+      solveSessionId: string;
+      userId: string;
+      materialId: string;
+      classId: string;
+    },
   ): Promise<{ id: string; startedAt: Date }> {
     const session = await tx.exerciseSolveSession.findFirst({
       where: {
         id: input.solveSessionId,
         userId: input.userId,
         materialId: input.materialId,
+        classId: input.classId,
       },
       select: { id: true, startedAt: true },
     });

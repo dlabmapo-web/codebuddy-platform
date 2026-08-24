@@ -44,11 +44,13 @@ import { WorkspaceHeader } from './workspace-header';
 export function Workspace({
   academyId,
   bootstrap,
+  classId,
   returnTo,
   submissionRequested = false,
 }: {
   academyId: string;
   bootstrap: LearnExerciseBootstrap;
+  classId: string;
   /**
    * The validated Answer records location to return to, or null when the
    * student arrived through My Courses. Never a caller-supplied URL: the
@@ -94,6 +96,7 @@ export function Workspace({
   const navigation = useExerciseNavigation({
     academyId,
     bootstrap,
+    classId,
     beforeTransitionRef,
   });
   const { workspace, navigating } = navigation;
@@ -119,10 +122,12 @@ export function Workspace({
 
   const solveSession = useSolveSession({
     academyId,
+    classId,
     materialId: exercise.materialId,
   });
   const submission = useSubmission({
     academyId,
+    classId,
     materialId: exercise.materialId,
     initialResult: selected?.result ?? null,
     solveSessionId: solveSession.solveSessionId,
@@ -140,6 +145,7 @@ export function Workspace({
   // back. It publishes nothing the student cannot already see, and learns
   // nothing about who is watching.
   const monitoring = useStudentMonitoring({
+    classId,
     courseId: workspace.breadcrumb.course.id,
     materialId: exercise.materialId,
     onBeforeCollaborate: draft.flushNow,

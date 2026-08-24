@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import {
   DEFAULT_POINTS_PERIOD,
   MIN_STUDENTS_FOR_COMPARISON,
+  OVERVIEW_RANKING_MAX_ROWS,
   POINTS_LEDGER_PAGE_SIZE,
   learningTiers,
   parsePointsPeriodKind,
@@ -11,12 +12,13 @@ import {
   type ClassPointsBoard,
   type ClassPointsBoardInput,
   type Leaderboard,
+  type OverviewPointsBoard,
+  type OverviewPointsBoardInput,
   type PointsLedgerInput,
   type PointsLedgerPage,
   type PointsPage,
   type PointsPageInput,
   type PointsPeriod,
-  type PointsSummary,
   type PointRules,
   type StaffLeaderboard,
 } from "@cove/shared";
@@ -68,26 +70,36 @@ export class PointsService {
     // fail independently below, but a student's own total silently reading
     // zero would be a lie about their work, so this one is left to throw and
     // take the page with it.
-    const standing = await this.leaderboard.standingFor(
-      scope.academyId,
-      scope.membershipId,
-      period,
-    );
+    const selectedClass =
+      scope.classes.find((entry) => entry.classId === input.classId) ??
+      scope.classes[0];
+    const standing = selectedClass
+      ? await this.leaderboard.standingFor(
+          scope.academyId,
+          selectedClass.classId,
+          scope.membershipId,
+          period,
+        )
+      : { points: 0, solvedProblems: 0, activeDays: 0 };
 
     const [board, ledger] = await Promise.all([
       scope.leaderboardEnabled
-        ? this.buildLeaderboard(scope, period, input.classId ?? null).catch(
+        ? this.buildLeaderboard(scope, period, selectedClass?.classId ?? null).catch(
             (error: unknown) => {
               this.logger.warn(
                 `class board for ${scope.academyId} failed: ${reason(error)}`,
               );
-              return unavailableBoard(scope.classes);
+              return unavailableBoard(
+                scope.classes,
+                selectedClass?.classId ?? null,
+              );
             },
           )
         : Promise.resolve(null),
       this.listLedger(identity, {
         academyId: scope.academyId,
         ...(input.membershipId ? { membershipId: input.membershipId } : {}),
+        ...(selectedClass ? { classId: selectedClass.classId } : {}),
       }).catch((error: unknown) => {
         this.logger.warn(
           `ledger for ${scope.membershipId} failed: ${reason(error)}`,
@@ -143,13 +155,13 @@ export class PointsService {
             this.logger.warn(
               `class board for ${input.classId ?? "first"} failed: ${reason(error)}`,
             );
-            return unavailableBoard(scope.classes);
+            return unavailableBoard(scope.classes, input.classId ?? null);
           },
         )
       : // The academy runs points without the named board. A staff reader gets
         // the same answer a student would rather than a list their students
         // are not allowed to see.
-        unavailableBoard(scope.classes);
+        unavailableBoard(scope.classes, input.classId ?? null);
 
     const { gap: _gap, ...leaderboard } = board;
     return {
@@ -160,44 +172,49 @@ export class PointsService {
   }
 
   /**
-   * The overview's compact card. §6.1.
+   * Today's first five rows, for every role overview.
    *
-   * Today's total and today's position, and nothing else — the overview is a
-   * starting page, and a ranked table of eighteen classmates is the opposite
-   * of a hand-off.
-   *
-   * It recomputes the board rather than reading a stored position, which is
-   * the point: there is nowhere a rank is kept, so the card and the points
-   * page cannot drift apart. The work is bounded by one class.
+   * The complete board is built once, through the same path as the points
+   * pages, before it is trimmed. That preserves ties, eligibility, `isYou`,
+   * and the student's own row without introducing a second ranking algorithm.
    */
-  async getSummary(
+  async getOverviewBoard(
     identity: SupabaseIdentity,
-    input: { academyId: string },
-  ): Promise<PointsSummary> {
-    const scope = await this.access.resolve(identity, input);
+    input: OverviewPointsBoardInput,
+  ): Promise<OverviewPointsBoard> {
+    const scope = await this.access.resolveOverviewBoard(identity, input);
     const period = resolvePointsPeriod(
       DEFAULT_POINTS_PERIOD,
       new Date(),
       scope.timeZone,
     );
 
-    const standing = await this.leaderboard.standingFor(
-      scope.academyId,
-      scope.membershipId,
+    const board = await this.buildLeaderboard(
+      scope,
       period,
-    );
-    const board = scope.leaderboardEnabled
-      ? await this.buildLeaderboard(scope, period, null)
+      input.classId ?? null,
+    ).catch((error: unknown) => {
+      this.logger.warn(
+        `overview board for ${input.classId ?? "first"} failed: ${reason(error)}`,
+      );
+      return unavailableBoard(scope.classes, input.classId ?? null);
+    });
+    const safe = stripGap(board);
+
+    if (safe.eligible === false) {
+      return { period: viewPeriod(period), leaderboard: safe };
+    }
+
+    const rows = safe.rows.slice(0, OVERVIEW_RANKING_MAX_ROWS);
+    const viewer = scope.isSelf
+      ? safe.rows
+          .slice(OVERVIEW_RANKING_MAX_ROWS)
+          .find((row) => row.isYou) ?? null
       : null;
-    const mine =
-      board?.eligible === true
-        ? board.rows.find((row) => row.isYou)
-        : undefined;
 
     return {
-      points: standing.points,
-      position: mine?.position ?? null,
-      participants: board?.eligible === true ? board.participants : null,
+      period: viewPeriod(period),
+      leaderboard: { ...safe, rows, viewer },
     };
   }
 
@@ -231,11 +248,21 @@ export class PointsService {
     const members = await this.leaderboard.roster(selected.classId);
     const membershipIds = members.map((member) => member.membershipId);
     const totals = await this.leaderboard.withLearningMinutes(
-      await this.leaderboard.totals(scope.academyId, membershipIds, period),
+      await this.leaderboard.totals(
+        scope.academyId,
+        selected.classId,
+        membershipIds,
+        period,
+      ),
+      selected.classId,
       membershipIds,
       period,
     );
-    const days = await this.leaderboard.activeDays(membershipIds, period);
+    const days = await this.leaderboard.activeDays(
+      selected.classId,
+      membershipIds,
+      period,
+    );
 
     const active = members.filter((member) => {
       const total = totals.get(member.membershipId);
@@ -285,6 +312,7 @@ export class PointsService {
         ? new Set<string>()
         : await this.leaderboard.improvedSince(
             scope.academyId,
+            selected.classId,
             members,
             period,
             new Map(ranked.map((row) => [row.membershipId, row.position])),
@@ -351,7 +379,16 @@ export class PointsService {
     const scope = await this.access.resolve(identity, input);
     const pageSize = input.pageSize ?? POINTS_LEDGER_PAGE_SIZE;
     const page = Math.max(1, input.page ?? 1);
-    const where = { membershipId: scope.membershipId };
+    const selectedClass =
+      scope.classes.find((entry) => entry.classId === input.classId) ??
+      scope.classes[0];
+    if (!selectedClass) {
+      return { page, pageSize, totalRows: 0, rows: [] };
+    }
+    const where = {
+      membershipId: scope.membershipId,
+      classId: selectedClass.classId,
+    };
 
     // `id` breaks the tie on `createdAt`, which is what makes offset paging
     // safe here: two awards written in the same transaction share a timestamp
@@ -397,12 +434,17 @@ export class PointsService {
  * does not run a leaderboard" and a section that says nothing is how a student
  * concludes their class has no ranking. §12.3.
  */
-function unavailableBoard(classes: { classId: string; name: string }[]) {
+function unavailableBoard(
+  classes: { classId: string; name: string }[],
+  requestedClassId: string | null = null,
+) {
+  const selected =
+    classes.find((entry) => entry.classId === requestedClassId) ?? classes[0];
   return {
     eligible: false as const,
     reason: "UNAVAILABLE" as const,
     classes,
-    classId: null,
+    classId: selected?.classId ?? null,
     gap: { kind: "alone" as const },
   };
 }

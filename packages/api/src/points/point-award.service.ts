@@ -53,7 +53,7 @@ type AwardInput = {
   lectureId?: string | null;
   moduleId?: string | null;
   courseId?: string | null;
-  classId?: string | null;
+  classId: string;
   difficulty?: "EASY" | "MEDIUM" | "HARD" | null;
 };
 
@@ -119,6 +119,7 @@ export class PointAwardService {
     const earnedToday = await tx.pointAward.aggregate({
       where: {
         membershipId: input.membershipId,
+        classId: input.classId,
         localDate: new Date(`${localDate}T00:00:00.000Z`),
         voidedAt: null,
       },
@@ -153,7 +154,7 @@ export class PointAwardService {
           lectureId: input.lectureId ?? null,
           moduleId: input.moduleId ?? null,
           courseId: input.courseId ?? null,
-          classId: input.classId ?? null,
+          classId: input.classId,
           difficulty: input.difficulty ?? null,
           cappedAt: capped ? input.now : null,
         },
@@ -190,6 +191,7 @@ export class PointAwardService {
       userId: string;
       materialId: string;
       courseId: string;
+      classId: string;
       now: Date;
     },
   ): Promise<void> {
@@ -259,6 +261,7 @@ export class PointAwardService {
       timeZone,
       now: input.now,
       courseId: course.id,
+      classId: input.classId,
     };
     const difficulty = material.programmingExercise.difficulty;
 
@@ -305,6 +308,7 @@ export class PointAwardService {
       membershipId: string;
       userId: string;
       courseId: string;
+      classId: string;
       timeZone: string;
       now: Date;
       policy: PointPolicy;
@@ -327,6 +331,7 @@ export class PointAwardService {
       timeZone: input.timeZone,
       now: input.now,
       courseId: input.courseId,
+      classId: input.classId,
     };
 
     if (!(await this.allSolved(tx, input.userId, { lectureId: lecture.id }))) {
@@ -436,6 +441,7 @@ export class PointAwardService {
     input: {
       academyId: string;
       membershipId: string;
+      classId: string;
       totalMinutes: number;
       timeZone: string;
       localDate: string;
@@ -451,9 +457,10 @@ export class PointAwardService {
         {
           academyId: input.academyId,
           membershipId: input.membershipId,
+          classId: input.classId,
           reason: "LEARNING_TIME",
           amount: tier.points,
-          dedupeKey: `${input.membershipId}:${input.localDate}:TIME:${tier.tier}`,
+          dedupeKey: `${input.membershipId}:${input.classId}:${input.localDate}:TIME:${tier.tier}`,
           subjectLabel: String(tier.minutes),
           timeZone: input.timeZone,
           now: input.now,
@@ -481,6 +488,7 @@ export class PointAwardService {
     input: {
       academyId: string;
       membershipId: string;
+      classId: string;
       courseId: string;
       timeZone: string;
       localDate: string;
@@ -500,6 +508,7 @@ export class PointAwardService {
       where: {
         weekday,
         class: {
+          id: input.classId,
           academyId: input.academyId,
           status: "ACTIVE",
           enrollments: { some: { membershipId: input.membershipId } },
@@ -548,7 +557,7 @@ export class PointAwardService {
           // arrived, and a late award must never be topped up by an on-time one.
           dedupeKey: `${input.membershipId}:${slot.classId}:${input.localDate}:ATTENDANCE`,
           subjectLabel: slot.class.name,
-          classId: slot.classId,
+          classId: input.classId,
           courseId: input.courseId,
           timeZone: input.timeZone,
           now: input.now,

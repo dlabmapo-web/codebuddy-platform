@@ -990,6 +990,8 @@ describe("student movement", () => {
         membershipId: studentMembershipId,
         classes: [{ classId, membershipId: studentMembershipId }],
         materialId: null,
+        courseId: null,
+        classId: null,
         draftId: null,
         lastSeenPersistedAt: null,
         terminal: null,
@@ -1005,6 +1007,7 @@ describe("student movement", () => {
         academyId,
         materialId: material,
         courseId: openCourseId,
+        classId: openCourseId ? classId : null,
         visibility,
         active: true,
       });

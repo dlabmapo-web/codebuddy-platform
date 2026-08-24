@@ -1,18 +1,16 @@
 import { z } from "zod";
 
-import { pointsSummarySchema } from "../points/points.js";
 import { acceptedRate } from "./answer-records.js";
 import { overviewPeriodSchema, overviewRangeSchema } from "./teacher-overview.js";
 
 /**
  * What a student's own academy overview is made of.
  *
- * The measurements are the teacher's measurements. `averageBestScore`,
- * `resolveOverviewPeriod`, and the attention rules all live in
- * `teacher-overview.ts` and `teacher-progress.ts`, and this file imports them
- * rather than restating them — a student and their teacher reading different
- * averages for the same week would be a defect neither could diagnose, and one
- * definition is how that stays impossible.
+ * The measurements are the teacher's measurements. `averageBestScore` and
+ * `resolveOverviewPeriod` live in `teacher-overview.ts`, and this file imports
+ * them rather than restating them — a student and their teacher reading
+ * different averages for the same week would be a defect neither could
+ * diagnose, and one definition is how that stays impossible.
  *
  * What is decided here is everything that is only true of the student's own
  * page: which work to resume, how a position in a class is computed, and — the
@@ -33,8 +31,6 @@ const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const STUDENT_MAX_CONTINUE_ROWS = 3;
 /** §7.7, §7.10 — five rows is what a preview is. */
 export const STUDENT_MAX_PREVIEW_ROWS = 5;
-/** §7.8 — three is what a child will actually work through in a sitting. */
-export const STUDENT_MAX_PRACTICE_ROWS = 3;
 /** §7.6 — a period longer than this aggregates to weeks rather than shrinking. */
 export const STUDENT_ACTIVITY_DAILY_MAX_DAYS = 31;
 /** §9.1 — the top of the standing, above the student's own neighbourhood. */
@@ -278,65 +274,6 @@ export function activityPeak(points: StudentActivityPoint[]): number {
   return points.reduce((peak, point) => Math.max(peak, point.activeSeconds), 0);
 }
 
-/* -------------------------------------------------------------- messages */
-
-/**
- * One message a teacher wrote to this student.
- *
- * There is no author name and no author id, preserving the anonymity the
- * feedback delivery design chose deliberately: the student sees "Teacher", the
- * live indicator already tells them somebody is helping, and a named thread
- * would hand back exactly what the rest of the system withholds.
- */
-export const studentMessageSchema = z
-  .object({
-    id: z.uuid(),
-    body: z.string().min(1).max(4000),
-    materialId: z.uuid().nullable(),
-    exerciseTitle: labelSchema.nullable(),
-    createdAt: z.iso.datetime(),
-    readAt: z.iso.datetime().nullable(),
-  })
-  .strict();
-export type StudentMessage = z.infer<typeof studentMessageSchema>;
-
-/* -------------------------------------------------------------- practice */
-
-/**
- * An exercise worth returning to.
- *
- * The teacher's queue prints the reason and the measurement, because a teacher
- * is deciding where to spend a lesson. This prints neither. A child needs the
- * door, not the evidence that they failed four times, and there is no field
- * here that could carry a count, a severity, or an adjective — §7.8 forbids
- * one, and a schema with nowhere to put it cannot grow one later.
- */
-export const practiceExerciseSchema = z
-  .object({
-    materialId: z.uuid(),
-    title: labelSchema,
-    courseTitle: labelSchema,
-    moduleTitle: labelSchema,
-    lectureTitle: labelSchema,
-    outlineNumber: z.string().max(24).nullable(),
-    /** The best score so far, which is the one number that helps a student. */
-    bestScore: percentSchema.nullable(),
-    lastAttemptAt: z.iso.datetime().nullable(),
-  })
-  .strict();
-export type PracticeExercise = z.infer<typeof practiceExerciseSchema>;
-
-/** Most recently attempted first: the thing they were last trying to do. */
-export function comparePracticeExercises(
-  left: PracticeExercise,
-  right: PracticeExercise,
-): number {
-  const leftAt = left.lastAttemptAt ? Date.parse(left.lastAttemptAt) : 0;
-  const rightAt = right.lastAttemptAt ? Date.parse(right.lastAttemptAt) : 0;
-  if (leftAt !== rightAt) return rightAt - leftAt;
-  return left.materialId.localeCompare(right.materialId);
-}
-
 /* --------------------------------------------------------------- records */
 
 export const studentRecordSchema = z
@@ -575,10 +512,7 @@ export const studentOverviewSections = [
   "ledger",
   "courses",
   "activity",
-  "messages",
-  "practice",
   "standing",
-  "points",
   "records",
 ] as const;
 export const studentOverviewSectionSchema = z.enum(studentOverviewSections);
@@ -627,22 +561,9 @@ export const studentAcademyOverviewSchema = z
         points: z.array(studentActivityPointSchema),
       })
       .strict(),
-    messages: z.array(studentMessageSchema).max(STUDENT_MAX_PREVIEW_ROWS),
-    unreadMessages: countSchema,
-    practice: z.array(practiceExerciseSchema).max(STUDENT_MAX_PRACTICE_ROWS),
     records: z.array(studentRecordSchema).max(STUDENT_MAX_PREVIEW_ROWS),
     /** Null when the academy has not enabled class standing at all. */
     standing: classStandingSchema.nullable(),
-    /**
-     * Today's points, when the academy runs a point economy. §6.1 — one
-     * compact card after the ledger, and the only thing about points on this
-     * page.
-     *
-     * Never non-null at the same time as `standing`: §18.2 makes the
-     * leaderboard supersede the standing section, because two comparison
-     * surfaces computed differently will eventually disagree.
-     */
-    points: pointsSummarySchema.nullable(),
     /** Every class the standing could describe, when there is more than one. */
     standingClasses: z.array(studentOverviewClassSchema),
     unavailable: z.array(studentOverviewSectionSchema),

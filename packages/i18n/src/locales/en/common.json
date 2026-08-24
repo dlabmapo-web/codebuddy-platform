@@ -18,6 +18,13 @@
     "try_again": "Try again",
     "close": "Close"
   },
+  "sign_out_confirm": {
+    "title": "Sign out?",
+    "description": "You'll need to sign in again to continue.",
+    "body": "Your progress is saved automatically — sign back in anytime to pick up where you left off.",
+    "confirm": "Yes, sign out",
+    "confirming": "Signing out…"
+  },
   "state": {
     "loading": "Loading…",
     "empty": "Nothing to show yet.",

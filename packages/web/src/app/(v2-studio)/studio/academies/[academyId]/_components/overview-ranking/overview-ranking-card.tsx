@@ -192,12 +192,14 @@ function RankingRow({ row }: { row: LeaderboardRow }) {
         position: formatNumber(row.position, locale),
       })}
       className={cn(
-        'grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0',
+        'flex min-h-14 items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0',
         row.isYou && 'bg-brand-soft shadow-[inset_3px_0_0_var(--brand)]',
       )}
     >
-      <PositionMarker position={row.position} />
-      <span className="flex min-w-0 items-center gap-2.5">
+      <span className="flex w-10 shrink-0 justify-center">
+        <PositionMarker position={row.position} />
+      </span>
+      <span className="flex min-w-0 flex-1 items-center gap-2.5">
         <ProfileAvatar
           {...row.avatar}
           className="hidden sm:inline-flex"
@@ -213,7 +215,7 @@ function RankingRow({ row }: { row: LeaderboardRow }) {
           </span>
         ) : null}
       </span>
-      <span className="font-mono text-[15px] font-bold tabular-nums text-ink">
+      <span className="shrink-0 font-mono text-[15px] font-bold tabular-nums text-ink">
         {formatNumber(row.points, locale)}
         <span className="ml-0.5 text-[12px] font-semibold text-sub">P</span>
       </span>
@@ -225,9 +227,11 @@ function ViewerFooter({ row }: { row: LeaderboardRow }) {
   const { t } = useTranslation('points');
   const locale = useLocale();
   return (
-    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-brand/20 bg-brand-soft px-4 py-3 shadow-[inset_3px_0_0_var(--brand)]">
-      <PositionMarker position={row.position} />
-      <span className="min-w-0">
+    <div className="flex items-center gap-3 border-t border-brand/20 bg-brand-soft px-4 py-3 shadow-[inset_3px_0_0_var(--brand)]">
+      <span className="flex w-10 shrink-0 justify-center">
+        <PositionMarker position={row.position} />
+      </span>
+      <span className="min-w-0 flex-1">
         <span className="block text-[10.5px] font-bold uppercase tracking-[0.08em] text-brand">
           {t('preview.your_place')}
         </span>
@@ -235,7 +239,7 @@ function ViewerFooter({ row }: { row: LeaderboardRow }) {
           {row.displayName}
         </span>
       </span>
-      <span className="font-mono text-[15px] font-bold tabular-nums text-ink">
+      <span className="shrink-0 font-mono text-[15px] font-bold tabular-nums text-ink">
         {formatNumber(row.points, locale)}
         <span className="ml-0.5 text-[12px] font-semibold text-sub">P</span>
       </span>

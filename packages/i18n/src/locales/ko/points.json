@@ -1,0 +1,146 @@
+{
+  "title": "내 포인트",
+  "description": "모은 포인트와 우리 반 순위를 확인해요.",
+  "period": {
+    "label": "기간",
+    "day": "오늘",
+    "week": "이번 주",
+    "month": "이번 달"
+  },
+  "plate": {
+    "total": "{{points}}P",
+    "position": "{{position}}위 / {{participants}}명",
+    "no_position": "순위 준비 중",
+    "gap_chase": "{{position}}위까지 {{points}}P",
+    "gap_lead": "1위 유지 중 · 2위와 {{points}}P 차이",
+    "gap_alone": "문제를 풀면 순위가 시작돼요",
+    "track_label": "다음 순위까지 남은 포인트",
+    "solved": "{{count}}문제",
+    "you": "나",
+    "rank_short": "{{position}}위",
+    "total_label_day": "오늘 모은 포인트",
+    "total_label_week": "이번 주에 모은 포인트",
+    "total_label_month": "이번 달에 모은 포인트",
+    "days_other": "{{count}}일",
+    "next_up": "다음 순위"
+  },
+  "board": {
+    "title": "우리 반 랭킹",
+    "caption": "{{className}} · {{period}} 순위표",
+    "class_label": "반 선택",
+    "you": "나",
+    "improved": "순위 상승",
+    "column": {
+      "position": "순위",
+      "student": "이름",
+      "points": "총 포인트",
+      "days": "학습 일수",
+      "solved": "문제 풀이",
+      "finished": "완료",
+      "attendance": "수업 출석",
+      "time": "학습 시간",
+      "actions": "자세히"
+    },
+    "rank": "{{position}}위",
+    "quiet": "오늘은 아직 조용해요",
+    "quiet_hint": "우리 반 세 명이 오늘 공부를 시작하면 순위가 열려요. 이번 주 순위는 지금 볼 수 있어요.",
+    "quiet_action": "이번 주 순위 보기",
+    "too_few": "아직 랭킹을 열 수 없어요",
+    "too_few_hint": "한 반에 학생이 세 명 이상일 때 순위를 보여줘요.",
+    "not_enrolled": "아직 반이 없어요",
+    "not_enrolled_hint": "반에 들어가면 우리 반 순위를 볼 수 있어요.",
+    "unavailable": "지금은 랭킹을 불러올 수 없어요",
+    "participants": "{{count}}명",
+    "search": "이름으로 찾기",
+    "split": {
+      "easy": "쉬움 {{count}}",
+      "medium": "보통 {{count}}",
+      "hard": "어려움 {{count}}",
+      "lecture_other": "강의 {{count}}",
+      "module_other": "단원 {{count}}",
+      "course_other": "과정 {{count}}",
+      "attendance_other": "수업 {{count}}회",
+      "worth": "{{parts}} · {{points}}",
+      "none": "아직 없어요"
+    },
+    "time": {
+      "hours_minutes": "{{hours}}시간 {{minutes}}분",
+      "minutes": "{{minutes}}분"
+    },
+    "caption_explains": "문제 풀이 · 완료 · 수업 출석 · 학습 시간을 더하면 총 포인트가 돼요. 모든 포인트는 스스로 모은 거예요."
+  },
+  "rules": {
+    "title": "포인트 받는 방법",
+    "description": "포인트는 줄어들지 않아요. 모은 포인트는 그대로 남아요.",
+    "solve": "문제를 풀었어요",
+    "solve_easy": "쉬움",
+    "solve_medium": "보통",
+    "solve_hard": "어려움",
+    "lecture": "강의를 끝냈어요",
+    "module": "단원을 끝냈어요",
+    "course": "과정을 끝냈어요",
+    "attendance": "수업 시간에 공부했어요",
+    "attendance_late": "늦게 시작했어요",
+    "time": "하루 {{minutes}}분 공부했어요",
+    "daily_cap": "하루에 최대 {{points}}P까지 모을 수 있어요",
+    "value": "+{{points}}P",
+    "group": {
+      "solve": "문제 풀기",
+      "work": "공부하고 출석하기",
+      "finish": "끝까지 마치기"
+    },
+    "note": {
+      "solve": "한 문제당 처음 푼 한 번만 받아요.",
+      "work": "하루에 한 단계 — 가장 높이 도달한 단계만 받아요.",
+      "finish": "마지막 하나를 끝냈을 때 한 번 받아요."
+    },
+    "in_class": "수업 시간에",
+    "minutes": "{{minutes}}분",
+    "lecture_short": "강의 하나",
+    "module_short": "단원 하나",
+    "course_short": "과정 전체"
+  },
+  "ledger": {
+    "title": "포인트 내역",
+    "empty": "아직 포인트가 없어요",
+    "empty_hint": "문제를 하나 풀면 시작돼요.",
+    "amount": "+{{points}}P",
+    "capped": "오늘 한도에 닿았어요",
+    "voided": "취소됨",
+    "unavailable": "내역을 불러올 수 없어요",
+    "reason": {
+      "ATTENDANCE": "수업 출석",
+      "ATTENDANCE_LATE": "수업 출석 (늦음)",
+      "LEARNING_TIME": "{{label}}분 학습",
+      "EXERCISE_SOLVED": "문제 해결",
+      "LECTURE_COMPLETED": "강의 완료",
+      "MODULE_COMPLETED": "단원 완료",
+      "COURSE_COMPLETED": "과정 완료"
+    },
+    "today": "오늘",
+    "column": {
+      "date": "날짜",
+      "reason": "무엇으로 받았나",
+      "amount": "포인트"
+    }
+  },
+  "difficulty": {
+    "EASY": "쉬움",
+    "MEDIUM": "보통",
+    "HARD": "어려움"
+  },
+  "student": {
+    "description": "이 학생이 모은 포인트와 그 이유입니다.",
+    "solved_other": "이 기간에 {{count}}문제 해결",
+    "open": "포인트"
+  },
+  "staff": {
+    "title": "반 랭킹",
+    "description": "반과 기간을 골라 학생들의 순위를 확인하고, 학생을 열어 포인트를 어떻게 모았는지 볼 수 있어요.",
+    "open_points": "포인트",
+    "open_points_aria": "{{name}} 학생의 포인트 내역 열기",
+    "no_classes": "아직 반이 없어요",
+    "no_classes_hint": "반을 만들고 학생을 등록하면 여기에서 순위를 볼 수 있어요.",
+    "class_label": "반 선택"
+  }
+}

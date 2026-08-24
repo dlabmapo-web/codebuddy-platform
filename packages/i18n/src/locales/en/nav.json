@@ -20,8 +20,10 @@
     "my_courses": "My courses",
     "my_classes": "My classes",
     "answer_records": "Answer records",
+    "my_points": "My points",
     "solution_status": "Solution status",
-    "student_analytics": "Student analytics"
+    "student_analytics": "Student analytics",
+    "class_ranking": "Class ranking"
   },
   "academy_switcher": {
     "select": "Select academy",

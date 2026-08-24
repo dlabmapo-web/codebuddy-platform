@@ -212,6 +212,20 @@ export function canManageEnrollment(
 }
 
 /**
+ * Who may say when a class meets.
+ *
+ * `MANAGER` alone. §5.1 and §8.1 of the student points design: the schedule
+ * decides who is paid for turning up, which makes it a setting rather than a
+ * piece of curriculum — a team lead who runs the content has no reason to move
+ * a class's hours.
+ */
+export function canManageClassSchedule(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role ? roleHasPermission(role, 'class-schedule.manage') : false;
+}
+
+/**
  * Who may put a teacher in charge of a class. A Teacher is deliberately not on
  * this list: they hold `classes.assigned.manage`, which is about what they do
  * with their own classes, never about choosing who runs one.

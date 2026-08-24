@@ -6,12 +6,14 @@ import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
+import { ClassPointsBoard } from '../../../_components/class-points/class-points-board';
 import { ArchiveClassDialog } from '../../_components/archive-class-dialog';
 import { useClassDetailManager } from '../_hooks/use-class-detail-manager';
 import { AccessRemovalDialog } from './access-removal-dialog';
 import { ClassCoursesPanel } from './class-courses-panel';
 import { ClassHeader } from './class-header';
 import { ClassOverviewCard } from './class-overview-card';
+import { ClassSchedulePanel } from './class-schedule-panel';
 import { ClassStudentsPanel } from './class-students-panel';
 import { ClassTeacherPanel } from './class-teacher-panel';
 import { CourseAssignmentDialog } from './course-assignment-dialog';
@@ -24,12 +26,14 @@ export function ClassDetailManager({
   canAssignCourses,
   canAssignTeacher,
   canEnroll,
+  canSetSchedule,
   initialDetail,
 }: {
   academyId: string;
   canAssignCourses: boolean;
   canAssignTeacher: boolean;
   canEnroll: boolean;
+  canSetSchedule: boolean;
   initialDetail: ClassDetail;
 }) {
   const { t } = useLayoutTranslation(['classes', 'common']);
@@ -49,17 +53,31 @@ export function ClassDetailManager({
 
       <ClassOverviewCard detail={manager.detail} />
 
-      {/* Courses, then the teacher, then the roster: what is taught, who
-          teaches it, and only then the long list of who takes it. The roster
-          is the one panel that grows without bound, so it goes last rather
-          than pushing a one-line answer below a page of rows. */}
+      {/* Courses, then the timetable, then the teacher, then the roster: what
+          is taught, when it meets, who teaches it, and only then the long list
+          of who takes it. The roster is the one panel that grows without
+          bound, so it goes last rather than pushing a one-line answer below a
+          page of rows. */}
       <ClassCoursesPanel
         academyId={academyId}
         canAssign={canAssignCourses}
         manager={manager}
       />
+      <ClassSchedulePanel canEdit={canSetSchedule} manager={manager} />
       <ClassTeacherPanel canAssign={canAssignTeacher} manager={manager} />
-      <ClassStudentsPanel canEnroll={canEnroll} manager={manager} />
+      <ClassStudentsPanel
+        academyId={academyId}
+        canEnroll={canEnroll}
+        manager={manager}
+      />
+
+      {/*
+       * §5.1 — the identical board this class's students see, and the last
+       * thing on the page because it is the only panel that says anything
+       * about how individual children are doing. It renders nothing when the
+       * academy does not run points.
+       */}
+      <ClassPointsBoard academyId={academyId} classId={manager.detail.id} />
 
       {manager.loadError ? (
         <p className="text-[14px] font-semibold text-sub">{t('load_failed')}</p>

@@ -23,11 +23,17 @@ import { cn } from '@/lib/utils';
  *
  * ## The "all" row
  *
- * The selector has no concept of an empty choice, and this filter needs one:
- * "every class I teach" is a real answer rather than the absence of one. So it
- * is a real row at the top of the list, carrying the id `all` — which is
- * already the word the address uses for the same state, so the control, the URL,
- * and the server all spell it the same way.
+ * The selector has no concept of an empty choice, and most of these filters
+ * need one: "every class I teach" is a real answer rather than the absence of
+ * one. So it is a real row at the top of the list, carrying the id `all` —
+ * already the word the address uses for the same state, so the control, the
+ * URL, and the server all spell it the same way.
+ *
+ * `allLabel` is optional because one caller has no such state. A student's
+ * points board ranks one class against itself, and "all my classes" is not a
+ * board that could exist — §10.2 rules out any scope wider than a room a child
+ * can move a position in. Omitting it drops the row, and `onChange` then only
+ * ever receives a real id.
  *
  * ## The trigger
  *
@@ -50,27 +56,41 @@ export function FilterSelector({
   label,
   onChange,
   options,
+  triggerClassName,
   value,
 }: {
-  /** The row that clears this filter, e.g. "All my classes". */
-  allLabel: string;
+  /**
+   * The row that clears this filter, e.g. "All my classes". Omit where the
+   * filter has no cleared state and one option must always be chosen.
+   */
+  allLabel?: string;
   disabled?: boolean;
   icon: LucideIcon;
   /** Names the control for assistive technology and titles the mobile drawer. */
   label: string;
   onChange: (value: string | null) => void;
   options: FilterOption[];
+  /**
+   * Classes for the trigger, for a caller placing this on a row of other
+   * controls. The default `h-9` suits a page header; a data-table toolbar sets
+   * every control to `h-10`, and one control a pixel short of its neighbours is
+   * the kind of thing a reader notices without being able to say why.
+   */
+  triggerClassName?: string;
   value: string | null;
 }) {
   const items = React.useMemo<SelectorItem[]>(
     () => [
-      { id: ALL_OPTION, name: allLabel },
+      ...(allLabel ? [{ id: ALL_OPTION, name: allLabel }] : []),
       ...options.map((option) => ({ id: option.value, name: option.label })),
     ],
     [allLabel, options],
   );
 
-  const Trigger = React.useMemo(() => createTrigger(icon, label), [icon, label]);
+  const Trigger = React.useMemo(
+    () => createTrigger(icon, label, triggerClassName),
+    [icon, label, triggerClassName],
+  );
 
   return (
     <ResponsiveSelector
@@ -81,15 +101,16 @@ export function FilterSelector({
         onChange(item.id === ALL_OPTION ? null : item.id)
       }
       popoverClassName="min-w-64"
-      // Never null: with nothing narrowed the "all" row is the selection, so
-      // the list always shows a tick and the trigger always has a name to print.
-      selectedId={value ?? ALL_OPTION}
+      // Never null while an "all" row exists: with nothing narrowed that row
+      // is the selection, so the list always shows a tick and the trigger
+      // always has a name to print. Without one the caller's value stands.
+      selectedId={value ?? (allLabel ? ALL_OPTION : null)}
       TriggerComp={Trigger}
     />
   );
 }
 
-function createTrigger(Icon: LucideIcon, label: string) {
+function createTrigger(Icon: LucideIcon, label: string, extra?: string) {
   return React.forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>(
     function FilterTrigger({ className, selectedItem, ...props }, ref) {
       // A narrowed filter is a fact about what the page is showing, so the
@@ -107,6 +128,7 @@ function createTrigger(Icon: LucideIcon, label: string) {
             'hover:border-brand focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
             narrowed ? 'border-brand text-brand' : 'border-border text-ink',
+            extra,
             className,
           )}
           ref={ref}

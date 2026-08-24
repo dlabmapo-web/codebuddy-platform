@@ -64,6 +64,8 @@
   "TEACHER_PROGRESS_NOT_FOUND": "That is no longer part of this class.",
   "TEACHER_OVERVIEW_ACCESS_DENIED": "You do not have a teaching overview for this academy.",
   "STUDENT_OVERVIEW_ACCESS_DENIED": "You do not have a learning overview for this academy.",
+  "POINTS_ACCESS_DENIED": "You do not have access to these points.",
+  "POINTS_UNAVAILABLE": "This academy does not use points.",
   "MANAGER_OPERATIONS_ACCESS_DENIED": "You are not an active manager of this academy.",
   "CURRICULUM_OVERVIEW_ACCESS_DENIED": "You are not an active team lead of this academy.",
   "IMPORT_FILE_REJECTED": "That file could not be read as a member list.",

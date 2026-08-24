@@ -37,6 +37,7 @@
     "no_enrollments": "아직 이 반에 등록된 학생이 없습니다.",
     "truncated": "이 반의 처음 {{count}}명만 표시합니다.",
     "open_live": "실시간 보기",
+    "open_points": "포인트",
     "no_exercise": "문제 풀이 중이 아님",
     "never_seen": "없음",
     "membership_inactive": "비활성 멤버십",

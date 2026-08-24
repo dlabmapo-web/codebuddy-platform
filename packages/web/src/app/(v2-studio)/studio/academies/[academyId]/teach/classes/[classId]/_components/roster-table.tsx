@@ -129,20 +129,36 @@ export function RosterTable({
         id: 'actions',
         header: '',
         enableSorting: false,
-        cell: ({ row }) =>
-          // Only for a student actually inside a monitorable exercise: the
-          // workspace has nothing to show otherwise, and the server would
-          // refuse the watch anyway.
-          row.original.canOpenLive ? (
-            <div className="flex justify-end">
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            {/*
+             * §5.1 — the per-student ledger, from the roster. "Why does 지호
+             * have 40 points" is a question a parent asks a teacher, and this
+             * is where the teacher goes to answer it. Always offered: unlike
+             * the live watch there is no state a student has to be in, and an
+             * academy without points answers with its own not-found page.
+             */}
+            <Link
+              className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              href={`/studio/academies/${academyId}/points/students/${row.original.membershipId}`}
+            >
+              {t('roster.open_points')}
+            </Link>
+            {/*
+             * Only for a student actually inside a monitorable exercise: the
+             * workspace has nothing to show otherwise, and the server would
+             * refuse the watch anyway.
+             */}
+            {row.original.canOpenLive ? (
               <Link
                 className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                 href={`/studio/academies/${academyId}/teach/classes/${classId}/students/${row.original.membershipId}/live`}
               >
                 {t('roster.open_live')}
               </Link>
-            </div>
-          ) : null,
+            ) : null}
+          </div>
+        ),
       },
     ],
     [academyId, classId, relative, t],

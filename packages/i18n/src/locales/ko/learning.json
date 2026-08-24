@@ -64,6 +64,13 @@
     "accepted_caption_empty": "이 기간에 제출 없음",
     "accepted_meter": "제출 중 {{value}}퍼센트 정답"
   },
+  "points": {
+    "title": "내 포인트",
+    "total": "{{points}}P",
+    "today": "오늘 모은 포인트",
+    "position": "오늘 {{participants}}명 중 {{position}}위",
+    "open": "순위 보기"
+  },
   "courses": {
     "title": "나의 코스",
     "description": "코스별 진행 상황과 다음에 풀 문제입니다.",

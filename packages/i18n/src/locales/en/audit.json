@@ -22,6 +22,7 @@
     "class.archived": "Archived a class",
     "class.restored": "Restored a class",
     "class.courses.updated": "Changed a class's courses",
+    "class.schedule.updated": "Changed when a class meets",
     "class.students.enrolled": "Enrolled students",
     "class.student.removed": "Removed a student",
     "class.teacher.assigned": "Assigned a teacher",

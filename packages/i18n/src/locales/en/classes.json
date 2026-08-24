@@ -99,6 +99,33 @@
       "row_menu_aria": "Actions for “{{title}}”",
       "remove": "Remove from class"
     },
+    "schedule_panel": {
+      "heading": "Class times",
+      "body": "When this class meets. Students earn attendance points for working inside these hours; a class with no times simply never pays them.",
+      "edit": "Edit times",
+      "add": "Add a time",
+      "save": "Save times",
+      "saving": "Saving…",
+      "empty": "No class times yet. Add one to start paying attendance points.",
+      "empty_readonly": "No class times set.",
+      "weekday_label": "Day",
+      "start_label": "Starts at",
+      "end_label": "Ends at",
+      "next_day": "next day",
+      "invalid": "The end time must be after the start time.",
+      "remove": "Remove this time",
+      "limit": "A class can hold at most {{count}} times.",
+      "failed": "Those class times could not be saved.",
+      "weekday": {
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday",
+        "7": "Sunday"
+      }
+    },
     "teacher_panel": {
       "heading": "Assigned teacher",
       "body": "One teacher is responsible for this class. The same teacher can run any number of classes.",
@@ -139,7 +166,8 @@
       "inactive_suspended": "This membership is suspended, so the seat grants no access.",
       "inactive_role": "This member is no longer a student, so the seat grants no access.",
       "row_menu_aria": "Actions for {{name}}",
-      "remove": "Remove from class"
+      "remove": "Remove from class",
+      "points": "Points"
     }
   },
   "assign_dialog": {

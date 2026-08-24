@@ -23,6 +23,7 @@ import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
 import type peopleOps from '@cove/i18n/locales/en/people-ops.json';
 import type platform from '@cove/i18n/locales/en/platform.json';
+import type points from '@cove/i18n/locales/en/points.json';
 import type profile from '@cove/i18n/locales/en/profile.json';
 import type pythonErrors from '@cove/i18n/locales/en/python-errors.json';
 import type session from '@cove/i18n/locales/en/session.json';
@@ -53,6 +54,7 @@ declare module 'i18next' {
       nav: typeof nav;
       'people-ops': typeof peopleOps;
       platform: typeof platform;
+      points: typeof points;
       profile: typeof profile;
       'python-errors': typeof pythonErrors;
       session: typeof session;

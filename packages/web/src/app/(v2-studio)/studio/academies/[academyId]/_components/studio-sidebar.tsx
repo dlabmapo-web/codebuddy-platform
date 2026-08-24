@@ -16,6 +16,7 @@ import {
   UserCheck,
   Users,
   type LucideIcon,
+  Trophy,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -71,6 +72,7 @@ export function StudioSidebar({
   canManageClasses,
   canManageContent,
   canMonitor,
+  hasPoints,
   isStudent,
 }: {
   academies: StudioAcademy[];
@@ -80,6 +82,7 @@ export function StudioSidebar({
   canManageClasses: boolean;
   canManageContent: boolean;
   canMonitor: boolean;
+  hasPoints: boolean;
   isStudent: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
@@ -91,6 +94,7 @@ export function StudioSidebar({
     canManageClasses,
     canManageContent,
     canMonitor,
+    hasPoints,
     isStudent,
   });
   // Decided across every group: the Overview link prefixes all the others, so
@@ -256,6 +260,7 @@ function studioNavGroups({
   canManageClasses,
   canManageContent,
   canMonitor,
+  hasPoints,
   isStudent,
 }: {
   academyId: string;
@@ -264,6 +269,8 @@ function studioNavGroups({
   canManageClasses: boolean;
   canManageContent: boolean;
   canMonitor: boolean;
+  /** §5 — the academy switched points on. Off means the link is not there. */
+  hasPoints: boolean;
   isStudent: boolean;
 }): NavGroup[] {
   const base = `/studio/academies/${academyId}`;
@@ -300,6 +307,16 @@ function studioNavGroups({
         labelKey: 'link.answer_records',
         icon: ClipboardList,
       });
+      // Only when the academy runs a point economy. An academy that does not
+      // must never show a child a link to a page about points they cannot
+      // earn.
+      if (hasPoints) {
+        learning.push({
+          href: `${base}/points`,
+          labelKey: 'link.my_points',
+          icon: Trophy,
+        });
+      }
     }
     groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });
   }
@@ -330,6 +347,18 @@ function studioNavGroups({
       labelKey: 'link.classes',
       icon: Presentation,
     });
+    // A manager and a team lead hold every class, and asking "who is doing the
+    // work this week" through one class's detail page cost one navigation per
+    // class. A teacher is deliberately not given this link: they hold two or
+    // three classes and arrive at one to teach it, so the board belongs on the
+    // page they are already on. Only when the academy runs points at all.
+    if (hasPoints) {
+      teaching.push({
+        href: `${base}/points/classes`,
+        labelKey: 'link.class_ranking',
+        icon: Trophy,
+      });
+    }
   }
   if (canMonitor) {
     teaching.push({

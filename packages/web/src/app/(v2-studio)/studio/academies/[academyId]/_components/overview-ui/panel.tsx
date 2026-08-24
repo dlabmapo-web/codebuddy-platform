@@ -40,6 +40,11 @@ import { meterWidth } from '../../_lib/overview-view';
  * any of these pages. §4 rules out a page that sorts children into good and
  * bad, and a palette that cannot express it is how that stays true when
  * somebody adds a section next year.
+ *
+ * Rank markers on the class leaderboard carry the metal tokens. They colour a
+ * position inside a period that resets monthly — a measurement — and they are
+ * confined to the marker. Nothing tints a row, a name, or an avatar, because
+ * that would colour a child.
  */
 
 /* ------------------------------------------------------------------ tones */

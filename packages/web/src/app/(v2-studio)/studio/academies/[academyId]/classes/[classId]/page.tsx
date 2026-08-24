@@ -4,6 +4,7 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import {
   academyRoleFor,
   canManageClasses,
+  canManageClassSchedule,
   canManageClassTeachers,
   canManageEnrollment,
 } from '@/lib/academy-access-state';
@@ -24,6 +25,7 @@ export default async function ClassDetailPage({
   let canAssignCourses = false;
   let canEnroll = false;
   let canAssignTeacher = false;
+  let canSetSchedule = false;
   let denied = false;
 
   try {
@@ -38,6 +40,7 @@ export default async function ClassDetailPage({
     canAssignCourses = canManageClasses(role);
     canEnroll = canManageEnrollment(role);
     canAssignTeacher = canManageClassTeachers(role);
+    canSetSchedule = canManageClassSchedule(role);
   } catch (error) {
     // A missing class and a server fault get different copy: only the first is
     // something the reader can act on by going back to the list.
@@ -57,6 +60,7 @@ export default async function ClassDetailPage({
           canAssignCourses={canAssignCourses}
           canAssignTeacher={canAssignTeacher}
           canEnroll={canEnroll}
+          canSetSchedule={canSetSchedule}
           initialDetail={detail}
         />
       ) : (

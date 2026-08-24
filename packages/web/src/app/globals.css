@@ -132,6 +132,26 @@
   --unstable: #475569;
   --unstable-soft: #EEF2F6;
 
+  /*
+   * The three podium metals, and the one rule that comes with them.
+   *
+   * They colour a *position inside a period that resets tomorrow* — a
+   * measurement — and they are confined to the rank marker. Nothing tints a
+   * row, a name, or an avatar: tint the row and you have made a golden student
+   * and, by contrast, a colourless one. See the note in `overview-ui/panel.tsx`.
+   *
+   * These are the darkened metals rather than the bright ones, for the same
+   * reason `--success` and `--warning` are darker than the hues they read as:
+   * each is used as the numeral beside its icon and has to carry a word on a
+   * white card at 4.5:1. Bright gold sits near 2:1 and cannot.
+   */
+  --rank-gold: #A16207;
+  --rank-gold-soft: #FDF3DC;
+  --rank-silver: #64748B;
+  --rank-silver-soft: #F1F5F9;
+  --rank-bronze: #9A5B2D;
+  --rank-bronze-soft: #FBEEE4;
+
   --ring: #1B64DA;
   --sidebar: #FFFFFF;
   --sidebar-border: #E9EDF3;
@@ -215,6 +235,14 @@
   --unstable: #94A3B8;
   --unstable-soft: #1B222D;
 
+  /* Metals lift in dark; their fills stay low-alpha so a marker never glows. */
+  --rank-gold: #E0B341;
+  --rank-gold-soft: #2A2311;
+  --rank-silver: #A9B4C4;
+  --rank-silver-soft: #1E242D;
+  --rank-bronze: #D08B58;
+  --rank-bronze-soft: #2A1D14;
+
   --ring: #5B93F5;
   --sidebar: #12161F;
   --sidebar-border: #222937;
@@ -273,6 +301,12 @@
   --color-present: var(--present);
   --color-present-soft: var(--present-soft);
   --color-unstable: var(--unstable);
+  --color-rank-gold: var(--rank-gold);
+  --color-rank-gold-soft: var(--rank-gold-soft);
+  --color-rank-silver: var(--rank-silver);
+  --color-rank-silver-soft: var(--rank-silver-soft);
+  --color-rank-bronze: var(--rank-bronze);
+  --color-rank-bronze-soft: var(--rank-bronze-soft);
   --color-unstable-soft: var(--unstable-soft);
 
   --color-ring: var(--ring);

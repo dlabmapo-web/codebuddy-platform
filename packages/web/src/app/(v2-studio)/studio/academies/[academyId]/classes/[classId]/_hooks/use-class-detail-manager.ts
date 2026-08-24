@@ -2,6 +2,7 @@
 
 import type {
   ClassDetail,
+  ClassScheduleSlotInput,
   CourseSummary,
   EnrolledStudentSummary,
 } from '@cove/shared';
@@ -134,6 +135,26 @@ export function useClassDetailManager({
     },
   });
 
+  /**
+   * The whole timetable at once, against the class revision the page loaded.
+   *
+   * Like every other mutation here it returns the full detail, so the panel is
+   * seeded from the server's ordering rather than from the order the manager
+   * happened to type the rows in.
+   */
+  const scheduleMutation = useMutation({
+    mutationFn: (slots: ClassScheduleSlotInput[]) =>
+      orpc.academyClasses.setSchedule({
+        academyId,
+        classId,
+        slots,
+        expectedUpdatedAt: detail.updatedAt,
+      }),
+    onSuccess: async (next) => {
+      await applyDetail(next);
+    },
+  });
+
   const addStudentsMutation = useMutation({
     mutationFn: (membershipIds: string[]) =>
       orpc.academyClasses.addStudents({ academyId, classId, membershipIds }),
@@ -251,6 +272,13 @@ export function useClassDetailManager({
     saveTeacher: () => teacherMutation.mutate(selectedTeacherId),
     teacherPending: teacherMutation.isPending,
     teacherError: teacherMutation.error,
+
+    saveSchedule: (slots: ClassScheduleSlotInput[]) =>
+      scheduleMutation.mutate(slots),
+    resetSchedule: () => scheduleMutation.reset(),
+    schedulePending: scheduleMutation.isPending,
+    scheduleError: scheduleMutation.error,
+    scheduleSaved: scheduleMutation.isSuccess,
 
     removing,
     askRemoveCourse: (course: { id: string; title: string }) => {

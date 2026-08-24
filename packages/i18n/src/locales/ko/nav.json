@@ -20,8 +20,10 @@
     "my_courses": "내 코스",
     "my_classes": "내 반",
     "answer_records": "제출 기록",
+    "my_points": "내 포인트",
     "solution_status": "풀이 현황",
-    "student_analytics": "학생 분석"
+    "student_analytics": "학생 분석",
+    "class_ranking": "반 랭킹"
   },
   "academy_switcher": {
     "select": "학원 선택",

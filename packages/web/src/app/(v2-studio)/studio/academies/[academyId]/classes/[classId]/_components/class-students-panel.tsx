@@ -4,6 +4,7 @@ import type { EnrolledStudentSummary } from '@cove/shared';
 import { enrollmentGrantsAccess } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, UserMinus } from 'lucide-react';
+import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { Button } from '@/components/studio/button';
@@ -20,9 +21,11 @@ import { ClassRowActions } from './class-row-actions';
 const PAGE_SIZE = 10;
 
 export function ClassStudentsPanel({
+  academyId,
   canEnroll,
   manager,
 }: {
+  academyId: string;
   canEnroll: boolean;
   manager: ClassDetailManagerState;
 }) {
@@ -120,25 +123,41 @@ export function ClassStudentsPanel({
         header: t('detail.students_panel.column.actions'),
         enableSorting: false,
         cell: ({ row }) => {
-          if (!editable) return null;
           const student = row.original;
           const name = displayName(student);
           return (
-            <div className="flex justify-end">
-              <ClassRowActions
-                disabled={manager.removalPending}
-                icon={UserMinus}
-                menuAriaLabel={t('detail.students_panel.row_menu_aria', { name })}
-                onRemove={() => manager.askRemoveStudent(student, name)}
-                removeLabel={t('detail.students_panel.remove')}
-                title={name}
-              />
+            <div className="flex items-center justify-end gap-2">
+              {/*
+               * §5.1 — the per-student ledger, from the roster. Offered to any
+               * reader of this page, not only to one who may edit it: reading
+               * why a child has forty points is not an act of administration,
+               * and an academy without points answers with its own not-found
+               * page.
+               */}
+              <Link
+                className="whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
+                href={`/studio/academies/${academyId}/points/students/${student.membershipId}`}
+              >
+                {t('detail.students_panel.points')}
+              </Link>
+              {editable ? (
+                <ClassRowActions
+                  disabled={manager.removalPending}
+                  icon={UserMinus}
+                  menuAriaLabel={t('detail.students_panel.row_menu_aria', {
+                    name,
+                  })}
+                  onRemove={() => manager.askRemoveStudent(student, name)}
+                  removeLabel={t('detail.students_panel.remove')}
+                  title={name}
+                />
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [contentDate, displayName, editable, manager, t],
+    [academyId, contentDate, displayName, editable, manager, t],
   );
 
   return (

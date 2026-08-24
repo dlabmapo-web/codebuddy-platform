@@ -1,0 +1,152 @@
+{
+  "title": "My points",
+  "description": "What you have earned, and where you are in your class.",
+  "period": {
+    "label": "Period",
+    "day": "Today",
+    "week": "This week",
+    "month": "This month"
+  },
+  "plate": {
+    "total": "{{points}}P",
+    "position": "{{position}} of {{participants}}",
+    "no_position": "No ranking yet",
+    "gap_chase": "{{points}}P to reach {{position}}",
+    "gap_lead": "Holding 1st · {{points}}P ahead of 2nd",
+    "gap_alone": "Solve a problem to join the ranking",
+    "track_label": "Points to the next position",
+    "solved": "{{count}} solved",
+    "you": "You",
+    "rank_short": "#{{position}}",
+    "total_label_day": "Points earned today",
+    "total_label_week": "Points earned this week",
+    "total_label_month": "Points earned this month",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "next_up": "Next up"
+  },
+  "board": {
+    "title": "Class ranking",
+    "caption": "{{className}} · ranking for {{period}}",
+    "class_label": "Class",
+    "you": "You",
+    "improved": "Moved up",
+    "column": {
+      "position": "Position",
+      "student": "Name",
+      "points": "Total points",
+      "days": "Days",
+      "solved": "From solving",
+      "finished": "From finishing",
+      "attendance": "From class",
+      "time": "From study time",
+      "actions": "Detail"
+    },
+    "rank": "Position {{position}}",
+    "quiet": "Quiet so far today",
+    "quiet_hint": "The ranking opens once three classmates have started today. This week's ranking is ready now.",
+    "quiet_action": "See this week",
+    "too_few": "No ranking yet",
+    "too_few_hint": "A class needs three students before a ranking is shown.",
+    "not_enrolled": "You are not in a class yet",
+    "not_enrolled_hint": "Join a class to see how your class is doing.",
+    "unavailable": "The ranking could not be loaded",
+    "participants": "{{count}} students",
+    "search": "Search a classmate",
+    "split": {
+      "easy": "{{count}} easy",
+      "medium": "{{count}} medium",
+      "hard": "{{count}} hard",
+      "lecture_one": "{{count}} lecture",
+      "lecture_other": "{{count}} lectures",
+      "module_one": "{{count}} module",
+      "module_other": "{{count}} modules",
+      "course_one": "{{count}} course",
+      "course_other": "{{count}} courses",
+      "attendance_one": "{{count}} class",
+      "attendance_other": "{{count}} classes",
+      "worth": "{{parts}} · worth {{points}}",
+      "none": "Nothing yet"
+    },
+    "time": {
+      "hours_minutes": "{{hours}}h {{minutes}}m",
+      "minutes": "{{minutes}}m"
+    },
+    "caption_explains": "Solving, finishing, class and study time add up to the total. Every point here was earned — nobody can give one."
+  },
+  "rules": {
+    "title": "How to earn points",
+    "description": "Points are never taken away. What you earn, you keep.",
+    "solve": "Solve a problem",
+    "solve_easy": "Easy",
+    "solve_medium": "Medium",
+    "solve_hard": "Hard",
+    "lecture": "Finish a lecture",
+    "module": "Finish a module",
+    "course": "Finish a course",
+    "attendance": "Work during your class",
+    "attendance_late": "Start late",
+    "time": "Study {{minutes}} minutes in a day",
+    "daily_cap": "Up to {{points}}P a day",
+    "value": "+{{points}}P",
+    "group": {
+      "solve": "Solve a problem",
+      "work": "Study and show up",
+      "finish": "Finish what you started"
+    },
+    "note": {
+      "solve": "Paid once per problem, the first time you solve it.",
+      "work": "One rung a day — the highest one you reach.",
+      "finish": "Paid once, when the last piece is done."
+    },
+    "in_class": "During your class",
+    "minutes": "{{minutes}} minutes",
+    "lecture_short": "A lecture",
+    "module_short": "A module",
+    "course_short": "A whole course"
+  },
+  "ledger": {
+    "title": "Point history",
+    "empty": "No points yet",
+    "empty_hint": "Solve one problem to start.",
+    "amount": "+{{points}}P",
+    "capped": "Reached today's limit",
+    "voided": "Reversed",
+    "unavailable": "Your history could not be loaded",
+    "reason": {
+      "ATTENDANCE": "Attended class",
+      "ATTENDANCE_LATE": "Attended class (late)",
+      "LEARNING_TIME": "{{label}} minutes of study",
+      "EXERCISE_SOLVED": "Problem solved",
+      "LECTURE_COMPLETED": "Lecture finished",
+      "MODULE_COMPLETED": "Module finished",
+      "COURSE_COMPLETED": "Course finished"
+    },
+    "today": "Today",
+    "column": {
+      "date": "Date",
+      "reason": "What earned it",
+      "amount": "Points"
+    }
+  },
+  "difficulty": {
+    "EASY": "Easy",
+    "MEDIUM": "Medium",
+    "HARD": "Hard"
+  },
+  "student": {
+    "description": "Every point this student has earned, and what earned it.",
+    "solved_one": "{{count}} problem solved this period",
+    "solved_other": "{{count}} problems solved this period",
+    "open": "Points"
+  },
+  "staff": {
+    "title": "Class ranking",
+    "description": "Choose a class and a period to see where its students stand, and open any student to see how they earned it.",
+    "open_points": "Points",
+    "open_points_aria": "Open {{name}}'s point history",
+    "no_classes": "No classes yet",
+    "no_classes_hint": "Create a class and enroll students, and its ranking opens here.",
+    "class_label": "Class"
+  }
+}

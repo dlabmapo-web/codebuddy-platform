@@ -19,6 +19,7 @@ import { ActivityChart } from './activity-chart';
 import { ClassStandingPanel } from './class-standing';
 import { CourseProgress } from './course-progress';
 import { LearningLedger } from './learning-ledger';
+import { PointsCard } from './points-card';
 import { OverviewHeader } from './overview-header';
 import { PracticeList } from './practice-list';
 import { RecentAttempts } from './recent-attempts';
@@ -152,6 +153,21 @@ export function StudentOverviewWorkspace({
               ledger={data.ledger}
             />,
           )}
+
+          {/*
+           * §6.1 — one compact card, immediately after the ledger, and the
+           * only thing about points on this page. Absent entirely when the
+           * academy does not run a point economy: a disabled section is
+           * silent, not an explanation of a feature this student's school
+           * chose not to use.
+           */}
+          {data.points
+            ? section(
+                'points',
+                t('points.title'),
+                <PointsCard academyId={academyId} points={data.points} />,
+              )
+            : null}
 
           {section(
             'courses',

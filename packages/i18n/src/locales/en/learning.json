@@ -70,6 +70,13 @@
     "accepted_caption_empty": "No submissions in this period",
     "accepted_meter": "{{value}} percent of submissions passed"
   },
+  "points": {
+    "title": "Your points",
+    "total": "{{points}}P",
+    "today": "Earned today",
+    "position": "Position {{position}} of {{participants}} today",
+    "open": "See the ranking"
+  },
   "courses": {
     "title": "Your courses",
     "description": "How far through each course you are, and what comes next.",

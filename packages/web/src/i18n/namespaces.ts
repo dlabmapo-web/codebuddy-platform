@@ -46,7 +46,15 @@ export const exerciseNamespaces = [
  * out of `layoutNamespaces` and is paid for here. Both teaching surfaces mount
  * the same list because a teacher moves between them through the class header.
  */
-export const teachNamespaces = ["monitoring", "teach", "errors"] as const;
+export const teachNamespaces = [
+  "monitoring",
+  "teach",
+  // §5.1 of the student points design: staff see the identical board their
+  // students see, inside the class page they already open — which means this
+  // route needs the board's own vocabulary rather than a second copy of it.
+  "points",
+  "errors",
+] as const;
 
 /**
  * The academy overview, which the Teacher's own landing page mounts.
@@ -148,6 +156,15 @@ export const sessionNamespaces = ["session"] as const;
  */
 export const profileNamespaces = ["profile", "errors"] as const;
 
+/**
+ * The student's points page.
+ *
+ * Its own list for the same reason `learning` has one: a Student's catalog
+ * should not carry a leaderboard's vocabulary, and an academy without the
+ * points flag never loads this at all.
+ */
+export const pointsNamespaces = ["points", "errors"] as const;
+
 export type PageNamespace =
   | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]
@@ -160,4 +177,5 @@ export type PageNamespace =
   | (typeof peopleOpsNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof sessionNamespaces)[number]
-  | (typeof profileNamespaces)[number];
+  | (typeof profileNamespaces)[number]
+  | (typeof pointsNamespaces)[number];

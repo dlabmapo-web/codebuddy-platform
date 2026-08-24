@@ -39,6 +39,7 @@
     "no_enrollments": "Nobody is enrolled in this class yet.",
     "truncated": "Showing the first {{count}} students of this class.",
     "open_live": "Open live",
+    "open_points": "Points",
     "no_exercise": "Not in an exercise",
     "never_seen": "Never",
     "membership_inactive": "Inactive membership",

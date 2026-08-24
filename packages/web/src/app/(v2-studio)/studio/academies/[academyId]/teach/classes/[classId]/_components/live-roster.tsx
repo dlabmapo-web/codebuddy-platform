@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { ConnectionBadge } from '../../../_components/live-badges';
+import { ClassPointsBoard } from '../../../../_components/class-points/class-points-board';
 import { RosterTable } from './roster-table';
 
 const filters: RosterFilter[] = ['all', 'online', 'solving', 'idle', 'offline'];
@@ -167,6 +168,13 @@ export function LiveRoster({
           rows={visible}
         />
       )}
+
+      {/*
+       * §5.1 — the identical board this class's students see, below the live
+       * roster because the roster is what a teacher opened this page for. It
+       * renders nothing when the academy does not run points.
+       */}
+      <ClassPointsBoard academyId={academyId} classId={classId} />
     </div>
   );
 }

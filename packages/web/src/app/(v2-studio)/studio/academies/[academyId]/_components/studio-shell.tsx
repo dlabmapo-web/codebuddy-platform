@@ -39,6 +39,7 @@ export async function StudioShell({
 }) {
   let academies: StudioAcademy[] = [];
   let role = null;
+  let hasPoints = false;
   let viewer: {
     academyImageUrl: string | null;
     imageUrl: string | null;
@@ -59,6 +60,7 @@ export async function StudioShell({
       (membership) => membership.academy.id === academyId,
     );
     role = selectedMembership?.role ?? null;
+    hasPoints = (selectedMembership?.features ?? []).includes('STUDENT_POINTS');
     // Feeds the header's way into My Page. The name is only for the initials
     // fallback, so the global one is right even inside an academy.
     viewer = {
@@ -83,6 +85,7 @@ export async function StudioShell({
         canManageClasses={canManageClasses(role)}
         canManageContent={canReviewContent(role)}
         canMonitor={canMonitorClasses(role)}
+        hasPoints={hasPoints}
         isStudent={isStudent(role)}
       />
       <SidebarInset>

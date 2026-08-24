@@ -22,6 +22,7 @@
     "class.archived": "반 보관",
     "class.restored": "반 복구",
     "class.courses.updated": "반 과정 변경",
+    "class.schedule.updated": "수업 시간표를 변경했습니다",
     "class.students.enrolled": "학생 등록",
     "class.student.removed": "학생 제외",
     "class.teacher.assigned": "담당 선생님 배정",

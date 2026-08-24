@@ -138,6 +138,20 @@ Rankings are recomputed on each request. No cache or snapshot is introduced by
 this design; the query library may retain a response according to the same
 short-lived client policy as the complete points page.
 
+### 5.5 Cross-browser row layout
+
+Each ranking row uses one shared Flexbox layout for every role and supported
+browser. The rank marker occupies a fixed-width leading slot, student identity
+uses the flexible middle slot with `min-width: 0` so long names truncate, and
+the points value remains a fixed-width trailing item.
+
+Do not express this layout through a Tailwind arbitrary grid-template class.
+Some Safari versions accept `display: grid` but fail to match the generated
+escaped selector for the arbitrary template, which collapses the medal,
+identity, and points into three vertical rows. Standard Flexbox utilities avoid
+that selector parsing path while preserving the approved visual hierarchy and
+responsive behavior. Apply the same structure to the optional viewer footer.
+
 ## 6. Contract
 
 Add one bounded read to the points contract:

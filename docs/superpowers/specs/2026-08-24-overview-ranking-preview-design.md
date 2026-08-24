@@ -3,6 +3,7 @@
 - Status: proposed
 - Date: 2026-08-24
 - Extends [Student Points and Class Ranking](./2026-08-21-student-points-and-class-ranking-design.md)
+- Uses [Class-Scoped Points Attribution](./2026-08-24-class-scoped-points-attribution-design.md)
 - Amends the student overview described by [Student Academy Overview](./2026-08-18-student-academy-overview-design.md)
 
 ## 1. Decision
@@ -237,6 +238,11 @@ Extract the existing private board construction in `PointsService` only as far
 as needed for both the complete board and preview to call it. Ordering,
 eligibility floors, learning-minute enrichment, ties, and `isYou` remain in
 that one path.
+
+The canonical board filters point awards, learning minutes, and active days by
+the selected class. Changing the preview selector therefore changes the
+calculation as well as the roster; it never carries an academy-wide student
+total into two class boards.
 
 The server must find the student's viewer row before truncating. The response
 does not perform a second leaderboard query to obtain it.

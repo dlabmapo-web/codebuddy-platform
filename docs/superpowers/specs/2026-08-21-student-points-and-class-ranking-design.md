@@ -3,6 +3,7 @@
 - Status: proposed
 - Date: 2026-08-21
 - Supersedes parts of [Student Academy Overview](./2026-08-18-student-academy-overview-design.md) — see §18
+- Amended by [Class-Scoped Points Attribution](./2026-08-24-class-scoped-points-attribution-design.md)
 
 ## 1. Decision
 
@@ -39,7 +40,7 @@ Everything the earning rules need, except a clock.
 | A student solved an exercise for the first time | `solvedNow` — `packages/api/src/judge/grading.ts` |
 | …recorded transactionally | `GradingService.finalize` — `packages/api/src/judge/grading.service.ts` |
 | How hard that exercise was | `ProgrammingExercise.difficulty` (`EASY` / `MEDIUM` / `HARD`) |
-| Counted active learning seconds, per academy-local day | `StudentCourseLearningDay` + `LearningActivityAccumulator` |
+| Counted active learning seconds, per academy-local day | `StudentCourseLearningDay` + `LearningActivityAccumulator`; the amendment adds a class projection |
 | Which materials a student can see | `packages/api/src/learn/curriculum-visibility.ts` |
 | Who is in a class | `ClassEnrollment` |
 | The academy's day boundary | `Academy.timeZone`, `academyLocalDate` |
@@ -188,6 +189,10 @@ that page.
 Both are shareable and both survive a reload. Ledger paging is cursor state in
 the query hook, not in the URL — the ledger is a scroll, not a destination.
 
+The same `classId` scopes the student's period plate, board, learning
+measurements, and ledger. Learning links also preserve it so new awards record
+the class in which the work occurred. See the class-attribution amendment.
+
 ### 6.3 Period
 
 **Three calendar periods in the academy's timezone, never a rolling window.**
@@ -234,7 +239,7 @@ academy that wants a different economy changes numbers, never code.
 |---|---|---|
 | `ATTENDANCE` | **5** | ≥10 counted active minutes inside a class window, before the grace cutoff |
 | `ATTENDANCE_LATE` | **2** | the same, first activity after the cutoff |
-| `LEARNING_TIME` | **3 / +5 / +7** | day totals of 30 min, 60 min, 120 min |
+| `LEARNING_TIME` | **3 / +5 / +7** | per-class day totals of 30 min, 60 min, 120 min |
 | `EXERCISE_SOLVED` | **3 / 5 / 10** | first solve, by `EASY` / `MEDIUM` / `HARD` |
 | `LECTURE_COMPLETED` | **15** | every visible material in the lecture solved |
 | `MODULE_COMPLETED` | **40** | every visible lecture in the module completed |
@@ -244,7 +249,7 @@ Caps:
 
 | Cap | Default | Why |
 |---|---|---|
-| Student daily earn | **100** | Without it the ranking measures endurance, not learning |
+| Student daily earn per class | **100** | Without it the ranking measures endurance, not learning |
 
 ### 7.2 Why the solve values are 3 / 5 / 10
 
@@ -282,7 +287,7 @@ and, for the few who reach it, is a reward for five hours at a screen. The
 ladder pays the first rung to everyone who shows up and works, and the top rung
 is `learningTimeTier3Minutes`, which an academy may set to 300 if it wants.
 
-Tiers are cumulative and each is paid once per academy-local day.
+Tiers are cumulative and each is paid once per class per academy-local day.
 
 ### 7.4 Completion, and the moving denominator
 
@@ -409,16 +414,11 @@ effect of a rewards feature.
 
 ### 8.5 Attribution
 
-The accumulator writes `StudentCourseLearningDay`, which is course-scoped by
-design — *"the learning route knows the academy and the course and not which
-class motivated the work."* Attendance needs a class.
-
-Resolution, at flush time: of the classes the student is actively enrolled in,
-take those that have the flushed course assigned (`ClassCourse`) and a schedule
-slot whose window contains the flushed interval. Ambiguity is impossible in
-practice and harmless in principle — the dedupe key is per class, so two
-overlapping classes would each pay once, which is the correct answer if a
-student really is enrolled in both at that hour.
+The learning workspace resolves one class before activity begins. The
+accumulator retains that validated class and writes both the existing
+course-scoped daily projection and the class-aware projection defined by the
+class-attribution amendment. Attendance considers only the resolved class and
+its schedule window. It never copies one interval into every matching class.
 
 ## 9. Awarding
 
@@ -465,24 +465,25 @@ uses, where *"the row is the idempotency key."*
 | `LECTURE_COMPLETED` | `{membershipId}:{lectureId}:LECTURE` |
 | `MODULE_COMPLETED` | `{membershipId}:{moduleId}:MODULE` |
 | `COURSE_COMPLETED` | `{membershipId}:{courseId}:COURSE` |
-| `LEARNING_TIME` | `{membershipId}:{localDate}:TIME:{tierMinutes}` |
+| `LEARNING_TIME` | `{membershipId}:{classId}:{localDate}:TIME:{tierMinutes}` |
 | `ATTENDANCE` | `{membershipId}:{classId}:{localDate}:ATTENDANCE` |
 
 No key contains a grading revision, a difficulty, a point value, or a timestamp
 finer than a day. Every one of those would let the same fact pay twice after an
 ordinary edit.
 
-The daily cap is applied at insert: an award that would exceed it is truncated
-to the remainder, and truncated to nothing rather than skipped, so the ledger
-still shows the line with a `cappedAt` marker and the student can see why the
-number stopped moving.
+The daily cap is applied per membership and class at insert: an award that
+would exceed that class's cap is truncated to the remainder, and truncated to
+nothing rather than skipped, so the ledger still shows the line with a
+`cappedAt` marker and the student can see why the number stopped moving.
 
 ### 9.4 The balance projection
 
-`StudentPointBalance` is a projection, rebuildable at any time by
+`StudentPointBalance` is an all-class projection, rebuildable at any time by
 `SUM(amount) WHERE voidedAt IS NULL`. It is incremented in the same transaction
-as the award. The ledger is the truth; the balance is the fast answer — the same
-relationship `StudentCourseLearningDay` has to the heartbeats that built it.
+as the award. It is not displayed as a class total. The ledger is the truth;
+the balance is the fast answer — the same relationship
+`StudentCourseLearningDay` has to the heartbeats that built it.
 
 ## 10. Ranking
 
@@ -587,16 +588,17 @@ Only `ACTIVE` memberships appear. A `SUSPENDED` or `LEFT` student keeps their
 ledger — their points are theirs — and simply does not appear in a comparison
 they are not part of.
 
-### 10.7 Transfers
+### 10.7 Transfers and multiple classes
 
-Awards are academy- and membership-scoped, not class-scoped, because learning is
-not class-scoped. A student who moves from class A to class B mid-month arrives
-in B's board carrying the points they earned in A.
+Awards used by a ranking are class-scoped. A student who moves from Class A to
+Class B keeps every award in the academy balance and personal history, but
+Class B's board counts only work attributed to Class B. A student enrolled in
+two classes may therefore have different totals and positions in each.
 
-Accepted, and stated here so it is not discovered as a bug. Within a one-month
-season the distortion is bounded, the alternative (class-scoped awards) would
-mean a student loses their month by being moved for administrative reasons, and
-that would violate §7.6 in spirit if not in code.
+The class is fixed when the learning action occurs. It is never reconstructed
+later from the current roster, so a transfer cannot rewrite a finished period.
+Historical classless awards are backfilled only when one class can be resolved
+without guessing; ambiguous rows remain outside class rankings.
 
 ### 10.8 Class versus class
 
@@ -853,7 +855,7 @@ Rules:
 // packages/shared/src/api/orpc/points.contract.ts
 export const pointsContract = {
   page:      oc.input(pointsPageInputSchema).output(pointsPageSchema),
-  ledger:    oc.input(ledgerInputSchema).output(ledgerPageSchema),
+  ledger:    oc.input(ledgerInputSchema).output(ledgerPageSchema), // class-scoped on ranking pages
   /// MANAGER only. Corrects a platform mistake; never a deduction. §7.6.
   voidAward: oc.input(voidAwardInputSchema).output(pointAwardSchema),
   policy: {
@@ -938,6 +940,7 @@ model PointAward {
   lectureId  String? @map("lecture_id") @db.Uuid
   moduleId   String? @map("module_id") @db.Uuid
   courseId   String? @map("course_id") @db.Uuid
+  /// Required by every new earning path. Nullable only for unresolved history.
   classId    String? @map("class_id") @db.Uuid
   localDate  DateTime? @map("local_date") @db.Date
 
@@ -957,8 +960,8 @@ model PointAward {
   academy    Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
   membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
-  /// The period sum behind every leaderboard row.
-  @@index([academyId, membershipId, createdAt])
+  /// The class-period sum behind every leaderboard row.
+  @@index([academyId, classId, membershipId, createdAt])
   /// One student's ledger, newest first.
   @@index([membershipId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("point_awards")
@@ -1033,14 +1036,15 @@ already happening.
 ## 15. Performance
 
 - `page` is one round trip. The leaderboard is one grouped sum over
-  `PointAward` filtered by the roster's membership ids and the period, served by
-  `[academyId, membershipId, createdAt]`.
+  `PointAward` filtered by class, the roster's membership ids, and the period,
+  served by `[academyId, classId, membershipId, createdAt]`.
 - Rows are bounded at `OVERVIEW_MAX_PARTICIPATION_STUDENTS` (250). A class
   larger than that is a data problem, and the response says it was truncated.
 - The awarding path adds, per accepted submission: one insert, one balance
   upsert, and one bounded count when `solvedNow`. Nothing on the failing path.
-- The activity flush adds one sum over that student's day (a prefix scan of the
-  `StudentCourseLearningDay` primary key) and at most three inserts.
+- The activity flush updates the existing course-day projection and its
+  class-course-day counterpart, then adds at most three tier awards for that
+  class.
 - `improved` costs a second grouped sum over the previous period. It is computed
   in the same query with a `FILTER` clause, not a second round trip.
 
@@ -1148,11 +1152,15 @@ The rule stands, with one sentence added to the doc comment:
 - A re-grade of a solved problem awards nothing.
 - A lecture completed, then extended, then completed again awards once.
 - A replayed activity flush awards no extra tier.
-- The daily cap truncates and marks `cappedAt`; a second award that day adds 0.
+- Two classes reach learning-time tiers independently on the same day.
+- The daily cap truncates and marks `cappedAt` per class; reaching it in one
+  class does not suppress another.
 - A void excludes the row from the balance and from the leaderboard sum.
 - The flag off means no rows written and no queries run.
 - A `SUSPENDED` membership keeps its ledger and leaves the board.
 - A class below the floor returns `eligible: false` with a reason.
+- Class A totals, active days, and ledger rows exclude Class B records.
+- Safe historical rows are backfilled and ambiguous rows remain classless.
 
 ### 19.3 Web and e2e
 
@@ -1163,6 +1171,8 @@ The rule stands, with one sentence added to the doc comment:
 - A failing leaderboard leaves the plate and ledger intact.
 - e2e: solve a problem, see the toast, see the ledger line, see the position
   move.
+- e2e: the same student works different amounts in two classes and sees
+  different totals and positions after changing the selector.
 
 ## 20. Delivery stages
 
@@ -1197,6 +1207,10 @@ The rule stands, with one sentence added to the doc comment:
   stays in the row shape so photos are a UI change later, never a migration.
   §11.5.
 - **No one awards points.** Removed entirely; §5.2.
+- **Every ranked point belongs to one class.** The validated learning context
+  is stored on submissions, activity, and awards; tiers and caps are per class.
+  The academy balance remains their all-class sum. See the class-attribution
+  amendment.
 
 ### Open
 

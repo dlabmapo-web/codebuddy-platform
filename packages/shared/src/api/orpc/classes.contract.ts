@@ -13,6 +13,7 @@ import {
   removeClassStudentSchema,
   setClassCoursesSchema,
   setClassStatusSchema,
+  setClassScheduleSchema,
   setClassTeacherSchema,
   updateClassSchema,
 } from "../../classes/class.js";
@@ -31,6 +32,11 @@ export const academyClassesContract = {
   update: oc.input(updateClassSchema).output(classDetailSchema),
   setStatus: oc.input(setClassStatusSchema).output(classDetailSchema),
   setCourses: oc.input(setClassCoursesSchema).output(classDetailSchema),
+  /**
+   * When the class meets. §8.1 — the whole timetable at once, `MANAGER` only,
+   * and the only thing in this contract that attendance points depend on.
+   */
+  setSchedule: oc.input(setClassScheduleSchema).output(classDetailSchema),
   listEligibleStudents: oc
     .input(classIdInputSchema)
     .output(z.object({ students: z.array(eligibleStudentSummarySchema) })),

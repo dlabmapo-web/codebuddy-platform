@@ -66,6 +66,8 @@ export const appErrorCodes = [
   "TEACHER_PROGRESS_NOT_FOUND",
   "TEACHER_OVERVIEW_ACCESS_DENIED",
   "STUDENT_OVERVIEW_ACCESS_DENIED",
+  "POINTS_ACCESS_DENIED",
+  "POINTS_UNAVAILABLE",
   "MANAGER_OPERATIONS_ACCESS_DENIED",
   "CURRICULUM_OVERVIEW_ACCESS_DENIED",
   "IMPORT_FILE_REJECTED",
@@ -107,6 +109,8 @@ export function isAppErrorCode(value: unknown): value is AppErrorCode {
 }
 
 export const appErrorFallbacks: Record<AppErrorCode, string> = {
+  POINTS_ACCESS_DENIED: "You do not have access to these points.",
+  POINTS_UNAVAILABLE: "This academy does not use points.",
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",
   STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",

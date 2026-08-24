@@ -6,6 +6,7 @@ import type {
   ClassSummary,
   EligibleStudentSummary,
   EligibleTeacherSummary,
+  SetClassScheduleInput,
 } from "@cove/shared";
 
 import { AuditService } from "../academies/audit.service.js";
@@ -65,6 +66,11 @@ const classDetailInclude = {
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
   assignedTeacher: assignedTeacherDetailSelect,
+  scheduleSlots: {
+    // The timetable reads down the week and across the day, which is the order
+    // a manager types it in and the order they check it back.
+    orderBy: [{ weekday: "asc" }, { startMinute: "asc" }, { id: "asc" }],
+  },
   enrollments: {
     include: {
       membership: {
@@ -341,6 +347,73 @@ export class ClassesService {
     if (removed.length > 0) {
       await this.revocation.revokeClass(input.classId, "MATERIAL_UNAVAILABLE");
     }
+    return this.presentDetail(updated);
+  }
+
+  /**
+   * Replaces the complete timetable.
+   *
+   * A set rather than add/edit/remove, matching `setCourses` — three
+   * operations would need the concurrency check, the authorization, and the
+   * audit entry written three times for three shapes of one decision.
+   *
+   * Rows are deleted and rewritten rather than diffed. `ClassScheduleSlot`
+   * carries no history a student's ledger depends on: an award froze the class
+   * name onto its own row when it was paid, so last month's attendance stays
+   * explicable even after the window it was earned in is gone. §8.1.
+   *
+   * `MANAGER` only. §5.1 — a schedule edit changes who is paid for turning up,
+   * which is a setting rather than a piece of curriculum.
+   */
+  async setSchedule(
+    identity: SupabaseIdentity,
+    input: SetClassScheduleInput,
+    context: ClassRequestContext = {},
+  ): Promise<ClassDetail> {
+    const actor = await this.requireScheduleManager(identity, input.academyId);
+    const desired = normalizeSchedule(input.slots);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await requireClass(tx, input.academyId, input.classId);
+      const before = current.scheduleSlots.map((slot) => ({
+        weekday: slot.weekday,
+        startMinute: slot.startMinute,
+        endMinute: slot.endMinute,
+      }));
+
+      const claimed = await tx.class.updateMany({
+        where: {
+          id: current.id,
+          academyId: input.academyId,
+          status: "ACTIVE",
+          updatedAt: new Date(input.expectedUpdatedAt),
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        throwClassWriteConflict(current, input.expectedUpdatedAt);
+      }
+
+      await tx.classScheduleSlot.deleteMany({ where: { classId: current.id } });
+      if (desired.length > 0) {
+        await tx.classScheduleSlot.createMany({
+          data: desired.map((slot) => ({ classId: current.id, ...slot })),
+        });
+      }
+
+      const record = await requireClass(tx, input.academyId, input.classId);
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "class.schedule.updated",
+        targetType: "Class",
+        targetId: current.id,
+        requestId: context.requestId,
+        before: { slots: before },
+        after: { slots: desired },
+      });
+      return record;
+    });
     return this.presentDetail(updated);
   }
 
@@ -687,6 +760,17 @@ export class ClassesService {
     );
   }
 
+  private requireScheduleManager(
+    identity: SupabaseIdentity,
+    academyId: string,
+  ) {
+    return this.access.requirePermission(
+      identity.authUserId,
+      academyId,
+      "class-schedule.manage",
+    );
+  }
+
   /**
    * Never `classes.assigned.manage`: a Teacher holds that one, and holding it
    * must not let them put themselves or a colleague in charge of a class.
@@ -779,6 +863,43 @@ async function requireClass(
   return record;
 }
 
+/**
+ * The submitted timetable, ordered and de-duplicated.
+ *
+ * Two identical windows on one weekday are one window: the attendance award
+ * pays per class per day, so a duplicate row could never pay twice, and
+ * storing it would only give a manager a timetable that disagrees with itself.
+ *
+ * Overlaps that are not identical are left alone. A class that meets 16:00
+ * to 17:00 and again 16:30 to 18:00 is a typo, but it is a harmless one — the
+ * award still pays once, and refusing it would mean rejecting a legitimate
+ * split session that happens to touch.
+ */
+function normalizeSchedule(
+  slots: SetClassScheduleInput["slots"],
+): { weekday: number; startMinute: number; endMinute: number }[] {
+  const seen = new Set<string>();
+  const unique: {
+    weekday: number;
+    startMinute: number;
+    endMinute: number;
+  }[] = [];
+  for (const slot of slots) {
+    const key = `${slot.weekday}:${slot.startMinute}:${slot.endMinute}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({
+      weekday: slot.weekday,
+      startMinute: slot.startMinute,
+      endMinute: slot.endMinute,
+    });
+  }
+  return unique.sort(
+    (left, right) =>
+      left.weekday - right.weekday || left.startMinute - right.startMinute,
+  );
+}
+
 function classSummaryFields(
   record: ClassListRecord | ClassRecord,
   studentCount: number,
@@ -835,6 +956,12 @@ function toClassDetail(
             email: record.assignedTeacher.user.email,
           }
         : null,
+    schedule: record.scheduleSlots.map((slot) => ({
+      id: slot.id,
+      weekday: slot.weekday,
+      startMinute: slot.startMinute,
+      endMinute: slot.endMinute,
+    })),
     students: record.enrollments.map((enrollment) => ({
       membershipId: enrollment.membershipId,
       userId: enrollment.membership.user.id,

@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { teacherOutlineNumber } from "@cove/shared";
+import { resolveComparisonSurface, teacherOutlineNumber } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -69,6 +69,11 @@ export type StudentOverviewScopeInternal = {
   materialIds: string[];
   /** §9.7 — whether this academy shows students a class standing at all. */
   standingEnabled: boolean;
+  /**
+   * §18.2 — whether the points card replaces it. Never true at the same time
+   * as `standingEnabled`: two comparison surfaces must never both render.
+   */
+  pointsEnabled: boolean;
   /** The class the standing describes, after the request has been validated. */
   standingClass: StudentOverviewClassScope | null;
 };
@@ -112,7 +117,7 @@ export class StudentOverviewAccessService {
       throw new AppException("ACADEMY_MEMBERSHIP_REQUIRED", HttpStatus.FORBIDDEN);
     }
 
-    const [classes, courses, standingEnabled] = await Promise.all([
+    const [classes, courses, comparison] = await Promise.all([
       this.resolveClasses(academyId, actor.userId),
       this.prisma.course.findMany({
         where: {
@@ -125,7 +130,7 @@ export class StudentOverviewAccessService {
         include: visibleCurriculumInclude,
         orderBy: [{ title: "asc" }, { id: "asc" }],
       }),
-      this.standingEnabledFor(academyId),
+      this.comparisonFor(academyId),
     ]);
 
     const exercises = courses.flatMap(exercisesOf);
@@ -150,43 +155,75 @@ export class StudentOverviewAccessService {
         exercises.map((exercise) => [exercise.materialId, exercise]),
       ),
       materialIds: exercises.map((exercise) => exercise.materialId),
-      standingEnabled,
-      standingClass: standingEnabled
+      standingEnabled: comparison.standingEnabled,
+      pointsEnabled: comparison.pointsEnabled,
+      standingClass: comparison.standingEnabled
         ? selectStandingClass(classes, input.standingClassId)
         : null,
     };
   }
 
   /**
-   * Whether this academy shows students a class standing, failing to off.
+   * Which comparison surface this academy shows a student, if any.
+   *
+   * §18.2 of the student points design: the class leaderboard supersedes the
+   * standing section wherever both are on. They must never render together —
+   * two comparison surfaces computed differently will eventually disagree, and
+   * neither a student nor their teacher would be able to say which is right.
+   *
+   * Resolution order, in one read:
+   *
+   * 1. `STUDENT_CLASS_LEADERBOARD` on → the points card, no standing section.
+   * 2. `STUDENT_CLASS_STANDING` on, leaderboard off → standing, unchanged.
+   * 3. Neither → no comparison at all.
    *
    * Read on its own rather than beside the scope's other queries, and never
-   * allowed to throw. §10.3 makes the header the page's only core claim, and
-   * standing is the most optional thing on the page — a Stage 2 section whose
-   * precondition could take down a student's whole overview would be exactly
-   * the wrong dependency direction.
+   * allowed to throw. §10.3 makes the header the page's only core claim, and a
+   * comparison is the most optional thing on the page — an optional section
+   * whose precondition could take down a student's whole overview would be
+   * exactly the wrong dependency direction.
    *
-   * The concrete failure this catches is a deployment where the code carries
-   * `STUDENT_CLASS_STANDING` and the database enum does not yet. That is a
-   * migration that has not run, not a reason a child cannot see what they were
-   * working on, so it is logged loudly and the section stays dark.
+   * The concrete failure this catches is a deployment where the code carries a
+   * feature the database enum does not yet. That is a migration that has not
+   * run, not a reason a child cannot see what they were working on, so it is
+   * logged loudly and both sections stay dark.
    */
-  private async standingEnabledFor(academyId: string): Promise<boolean> {
+  private async comparisonFor(
+    academyId: string,
+  ): Promise<{ standingEnabled: boolean; pointsEnabled: boolean }> {
     try {
-      const flag = await this.prisma.academyFeatureFlag.findUnique({
+      const flags = await this.prisma.academyFeatureFlag.findMany({
         where: {
-          academyId_feature: { academyId, feature: "STUDENT_CLASS_STANDING" },
+          academyId,
+          feature: {
+            in: [
+              "STUDENT_CLASS_STANDING",
+              "STUDENT_POINTS",
+              "STUDENT_CLASS_LEADERBOARD",
+            ],
+          },
+          isEnabled: true,
         },
-        select: { isEnabled: true },
+        select: { feature: true },
       });
-      return flag?.isEnabled === true;
+      // Resolved by the pure function rather than by three conditions here:
+      // "both must never render" survives exactly as long as it is testable at
+      // its boundary, and it is, in `@cove/shared`.
+      const resolved = resolveComparisonSurface(
+        flags.map((flag) => flag.feature),
+      );
+      return {
+        pointsEnabled: resolved.points,
+        standingEnabled: resolved.standing,
+      };
     } catch (error) {
       this.logger.warn(
-        `class standing flag unreadable, treating as off — is ` +
-          `20260819120000_student_class_standing_feature applied? ` +
+        `academy feature flags unreadable, treating every comparison as off — ` +
+          `are 20260819120000_student_class_standing_feature and ` +
+          `20260821120000_student_points_and_class_ranking applied? ` +
           `${error instanceof Error ? error.message : "unknown"}`,
       );
-      return false;
+      return { standingEnabled: false, pointsEnabled: false };
     }
   }
 

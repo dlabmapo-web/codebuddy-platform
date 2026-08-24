@@ -154,10 +154,15 @@ async function seedAcademy(
   // Both surfaces an investor is shown are behind flags, and a missing row
   // means off — so an academy that is never switched on looks like a product
   // that does not have the feature.
+  // `STUDENT_CLASS_STANDING` is deliberately absent beside the leaderboard:
+  // §18.2 of the student points design makes the board supersede the standing
+  // wherever both are on, so a demo that set both would be demonstrating a
+  // configuration the product resolves away.
   await prisma.academyFeatureFlag.createMany({
     data: [
       { academyId, feature: "TEACHER_LIVE_MONITORING", isEnabled: true },
-      { academyId, feature: "STUDENT_CLASS_STANDING", isEnabled: true },
+      { academyId, feature: "STUDENT_POINTS", isEnabled: true },
+      { academyId, feature: "STUDENT_CLASS_LEADERBOARD", isEnabled: true },
     ],
   });
 
@@ -432,6 +437,18 @@ async function seedClasses(
         courseId: courseIds.get(courseKey)!,
         assignedByUserId: managerUserId,
         assignedAt: weeksAfterFounding(2),
+      })),
+    });
+
+    // A weekday evening, the hour a 학원 class actually runs. Without a window
+    // no class pays attendance points, and a demo of a point economy with an
+    // empty attendance column would be showing a bug that is not there. §8.1.
+    await prisma.classScheduleSlot.createMany({
+      data: [1, 3, 5].map((weekday) => ({
+        classId,
+        weekday,
+        startMinute: 16 * 60,
+        endMinute: 18 * 60,
       })),
     });
 

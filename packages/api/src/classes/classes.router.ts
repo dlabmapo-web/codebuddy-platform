@@ -48,6 +48,13 @@ export function createClassesRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      setSchedule: os.academyClasses.setSchedule
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.classesService.setSchedule(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
       listEligibleStudents: os.academyClasses.listEligibleStudents
         .use(access.authenticated)
         .handler(({ context, input }) =>

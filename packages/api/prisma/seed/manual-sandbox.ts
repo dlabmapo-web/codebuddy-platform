@@ -7,6 +7,10 @@ import { PrismaClient } from "../../src/generated/prisma/client.js";
 import { seedClassFixture } from "./class-fixtures.js";
 import { developmentOrganization } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
+import {
+  seedLeaderboardClassmates,
+  seedPointsFixture,
+} from "./points-fixtures.js";
 
 /**
  * A visible problem for manual exploration.
@@ -57,7 +61,7 @@ async function main(): Promise<void> {
 
   const academy = await prisma.academy.findFirstOrThrow({
     where: { organization: { slug: developmentOrganization.slug } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, timeZone: true },
   });
 
   await prisma.course.upsert({
@@ -170,6 +174,25 @@ async function main(): Promise<void> {
     )?.email,
   });
 
+  // Points are opt-in per academy, so the sandbox opens the economy for
+  // itself. Without this the nav has no points link and the page 404s, which
+  // is correct for a real academy and only confusing here.
+  const { slots } = await seedPointsFixture(prisma, {
+    academyId: academy.id,
+    classId: sandbox.classId,
+  });
+
+  // The board is invisible below three active classmates (§10.4), so a lone
+  // seeded student meets an empty state and never sees the table it is for.
+  // Every class the student belongs to gets its own cast, so the class
+  // selector switches between two real boards. Their own ledger is untouched.
+  const board = await seedLeaderboardClassmates(prisma, {
+    academyId: academy.id,
+    timeZone: academy.timeZone,
+    studentEmail: "student@cove.test",
+    createdByUserId: teamLead.id,
+  });
+
   const student = await prisma.user.findFirst({
     where: { email: "student@cove.test" },
     select: { id: true },
@@ -193,6 +216,12 @@ async function main(): Promise<void> {
   console.log(`   class:    ${sandbox.className} (${enrolled} enrolled)`);
   console.log(`   material: ${sandbox.materialId}`);
   console.log(`   cases:    2 sample, 3 hidden`);
+  console.log(`   points:   on (${slots} attendance windows)`);
+  for (const entry of board.classes) {
+    console.log(
+      `   board:    ${entry.name} — ${entry.classmates} classmates, ${entry.awards} awards`,
+    );
+  }
   await prisma.$disconnect();
 }
 

@@ -2,6 +2,7 @@ import { ACTIVITY_FLUSH_INTERVAL_MS } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaService } from "../database/prisma.service.js";
+import type { PointAwardService } from "../points/point-award.service.js";
 import { LearningActivityAccumulator } from "./learning-activity.accumulator.js";
 
 /**
@@ -26,6 +27,12 @@ function createPrisma() {
   const days = new Map<string, { seconds: number; intervals: number }>();
 
   const tx = {
+    // The award path reads both of these back inside the same transaction.
+    // Stubbing them is not optional: `awardPoints` deliberately does not catch,
+    // so a missing model here would abort the flush rather than be ignored.
+    academy: {
+      findUnique: vi.fn(async () => ({ timeZone: "Asia/Seoul" })),
+    },
     learningActivityFlush: {
       createMany: vi.fn(async ({ data }: { data: { id: string } }) => {
         if (receipts.has(data.id)) return { count: 0 };
@@ -59,6 +66,10 @@ function createPrisma() {
           existing.intervals += args.update.activeIntervals.increment;
         },
       ),
+      aggregate: vi.fn(async () => ({
+        _sum: { activeSeconds: 0 },
+        _min: { firstActiveAt: new Date() },
+      })),
     },
   };
 
@@ -74,11 +85,23 @@ function createPrisma() {
   return { prisma, tx, days, receipts };
 }
 
+/**
+ * Points are stubbed here. What this suite owns is counted time; that the
+ * flush transaction offers its day to the award service is asserted where the
+ * awards themselves are tested.
+ */
+function createPoints() {
+  return {
+    awardLearningTime: vi.fn().mockResolvedValue(undefined),
+    awardAttendance: vi.fn().mockResolvedValue(undefined),
+  } as unknown as PointAwardService;
+}
+
 function createAccumulator() {
   const { prisma, tx, days, receipts } = createPrisma();
   // No Redis: the accumulator keeps its open interval in process memory, which
   // is the deployment every test and every single-node dev environment uses.
-  const accumulator = new LearningActivityAccumulator(prisma, null);
+  const accumulator = new LearningActivityAccumulator(prisma, null, createPoints());
   return { accumulator, prisma, tx, days, receipts };
 }
 
@@ -207,7 +230,7 @@ describe("LearningActivityAccumulator", () => {
         throw new Error("connection reset");
       }),
     } as unknown as PrismaService;
-    const accumulator = new LearningActivityAccumulator(prisma, null);
+    const accumulator = new LearningActivityAccumulator(prisma, null, createPoints());
 
     expect(
       await accumulator.apply({

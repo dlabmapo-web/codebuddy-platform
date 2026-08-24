@@ -20,6 +20,7 @@ import {
 } from "./orpc/manager-overview.contract.js";
 import { monitoringContract } from "./orpc/monitoring.contract.js";
 import { platformAcademiesContract } from "./orpc/platform.contract.js";
+import { pointsContract } from "./orpc/points.contract.js";
 import {
   academyInvitationDeliveryContract,
   academyPeopleBulkContract,
@@ -47,6 +48,7 @@ export const appContract = {
   learn: learnContract,
   monitoring: monitoringContract,
   platformAcademies: platformAcademiesContract,
+  points: pointsContract,
   studentSession: studentSessionContract,
   teacherProgress: teacherProgressContract,
   academyOperationsOverview: academyOperationsOverviewContract,

@@ -83,6 +83,14 @@ export const academyPermissions = [
   "class-enrollments.manage",
   /** Assign, replace, and remove the one teacher responsible for a class. */
   "class-teachers.manage",
+  /**
+   * When a class meets — the recurring windows attendance points are paid
+   * inside. `MANAGER` only, deliberately: §5.1 of the student points design
+   * puts the point economy's settings with the role that owns the academy's
+   * settings, and a schedule edit silently changes who gets paid for turning
+   * up. A team lead who runs the curriculum has no reason to move it.
+   */
+  "class-schedule.manage",
   /** Reserved for the later teacher monitoring design: what an assigned
    * teacher may do with their own classes. It authorizes neither class CRUD
    * nor assignment changes, so holding it never lets a teacher assign one. */
@@ -131,6 +139,7 @@ export const academyRolePermissions = {
     "classes.manage",
     "class-enrollments.manage",
     "class-teachers.manage",
+    "class-schedule.manage",
   ],
 } as const satisfies Record<AcademyRole, readonly AcademyPermission[]>;
 

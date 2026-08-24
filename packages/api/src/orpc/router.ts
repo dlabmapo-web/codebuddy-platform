@@ -40,6 +40,8 @@ import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
 import { PlatformAcademyService } from "../platform/platform-academy.service.js";
 import { PlatformLifecycleService } from "../platform/platform-lifecycle.service.js";
 import { createPlatformRouters } from "../platform/platform.router.js";
+import { PointsService } from "../points/points.service.js";
+import { createPointsRouter } from "../points/points.router.js";
 import { AcademyProfileService } from "../profile/academy-profile.service.js";
 import { ProfileService } from "../profile/profile.service.js";
 import { createProfileRouters } from "../profile/profile.router.js";
@@ -104,6 +106,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     platformAcademyService: app.get(PlatformAcademyService, { strict: false }),
+    pointsService: app.get(PointsService, { strict: false }),
     platformLifecycleService: app.get(PlatformLifecycleService, {
       strict: false,
     }),
@@ -150,6 +153,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...manageRouters,
     ...platformRouters,
     learn: createLearnRouter(os, deps),
+    points: createPointsRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),
     academyCurriculumOverview: createAcademyCurriculumOverviewRouter(os, deps),

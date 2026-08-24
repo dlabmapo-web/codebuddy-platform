@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaService } from "../database/prisma.service.js";
 import type { ExecutionEngine } from "./execution-engine.js";
+import type { PointAwardService } from "../points/point-award.service.js";
 import { GradingService } from "./grading.service.js";
 
 const submissionId = "50000000-0000-4000-8000-000000000001";
@@ -64,11 +65,18 @@ function createService(options?: { claimed?: number; currentRevision?: number })
     }),
     dispose: vi.fn(),
   } as unknown as ExecutionEngine;
+  // The award service is stubbed rather than exercised here: what this suite
+  // owns is the verdict, and what it must prove about points is only that the
+  // solve branch is the one that calls them.
+  const points = {
+    awardSolve: vi.fn().mockResolvedValue(undefined),
+  } as unknown as PointAwardService;
   return {
     prisma,
     tx,
     engine,
-    service: new GradingService(prisma, engine),
+    points,
+    service: new GradingService(prisma, engine, points),
   };
 }
 

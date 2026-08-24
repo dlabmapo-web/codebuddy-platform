@@ -48,6 +48,10 @@ export async function resetDemoDatabase(
   // Student work, newest layer first.
   await prisma.learningActivityFlush.deleteMany();
   await prisma.studentCourseLearningDay.deleteMany();
+  // The ledger before the balance projected from it, and both before the
+  // memberships they hang off.
+  await prisma.pointAward.deleteMany();
+  await prisma.studentPointBalance.deleteMany();
   await prisma.teacherFeedback.deleteMany();
   await prisma.teacherMonitoringVisit.deleteMany();
   await prisma.exerciseCollaborationDocument.deleteMany();
@@ -68,6 +72,7 @@ export async function resetDemoDatabase(
 
   // Delivery.
   await prisma.classCourse.deleteMany();
+  await prisma.classScheduleSlot.deleteMany();
   await prisma.classEnrollment.deleteMany();
   await prisma.class.deleteMany();
   await prisma.course.deleteMany();

@@ -62,6 +62,16 @@ describe("roleHasPermission", () => {
     }
   });
 
+  it("keeps the class schedule with managers alone", () => {
+    // §5.1 and §8.1 of the student points design: a schedule edit changes who
+    // is paid for turning up, so it sits with the role that owns the academy's
+    // settings — not with the one that owns the curriculum.
+    expect(roleHasPermission("MANAGER", "class-schedule.manage")).toBe(true);
+    for (const role of ["TEAM_LEAD", "TEACHER", "STUDENT"] as const) {
+      expect(roleHasPermission(role, "class-schedule.manage")).toBe(false);
+    }
+  });
+
   it("gives teacher assignment to team leads and managers only", () => {
     expect(roleHasPermission("TEAM_LEAD", "class-teachers.manage")).toBe(true);
     expect(roleHasPermission("MANAGER", "class-teachers.manage")).toBe(true);

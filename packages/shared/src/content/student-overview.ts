@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { pointsSummarySchema } from "../points/points.js";
 import { acceptedRate } from "./answer-records.js";
 import { overviewPeriodSchema, overviewRangeSchema } from "./teacher-overview.js";
 
@@ -577,6 +578,7 @@ export const studentOverviewSections = [
   "messages",
   "practice",
   "standing",
+  "points",
   "records",
 ] as const;
 export const studentOverviewSectionSchema = z.enum(studentOverviewSections);
@@ -631,6 +633,16 @@ export const studentAcademyOverviewSchema = z
     records: z.array(studentRecordSchema).max(STUDENT_MAX_PREVIEW_ROWS),
     /** Null when the academy has not enabled class standing at all. */
     standing: classStandingSchema.nullable(),
+    /**
+     * Today's points, when the academy runs a point economy. §6.1 — one
+     * compact card after the ledger, and the only thing about points on this
+     * page.
+     *
+     * Never non-null at the same time as `standing`: §18.2 makes the
+     * leaderboard supersede the standing section, because two comparison
+     * surfaces computed differently will eventually disagree.
+     */
+    points: pointsSummarySchema.nullable(),
     /** Every class the standing could describe, when there is more than one. */
     standingClasses: z.array(studentOverviewClassSchema),
     unavailable: z.array(studentOverviewSectionSchema),

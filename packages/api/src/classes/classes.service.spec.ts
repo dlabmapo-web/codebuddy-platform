@@ -56,6 +56,13 @@ function classRecord(
     updatedAt: Date;
     /** The stored assignment, valid or not. */
     teacher: ReturnType<typeof teacherMembership> | null;
+    /** When the class meets. Empty is the ordinary case. */
+    schedule: {
+      id: string;
+      weekday: number;
+      startMinute: number;
+      endMinute: number;
+    }[];
   }> = {},
 ) {
   const teacher = overrides.teacher ?? null;
@@ -71,6 +78,9 @@ function classRecord(
     archivedAt: null,
     createdAt: updatedAt,
     updatedAt: overrides.updatedAt ?? updatedAt,
+    // A class with no windows is the ordinary case: it simply never pays
+    // attendance points. §8.1 of the student points design.
+    scheduleSlots: overrides.schedule ?? [],
     courseAssignments: (overrides.courseIds ?? [courseA]).map((courseId) => ({
       classId,
       courseId,
@@ -132,6 +142,10 @@ function createService(options?: {
       findFirst: vi.fn().mockResolvedValue(record),
     },
     classCourse: {
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    classScheduleSlot: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -428,6 +442,107 @@ describe("ClassesService course assignment", () => {
         expectedUpdatedAt: updatedAt.toISOString(),
       }),
     ).rejects.toMatchObject({ code: "CLASS_ARCHIVED" });
+  });
+});
+
+describe("ClassesService schedule", () => {
+  const monday = { weekday: 1, startMinute: 16 * 60, endMinute: 18 * 60 };
+  const wednesday = { weekday: 3, startMinute: 16 * 60, endMinute: 18 * 60 };
+
+  it("replaces the whole timetable rather than diffing it", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({
+        schedule: [{ id: "slot-1", ...wednesday }],
+      }),
+    });
+
+    await service.setSchedule(identity, {
+      academyId,
+      classId,
+      slots: [monday],
+      expectedUpdatedAt: updatedAt.toISOString(),
+    });
+
+    expect(transaction.classScheduleSlot.deleteMany).toHaveBeenCalledWith({
+      where: { classId },
+    });
+    expect(transaction.classScheduleSlot.createMany).toHaveBeenCalledWith({
+      data: [{ classId, ...monday }],
+    });
+  });
+
+  it("orders the week and drops a repeated window", async () => {
+    const { service, transaction } = createService();
+
+    await service.setSchedule(identity, {
+      academyId,
+      classId,
+      // Out of order, and Monday twice. A duplicate could never pay twice —
+      // the award is keyed per class per day — so storing it would only give a
+      // manager a timetable that disagrees with itself.
+      slots: [wednesday, monday, monday],
+      expectedUpdatedAt: updatedAt.toISOString(),
+    });
+
+    expect(transaction.classScheduleSlot.createMany).toHaveBeenCalledWith({
+      data: [
+        { classId, ...monday },
+        { classId, ...wednesday },
+      ],
+    });
+  });
+
+  it("writes no rows for an emptied timetable, and does not fail", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({ schedule: [{ id: "slot-1", ...monday }] }),
+    });
+
+    await service.setSchedule(identity, {
+      academyId,
+      classId,
+      slots: [],
+      expectedUpdatedAt: updatedAt.toISOString(),
+    });
+
+    // A class with no windows simply never pays attendance points. §8.1.
+    expect(transaction.classScheduleSlot.deleteMany).toHaveBeenCalled();
+    expect(transaction.classScheduleSlot.createMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale revision rather than overwriting a colleague", async () => {
+    const { service, transaction } = createService({ claimFails: true });
+
+    await expect(
+      service.setSchedule(identity, {
+        academyId,
+        classId,
+        slots: [monday],
+        expectedUpdatedAt: updatedAt.toISOString(),
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_EDIT_CONFLICT" });
+    expect(transaction.classScheduleSlot.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("writes an audit entry naming the timetable before and after", async () => {
+    const { service, audit } = createService({
+      record: classRecord({ schedule: [{ id: "slot-1", ...wednesday }] }),
+    });
+
+    await service.setSchedule(identity, {
+      academyId,
+      classId,
+      slots: [monday],
+      expectedUpdatedAt: updatedAt.toISOString(),
+    });
+
+    expect(audit.write).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "class.schedule.updated",
+        before: { slots: [wednesday] },
+        after: { slots: [monday] },
+      }),
+    );
   });
 });
 

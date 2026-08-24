@@ -24,6 +24,15 @@ export const academyMembershipSummarySchema = z.object({
   status: z.enum(["INVITED", "ACTIVE", "SUSPENDED", "LEFT"]),
   /** Signed academy-scoped avatar URL for the current viewer. */
   imageUrl: z.string().nullable(),
+  /**
+   * The features this academy has switched on.
+   *
+   * Carried on the session so the shell can decide what to put in the nav
+   * without a second round trip per page. A feature that is off is absent —
+   * the same "a missing row means off" rule `AcademyFeatureFlag` uses, so a
+   * client can never read a stale `false` as a deliberate one.
+   */
+  features: z.array(z.string()).optional(),
 });
 
 export const authUserSchema = z.object({

@@ -218,6 +218,9 @@ describe("AuthService.me profile images", () => {
           id: academyId,
           name: "Cove Academy",
           slug: "cove-academy",
+          // The include only returns enabled flags, so an academy with none
+          // arrives as an empty array rather than as absent.
+          featureFlags: [],
         },
         role: "MANAGER",
         status: "ACTIVE",

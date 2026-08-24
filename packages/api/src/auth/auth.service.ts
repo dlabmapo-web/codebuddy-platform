@@ -22,7 +22,7 @@ const userInclude = {
   avatarAsset: true,
   memberships: {
     include: {
-      academy: true,
+      academy: { include: { featureFlags: { where: { isEnabled: true } } } },
       memberProfile: { include: { avatarAsset: true } },
     },
     orderBy: { createdAt: "asc" as const },
@@ -478,6 +478,7 @@ function toAuthMe(
         imageUrl: membership.memberProfile?.avatarAssetId
           ? imageUrls.get(membership.memberProfile.avatarAssetId) ?? null
           : null,
+        features: membership.academy.featureFlags.map((flag) => flag.feature),
       })),
       applications: user.joinRequests.map((request) => ({
         id: request.id,

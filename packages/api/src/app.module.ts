@@ -15,6 +15,7 @@ import { MonitoringModule } from "./monitoring/monitoring.module.js";
 import { ProfileModule } from "./profile/profile.module.js";
 import { ManageModule } from "./manage/manage.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
+import { PointsModule } from "./points/points.module.js";
 import { TeachModule } from "./teach/teach.module.js";
 
 @Module({
@@ -38,6 +39,7 @@ import { TeachModule } from "./teach/teach.module.js";
     TeachModule,
     ManageModule,
     PlatformModule,
+    PointsModule,
   ],
   controllers: [AppController],
 })

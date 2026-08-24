@@ -34,6 +34,7 @@ import {
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { PointsService } from "../points/points.service.js";
 import { TeacherProgressRepository } from "../teach/teacher-progress.repository.js";
 import {
   CurriculumOutlineService,
@@ -86,6 +87,13 @@ export class StudentOverviewService {
      */
     private readonly progress: TeacherProgressRepository,
     private readonly curriculum: CurriculumOutlineService,
+    /**
+     * The overview's points card is computed by the points service itself, not
+     * reimplemented here. §6.1 gives this page one compact card; a second
+     * implementation of "where does this student stand" is exactly how the
+     * card and the board it links to would end up disagreeing.
+     */
+    private readonly points: PointsService,
   ) {}
 
   async get(
@@ -119,6 +127,7 @@ export class StudentOverviewService {
       records,
       attention,
       standing,
+      points,
     ] = await Promise.all([
       settle(
         ["continue", "courses", "practice"],
@@ -209,6 +218,17 @@ export class StudentOverviewService {
       settle(
         ["standing"],
         () => this.resolveStanding(scope, periodBounds, window),
+        null,
+      ),
+      // §18.2 — never computed beside a standing. The scope has already
+      // resolved which of the two this academy shows, and it can never be
+      // both.
+      settle(
+        ["points"],
+        () =>
+          scope.pointsEnabled
+            ? this.points.getSummary(identity, { academyId: scope.academyId })
+            : Promise.resolve(null),
         null,
       ),
     ]);
@@ -324,6 +344,7 @@ export class StudentOverviewService {
         }),
       ),
       standing,
+      points,
       standingClasses: scope.standingEnabled
         ? scope.classes.map((entry) => ({
             classId: entry.classId,

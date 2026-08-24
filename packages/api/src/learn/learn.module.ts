@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { PointsModule } from "../points/points.module.js";
 import { TeachModule } from "../teach/teach.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { AnswerRecordsService } from "./answer-records.service.js";
@@ -26,7 +27,16 @@ import { SubmissionService } from "./submission.service.js";
   // student overview suggests the same exercises a teacher is told to check,
   // and §7.8 requires one rule for both — the repository holds no
   // authorization of its own, which is what makes the seam safe to cross.
-  imports: [AcademiesModule, AuthModule, AuthorizationModule, TeachModule],
+  // `PointsModule` is imported for the overview's points card alone. §6.1 —
+  // the card is computed by the points service rather than reimplemented, so
+  // it can never disagree with the board it links to.
+  imports: [
+    AcademiesModule,
+    AuthModule,
+    AuthorizationModule,
+    PointsModule,
+    TeachModule,
+  ],
   controllers: [SubmissionController],
   providers: [
     AnswerRecordsService,

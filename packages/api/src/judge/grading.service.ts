@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 
 import { PrismaService } from "../database/prisma.service.js";
+import { PointAwardService } from "../points/point-award.service.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import {
   caseOutcomeFor,
@@ -24,6 +25,13 @@ export class GradingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly engine: ExecutionEngine,
+    /**
+     * Points are written inside the same transaction as the progress row, so a
+     * solve and what it earned are never observable apart. The service is
+     * inert for an academy without the flag, so the judge pays one indexed
+     * lookup per accepted first solve and nothing else.
+     */
+    private readonly points: PointAwardService,
   ) {}
 
   async grade(
@@ -205,6 +213,20 @@ export class GradingService {
           lastAttemptAt: new Date(),
         },
       });
+
+      // `solvedNow` is the only branch that can earn anything: a repeat solve
+      // pays nothing, and only a first solve can complete a lecture. Awarding
+      // here rather than after the transaction is what makes a retried job
+      // safe — the dedupe key absorbs the repeat, and a rolled-back verdict
+      // takes its points with it.
+      if (progress.solvedNow) {
+        await this.points.awardSolve(tx, {
+          userId: submission.userId,
+          materialId,
+          courseId: submission.courseId,
+          now: new Date(),
+        });
+      }
     });
   }
 

@@ -12,9 +12,12 @@ import {
   ACTIVITY_MAX_GAP_MS,
   academyLocalDate,
   heartbeatActiveSeconds,
+  zoneOffsetMs,
 } from "@cove/shared";
 
 import { PrismaService } from "../database/prisma.service.js";
+import type { Prisma } from "../generated/prisma/client.js";
+import { PointAwardService } from "../points/point-award.service.js";
 import {
   MONITORING_REDIS,
   monitoringKeyPrefix,
@@ -107,6 +110,11 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
   constructor(
     private readonly prisma: PrismaService,
     @Inject(MONITORING_REDIS) private readonly redis: MonitoringRedis,
+    /**
+     * Points ride the same transaction as the projection they are computed
+     * from, so a student's counted day and what it earned can never disagree.
+     */
+    private readonly points: PointAwardService,
   ) {}
 
   onModuleInit(): void {
@@ -292,6 +300,8 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
             lastActiveAt: increment.lastActiveAt,
           },
         });
+
+        await this.awardPoints(tx, increment);
         return true;
       });
     } catch (error) {
@@ -302,6 +312,73 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
       );
       return false;
     }
+  }
+
+  /**
+   * The learning-time ladder and the attendance award, from one flushed day.
+   *
+   * Both read the student's whole counted day rather than this increment: the
+   * ladder is a threshold on the day's total, and a minute flushed at 16:05
+   * says nothing on its own about whether a child came to a four o'clock
+   * class. The projection has just been written in this transaction, so the
+   * sum below already includes the seconds that triggered it.
+   *
+   * Nothing here is caught. Both awards run inside the caller's transaction,
+   * and a swallowed failure would be a lie: Postgres has already aborted the
+   * transaction by the time the `catch` runs, so the commit fails anyway and
+   * the minute rolls back regardless. Letting it throw is the honest version —
+   * the outer handler logs it, the receipt rolls back with the projection, and
+   * the next flush of the same interval applies the whole thing again.
+   *
+   * The paths that are merely *absent* rather than broken — no academy, no
+   * flag, no schedule slot — return early instead of throwing, so an ordinary
+   * academy without points never reaches an error at all.
+   */
+  private async awardPoints(
+    tx: Prisma.TransactionClient,
+    increment: ActivityIncrement,
+  ): Promise<void> {
+    const academy = await tx.academy.findUnique({
+      where: { id: increment.academyId },
+      select: { timeZone: true },
+    });
+    if (!academy) return;
+
+    const day = await tx.studentCourseLearningDay.aggregate({
+      where: {
+        academyId: increment.academyId,
+        membershipId: increment.membershipId,
+        localDate: new Date(`${increment.localDate}T00:00:00.000Z`),
+      },
+      _sum: { activeSeconds: true },
+      _min: { firstActiveAt: true },
+    });
+
+    const totalMinutes = Math.floor((day._sum.activeSeconds ?? 0) / 60);
+    const now = increment.lastActiveAt;
+
+    await this.points.awardLearningTime(tx, {
+      academyId: increment.academyId,
+      membershipId: increment.membershipId,
+      totalMinutes,
+      timeZone: academy.timeZone,
+      localDate: increment.localDate,
+      now,
+    });
+
+    const firstActiveAt = day._min.firstActiveAt ?? increment.firstActiveAt;
+    await this.points.awardAttendance(tx, {
+      academyId: increment.academyId,
+      membershipId: increment.membershipId,
+      courseId: increment.courseId,
+      timeZone: academy.timeZone,
+      localDate: increment.localDate,
+      firstActiveMinute: localMinuteOfDay(firstActiveAt, academy.timeZone),
+      // Every counted minute of the day is offered; the window check inside
+      // the award decides which class, if any, it belongs to.
+      minutesInWindow: totalMinutes,
+      now,
+    });
   }
 
   /** Sweeps receipts past the retention window. Safe to call repeatedly. */
@@ -451,4 +528,16 @@ export class LearningActivityAccumulator implements OnModuleInit, OnModuleDestro
 /** One namespace, separate from presence, so a flush cannot read a roster. */
 function stateKey(membershipId: string, courseId: string): string {
   return `${monitoringKeyPrefix}act:${membershipId}:${courseId}`;
+}
+
+/**
+ * Minutes from academy-local midnight, which is what a schedule slot stores.
+ *
+ * Read through the zone offset rather than from the UTC clock: a four o'clock
+ * class is four o'clock in Seoul, and comparing a UTC hour against a local
+ * slot would mark every student in Korea nine hours late.
+ */
+function localMinuteOfDay(instant: Date, timeZone: string): number {
+  const shifted = new Date(instant.getTime() + zoneOffsetMs(instant, timeZone));
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
 }

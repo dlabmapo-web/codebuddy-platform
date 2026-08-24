@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { validateEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { GradingService } from "./grading.service.js";
+import { PointAwardService } from "../points/point-award.service.js";
 import { JudgeQueue } from "./judge.queue.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 
@@ -48,7 +49,7 @@ async function bootstrap(): Promise<void> {
     environment.PYODIDE_VERSION,
     environment.JUDGE_CONCURRENCY,
   );
-  const grading = new GradingService(prisma, engine);
+  const grading = new GradingService(prisma, engine, new PointAwardService(prisma));
   const queue = new JudgeQueue(environment.REDIS_URL);
 
   // Paid once at startup rather than by the first student to submit.

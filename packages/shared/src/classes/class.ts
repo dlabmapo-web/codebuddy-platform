@@ -106,9 +106,56 @@ export const classSummarySchema = z.object({
 });
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 
+/* --------------------------------------------------------------- schedule */
+
+/** Minutes from academy-local midnight of the last instant a slot may end. */
+export const CLASS_SCHEDULE_MAX_MINUTE = 2 * 24 * 60;
+/** More windows than this on one class is a data problem, not a timetable. */
+export const CLASS_SCHEDULE_MAX_SLOTS = 21;
+
+/**
+ * When one class meets, as a recurring academy-local rule.
+ *
+ * Minutes from local midnight rather than instants, because the rule is
+ * "Tuesdays at four" and not `2026-09-01T07:00Z`. Stored as an instant it
+ * would be wrong the first time an academy changed timezone, and unreadable to
+ * the manager who typed it.
+ *
+ * `endMinute` may exceed 1440 for a class that crosses midnight. It never
+ * wraps — a window that wrapped would be two windows wearing one row, and the
+ * attendance check would have to guess which one a student's first minute fell
+ * inside. §8.1 of the student points design.
+ */
+export const classScheduleSlotSchema = z.object({
+  id: z.uuid(),
+  /** 1 = Monday … 7 = Sunday, ISO-8601, academy-local. */
+  weekday: z.number().int().min(1).max(7),
+  /** Minutes from academy-local midnight. 16:00 is 960. */
+  startMinute: z.number().int().min(0).max(CLASS_SCHEDULE_MAX_MINUTE),
+  endMinute: z.number().int().min(1).max(CLASS_SCHEDULE_MAX_MINUTE),
+});
+export type ClassScheduleSlot = z.infer<typeof classScheduleSlotSchema>;
+
+/** One row of a submitted timetable, before the server has given it an id. */
+export const classScheduleSlotInputSchema = classScheduleSlotSchema
+  .omit({ id: true })
+  .refine((slot) => slot.endMinute > slot.startMinute, {
+    message: "A class window must end after it starts.",
+    path: ["endMinute"],
+  });
+export type ClassScheduleSlotInput = z.infer<
+  typeof classScheduleSlotInputSchema
+>;
+
 export const classDetailSchema = classSummarySchema.extend({
   students: z.array(enrolledStudentSummarySchema),
   assignedTeacher: assignedTeacherDetailSchema.nullable(),
+  /**
+   * When the class meets. Empty is a valid timetable and means one specific
+   * thing: this class never pays attendance points. Nothing else about it
+   * changes, which is what lets the schedule arrive without a backfill.
+   */
+  schedule: z.array(classScheduleSlotSchema),
 });
 export type ClassDetail = z.infer<typeof classDetailSchema>;
 
@@ -149,6 +196,20 @@ export const setClassCoursesSchema = classIdInputSchema.extend({
   courseIds: z.array(z.uuid()).max(classCourseAssignmentLimit),
   expectedUpdatedAt: z.iso.datetime(),
 });
+
+/**
+ * The complete desired timetable, replacing whatever is there.
+ *
+ * A set rather than add/edit/remove, for the same reason `setCourses` is one:
+ * three operations would need the concurrency check, the authorization, and
+ * the audit entry written three times for three shapes of one decision — when
+ * does this class meet.
+ */
+export const setClassScheduleSchema = classIdInputSchema.extend({
+  slots: z.array(classScheduleSlotInputSchema).max(CLASS_SCHEDULE_MAX_SLOTS),
+  expectedUpdatedAt: z.iso.datetime(),
+});
+export type SetClassScheduleInput = z.infer<typeof setClassScheduleSchema>;
 
 export const addClassStudentsSchema = classIdInputSchema.extend({
   membershipIds: z.array(z.uuid()).min(1).max(classEnrollmentBatchLimit),

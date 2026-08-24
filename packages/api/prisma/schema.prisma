@@ -82,6 +82,31 @@ enum AcademyFeature {
   /// another student, and an academy that has not asked for it should not have
   /// to discover it after the fact.
   STUDENT_CLASS_STANDING
+  /// The point ledger, the points page, and all awarding. Off means no row is
+  /// ever written, so an academy that does not want a point economy pays
+  /// nothing for one.
+  STUDENT_POINTS
+  /// The named class board. Requires STUDENT_POINTS, and replaces
+  /// STUDENT_CLASS_STANDING where both are on — two comparison surfaces
+  /// computed differently would eventually disagree. §18.2 of the student
+  /// points design.
+  STUDENT_CLASS_LEADERBOARD
+}
+
+/// Why one student earned points.
+///
+/// Every value here names a fact the server observed. There is no reason code
+/// for a granted point and none for a penalty: points cannot be awarded by a
+/// person and cannot be deducted by anyone. §5.2 and §7.6 of the student
+/// points design.
+enum PointReason {
+  ATTENDANCE
+  ATTENDANCE_LATE
+  LEARNING_TIME
+  EXERCISE_SOLVED
+  LECTURE_COMPLETED
+  MODULE_COMPLETED
+  COURSE_COMPLETED
 }
 
 /// Why one teacher's watch of one student ended. Recorded on the visit and
@@ -492,6 +517,8 @@ model Academy {
   media                  AcademyMedia[]
   importSessions         PeopleImportSession[]
   bulkOperations         PeopleBulkOperation[]
+  pointAwards            PointAward[]
+  pointPolicy            AcademyPointPolicy?
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -561,6 +588,8 @@ model AcademyMembership {
   feedbackAuthored          TeacherFeedback[]          @relation("TeacherFeedbackAuthor")
   feedbackReceived          TeacherFeedback[]          @relation("TeacherFeedbackRecipient")
   learningDays              StudentCourseLearningDay[]
+  pointAwards               PointAward[]
+  pointBalance              StudentPointBalance?
   memberProfile             AcademyMemberProfile?
   studentProfile            StudentAcademyProfile?
   staffProfile              StaffAcademyProfile?
@@ -844,6 +873,7 @@ model Class {
   assignedTeacher   AcademyMembership?       @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
   courseAssignments ClassCourse[]
   enrollments       ClassEnrollment[]
+  scheduleSlots     ClassScheduleSlot[]
   monitoringVisits  TeacherMonitoringVisit[]
   teacherFeedback   TeacherFeedback[]
 
@@ -1378,4 +1408,164 @@ model LearningActivityFlush {
 
   @@index([createdAt])
   @@map("learning_activity_flushes")
+}
+
+/// When one class meets, as a recurring academy-local rule.
+///
+/// Minutes from local midnight rather than instants, because the rule is
+/// "Tuesdays at four" and not "2026-09-01T07:00Z". Stored as an instant it
+/// would be wrong the first time an academy changed timezone, and unreadable
+/// to the manager who typed it.
+///
+/// A class with no slots simply never pays attendance points. Nothing else
+/// about it changes, which is what lets this arrive without a backfill.
+model ClassScheduleSlot {
+  id            String    @id @default(uuid()) @db.Uuid
+  classId       String    @map("class_id") @db.Uuid
+  /// 1 = Monday … 7 = Sunday, ISO-8601, academy-local.
+  weekday       Int
+  /// Minutes from academy-local midnight. 16:00 is 960.
+  startMinute   Int       @map("start_minute")
+  /// May exceed 1440 for a class that crosses midnight. It never wraps.
+  endMinute     Int       @map("end_minute")
+  /// A term change adds a slot and closes the old one. Nothing is deleted, so
+  /// last month's attendance stays explicable.
+  effectiveFrom DateTime? @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([classId, weekday])
+  @@map("class_schedule_slots")
+}
+
+/// One earned point award. Append-only.
+///
+/// The ledger is the truth and `StudentPointBalance` is a fast answer derived
+/// from it — the same relationship `StudentCourseLearningDay` has to the
+/// heartbeats that built it. Nothing here is ever updated except a void, and a
+/// void is an exclusion rather than a subtraction: `amount` is positive by
+/// check constraint and no service writes a negative one.
+///
+/// Every row is written by the server inside the transaction that recorded the
+/// fact it describes. No person can grant one.
+model PointAward {
+  id           String      @id @default(uuid()) @db.Uuid
+  academyId    String      @map("academy_id") @db.Uuid
+  membershipId String      @map("membership_id") @db.Uuid
+  reason       PointReason
+  /// Always > 0. §7.6 of the student points design.
+  amount       Int
+  /// The idempotency key, and the whole concurrency design.
+  ///
+  /// A retried judge callback or a replayed activity flush collides here and
+  /// writes nothing — there is no read-then-write and no lock. It deliberately
+  /// contains no grading revision, no difficulty, no point value, and no
+  /// timestamp finer than a day: every one of those would let the same fact
+  /// pay twice after an ordinary curriculum edit. §9.3.
+  dedupeKey    String      @unique @map("dedupe_key")
+
+  /// What it was for. All nullable — not every reason has every subject.
+  materialId String?   @map("material_id") @db.Uuid
+  lectureId  String?   @map("lecture_id") @db.Uuid
+  moduleId   String?   @map("module_id") @db.Uuid
+  courseId   String?   @map("course_id") @db.Uuid
+  classId    String?   @map("class_id") @db.Uuid
+  localDate  DateTime? @map("local_date") @db.Date
+
+  /// The label this row printed when it was written.
+  ///
+  /// History has to stay readable after ordinary curriculum edits — the same
+  /// reason `Submission.problemTitle` is frozen. A renamed lecture must not
+  /// rewrite what a student earned last term.
+  subjectLabel String              @map("subject_label")
+  /// Frozen difficulty for a solve, so the ledger can print the word it paid
+  /// for even after an author reclassifies the problem.
+  difficulty   ExerciseDifficulty? @map("difficulty")
+
+  /// Set when the daily cap truncated this award, so the ledger can say why
+  /// the number stopped moving instead of paying nothing silently.
+  cappedAt DateTime? @map("capped_at") @db.Timestamptz(6)
+
+  /// A platform correction — a misconfigured difficulty, a double-paid tier.
+  /// MANAGER-only, audit-logged, and never a deduction: the row is excluded
+  /// from every sum and still shown to the student with its reason.
+  voidedAt             DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidedByMembershipId String?   @map("voided_by_membership_id") @db.Uuid
+  voidReason           String?   @map("void_reason")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  academy    Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  /// The period sum behind every leaderboard row.
+  @@index([academyId, membershipId, createdAt])
+  /// One student's ledger, newest first, with the id tiebreak paging needs.
+  @@index([membershipId, createdAt(sort: Desc), id(sort: Desc)])
+  /// The daily cap, which is checked before every single award.
+  @@index([membershipId, localDate])
+  @@map("point_awards")
+}
+
+/// One student's running totals. A projection, rebuildable by SUM at any time.
+model StudentPointBalance {
+  /// Keyed on the membership alone, with the academy denormalized beside it —
+  /// the shape `StudentAcademyProfile` already uses. A membership belongs to
+  /// exactly one academy, so a composite key would only give the same fact a
+  /// second place to drift.
+  membershipId String   @id @map("membership_id") @db.Uuid
+  academyId    String   @map("academy_id") @db.Uuid
+  earnedTotal  Int      @default(0) @map("earned_total")
+  spentTotal   Int      @default(0) @map("spent_total")
+  /// For the deferred 스탬프판. Written by nothing yet; the column exists so
+  /// the board does not need a migration to arrive.
+  stampCount   Int      @default(0) @map("stamp_count")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([academyId])
+  @@map("student_point_balances")
+}
+
+/// One academy's point economy. Numbers, not code.
+///
+/// A missing row means the defaults in `@cove/shared`, so enabling points
+/// never requires a manager to fill a form first.
+model AcademyPointPolicy {
+  academyId String @id @map("academy_id") @db.Uuid
+
+  solveEasy   Int @default(3) @map("solve_easy")
+  solveMedium Int @default(5) @map("solve_medium")
+  solveHard   Int @default(10) @map("solve_hard")
+
+  lectureCompleted Int @default(15) @map("lecture_completed")
+  moduleCompleted  Int @default(40) @map("module_completed")
+  courseCompleted  Int @default(150) @map("course_completed")
+
+  attendance             Int @default(5) @map("attendance")
+  attendanceLate         Int @default(2) @map("attendance_late")
+  attendanceMinMinutes   Int @default(10) @map("attendance_min_minutes")
+  attendanceGraceMinutes Int @default(15) @map("attendance_grace_minutes")
+
+  learningTimeTier1Minutes Int @default(30) @map("learning_time_tier1_minutes")
+  learningTimeTier1Points  Int @default(3) @map("learning_time_tier1_points")
+  learningTimeTier2Minutes Int @default(60) @map("learning_time_tier2_minutes")
+  learningTimeTier2Points  Int @default(5) @map("learning_time_tier2_points")
+  learningTimeTier3Minutes Int @default(120) @map("learning_time_tier3_minutes")
+  learningTimeTier3Points  Int @default(7) @map("learning_time_tier3_points")
+
+  /// The most one student may earn in one academy-local day. Without it the
+  /// board measures endurance rather than learning.
+  studentDailyCap Int @default(100) @map("student_daily_cap")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@map("academy_point_policies")
 }

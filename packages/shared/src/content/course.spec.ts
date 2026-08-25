@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createProgrammingExerciseSchema } from "./course.js";
+import {
+  createCourseSchema,
+  createProgrammingExerciseSchema,
+  programmingExerciseDescriptionMaxLength,
+  programmingExerciseSchema,
+} from "./course.js";
 
 const validExercise = {
   academyId: "20000000-0000-4000-8000-000000000001",
@@ -27,6 +32,42 @@ describe("manual programming exercise schemas", () => {
   it("accepts the v1 manual authoring fields", () => {
     expect(createProgrammingExerciseSchema.safeParse(validExercise).success)
       .toBe(true);
+  });
+
+  it("accepts large lesson-style exercise descriptions for reads and writes", () => {
+    const description = "x".repeat(100_001);
+
+    expect(createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      description,
+    }).success).toBe(true);
+    expect(
+      programmingExerciseSchema.shape.description.safeParse(description)
+        .success,
+    ).toBe(true);
+  });
+
+  it("keeps exercise descriptions bounded", () => {
+    const description = "x".repeat(
+      programmingExerciseDescriptionMaxLength + 1,
+    );
+
+    expect(createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      description,
+    }).success).toBe(false);
+    expect(
+      programmingExerciseSchema.shape.description.safeParse(description)
+        .success,
+    ).toBe(false);
+  });
+
+  it("does not widen ordinary course descriptions", () => {
+    expect(createCourseSchema.safeParse({
+      academyId: validExercise.academyId,
+      title: "A course",
+      description: "x".repeat(10_001),
+    }).success).toBe(false);
   });
 
   it("rejects browser-controlled execution limits", () => {

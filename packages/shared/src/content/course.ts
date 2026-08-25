@@ -18,6 +18,10 @@ export type TestCaseVisibility = z.infer<typeof testCaseVisibilitySchema>;
 
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(10_000);
+export const programmingExerciseDescriptionMaxLength = 500_000;
+const programmingExerciseDescriptionSchema = z
+  .string()
+  .max(programmingExerciseDescriptionMaxLength);
 const positionSchema = z.number().int().positive();
 
 /** What the curriculum currently holds, for the course list. */
@@ -60,7 +64,7 @@ export const programmingExerciseSchema = z.object({
   externalKey: z.string().trim().min(1).max(200),
   legacyProblemNo: z.number().int().positive().nullable(),
   difficulty: exerciseDifficultySchema,
-  description: descriptionSchema,
+  description: programmingExerciseDescriptionSchema,
   inputFormat: z.string().max(10_000),
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
@@ -177,8 +181,6 @@ export const reorderLecturesSchema = courseIdInputSchema.extend({
   orderedLectureIds: z.array(z.uuid()).min(1),
 });
 
-const richDescriptionSchema = z.string().max(10_000);
-
 export const exerciseTestCaseDraftSchema = z.object({
   input: z.string().max(100_000),
   expectedOutput: z.string().max(100_000),
@@ -193,7 +195,7 @@ export const exerciseHintDraftSchema = z.object({
 export const exerciseDraftFieldsSchema = z.object({
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
-  description: richDescriptionSchema,
+  description: programmingExerciseDescriptionSchema,
   inputFormat: z.string().max(10_000),
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),

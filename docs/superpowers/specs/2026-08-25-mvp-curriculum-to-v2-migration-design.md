@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25
 **Branch:** `feat/cove-studio-v2`
-**Status:** Awaiting written-spec review
+**Status:** Implemented; production curriculum migration applied and verified
 
 ## 1. Context
 
@@ -237,3 +237,20 @@ checksums, never raw hidden inputs or expected outputs.
 - Representative sample and hidden test cases grade correctly in v2.
 - A second apply with the same source snapshot inserts zero new rows and
   reports every migrated row as already present.
+
+## 13. Production execution result
+
+The migration was applied to `dlab-mapo` on 2026-08-25 using the reviewed
+source snapshot and the Supabase scheduled physical backup from
+2026-08-24T18:05:02Z as the recovery reference.
+
+- 5 courses, 8 modules, and 60 lectures migrated.
+- 497 programming exercises, 1,100 test cases, and 123 hints migrated.
+- Independent verification completed with zero mismatches.
+- A second apply reported all 5 courses as already present and inserted zero
+  rows.
+- The temporary source credential was removed after extraction; sensitive
+  snapshots and reports remain in the gitignored, owner-only artifact folder.
+
+Users, memberships, classes, submissions, progress, and other activity data
+were not migrated, in accordance with the approved scope.

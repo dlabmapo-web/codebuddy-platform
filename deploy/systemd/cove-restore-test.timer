@@ -1,0 +1,11 @@
+[Unit]
+Description=Validate the latest Cove backup monthly
+
+[Timer]
+OnCalendar=Sat *-*-01..07 05:30:00 Asia/Seoul
+RandomizedDelaySec=30m
+Persistent=true
+Unit=cove-restore-test.service
+
+[Install]
+WantedBy=timers.target

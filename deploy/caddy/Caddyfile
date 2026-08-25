@@ -1,0 +1,61 @@
+{
+	email {$ACME_EMAIL}
+	# Port 2019 is reachable only on Docker's private networks and is scraped by
+	# Prometheus. It is never published on the VPS host.
+	admin 0.0.0.0:2019
+	metrics {
+		per_host
+	}
+}
+
+(production_common) {
+	encode zstd gzip
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		Strict-Transport-Security "max-age=15552000"
+	}
+	request_body {
+		max_size 20MB
+	}
+	log {
+		output file /var/log/caddy/access.json {
+			roll_size 50MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format json
+	}
+}
+
+coveedu.com {
+	import production_common
+	reverse_proxy home:3100
+}
+
+cs.coveedu.com {
+	import production_common
+	reverse_proxy studio:3000 {
+		transport http {
+			read_timeout 10m
+			write_timeout 10m
+		}
+	}
+}
+
+api.coveedu.com {
+	import production_common
+	reverse_proxy api:4000 {
+		transport http {
+			read_timeout 10m
+			write_timeout 10m
+		}
+	}
+}
+
+mvp.coveedu.com {
+	import production_common
+	reverse_proxy mvp:3200
+}

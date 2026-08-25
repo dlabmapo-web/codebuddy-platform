@@ -63,3 +63,11 @@ playwright-report/
 
 # Sensitive one-time database migration snapshots and reports
 .migration-artifacts/
+
+# Production deployment secrets and rendered secret-bearing configuration.
+deploy/deployment.env
+deploy/secrets/*
+!deploy/secrets/*.example
+deploy/generated/*
+!deploy/generated/.gitkeep
+deploy/load/results/

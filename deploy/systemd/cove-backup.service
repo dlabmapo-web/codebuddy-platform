@@ -1,0 +1,17 @@
+[Unit]
+Description=Cove encrypted production backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__COVE_DEPLOY_USER__
+Group=__COVE_DEPLOY_USER__
+Environment=COVE_DEPLOY_ROOT=/opt/cove
+ExecStart=/opt/cove/scripts/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+NoNewPrivileges=true

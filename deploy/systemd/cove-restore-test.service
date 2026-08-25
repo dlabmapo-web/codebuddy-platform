@@ -1,0 +1,15 @@
+[Unit]
+Description=Test restoration of the latest Cove backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__COVE_DEPLOY_USER__
+Group=__COVE_DEPLOY_USER__
+Environment=COVE_DEPLOY_ROOT=/opt/cove
+ExecStart=/opt/cove/scripts/restore-test.sh
+Nice=15
+IOSchedulingClass=idle
+PrivateTmp=true
+NoNewPrivileges=true

@@ -1,0 +1,60 @@
+groups:
+  - name: cove-host
+    rules:
+      - alert: MetricsTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Metrics target is down"
+          description: "{{ $labels.job }} / {{ $labels.instance }} has been unreachable for five minutes."
+
+      - alert: HostDiskSpaceLow
+        expr: |
+          100 * node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 15
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VPS disk space is low"
+          description: "Filesystem {{ $labels.mountpoint }} has less than 15% free space."
+
+      - alert: HostMemoryPressure
+        expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "VPS available memory is low"
+          description: "Available memory has remained below 15% for fifteen minutes."
+
+      - alert: HostCpuSaturation
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "VPS CPU is saturated"
+          description: "Average CPU utilization has remained above 90% for fifteen minutes."
+
+      - alert: ContainerRecentlyMissing
+        expr: time() - container_last_seen{name=~"cove-production-.+"} > 120
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Production container disappeared"
+          description: "{{ $labels.name }} has not reported container metrics recently."
+
+      - alert: CaddyRequestErrors
+        expr: |
+          sum(rate(caddy_http_request_errors_total[5m]))
+            / clamp_min(sum(rate(caddy_http_requests_total[5m])), 0.001) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Caddy error rate is elevated"
+          description: "More than one percent of requests have failed for ten minutes."

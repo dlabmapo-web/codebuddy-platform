@@ -1,0 +1,101 @@
+name: Release Cove MVP
+
+on:
+  workflow_dispatch:
+    inputs:
+      main_commit:
+        description: Full commit SHA from main to deploy as the frozen MVP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-mvp
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out deployment infrastructure
+        uses: actions/checkout@v4
+        with:
+          path: infrastructure
+
+      - name: Check out requested MVP source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.main_commit }}
+          fetch-depth: 0
+          path: mvp-source
+
+      - name: Verify commit belongs to main
+        id: revision
+        working-directory: mvp-source
+        run: |
+          git fetch origin main
+          resolved="$(git rev-parse HEAD)"
+          [[ "$resolved" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$resolved" origin/main
+          printf 'sha=%s\n' "$resolved" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish frozen MVP
+        uses: docker/build-push-action@v6
+        with:
+          context: mvp-source
+          file: infrastructure/deploy/docker/mvp.Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/cove-mvp:sha-${{ steps.revision.outputs.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.revision.outputs.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.MVP_NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.MVP_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Scan published MVP image
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/cove-mvp:sha-${{ steps.revision.outputs.sha }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Configure production SSH identity
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/cove-production
+          chmod 600 ~/.ssh/cove-production
+          printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy approved MVP image
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          GHCR_READ_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          REGISTRY_NAMESPACE: ghcr.io/${{ github.repository_owner }}
+          MVP_TAG: sha-${{ steps.revision.outputs.sha }}
+        run: |
+          printf '%s' "$GHCR_READ_TOKEN" | ssh -i ~/.ssh/cove-production "$VPS_USER@$VPS_HOST" \
+            "docker login ghcr.io --username '$GHCR_READ_USERNAME' --password-stdin"
+          ssh -i ~/.ssh/cove-production "$VPS_USER@$VPS_HOST" \
+            "/opt/cove/scripts/set-mvp-release.sh '$REGISTRY_NAMESPACE' '$MVP_TAG'"

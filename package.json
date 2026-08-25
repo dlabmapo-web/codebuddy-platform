@@ -18,7 +18,10 @@
     "start:home": "pnpm --filter @cove/home start",
     "start:api": "pnpm --filter @cove/api start",
     "e2e": "playwright test --config e2e/playwright.config.ts",
-    "e2e:ui": "playwright test --config e2e/playwright.config.ts --ui"
+    "e2e:ui": "playwright test --config e2e/playwright.config.ts --ui",
+    "e2e:production": "playwright test --config e2e/production.playwright.config.ts",
+    "deploy:validate": "bash deploy/scripts/validate-local.sh",
+    "load:production": "bash deploy/load/run.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1"

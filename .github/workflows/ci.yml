@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feat/cove-studio-v2]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -47,8 +47,70 @@ jobs:
       - name: Lint
         run: pnpm -r lint
 
+      - name: Validate canonical routes and translations
+        run: |
+          pnpm --filter @cove/web routes:lint
+          pnpm --filter @cove/web i18n:check
+
       - name: Test
         run: pnpm -r test
 
       - name: Build
         run: pnpm -r build
+
+  deployment-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        run: bash deploy/scripts/validate-local.sh
+
+  container-images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: home
+            dockerfile: deploy/docker/home.Dockerfile
+            target: runtime
+          - name: studio
+            dockerfile: deploy/docker/web.Dockerfile
+            target: runtime
+          - name: api
+            dockerfile: deploy/docker/api.Dockerfile
+            target: runtime
+          - name: judge
+            dockerfile: deploy/docker/judge-worker.Dockerfile
+            target: runtime
+          - name: migration
+            dockerfile: deploy/docker/api.Dockerfile
+            target: migration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          load: true
+          push: false
+          tags: local/cove-${{ matrix.name }}:ci
+          build-args: |
+            DEPLOYMENT_VERSION=ci-${{ github.sha }}
+            NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=ci-publishable-key
+            NEXT_PUBLIC_API_URL=https://api.coveedu.com/api/rpc
+            NEXT_PUBLIC_SITE_URL=https://cs.coveedu.com
+            NEXT_PUBLIC_STUDIO_URL=https://cs.coveedu.com
+            NEXT_PUBLIC_MVP_URL=https://mvp.coveedu.com
+      - name: Scan runtime image
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          image-ref: local/cove-${{ matrix.name }}:ci
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

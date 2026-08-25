@@ -14,6 +14,12 @@ env:
   # this workflow connects to a database.
   DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
   DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+  # Next.js evaluates public configuration while collecting page data. These
+  # non-secret placeholders make the clean CI build match the Docker build.
+  NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-publishable-key
+  NEXT_PUBLIC_API_URL: https://api.coveedu.com/api/rpc
+  NEXT_PUBLIC_SITE_URL: https://cs.coveedu.com
 
 jobs:
   verify:

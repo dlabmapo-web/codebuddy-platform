@@ -10,6 +10,10 @@ Restore the production CI gates without weakening the deployment security model.
 properties. The package will declare `@types/node` directly so a clean pnpm
 install has the same type environment as local development.
 
+The clean verification build will also receive non-secret public placeholders
+for the build-time Next.js configuration. Production values remain supplied by
+the release workflow and are not stored in CI source.
+
 ## Container scanning
 
 All workflows will use Trivy Action `v0.36.0` pinned to its immutable commit SHA.

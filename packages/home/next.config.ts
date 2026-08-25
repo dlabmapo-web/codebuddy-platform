@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { fileURLToPath } from "node:url";
 
 /*
  * Deliberately thin.
@@ -11,6 +12,9 @@ import type { NextConfig } from "next";
  * See docs/superpowers/specs/2026-08-11-coveedu-marketing-site-design.md §1.
  */
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
+  deploymentId: process.env.DEPLOYMENT_VERSION,
   transpilePackages: ["@cove/i18n"],
 };
 

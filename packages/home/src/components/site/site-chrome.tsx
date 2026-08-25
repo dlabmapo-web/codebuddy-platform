@@ -76,6 +76,7 @@ export function SiteFooter({ t }: { t: MarketingT }) {
         contactLabel: t("footer.contact_label"),
         studioLink: t("footer.studio_link"),
         studioApp: t("footer.studio_app"),
+        mvpApp: t("footer.mvp_app"),
         campusLink: t("footer.campus_link"),
         aboutLink: t("nav.about"),
         areasLink: t("nav.areas"),

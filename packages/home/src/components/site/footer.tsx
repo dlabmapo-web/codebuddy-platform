@@ -11,6 +11,7 @@ export type FooterCopy = {
   contactLabel: string;
   studioLink: string;
   studioApp: string;
+  mvpApp: string;
   campusLink: string;
   aboutLink: string;
   areasLink: string;
@@ -77,10 +78,7 @@ export function Footer({ copy }: { copy: FooterCopy }) {
                 </Link>
               </li>
               <li>
-                {/*
-                 * The only outbound link on the site: the real application,
-                 * which is a different origin in every environment.
-                 */}
+                {/* Product applications use separate origins in production. */}
                 <a
                   href={
                     process.env.NEXT_PUBLIC_STUDIO_URL ??
@@ -89,6 +87,17 @@ export function Footer({ copy }: { copy: FooterCopy }) {
                   className="text-white/80 transition-colors hover:text-white"
                 >
                   {copy.studioApp}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={
+                    process.env.NEXT_PUBLIC_MVP_URL ??
+                    "https://mvp.coveedu.com"
+                  }
+                  className="text-white/80 transition-colors hover:text-white"
+                >
+                  {copy.mvpApp}
                 </a>
               </li>
             </ul>

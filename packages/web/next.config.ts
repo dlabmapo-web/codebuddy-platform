@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { fileURLToPath } from "node:url";
 
 import { compatibilityRedirects } from "./src/lib/routes";
 
@@ -23,6 +24,14 @@ const workerAssetHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  // The app consumes workspace packages outside packages/web. Next's default
+  // tracing root is the app directory, which would omit those files from a
+  // standalone Docker image.
+  outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
+  // A release identifier lets Next force a safe reload when a browser holding
+  // assets from the prior image reaches a newly deployed container.
+  deploymentId: process.env.DEPLOYMENT_VERSION,
   transpilePackages: ["@cove/shared", "@cove/i18n"],
   async redirects() {
     return [...compatibilityRedirects];

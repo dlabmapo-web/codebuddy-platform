@@ -124,7 +124,12 @@ export async function seedE2eContent(prisma: PrismaClient) {
   for (const module of modules) {
     await prisma.courseModule.upsert({
       where: { id: module.id },
-      create: { ...module, courseId: e2eContent.courseId, description: "" },
+      create: {
+        ...module,
+        courseId: e2eContent.courseId,
+        description: "",
+        externalKey: module.id.toUpperCase(),
+      },
       update: { title: module.title, position: module.position, isVisible: module.isVisible },
     });
   }
@@ -163,6 +168,7 @@ export async function seedE2eContent(prisma: PrismaClient) {
       create: {
         id: lecture.id,
         courseModuleId: lecture.moduleId,
+        externalKey: lecture.id.toUpperCase(),
         title: lecture.title,
         description: lecture.description,
         position: lecture.position,

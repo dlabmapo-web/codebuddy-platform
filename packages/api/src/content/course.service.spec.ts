@@ -167,6 +167,96 @@ const moduleId = "50000000-0000-4000-8000-000000000001";
 const lectureId = "60000000-0000-4000-8000-000000000001";
 const materialId = "70000000-0000-4000-8000-000000000001";
 
+function createHierarchyService() {
+  const module = {
+    id: moduleId,
+    courseId,
+    externalKey: "MODULE-1",
+    title: "Basics",
+    description: "",
+    position: 1,
+    isVisible: false,
+  };
+  const lecture = {
+    id: lectureId,
+    courseModuleId: moduleId,
+    externalKey: "LECTURE-1",
+    title: "Variables",
+    description: "",
+    position: 1,
+    isVisible: false,
+  };
+  const transaction = {
+    courseModule: { update: vi.fn().mockResolvedValue(module) },
+    lecture: { update: vi.fn().mockResolvedValue(lecture) },
+    course: {
+      update: vi.fn().mockResolvedValue({ contentRevision: 2 }),
+    },
+  };
+  const prisma = {
+    courseModule: { findFirst: vi.fn().mockResolvedValue(module) },
+    lecture: { findFirst: vi.fn().mockResolvedValue(lecture) },
+    $transaction: vi.fn(
+      async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+    ),
+  } as unknown as PrismaService;
+  const service = new CourseService(
+    prisma,
+    {
+      requirePermission: vi.fn().mockResolvedValue({
+        userId: actorUserId,
+        academyId,
+        role: "TEAM_LEAD",
+      }),
+    } as unknown as AcademyAccessService,
+    { write: vi.fn().mockResolvedValue({ id: "audit-id" }) } as unknown as AuditService,
+    { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
+  );
+  Object.defineProperty(service, "currentTree", {
+    value: vi.fn().mockResolvedValue({}),
+  });
+  return { service, transaction };
+}
+
+describe("CourseService hierarchy revisions", () => {
+  it("bumps the course revision when a module changes", async () => {
+    const { service, transaction } = createHierarchyService();
+
+    await service.updateModule(identity, {
+      academyId,
+      courseId,
+      moduleId,
+      title: "Updated basics",
+    });
+
+    expect(transaction.course.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: courseId },
+        data: { contentRevision: { increment: 1 } },
+      }),
+    );
+  });
+
+  it("bumps the course revision when a lecture changes", async () => {
+    const { service, transaction } = createHierarchyService();
+
+    await service.updateLecture(identity, {
+      academyId,
+      courseId,
+      lectureId,
+      title: "Updated variables",
+    });
+
+    expect(transaction.course.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: courseId },
+        data: { contentRevision: { increment: 1 } },
+      }),
+    );
+  });
+});
+
 function exerciseRecord() {
   return {
     id: materialId,
@@ -268,6 +358,11 @@ function createExerciseService() {
     studentExerciseProgress: {
       updateMany: vi.fn().mockResolvedValue({ count: 4 }),
     },
+    // §9.2 — every content mutation bumps the course's content revision in the
+    // same transaction, so an import preview taken beforehand is refused.
+    course: {
+      update: vi.fn().mockResolvedValue({ contentRevision: 2 }),
+    },
   };
   const prisma = {
     material: { findFirst: vi.fn().mockResolvedValue(current) },
@@ -301,6 +396,21 @@ function createExerciseService() {
 }
 
 describe("CourseService direct problem editing", () => {
+  it("bumps the course content revision so an open import preview goes stale", async () => {
+    const { service, transaction } = createExerciseService();
+
+    await service.updateExercise(identity, { ...exerciseInput });
+
+    // §9.2 — `updatedAt` on the course row does not move when a test case four
+    // levels down changes, which is exactly the edit an import preview must not
+    // survive. The counter is bumped inside the same transaction as the write.
+    expect(transaction.course.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { contentRevision: { increment: 1 } },
+      }),
+    );
+  });
+
   it("increments the grading revision and resets current progress", async () => {
     const { service, transaction, audit } = createExerciseService();
 

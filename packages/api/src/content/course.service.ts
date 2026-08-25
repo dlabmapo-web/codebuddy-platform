@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import { stableKeyFromUuid } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -7,6 +8,16 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { AuditService } from "../academies/audit.service.js";
+import {
+  bumpContentRevision,
+  compactLecturePositions,
+  compactMaterialPositions,
+  compactModulePositions,
+  nextLecturePosition,
+  nextMaterialPosition,
+  nextModulePosition,
+  rewritePositions,
+} from "./content-positions.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 
 type ContentRequestContext = { requestId?: string };
@@ -183,6 +194,9 @@ export class CourseService {
         before: { title: current.title, description: current.description },
         after: { title: updated.title, description: updated.description },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
       return updated;
     });
     return toCourseSummary(course);
@@ -219,6 +233,9 @@ export class CourseService {
         before: { isVisible: current.isVisible },
         after: { isVisible: updated.isVisible },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
       return updated;
     });
     if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
@@ -255,6 +272,10 @@ export class CourseService {
       const created = await tx.courseModule.create({
         data: {
           courseId: input.courseId,
+          // §5.2 — server-generated, never author-supplied. The generated
+          // workbook exposes this key, which is what lets a team lead update a
+          // module they created by hand through Excel later.
+          externalKey: stableKeyFromUuid(randomUUID()),
           title: input.title.trim(),
           description: input.description.trim(),
           position,
@@ -270,6 +291,9 @@ export class CourseService {
         requestId: context.requestId,
         after: { title: created.title, position, isVisible: false },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
   }
@@ -311,6 +335,7 @@ export class CourseService {
         before: moduleAudit(current),
         after: moduleAudit(updated),
       });
+      await bumpContentRevision(tx, input.courseId);
     });
     if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -336,6 +361,9 @@ export class CourseService {
         requestId: context.requestId,
         before: moduleAudit(current),
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -365,6 +393,9 @@ export class CourseService {
         requestId: context.requestId,
         after: { orderedModuleIds: input.orderedModuleIds },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
   }
@@ -388,6 +419,7 @@ export class CourseService {
       const created = await tx.lecture.create({
         data: {
           courseModuleId: input.moduleId,
+          externalKey: stableKeyFromUuid(randomUUID()),
           title: input.title.trim(),
           description: input.description.trim(),
           position,
@@ -403,6 +435,9 @@ export class CourseService {
         requestId: context.requestId,
         after: { title: created.title, position, isVisible: false },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
   }
@@ -444,6 +479,7 @@ export class CourseService {
         before: lectureAudit(current),
         after: lectureAudit(updated),
       });
+      await bumpContentRevision(tx, input.courseId);
     });
     if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -469,6 +505,9 @@ export class CourseService {
         requestId: context.requestId,
         before: lectureAudit(current),
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -504,6 +543,9 @@ export class CourseService {
         requestId: context.requestId,
         after: { orderedLectureIds: input.orderedLectureIds },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
   }
@@ -544,7 +586,9 @@ export class CourseService {
           isVisible: false,
           programmingExercise: {
             create: {
-              externalKey: randomUUID(),
+              // §9.1 — the same canonical form imported keys use, so a
+              // generated workbook round-trips a hand-made problem unchanged.
+              externalKey: stableKeyFromUuid(randomUUID()),
               difficulty: input.difficulty,
               description: input.description,
               inputFormat: input.inputFormat,
@@ -572,6 +616,9 @@ export class CourseService {
         requestId: context.requestId,
         after: exerciseAuditFromInput(input, position, false, 1),
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
       return material;
     });
     return toExerciseAuthoringContext(record);
@@ -665,6 +712,9 @@ export class CourseService {
           progressResetCount,
         },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
       return updated;
     });
     return toExerciseAuthoringContext(record);
@@ -698,6 +748,9 @@ export class CourseService {
         before: { isVisible: current.isVisible },
         after: { isVisible: input.isVisible },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -728,6 +781,9 @@ export class CourseService {
         requestId: context.requestId,
         before: exerciseRecordAudit(current),
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -763,6 +819,9 @@ export class CourseService {
         requestId: context.requestId,
         after: { orderedMaterialIds: input.orderedMaterialIds },
       });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
   }
@@ -915,113 +974,6 @@ export class CourseService {
     ) {
       throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.CONFLICT);
     }
-  }
-}
-
-async function nextModulePosition(
-  tx: Prisma.TransactionClient,
-  courseId: string,
-) {
-  const result = await tx.courseModule.aggregate({
-    where: { courseId },
-    _max: { position: true },
-  });
-  return (result._max.position ?? 0) + 1;
-}
-
-async function nextLecturePosition(
-  tx: Prisma.TransactionClient,
-  moduleId: string,
-) {
-  const result = await tx.lecture.aggregate({
-    where: { courseModuleId: moduleId },
-    _max: { position: true },
-  });
-  return (result._max.position ?? 0) + 1;
-}
-
-async function nextMaterialPosition(
-  tx: Prisma.TransactionClient,
-  lectureId: string,
-) {
-  const result = await tx.material.aggregate({
-    where: { lectureId },
-    _max: { position: true },
-  });
-  return (result._max.position ?? 0) + 1;
-}
-
-async function compactModulePositions(
-  tx: Prisma.TransactionClient,
-  courseId: string,
-) {
-  const records = await tx.courseModule.findMany({
-    where: { courseId },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    select: { id: true },
-  });
-  await rewritePositions(tx, "module", records.map((record) => record.id));
-}
-
-async function compactLecturePositions(
-  tx: Prisma.TransactionClient,
-  moduleId: string,
-) {
-  const records = await tx.lecture.findMany({
-    where: { courseModuleId: moduleId },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    select: { id: true },
-  });
-  await rewritePositions(tx, "lecture", records.map((record) => record.id));
-}
-
-async function compactMaterialPositions(
-  tx: Prisma.TransactionClient,
-  lectureId: string,
-) {
-  const records = await tx.material.findMany({
-    where: { lectureId },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    select: { id: true },
-  });
-  await rewritePositions(tx, "material", records.map((record) => record.id));
-}
-
-async function rewritePositions(
-  tx: Prisma.TransactionClient,
-  kind: "module" | "lecture" | "material",
-  ids: string[],
-) {
-  if (ids.length === 0) return;
-  const currentMax =
-    kind === "module"
-      ? await tx.courseModule.aggregate({
-          where: { id: { in: ids } },
-          _max: { position: true },
-        })
-      : kind === "lecture"
-        ? await tx.lecture.aggregate({
-            where: { id: { in: ids } },
-            _max: { position: true },
-          })
-        : await tx.material.aggregate({
-            where: { id: { in: ids } },
-            _max: { position: true },
-          });
-  const temporaryStart = (currentMax._max.position ?? 0) + ids.length + 1;
-  for (const [index, id] of ids.entries()) {
-    // Positions have positive CHECK constraints, so move records above the
-    // current range before assigning the final contiguous order.
-    const data = { position: temporaryStart + index };
-    if (kind === "module") await tx.courseModule.update({ where: { id }, data });
-    if (kind === "lecture") await tx.lecture.update({ where: { id }, data });
-    if (kind === "material") await tx.material.update({ where: { id }, data });
-  }
-  for (const [index, id] of ids.entries()) {
-    const data = { position: index + 1 };
-    if (kind === "module") await tx.courseModule.update({ where: { id }, data });
-    if (kind === "lecture") await tx.lecture.update({ where: { id }, data });
-    if (kind === "material") await tx.material.update({ where: { id }, data });
   }
 }
 

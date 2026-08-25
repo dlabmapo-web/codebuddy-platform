@@ -11,6 +11,7 @@ import type auth from '@cove/i18n/locales/en/auth.json';
 import type classes from '@cove/i18n/locales/en/classes.json';
 import type common from '@cove/i18n/locales/en/common.json';
 import type content from '@cove/i18n/locales/en/content.json';
+import type contentImport from '@cove/i18n/locales/en/content-import.json';
 import type courses from '@cove/i18n/locales/en/courses.json';
 import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
@@ -42,6 +43,7 @@ declare module 'i18next' {
       classes: typeof classes;
       common: typeof common;
       content: typeof content;
+      'content-import': typeof contentImport;
       courses: typeof courses;
       errors: typeof errors;
       invitations: typeof invitations;

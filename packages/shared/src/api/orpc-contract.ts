@@ -11,6 +11,7 @@ import {
   joinRequestsContract,
 } from "./orpc/academies.contract.js";
 import { academyClassesContract } from "./orpc/classes.contract.js";
+import { academyContentImportsContract } from "./orpc/content-imports.contract.js";
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
 import {
@@ -44,6 +45,7 @@ export const appContract = {
   profile: profileContract,
   academyProfile: academyProfileContract,
   academyCourses: academyCoursesContract,
+  academyContentImports: academyContentImportsContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
   monitoring: monitoringContract,

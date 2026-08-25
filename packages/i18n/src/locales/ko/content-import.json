@@ -1,0 +1,151 @@
+{
+  "page_title": "엑셀로 가져오기",
+  "page_description": "워크북에서 모듈·강의·문제를 추가하거나 수정합니다.",
+  "back_to_course": "{{course}}(으)로 돌아가기",
+  "stage": {
+    "prepare": "준비",
+    "upload": "업로드",
+    "review": "검토",
+    "result": "결과"
+  },
+  "prepare": {
+    "title": "워크북에서 시작하기",
+    "description": "코스를 스프레드시트로 내려받아 편집한 뒤 다시 업로드하세요. 파일의 키가 무엇을 수정할지 결정합니다.",
+    "recommended": "권장",
+    "current_label": "이 코스 내려받기",
+    "current_description": "현재 존재하는 모든 모듈·강의·문제·테스트·힌트를 키와 함께 담습니다. 행을 그 자리에서 고치면 수정됩니다.",
+    "blank_label": "빈 서식 내려받기",
+    "blank_description": "예시 행이 들어 있는 같은 네 개의 시트입니다. 코스를 편집하기 전에 형식을 확인할 때 사용하세요.",
+    "too_large": "이 코스에는 문제가 {{total}}개 있어 한 번에 가져올 수 있는 {{limit}}개를 넘습니다. 코스 빌더에서 모듈 단위로 내보내세요.",
+    "rule_keys": "키를 그대로 두면 수정되고, 새 키를 적으면 새로 만들어집니다.",
+    "rule_no_delete": "행을 지워도 아무것도 삭제되지 않습니다. 삭제는 코스 빌더에서 하세요.",
+    "rule_hidden": "새로 만든 모듈·강의·문제는 학생에게 숨겨진 상태로 추가됩니다.",
+    "rule_collections": "문제의 테스트와 힌트 행은 해당 문제의 전체 목록을 대체합니다."
+  },
+  "upload": {
+    "title": "워크북을 여기에 놓으세요",
+    "description": "최대 {{size}}MB의 .xlsx 파일이며, 눌러서 선택할 수도 있습니다.",
+    "safe_note": "업로드해도 아무것도 바뀌지 않습니다. 무엇이 바뀔지 먼저 보여드립니다.",
+    "working": "워크북을 읽는 중",
+    "reason": {
+      "not_xlsx": ".xlsx로 저장한 뒤 다시 시도하세요. CSV로는 이 형식에 필요한 네 개의 연결된 시트를 담을 수 없습니다.",
+      "file_too_large": "파일이 {{size}}MB보다 큽니다."
+    }
+  },
+  "review": {
+    "summary_title": "이 워크북이 적용할 내용",
+    "summary_total_other": "{{count}}개 항목",
+    "upload_again": "다른 파일 업로드",
+    "search_placeholder": "키 또는 제목으로 검색",
+    "filter": {
+      "all": "전체",
+      "create": "생성",
+      "update": "수정",
+      "unchanged": "변경 없음",
+      "warnings": "경고",
+      "conflicts": "충돌"
+    },
+    "action": {
+      "CREATE": {
+        "module": "새 모듈",
+        "lecture": "새 강의",
+        "problem": "생성"
+      },
+      "UPDATE": {
+        "module": "모듈 수정",
+        "lecture": "강의 수정",
+        "problem": "수정"
+      },
+      "UNCHANGED": {
+        "module": "변경 없음",
+        "lecture": "변경 없음",
+        "problem": "변경 없음"
+      }
+    },
+    "child_counts": "테스트 {{tests}}개 · 힌트 {{hints}}개",
+    "changed_fields": "변경 항목",
+    "visible": "학생에게 공개됨",
+    "visible_hint": "학생이 볼 수 있는 상태에서 이 내용이 수정됩니다. 공개 여부는 바뀌지 않습니다.",
+    "issue_location": "{{sheet}} · {{row}}행 · {{column}}",
+    "issue_received": "입력값: {{value}}",
+    "empty_title": "일치하는 항목이 없습니다",
+    "empty_body": "검색어를 지우거나 다른 필터를 선택하세요.",
+    "confirm_title": "확인하기 전에",
+    "promise_no_delete": "모듈·강의·문제는 삭제되지 않습니다.",
+    "promise_hidden": "새 내용은 학생에게 숨겨진 상태로 추가됩니다.",
+    "promise_visibility": "기존 내용의 공개 여부는 지금 그대로 유지됩니다.",
+    "promise_atomic": "가져오기는 전부 반영되거나 아무것도 바꾸지 않습니다.",
+    "blocked_title_other": "해결할 충돌 {{count}}건",
+    "blocked_body": "워크북에서 해당 행을 고친 뒤 다시 업로드하세요. 충돌이 하나라도 남아 있으면 아무것도 반영되지 않습니다.",
+    "acknowledge_title_other": "경고 {{count}}건을 확인했습니다",
+    "acknowledge_body": "경고는 가져오기를 막지 않지만, 학생에게 영향을 주거나 기존 작업을 대체하는 변경을 설명합니다.",
+    "confirm_action_other": "변경 {{count}}건 가져오기",
+    "download_issues_other": "문제 {{count}}건 내려받기"
+  },
+  "result": {
+    "title": "가져오기 완료",
+    "description": "새 내용은 학생에게 숨겨져 있습니다. 코스 빌더에서 검토한 뒤 공개하세요.",
+    "created": "생성됨",
+    "updated": "수정됨",
+    "unchanged": "변경 없음",
+    "failed": "실패",
+    "return_to_course": "코스로 돌아가기",
+    "import_another": "다른 워크북 가져오기",
+    "problems_title_other": "검토할 문제 {{count}}개",
+    "action": {
+      "CREATE": "생성",
+      "UPDATE": "수정",
+      "UNCHANGED": "변경 없음"
+    }
+  },
+  "unavailable": {
+    "denied_title": "가져오기를 사용할 수 없습니다",
+    "denied_body": "코스에 커리큘럼을 가져올 수 있는 것은 팀 리드뿐입니다.",
+    "load_failed_title": "코스를 불러오지 못했습니다",
+    "load_failed_body": "저희 쪽 문제입니다. 잠시 후 다시 시도해 주세요.",
+    "back": "코스로 돌아가기"
+  },
+  "issue": {
+    "sheet_missing": "이 시트가 없거나 비어 있습니다.",
+    "column_missing": "필수 열이 없습니다.",
+    "column_duplicated": "이 열이 두 번 있습니다.",
+    "row_blank": "이 행이 비어 있습니다.",
+    "key_missing": "이 행에는 키가 필요합니다.",
+    "key_invalid": "키는 문자·숫자와 - _ . 만 사용할 수 있으며 최대 80자입니다.",
+    "title_missing": "이 행에는 제목이 필요합니다.",
+    "title_too_long": "제목은 최대 200자입니다.",
+    "text_too_long": "이 항목은 최대 10,000자입니다.",
+    "code_too_long": "코드와 테스트 값은 최대 100,000자입니다.",
+    "difficulty_missing": "난이도를 EASY, MEDIUM, HARD 중 하나로 지정하세요.",
+    "difficulty_invalid": "난이도는 EASY, MEDIUM, HARD여야 합니다.",
+    "description_missing": "모든 문제에는 설명이 필요합니다.",
+    "description_format_invalid": "description_format은 PLAIN_TEXT 또는 RICH_TEXT_HTML이어야 합니다.",
+    "boolean_invalid": "TRUE 또는 FALSE를 사용하세요.",
+    "order_missing": "이 행에는 순서 번호가 필요합니다.",
+    "order_invalid": "순서는 1 이상의 정수여야 합니다.",
+    "visibility_missing": "visibility를 SAMPLE 또는 HIDDEN으로 지정하세요.",
+    "visibility_invalid": "visibility는 SAMPLE 또는 HIDDEN이어야 합니다.",
+    "expected_output_missing": "모든 테스트에는 기대 출력이 필요합니다.",
+    "hint_content_missing": "모든 힌트에는 내용이 필요합니다.",
+    "formula_cell": "이 셀의 수식을 지우고 값을 직접 입력하세요.",
+    "too_many_problems": "한 번에 가져올 수 있는 문제는 200개까지입니다.",
+    "too_many_tests": "한 문제의 테스트는 최대 50개입니다.",
+    "too_many_hints": "한 문제의 힌트는 최대 20개입니다.",
+    "tests_missing": "이 문제에는 테스트가 없습니다. 최소 한 개를 추가하세요.",
+    "sample_test_missing": "이 문제에는 SAMPLE 테스트가 최소 한 개 필요합니다.",
+    "duplicate_key_in_workbook": "두 행이 같은 키를 사용합니다. 키는 코스 안에서 고유해야 합니다.",
+    "parent_conflict": "이미 코스의 다른 위치에 있습니다. 가져오기로는 옮길 수 없습니다.",
+    "title_conflict": "다른 키를 가진 항목이 이미 이 제목을 사용합니다.",
+    "order_conflict": "두 항목이 같은 위치를 차지합니다.",
+    "orphan_lecture_reference": "이 워크북과 코스 어디에도 해당 키의 강의가 없습니다.",
+    "orphan_problem_reference": "이 워크북에 해당 키의 문제가 없습니다.",
+    "structure_contradiction": "같은 모듈의 행들이 서로 다른 내용을 말합니다.",
+    "duplicate_order_in_workbook": "두 행이 이 문제에서 같은 순서를 차지합니다.",
+    "updates_visible_content": "지금 학생이 볼 수 있는 내용이며, 이번에 수정됩니다.",
+    "replaces_test_cases": "이 문제의 테스트가 교체됩니다.",
+    "clears_hints": "워크북에 힌트 행이 없어 이 문제의 힌트가 모두 삭제됩니다.",
+    "grading_revision_advances": "채점 기준이 바뀌어 기존 제출도 새 테스트로 평가됩니다.",
+    "unknown_sheet_ignored": "형식에 없는 시트라 무시됩니다.",
+    "unknown_column_ignored": "형식에 없는 열이라 무시됩니다."
+  }
+}

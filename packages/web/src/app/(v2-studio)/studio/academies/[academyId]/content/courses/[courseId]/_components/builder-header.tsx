@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ChevronsDownUp,
   ChevronsUpDown,
+  FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -13,9 +14,13 @@ import { VisibilityIndicator } from './builder-controls';
 export function BuilderHeader({
   academyId,
   builder,
+  canImport,
+  courseId,
 }: {
   academyId: string;
   builder: CourseBuilderState;
+  canImport: boolean;
+  courseId: string;
 }) {
   const { t } = useLayoutTranslation('content');
 
@@ -35,6 +40,21 @@ export function BuilderHeader({
             lectures: builder.lectureCount,
           })}
         </p>
+        {/*
+          §4.1 — offered only to a Team Lead, and only as a convenience: every
+          server call the wizard makes checks `content.import` for itself, so
+          hiding this saves a Manager a dead end rather than protecting
+          anything.
+        */}
+        {canImport ? (
+          <Link
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
+            href={`/studio/academies/${academyId}/content/courses/${courseId}/imports/new`}
+          >
+            <FileSpreadsheet className="size-4" />
+            {t('builder.import_excel')}
+          </Link>
+        ) : null}
         <VisibilityIndicator
           effectivelyVisible={builder.tree.course.isVisible}
           isVisible={builder.tree.course.isVisible}

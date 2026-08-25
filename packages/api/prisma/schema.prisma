@@ -203,6 +203,20 @@ enum PeopleImportStatus {
 
 /// What a bulk operation does. Named rather than free text so a new kind is a
 /// migration and a decision, not a string somebody passed.
+/// The lifecycle of one curriculum import.
+///
+/// The same five states the member importer uses, and for the same reason:
+/// PREVIEW_READY is the only one a commit may claim, and claiming it is a
+/// conditional update, so two tabs holding one preview produce one winner
+/// rather than two imports.
+enum ContentImportStatus {
+  PREVIEW_READY
+  COMMITTING
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
 enum PeopleBulkKind {
   ENROLL
   ROLE_CHANGE
@@ -299,6 +313,7 @@ model User {
   avatarAsset           MediaAsset?               @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
   mediaUploaded         MediaAsset[]              @relation("MediaUploader")
   peopleImports         PeopleImportSession[]     @relation("PeopleImportActor")
+  contentImports        ContentImportSession[]    @relation("ContentImportActor")
   peopleBulkOperations  PeopleBulkOperation[]     @relation("PeopleBulkActor")
   academiesCreated      Academy[]                 @relation("AcademyCreator")
 
@@ -517,6 +532,7 @@ model Academy {
   classLearningDays      StudentClassCourseLearningDay[]
   media                  AcademyMedia[]
   importSessions         PeopleImportSession[]
+  contentImportSessions  ContentImportSession[]
   bulkOperations         PeopleBulkOperation[]
   pointAwards            PointAward[]
   pointPolicy            AcademyPointPolicy?
@@ -711,6 +727,63 @@ model PeopleImportSession {
   @@map("people_import_sessions")
 }
 
+/// One curriculum import, from the moment the workbook was read to the receipt
+/// it leaves behind.
+///
+/// Durable rather than cached, for the case that makes an importer dangerous:
+/// the transaction committed and the response was lost on the wire. A retry has
+/// to be able to learn that forty problems already exist, and a session held in
+/// memory could not answer that after a deploy — the team lead would be shown a
+/// preview of changes that had already been applied.
+///
+/// Scoped to one course as well as one academy. Every read filters on both, and
+/// a session belonging to another course is reported with the same code as one
+/// that never existed, so an id cannot be probed for existence across a course
+/// or tenant boundary.
+model ContentImportSession {
+  id                     String              @id @default(uuid()) @db.Uuid
+  academyId              String              @map("academy_id") @db.Uuid
+  courseId               String              @map("course_id") @db.Uuid
+  actorUserId            String              @map("actor_user_id") @db.Uuid
+  originalFilename       String              @map("original_filename")
+  /// SHA-256 of the uploaded bytes, for the audit trail. The raw workbook is
+  /// never stored: it holds hidden expected outputs and problem text, and a
+  /// checksum answers "was this the same file" without keeping any of it.
+  checksumSha256         String              @map("checksum_sha256")
+  templateVersion        Int                 @map("template_version")
+  status                 ContentImportStatus @default(PREVIEW_READY)
+  createCount            Int                 @map("create_count")
+  updateCount            Int                 @map("update_count")
+  unchangedCount         Int                 @map("unchanged_count")
+  warningCount           Int                 @map("warning_count")
+  conflictCount          Int                 @map("conflict_count")
+  errorCount             Int                 @map("error_count")
+  /// The planned actions, exactly as the team lead reviewed them. Bounded by
+  /// the 200-problem cap and the per-cell limits the reader enforces.
+  plan                   Json
+  /// §9.2 — the course revision the plan was computed against.
+  capturedContentRevision Int                @map("captured_content_revision")
+  expiresAt              DateTime            @map("expires_at") @db.Timestamptz(6)
+  /// Unique per course: a retried commit returns the original result rather
+  /// than importing the workbook twice.
+  idempotencyKey         String              @map("idempotency_key")
+  committedAt            DateTime?           @map("committed_at") @db.Timestamptz(6)
+  /// What the commit actually did, with the ids the result screen links to.
+  result                 Json?
+  failureCode            String?             @map("failure_code")
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  actor   User    @relation("ContentImportActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, idempotencyKey])
+  @@index([academyId, courseId, status, createdAt])
+  @@index([expiresAt])
+  @@map("content_import_sessions")
+}
+
 /// One bulk mutation, and what it actually did.
 ///
 /// Durable because §12 makes bulk operations idempotent: a retry with the same
@@ -826,6 +899,15 @@ model Course {
   title           String
   description     String   @default("")
   isVisible       Boolean  @default(false) @map("is_visible")
+  /// Bumped by every mutation anywhere in this course's content, in the same
+  /// transaction as the mutation itself.
+  ///
+  /// `updatedAt` cannot do this job: adding a test case to a problem four
+  /// levels down never touches the course row, so an import preview validated
+  /// against `updatedAt` would survive an edit that invalidated it. An import
+  /// captures this number, the browser round-trips it, and the commit compares
+  /// it again while holding the course lock.
+  contentRevision Int      @default(1) @map("content_revision")
   createdByUserId String   @map("created_by_user_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -838,6 +920,7 @@ model Course {
   classAssignments  ClassCourse[]
   learningDays      StudentCourseLearningDay[]
   classLearningDays StudentClassCourseLearningDay[]
+  importSessions    ContentImportSession[]
 
   @@index([academyId, isVisible, updatedAt])
   @@map("courses")
@@ -937,6 +1020,14 @@ model ClassEnrollment {
 model CourseModule {
   id          String   @id @default(uuid()) @db.Uuid
   courseId    String   @map("course_id") @db.Uuid
+  /// The import identity, stable across renaming and reordering.
+  ///
+  /// Manually created modules get a server-generated UUID key, which the
+  /// generated workbook exposes — that is what lets a team lead edit content
+  /// they made by hand through Excel without inventing a key for it. Never
+  /// author-supplied outside an import: the manual create path has no column
+  /// for it, so a hand-typed key cannot collide with an imported one.
+  externalKey String   @map("external_key")
   title       String
   description String   @default("")
   position    Int
@@ -949,6 +1040,11 @@ model CourseModule {
   lectures Lecture[]
 
   @@unique([courseId, position])
+  /// The database enforces module keys because it can: a module's course is one
+  /// column away. Lecture and problem keys are course-unique too, but proving
+  /// that needs the whole Material -> Lecture -> Module -> Course chain, so the
+  /// import service enforces those while holding the course lock.
+  @@unique([courseId, externalKey])
   @@index([courseId])
   @@map("course_modules")
 }
@@ -956,6 +1052,11 @@ model CourseModule {
 model Lecture {
   id             String   @id @default(uuid()) @db.Uuid
   courseModuleId String   @map("course_module_id") @db.Uuid
+  /// The import identity. Course-unique rather than module-unique: the
+  /// Problems sheet references a lecture with no module column, so a key that
+  /// was only unique inside its module would be ambiguous the moment two
+  /// modules reused one.
+  externalKey    String   @map("external_key")
   title          String
   description    String   @default("")
   position       Int
@@ -969,6 +1070,7 @@ model Lecture {
 
   @@unique([courseModuleId, position])
   @@index([courseModuleId])
+  @@index([externalKey])
   @@map("lectures")
 }
 

@@ -16,6 +16,7 @@ import type { AcademyMembershipService } from "../academies/academy-membership.s
 import type { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import type { RateLimitService } from "../academies/rate-limit.service.js";
 import type { ClassesService } from "../classes/classes.service.js";
+import type { ContentImportService } from "../content/import/content-import.service.js";
 import type { CourseService } from "../content/course.service.js";
 import type { AnswerRecordsService } from "../learn/answer-records.service.js";
 import type { LearnClassService } from "../learn/learn-class.service.js";
@@ -57,6 +58,7 @@ export type ORPCDeps = {
   academyOnboardingService: AcademyOnboardingService;
   rateLimitService: RateLimitService;
   courseService: CourseService;
+  contentImportService: ContentImportService;
   classesService: ClassesService;
   answerRecordsService: AnswerRecordsService;
   learnClassService: LearnClassService;

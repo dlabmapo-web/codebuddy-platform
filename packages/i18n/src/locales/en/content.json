@@ -9,7 +9,8 @@
     "load_failed_title": "Could not load this course",
     "load_failed_body": "This is not a permissions problem. Something went wrong on the server — try again, and check the server logs if it persists.",
     "summary": "{{modules}} modules · {{lectures}} lectures",
-    "structural_error": "Could not save that change. Try again."
+    "structural_error": "Could not save that change. Try again.",
+    "import_excel": "Import from Excel"
   },
   "empty": {
     "heading": "Start with a module",

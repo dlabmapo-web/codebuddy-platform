@@ -75,6 +75,17 @@ export const appErrorCodes = [
   "IMPORT_PREVIEW_EXPIRED",
   "IMPORT_NOT_COMMITTABLE",
   "IMPORT_IN_PROGRESS",
+  "CONTENT_IMPORT_FILE_REJECTED",
+  "CONTENT_IMPORT_TEMPLATE_UNSUPPORTED",
+  "CONTENT_IMPORT_SESSION_NOT_FOUND",
+  "CONTENT_IMPORT_PREVIEW_EXPIRED",
+  "CONTENT_IMPORT_NOT_COMMITTABLE",
+  "CONTENT_IMPORT_IN_PROGRESS",
+  "CONTENT_IMPORT_REVISION_CONFLICT",
+  "CONTENT_IMPORT_PARENT_CONFLICT",
+  "CONTENT_IMPORT_KEY_CONFLICT",
+  "CONTENT_IMPORT_ORDER_CONFLICT",
+  "CONTENT_IMPORT_VALIDATION_FAILED",
   "PEOPLE_REVISION_CONFLICT",
   "BULK_OPERATION_IN_PROGRESS",
   "BULK_SELECTION_EMPTY",
@@ -216,6 +227,31 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   IMPORT_NOT_COMMITTABLE:
     "Fix the errors and acknowledge the warnings before importing.",
   IMPORT_IN_PROGRESS: "This import is already running.",
+  // The curriculum importer's own family. Kept separate from the member one
+  // rather than widened: the two features share a shape and nothing else, and a
+  // single IMPORT_SESSION_NOT_FOUND covering both would make a member session
+  // and a course session interchangeable in every scope check that reads it.
+  CONTENT_IMPORT_FILE_REJECTED: "That file could not be read as a course workbook.",
+  CONTENT_IMPORT_TEMPLATE_UNSUPPORTED:
+    "This workbook was made for a different template version. Download the workbook again.",
+  // One code for a missing session, another course's, and another academy's, so
+  // a team lead cannot confirm that an id belongs to somebody else's import.
+  CONTENT_IMPORT_SESSION_NOT_FOUND: "That import is no longer available.",
+  CONTENT_IMPORT_PREVIEW_EXPIRED:
+    "This preview has expired. Upload the workbook again to see current results.",
+  CONTENT_IMPORT_NOT_COMMITTABLE:
+    "Resolve the conflicts and acknowledge the warnings before importing.",
+  CONTENT_IMPORT_IN_PROGRESS: "This import is already running.",
+  // The course moved while the preview was on screen. Never resolved by
+  // overwriting: the team lead uploads again and reviews the new plan.
+  CONTENT_IMPORT_REVISION_CONFLICT:
+    "The course changed while you were reviewing. Upload the workbook again.",
+  CONTENT_IMPORT_PARENT_CONFLICT:
+    "Import cannot move existing content to another module or lecture.",
+  CONTENT_IMPORT_KEY_CONFLICT: "Two rows use the same key.",
+  CONTENT_IMPORT_ORDER_CONFLICT: "Two rows claim the same position.",
+  CONTENT_IMPORT_VALIDATION_FAILED:
+    "Fix the issues listed in the preview and upload the workbook again.",
   // The roster moved while a preview or a selection was on screen. Never
   // resolved by overwriting: the manager re-reads and decides again.
   PEOPLE_REVISION_CONFLICT:

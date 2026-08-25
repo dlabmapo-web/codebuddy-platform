@@ -1,6 +1,7 @@
 export * from "./academy-time.js";
 export * from "./answer-records.js";
 export * from "./course.js";
+export * from "./import/index.js";
 export * from "./learn.js";
 export * from "./manager-overview.js";
 export * from "./python-error-focus.js";

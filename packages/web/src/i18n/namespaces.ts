@@ -139,6 +139,26 @@ export const peopleOpsNamespaces = [
 export const platformNamespaces = ['platform', 'errors'] as const;
 
 /**
+ * The curriculum importer.
+ *
+ * Its own list for the same reason `lead` and `people-ops` have one: it is a
+ * large namespace belonging to one role on one route, and it carries a
+ * vocabulary nothing else needs — forty issue codes, five planned outcomes, and
+ * the copy of a four-stage wizard. A Student loading their catalog should not
+ * pay for the sentence explaining what a stable key is.
+ *
+ * `content` travels with it because the wizard names modules, lectures, and
+ * problems constantly and two spellings of "lecture" in one product is worse
+ * than one extra namespace on one route. `errors` because every step here is a
+ * call that can be refused.
+ */
+export const contentImportNamespaces = [
+  'content',
+  'content-import',
+  'errors',
+] as const;
+
+/**
  * The student inactivity countdown, mounted by the academy layout.
  *
  * Its own list, and a very small one: it is the only copy every authenticated
@@ -176,6 +196,7 @@ export type PageNamespace =
   | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
   | (typeof platformNamespaces)[number]
+  | (typeof contentImportNamespaces)[number]
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number]
   | (typeof pointsNamespaces)[number];

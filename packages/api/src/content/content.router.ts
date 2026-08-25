@@ -138,5 +138,34 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
           })
         ),
     },
+
+    /**
+     * §8 — everything after the workbook's bytes have landed.
+     *
+     * `access.authenticated` only proves who is calling; the `content.import`
+     * permission, the academy, the course, and the session's ownership are all
+     * checked inside the service, on every one of these three calls. A
+     * middleware that checked them once here would be a middleware somebody
+     * could add a fourth procedure beside.
+     */
+    academyContentImports: {
+      getPreview: os.academyContentImports.getPreview
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.contentImportService.getPreview(context.identity, input)
+        ),
+      commit: os.academyContentImports.commit
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.contentImportService.commit(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
+      getResult: os.academyContentImports.getResult
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.contentImportService.getResult(context.identity, input)
+        ),
+    },
   };
 }

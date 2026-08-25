@@ -14,12 +14,14 @@ export function CourseBuilder({
   academyId,
   canEditCurriculum,
   canEditExercises,
+  canImport,
   courseId,
   initialTree,
 }: {
   academyId: string;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
+  canImport: boolean;
   courseId: string;
   initialTree: CourseTree;
 }) {
@@ -35,7 +37,12 @@ export function CourseBuilder({
 
   return (
     <div className="space-y-5">
-      <BuilderHeader academyId={academyId} builder={builder} />
+      <BuilderHeader
+        academyId={academyId}
+        builder={builder}
+        canImport={canImport}
+        courseId={courseId}
+      />
 
       <div>
         <section className="space-y-3">

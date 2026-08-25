@@ -5,6 +5,7 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import {
   academyRoleFor,
+  canImportContent,
   canManageContent,
   canManageExercises,
 } from '@/lib/academy-access-state';
@@ -24,6 +25,7 @@ export default async function CourseBuilderPage({
   let initialTree = null;
   let canEditCurriculum = false;
   let canEditExercises = false;
+  let canImport = false;
   let loadFailed = false;
 
   try {
@@ -36,6 +38,7 @@ export default async function CourseBuilderPage({
     const role = academyRoleFor(account, academyId);
     canEditCurriculum = canManageContent(role);
     canEditExercises = canManageExercises(role);
+    canImport = canImportContent(role);
   } catch (error) {
     // Only access denial gets the not-found state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.
@@ -61,6 +64,7 @@ export default async function CourseBuilderPage({
           academyId={academyId}
           canEditCurriculum={canEditCurriculum}
           canEditExercises={canEditExercises}
+          canImport={canImport}
           courseId={courseId}
           initialTree={initialTree}
         />

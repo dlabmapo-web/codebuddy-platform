@@ -302,6 +302,9 @@ async function seedCourseContent(
       data: {
         id: moduleId,
         courseId,
+        // Seeded content is addressable from a workbook like any other: the
+        // deterministic id doubles as the stable import key.
+        externalKey: moduleId.toUpperCase(),
         title: module.title,
         description: module.description,
         position: moduleIndex + 1,
@@ -317,6 +320,7 @@ async function seedCourseContent(
         data: {
           id: lectureId,
           courseModuleId: moduleId,
+          externalKey: lectureId.toUpperCase(),
           title: lecture.title,
           description: lecture.description,
           position: lectureIndex + 1,

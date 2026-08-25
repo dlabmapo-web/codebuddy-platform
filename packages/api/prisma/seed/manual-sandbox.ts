@@ -82,6 +82,7 @@ async function main(): Promise<void> {
     create: {
       id: sandbox.moduleId,
       courseId: sandbox.courseId,
+      externalKey: sandbox.moduleId.toUpperCase(),
       title: "Conditionals",
       description: "",
       position: 1,
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
     create: {
       id: sandbox.lectureId,
       courseModuleId: sandbox.moduleId,
+      externalKey: sandbox.lectureId.toUpperCase(),
       title: "Branching on remainders",
       description: "",
       position: 1,

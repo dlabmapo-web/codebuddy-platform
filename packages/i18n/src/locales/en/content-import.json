@@ -1,0 +1,157 @@
+{
+  "page_title": "Import from Excel",
+  "page_description": "Add or update modules, lectures, and problems from a workbook.",
+  "back_to_course": "Back to {{course}}",
+  "stage": {
+    "prepare": "Prepare",
+    "upload": "Upload",
+    "review": "Review",
+    "result": "Result"
+  },
+  "prepare": {
+    "title": "Start from a workbook",
+    "description": "Download the course as a spreadsheet, edit it, and upload it back. Keys in the file decide what gets updated.",
+    "recommended": "Recommended",
+    "current_label": "Download this course",
+    "current_description": "Every module, lecture, problem, test, and hint that exists now, with its keys. Edit rows in place to change them.",
+    "blank_label": "Download a blank template",
+    "blank_description": "The same four sheets with example rows. Use this to see the format before you edit your course.",
+    "too_large": "This course has {{total}} problems, more than the {{limit}} one import can carry. Export a module at a time from the course builder.",
+    "rule_keys": "Keep a row's key to update it. Give a new key to create something.",
+    "rule_no_delete": "Deleting a row changes nothing. Delete content in the course builder.",
+    "rule_hidden": "New modules, lectures, and problems arrive hidden from students.",
+    "rule_collections": "A problem's test and hint rows replace its whole set."
+  },
+  "upload": {
+    "title": "Drop your workbook here",
+    "description": "An .xlsx file up to {{size}} MB, or click to choose one.",
+    "safe_note": "Uploading changes nothing. You will see what it would do first.",
+    "working": "Reading your workbook",
+    "reason": {
+      "not_xlsx": "Save the file as .xlsx and try again. CSV cannot hold the four related sheets this format needs.",
+      "file_too_large": "That file is larger than {{size}} MB."
+    }
+  },
+  "review": {
+    "summary_title": "What this workbook would do",
+    "summary_total_one": "{{count}} item",
+    "summary_total_other": "{{count}} items",
+    "upload_again": "Upload a different file",
+    "search_placeholder": "Search by key or title",
+    "filter": {
+      "all": "All",
+      "create": "Create",
+      "update": "Update",
+      "unchanged": "No change",
+      "warnings": "Warnings",
+      "conflicts": "Conflicts"
+    },
+    "action": {
+      "CREATE": {
+        "module": "New module",
+        "lecture": "New lecture",
+        "problem": "New"
+      },
+      "UPDATE": {
+        "module": "Update module",
+        "lecture": "Update lecture",
+        "problem": "Update"
+      },
+      "UNCHANGED": {
+        "module": "No change",
+        "lecture": "No change",
+        "problem": "No change"
+      }
+    },
+    "child_counts": "{{tests}} tests · {{hints}} hints",
+    "changed_fields": "Changing",
+    "visible": "Students can see this",
+    "visible_hint": "Importing changes this content while students can see it. Its visibility will not change.",
+    "issue_location": "{{sheet}} · row {{row}} · {{column}}",
+    "issue_received": "Received: {{value}}",
+    "empty_title": "Nothing matches",
+    "empty_body": "Clear the search or choose a different filter.",
+    "confirm_title": "Before you confirm",
+    "promise_no_delete": "No module, lecture, or problem will be deleted.",
+    "promise_hidden": "New content arrives hidden from students.",
+    "promise_visibility": "Existing content keeps the visibility it has now.",
+    "promise_atomic": "The import either finishes completely or changes nothing.",
+    "blocked_title_one": "{{count}} conflict to resolve",
+    "blocked_title_other": "{{count}} conflicts to resolve",
+    "blocked_body": "Fix these rows in your workbook and upload it again. Nothing will be imported until every conflict is gone.",
+    "acknowledge_title_one": "I have read the {{count}} warning",
+    "acknowledge_title_other": "I have read the {{count}} warnings",
+    "acknowledge_body": "Warnings do not block the import, but they describe changes that reach students or replace work.",
+    "confirm_action_one": "Import {{count}} change",
+    "confirm_action_other": "Import {{count}} changes",
+    "download_issues_one": "Download {{count}} issue",
+    "download_issues_other": "Download {{count}} issues"
+  },
+  "result": {
+    "title": "Import finished",
+    "description": "New content is hidden from students. Open the course builder to review it and make it visible.",
+    "created": "Created",
+    "updated": "Updated",
+    "unchanged": "No change",
+    "failed": "Failed",
+    "return_to_course": "Return to course",
+    "import_another": "Import another workbook",
+    "problems_title_one": "{{count}} problem to review",
+    "problems_title_other": "{{count}} problems to review",
+    "action": {
+      "CREATE": "New",
+      "UPDATE": "Updated",
+      "UNCHANGED": "No change"
+    }
+  },
+  "unavailable": {
+    "denied_title": "Import is not available to you",
+    "denied_body": "Only a Team Lead can import curriculum content into a course.",
+    "load_failed_title": "This course could not be loaded",
+    "load_failed_body": "Something went wrong on our side. Try again in a moment.",
+    "back": "Back to the course"
+  },
+  "issue": {
+    "sheet_missing": "This sheet is missing or empty.",
+    "column_missing": "A required column is missing.",
+    "column_duplicated": "This column appears twice.",
+    "row_blank": "This row is empty.",
+    "key_missing": "This row needs a key.",
+    "key_invalid": "A key can use letters, numbers, and - _ . only, up to 80 characters.",
+    "title_missing": "This row needs a title.",
+    "title_too_long": "Titles are limited to 200 characters.",
+    "text_too_long": "This field is limited to 10,000 characters.",
+    "code_too_long": "Code and test values are limited to 100,000 characters.",
+    "difficulty_missing": "Set the difficulty to EASY, MEDIUM, or HARD.",
+    "difficulty_invalid": "Difficulty must be EASY, MEDIUM, or HARD.",
+    "description_missing": "Every problem needs a description.",
+    "description_format_invalid": "description_format must be PLAIN_TEXT or RICH_TEXT_HTML.",
+    "boolean_invalid": "Use TRUE or FALSE.",
+    "order_missing": "This row needs an order number.",
+    "order_invalid": "An order must be a whole number of 1 or more.",
+    "visibility_missing": "Set visibility to SAMPLE or HIDDEN.",
+    "visibility_invalid": "Visibility must be SAMPLE or HIDDEN.",
+    "expected_output_missing": "Every test needs an expected output.",
+    "hint_content_missing": "Every hint needs content.",
+    "formula_cell": "Remove the formula from this cell and type the value instead.",
+    "too_many_problems": "One import carries at most 200 problems.",
+    "too_many_tests": "A problem can have at most 50 tests.",
+    "too_many_hints": "A problem can have at most 20 hints.",
+    "tests_missing": "This problem has no tests. Add at least one.",
+    "sample_test_missing": "This problem needs at least one SAMPLE test.",
+    "duplicate_key_in_workbook": "Two rows use this key. Keys must be unique in the course.",
+    "parent_conflict": "This already exists somewhere else in the course. Import cannot move it.",
+    "title_conflict": "Another item already has this title under a different key.",
+    "order_conflict": "Two items claim this position.",
+    "orphan_lecture_reference": "No lecture in this workbook or course has that key.",
+    "orphan_problem_reference": "No problem in this workbook has that key.",
+    "structure_contradiction": "Rows for the same module disagree about its details.",
+    "duplicate_order_in_workbook": "Two rows claim the same order for this problem.",
+    "updates_visible_content": "Students can see this right now, and it is being changed.",
+    "replaces_test_cases": "This problem's tests are being replaced.",
+    "clears_hints": "This problem's hints are being removed, because the workbook has none for it.",
+    "grading_revision_advances": "Grading changes, so past submissions are measured against the new tests.",
+    "unknown_sheet_ignored": "This sheet is not part of the format and is ignored.",
+    "unknown_column_ignored": "These columns are not part of the format and are ignored."
+  }
+}

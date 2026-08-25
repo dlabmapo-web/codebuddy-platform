@@ -34,9 +34,12 @@ RUN pnpm --filter @cove/shared build \
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV JUDGE_HEALTH_PORT=4101
+# The built worker needs Node only; package managers add unused attack surface.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates openssl tini \
  && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
  && groupadd --system --gid 1001 cove \
  && useradd --system --uid 1001 --gid cove --home-dir /app cove
 WORKDIR /app

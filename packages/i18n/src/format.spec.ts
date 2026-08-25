@@ -29,4 +29,11 @@ describe("locale formatting", () => {
     expect(formatPercent(0.24, "en")).toBe("24%");
     expect(formatPercent(0.24, "ko")).toBe("24%");
   });
+
+  it("formats day periods consistently across ICU releases", () => {
+    expect(formatTime("2026-07-23T15:00:00.000Z", "en")).toBe("12:00 AM");
+    expect(formatTime("2026-07-23T15:00:00.000Z", "ko")).toBe("오전 12:00");
+    expect(formatTime("2026-07-24T03:00:00.000Z", "en")).toBe("12:00 PM");
+    expect(formatTime("2026-07-24T03:00:00.000Z", "ko")).toBe("오후 12:00");
+  });
 });

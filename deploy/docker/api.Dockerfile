@@ -36,9 +36,12 @@ RUN pnpm --filter @cove/shared build \
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV PORT=4000
+# The built service needs Node only; package managers add unused attack surface.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates openssl tini \
  && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
  && groupadd --system --gid 1001 cove \
  && useradd --system --uid 1001 --gid cove --home-dir /app cove
 WORKDIR /app
@@ -58,9 +61,15 @@ ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV DIRECT_URL=$DIRECT_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm --filter @cove/api db:generate \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /opt/corepack /pnpm \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/pnpm /usr/local/bin/pnpx \
  && groupadd --system --gid 1001 cove \
  && useradd --system --uid 1001 --gid cove --home-dir /app cove \
  && chown -R cove:cove /app
 USER cove
-ENTRYPOINT ["pnpm", "--filter", "@cove/api"]
-CMD ["db:migrate:deploy"]
+WORKDIR /app/packages/api
+# Invoke Prisma directly so the final one-shot image does not retain pnpm.
+ENTRYPOINT ["node", "node_modules/prisma/build/index.js"]
+CMD ["migrate", "deploy"]

@@ -16,6 +16,19 @@ All workflows will use Trivy Action `v0.36.0` pinned to its immutable commit SHA
 This fixes the invalid tag and prevents a mutable action tag from changing the
 code executed by CI.
 
+The final Node images will omit npm and Corepack because the services execute
+already-built JavaScript and do not need package managers at runtime. The
+migration image will invoke the installed Prisma CLI directly. This removes the
+base image's vulnerable `node-tar` copy without suppressing a valid scanner
+finding.
+
+## Cross-runtime formatting
+
+Korean day periods will be rendered from academy-local numeric clock fields
+instead of ICU's localized day-period token. ICU versions disagree between
+`오전`/`오후` and `AM`/`PM`; explicit rendering keeps server, browser, macOS, and
+Linux output identical and prevents hydration mismatches.
+
 ## Alertmanager configuration
 
 The rendered Alertmanager configuration contains a Resend credential and will

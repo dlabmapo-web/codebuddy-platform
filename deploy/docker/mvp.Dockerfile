@@ -18,7 +18,10 @@ FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3200
-RUN groupadd --system --gid 1001 cove \
+# The built service needs Node only; package managers add unused attack surface.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+ && groupadd --system --gid 1001 cove \
  && useradd --system --uid 1001 --gid cove --home-dir /app cove
 WORKDIR /app
 COPY --from=builder --chown=cove:cove /app/package.json ./

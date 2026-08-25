@@ -68,9 +68,28 @@ export function formatShortDateTime(
 
 /** 3:40 PM · 오후 3:40 */
 export function formatTime(value: Date | string, locale: Locale): string {
-  return dateFormatter(locale, { hour: "numeric", minute: "2-digit" }, "time").format(
-    new Date(value),
-  );
+  // ICU 78 changed ko-KR's day-period text from 오전/오후 to AM/PM. Node and
+  // browsers do not necessarily ship the same ICU release, so relying on that
+  // localized token can also create a React hydration mismatch. Read only the
+  // academy-local clock fields from Intl and render our two supported locale
+  // conventions explicitly.
+  const parts = dateFormatter(
+    "en",
+    { hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
+    "clockParts",
+  ).formatToParts(new Date(value));
+  const hour24 = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = parts.find((part) => part.type === "minute")?.value;
+
+  if (!Number.isInteger(hour24) || minute === undefined) {
+    throw new RangeError("Unable to format time");
+  }
+
+  const hour12 = hour24 % 12 || 12;
+  const isAfternoon = hour24 >= 12;
+  return locale === "ko"
+    ? `${isAfternoon ? "오후" : "오전"} ${hour12}:${minute}`
+    : `${hour12}:${minute} ${isAfternoon ? "PM" : "AM"}`;
 }
 
 /** 1,204 in both locales, but via Intl so a third language stays correct. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canApplyProviderEvent,
   canAdvanceDelivery,
   providerEventSchema,
   providerEventToState,
@@ -89,6 +90,43 @@ describe("providerEventSchema", () => {
     expect(
       providerEventSchema.safeParse({ type: "sent", messageId: "msg_1" })
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("canApplyProviderEvent", () => {
+  const base = { eventId: "evt_1", messageId: "msg_1" };
+
+  it.each(["suppressed", "complained"] as const)(
+    "lets later %s evidence replace a delivered state",
+    (failureCode) => {
+      expect(
+        canApplyProviderEvent("DELIVERED", {
+          ...base,
+          type: "failed",
+          failureCode,
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it("does not let an ordinary late provider failure erase delivery", () => {
+    expect(
+      canApplyProviderEvent("DELIVERED", {
+        ...base,
+        type: "failed",
+        failureCode: "failed",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not reapply repeated adverse terminal evidence", () => {
+    expect(
+      canApplyProviderEvent("FAILED", {
+        ...base,
+        type: "failed",
+        failureCode: "complained",
+      }),
     ).toBe(false);
   });
 });

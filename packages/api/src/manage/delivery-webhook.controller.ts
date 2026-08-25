@@ -30,7 +30,7 @@ import { InvitationDeliveryService } from "./invitation-delivery.service.js";
  * an oRPC route would be an authenticated-by-default surface pretending to be a
  * public one.
  *
- * The response is always 204 once the signature checks out — including for an
+ * The response is always 200 once the signature checks out — including for an
  * event about a message this platform has never heard of. A provider that gets
  * a 404 retries it forever, and a differentiated response would let an
  * unauthorized caller probe which message ids exist.
@@ -49,7 +49,7 @@ export class DeliveryWebhookController {
   ) {}
 
   @Post()
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async receive(
     @Req() request: Request,
     @Headers("svix-id") eventId?: string,
@@ -144,16 +144,65 @@ export function parseEvents(raw: string, eventId?: string): ProviderEvent[] {
 function normalizeEvent(item: unknown, eventId?: string): unknown {
   if (typeof item !== "object" || item === null) return item;
   const record = item as Record<string, unknown>;
-  const data = (record.data ?? record) as Record<string, unknown>;
-  const type = String(record.type ?? record.event ?? "")
-    .replace(/^email\./, "")
-    .replace("delivery_delayed", "failed")
-    .replace("complained", "bounced");
+  const data = isRecord(record.data) ? record.data : record;
+  const normalized = normalizeEventType(record.type ?? record.event);
+  if (!normalized) return null;
+
   return {
     eventId: eventId ?? record.id ?? record.event_id,
-    type,
+    type: normalized.type,
     messageId: data.email_id ?? data.message_id ?? data.id,
-    failureCode: data.bounce_type ?? data.reason,
+    failureCode:
+      normalized.failureCode ??
+      (normalized.type === "bounced" ? bounceFailureCode(data) : undefined),
     occurredAt: record.created_at ?? record.occurred_at,
   };
+}
+
+function normalizeEventType(
+  value: unknown,
+): { type: ProviderEvent["type"]; failureCode?: string } | null {
+  switch (value) {
+    case "email.sent":
+    case "sent":
+      return { type: "sent" };
+    case "email.delivered":
+    case "delivered":
+      return { type: "delivered" };
+    case "email.bounced":
+    case "bounced":
+      return { type: "bounced" };
+    case "email.failed":
+    case "failed":
+      return { type: "failed", failureCode: "failed" };
+    case "email.suppressed":
+    case "suppressed":
+      return { type: "failed", failureCode: "suppressed" };
+    case "email.complained":
+    case "complained":
+      return { type: "failed", failureCode: "complained" };
+    // A delay is diagnostic evidence, not a terminal outcome. Returning null
+    // acknowledges the signed webhook without changing the attempt.
+    case "email.delivery_delayed":
+    case "delivery_delayed":
+    default:
+      return null;
+  }
+}
+
+function bounceFailureCode(data: Record<string, unknown>): string {
+  const bounce = isRecord(data.bounce) ? data.bounce : null;
+  if (!bounce) return "bounced";
+
+  const pieces = ["bounce", bounce.type, bounce.subType]
+    .filter((piece): piece is string => typeof piece === "string")
+    .map((piece) => piece.toLowerCase().replace(/[^a-z0-9]+/g, "_"))
+    .map((piece) => piece.replace(/^_+|_+$/g, ""))
+    .filter(Boolean);
+  const code = pieces.join("_").slice(0, 64).replace(/_+$/g, "");
+  return code || "bounced";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

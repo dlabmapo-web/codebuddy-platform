@@ -6,7 +6,7 @@ import {
   INVITATION_RESEND_EXTENSION_MS,
   INVITATION_RESEND_LIMIT,
   INVITATION_RESEND_WINDOW_MS,
-  canAdvanceDelivery,
+  canApplyProviderEvent,
   providerEventToState,
   type InvitationDelivery,
   type ProviderEvent,
@@ -294,6 +294,7 @@ export class InvitationDeliveryService {
         academyName: academy?.name ?? "an academy",
         link: this.invitationLink(input.token),
       }),
+      idempotencyKey: `invitation-delivery/${input.attemptId}`,
     });
 
     const now = new Date();
@@ -352,8 +353,9 @@ export class InvitationDeliveryService {
 
     const next = providerEventToState(event.type);
     // Providers deliver out of order — `delivered` before `sent` is routine —
-    // so evidence only ever strengthens. See `canAdvanceDelivery`.
-    if (!canAdvanceDelivery(attempt.state, next)) return;
+    // so evidence only ever strengthens, except explicit adverse evidence.
+    // See `canApplyProviderEvent`.
+    if (!canApplyProviderEvent(attempt.state, event)) return;
 
     const occurredAt = event.occurredAt ? new Date(event.occurredAt) : new Date();
 

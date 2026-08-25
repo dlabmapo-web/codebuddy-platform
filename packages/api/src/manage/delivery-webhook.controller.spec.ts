@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Webhook } from "svix";
 
 import {
+  DeliveryWebhookController,
   parseEvents,
   verifySignature,
 } from "./delivery-webhook.controller.js";
@@ -85,6 +86,35 @@ describe("verifySignature", () => {
   });
 });
 
+describe("DeliveryWebhookController.receive", () => {
+  it("rejects a request missing any signed header", async () => {
+    const controller = new DeliveryWebhookController(
+      { applyProviderEvent: async () => undefined } as never,
+      { get: () => SECRET } as never,
+    );
+
+    await expect(
+      controller.receive(
+        { rawBody: Buffer.from('{"type":"email.sent"}') } as never,
+        "evt_1",
+        undefined,
+        String(Math.floor(Date.now() / 1_000)),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("refuses all webhook traffic when no signing secret is configured", async () => {
+    const controller = new DeliveryWebhookController(
+      { applyProviderEvent: async () => undefined } as never,
+      { get: () => undefined } as never,
+    );
+
+    await expect(controller.receive({} as never)).rejects.toMatchObject({
+      status: 503,
+    });
+  });
+});
+
 describe("parseEvents", () => {
   it("reads a single provider event", () => {
     expect(
@@ -129,12 +159,77 @@ describe("parseEvents", () => {
     expect(events[0].type).toBe("bounced");
   });
 
-  it("maps a complaint onto a bounce", () => {
+  it.each([
+    ["email.suppressed", "suppressed"],
+    ["email.complained", "complained"],
+  ])("maps %s to a stable terminal failure", (type, failureCode) => {
     expect(
       parseEvents(
-        JSON.stringify({ id: "e", type: "email.complained", data: { email_id: "m" } }),
-      )[0].type,
-    ).toBe("bounced");
+        JSON.stringify({ id: "e", type, data: { email_id: "m" } }),
+      ),
+    ).toEqual([{ eventId: "e", type: "failed", messageId: "m", failureCode }]);
+  });
+
+  it("keeps a stable bounce code without retaining provider prose", () => {
+    expect(
+      parseEvents(
+        JSON.stringify({
+          id: "e",
+          type: "email.bounced",
+          data: {
+            email_id: "m",
+            bounce: {
+              type: "Permanent",
+              subType: "General",
+              message: "recipient@example.com does not exist",
+            },
+          },
+        }),
+      ),
+    ).toEqual([
+      {
+        eventId: "e",
+        type: "bounced",
+        messageId: "m",
+        failureCode: "bounce_permanent_general",
+      },
+    ]);
+  });
+
+  it("uses a stable generic code when a bounce has no classification", () => {
+    expect(
+      parseEvents(
+        JSON.stringify({ id: "e", type: "email.bounced", data: { email_id: "m" } }),
+      ),
+    ).toEqual([
+      { eventId: "e", type: "bounced", messageId: "m", failureCode: "bounced" },
+    ]);
+  });
+
+  it("maps a provider failure to a stable code", () => {
+    expect(
+      parseEvents(
+        JSON.stringify({
+          id: "e",
+          type: "email.failed",
+          data: { email_id: "m", reason: "recipient@example.com was rejected" },
+        }),
+      ),
+    ).toEqual([
+      { eventId: "e", type: "failed", messageId: "m", failureCode: "failed" },
+    ]);
+  });
+
+  it("acknowledges delivery delays without making them terminal", () => {
+    expect(
+      parseEvents(
+        JSON.stringify({
+          id: "e",
+          type: "email.delivery_delayed",
+          data: { email_id: "m" },
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it("returns nothing for a body that is not JSON", () => {

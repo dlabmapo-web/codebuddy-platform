@@ -28,6 +28,8 @@ export type EmailMessage = {
   subject: string;
   /** Plain text. Cove sends no HTML invitations: see the note in the service. */
   text: string;
+  /** Stable for one delivery attempt; Resend retains keys for 24 hours. */
+  idempotencyKey: string;
 };
 
 export type EmailSendResult =
@@ -95,6 +97,7 @@ export class HttpEmailSender implements EmailSender {
         headers: {
           authorization: `Bearer ${this.apiKey}`,
           "content-type": "application/json",
+          "Idempotency-Key": message.idempotencyKey,
         },
         body: JSON.stringify({
           from: this.from,
@@ -108,20 +111,37 @@ export class HttpEmailSender implements EmailSender {
       });
 
       if (response.ok) {
-        const body = (await response.json()) as { id?: string };
+        const body = await readJson(response);
+        const providerMessageId = readNonEmptyString(body, "id");
+        if (providerMessageId) return { ok: true, providerMessageId };
+
+        // A made-up id would make every later webhook impossible to match.
+        // Treat an unexpected success payload as a permanent integration
+        // failure so it is visible rather than recorded as SENT.
+        this.logger.warn("email provider returned an invalid success response");
         return {
-          ok: true,
-          providerMessageId: body.id ?? `unknown-${Date.now()}`,
+          ok: false,
+          failureCode: "provider_invalid_response",
+          retryable: false,
         };
       }
 
-      // The provider's own prose is never stored or shown; the status is
-      // enough to decide what to do and cannot leak a recipient.
-      this.logger.warn(`email rejected status=${response.status}`);
+      // Resend's machine-readable `name` is useful for operations, but its
+      // prose `message` can contain recipient data and is never logged/stored.
+      const body = await readJson(response);
+      const providerCode = normalizeProviderCode(
+        readNonEmptyString(body, "name") ?? readNonEmptyString(body, "type"),
+      );
+      const failureCode = providerCode
+        ? `provider_${providerCode}`
+        : `provider_${response.status}`;
+      this.logger.warn(
+        `email rejected status=${response.status} code=${failureCode}`,
+      );
       return {
         ok: false,
-        failureCode: `provider_${response.status}`,
-        retryable: response.status >= 500 || response.status === 429,
+        failureCode,
+        retryable: isRetryableProviderFailure(response.status, providerCode),
       };
     } catch (error) {
       this.logger.warn(
@@ -132,6 +152,36 @@ export class HttpEmailSender implements EmailSender {
       return { ok: false, failureCode: "transport_error", retryable: true };
     }
   }
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function readNonEmptyString(value: unknown, key: string): string | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const candidate = (value as Record<string, unknown>)[key];
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : undefined;
+}
+
+/** Only retain Resend's documented machine code shape, never arbitrary text. */
+function normalizeProviderCode(value: string | undefined): string | undefined {
+  if (!value || !/^[a-z0-9_]{1,48}$/.test(value)) return undefined;
+  return value;
+}
+
+function isRetryableProviderFailure(
+  status: number,
+  providerCode: string | undefined,
+): boolean {
+  if (status === 429 || status >= 500) return true;
+  return providerCode === "concurrent_idempotent_requests";
 }
 
 /**

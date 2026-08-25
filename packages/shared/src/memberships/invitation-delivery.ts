@@ -147,6 +147,27 @@ export const providerEventSchema = z
   .strict();
 export type ProviderEvent = z.infer<typeof providerEventSchema>;
 
+/**
+ * Whether one authenticated provider event may replace the stored evidence.
+ *
+ * Ordinary failures cannot erase a confirmed delivery. Suppression and spam
+ * complaint events are different: they are later adverse evidence about the
+ * recipient/provider relationship and must remain visible even if delivery
+ * was reported first.
+ */
+export function canApplyProviderEvent(
+  from: InvitationDeliveryState,
+  event: ProviderEvent,
+): boolean {
+  const next = providerEventToState(event.type);
+  if (canAdvanceDelivery(from, next)) return true;
+  return (
+    from === "DELIVERED" &&
+    next === "FAILED" &&
+    (event.failureCode === "suppressed" || event.failureCode === "complained")
+  );
+}
+
 export function providerEventToState(
   type: ProviderEventType,
 ): InvitationDeliveryState {

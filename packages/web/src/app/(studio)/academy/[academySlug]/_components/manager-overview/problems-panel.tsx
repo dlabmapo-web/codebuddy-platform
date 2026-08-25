@@ -4,11 +4,13 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import type { AuditSummary, DifficultProblem } from '@cove/shared';
 import { isAcademyAuditAction } from '@cove/shared';
+import { formatShortDateTime } from '@cove/i18n/format';
 import { CircleCheckBig, Flame, History } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/i18n';
 
 import { meterWidth } from '../../_lib/overview-view';
 import { solutionStatusPath } from '../../_lib/overview-url';
@@ -158,7 +160,8 @@ export function ProblemsPanel({
  * details is not something to leave there.
  */
 export function ChangesPanel({ changes }: { changes: AuditSummary[] }) {
-  const { t, i18n } = useTranslation('manager');
+  const { t } = useTranslation('manager');
+  const locale = useLocale();
   // The action vocabulary is its own namespace: it mirrors a server-side list
   // that grows with every feature that writes an audit record.
   const { t: tAudit } = useTranslation('audit');
@@ -223,14 +226,12 @@ export function ChangesPanel({ changes }: { changes: AuditSummary[] }) {
                       actor: change.actorName ?? t('changes.system'),
                     })}
                   </span>
-                  <span className="font-mono tabular-nums">
-                    {new Intl.DateTimeFormat(i18n.language, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }).format(new Date(change.createdAt))}
-                  </span>
+                  <time
+                    className="font-mono tabular-nums"
+                    dateTime={change.createdAt}
+                  >
+                    {formatShortDateTime(change.createdAt, locale)}
+                  </time>
                 </p>
               </div>
             </li>

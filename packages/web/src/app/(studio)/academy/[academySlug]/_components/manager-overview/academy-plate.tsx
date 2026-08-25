@@ -78,7 +78,7 @@ export function AcademyPlate({
   scale: AcademyScale;
 }) {
   const { t, i18n } = useTranslation('manager');
-  const now = useAcademyClock();
+  const now = useAcademyClock(generatedAt);
   const address = addressLine(academy);
 
   return (
@@ -354,12 +354,12 @@ function RangePicker({
  *
  * A minute rather than a second: the display has no seconds, so a per-second
  * timer would re-render the plate sixty times to change nothing. The first
- * value comes from a state initializer rather than from render, so the server
- * and the client agree on the first paint and React does not report a
- * hydration mismatch on a page whose whole point is being trusted.
+ * value comes from the overview's server snapshot, so the server and client
+ * agree on the first paint even when hydration crosses a minute boundary.
+ * Once hydrated, the browser owns the clock and advances it once a minute.
  */
-function useAcademyClock(): Date {
-  const [now, setNow] = React.useState(() => new Date());
+function useAcademyClock(generatedAt: string): Date {
+  const [now, setNow] = React.useState(() => new Date(generatedAt));
   React.useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);

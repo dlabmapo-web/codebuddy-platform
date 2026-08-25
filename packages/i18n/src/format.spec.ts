@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatDate,
+  formatDateTime,
   formatNumber,
   formatPercent,
+  formatShortDateTime,
   formatTime,
 } from "./format.js";
 
@@ -15,6 +17,10 @@ describe("locale formatting", () => {
     expect(formatDate(instant, "ko")).toBe("2026년 7월 24일");
     expect(formatTime(instant, "en")).toBe("3:40 PM");
     expect(formatTime(instant, "ko")).toBe("오후 3:40");
+    expect(formatDateTime(instant, "en")).toBe("Jul 24, 2026 · 3:40 PM");
+    expect(formatDateTime(instant, "ko")).toBe("2026년 7월 24일 · 오후 3:40");
+    expect(formatShortDateTime(instant, "en")).toBe("Jul 24 · 3:40 PM");
+    expect(formatShortDateTime(instant, "ko")).toBe("7월 24일 · 오후 3:40");
   });
 
   it("formats numbers and percentages by locale", () => {

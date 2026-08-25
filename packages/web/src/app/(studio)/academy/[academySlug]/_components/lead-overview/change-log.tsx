@@ -1,10 +1,12 @@
 'use client';
 
 import type { CurriculumChange } from '@cove/shared';
+import { formatShortDateTime } from '@cove/i18n/format';
 import { Eye, EyeOff, History } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/i18n';
 
 import { changeIcons, changeShape } from '../../_lib/lead-view';
 import { EmptyState } from '../overview-ui/panel';
@@ -25,7 +27,8 @@ import { EmptyState } from '../overview-ui/panel';
  * is worth a Team Lead's attention on a Monday morning.
  */
 export function ChangeLog({ rows }: { rows: CurriculumChange[] }) {
-  const { t, i18n } = useTranslation('lead');
+  const { t } = useTranslation('lead');
+  const locale = useLocale();
 
   if (rows.length === 0) {
     return (
@@ -37,14 +40,6 @@ export function ChangeLog({ rows }: { rows: CurriculumChange[] }) {
       />
     );
   }
-
-  const formatter = new Intl.DateTimeFormat(i18n.language, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  });
 
   return (
     <ul className="divide-y divide-border">
@@ -105,7 +100,7 @@ export function ChangeLog({ rows }: { rows: CurriculumChange[] }) {
               className="shrink-0 font-mono text-[11px] font-bold tabular-nums text-sub"
               dateTime={row.at}
             >
-              {formatter.format(new Date(row.at))}
+              {formatShortDateTime(row.at, locale)}
             </time>
           </li>
         );

@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Info, KeyRound, Mail } from 'lucide-react';
 import { locales, type Locale } from '@cove/i18n/settings';
+import { formatDateTime } from '@cove/i18n/format';
 import {
   formatPhoneForDisplay,
   profileLocales,
@@ -351,10 +352,7 @@ function SecuritySection({ profile }: { profile: MyProfileResponse }) {
         {security.lastSignInAt ? (
           <p className="pl-6.5 text-[12.5px] text-sub/85">
             {t('security.last_sign_in', {
-              date: new Intl.DateTimeFormat(locale, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }).format(new Date(security.lastSignInAt)),
+              date: formatDateTime(security.lastSignInAt, locale),
             })}
           </p>
         ) : null}

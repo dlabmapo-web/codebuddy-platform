@@ -7,6 +7,7 @@ import {
   formatNumber,
   formatPercent,
   formatShortDate,
+  formatShortDateTime,
   formatTime,
 } from '@cove/i18n/format';
 import {
@@ -70,6 +71,8 @@ export async function initTranslations(
       formatShortDate(value as Date | string, localeFor(language)));
     formatter.add('dateTime', (value, language) =>
       formatDateTime(value as Date | string, localeFor(language)));
+    formatter.add('shortDateTime', (value, language) =>
+      formatShortDateTime(value as Date | string, localeFor(language)));
     formatter.add('time', (value, language) =>
       formatTime(value as Date | string, localeFor(language)));
     formatter.add('number', (value, language) =>

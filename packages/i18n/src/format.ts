@@ -47,19 +47,23 @@ export function formatShortDate(value: Date | string, locale: Locale): string {
   );
 }
 
-/** Jul 24, 2026, 3:40 PM · 2026년 7월 24일 오후 3:40 */
+/**
+ * Jul 24, 2026 · 3:40 PM · 2026년 7월 24일 · 오후 3:40
+ *
+ * Date and time are formatted separately and joined with our own separator.
+ * Node and browsers can choose different locale punctuation (`,` versus
+ * `at`) for one combined Intl formatter, which breaks React hydration.
+ */
 export function formatDateTime(value: Date | string, locale: Locale): string {
-  return dateFormatter(
-    locale,
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    },
-    "dateTime",
-  ).format(new Date(value));
+  return `${formatDate(value, locale)} · ${formatTime(value, locale)}`;
+}
+
+/** Aug 25 · 2:54 PM · 8월 25일 · 오후 2:54 */
+export function formatShortDateTime(
+  value: Date | string,
+  locale: Locale,
+): string {
+  return `${formatShortDate(value, locale)} · ${formatTime(value, locale)}`;
 }
 
 /** 3:40 PM · 오후 3:40 */

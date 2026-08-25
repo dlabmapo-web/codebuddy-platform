@@ -9,6 +9,7 @@ import type {
   TeamLeadOverview,
   TeamLeadOverviewSection,
 } from '@cove/shared';
+import { formatShortDateTime } from '@cove/i18n/format';
 import {
   BookPlus,
   Clock3,
@@ -26,6 +27,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/i18n';
 
 import {
   useLeadOverviewQuery,
@@ -405,15 +407,9 @@ function Header({
   academy: TeamLeadOverview['academy'];
   generatedAt: string;
 }) {
-  const { t, i18n } = useTranslation('lead');
-  const stamp = new Intl.DateTimeFormat(i18n.language, {
-    timeZone: academy.timeZone,
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(generatedAt));
+  const { t } = useTranslation('lead');
+  const locale = useLocale();
+  const stamp = formatShortDateTime(generatedAt, locale);
 
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">

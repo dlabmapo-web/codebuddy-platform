@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25
 **Branch:** `feat/cove-studio-v2`
-**Status:** Approved design; awaiting written-spec review
+**Status:** Implemented locally; live VPS and provider acceptance pending
 
 ## 1. Purpose
 

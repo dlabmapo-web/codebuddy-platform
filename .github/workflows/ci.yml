@@ -107,7 +107,7 @@ jobs:
             NEXT_PUBLIC_STUDIO_URL=https://cs.coveedu.com
             NEXT_PUBLIC_MVP_URL=https://mvp.coveedu.com
       - name: Scan runtime image
-        uses: aquasecurity/trivy-action@0.32.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/cove-${{ matrix.name }}:ci
           format: table

@@ -6,7 +6,21 @@ require_command docker
 require_command python3
 
 validation_root="$(mktemp -d)"
+validation_project="cove-validation-$$"
+
+validation_compose() {
+  docker compose \
+    --project-name "$validation_project" \
+    --project-directory "$validation_root" \
+    --env-file "$validation_root/deployment.env" \
+    -f "$validation_root/compose.production.yml" \
+    "$@"
+}
+
 cleanup() {
+  if [[ -f "$validation_root/deployment.env" ]]; then
+    validation_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  fi
   [[ "$validation_root" == /tmp/* || "$validation_root" == /var/folders/* ]] \
     && rm -rf -- "$validation_root"
 }
@@ -33,11 +47,7 @@ path.write_text(
 PY
 
 COVE_DEPLOY_ROOT="$validation_root" "$validation_root/scripts/render-monitoring-config.sh"
-docker compose \
-  --project-directory "$validation_root" \
-  --env-file "$validation_root/deployment.env" \
-  -f "$validation_root/compose.production.yml" \
-  config --quiet
+validation_compose config --quiet
 
 docker run --rm \
   -e ACME_EMAIL=operations@coveedu.com \
@@ -51,10 +61,19 @@ docker run --rm \
   check config /etc/prometheus/prometheus.yml
 
 docker run --rm \
+  --user 0:0 \
   --entrypoint /bin/amtool \
   -v "$validation_root/generated/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
   prom/alertmanager:v0.28.1 \
   check-config /etc/alertmanager/alertmanager.yml
+
+# Exercise the same protected-copy path used in production, then prove that the
+# non-root Alertmanager user can read the resulting private configuration.
+validation_compose run --rm alertmanager-config
+validation_compose run --rm --no-deps \
+  --entrypoint /bin/amtool \
+  alertmanager \
+  check-config /alertmanager/config/alertmanager.yml
 
 python3 -m json.tool \
   "$validation_root/monitoring/grafana/dashboards/cove-host.json" >/dev/null

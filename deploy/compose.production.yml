@@ -265,6 +265,41 @@ services:
         max-size: 10m
         max-file: "3"
 
+  alertmanager-config:
+    image: alpine:3.22.1
+    restart: "no"
+    user: "0:0"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        mkdir -p /alertmanager/config
+        cp /source/alertmanager.yml /alertmanager/config/alertmanager.yml
+        chown -R 65534:65534 /alertmanager
+        chmod 0600 /alertmanager/config/alertmanager.yml
+    volumes:
+      - ./generated/alertmanager.yml:/source/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    network_mode: none
+    mem_limit: 32m
+    cpus: 0.10
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "1"
+
   alertmanager:
     image: prom/alertmanager:v0.28.1
     restart: unless-stopped
@@ -273,14 +308,16 @@ services:
       - no-new-privileges:true
     read_only: true
     command:
-      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --config.file=/alertmanager/config/alertmanager.yml
       - --storage.path=/alertmanager
     volumes:
-      - ./generated/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
     networks:
       - monitoring
       - egress
+    depends_on:
+      alertmanager-config:
+        condition: service_completed_successfully
     mem_limit: 128m
     cpus: 0.25
     pids_limit: 128

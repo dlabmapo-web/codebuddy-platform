@@ -1,7 +1,7 @@
 # Cove Production Deployment Runbook
 
 This runbook deploys Cove Home, Cove Studio v2, API, judge worker, Redis,
-monitoring, and the preserved MVP to one Contabo Cloud VPS 8. PostgreSQL stays
+monitoring, and the preserved MVP to one Contabo Cloud VPS 6. PostgreSQL stays
 on Supabase and transactional mail stays on Resend.
 
 The deployment source of truth is
@@ -13,7 +13,7 @@ passes.
 
 Prepare these resources before deployment:
 
-- Contabo Cloud VPS 8 with Ubuntu 24.04 LTS and an SSH public key;
+- Contabo Cloud VPS 6 with six vCPU, 12 GB RAM, Ubuntu 24.04 LTS, and an SSH public key;
 - private GHCR packages under `ghcr.io/dlabmapo-web`;
 - Contabo Object Storage bucket dedicated to encrypted Cove backups;
 - Supabase Pro v2 project and the unchanged MVP project;

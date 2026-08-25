@@ -49,6 +49,36 @@ PY
 COVE_DEPLOY_ROOT="$validation_root" "$validation_root/scripts/render-monitoring-config.sh"
 validation_compose config --quiet
 
+# Cloud VPS 6 has 12 GB RAM. Keep the sum of all always-on container limits at
+# or below 9 GiB so Ubuntu, Docker, filesystem cache, and deployments retain
+# roughly 3 GB of headroom. Profile-only operations containers are excluded by
+# `docker compose config` unless their profile is explicitly enabled.
+compose_json="$(validation_compose config --format json)"
+python3 - "$compose_json" <<'PY'
+import json
+import sys
+
+configuration = json.loads(sys.argv[1])
+services = configuration.get("services", {})
+limits = {
+    name: service.get("mem_limit")
+    for name, service in services.items()
+    if service.get("mem_limit") is not None
+}
+missing = sorted(set(services) - set(limits))
+if missing:
+    raise SystemExit("services without memory limits: " + ", ".join(missing))
+
+budget = 9 * 1024**3
+allocated = sum(int(value) for value in limits.values())
+if allocated > budget:
+    raise SystemExit(
+        f"always-on memory ceilings total {allocated / 1024**3:.2f} GiB; "
+        "Cloud VPS 6 budget is 9.00 GiB"
+    )
+print(f"Always-on memory ceiling: {allocated / 1024**3:.2f} GiB / 9.00 GiB")
+PY
+
 docker run --rm \
   -e ACME_EMAIL=operations@coveedu.com \
   -v "$validation_root/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \

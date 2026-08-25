@@ -227,25 +227,28 @@ resource ceiling and tuned concurrency so CPU-bound Python execution cannot
 starve Caddy, API, Redis, or SSH. Redis uses authentication, append-only
 persistence with one-second fsync, a no-eviction policy, and a named volume.
 
-The initial profile targets Cloud VPS 8 with eight vCPU and 24 GB RAM. Memory
-ceilings reserve at least 4 GB for the operating system, filesystem cache,
-Docker, deployment overlap, and emergency access. The first allocation is:
+The initial profile targets Cloud VPS 6 with six vCPU and 12 GB RAM. Memory
+ceilings keep the always-on stack below 9 GiB and reserve roughly 3 GB for the
+operating system, filesystem cache, Docker, deployment work, and emergency
+access. The first allocation is:
 
 | Service group | Memory ceiling | CPU ceiling |
 |---|---:|---:|
-| Caddy | 256 MB | 0.50 CPU |
-| Home | 768 MB | 0.75 CPU |
-| Studio | 3 GB | 2.00 CPU |
-| API | 3 GB | 2.00 CPU |
-| Judge worker | 5 GB | 3.00 CPU |
-| Redis | 1.5 GB container / 1 GB Redis maxmemory | 1.00 CPU |
-| MVP | 2 GB | 1.50 CPU |
-| Monitoring stack | 2.5 GB combined | 1.50 CPU combined |
+| Caddy | 256 MB | 0.35 CPU |
+| Home | 512 MB | 0.50 CPU |
+| Studio | 1.5 GB | 1.25 CPU |
+| API | 1.5 GB | 1.25 CPU |
+| Judge worker | 2 GB | 2.00 CPU |
+| Redis | 768 MB container / 512 MB Redis maxmemory | 0.50 CPU |
+| MVP | 1.25 GB | 1.00 CPU |
+| Monitoring stack | 1.25 GB combined | 1.15 CPU combined |
 
 CPU ceilings may be oversubscribed because ordinary peaks are not simultaneous;
-memory ceilings must fit concurrently. Load-test evidence may lower judge
-concurrency or revise these values before launch, but the operating-system
-reserve is not consumed merely to make a failing test pass.
+memory ceilings must fit concurrently. Judge concurrency starts at one because
+student code execution is the largest unpredictable resource consumer. Load
+tests may justify increasing it, but the operating-system reserve is not
+consumed merely to make a failing test pass. The deployment validation rejects
+an always-on memory budget above 9 GiB.
 
 Docker log rotation bounds file size and retained file count. Disk alerts fire
 before logs, images, or Redis persistence can exhaust the filesystem. Old

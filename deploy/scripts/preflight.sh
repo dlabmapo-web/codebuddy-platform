@@ -140,11 +140,16 @@ if violations:
 PY
 
 if [[ -r /proc/meminfo ]]; then
+  total_kb="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
   available_kb="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)"
 else
-  available_kb="$(( $(sysctl -n hw.memsize) / 1024 ))"
+  total_kb="$(( $(sysctl -n hw.memsize) / 1024 ))"
+  available_kb="$total_kb"
 fi
-(( available_kb >= 4 * 1024 * 1024 )) || fail "less than 4 GB memory is currently available"
+(( total_kb >= 10 * 1024 * 1024 )) || fail "production requires a VPS with at least 10 GiB total memory"
+(( available_kb >= 2 * 1024 * 1024 )) || fail "less than 2 GiB memory is currently available"
+cpu_count="$(getconf _NPROCESSORS_ONLN)"
+(( cpu_count >= 6 )) || fail "production requires at least 6 online CPU cores"
 available_disk_kb="$(df -Pk "$deploy_root" | awk 'NR==2 {print $4}')"
 (( available_disk_kb >= 20 * 1024 * 1024 )) || fail "less than 20 GB disk is currently available"
 

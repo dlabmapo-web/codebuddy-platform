@@ -22,13 +22,22 @@ groups:
           description: "Filesystem {{ $labels.mountpoint }} has less than 15% free space."
 
       - alert: HostMemoryPressure
-        expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 15
-        for: 15m
+        expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 20
+        for: 10m
         labels:
           severity: warning
         annotations:
           summary: "VPS available memory is low"
-          description: "Available memory has remained below 15% for fifteen minutes."
+          description: "Available memory has remained below 20% for ten minutes."
+
+      - alert: HostMemoryCritical
+        expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VPS available memory is critically low"
+          description: "Available memory has remained below 10% for five minutes."
 
       - alert: HostCpuSaturation
         expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90

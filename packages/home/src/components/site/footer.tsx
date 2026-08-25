@@ -84,7 +84,7 @@ export function Footer({ copy }: { copy: FooterCopy }) {
                 <a
                   href={
                     process.env.NEXT_PUBLIC_STUDIO_URL ??
-                    "https://studio.coveedu.com"
+                    "https://cs.coveedu.com"
                   }
                   className="text-white/80 transition-colors hover:text-white"
                 >

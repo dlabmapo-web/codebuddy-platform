@@ -1,15 +1,32 @@
+import { PageTranslationsProvider } from '@/i18n';
+import { initTranslations } from '@/i18n/init-translations';
+import { authNamespaces } from '@/i18n/namespaces';
+import { getLocale } from '@/i18n/server/get-locale';
+
 /**
- * The v1 login and signup screens.
+ * Mounts the `auth` copy for the signed-out screens.
  *
- * Pinned to the light palette like the other v1-era groups: their colour is
- * almost entirely inline `style` hex, so a themed surface underneath it would
- * darken while the text stayed near-black. See `.theme-light` in globals.css.
- * The v2 screens under `(v2-auth)` are fully tokenised and follow the theme.
+ * It rides here rather than in every page's RSC payload because nobody reads
+ * it once they are signed in. Client components under this layout use
+ * `useTranslation` from react-i18next; anything belonging to the app shell
+ * keeps using `useLayoutTranslation` and still resolves `common` and `nav`
+ * from the root instance.
  */
-export default function LegacyAuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="theme-light contents">{children}</div>;
+  const locale = await getLocale();
+  const { resources } = await initTranslations(locale, authNamespaces);
+
+  return (
+    <PageTranslationsProvider
+      locale={locale}
+      namespaces={authNamespaces}
+      resources={resources}
+    >
+      {children}
+    </PageTranslationsProvider>
+  );
 }

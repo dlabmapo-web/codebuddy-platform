@@ -14,8 +14,8 @@ const localesDir = resolve(webDir, '../i18n/src/locales');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'cove-i18n-check-'));
 const extractedDir = join(temporaryRoot, 'locales');
 const sourceRoots = [
-  resolve(webDir, 'src/app/(v2-auth)'),
-  resolve(webDir, 'src/app/(v2-studio)'),
+  resolve(webDir, 'src/app/(auth)'),
+  resolve(webDir, 'src/app/(studio)'),
   resolve(webDir, 'src/components/studio'),
 ];
 

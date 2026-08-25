@@ -328,7 +328,7 @@ export class InvitationDeliveryService {
 
   private invitationLink(token: string): string {
     const origin = this.config.get("WEB_ORIGIN", { infer: true });
-    return `${origin}/auth/invitations/${token}`;
+    return `${origin}/invite/${encodeURIComponent(token)}`;
   }
 
   /* ------------------------------------------------------ provider events */

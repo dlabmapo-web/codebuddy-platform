@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { activeNavHref } from './nav-active';
 
-const base = '/studio/academies/a1';
+const base = '/academy/a1';
 const hrefs = [
   base,
   `${base}/content/courses`,
@@ -36,7 +36,7 @@ describe('activeNavHref', () => {
   });
 
   it('returns null when nothing matches', () => {
-    expect(activeNavHref('/auth/login', hrefs)).toBeNull();
+    expect(activeNavHref('/login', hrefs)).toBeNull();
   });
 
   // The Learning group holds two sibling entries. They must never light up

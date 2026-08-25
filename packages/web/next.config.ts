@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { compatibilityRedirects } from "./src/lib/routes";
+
 const crossOriginIsolationHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   // `credentialless` is not implemented by Safari, which leaves
@@ -22,6 +24,9 @@ const workerAssetHeaders = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@cove/shared", "@cove/i18n"],
+  async redirects() {
+    return [...compatibilityRedirects];
+  },
   async headers() {
     return [
       // 전 경로에 cross-origin isolation 적용 → 어느 진입 경로(SPA 네비게이션 포함)에서도
@@ -46,7 +51,7 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
       {
-        source: "/auth/reset-password",
+        source: "/reset-password",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
       // 워커/파이오다이드 자원은 같은 출처 하위 리소스로 로드되도록 CORP 추가

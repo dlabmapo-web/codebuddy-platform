@@ -1,15 +1,10 @@
 import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/auth/session';
+
+import { authDestination } from '@/lib/academy-access-state';
+import { createServerORPCClient } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
 
 export default async function Home() {
-  const user = await getCurrentUser();
-  if (!user) redirect('/login');
-
-  const homeMap = {
-    student: '/problems',
-    teacher: '/students',
-    admin: '/admin/problems',
-  } as const;
-
-  redirect(homeMap[user.role]);
+  const account = await createServerORPCClient().auth.me({}).catch(() => null);
+  redirect(account ? authDestination(account) : routes.login);
 }

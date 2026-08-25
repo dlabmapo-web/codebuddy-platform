@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25
 **Branch:** `feat/cove-studio-v2`
-**Status:** Awaiting written-spec review
+**Status:** Implemented
 
 ## 1. Problem
 

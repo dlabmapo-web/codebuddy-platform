@@ -5,6 +5,8 @@ import type {
 } from '@cove/shared';
 import { roleCanMonitor, roleHasPermission } from '@cove/shared';
 
+import { routes } from '@/lib/routes';
+
 type Membership = AuthUser['memberships'][number];
 type Application = AuthUser['applications'][number];
 
@@ -73,7 +75,7 @@ export function authDestination(account: AuthMeResponse): string {
     // student overview shipped — the work that student left open. Sending a
     // student past it to the catalog would skip the one section that knows
     // which problem they were in the middle of.
-    return `/studio/academies/${academy.id}`;
+    return routes.academy(academy.slug);
   }
   // A platform operator belongs to no academy — that is the design, not an
   // incomplete signup — so every screen below this line would tell them to ask
@@ -83,12 +85,12 @@ export function authDestination(account: AuthMeResponse): string {
   // is also a real member of a real academy is arriving as that member, and the
   // console is one click away from My Page either way.
   if (account.user.platformRole === 'ADMIN') {
-    return '/platform';
+    return routes.admin;
   }
   if (state.kind === 'welcome') {
-    return '/auth/welcome';
+    return routes.welcome;
   }
-  return '/auth/pending';
+  return routes.pending;
 }
 
 export function pendingStateView(

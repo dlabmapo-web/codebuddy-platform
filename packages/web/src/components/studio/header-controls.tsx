@@ -14,6 +14,7 @@ import {
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { setBrowserLocale } from '@/i18n/client/set-locale';
+import { routes } from '@/lib/routes';
 import { useTheme } from '@/lib/theme/theme-provider';
 import { themes, type Theme } from '@/lib/theme/settings';
 import { cn } from '@/lib/utils';
@@ -138,7 +139,7 @@ export function ProfileControl({
     <Link
       aria-label={t('my_page')}
       className={cn(trigger, 'w-9 px-0', className)}
-      href="/studio/my-page"
+      href={routes.account}
       title={t('my_page')}
     >
       <ProfileAvatar

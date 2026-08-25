@@ -1,6 +1,6 @@
 /**
  * Picks which nav link is current. A prefix test alone marks every parent
- * active — an index link like `/studio/academies/{id}` prefixes every page
+ * active — an index link like `/academy/{id}` prefixes every page
  * under it — so the most specific matching link wins and the rest stay quiet.
  */
 export function activeNavHref(

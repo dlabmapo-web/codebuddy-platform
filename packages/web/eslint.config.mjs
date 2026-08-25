@@ -8,8 +8,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: [
-      "src/app/(v2-auth)/**/*.{ts,tsx}",
-      "src/app/(v2-studio)/**/*.{ts,tsx}",
+      "src/app/(auth)/**/*.{ts,tsx}",
+      "src/app/(studio)/**/*.{ts,tsx}",
       "src/components/studio/**/*.{ts,tsx}",
     ],
     plugins: { i18next },
@@ -27,7 +27,7 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    files: ["src/app/(v2-auth)/auth/_components/code-preview.tsx"],
+    files: ["src/app/(auth)/auth/_components/code-preview.tsx"],
     rules: {
       // This component intentionally renders a Python source-code sample.
       "i18next/no-literal-string": "off",

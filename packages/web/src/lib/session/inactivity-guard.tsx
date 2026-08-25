@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { logoutAction } from '@/app/(v2-auth)/auth/actions';
+import { logoutAction } from '@/app/(auth)/actions';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 import { cn } from '@/lib/utils';

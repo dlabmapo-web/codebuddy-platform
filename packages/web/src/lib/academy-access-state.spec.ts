@@ -64,7 +64,7 @@ describe('resolveAcademyAccessState', () => {
     expect(result.kind).toBe('active');
     expect(authDestination(account({
       memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE', imageUrl: null }],
-    }))).toBe(`/studio/academies/${academy.id}`);
+    }))).toBe(`/academy/${academy.slug}`);
   });
 
   it('routes a suspended membership to the pending access surface', () => {
@@ -74,7 +74,7 @@ describe('resolveAcademyAccessState', () => {
     });
 
     expect(resolveAcademyAccessState(input).kind).toBe('suspended');
-    expect(authDestination(input)).toBe('/auth/pending');
+    expect(authDestination(input)).toBe('/pending');
     expect(pendingStateView(resolveAcademyAccessState(input))).toMatchObject({
       state: 'suspended',
       canCancel: false,
@@ -95,7 +95,7 @@ describe('resolveAcademyAccessState', () => {
       }));
       expect(authDestination(account({
         applications: [application(status)],
-      }))).toBe('/auth/pending');
+      }))).toBe('/pending');
       expect(pendingStateView(state)).toMatchObject({
         state: expectedState,
         canCancel,
@@ -107,14 +107,14 @@ describe('resolveAcademyAccessState', () => {
   it('keeps an unrelated account on the welcome page', () => {
     const input = account();
     expect(resolveAcademyAccessState(input)).toEqual({ kind: 'welcome' });
-    expect(authDestination(input)).toBe('/auth/welcome');
+    expect(authDestination(input)).toBe('/welcome');
   });
 
   it('sends a platform operator to the console rather than the welcome page', () => {
     // Belonging to no academy is the design for an operator, not an unfinished
     // signup — so the screen telling them to ask a manager for an invitation is
     // the one place they must never land.
-    expect(authDestination(account({ platformRole: 'ADMIN' }))).toBe('/platform');
+    expect(authDestination(account({ platformRole: 'ADMIN' }))).toBe('/admin');
   });
 
   it('lets a real academy membership outrank the console', () => {
@@ -128,7 +128,7 @@ describe('resolveAcademyAccessState', () => {
           ],
         }),
       ),
-    ).toBe(`/studio/academies/${academy.id}`);
+    ).toBe(`/academy/${academy.slug}`);
   });
 
   it('exposes academy management only to managers', () => {
@@ -199,7 +199,7 @@ describe('resolveAcademyAccessState', () => {
     const destination = authDestination(account({
       memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null }],
     }));
-    expect(destination).toBe(`/studio/academies/${academy.id}`);
+    expect(destination).toBe(`/academy/${academy.slug}`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

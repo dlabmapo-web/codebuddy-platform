@@ -34,7 +34,7 @@ export function Screenshot({
         <span className="size-2.5 rounded-full bg-white/20" />
         <span className="size-2.5 rounded-full bg-white/20" />
         <span className="font-display ml-3 truncate rounded-full bg-white/[0.07] px-3 py-1 text-[11px] tracking-wide text-white/40">
-          studio.coveedu.com
+          cs.coveedu.com
         </span>
       </div>
       {src ? (

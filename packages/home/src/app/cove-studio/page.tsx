@@ -11,7 +11,7 @@ import { getServerTranslation } from "@/i18n/server/get-server-translation";
 
 /** The real application. A different origin in every environment. */
 const STUDIO_APP_URL =
-  process.env.NEXT_PUBLIC_STUDIO_URL ?? "https://studio.coveedu.com";
+  process.env.NEXT_PUBLIC_STUDIO_URL ?? "https://cs.coveedu.com";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getServerTranslation(["product"]);

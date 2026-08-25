@@ -127,8 +127,8 @@ describe('shouldSyncStudentSession', () => {
 
 describe('safeReturnPath', () => {
   it('keeps a same-origin learning path', () => {
-    expect(safeReturnPath('/studio/academies/a/learn/exercises/b')).toBe(
-      '/studio/academies/a/learn/exercises/b',
+    expect(safeReturnPath('/academy/a/learn/exercises/b')).toBe(
+      '/academy/a/learn/exercises/b',
     );
   });
 

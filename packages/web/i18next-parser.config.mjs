@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const webDir = fileURLToPath(new URL('.', import.meta.url));
 const input = [
-  ...sourceFiles(join(webDir, 'src/app/(v2-auth)')),
-  ...sourceFiles(join(webDir, 'src/app/(v2-studio)')),
+  ...sourceFiles(join(webDir, 'src/app/(auth)')),
+  ...sourceFiles(join(webDir, 'src/app/(studio)')),
   ...sourceFiles(join(webDir, 'src/components/studio')),
 ];
 

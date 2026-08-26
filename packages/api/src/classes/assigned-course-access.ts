@@ -69,12 +69,55 @@ export function assignedMaterialWhere(
 }
 
 /**
+ * A class this teacher currently runs.
+ *
+ * The mirror of `enrolledClassWhere` for the other side of delivery. The
+ * assignment stores a membership rather than a user, so the academy and the
+ * `TEACHER` role are both pinned here: a membership key alone cannot prove
+ * same-academy, and a demoted teacher must stop reaching the class through it.
+ */
+export function taughtClassWhere(
+  academyId: string,
+  userId: string,
+): Prisma.ClassWhereInput {
+  return {
+    academyId,
+    status: "ACTIVE",
+    assignedTeacher: { academyId, userId, status: "ACTIVE", role: "TEACHER" },
+  };
+}
+
+/** A course delivered by a class this teacher runs. */
+export function taughtCourseWhere(
+  academyId: string,
+  userId: string,
+): Prisma.CourseWhereInput {
+  return {
+    academyId,
+    classAssignments: { some: { class: taughtClassWhere(academyId, userId) } },
+  };
+}
+
+/** The same policy expressed from a material. */
+export function taughtMaterialWhere(
+  academyId: string,
+  userId: string,
+): Prisma.MaterialWhereInput {
+  return {
+    lecture: {
+      courseModule: { course: taughtCourseWhere(academyId, userId) },
+    },
+  };
+}
+
+/**
  * What one actor may reach through the learning surface.
  *
- * Class assignment gates delivery to students. Staff previewing their own
- * curriculum are governed by their staff permissions and the visibility rules
- * alone — a Team Lead should not have to enroll in a class to walk the course
- * they wrote — so their scope stays the plain academy.
+ * Class assignment gates delivery to students, and the teaching assignment
+ * gates it for teachers: a teacher sees the courses their own classes are
+ * given, not everything the academy owns. A Team Lead or Manager runs the
+ * curriculum for the whole academy, so their scope stays the plain academy —
+ * neither should have to enroll in a class to reach a course they own.
  */
 export type LearningScope = {
   course: Prisma.CourseWhereInput;
@@ -85,11 +128,17 @@ export function learningScopeFor(
   academyId: string,
   actor: { userId: string; role: AcademyRole },
 ): LearningScope {
-  if (actor.role !== "STUDENT") {
-    return { course: { academyId }, material: {} };
+  if (actor.role === "STUDENT") {
+    return {
+      course: assignedCourseWhere(academyId, actor.userId),
+      material: assignedMaterialWhere(academyId, actor.userId),
+    };
   }
-  return {
-    course: assignedCourseWhere(academyId, actor.userId),
-    material: assignedMaterialWhere(academyId, actor.userId),
-  };
+  if (actor.role === "TEACHER") {
+    return {
+      course: taughtCourseWhere(academyId, actor.userId),
+      material: taughtMaterialWhere(academyId, actor.userId),
+    };
+  }
+  return { course: { academyId }, material: {} };
 }

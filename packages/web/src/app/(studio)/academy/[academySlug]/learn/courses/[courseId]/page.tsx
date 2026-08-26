@@ -1,7 +1,7 @@
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnCourseOutlineResult } from '@cove/shared';
-import { notFound } from 'next/navigation';
+import { notFound, redirect, RedirectType } from 'next/navigation';
 
 import { createServerORPCClient } from '@/lib/orpc-server';
 
@@ -17,7 +17,20 @@ export default async function LearnCoursePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academySlug, courseId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const { academyId, role } = await requireAcademyRoute(academySlug);
+
+  // The outline below is the student delivery view: it is driven by a class,
+  // and reports progress and live presence for that class. Staff hold
+  // `curriculum.read` and legitimately reach this URL from the course list,
+  // but they have no student enrollment to deliver against. Send them to the
+  // management view of the same course rather than rendering a class-shaped
+  // page with no class.
+  if (role !== 'STUDENT') {
+    redirect(
+      `${routes.academy(academySlug)}/content/courses/${courseId}`,
+      RedirectType.replace,
+    );
+  }
   const requestedClassId = single((await searchParams).classId);
   let outline: LearnCourseOutlineResult | null = null;
   try {

@@ -40,7 +40,15 @@ export const resolvePlatformAcademyRoute = cache(
       });
       const academy = result.academies.find((row) => row.slug === academySlug);
       return academy
-        ? { academyId: academy.id, academySlug: academy.slug }
+        ? {
+            academyId: academy.id,
+            academySlug: academy.slug,
+            // A platform operator holds no academy membership. They reach an
+            // academy through the platform seam with full oversight, so for
+            // route decisions they behave as a manager: never the student
+            // delivery view, always the management view.
+            role: 'MANAGER' as const,
+          }
         : null;
     } catch {
       return null;

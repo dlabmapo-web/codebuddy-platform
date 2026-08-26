@@ -21,6 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Validate requested revision
+        env:
+          REQUESTED_COMMIT: ${{ inputs.main_commit }}
+        run: |
+          [[ "$REQUESTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+
       - name: Check out deployment infrastructure
         uses: actions/checkout@v4
         with:
@@ -39,7 +45,7 @@ jobs:
         run: |
           git fetch origin main
           resolved="$(git rev-parse HEAD)"
-          [[ "$resolved" =~ ^[0-9a-f]{40}$ ]]
+          test "$resolved" = "${{ inputs.main_commit }}"
           git merge-base --is-ancestor "$resolved" origin/main
           printf 'sha=%s\n' "$resolved" >> "$GITHUB_OUTPUT"
 

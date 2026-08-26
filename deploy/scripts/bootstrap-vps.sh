@@ -15,6 +15,10 @@ deploy_root="/opt/cove"
   printf 'usage: bootstrap-vps.sh DEPLOY_USER SSH_PUBLIC_KEY_FILE\n' >&2
   exit 2
 }
+[[ "$deploy_user" != "root" ]] || {
+  printf 'The deployment user must not be root.\n' >&2
+  exit 2
+}
 [[ -f "$public_key_file" ]] || {
   printf 'SSH public key file does not exist: %s\n' "$public_key_file" >&2
   exit 2
@@ -44,7 +48,13 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 if ! id "$deploy_user" >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash "$deploy_user"
 fi
-usermod -aG docker "$deploy_user"
+usermod -aG docker,sudo "$deploy_user"
+
+password_status="$(passwd -S "$deploy_user" | awk '{print $2}')"
+if [[ "$password_status" != "P" ]]; then
+  printf 'Set a strong local password for %s. It is used for sudo, not SSH login.\n' "$deploy_user"
+  passwd "$deploy_user"
+fi
 
 user_home="$(getent passwd "$deploy_user" | cut -d: -f6)"
 install -d -m 0700 -o "$deploy_user" -g "$deploy_user" "$user_home/.ssh"
@@ -117,7 +127,8 @@ done
 }
 
 if [[ "${HARDEN_SSH:-0}" == "1" ]]; then
-  cat > /etc/ssh/sshd_config.d/99-cove-hardening.conf <<'CONF'
+  hardening_file="/etc/ssh/sshd_config.d/00-cove-hardening.conf"
+  cat > "$hardening_file" <<'CONF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
@@ -125,7 +136,23 @@ PubkeyAuthentication yes
 X11Forwarding no
 AllowTcpForwarding yes
 CONF
+  chmod 0644 "$hardening_file"
+  rm -f -- /etc/ssh/sshd_config.d/99-cove-hardening.conf
   sshd -t
+
+  effective_sshd="$(sshd -T)"
+  for expected_setting in \
+    "permitrootlogin no" \
+    "pubkeyauthentication yes" \
+    "passwordauthentication no" \
+    "kbdinteractiveauthentication no"; do
+    grep -Fqx "$expected_setting" <<<"$effective_sshd" || {
+      printf 'Effective SSH setting is not secure: expected "%s". SSH was not reloaded.\n' \
+        "$expected_setting" >&2
+      exit 1
+    }
+  done
+
   systemctl reload ssh
   printf 'SSH password and direct root login are now disabled.\n'
 else

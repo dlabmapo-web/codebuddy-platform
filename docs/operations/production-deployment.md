@@ -4,6 +4,9 @@ This runbook deploys Cove Home, Cove Studio v2, API, judge worker, Redis,
 monitoring, and the preserved MVP to one Contabo Cloud VPS 6. PostgreSQL stays
 on Supabase and transactional mail stays on Resend.
 
+For the complete machine-provisioning and SSH-hardening procedure, see
+[`docs/operations/contabo-vps-bootstrap.md`](contabo-vps-bootstrap.md).
+
 The deployment source of truth is
 `docs/superpowers/specs/2026-08-25-production-contabo-docker-deployment-design.md`.
 Do not change public DNS until the launch checklist at the end of this runbook
@@ -26,38 +29,14 @@ key, database URL, or Restic password through chat or commit them to Git.
 
 ## 2. Bootstrap the VPS
 
-Record the VPS IPv4 address as `VPS_IP`. From the operator computer, upload the
-bootstrap script and the public half of the deployment key:
+Follow [`docs/operations/contabo-vps-bootstrap.md`](contabo-vps-bootstrap.md)
+from beginning to end. Record the public address privately as `VPS_IP`; never
+put the live value in Git.
 
-```bash
-scp deploy/scripts/bootstrap-vps.sh root@VPS_IP:/root/
-scp ~/.ssh/cove-production.pub root@VPS_IP:/root/cove-production.pub
-ssh root@VPS_IP
-bash /root/bootstrap-vps.sh cove /root/cove-production.pub
-```
-
-Open a second terminal and prove the non-root account works before hardening
-SSH:
-
-```bash
-ssh -i ~/.ssh/cove-production cove@VPS_IP
-docker version
-```
-
-Keep that session open. In the original root session, disable passwords and
-direct root login:
-
-```bash
-HARDEN_SSH=1 bash /root/bootstrap-vps.sh cove /root/cove-production.pub
-```
-
-Open one more fresh `cove` session before closing root. Confirm the firewall:
-
-```bash
-sudo ufw status verbose
-```
-
-Only OpenSSH, 80/tcp, 443/tcp, and 443/udp may be allowed inbound.
+Do not continue until a fresh, post-reboot key-only connection works as
+`cove`, Docker works without `sudo`, the deployment user can authenticate to
+`sudo`, the firewall exposes only SSH/HTTP/HTTPS/HTTP3, and VNC has been
+disabled for normal operation.
 
 ## 3. Install deployment assets
 
@@ -70,12 +49,19 @@ rsync -az \
   --exclude secrets/ \
   -e "ssh -i ~/.ssh/cove-production" \
   deploy/ cove@VPS_IP:/opt/cove/
+rsync -az --delete \
+  --include '*.example' \
+  --exclude '*' \
+  -e "ssh -i ~/.ssh/cove-production" \
+  deploy/secrets/ cove@VPS_IP:/opt/cove/secrets/
 ssh -i ~/.ssh/cove-production cove@VPS_IP \
   'chmod 700 /opt/cove/scripts/*.sh /opt/cove/scripts/*.py'
 ```
 
 The GitHub release workflow repeats this synchronization. It never overwrites
-`deployment.env`, `secrets/`, or rendered secret-bearing configuration.
+`deployment.env`, real files in `secrets/`, or rendered secret-bearing
+configuration. The second `rsync` copies only tracked `.example` templates;
+the exclusion protects all server-owned secret files from deletion.
 
 ## 4. Create production configuration
 
@@ -264,8 +250,40 @@ message. Confirm every user-facing link uses `cs.coveedu.com`.
 
 ## 10. DNS cutover at Gabia
 
-Lower relevant TTLs before the cutover window. Preserve unrelated Gabia
-records. Create explicit A records pointing to `VPS_IP` in this order:
+Netlify remains the live fallback until VPS acceptance succeeds. In Gabia,
+open **My Gabia → Service Management → DNS Management Tool**, select
+`coveedu.com`, and open its DNS settings. Gabia's official record-management
+guide is <https://customer.gabia.com/manual/dns/3041/3040>.
+
+At least one existing TTL period before cutover:
+
+1. export or screenshot every current DNS record;
+2. record the exact apex Netlify target and `www` behavior in the private
+   launch record;
+3. lower only the application records to the smallest practical Gabia TTL;
+4. preserve MX, TXT, DKIM, SPF, DMARC, verification, and
+   `mail.coveedu.com` records; and
+5. do not add wildcard records.
+
+Before public DNS changes, run internal smoke checks on the VPS. A local
+hostname override can prove HTTP routing, but public HTTPS certificates are
+accepted only after the corresponding public record reaches the VPS:
+
+```bash
+/opt/cove/scripts/wait-healthy.sh
+/opt/cove/scripts/smoke.sh
+curl --resolve api.coveedu.com:80:VPS_IP \
+  --head http://api.coveedu.com/api/health/ready
+curl --resolve cs.coveedu.com:80:VPS_IP \
+  --head http://cs.coveedu.com/login
+curl --resolve mvp.coveedu.com:80:VPS_IP \
+  --head http://mvp.coveedu.com/login
+curl --resolve coveedu.com:80:VPS_IP \
+  --head http://coveedu.com/
+```
+
+Create or replace explicit A records pointing to `VPS_IP` one at a time, in
+this order:
 
 ```text
 api.coveedu.com
@@ -274,15 +292,22 @@ mvp.coveedu.com
 coveedu.com
 ```
 
-Verify HTTPS and production smoke tests after each of the first three records.
-Move the root domain last. Add `www` only as an explicit redirect decision; do
-not introduce a wildcard record.
+After each of the first three changes, wait for public resolution, confirm that
+Caddy obtained a valid certificate, and run the relevant public health and
+login checks. Stop the sequence on any failure. Move the root domain last.
+Leave `www` unchanged unless a separately tested redirect has been approved.
 
 After DNS propagation:
 
 ```bash
 /opt/cove/scripts/smoke.sh --public
 ```
+
+If a subdomain fails, restore only that record to its captured previous value.
+If the Home cutover fails, restore the apex record to the captured Netlify
+target. Confirm public recovery before diagnosing further. Do not delete the
+Netlify site until the full launch has remained stable through the agreed
+rollback window. After stability is established, restore normal TTLs.
 
 ## 11. Production E2E and load tests
 

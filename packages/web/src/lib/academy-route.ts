@@ -43,10 +43,13 @@ export const resolvePlatformAcademyRoute = cache(
         ? {
             academyId: academy.id,
             academySlug: academy.slug,
-            // A platform operator holds no academy membership. They reach an
-            // academy through the platform seam with full oversight, so for
-            // route decisions they behave as a manager: never the student
-            // delivery view, always the management view.
+            // A platform operator holds no academy membership, so there is no
+            // academy role to report. This seam serves the platform academy
+            // page alone, which administers academies and never branches on
+            // role; the field only satisfies the shared identity type. The
+            // academy surfaces resolve through `resolveAcademyRoute`, which
+            // returns null without a membership, so an operator does not
+            // reach a course page from here.
             role: 'MANAGER' as const,
           }
         : null;

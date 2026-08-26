@@ -11,10 +11,18 @@ import { fileURLToPath } from "node:url";
  * of the reasons this is a separate app rather than a route group.
  * See docs/superpowers/specs/2026-08-11-coveedu-marketing-site-design.md §1.
  */
+// Next restricts `deploymentId` to alphanumerics, hyphens, and underscores,
+// but release tags carry dots (`v2.0.0-<sha>`). Normalize rather than letting
+// a valid tag fail the production image build.
+const deploymentId = process.env.DEPLOYMENT_VERSION?.replace(
+  /[^A-Za-z0-9_-]/g,
+  "-",
+);
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
-  deploymentId: process.env.DEPLOYMENT_VERSION,
+  deploymentId,
   transpilePackages: ["@cove/i18n"],
 };
 

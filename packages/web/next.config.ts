@@ -23,6 +23,14 @@ const workerAssetHeaders = [
   { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
 ];
 
+// Next restricts `deploymentId` to alphanumerics, hyphens, and underscores,
+// but release tags carry dots (`v2.0.0-<sha>`). Normalize rather than letting
+// a valid tag fail the production image build.
+const deploymentId = process.env.DEPLOYMENT_VERSION?.replace(
+  /[^A-Za-z0-9_-]/g,
+  "-",
+);
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // The app consumes workspace packages outside packages/web. Next's default
@@ -31,7 +39,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
   // A release identifier lets Next force a safe reload when a browser holding
   // assets from the prior image reaches a newly deployed container.
-  deploymentId: process.env.DEPLOYMENT_VERSION,
+  deploymentId,
   transpilePackages: ["@cove/shared", "@cove/i18n"],
   async redirects() {
     return [...compatibilityRedirects];

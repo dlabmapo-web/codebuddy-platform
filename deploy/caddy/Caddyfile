@@ -35,6 +35,17 @@ coveedu.com {
 	reverse_proxy home:3100
 }
 
+# `www` is not a second home for the marketing site. Two hostnames serving
+# identical content split search ranking and cookies, and the apex is the
+# canonical name every in-app link already uses. The redirect is permanent
+# and preserves the path, so old Netlify-era `www` links keep working.
+#
+# Caddy still needs its own certificate for this name to terminate TLS before
+# it can redirect, so the DNS record must point here for the block to work.
+www.coveedu.com {
+	redir https://coveedu.com{uri} permanent
+}
+
 cs.coveedu.com {
 	import production_common
 	reverse_proxy studio:3000 {

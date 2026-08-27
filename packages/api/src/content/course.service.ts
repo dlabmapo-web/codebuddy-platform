@@ -5,6 +5,7 @@ import { stableKeyFromUuid } from "@cove/shared";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
+import { atRevision } from "../common/optimistic-lock.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { AuditService } from "../academies/audit.service.js";
@@ -639,7 +640,7 @@ export class CourseService {
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.programmingExercise.updateMany({
-        where: { materialId: current.id, updatedAt: exercise.updatedAt },
+        where: { materialId: current.id, updatedAt: atRevision(exercise.updatedAt) },
         data: {
           difficulty: input.difficulty,
           description: input.description,

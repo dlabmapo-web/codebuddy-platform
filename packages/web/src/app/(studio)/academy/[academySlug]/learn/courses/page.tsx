@@ -2,7 +2,9 @@ import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnCourseSummary, LearnDraftSummary } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { toApiError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
 
 import { StudioShell } from '../../_components/studio-shell';
 import { CourseCatalog } from './_components/course-catalog';
@@ -14,10 +16,14 @@ export default async function LearnCoursesPage({
 }) {
   const { academySlug } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
-  const { t } = await getServerTranslation(['learn']);
+  const { t } = await getServerTranslation(['learn', 'errors', 'auth']);
 
   let courses: LearnCourseSummary[] | null = null;
   let drafts: LearnDraftSummary[] = [];
+  // A lapsed learning session is not a membership problem, and telling a
+  // student to ask their manager about one sends them to a person who cannot
+  // help. The two states are distinguished here rather than collapsed.
+  let sessionEnded = false;
 
   try {
     const client = createServerORPCClient();
@@ -30,8 +36,11 @@ export default async function LearnCoursesPage({
     if (courseResult.status === 'rejected') throw courseResult.reason;
     courses = courseResult.value.courses;
     if (draftResult.status === 'fulfilled') drafts = draftResult.value.drafts;
-  } catch {
-    // The permission-aware state renders below.
+  } catch (error) {
+    const { code } = toApiError(error);
+    sessionEnded =
+      code === 'STUDENT_SESSION_EXPIRED' ||
+      code === 'STUDENT_SESSION_UNAVAILABLE';
   }
 
   return (
@@ -47,6 +56,18 @@ export default async function LearnCoursesPage({
           initialCourses={courses}
           initialDrafts={drafts}
         />
+      ) : sessionEnded ? (
+        <div className="rounded-card border border-border bg-card p-5">
+          <p className="text-[14px] leading-6 text-sub">
+            {t('errors:STUDENT_SESSION_EXPIRED')}
+          </p>
+          <a
+            className="mt-3 inline-flex items-center rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-on-brand"
+            href={routes.login}
+          >
+            {t('auth:login.submit')}
+          </a>
+        </div>
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">
           <h2 className="text-[15px] font-bold text-danger">

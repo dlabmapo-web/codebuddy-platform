@@ -40,6 +40,10 @@ export function MyPageWorkspace() {
 
   const page = useMyPage({ requested, remembered });
   const { academyId, profile, academy, selection } = page;
+  // The academy zone links into that academy's studio routes, and My Page is
+  // not one of them, so the slug travels with the selection rather than being
+  // read from a route the page never entered.
+  const selectedAcademySlug = selection.selected?.academySlug ?? null;
   const [academyDirty, setAcademyDirty] = useState(false);
   const [pendingAcademyId, setPendingAcademyId] = useState<string | null>(null);
 
@@ -131,12 +135,13 @@ export function MyPageWorkspace() {
         selectedAcademyId={academyId}
       />
 
-      {academy ? (
+      {academy && selectedAcademySlug ? (
         // The accent lives on this wrapper and nowhere else, so every academy
         // section inherits one hue and the account zone below inherits none.
         <div className="space-y-5" style={accentStyle(academy.context.role)}>
           <AcademySections
             academy={academy}
+            academySlug={selectedAcademySlug}
             onDirtyChange={setAcademyDirty}
             onSaved={page.applyAcademy}
           />

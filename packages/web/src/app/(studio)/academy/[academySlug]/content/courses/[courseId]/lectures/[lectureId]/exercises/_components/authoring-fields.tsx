@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useId } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 
@@ -52,25 +53,52 @@ export function Field({
   required,
   error,
   children,
+  /*
+   * `label` wraps a form control; `group` wraps anything that is not one.
+   *
+   * A `<label>` around a rich text editor or a radiogroup is not merely
+   * imprecise: clicking inside it sends the browser looking for the control
+   * the label belongs to, and the click never reaches the editor. Typing was
+   * impossible until a toolbar button focused it explicitly, which is what
+   * every toolbar button happens to do.
+   */
+  as = 'label',
 }: {
   label: string;
   required?: boolean;
   error?: string | null;
   children: ReactNode;
+  as?: 'label' | 'group';
 }) {
   const { t } = useLayoutTranslation('content');
+  const labelId = useId();
+  const caption = (
+    <span className="text-[14px] font-bold" id={as === 'group' ? labelId : undefined}>
+      {label}
+      {required ? (
+        <span className="ml-1 text-danger">{t('exercise.required_mark')}</span>
+      ) : null}
+    </span>
+  );
+  const message = error ? (
+    <span className="text-[13.5px] font-semibold text-danger">{error}</span>
+  ) : null;
+
+  if (as === 'group') {
+    return (
+      <div aria-labelledby={labelId} className="grid gap-1.5" role="group">
+        {caption}
+        {children}
+        {message}
+      </div>
+    );
+  }
+
   return (
     <label className="grid gap-1.5">
-      <span className="text-[14px] font-bold">
-        {label}
-        {required ? (
-          <span className="ml-1 text-danger">{t('exercise.required_mark')}</span>
-        ) : null}
-      </span>
+      {caption}
       {children}
-      {error ? (
-        <span className="text-[13.5px] font-semibold text-danger">{error}</span>
-      ) : null}
+      {message}
     </label>
   );
 }

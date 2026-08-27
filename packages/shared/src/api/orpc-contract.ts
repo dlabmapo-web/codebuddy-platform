@@ -27,6 +27,7 @@ import {
   academyPeopleBulkContract,
   academyPeopleImportContract,
 } from "./orpc/people-operations.contract.js";
+import { academyFeaturesContract } from "./orpc/academy-features.contract.js";
 import {
   academyProfileContract,
   profileContract,
@@ -43,6 +44,7 @@ export const appContract = {
   academyInvitations: academyInvitationsContract,
   academyMembers: academyMembersContract,
   profile: profileContract,
+  academyFeatures: academyFeaturesContract,
   academyProfile: academyProfileContract,
   academyCourses: academyCoursesContract,
   academyContentImports: academyContentImportsContract,

@@ -184,5 +184,28 @@
     "toggle": "‘{{title}}’ 펼치기·접기",
     "collapse_all": "모두 접기",
     "expand_all": "모두 펼치기"
+  },
+  "settings": {
+    "title": "학원 설정",
+    "description": "이 학원에서 사용 중인 기능입니다.",
+    "requires": "{{title}} 기능이 필요합니다. 이 기능을 켜면 함께 켜집니다.",
+    "feature": {
+      "TEACHER_LIVE_MONITORING": {
+        "title": "실시간 모니터링",
+        "body": "선생님이 학생의 편집기와 터미널을 실시간으로 볼 수 있습니다."
+      },
+      "STUDENT_CLASS_STANDING": {
+        "title": "반 내 위치",
+        "body": "학생이 자기 반에서 어느 위치인지 확인합니다. 학생에게 다른 학생에 대한 정보를 보여주는 유일한 화면입니다."
+      },
+      "STUDENT_POINTS": {
+        "title": "포인트",
+        "body": "학생이 문제를 풀면 포인트를 얻습니다. 끄면 포인트가 전혀 기록되지 않습니다."
+      },
+      "STUDENT_CLASS_LEADERBOARD": {
+        "title": "반 순위표",
+        "body": "포인트 기준 반 순위를 이름과 함께 보여줍니다. 둘 다 켜져 있으면 반 내 위치를 대체합니다."
+      }
+    }
   }
 }

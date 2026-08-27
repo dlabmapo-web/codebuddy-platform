@@ -8,7 +8,8 @@
     "content": "커리큘럼",
     "teaching": "수업 운영",
     "people": "구성원",
-    "learning": "학습"
+    "learning": "학습",
+    "settings": "설정"
   },
   "link": {
     "overview": "개요",
@@ -23,7 +24,8 @@
     "my_points": "내 포인트",
     "solution_status": "풀이 현황",
     "student_analytics": "학생 분석",
-    "class_ranking": "반 랭킹"
+    "class_ranking": "반 랭킹",
+    "settings": "학원 설정"
   },
   "academy_switcher": {
     "select": "학원 선택",

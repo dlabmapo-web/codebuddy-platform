@@ -190,6 +190,18 @@ export function isStudent(role: AcademyRole | null | undefined): boolean {
   return role === 'STUDENT';
 }
 
+/**
+ * Who may switch this academy's features on and off.
+ *
+ * A manager alone. A Team Lead runs the curriculum and a teacher runs a class;
+ * neither decides whether students can see where they rank against each other.
+ */
+export function canManageAcademySettings(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role ? roleHasPermission(role, 'academy.settings.manage') : false;
+}
+
 export function canManageContent(role: AcademyRole | null | undefined): boolean {
   return role ? roleHasPermission(role, 'curriculum.manage') : false;
 }

@@ -186,5 +186,28 @@
     "toggle": "Expand or collapse “{{title}}”",
     "collapse_all": "Collapse all",
     "expand_all": "Expand all"
+  },
+  "settings": {
+    "title": "Academy settings",
+    "description": "What this academy has switched on.",
+    "requires": "Needs {{title}}. Turning this on turns that on too.",
+    "feature": {
+      "TEACHER_LIVE_MONITORING": {
+        "title": "Live monitoring",
+        "body": "Teachers can watch their students work in real time — the editor, the terminal, as it is typed."
+      },
+      "STUDENT_CLASS_STANDING": {
+        "title": "Class standing",
+        "body": "Students see where they sit in their class. This is the one place a student is told anything about another student."
+      },
+      "STUDENT_POINTS": {
+        "title": "Points",
+        "body": "Students earn points for solved problems. With this off no point is ever recorded."
+      },
+      "STUDENT_CLASS_LEADERBOARD": {
+        "title": "Class leaderboard",
+        "body": "A named ranking of the class, by points. Replaces class standing where both are on."
+      }
+    }
   }
 }

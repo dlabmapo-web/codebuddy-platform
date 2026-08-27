@@ -1,3 +1,4 @@
+import { academyFeatureNames } from "@cove/shared";
 import { randomBytes } from "node:crypto";
 
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -173,6 +174,22 @@ export class PlatformAcademyService {
           }
           throw error;
         });
+
+      /*
+       * A new academy gets the whole product. These rows began as rollout
+       * gates and nothing in the application could ever write them, so an
+       * academy created without them found monitoring and ranking dead with
+       * no way to revive them. A manager may switch any of them off from the
+       * academy settings page.
+       */
+      await transaction.academyFeatureFlag.createMany({
+        data: academyFeatureNames.map((feature) => ({
+          academyId: academy.id,
+          feature,
+          isEnabled: true,
+        })),
+        skipDuplicates: true,
+      });
 
       const invitation = await transaction.academyInvitation.create({
         data: {

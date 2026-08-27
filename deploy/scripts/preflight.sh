@@ -84,6 +84,11 @@ def read_env(path: str) -> dict[str, str]:
 
 
 api, studio, mvp, backup = map(read_env, sys.argv[1:])
+
+# The MVP signs its own session cookie. A missing secret is invisible until
+# someone signs in with a correct password, so it is checked before release.
+if len(mvp.get("JWT_SECRET", "")) < 32:
+    raise SystemExit("MVP JWT_SECRET must contain at least 32 characters")
 expected = {
     "API WEB_ORIGIN": (api.get("WEB_ORIGIN"), "https://cs.coveedu.com"),
     "Studio NEXT_PUBLIC_API_URL": (

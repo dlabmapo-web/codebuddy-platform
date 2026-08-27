@@ -17,6 +17,8 @@ import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
+
+import { IdentityPanel } from './identity-panel';
 import { cn } from '@/lib/utils';
 
 import { InvitationLink } from '../../../_components/invitation-link';
@@ -47,6 +49,7 @@ export function AcademyDetail({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <div className="grid gap-6">
         <FirstManagerPanel academy={academy} onChange={setAcademy} />
+        <IdentityPanel academy={academy} onChange={setAcademy} />
         <PeoplePanel academy={academy} />
         <DetailsPanel academy={academy} />
       </div>

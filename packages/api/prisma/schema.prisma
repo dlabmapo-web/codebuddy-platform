@@ -519,6 +519,7 @@ model Academy {
   organization           Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdBy              User?                           @relation("AcademyCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   memberships            AcademyMembership[]
+  slugHistory            AcademySlugHistory[]
   invitations            AcademyInvitation[]
   joinRequests           AcademyJoinRequest[]
   oauthOnboardingIntents OAuthOnboardingIntent[]
@@ -578,6 +579,27 @@ model OAuthOnboardingIntent {
   @@index([status, expiresAt])
   @@index([academyId, createdAt])
   @@map("oauth_onboarding_intents")
+}
+
+/// A slug this academy used to answer to.
+///
+/// The slug is in every URL an academy has appeared in — a student's bookmark
+/// mid-course, a link a teacher emailed, an invitation already sent. Retiring
+/// one without remembering it breaks all of them at once, which is why nobody
+/// would risk a rename.
+///
+/// The slug is the primary key: a retired slug can only ever have pointed at
+/// one academy, and that is a claim the database should hold rather than a
+/// convention the services agree to keep.
+model AcademySlugHistory {
+  slug      String   @id
+  academyId String   @map("academy_id") @db.Uuid
+  retiredAt DateTime @default(now()) @map("retired_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@index([academyId])
+  @@map("academy_slug_history")
 }
 
 model AcademyMembership {
@@ -741,38 +763,38 @@ model PeopleImportSession {
 /// that never existed, so an id cannot be probed for existence across a course
 /// or tenant boundary.
 model ContentImportSession {
-  id                     String              @id @default(uuid()) @db.Uuid
-  academyId              String              @map("academy_id") @db.Uuid
-  courseId               String              @map("course_id") @db.Uuid
-  actorUserId            String              @map("actor_user_id") @db.Uuid
-  originalFilename       String              @map("original_filename")
+  id                      String              @id @default(uuid()) @db.Uuid
+  academyId               String              @map("academy_id") @db.Uuid
+  courseId                String              @map("course_id") @db.Uuid
+  actorUserId             String              @map("actor_user_id") @db.Uuid
+  originalFilename        String              @map("original_filename")
   /// SHA-256 of the uploaded bytes, for the audit trail. The raw workbook is
   /// never stored: it holds hidden expected outputs and problem text, and a
   /// checksum answers "was this the same file" without keeping any of it.
-  checksumSha256         String              @map("checksum_sha256")
-  templateVersion        Int                 @map("template_version")
-  status                 ContentImportStatus @default(PREVIEW_READY)
-  createCount            Int                 @map("create_count")
-  updateCount            Int                 @map("update_count")
-  unchangedCount         Int                 @map("unchanged_count")
-  warningCount           Int                 @map("warning_count")
-  conflictCount          Int                 @map("conflict_count")
-  errorCount             Int                 @map("error_count")
+  checksumSha256          String              @map("checksum_sha256")
+  templateVersion         Int                 @map("template_version")
+  status                  ContentImportStatus @default(PREVIEW_READY)
+  createCount             Int                 @map("create_count")
+  updateCount             Int                 @map("update_count")
+  unchangedCount          Int                 @map("unchanged_count")
+  warningCount            Int                 @map("warning_count")
+  conflictCount           Int                 @map("conflict_count")
+  errorCount              Int                 @map("error_count")
   /// The planned actions, exactly as the team lead reviewed them. Bounded by
   /// the 200-problem cap and the per-cell limits the reader enforces.
-  plan                   Json
+  plan                    Json
   /// §9.2 — the course revision the plan was computed against.
-  capturedContentRevision Int                @map("captured_content_revision")
-  expiresAt              DateTime            @map("expires_at") @db.Timestamptz(6)
+  capturedContentRevision Int                 @map("captured_content_revision")
+  expiresAt               DateTime            @map("expires_at") @db.Timestamptz(6)
   /// Unique per course: a retried commit returns the original result rather
   /// than importing the workbook twice.
-  idempotencyKey         String              @map("idempotency_key")
-  committedAt            DateTime?           @map("committed_at") @db.Timestamptz(6)
+  idempotencyKey          String              @map("idempotency_key")
+  committedAt             DateTime?           @map("committed_at") @db.Timestamptz(6)
   /// What the commit actually did, with the ids the result screen links to.
-  result                 Json?
-  failureCode            String?             @map("failure_code")
-  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  result                  Json?
+  failureCode             String?             @map("failure_code")
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
   course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)

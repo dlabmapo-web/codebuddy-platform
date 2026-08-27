@@ -9,6 +9,7 @@ import {
   type PlatformAcademyDetail,
   type PlatformAcademySummary,
   type ResendFirstManagerInvitationInput,
+  type UpdatePlatformAcademyInput,
 } from "@cove/shared";
 
 import {
@@ -24,7 +25,7 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
-import type { Prisma } from "../generated/prisma/client.js";
+import type { AcademyStatus, Prisma } from "../generated/prisma/client.js";
 import {
   toAcademyDetail,
   toAcademySummary,
@@ -120,6 +121,122 @@ export class PlatformAcademyService {
       "platform.academies.read",
     );
     return toAcademyDetail(await this.requireAcademy(academyId));
+  }
+
+  /**
+   * Correct an academy's name and slug.
+   *
+   * The row is locked as `setStatus` locks it: two operators renaming at once
+   * must not both read the old slug, both find it free, and both write.
+   */
+  async update(
+    identity: SupabaseIdentity,
+    input: UpdatePlatformAcademyInput,
+  ): Promise<PlatformAcademyDetail> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.academies.update",
+    );
+
+    return this.prisma.$transaction(async (transaction) => {
+      const rows = await transaction.$queryRaw<
+        { id: string; name: string; slug: string; status: AcademyStatus }[]
+      >`SELECT id, name, slug, status FROM academies WHERE id = ${input.academyId}::uuid FOR UPDATE`;
+      const current = rows[0];
+      if (!current) {
+        throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
+      }
+      // Archived is the end. An academy that has ended does not get renamed.
+      if (current.status === "ARCHIVED") {
+        throw new AppException("ACADEMY_STATE_CONFLICT", HttpStatus.CONFLICT);
+      }
+
+      const slugChanged = current.slug !== input.slug;
+      if (slugChanged) {
+        await this.requireSlugFree(transaction, input.slug, input.academyId);
+      }
+
+      await transaction.academy.update({
+        where: { id: input.academyId },
+        data: { name: input.name, slug: input.slug },
+      });
+
+      if (slugChanged) {
+        /*
+         * Reclaiming a slug this academy itself retired is unambiguous, and
+         * its history row now describes the live slug — a redirect to itself.
+         */
+        await transaction.academySlugHistory.deleteMany({
+          where: { slug: input.slug },
+        });
+        await transaction.academySlugHistory.create({
+          data: { slug: current.slug, academyId: input.academyId },
+        });
+      }
+
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "platform.academy.updated",
+        targetType: "Academy",
+        targetId: input.academyId,
+        before: { name: current.name, slug: current.slug },
+        after: { name: input.name, slug: input.slug },
+      });
+
+      const detail = await transaction.academy.findUniqueOrThrow({
+        where: { id: input.academyId },
+        select: academyDetailSelect,
+      });
+      return toAcademyDetail(detail);
+    });
+  }
+
+  /**
+   * The slug this academy answers to now, for a URL carrying one it used to.
+   *
+   * Null for a slug no academy ever had. A redirect that guesses is worse than
+   * a page that admits it does not know where to go.
+   */
+  async resolveSlug(slug: string): Promise<{ slug: string | null }> {
+    const live = await this.prisma.academy.findFirst({
+      where: { slug },
+      select: { slug: true },
+    });
+    if (live) return { slug: live.slug };
+
+    const retired = await this.prisma.academySlugHistory.findUnique({
+      where: { slug },
+      select: { academy: { select: { slug: true } } },
+    });
+    return { slug: retired?.academy.slug ?? null };
+  }
+
+  /**
+   * A slug is free only when neither a live academy nor a retired slug holds
+   * it. Without the second check a retired slug could be handed to another
+   * academy, and its redirect would then carry somebody to an academy they
+   * were never looking at.
+   */
+  private async requireSlugFree(
+    transaction: Prisma.TransactionClient,
+    slug: string,
+    academyId: string,
+  ): Promise<void> {
+    const live = await transaction.academy.findFirst({
+      where: { slug, id: { not: academyId } },
+      select: { id: true },
+    });
+    if (live) {
+      throw new AppException("ACADEMY_SLUG_CONFLICT", HttpStatus.CONFLICT);
+    }
+    const retired = await transaction.academySlugHistory.findUnique({
+      where: { slug },
+      select: { academyId: true },
+    });
+    if (retired && retired.academyId !== academyId) {
+      throw new AppException("ACADEMY_SLUG_CONFLICT", HttpStatus.CONFLICT);
+    }
   }
 
   async create(

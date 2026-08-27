@@ -7,6 +7,9 @@ import {
   createPlatformAcademyResultSchema,
   listPlatformAcademiesInputSchema,
   platformAcademyDetailSchema,
+  resolveAcademySlugInputSchema,
+  resolveAcademySlugResultSchema,
+  updatePlatformAcademyInputSchema,
   platformAcademySummarySchema,
   resendFirstManagerInvitationInputSchema,
   setAcademyStatusInputSchema,
@@ -36,6 +39,16 @@ export const platformAcademiesContract = {
   create: oc
     .input(createPlatformAcademyInputSchema)
     .output(createPlatformAcademyResultSchema),
+  update: oc
+    .input(updatePlatformAcademyInputSchema)
+    .output(platformAcademyDetailSchema),
+  /**
+   * Where a URL's slug points now. Any authenticated caller: it reveals only
+   * what a working link already revealed.
+   */
+  resolveSlug: oc
+    .input(resolveAcademySlugInputSchema)
+    .output(resolveAcademySlugResultSchema),
   setStatus: oc
     .input(setAcademyStatusInputSchema)
     .output(platformAcademyDetailSchema),

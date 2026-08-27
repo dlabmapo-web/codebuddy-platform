@@ -92,8 +92,21 @@ describe("roleHasPermission", () => {
       expect(roleHasPermission(role, "exercises.manage")).toBe(false);
       expect(roleHasPermission(role, "content.import")).toBe(false);
       expect(roleHasPermission(role, "ai-feedback-rules.manage")).toBe(false);
-      expect(roleHasPermission(role, "curriculum.review")).toBe(false);
+      expect(roleHasPermission(role, "curriculum.manage")).toBe(false);
+      expect(roleHasPermission(role, "curriculum.publish")).toBe(false);
     }
+  });
+
+  it("lets a teacher read curriculum detail without authoring it", () => {
+    // The course tree and the exercise both sit behind `curriculum.review`,
+    // so without it a teacher sees a course listed and can open none of it.
+    expect(roleHasPermission("TEACHER", "curriculum.review")).toBe(true);
+    // Reading is the whole grant: writing stays with the curriculum owners.
+    expect(roleHasPermission("TEACHER", "curriculum.manage")).toBe(false);
+    expect(roleHasPermission("TEACHER", "curriculum.publish")).toBe(false);
+    // A student never reaches the authoring view: it carries the hidden test
+    // inputs and expected outputs their submission is graded against.
+    expect(roleHasPermission("STUDENT", "curriculum.review")).toBe(false);
   });
 });
 

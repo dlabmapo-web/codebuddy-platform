@@ -107,6 +107,19 @@ export const academyRolePermissions = {
     "academy.read",
     "academy.members.read",
     "curriculum.read",
+    /*
+     * A teacher reads the curriculum they deliver, exercises included.
+     * `curriculum.read` alone opens no detail page: the course tree and the
+     * exercise both sit behind `curriculum.review`. Without it a teacher can
+     * see a course listed and open none of it.
+     *
+     * This grants the authoring view of an exercise, so a teacher sees its
+     * hidden test inputs and expected outputs. That is deliberate and matches
+     * what they already hold: `submissions.assigned.review` shows them the
+     * graded result of those same cases for every student they teach.
+     * Authoring stays separate — writing needs `curriculum.manage`.
+     */
+    "curriculum.review",
     "curriculum.draft",
     "classes.assigned.manage",
     "submissions.assigned.review",

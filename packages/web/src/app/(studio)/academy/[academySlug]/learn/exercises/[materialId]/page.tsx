@@ -1,7 +1,7 @@
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnExerciseBootstrap } from '@cove/shared';
-import { notFound } from 'next/navigation';
+import { notFound, redirect, RedirectType } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -53,6 +53,20 @@ export default async function ExerciseWorkspacePage({
     notFound();
   }
   if (!bootstrap) notFound();
+
+  // No class at all means staff, not a student choosing between classes: the
+  // workspace runs solve sessions, submissions and monitoring against a class
+  // and would record their preview as a student's attempt. The authoring view
+  // shows the same exercise, and every staff role now holds the
+  // `curriculum.review` it needs.
+  if (bootstrap.classContext.classes.length === 0) {
+    const { course, lecture } = bootstrap.workspace.breadcrumb;
+    redirect(
+      `${routes.academy(academySlug)}/content/courses/${course.id}` +
+        `/lectures/${lecture.id}/exercises/${materialId}`,
+      RedirectType.replace,
+    );
+  }
 
   if (!bootstrap.classContext.classId) {
     const choiceQuery = new URLSearchParams();

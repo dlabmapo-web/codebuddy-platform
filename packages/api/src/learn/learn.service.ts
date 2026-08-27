@@ -143,12 +143,18 @@ export class LearnService {
     const learner = await this.requireLearner(identity, input.academyId);
     const material = await this.requireWorkspaceMaterial(input, learner.scope);
     const course = material.lecture.courseModule.course;
-    const classContext = await this.classContext.resolve({
-      academyId: input.academyId,
-      userId: learner.userId,
-      courseId: course.id,
-      requestedClassId: input.classId,
-    });
+    // As in `getCourseOutline`: only a student works through a class. Staff
+    // receive an empty context and the route sends them to the authoring view
+    // rather than into a workspace that would submit on their behalf.
+    const classContext =
+      learner.role === "STUDENT"
+        ? await this.classContext.resolve({
+            academyId: input.academyId,
+            userId: learner.userId,
+            courseId: course.id,
+            requestedClassId: input.classId,
+          })
+        : { classes: [], classId: null };
 
     // The historical attempt is loaded beside the workspace, not instead of
     // it. A submission that does not resolve leaves the ordinary workspace

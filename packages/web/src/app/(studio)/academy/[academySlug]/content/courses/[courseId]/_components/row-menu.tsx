@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Eye, EyeOff, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -22,6 +22,7 @@ export function RowMenu({
   kindLabel,
   label,
   onDelete,
+  onMove,
   onRename,
   onToggleVisible,
   tone = 'default',
@@ -31,6 +32,11 @@ export function RowMenu({
   kindLabel: string;
   label: string;
   onDelete: () => void;
+  /**
+   * Absent when the row has no sibling to move among. A list offering one
+   * destination — the place the item already occupies — is noise.
+   */
+  onMove?: () => void;
   onRename: () => void;
   onToggleVisible: (next: boolean) => void;
   /** `strong` marks the group-level menu so it reads apart from child rows. */
@@ -63,6 +69,12 @@ export function RowMenu({
           <Pencil className="text-sub" />
           {t('row.rename')}
         </DropdownMenuItem>
+        {onMove ? (
+          <DropdownMenuItem onSelect={onMove}>
+            <ArrowUpDown className="text-sub" />
+            {t('row.move')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => onToggleVisible(!isVisible)}>
           {isVisible ? (
             <EyeOff className="text-sub" />

@@ -155,7 +155,8 @@
     "delete": "Delete",
     "visible_tooltip": "Visible to students",
     "hidden_tooltip": "Hidden from students",
-    "hidden_by_parent_tooltip": "Set to visible, but hidden because a parent is hidden"
+    "hidden_by_parent_tooltip": "Set to visible, but hidden because a parent is hidden",
+    "move": "Move to…"
   },
   "visibility_confirm": {
     "title": "Hide this {{kind}}?",
@@ -186,5 +187,15 @@
     "toggle": "Expand or collapse “{{title}}”",
     "collapse_all": "Collapse all",
     "expand_all": "Expand all"
+  },
+  "move": {
+    "module_title": "Move chapter",
+    "lecture_title": "Move lecture",
+    "exercise_title": "Move problem",
+    "body": "Choose where it should sit among the others.",
+    "first": "First",
+    "after": "After {{title}}",
+    "current": "Current",
+    "hidden": "Hidden"
   }
 }

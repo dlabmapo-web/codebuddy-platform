@@ -9,6 +9,7 @@ import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseModule } from '../_lib/course-tree';
 import { VisibilityIndicator } from './builder-controls';
 import { DeleteModal } from './delete-modal';
+import { MoveModal } from './move-modal';
 import { LectureRow } from './lecture-row';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
@@ -26,6 +27,9 @@ export function ModuleCard({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const siblings = builder.tree.modules;
+  const moduleIndex = siblings.findIndex((item) => item.id === courseModule.id);
   const addingLecture = builder.lectureModuleId === courseModule.id;
   const effectivelyVisible =
     builder.tree.course.isVisible && courseModule.isVisible;
@@ -92,6 +96,7 @@ export function ModuleCard({
             kindLabel={t('row.kind_module')}
             label={courseModule.title}
             onDelete={() => setDeleting(true)}
+            onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
             onRename={() => setRenaming(true)}
             onToggleVisible={(next) => {
               if (!next) {
@@ -113,6 +118,7 @@ export function ModuleCard({
             exerciseBasePath={exerciseBasePath}
             key={lecture.id}
             lecture={lecture}
+            moduleId={courseModule.id}
             moduleNumber={courseModule.position}
             parentEffectivelyVisible={effectivelyVisible}
           />
@@ -178,6 +184,21 @@ export function ModuleCard({
           value={courseModule.title}
         />
       ) : null}
+      <MoveModal
+        currentIndex={moduleIndex}
+        kind="module"
+        onCancel={() => setMoving(false)}
+        onMove={(toIndex) => {
+          setMoving(false);
+          builder.moveModule(courseModule.id, toIndex);
+        }}
+        open={moving}
+        siblings={siblings.map((item) => ({
+          id: item.id,
+          isVisible: item.isVisible,
+          title: item.title,
+        }))}
+      />
       <DeleteModal
         cascade={{
           exercises: exerciseCount,

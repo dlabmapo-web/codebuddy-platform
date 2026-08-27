@@ -153,7 +153,8 @@
     "delete": "삭제",
     "visible_tooltip": "학생에게 보임",
     "hidden_tooltip": "학생에게 숨김",
-    "hidden_by_parent_tooltip": "공개로 설정되어 있지만 상위 항목이 숨겨져 있어 학생에게 보이지 않음"
+    "hidden_by_parent_tooltip": "공개로 설정되어 있지만 상위 항목이 숨겨져 있어 학생에게 보이지 않음",
+    "move": "위치 옮기기…"
   },
   "visibility_confirm": {
     "title": "이 {{kind}}을(를) 숨길까요?",
@@ -184,5 +185,15 @@
     "toggle": "‘{{title}}’ 펼치기·접기",
     "collapse_all": "모두 접기",
     "expand_all": "모두 펼치기"
+  },
+  "move": {
+    "module_title": "챕터 위치 옮기기",
+    "lecture_title": "강의 위치 옮기기",
+    "exercise_title": "문제 위치 옮기기",
+    "body": "다른 항목들 사이에서 놓을 위치를 선택하세요.",
+    "first": "맨 앞",
+    "after": "{{title}} 다음",
+    "current": "현재 위치",
+    "hidden": "숨김"
   }
 }

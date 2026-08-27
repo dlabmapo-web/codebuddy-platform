@@ -66,9 +66,12 @@ describe('recovery capability', () => {
   it('refuses a tampered signature', async () => {
     const token = await issueRecoveryCapability(subject, secret);
     const [header, payload, signature] = token.split('.');
-    const flipped = `${signature.slice(0, -1)}${
-      signature.endsWith('A') ? 'B' : 'A'
-    }`;
+    // Mutate the first character, not the last. A 32-byte HMAC is 43 base64url
+    // characters, and 43 * 6 bits carries 2 bits more than the signature holds:
+    // the final character's low bits are padding that decodes to nothing. So
+    // `A` -> `B` there leaves the bytes identical and the signature valid,
+    // which made this test fail whenever a signature happened to end in A-D.
+    const flipped = `${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
 
     expect(
       await verifyRecoveryCapability(

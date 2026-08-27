@@ -158,7 +158,14 @@ export const learningClassOptionSchema = z.object({
 });
 export const learningClassContextSchema = z.object({
   classId: z.uuid().nullable(),
-  classes: z.array(learningClassOptionSchema).min(1),
+  /*
+   * Empty for staff. A student always reaches a course through a class, but a
+   * teacher or curriculum owner previewing the course they teach or wrote has
+   * no enrollment to deliver against — see `learningScopeFor`. An empty list
+   * means "no class context", which the outline renders as a preview rather
+   * than as delivery.
+   */
+  classes: z.array(learningClassOptionSchema),
 });
 export type LearningClassContext = z.infer<typeof learningClassContextSchema>;
 

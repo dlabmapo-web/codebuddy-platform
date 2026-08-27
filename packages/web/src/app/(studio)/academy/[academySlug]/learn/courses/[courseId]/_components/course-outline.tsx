@@ -33,15 +33,20 @@ export function CourseOutline({
   const router = useRouter();
   const { t } = useLayoutTranslation('learn');
   const { markActive, setOpenMaterial } = useStudentPresence();
+  // No class means staff are previewing rather than learning: there is no
+  // enrollment to report progress or presence against.
+  const isPreview = classContext.classes.length === 0;
   const outline = useCourseOutline({
     academyId,
-    classId: classContext.classId!,
+    classId: classContext.classId,
     courseId,
     initialOutline,
   });
 
   React.useEffect(() => {
-    setOpenMaterial({ materialId: null, courseId, classId: classContext.classId! });
+    const classId = classContext.classId;
+    if (!classId) return;
+    setOpenMaterial({ materialId: null, courseId, classId });
     markActive();
     return () => setOpenMaterial(null);
   }, [classContext.classId, courseId, markActive, setOpenMaterial]);
@@ -71,12 +76,14 @@ export function CourseOutline({
             <ArrowLeft className="size-3.5" />
             {t('outline.back')}
           </Link>
-          <span className="text-[12.5px] text-sub">
-            {t('outline.progress', {
-              solved: outline.progress.solved,
-              total: outline.progress.total,
-            })}
-          </span>
+          {isPreview ? null : (
+            <span className="text-[12.5px] text-sub">
+              {t('outline.progress', {
+                solved: outline.progress.solved,
+                total: outline.progress.total,
+              })}
+            </span>
+          )}
         </div>
 
         <label className="relative w-full sm:w-72">
@@ -101,28 +108,30 @@ export function CourseOutline({
         </label>
       </div>
 
-      <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-        <span className="text-[12.5px] font-semibold text-sub">
-          {t('class_context.label')}
-        </span>
-        <div className="ml-auto min-w-52">
-          <ResponsiveSelector
-            align="end"
-            drawerTitle={t('class_context.title')}
-            label={t('class_context.label')}
-            list={classContext.classes.map((item) => ({
-              id: item.classId,
-              name: item.name,
-            }))}
-            onSelect={(item) =>
-            router.replace(
-              `${routes.academy(academySlug)}/learn/courses/${courseId}?classId=${item.id}`,
-            )
-            }
-            selectedId={classContext.classId}
-          />
-        </div>
-      </label>
+      {isPreview ? null : (
+        <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+          <span className="text-[12.5px] font-semibold text-sub">
+            {t('class_context.label')}
+          </span>
+          <div className="ml-auto min-w-52">
+            <ResponsiveSelector
+              align="end"
+              drawerTitle={t('class_context.title')}
+              label={t('class_context.label')}
+              list={classContext.classes.map((item) => ({
+                id: item.classId,
+                name: item.name,
+              }))}
+              onSelect={(item) =>
+              router.replace(
+                `${routes.academy(academySlug)}/learn/courses/${courseId}?classId=${item.id}`,
+              )
+              }
+              selectedId={classContext.classId}
+            />
+          </div>
+        </label>
+      )}
 
       {empty ? (
         <div className="flex flex-col items-center rounded-card border border-dashed border-border bg-card px-6 py-16 text-center">

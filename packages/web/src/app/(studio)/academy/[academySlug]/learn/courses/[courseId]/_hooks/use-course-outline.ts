@@ -20,7 +20,8 @@ export function useCourseOutline({
   initialOutline,
 }: {
   academyId: string;
-  classId: string;
+  /** Null while staff preview a course they have no enrollment in. */
+  classId: string | null;
   courseId: string;
   initialOutline: LearnCourseOutline;
 }) {
@@ -33,7 +34,12 @@ export function useCourseOutline({
 
   const outlineQuery = useQuery({
     queryKey: ['learn', academyId, 'outline', courseId, classId],
-    queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId, classId }),
+    queryFn: () =>
+      orpc.learn.getCourseOutline({
+        academyId,
+        courseId,
+        ...(classId ? { classId } : {}),
+      }),
     initialData: initialOutline,
     retry: false,
   });

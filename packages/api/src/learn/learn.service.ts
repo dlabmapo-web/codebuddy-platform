@@ -100,16 +100,25 @@ export class LearnService {
     identity: SupabaseIdentity,
     input: { academyId: string; courseId: string; classId?: string },
   ): Promise<LearnCourseOutlineResult> {
-    const { userId, scope } = await this.requireLearner(identity, input.academyId);
+    const { userId, role, scope } = await this.requireLearner(
+      identity,
+      input.academyId,
+    );
     const course = await this.requireVisibleCourse(input, scope);
+    // Delivery is a student's relationship to a course: the class decides
+    // progress, presence and points. Staff reach this course through their
+    // own permissions and have no enrollment to deliver against, so they get
+    // an empty context and the outline renders as a preview.
     const [outline, classContext] = await Promise.all([
       this.curriculum.outlineFor(course, userId),
-      this.classContext.resolve({
-        academyId: input.academyId,
-        userId,
-        courseId: course.id,
-        requestedClassId: input.classId,
-      }),
+      role === "STUDENT"
+        ? this.classContext.resolve({
+            academyId: input.academyId,
+            userId,
+            courseId: course.id,
+            requestedClassId: input.classId,
+          })
+        : Promise.resolve({ classes: [], classId: null }),
     ]);
     return { ...outline, classContext };
   }

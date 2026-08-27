@@ -2,7 +2,6 @@
 
 import { routes } from '@/lib/routes';
 
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -40,10 +39,17 @@ import { SectionCard } from '@/components/studio/profile/section-card';
  */
 export function AcademySections({
   academy,
+  academySlug,
   onSaved,
   onDirtyChange,
 }: {
   academy: AcademyProfileResponse;
+  /*
+   * Passed, not read from the academy route context: My Page lives at
+   * /account, outside `academy/[academySlug]`, so that provider is absent
+   * here. The selected membership carries the slug already.
+   */
+  academySlug: string;
   onSaved: (response: AcademyProfileResponse) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -71,7 +77,7 @@ export function AcademySections({
       ) : (
         <StaffSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} />
       )}
-      <LearningContextSection academy={academy} />
+      <LearningContextSection academy={academy} academySlug={academySlug} />
     </>
   );
 }
@@ -275,10 +281,11 @@ function useReportDirty(
  */
 function LearningContextSection({
   academy,
+  academySlug,
 }: {
   academy: AcademyProfileResponse;
+  academySlug: string;
 }) {
-  const academySlug = useAcademySlug();
   const { t } = useTranslation('profile');
   const isStudent = academy.context.role === 'STUDENT';
   const base = `${routes.academy(academySlug)}`;

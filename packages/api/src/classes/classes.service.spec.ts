@@ -30,6 +30,15 @@ const otherMembershipId = "60000000-0000-4000-8000-000000000002";
 const teacherA = "70000000-0000-4000-8000-00000000000a";
 const teacherB = "70000000-0000-4000-8000-00000000000b";
 const updatedAt = new Date("2026-08-03T09:00:00.000Z");
+/*
+ * What a revision claim looks like in a `where` clause. Not an equality: the
+ * stored `timestamptz` keeps microseconds that never reach the caller, so the
+ * claim names the millisecond it was handed. See `common/optimistic-lock.ts`.
+ */
+const claiming = {
+  gte: updatedAt,
+  lt: new Date(updatedAt.getTime() + 1),
+};
 
 function teacherMembership(
   id: string,
@@ -129,13 +138,18 @@ function createService(options?: {
       create: vi.fn().mockResolvedValue(record),
       update: vi.fn().mockResolvedValue(record),
       updateMany: vi.fn().mockImplementation(({ where }: {
-        where: { status?: string; updatedAt?: Date };
+        where: { status?: string; updatedAt?: { gte: Date; lt: Date } };
       }) => Promise.resolve({
         count: !options?.claimFails
           && record
           && (!where.status || where.status === record.status)
+          // A revision claim is a millisecond window, not an equality: the
+          // stored column keeps microseconds the caller never receives. The
+          // double honours the window so it cannot accept a query the database
+          // would refuse.
           && (!where.updatedAt
-            || where.updatedAt.toISOString() === record.updatedAt.toISOString())
+            || (record.updatedAt >= where.updatedAt.gte
+              && record.updatedAt < where.updatedAt.lt))
           ? 1
           : 0,
       })),
@@ -375,7 +389,7 @@ describe("ClassesService course assignment", () => {
           academyId,
           id: classId,
           status: "ACTIVE",
-          updatedAt,
+          updatedAt: claiming,
         }),
       }),
     );
@@ -423,7 +437,7 @@ describe("ClassesService course assignment", () => {
         academyId,
         id: classId,
         status: "ACTIVE",
-        updatedAt,
+        updatedAt: claiming,
       },
       data: { name: "Level 2", description: "Updated" },
     });
@@ -730,7 +744,7 @@ describe("ClassesService teacher assignment", () => {
     });
 
     expect(transaction.class.updateMany).toHaveBeenCalledWith({
-      where: { id: classId, academyId, status: "ACTIVE", updatedAt },
+      where: { id: classId, academyId, status: "ACTIVE", updatedAt: claiming },
       data: { teacherMembershipId: teacherA },
     });
   });

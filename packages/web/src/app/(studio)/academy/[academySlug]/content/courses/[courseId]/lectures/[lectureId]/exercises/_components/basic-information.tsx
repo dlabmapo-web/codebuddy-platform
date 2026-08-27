@@ -58,7 +58,7 @@ export function BasicInformation({
           value={draft.title}
         />
       </Field>
-      <Field label={t('exercise.field.difficulty')} required>
+      <Field as="group" label={t('exercise.field.difficulty')} required>
         <DifficultyPicker
           disabled={!editable}
           onChange={(difficulty: ExerciseDifficulty) =>
@@ -69,6 +69,7 @@ export function BasicInformation({
       </Field>
 
       <Field
+        as="group"
         error={descriptionError}
         label={t('exercise.field.description')}
         required

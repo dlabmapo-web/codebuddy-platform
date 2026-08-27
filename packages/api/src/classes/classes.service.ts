@@ -13,6 +13,7 @@ import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
+import { atRevision } from "../common/optimistic-lock.js";
 import { bumpPeopleRevision } from "../manage/people-revision.js";
 import {
   memberAvatarSelect,
@@ -193,7 +194,7 @@ export class ClassesService {
           id: input.classId,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: new Date(input.expectedUpdatedAt),
+          updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
         },
         data: { name, description },
       });
@@ -233,7 +234,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: current.status,
-          updatedAt: current.updatedAt,
+          updatedAt: atRevision(current.updatedAt),
         },
         data: {
           status: input.status,
@@ -298,7 +299,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: new Date(input.expectedUpdatedAt),
+          updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
         },
         data: { updatedAt: new Date() },
       });
@@ -386,7 +387,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: new Date(input.expectedUpdatedAt),
+          updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
         },
         data: { updatedAt: new Date() },
       });
@@ -522,7 +523,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: current.updatedAt,
+          updatedAt: atRevision(current.updatedAt),
         },
         data: { updatedAt: new Date() },
       });
@@ -580,7 +581,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: current.updatedAt,
+          updatedAt: atRevision(current.updatedAt),
         },
         data: { updatedAt: new Date() },
       });
@@ -706,7 +707,7 @@ export class ClassesService {
           id: current.id,
           academyId: input.academyId,
           status: "ACTIVE",
-          updatedAt: new Date(input.expectedUpdatedAt),
+          updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
         },
         data: { teacherMembershipId: requested },
       });

@@ -34,7 +34,24 @@ export default async function RootLayout({
     // switcher which option is selected; `className` drives the explicit half.
     // No `suppressHydrationWarning`: server and client read the same cookie and
     // agree on both attributes, so there is nothing to suppress.
-    <html className={themeClassName(theme)} data-theme={theme} lang={locale}>
+    /*
+     * Not machine-translated. The app ships Korean and English and offers
+     * the choice in its own switcher, so a browser translation adds nothing
+     * a reader cannot already get — and it rewrites text nodes underneath
+     * React, which breaks reconciliation with `insertBefore` errors. The
+     * exercise workspace is the worst place for that: a student loses the
+     * code they were writing. `translate="no"` covers the standard
+     * attribute; the meta covers Google's older opt-out.
+     */
+    <html
+      className={themeClassName(theme)}
+      data-theme={theme}
+      lang={locale}
+      translate="no"
+    >
+      <head>
+        <meta content="notranslate" name="google" />
+      </head>
       <body>
         <LayoutTranslationsProvider
           locale={locale}

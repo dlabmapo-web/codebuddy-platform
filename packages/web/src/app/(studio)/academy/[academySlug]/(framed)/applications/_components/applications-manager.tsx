@@ -1,5 +1,6 @@
 'use client';
 
+import { approvableRoles, type AcademyRole } from '@cove/shared';
 import { useState } from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -12,7 +13,13 @@ import {
 import { ApplicationsTable } from './applications-table';
 import { ReviewModal } from './review-modal';
 
-export function ApplicationsManager({ academyId }: { academyId: string }) {
+export function ApplicationsManager({
+  academyId,
+  role,
+}: {
+  academyId: string;
+  role: AcademyRole;
+}) {
   const { t } = useLayoutTranslation('applications');
   const errorText = useErrorText();
   const manager = useApplicationsManager(academyId);
@@ -47,6 +54,7 @@ export function ApplicationsManager({ academyId }: { academyId: string }) {
           setReviewing(null);
         }}
         request={reviewing}
+        roles={approvableRoles(role)}
       />
 
       {manager.reviewError ? (

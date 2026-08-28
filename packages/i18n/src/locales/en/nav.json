@@ -33,5 +33,9 @@
     "switch": "Switch academy",
     "search": "Search academies…"
   },
-  "my_page": "My page"
+  "my_page": "My page",
+  "badge": {
+    "pending_applications": "{{pending}} waiting for approval",
+    "pending_applications_tooltip": "{{link}} · {{pending}} waiting"
+  }
 }

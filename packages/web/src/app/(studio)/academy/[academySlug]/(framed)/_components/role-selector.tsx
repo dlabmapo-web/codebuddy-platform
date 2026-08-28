@@ -11,17 +11,19 @@ export function RoleSelector({
   onChange,
   disabled,
   label,
+  roles = academyRoles,
   popoverClassName = 'w-48',
 }: {
   value: AcademyRole | null;
   onChange: (role: AcademyRole) => void;
   disabled?: boolean;
   label?: string;
+  roles?: readonly AcademyRole[];
   popoverClassName?: string;
 }) {
   const { t } = useLayoutTranslation(['academy', 'common']);
   // Rebuilt per render so a language switch is reflected without a remount.
-  const roleOptions = academyRoles.map((role) => ({
+  const roleOptions = roles.map((role) => ({
     id: role,
     name: t(`common:role.${role}`),
   }));

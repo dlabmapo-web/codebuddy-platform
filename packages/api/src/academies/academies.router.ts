@@ -45,6 +45,14 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
             input.academyId,
           )
         ),
+      pendingCount: os.academyJoinRequests.pendingCount
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.academyJoinRequestService.pendingCount(
+            context.identity,
+            input.academyId,
+          )
+        ),
       review: os.academyJoinRequests.review
         .use(access.authenticated)
         .handler(({ context, input }) =>

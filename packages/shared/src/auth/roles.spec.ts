@@ -2,10 +2,37 @@ import { describe, expect, it } from "vitest";
 
 import {
   academyPermissions,
+  academyRoles,
+  approvableRoles,
+  canApproveAs,
   platformPermissions,
   platformRoleHasPermission,
   roleHasPermission,
 } from "./roles.js";
+
+describe("application approval roles", () => {
+  it("lets managers approve every academy role", () => {
+    expect(approvableRoles("MANAGER")).toEqual(academyRoles);
+  });
+
+  it("limits team leads to students and teachers", () => {
+    expect(approvableRoles("TEAM_LEAD")).toEqual(["STUDENT", "TEACHER"]);
+  });
+
+  it("gives teachers and students no approval roles", () => {
+    expect(approvableRoles("TEACHER")).toEqual([]);
+    expect(approvableRoles("STUDENT")).toEqual([]);
+  });
+
+  it("keeps canApproveAs aligned with each actor's role list", () => {
+    for (const actor of academyRoles) {
+      const allowed = approvableRoles(actor);
+      for (const target of academyRoles) {
+        expect(canApproveAs(actor, target)).toBe(allowed.includes(target));
+      }
+    }
+  });
+});
 
 describe("roleHasPermission", () => {
   it("allows managers to manage academy members", () => {

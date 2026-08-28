@@ -12,6 +12,7 @@ import {
   canManageAcademy,
   canManageClasses,
   canMonitorClasses,
+  canReviewApplications,
   canReviewContent,
   isStudent,
 } from '@/lib/academy-access-state';
@@ -94,6 +95,7 @@ export async function StudioChrome({
         canManageAcademy={canManageAcademy(role)}
         canManageClasses={canManageClasses(role)}
         canManageContent={canReviewContent(role)}
+        canReviewApplications={canReviewApplications(role)}
         canMonitor={canMonitorClasses(role)}
         hasPoints={hasPoints}
         isStudent={isStudent(role)}

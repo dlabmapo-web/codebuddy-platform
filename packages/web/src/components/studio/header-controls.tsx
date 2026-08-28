@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Languages, Moon, Sun } from 'lucide-react';
-import { locales, type Locale } from '@cove/i18n/settings';
+import { Moon, Sun } from 'lucide-react';
+import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
 
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { LocaleFlag } from '@/components/studio/locale-flag';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { setBrowserLocale } from '@/i18n/client/set-locale';
@@ -67,13 +68,21 @@ export function ThemeControl({ className }: { className?: string }) {
 }
 
 /**
- * The trigger carries the locale *code* and the menu carries each language's
- * own name. The code answers "what am I reading?" at a glance; `한국어` answers
- * "what can I switch to?" in the one form the reader who needs it can read.
+ * The trigger carries the current language as a flag and a code; the menu
+ * carries each language's own name beside its flag. The code answers "what am
+ * I reading?" at a glance, `한국어` answers "what can I switch to?" in the one
+ * form the reader who needs it can read, and the flag answers both before
+ * either is read at all.
  *
- * The code sits in a fixed-width box so switching language never nudges the
- * controls beside it. On a bilingual product every reader presses this at least
- * once, and a button that reflows its neighbours when used is a defect.
+ * The flag replaces the generic `Languages` glyph rather than joining it. That
+ * icon said "this control is about language" — which the code beside it already
+ * said — where the flag says *which* language, so keeping both would spend the
+ * width on the less useful half.
+ *
+ * The code sits in a fixed-width box and both spellings are three letters, so
+ * switching language never nudges the controls beside it. On a bilingual
+ * product every reader presses this at least once, and a button that reflows
+ * its neighbours when used is a defect.
  */
 export function LanguageControl({ className }: { className?: string }) {
   const { t } = useLayoutTranslation('common');
@@ -86,9 +95,9 @@ export function LanguageControl({ className }: { className?: string }) {
         className={cn(trigger, className)}
         title={t('language.label')}
       >
-        <Languages aria-hidden className="size-[1.05rem]" strokeWidth={1.75} />
-        <span className="min-w-[1.5rem] text-center text-[12px] font-bold uppercase tracking-[0.06em]">
-          {current}
+        <LocaleFlag locale={current} />
+        <span className="min-w-[1.75rem] text-center text-[12px] font-bold tracking-[0.06em]">
+          {localeCodes[current]}
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={menu}>
@@ -99,7 +108,9 @@ export function LanguageControl({ className }: { className?: string }) {
           value={current}
         >
           {locales.map((locale) => (
-            <DropdownMenuRadioItem key={locale} value={locale}>
+            // `RadioItem` carries no gap of its own, unlike `MenuItem`.
+            <DropdownMenuRadioItem className="gap-2" key={locale} value={locale}>
+              <LocaleFlag locale={locale} />
               {t(`language.${locale}`)}
             </DropdownMenuRadioItem>
           ))}
@@ -142,8 +153,24 @@ export function ProfileControl({
       href={routes.account}
       title={t('my_page')}
     >
+      {/*
+        * The ring is the whole reason this is not a bare `ProfileAvatar`.
+        *
+        * The header sits on `--card`, which is pure white in the light theme,
+        * and so is the top of most photographs — a face on a white studio
+        * background, or the placeholder's own pale disc. Without an edge the
+        * avatar bleeds into the bar and the one control every reader reaches
+        * for is the hardest one to find.
+        *
+        * Drawn from `--sub` at low opacity rather than from `--border`: the
+        * border token is `#E5E8EC`, which is tuned for dividing two panels and
+        * disappears against white at this size. A muted-foreground ring reads
+        * as an edge in both themes, and inverts correctly — `--sub` is light on
+        * the dark theme's dark bar.
+        */}
       <ProfileAvatar
         academyImageUrl={academyImageUrl}
+        className="ring-1 ring-sub/35"
         globalImageUrl={imageUrl}
         externalAvatarUrl={avatarUrl}
         name={name}

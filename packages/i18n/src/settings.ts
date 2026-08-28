@@ -27,6 +27,21 @@ export const localeNames: Record<Locale, string> = {
   en: "English",
 };
 
+/**
+ * The tag the switcher's trigger prints beside the flag.
+ *
+ * Not translated — these are the same three letters in either language, the
+ * forms a Korean reader already meets on documents and signage. Three letters
+ * rather than the two-letter locale key because `EN`/`KO` read as arbitrary at
+ * a glance, and because both spellings here are the same width: the trigger
+ * sits between other controls, and one that reflowed its neighbours every time
+ * somebody used it would be a defect.
+ */
+export const localeCodes: Record<Locale, string> = {
+  ko: "KOR",
+  en: "ENG",
+};
+
 export function isLocale(value: string | undefined | null): value is Locale {
   return typeof value === "string" && (locales as readonly string[]).includes(value);
 }

@@ -209,6 +209,7 @@
   --on-success: #FFFFFF;
   --on-danger: #FFFFFF;
   --on-warning: #FFFFFF;
+  --on-draft: #FFFFFF;
 
   /* The editor is a code surface and stays dark in both themes. */
   --editor-bg: #1E1E1E;
@@ -307,6 +308,7 @@
   --on-success: #0B1017;
   --on-danger: #0B1017;
   --on-warning: #0B1017;
+  --on-draft: #0B1017;
 
   --editor-bg: #1E1E1E;
 
@@ -383,6 +385,7 @@
   --color-on-success: var(--on-success);
   --color-on-danger: var(--on-danger);
   --color-on-warning: var(--on-warning);
+  --color-on-draft: var(--on-draft);
 
   --color-editor-bg: var(--editor-bg);
 

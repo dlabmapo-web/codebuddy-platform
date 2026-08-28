@@ -167,6 +167,14 @@ export function canManageAcademy(role: AcademyRole | null | undefined): boolean 
   return role === 'MANAGER';
 }
 
+export function canReviewApplications(
+  role: AcademyRole | null | undefined,
+): boolean {
+  return role
+    ? roleHasPermission(role, 'academy.applications.review')
+    : false;
+}
+
 /**
  * Every role holds `curriculum.read`, so the Learning group is always shown —
  * a Team Lead can walk their own curriculum exactly as a student sees it. A

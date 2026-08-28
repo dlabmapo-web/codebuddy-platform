@@ -19,6 +19,7 @@ export const appErrorCodes = [
   "JOIN_REQUEST_ALREADY_PENDING",
   "JOIN_REQUEST_NOT_FOUND",
   "JOIN_REQUEST_STATE_CONFLICT",
+  "JOIN_REQUEST_ROLE_NOT_PERMITTED",
   "MEMBERSHIP_ALREADY_EXISTS",
   "MEMBERSHIP_STATE_CONFLICT",
   "RATE_LIMITED",
@@ -141,6 +142,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   JOIN_REQUEST_ALREADY_PENDING: "A join request is already pending.",
   JOIN_REQUEST_NOT_FOUND: "The join request was not found.",
   JOIN_REQUEST_STATE_CONFLICT: "The join request has already been reviewed.",
+  JOIN_REQUEST_ROLE_NOT_PERMITTED:
+    "You can only approve applicants as a student or a teacher.",
   MEMBERSHIP_ALREADY_EXISTS: "This user already belongs to the academy.",
   MEMBERSHIP_STATE_CONFLICT: "The membership cannot make that transition.",
   RATE_LIMITED: "Too many requests. Try again later.",

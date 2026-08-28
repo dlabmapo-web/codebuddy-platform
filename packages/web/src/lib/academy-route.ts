@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect, RedirectType } from 'next/navigation';
 import { cache } from 'react';
 
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -24,9 +24,35 @@ export async function requireAcademyRoute(
   academySlug: string,
 ): Promise<AcademyRouteIdentity> {
   const identity = await resolveAcademyRoute(academySlug);
-  if (!identity) notFound();
-  return identity;
+  if (identity) return identity;
+
+  /*
+   * A slug this academy used to answer to. Renaming an academy changes every
+   * URL it has ever appeared in — a student's bookmark mid-course, a link a
+   * teacher emailed — so a retired slug carries on working rather than
+   * becoming a dead end. Only asked once the membership lookup has missed, so
+   * the ordinary path costs nothing.
+   *
+   * A slug no academy ever had still answers 404: a redirect that guesses is
+   * worse than a page that admits it does not know.
+   */
+  const current = await currentSlugFor(academySlug);
+  if (current && current !== academySlug) {
+    redirect(`/academy/${current}`, RedirectType.replace);
+  }
+  notFound();
 }
+
+const currentSlugFor = cache(async (academySlug: string) => {
+  try {
+    const { slug } = await createServerORPCClient().platformAcademies.resolveSlug(
+      { slug: academySlug },
+    );
+    return slug;
+  } catch {
+    return null;
+  }
+});
 
 /** Platform operators resolve through their separately authorized API seam. */
 export const resolvePlatformAcademyRoute = cache(

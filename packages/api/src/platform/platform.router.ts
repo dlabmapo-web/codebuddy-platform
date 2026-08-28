@@ -28,6 +28,16 @@ export function createPlatformRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.platformAcademyService.create(context.identity, input),
         ),
+      update: os.platformAcademies.update
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformAcademyService.update(context.identity, input),
+        ),
+      resolveSlug: os.platformAcademies.resolveSlug
+        .use(access.authenticated)
+        .handler(({ input }) =>
+          deps.platformAcademyService.resolveSlug(input.slug),
+        ),
       setStatus: os.platformAcademies.setStatus
         .use(access.authenticated)
         .handler(({ context, input }) =>

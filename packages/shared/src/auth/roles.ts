@@ -19,6 +19,13 @@ export const platformPermissions = [
   "platform.academies.read",
   "platform.academies.create",
   /**
+   * Correcting an academy's name and slug. Apart from `lifecycle` for the
+   * reason `lifecycle` is apart from `create`: renaming an academy and
+   * switching one off are different authorities, and a role added later
+   * should be able to hold either without the other.
+   */
+  "platform.academies.update",
+  /**
    * Suspend, restore, archive. Apart from `create` so a future support or
    * billing operator can onboard an academy without being able to switch one
    * off, and so the audit trail separates the two acts by permission and not
@@ -34,6 +41,7 @@ export const platformRolePermissions = {
   ADMIN: [
     "platform.academies.read",
     "platform.academies.create",
+    "platform.academies.update",
     "platform.academies.lifecycle",
   ],
 } as const satisfies Record<PlatformRole, readonly PlatformPermission[]>;

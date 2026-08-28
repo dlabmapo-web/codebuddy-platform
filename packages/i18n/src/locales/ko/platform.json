@@ -160,5 +160,16 @@
     "team_leads": "팀리드",
     "teachers": "선생님",
     "students": "학생"
+  },
+  "identity": {
+    "title": "이름과 주소",
+    "description": "이 학원의 이름과 접속에 사용되는 슬러그입니다. 나머지 항목은 학원 관리자가 관리합니다.",
+    "name": "학원 이름",
+    "slug": "URL 슬러그",
+    "slug_help": "모든 링크에 사용됩니다: /academy/<슬러그>/…",
+    "slug_warning": "이전 슬러그로 된 링크는 끊기지 않고 이곳으로 연결됩니다.",
+    "save": "변경 사항 저장",
+    "saving": "저장 중…",
+    "archived": "보관된 학원은 수정할 수 없습니다."
   }
 }

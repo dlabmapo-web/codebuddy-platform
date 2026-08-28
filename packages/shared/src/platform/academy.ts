@@ -176,6 +176,42 @@ export type ListPlatformAcademiesInput = z.input<
 
 /* ---------------------------------------------------------------- writing */
 
+/**
+ * The two identity fields, and only those.
+ *
+ * Everything else about an academy belongs to its manager, who edits address,
+ * phone, contact email and time zone through `academy.settings.manage`. Two
+ * editors of one field is how the two drift apart, so a platform admin gets
+ * exactly what nobody else can reach.
+ *
+ * The slug rules are `academySlugSchema`, the same object creation uses: two
+ * definitions of what a slug is would eventually disagree, and the one that
+ * disagreed would let a URL through that the other had refused.
+ */
+export const updatePlatformAcademyInputSchema = z
+  .object({
+    academyId: z.uuid(),
+    name: z.string().trim().min(2).max(120),
+    slug: academySlugSchema,
+  })
+  .strict();
+export type UpdatePlatformAcademyInput = z.infer<
+  typeof updatePlatformAcademyInputSchema
+>;
+
+/** Asked when a URL carries a slug no academy answers to any more. */
+export const resolveAcademySlugInputSchema = z
+  .object({ slug: academySlugSchema })
+  .strict();
+
+export const resolveAcademySlugResultSchema = z.object({
+  /** The slug this academy answers to now, or null when none ever did. */
+  slug: z.string().nullable(),
+});
+export type ResolveAcademySlugResult = z.infer<
+  typeof resolveAcademySlugResultSchema
+>;
+
 export const createPlatformAcademyInputSchema = z
   .object({
     name: z.string().trim().min(2).max(120),

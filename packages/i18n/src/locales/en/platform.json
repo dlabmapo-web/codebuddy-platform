@@ -160,5 +160,16 @@
     "team_leads": "Team leads",
     "teachers": "Teachers",
     "students": "Students"
+  },
+  "identity": {
+    "title": "Name and address",
+    "description": "What this academy is called, and the slug it is reached at. Everything else belongs to its manager.",
+    "name": "Academy name",
+    "slug": "URL slug",
+    "slug_help": "Appears in every link: /academy/<slug>/…",
+    "slug_warning": "Links using the old slug will redirect here rather than break.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "archived": "An archived academy cannot be edited."
   }
 }

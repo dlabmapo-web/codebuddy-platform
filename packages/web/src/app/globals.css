@@ -479,6 +479,16 @@ h1, h2, h3, h4 {
 @keyframes cove-hint-fade { to { opacity: 0.55; } }
 @keyframes cove-hint-pulse { 50% { opacity: 0.2; } }
 
+/*
+ * The spinner on a control that is working.
+ *
+ * Slower than the 1s Tailwind default: at a full second the ring reads as
+ * urgent, and sign-in is not an emergency. 800ms of travel with a calm easing
+ * is the difference between "working" and "hurry up".
+ */
+@keyframes cove-spin { to { transform: rotate(360deg); } }
+.cove-spinner { animation: cove-spin 800ms linear infinite; }
+
 /* Grey on grey reads as noise on the dark canvas, so the highlight borrows the
    faintest blue instead — enough to read as light, far below the point where
    anyone would call it blue. The one place this system spends any colour. */
@@ -519,6 +529,13 @@ h1, h2, h3, h4 {
     animation: none !important;
     opacity: 0.55;
   }
+  /*
+   * Slowed rather than stopped. A spinner is the only thing on a submitting
+   * button that says the click was taken, and a ring frozen mid-rotation says
+   * the opposite — that something hung. Reduced motion asks for less movement,
+   * not for a control that lies about its state.
+   */
+  .cove-spinner { animation-duration: 2.4s !important; }
 }
 
 /* The curriculum navigator's geometry.

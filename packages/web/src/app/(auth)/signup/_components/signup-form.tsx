@@ -11,7 +11,9 @@ import { signupAction, type AuthFormState } from '../../actions';
 import { AuthDivider } from '../../_components/auth-divider';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
+import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import { useSignupAcademies } from '../_hooks/use-signup-academies';
 import { AcademySelectorField } from './academy-selector-field';
 import { SignupNotice } from './signup-notice';
@@ -30,8 +32,14 @@ export function SignupForm({
   const academies = useSignupAcademies(invitedAcademyId);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [challengeKey, setChallengeKey] = useState(0);
+  // Signup ends two ways. With email confirmation off it redirects, and the
+  // form is replaced rather than answered; with it on it returns the "check
+  // your email" notice. Only the second is an answer, and only the second
+  // releases the button.
+  const submission = useAuthSubmission(state, pending);
 
   function submit(formData: FormData) {
+    if (!submission.begin()) return;
     setCaptchaToken(null);
     setChallengeKey((current) => current + 1);
     action(formData);
@@ -110,18 +118,17 @@ export function SignupForm({
           </p>
         ) : null}
 
-        <button
-          className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+        <AuthSubmitButton
+          busy={submission.busy}
+          busyLabel={t('signup.submitting')}
           disabled={
-            pending ||
-            state.success ||
+            Boolean(state.success) ||
             !academies.academyId ||
             Boolean(publicConfig.turnstileSiteKey && !captchaToken)
           }
-          type="submit"
         >
-          {pending ? t('signup.submitting') : t('signup.submit')}
-        </button>
+          {t('signup.submit')}
+        </AuthSubmitButton>
       </form>
 
       <AuthDivider label={t('divider.or_continue_with')} />

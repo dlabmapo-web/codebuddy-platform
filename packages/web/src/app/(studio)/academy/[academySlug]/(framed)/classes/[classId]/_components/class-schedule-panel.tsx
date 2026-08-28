@@ -5,9 +5,10 @@ import { CalendarClock, Pencil, Plus, Trash2 } from 'lucide-react';
 import * as React from 'react';
 
 import { Button } from '@/components/studio/button';
+import { TimePicker } from '@/components/studio/time-picker';
+import { WeekdayPicker } from '@/components/studio/weekday-picker';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
-import { cn } from '@/lib/utils';
 
 import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager';
 import {
@@ -303,34 +304,16 @@ function EditableRow({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
-        <fieldset className="min-w-0">
-          <legend className="sr-only">
-            {t('detail.schedule_panel.days_label')}
-          </legend>
-          <div className="flex flex-wrap gap-1.5">
-            {weekdays.map((weekday) => {
-              const on = row.days.includes(weekday);
-              return (
-                <button
-                  aria-label={t(weekdayKeys[weekday])}
-                  aria-pressed={on}
-                  className={cn(
-                    'h-9 min-w-9 rounded-lg border px-2.5 text-[13px] font-bold transition-colors duration-150 motion-reduce:transition-none',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
-                    on
-                      ? 'border-brand bg-brand text-on-brand'
-                      : 'border-border bg-card text-sub hover:border-ink/25 hover:text-ink',
-                  )}
-                  key={weekday}
-                  onClick={() => onChange(toggleDay(row, weekday))}
-                  type="button"
-                >
-                  {t(shortKeys[weekday])}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <WeekdayPicker
+          days={row.days}
+          label={t('detail.schedule_panel.days_label')}
+          onToggle={(weekday) => onChange(toggleDay(row, weekday))}
+          options={weekdays.map((weekday) => ({
+            weekday,
+            full: t(weekdayKeys[weekday]),
+            short: t(shortKeys[weekday]),
+          }))}
+        />
 
         <button
           aria-label={t('detail.schedule_panel.remove')}
@@ -343,7 +326,7 @@ function EditableRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <TimeField
+        <TimePicker
           label={t('detail.schedule_panel.start_label')}
           minute={row.startMinute}
           onChange={(startMinute) => onChange({ ...row, startMinute })}
@@ -351,7 +334,7 @@ function EditableRow({
         <span aria-hidden className="text-sub">
           –
         </span>
-        <TimeField
+        <TimePicker
           label={t('detail.schedule_panel.end_label')}
           minute={row.endMinute}
           onChange={(endMinute) => onChange({ ...row, endMinute })}
@@ -377,40 +360,6 @@ function EditableRow({
         </p>
       ) : null}
     </div>
-  );
-}
-
-/**
- * One wall-clock time, in and out as minutes from academy-local midnight.
- *
- * `type="time"` gives every locale its own 12- or 24-hour presentation for
- * free, and gives a keyboard user real time semantics rather than two number
- * boxes. A class that runs past midnight is typed as an end time on the next
- * day, which the row labels rather than the control.
- */
-function TimeField({
-  label,
-  minute,
-  onChange,
-}: {
-  label: string;
-  minute: number;
-  onChange: (minute: number) => void;
-}) {
-  return (
-    <label>
-      <span className="sr-only">{label}</span>
-      <input
-        className="h-9 rounded-lg border border-border bg-card px-2.5 font-mono text-[14px] tabular-nums outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
-        onChange={(event) => {
-          const [hours, minutes] = event.target.value.split(':').map(Number);
-          if (Number.isNaN(hours) || Number.isNaN(minutes)) return;
-          onChange(hours * 60 + minutes);
-        }}
-        type="time"
-        value={clockOf(minute % (24 * 60))}
-      />
-    </label>
   );
 }
 

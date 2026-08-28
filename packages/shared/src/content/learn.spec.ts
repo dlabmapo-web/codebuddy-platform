@@ -216,7 +216,12 @@ describe("student class schemas", () => {
     classId,
     name: "Algorithms A",
     description: "Weekly problem solving.",
-    teacher: { displayName: "Kim Minji" },
+    teacher: {
+      displayName: "Kim Minji",
+      academyImageUrl: null,
+      globalImageUrl: null,
+      externalAvatarUrl: null,
+    },
     availableCourseCount: 2,
   };
 
@@ -255,7 +260,12 @@ describe("student class schemas", () => {
     expect(
       learnClassSummarySchema.safeParse({
         ...summary,
-        teacher: { displayName: "   " },
+        teacher: {
+          displayName: "   ",
+          academyImageUrl: null,
+          globalImageUrl: null,
+          externalAvatarUrl: null,
+        },
       }).success,
     ).toBe(false);
   });
@@ -263,10 +273,29 @@ describe("student class schemas", () => {
   // §11: the student shapes are allowlists. A field added to the management
   // schemas later must fail here rather than reach a student surface.
   it.each([
-    ["a teacher account id", { teacher: { displayName: "Kim", userId: "u1" } }],
+    [
+      "a teacher account id",
+      {
+        teacher: {
+          displayName: "Kim",
+          academyImageUrl: null,
+          globalImageUrl: null,
+          externalAvatarUrl: null,
+          userId: "u1",
+        },
+      },
+    ],
     [
       "a teacher email",
-      { teacher: { displayName: "Kim", email: "kim@example.com" } },
+      {
+        teacher: {
+          displayName: "Kim",
+          academyImageUrl: null,
+          globalImageUrl: null,
+          externalAvatarUrl: null,
+          email: "kim@example.com",
+        },
+      },
     ],
     ["a membership id", { teacherMembershipId: "m1" }],
     ["a roster", { students: [{ displayName: "Student" }] }],

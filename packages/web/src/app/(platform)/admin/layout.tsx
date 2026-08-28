@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 
-import { createServerORPCClient } from '@/lib/orpc-server';
-import { createClient } from '@/lib/supabase/server';
+import { getAccount } from '@/lib/orpc-server';
 
 /**
  * The platform console's boundary.
@@ -31,11 +30,10 @@ export default async function PlatformLayout({
 
 async function readPlatformRole(): Promise<boolean> {
   try {
-    const { data } = await (await createClient()).auth.getSession();
-    if (!data.session) return false;
-    const account = await createServerORPCClient(
-      data.session.access_token,
-    ).auth.me({});
+    // `getAccount` reads the session itself and throws when there is none, so
+    // an absent session lands in the same `catch` an unreachable API does —
+    // which is the answer this function wants for both.
+    const account = await getAccount();
     return account.user.platformRole === 'ADMIN';
   } catch {
     // A failed lookup is not permission. This is the one surface where an

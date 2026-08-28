@@ -2,13 +2,13 @@ import { AuthCard } from '../_components/auth-card';
 import { SignOutControl } from '../_components/sign-out-control';
 import { PendingApproval } from './_components/pending-approval';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount } from '@/lib/orpc-server';
 
 export default async function PendingApprovalPage() {
   const { t } = await getServerTranslation(['auth']);
   let account;
   try {
-    account = await createServerORPCClient().auth.me({});
+    account = await getAccount();
   } catch {
     return (
       <AuthCard

@@ -5,24 +5,27 @@ import { initTranslations } from '@/i18n/init-translations';
 import { sessionNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { StudentPresenceProvider } from '@/lib/monitoring/student-presence';
-import { createServerORPCClient } from '@/lib/orpc-server';
-import { createClient } from '@/lib/supabase/server';
+import { getAccount } from '@/lib/orpc-server';
 import { InactivityGuard } from '@/lib/session/inactivity-guard';
 import { ResumePrompt } from '@/lib/session/resume-prompt';
 
 /**
- * Holds the student's presence and their inactivity deadline for as long as
- * they are inside this academy.
+ * Everything that lasts longer than one page inside an academy, and that both
+ * halves of it need.
  *
- * A layout rather than something inside `StudioShell`: the shell is composed
- * per page, so it would unmount on every navigation and take the socket with
- * it — a student clicking between their courses would flicker through
- * Reconnecting on the teacher's roster. This persists across every page under
- * the academy, which is the lifetime both of these actually have.
+ * The studio frame is deliberately not here: it belongs to `(framed)`, because
+ * the exercise workspace and live monitoring take the whole viewport and have
+ * no chrome. What is left is what is true of every academy route regardless —
+ * the slug, the student's presence, and their inactivity deadline.
  *
- * The inactivity guard sits here for the same reason and one more: §9.1 measures
- * the student, not the route, so a timer that remounted on every navigation
- * would reset itself for the wrong reason and never fire.
+ * The student's presence socket sits here for the reason it always has: the
+ * shell used to be composed per page, so it unmounted on every navigation and
+ * took the socket with it — a student clicking between their courses flickered
+ * through Reconnecting on the teacher's roster.
+ *
+ * The inactivity guard sits here for the same reason and one more: §9.1
+ * measures the student, not the route, so a timer that remounted on every
+ * navigation would reset itself for the wrong reason and never fire.
  *
  * Both are students-only. A teacher's presence signals would be dropped by the
  * gateway anyway, and §5.2 keeps staff session policy separate from this one.
@@ -39,14 +42,10 @@ export default async function AcademyLayout({
 
   let isStudent = false;
   try {
-    // Capture the request's token before constructing the RPC link. Resolving
-    // it lazily inside a parallel layout/page render can lose the request
-    // context and would fail open by omitting the student session guard.
-    const { data } = await (await createClient()).auth.getSession();
-    if (!data.session) throw new Error('No authenticated studio session');
-    const account = await createServerORPCClient(
-      data.session.access_token,
-    ).auth.me({});
+    // `getAccount` captures the request's token before building the RPC link.
+    // Resolving it lazily inside a parallel layout/page render can lose the
+    // request context, which would fail open by omitting this guard.
+    const account = await getAccount();
     isStudent = account.user.memberships.some(
       (membership) =>
         membership.academy.id === academyId &&
@@ -59,13 +58,13 @@ export default async function AcademyLayout({
     isStudent = false;
   }
 
-  if (!isStudent) {
-    return (
-      <AcademyRouteProvider academySlug={academySlug}>
-        {children}
-      </AcademyRouteProvider>
-    );
-  }
+  const scoped = (
+    <AcademyRouteProvider academySlug={academySlug}>
+      {children}
+    </AcademyRouteProvider>
+  );
+
+  if (!isStudent) return scoped;
 
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, sessionNamespaces);
@@ -80,9 +79,7 @@ export default async function AcademyLayout({
         <InactivityGuard />
         <ResumePrompt />
       </PageTranslationsProvider>
-      <AcademyRouteProvider academySlug={academySlug}>
-        {children}
-      </AcademyRouteProvider>
+      {scoped}
     </StudentPresenceProvider>
   );
 }

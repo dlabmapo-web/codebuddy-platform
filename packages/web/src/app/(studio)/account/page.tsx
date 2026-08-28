@@ -5,7 +5,7 @@ import { initTranslations } from '@/i18n/init-translations';
 import { profileNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
 
 import { MyPageShell } from './_components/my-page-shell';
@@ -25,7 +25,7 @@ export default async function MyPage() {
   let firstAcademySlug: string | null = null;
   let isPlatformAdmin = false;
   try {
-    const account = await createServerORPCClient().auth.me({});
+    const account = await getAccount();
     firstAcademySlug = account.user.memberships.find(
       (membership) => membership.status === 'ACTIVE',
     )?.academy.slug ?? null;

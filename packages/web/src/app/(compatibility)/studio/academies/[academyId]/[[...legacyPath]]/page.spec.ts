@@ -19,6 +19,9 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/orpc-server', () => ({
   createServerORPCClient: () => ({ auth: { me: authMe } }),
+  // The account read is memoised behind `getAccount` in the real module; the
+  // spec drives the same `authMe` mock through it.
+  getAccount: () => authMe(),
 }));
 
 import LegacyAcademyPage from './page';

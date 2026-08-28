@@ -1,7 +1,7 @@
 import type { AuthMeResponse } from '@cove/shared';
 
 import { authDestination } from '@/lib/academy-access-state';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount } from '@/lib/orpc-server';
 
 export function signedOutOnlyDestination(
   account: AuthMeResponse | null,
@@ -12,7 +12,7 @@ export function signedOutOnlyDestination(
 /** Return the existing account's home, or null when this is a signed-out visit. */
 export async function currentAccountDestination(): Promise<string | null> {
   try {
-    const account = await createServerORPCClient().auth.me({});
+    const account = await getAccount();
     return signedOutOnlyDestination(account);
   } catch {
     return null;

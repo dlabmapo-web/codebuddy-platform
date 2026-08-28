@@ -10,7 +10,7 @@ import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { platformNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount } from '@/lib/orpc-server';
 
 import { PlatformSidebar } from './platform-sidebar';
 
@@ -113,7 +113,7 @@ async function readViewer(): Promise<{
   name: string | null;
 }> {
   try {
-    const account = await createServerORPCClient().auth.me({});
+    const account = await getAccount();
     return {
       imageUrl: account.user.imageUrl,
       avatarUrl: account.user.avatarUrl,

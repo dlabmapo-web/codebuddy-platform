@@ -35,13 +35,36 @@ export function courseAccent(courseId: string): CourseAccent {
  * Tailwind scans source text, so `bg-course-${accent}-soft` would compile to
  * nothing and every mark would render transparent. The lookup is the price of
  * that, and it is the reason a fifth hue means editing this table.
+ *
+ * Two weights, and which one to use is a question of what the thing is. `mark`
+ * is the solid fill: the course itself, on its card, where it is the object
+ * being chosen. `tint` is the pale one: a *reference* to a course from
+ * somewhere else — a saved draft pointing back at the course it belongs to —
+ * where the same fill twenty rows deep would be a wall of colour instead of a
+ * way to tell rows apart.
  */
 export const courseAccentClasses: Record<
   CourseAccent,
-  { spine: string; tile: string }
+  { spine: string; mark: string; tint: string }
 > = {
-  a: { spine: 'bg-course-a', tile: 'bg-course-a-soft text-course-a' },
-  b: { spine: 'bg-course-b', tile: 'bg-course-b-soft text-course-b' },
-  c: { spine: 'bg-course-c', tile: 'bg-course-c-soft text-course-c' },
-  d: { spine: 'bg-course-d', tile: 'bg-course-d-soft text-course-d' },
+  a: {
+    spine: 'bg-course-a',
+    mark: 'bg-course-a text-on-course',
+    tint: 'bg-course-a-soft text-course-a',
+  },
+  b: {
+    spine: 'bg-course-b',
+    mark: 'bg-course-b text-on-course',
+    tint: 'bg-course-b-soft text-course-b',
+  },
+  c: {
+    spine: 'bg-course-c',
+    mark: 'bg-course-c text-on-course',
+    tint: 'bg-course-c-soft text-course-c',
+  },
+  d: {
+    spine: 'bg-course-d',
+    mark: 'bg-course-d text-on-course',
+    tint: 'bg-course-d-soft text-course-d',
+  },
 };

@@ -28,7 +28,6 @@ export function CourseCatalog({
   return (
     <div className="flex flex-col gap-6">
       <ContinuePanel
-        academyId={academyId}
         discard={catalog.discard}
         discardingId={catalog.discardingId}
         drafts={catalog.drafts}

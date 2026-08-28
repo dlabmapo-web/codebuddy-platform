@@ -45,7 +45,10 @@
     "lines_other": "코드 {{count}}줄 저장됨",
     "empty_lines": "빈 코드",
     "discard": "저장된 코드 삭제",
-    "discarding": "삭제 중…"
+    "discarding": "삭제 중…",
+    "show_all_other": "{{count}}개 더 보기",
+    "show_fewer": "접기",
+    "saved_now": "방금 저장됨"
   },
   "outline": {
     "back": "전체 코스",

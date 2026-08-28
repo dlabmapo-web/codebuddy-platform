@@ -69,11 +69,15 @@ export function CourseCard({
       />
 
       <div className="flex items-start gap-3">
+        {/* Solid, not tinted. This is the course itself, and a pale wash
+            behind a book glyph reads as a placeholder for an icon rather than
+            as the course's own mark. The `tint` weight is for rows that point
+            back here from somewhere else — see `courseAccentClasses`. */}
         <span
           aria-hidden
-          className={`grid size-10 shrink-0 place-items-center rounded-lg ${accent.tile}`}
+          className={`grid size-10 shrink-0 place-items-center rounded-lg ${accent.mark}`}
         >
-          <BookOpen className="size-5" />
+          <BookOpen className="size-5" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[16px] font-extrabold tracking-[-0.015em]">

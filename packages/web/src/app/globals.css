@@ -187,6 +187,10 @@
   --course-c-soft: #E4F3F8;
   --course-d: #BE185D;
   --course-d-soft: #FCEAF2;
+  /* One foreground for all four: every light-theme accent above is dark
+     enough to carry white, and every dark-theme one is light enough to carry
+     near-black. Same split as `--on-brand` and its siblings. */
+  --on-course: #FFFFFF;
 
   --ring: #1B64DA;
   --sidebar: #FFFFFF;
@@ -289,6 +293,7 @@
   --course-c-soft: #0D2830;
   --course-d: #F472B6;
   --course-d-soft: #33162A;
+  --on-course: #0B1017;
 
   --ring: #5B93F5;
   --sidebar: #12161F;
@@ -364,6 +369,7 @@
   --color-course-c-soft: var(--course-c-soft);
   --color-course-d: var(--course-d);
   --color-course-d-soft: var(--course-d-soft);
+  --color-on-course: var(--on-course);
 
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);

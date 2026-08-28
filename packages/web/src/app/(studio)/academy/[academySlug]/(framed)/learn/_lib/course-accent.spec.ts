@@ -48,10 +48,26 @@ describe('courseAccent', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
-  it('has a class pair for every hue', () => {
+  it('names its own hue in every class it hands out', () => {
+    // The table is written by hand because Tailwind cannot see a built class
+    // name, which makes a copy-paste slip — hue `c` carrying `course-b` — both
+    // easy and invisible until somebody notices two courses sharing a colour.
     for (const accent of courseAccents) {
-      expect(courseAccentClasses[accent].spine).toContain(accent);
-      expect(courseAccentClasses[accent].tile).toContain(accent);
+      const { spine, mark, tint } = courseAccentClasses[accent];
+      expect(spine).toContain(`course-${accent}`);
+      expect(mark).toContain(`course-${accent}`);
+      expect(tint).toContain(`course-${accent}-soft`);
+    }
+  });
+
+  it('keeps the solid mark and the pale tint distinct', () => {
+    // A card's own colour and a reference back to it from a draft row are
+    // different weights on purpose; collapsing them would put twenty solid
+    // fills in the continue list.
+    for (const accent of courseAccents) {
+      const { mark, tint } = courseAccentClasses[accent];
+      expect(mark).not.toBe(tint);
+      expect(mark).toContain('text-on-course');
     }
   });
 });

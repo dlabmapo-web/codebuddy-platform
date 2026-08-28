@@ -51,7 +51,11 @@
     "lines_other": "{{count}} lines saved",
     "empty_lines": "Empty draft",
     "discard": "Discard draft",
-    "discarding": "Discarding…"
+    "discarding": "Discarding…",
+    "show_all_one": "Show {{count}} more",
+    "show_all_other": "Show {{count}} more",
+    "show_fewer": "Show fewer",
+    "saved_now": "Just saved"
   },
   "outline": {
     "back": "All courses",

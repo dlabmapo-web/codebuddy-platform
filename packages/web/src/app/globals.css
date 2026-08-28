@@ -449,6 +449,36 @@ h1, h2, h3, h4 {
     cove-skeleton-sweep 1600ms linear 120ms infinite;
 }
 
+/*
+ * The nav item that was clicked, while its destination is on the wire.
+ *
+ * A dot on the item itself rather than a bar across the top of the page: it
+ * says *which* destination is loading, which a global indicator cannot, and it
+ * appears in the place the reader is already looking. Most navigations never
+ * show it — the route skeletons make them instant — so this is what is left
+ * for the ones that are genuinely slow.
+ *
+ * Always rendered, never resized: only opacity changes, so an appearing hint
+ * cannot nudge the label beside it. The 120ms delay is the same anti-flash
+ * rule the skeletons use — a prefetched route resolves inside it and the dot
+ * never becomes visible at all.
+ */
+.cove-link-hint {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  flex-shrink: 0;
+}
+.cove-link-hint[data-pending='true'] {
+  animation:
+    cove-hint-fade 200ms ease 120ms forwards,
+    cove-hint-pulse 1s ease-in-out 120ms infinite;
+}
+@keyframes cove-hint-fade { to { opacity: 0.55; } }
+@keyframes cove-hint-pulse { 50% { opacity: 0.2; } }
+
 /* Grey on grey reads as noise on the dark canvas, so the highlight borrows the
    faintest blue instead — enough to read as light, far below the point where
    anyone would call it blue. The one place this system spends any colour. */
@@ -482,6 +512,12 @@ h1, h2, h3, h4 {
     animation: none !important;
     background-image: none;
     opacity: 1;
+  }
+  /* The hint still has to appear — it is the only feedback a slow navigation
+     gets — so reduced motion drops the pulse and keeps a steady dot. */
+  .cove-link-hint[data-pending='true'] {
+    animation: none !important;
+    opacity: 0.55;
   }
 }
 

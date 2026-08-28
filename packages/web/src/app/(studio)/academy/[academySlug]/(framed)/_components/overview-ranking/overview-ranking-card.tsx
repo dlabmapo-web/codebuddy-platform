@@ -12,6 +12,8 @@ import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Skeleton } from '@/components/studio/skeletons';
+
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLocale } from '@/i18n';
 import { orpc } from '@/lib/orpc';
@@ -315,15 +317,15 @@ function RankingSkeleton() {
   const { t } = useTranslation('points');
   return (
     <Panel icon={Trophy} title={t('preview.title')} tone="primary">
-      <div aria-hidden className="animate-pulse motion-reduce:animate-none">
+      <div aria-hidden>
         {Array.from({ length: 5 }, (_, index) => (
           <div
             className="flex h-14 items-center gap-3 border-b border-border px-4 last:border-b-0"
             key={index}
           >
-            <span className="size-8 rounded-lg bg-muted" />
-            <span className="h-3.5 w-36 rounded bg-muted" />
-            <span className="ml-auto h-4 w-12 rounded bg-muted" />
+            <Skeleton className="size-8 rounded-lg" />
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="ml-auto h-4 w-12" />
           </div>
         ))}
       </div>

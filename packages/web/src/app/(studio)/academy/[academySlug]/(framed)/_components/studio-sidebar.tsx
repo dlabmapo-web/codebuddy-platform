@@ -45,6 +45,7 @@ import {
   useSidebar,
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation, type TranslationKey } from '@/i18n';
+import { NavPendingHint } from './nav-pending-hint';
 import { activeNavHref } from '@/lib/nav-active';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -168,6 +169,10 @@ function NavSection({
                 <Link href={item.href} onClick={() => setOpenMobile(false)}>
                   <item.icon />
                   <span>{label}</span>
+                  {/* Hidden while the rail is collapsed to icons: there is no
+                      room beside a glyph, and a dot crowding one would be read
+                      as part of the icon rather than as a state. */}
+                  {collapsed ? null : <NavPendingHint />}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

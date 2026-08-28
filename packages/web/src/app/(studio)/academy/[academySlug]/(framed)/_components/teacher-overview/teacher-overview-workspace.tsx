@@ -10,6 +10,12 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  Skeleton,
+  SkeletonColumn,
+  SkeletonRegion,
+} from '@/components/studio/skeletons';
+
+import {
   useOverviewState,
   useTeacherOverviewQuery,
 } from '../../_hooks/use-teacher-overview';
@@ -237,16 +243,9 @@ function NoAssignedClasses({ academyId }: { academyId: string }) {
 function OverviewSkeleton() {
   const { t } = useTranslation('teaching');
   return (
-    <div aria-live="polite" className="flex flex-col gap-4">
-      <span className="sr-only">{t('loading')}</span>
-      <div className="h-9 w-72 animate-pulse rounded-lg bg-accent motion-reduce:animate-none" />
-      {[22, 11, 24, 14, 14].map((height, index) => (
-        <div
-          className="animate-pulse rounded-card bg-accent motion-reduce:animate-none"
-          key={index}
-          style={{ height: `${height}rem` }}
-        />
-      ))}
-    </div>
+    <SkeletonRegion className="flex flex-col gap-4" label={t('loading')}>
+      <Skeleton className="h-9 w-72 rounded-lg" />
+      <SkeletonColumn heights={[22, 11, 24, 14, 14]} />
+    </SkeletonRegion>
   );
 }

@@ -26,6 +26,13 @@ import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useLayoutTranslation } from '@/i18n';
+
+import {
+  SkeletonColumn,
+  SkeletonRegion,
+} from '@/components/studio/skeletons';
+
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/i18n';
 
@@ -488,13 +495,13 @@ function QuickActions({ academyId }: { academyId: string }) {
 
 /** The page's shape before its first answer, so nothing jumps when it lands. */
 function OverviewSkeleton() {
+  // The shell's own word for this, not the page's: neither namespace has
+  // one, and inventing a per-role phrasing for a state every page shares
+  // would be three spellings of the same second.
+  const { t } = useLayoutTranslation('common');
   return (
-    <div aria-hidden className="flex animate-pulse flex-col gap-4">
-      <div className="h-12 rounded-card bg-muted" />
-      <div className="h-72 rounded-card bg-muted" />
-      <div className="h-12 rounded-card bg-muted" />
-      <div className="h-56 rounded-card bg-muted" />
-      <div className="h-56 rounded-card bg-muted" />
-    </div>
+    <SkeletonRegion className="flex flex-col gap-4" label={t('state.loading')}>
+      <SkeletonColumn heights={[3, 18, 3, 14, 14]} />
+    </SkeletonRegion>
   );
 }

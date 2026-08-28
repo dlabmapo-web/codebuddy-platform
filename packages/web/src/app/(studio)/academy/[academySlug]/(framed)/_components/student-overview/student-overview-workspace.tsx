@@ -13,6 +13,13 @@ import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useLayoutTranslation } from '@/i18n';
+
+import {
+  SkeletonColumn,
+  SkeletonRegion,
+} from '@/components/studio/skeletons';
+
 import { cn } from '@/lib/utils';
 
 import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
@@ -242,12 +249,13 @@ function NoCourses({ academyId }: { academyId: string }) {
 
 /** The page's shape before its numbers, so the layout does not jump. */
 function OverviewSkeleton() {
+  // The shell's own word for this, not the page's: neither namespace has
+  // one, and inventing a per-role phrasing for a state every page shares
+  // would be three spellings of the same second.
+  const { t } = useLayoutTranslation('common');
   return (
-    <div aria-hidden className="flex animate-pulse flex-col gap-4">
-      <div className="h-16 rounded-card bg-accent" />
-      <div className="h-32 rounded-card bg-accent" />
-      <div className="h-28 rounded-card bg-accent" />
-      <div className="h-56 rounded-card bg-accent" />
-    </div>
+    <SkeletonRegion className="flex flex-col gap-4" label={t('state.loading')}>
+      <SkeletonColumn heights={[4, 8, 7, 14]} />
+    </SkeletonRegion>
   );
 }

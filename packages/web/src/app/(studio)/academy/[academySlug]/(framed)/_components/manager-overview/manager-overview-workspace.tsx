@@ -8,6 +8,10 @@ import {
   useManagerOverviewQuery,
   useManagerOverviewState,
 } from '../../_hooks/use-manager-overview';
+import {
+  SkeletonColumn,
+  SkeletonRegion,
+} from '@/components/studio/skeletons';
 import { Panel } from '../overview-ui/panel';
 import { OverviewRankingCard } from '../overview-ranking/overview-ranking-card';
 import { AcademyPlate } from './academy-plate';
@@ -229,24 +233,12 @@ function SectionUnavailable({
   );
 }
 
-/**
- * The page's shape, held while the first response lands.
- *
- * Every block is roughly the height of what replaces it and they are stacked in
- * the same single column, so the page does not reflow as the data arrives.
- */
+/** The page's shape, held while the first response lands. */
 function OverviewSkeleton() {
   const { t } = useTranslation('manager');
   return (
-    <div aria-live="polite" className="flex flex-col gap-4">
-      <span className="sr-only">{t('loading')}</span>
-      {[15, 18, 20, 26, 16, 14, 10].map((height, index) => (
-        <div
-          className="animate-pulse rounded-card bg-accent motion-reduce:animate-none"
-          key={index}
-          style={{ height: `${height}rem` }}
-        />
-      ))}
-    </div>
+    <SkeletonRegion className="flex flex-col gap-4" label={t('loading')}>
+      <SkeletonColumn heights={[15, 18, 20, 26, 16, 14, 10]} />
+    </SkeletonRegion>
   );
 }

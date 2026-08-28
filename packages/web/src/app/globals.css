@@ -152,6 +152,42 @@
   --rank-bronze: #9A5B2D;
   --rank-bronze-soft: #FBEEE4;
 
+  /*
+   * Course identity.
+   *
+   * Its own family for the same reason `--peer` and the rank metals have one:
+   * a catalog of four courses with one blue mark on each is a wall of text a
+   * student has to read every time, and colour is what turns it into a shelf
+   * they recognise. That is identity, not status — the hue says *which* course,
+   * never how it is going — so it cannot borrow a token that already means
+   * something. Progress on these cards stays `brand` and `success`.
+   *
+   * Assigned by hashing the course id, so a course keeps its colour between
+   * sessions and across every surface it appears on.
+   *
+   * Confined to the course's own mark: the spine and the icon tile, never the
+   * card, the title, or the counts. The note on the rank metals explains why —
+   * tint the whole thing and you have made a favourite course and, by
+   * contrast, a dull one.
+   *
+   * Four hues, each chosen to stay clear of the palettes that mean something:
+   * not `brand` (links and actions), not `success`/`danger`/`warning`, not
+   * `draft`. `peer` violet and `teal` are the near misses, and neither ever
+   * appears beside a course card — one lives in the shared editor, the other
+   * on measured time.
+   *
+   * Each clears 4.5:1 as text on `card`, so the mark can carry a glyph or a
+   * letter rather than only a fill.
+   */
+  --course-a: #4338CA;
+  --course-a-soft: #EEF0FD;
+  --course-b: #7E22CE;
+  --course-b-soft: #F6EDFD;
+  --course-c: #0E7490;
+  --course-c-soft: #E4F3F8;
+  --course-d: #BE185D;
+  --course-d-soft: #FCEAF2;
+
   --ring: #1B64DA;
   --sidebar: #FFFFFF;
   --sidebar-border: #E9EDF3;
@@ -243,6 +279,17 @@
   --rank-bronze: #D08B58;
   --rank-bronze-soft: #2A1D14;
 
+  /* Lifted to clear 4.5:1 on the dark `card`; the tints stay low so a mark
+     never glows out of the grid. */
+  --course-a: #8B93F8;
+  --course-a-soft: #1B1F3A;
+  --course-b: #C084FC;
+  --course-b-soft: #241A38;
+  --course-c: #22D3EE;
+  --course-c-soft: #0D2830;
+  --course-d: #F472B6;
+  --course-d-soft: #33162A;
+
   --ring: #5B93F5;
   --sidebar: #12161F;
   --sidebar-border: #222937;
@@ -308,6 +355,15 @@
   --color-rank-bronze: var(--rank-bronze);
   --color-rank-bronze-soft: var(--rank-bronze-soft);
   --color-unstable-soft: var(--unstable-soft);
+
+  --color-course-a: var(--course-a);
+  --color-course-a-soft: var(--course-a-soft);
+  --color-course-b: var(--course-b);
+  --color-course-b-soft: var(--course-b-soft);
+  --color-course-c: var(--course-c);
+  --color-course-c-soft: var(--course-c-soft);
+  --color-course-d: var(--course-d);
+  --color-course-d-soft: var(--course-d-soft);
 
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);

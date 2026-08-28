@@ -12,11 +12,18 @@
     "empty_body": "Your academy has not published a course. Once a Team Lead publishes one, it appears here.",
     "forbidden_title": "Courses are not available to you",
     "forbidden_body": "Learning needs an active academy membership. Ask an academy manager to check your account.",
-    "counts": "{{modules}} modules · {{lectures}} lectures · {{exercises}} problems",
     "progress_started_one": "{{count}} problem started",
     "progress_started_other": "{{count}} problems started",
     "progress_none": "Not started yet",
-    "open": "Open course"
+    "open": "Open course",
+    "problems_one": "{{count}} problem",
+    "problems_other": "{{count}} problems",
+    "structure_one": "{{modules}} module · {{lectures}} lectures",
+    "structure_other": "{{modules}} modules · {{lectures}} lectures",
+    "start": "Start",
+    "resume": "Resume",
+    "complete": "Complete",
+    "solved_of": "{{solved}} of {{total}} solved"
   },
   "classes": {
     "title": "My classes",

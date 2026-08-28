@@ -1,14 +1,14 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
-
 import type { LearnCourseSummary } from '@cove/shared';
-import { BookOpen, ChevronRight } from 'lucide-react';
+import { BookOpen, Check } from 'lucide-react';
 import Link from 'next/link';
 
+import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { useLayoutTranslation } from '@/i18n';
+import { routes } from '@/lib/routes';
+
+import { courseAccent, courseAccentClasses } from '../_lib/course-accent';
 
 /**
  * One course, wherever a student meets it.
@@ -19,6 +19,20 @@ import { useLayoutTranslation } from '@/i18n';
  * destination is the academy-level course route on purpose: access means
  * access through any eligible class, so the URL a student remembers keeps
  * working when one class path goes away and another still grants the course.
+ *
+ * A shelf, not a grid of forms. The coloured spine down the left edge and the
+ * tinted tile beside the title are the course's own identity — derived from
+ * its id, so it is the same colour every time — and together they are what
+ * lets somebody find 파이썬 기초 among four cards without reading four titles.
+ * Nothing else on the card takes that colour; see the `--course-*` note in
+ * `globals.css`.
+ *
+ * The footer says where you are, and says it differently depending on where
+ * that is. A course nobody has opened leads with what it is offering — its
+ * problem count, and an invitation — and draws no progress bar at all, because
+ * an empty bar is a promise of nothing and four of them in a row read as a
+ * page that is broken. A course underway gets the bar, because then it has
+ * something to show. A finished one gets a check and stops measuring.
  */
 export function CourseCard({
   academyId,
@@ -31,61 +45,112 @@ export function CourseCard({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
-  const { progress } = course;
+  const { counts, progress } = course;
+  const accent = courseAccentClasses[courseAccent(course.courseId)];
+
   const completion =
     progress.total > 0
       ? Math.round((progress.solved / progress.total) * 100)
       : 0;
+  const done = progress.total > 0 && progress.solved === progress.total;
+  const underway = !done && (progress.solved > 0 || progress.started > 0);
 
   return (
     <Link
-      className="group flex flex-col rounded-card border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+      className="group relative flex flex-col overflow-hidden rounded-card border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
       href={`${routes.academy(academySlug)}/learn/courses/${course.courseId}${classId ? `?classId=${classId}` : ''}`}
     >
+      {/* The spine. Widens on hover the way a book tips out of a shelf — the
+          one piece of motion here that is about this card rather than about
+          cards in general. */}
+      <span
+        aria-hidden
+        className={`absolute inset-y-0 left-0 w-1 transition-[width] duration-200 group-hover:w-1.5 motion-reduce:transition-none ${accent.spine}`}
+      />
+
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
+        <span
+          aria-hidden
+          className={`grid size-10 shrink-0 place-items-center rounded-lg ${accent.tile}`}
+        >
           <BookOpen className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-[15.5px] font-bold tracking-[-0.01em]">
+          <h3 className="truncate text-[16px] font-extrabold tracking-[-0.015em]">
             {course.title}
           </h3>
-          <p className="mt-1 line-clamp-2 min-h-[2.6em] text-[13px] leading-[1.6] text-sub">
+          {/* No reserved height. A one-line description used to leave a blank
+              line under it on every card in the grid; the footer is pinned to
+              the bottom instead, which keeps the row even without padding the
+              text out. */}
+          <p className="mt-1 line-clamp-2 text-[13px] leading-[1.6] text-sub">
             {course.description}
           </p>
         </div>
-        <ChevronRight className="mt-1 size-4 shrink-0 text-sub transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
       </div>
 
-      <p className="mt-4 text-[12px] text-sub">
-        {t('catalog.counts', {
-          modules: course.counts.modules,
-          lectures: course.counts.lectures,
-          exercises: course.counts.exercises,
-        })}
-      </p>
-
-      <div className="mt-3">
-        <div className="mb-1.5 flex items-center justify-between text-[12px]">
-          <span className="text-sub">
-            {progress.started > 0
-              ? t('catalog.progress_started', { count: progress.started })
-              : t('catalog.progress_none')}
-          </span>
-          <span className="font-bold text-brand">
-            {progress.solved}/{progress.total}
-          </span>
+      {/* `mt-auto` rather than a fixed gap: cards in a row share a height, and
+          this puts every footer on the same line regardless of title wrap. */}
+      {/* `mt-auto` pins every footer in a row to the same line: grid items
+          stretch to the tallest card, and without it a short description
+          left its counts floating halfway up. `mt-5` was doing that job
+          with a reserved height on the description instead, which padded
+          out one-line copy on every card in the grid. */}
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-border pt-5">
+        <div className="min-w-0">
+          {/*
+           * The problem count is what a student actually compares courses by,
+           * and it was the smallest, greyest text on the card. It leads now.
+           *
+           * Kept as one phrase rather than a big numeral with a noun beside it:
+           * Korean puts the count after the noun and closes it with a counter
+           * — 문제 194개 — so isolating the digit would leave the label
+           * stranded in the wrong order for most of the people reading this.
+           * Weight carries the emphasis instead of layout.
+           */}
+          <p className="text-[15px] font-extrabold tracking-[-0.01em] tabular">
+            {t('catalog.problems', { count: counts.exercises })}
+          </p>
+          <p className="mt-1 truncate text-[12px] text-sub">
+            {t('catalog.structure', {
+              count: counts.modules,
+              modules: counts.modules,
+              lectures: counts.lectures,
+            })}
+          </p>
         </div>
+
+        {done ? (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-[12px] font-bold text-success">
+            <Check className="size-3.5" strokeWidth={2.5} />
+            {t('catalog.complete')}
+          </span>
+        ) : underway ? (
+          <span className="shrink-0 text-[12px] font-bold text-brand tabular">
+            {t('catalog.solved_of', {
+              solved: progress.solved,
+              total: progress.total,
+            })}
+          </span>
+        ) : (
+          <span className="shrink-0 text-[12.5px] font-bold text-brand transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none">
+            {t('catalog.start')} →
+          </span>
+        )}
+      </div>
+
+      {/* Only once there is something to show. */}
+      {underway ? (
         <div
           aria-hidden
-          className="h-1.5 overflow-hidden rounded-full bg-canvas"
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-accent"
         >
           <div
-            className="h-full rounded-full bg-brand transition-all"
+            className="h-full rounded-full bg-brand transition-[width] duration-300 motion-reduce:transition-none"
             style={{ width: `${completion}%` }}
           />
         </div>
-      </div>
+      ) : null}
     </Link>
   );
 }

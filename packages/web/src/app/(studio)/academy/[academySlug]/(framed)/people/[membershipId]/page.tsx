@@ -5,7 +5,9 @@ import { profileNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { backTo } from '@/lib/back-to';
 import { MemberProfileEditor } from './_components/member-profile-editor';
 
 /**
@@ -24,11 +26,19 @@ export default async function MemberProfilePage({
   const { academySlug, membershipId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['profile']);
+  // The back link names its destination with the sidebar's own word for it.
+  const { t: tNav } = await getServerTranslation(['nav']);
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, profileNamespaces);
 
   return (
     <StudioPage
+      back={
+        <BackLink
+          href={backTo.academyPerson(academySlug)}
+          label={tNav('link.members')}
+        />
+      }
       showPageHeading={false}
       bleed
       title={t('manager.title')}

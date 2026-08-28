@@ -2,9 +2,12 @@ import { requireAcademyRoute } from '@/lib/academy-route';
 import type { MonitoringClassRoster } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { backTo } from '@/lib/back-to';
 import { LiveRoster } from './_components/live-roster';
 
 /**
@@ -21,6 +24,8 @@ export default async function LiveClassPage({
 }) {
   const { academySlug, classId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
+  // The back link names its destination with the sidebar's own word for it.
+  const { t: tNav } = await getServerTranslation(['nav']);
   let roster: MonitoringClassRoster | null = null;
   try {
     roster = await createServerORPCClient().monitoring.getClassRoster({
@@ -34,6 +39,12 @@ export default async function LiveClassPage({
 
   return (
     <StudioPage
+      back={
+        <BackLink
+          href={backTo.academyTeachClass(academySlug)}
+          label={tNav('link.solution_status')}
+        />
+      }
       bleed
       description={roster.class.description || undefined}
       title={roster.class.name}

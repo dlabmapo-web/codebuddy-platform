@@ -35,12 +35,15 @@ export async function PlatformShell({
   title,
   description,
   actions,
+  back,
   bleed = false,
   children,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  /** The way back out of a detail page, rendered above the heading. */
+  back?: React.ReactNode;
   /** Skip the white content card so a page can lay out its own panels. */
   bleed?: boolean;
   children: React.ReactNode;
@@ -70,6 +73,7 @@ export async function PlatformShell({
           </header>
 
           <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
+            {back ? <div className="mb-3">{back}</div> : null}
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="text-[1.7rem] font-extrabold leading-tight">

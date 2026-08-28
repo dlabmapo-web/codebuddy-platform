@@ -3,9 +3,8 @@
 import type { TeacherReviewCase, TeacherSubmissionReview } from '@cove/shared';
 import type { TFunction } from 'i18next';
 import { formatDateTime } from '@cove/i18n/format';
-import { ChevronLeft, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/i18n';
@@ -35,10 +34,8 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
  * are absent from the payload, not hidden by the markup.
  */
 export function SubmissionReview({
-  backHref,
   review,
 }: {
-  backHref: string;
   review: TeacherSubmissionReview;
 }) {
   const { t } = useTranslation('teach');
@@ -47,14 +44,9 @@ export function SubmissionReview({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-sub transition-colors hover:text-ink"
-          href={backHref}
-        >
-          <ChevronLeft aria-hidden className="size-4" />
-          {t('progress.review.back')}
-        </Link>
+      {/* The way back moved to the page's `back` slot, above the heading,
+          where every other detail page keeps it. */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[12px] font-semibold text-sub">
           <Lock aria-hidden className="size-3.5" />
           {t('progress.review.read_only')}

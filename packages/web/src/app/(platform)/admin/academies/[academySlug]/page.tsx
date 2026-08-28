@@ -1,7 +1,11 @@
 import { requirePlatformAcademyRoute } from '@/lib/academy-route';
 import { notFound } from 'next/navigation';
 
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
+
+import { BackLink } from '@/components/studio/back-link';
+import { backTo } from '@/lib/back-to';
 
 import { PlatformShell } from '../../_components/platform-shell';
 import { AcademyDetail } from './_components/academy-detail';
@@ -19,6 +23,7 @@ export default async function PlatformAcademyPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
+  const { t } = await getServerTranslation(['platform']);
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const academy = await createServerORPCClient()
     .platformAcademies.get({ academyId })
@@ -26,7 +31,12 @@ export default async function PlatformAcademyPage({
   if (!academy) notFound();
 
   return (
-    <PlatformShell bleed description={`/${academy.slug}`} title={academy.name}>
+    <PlatformShell
+      back={<BackLink href={backTo.platformAcademy()} label={t('shell.back')} />}
+      bleed
+      description={`/${academy.slug}`}
+      title={academy.name}
+    >
       <AcademyDetail academy={academy} />
     </PlatformShell>
   );

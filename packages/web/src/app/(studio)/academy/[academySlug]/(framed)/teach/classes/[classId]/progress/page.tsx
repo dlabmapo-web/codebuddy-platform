@@ -6,7 +6,9 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isExplicitAccessDeniedError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { backTo } from '@/lib/back-to';
 import { ProgressWorkspace } from './_components/progress-workspace';
 import { parseProgressQuery, serializeProgressQuery } from './_lib/progress-url';
 
@@ -58,6 +60,15 @@ export default async function ClassProgressPage({
 
   return (
     <StudioPage
+      // Up one level, to the class — not out to the class list. A teacher
+      // reading progress came from this class, and the label is its name
+      // because that is the heading they will land on.
+      back={
+        <BackLink
+          href={backTo.academyTeachProgress(academySlug, classId)}
+          label={className}
+        />
+      }
       bleed
       description={t('progress.description')}
       title={students ? `${className} · ${t('progress.title')}` : className}

@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { safeReturnTo } from '../../../../progress/_lib/progress-url';
 import { SubmissionReview } from './_components/submission-review';
@@ -58,21 +59,23 @@ export default async function SubmissionReviewPage({
     classId,
     typeof raw === 'string' ? raw : undefined,
   );
+  const returnHref = backHref.includes('?')
+    ? backHref
+    : `${backHref}?student=${membershipId}`;
 
   return (
     <StudioPage
+      // The same slot every other detail page uses. It was a link inside the
+      // review, which put it below the heading and gave this one page a
+      // different shape from the rest. `safeReturnTo` still decides where it
+      // goes: a reviewer who arrived from a filtered table returns to that
+      // table, filter intact, rather than to a bare default.
+      back={<BackLink href={returnHref} label={t('progress.review.back')} />}
       bleed
       showPageHeading={false}
       title={t('progress.review.title')}
     >
-      <SubmissionReview
-        backHref={
-          backHref.includes('?')
-            ? backHref
-            : `${backHref}?student=${membershipId}`
-        }
-        review={review}
-      />
+      <SubmissionReview review={review} />
     </StudioPage>
   );
 }

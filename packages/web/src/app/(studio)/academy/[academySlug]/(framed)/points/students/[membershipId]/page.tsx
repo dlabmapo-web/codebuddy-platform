@@ -5,7 +5,9 @@ import { notFound } from 'next/navigation';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { backTo } from '@/lib/back-to';
 import { StudentPointsLedger } from '../../_components/student-points-ledger';
 
 /**
@@ -31,6 +33,7 @@ export default async function StudentPointsPage({
   const { academySlug, membershipId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['points']);
+  const { t: tNav } = await getServerTranslation(['nav']);
 
   let page: PointsPage | null = null;
   try {
@@ -45,6 +48,12 @@ export default async function StudentPointsPage({
 
   return (
     <StudioPage
+      back={
+        <BackLink
+          href={backTo.academyStudentPoints(academySlug)}
+          label={tNav('link.class_ranking')}
+        />
+      }
       description={t('student.description')}
       title={page.subjectName}
     >

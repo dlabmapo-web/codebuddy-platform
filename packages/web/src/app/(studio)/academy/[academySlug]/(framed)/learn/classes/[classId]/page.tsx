@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { toApiError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
-import { BackLink } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/back-link';
+import { BackLink } from '@/components/studio/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { routes } from '@/lib/routes';

@@ -2,6 +2,7 @@ import { notFound, redirect, RedirectType } from 'next/navigation';
 import { cache } from 'react';
 
 import { createServerORPCClient } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
 import {
   academyIdentityFromAccount,
   type AcademyRouteIdentity,
@@ -38,7 +39,7 @@ export async function requireAcademyRoute(
    */
   const current = await currentSlugFor(academySlug);
   if (current && current !== academySlug) {
-    redirect(`/academy/${current}`, RedirectType.replace);
+    redirect(routes.academy(current), RedirectType.replace);
   }
   notFound();
 }

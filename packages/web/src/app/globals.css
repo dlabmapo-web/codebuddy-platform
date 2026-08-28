@@ -404,6 +404,63 @@ h1, h2, h3, h4 {
 }
 .cove-hint-in { animation: cove-hint-in 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 
+/*
+ * Loading placeholders.
+ *
+ * A directional sweep rather than an opacity pulse. `animate-pulse` throbs the
+ * whole block, and at the scale of a real page — twenty placeholders at once —
+ * twenty independent throbs read as flicker. A highlight travelling in reading
+ * direction across a field held at constant opacity reads instead as being
+ * filled in.
+ *
+ * Every skeleton in one `loading.tsx` mounts in a single commit, so their
+ * animations start on the same tick and the page shimmers in phase: one sheet
+ * being scanned rather than twenty rectangles each doing their own thing. That
+ * costs nothing beyond sharing one keyframe name and one duration, which is
+ * why nothing here is ever given a per-element delay.
+ *
+ * The 120ms delay paired with `opacity: 0` at rest is the anti-flash rule: a
+ * navigation that resolves inside it never paints a placeholder at all, and a
+ * placeholder shown and removed inside 200ms reads as a glitch rather than as
+ * feedback. `next/link`'s own pending-hint guidance recommends the same shape.
+ */
+@keyframes cove-skeleton-sweep {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes cove-skeleton-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cove-skeleton {
+  background-color: var(--accent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--card) 65%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation:
+    cove-skeleton-in 160ms ease-out 120ms forwards,
+    cove-skeleton-sweep 1600ms linear 120ms infinite;
+}
+
+/* Grey on grey reads as noise on the dark canvas, so the highlight borrows the
+   faintest blue instead — enough to read as light, far below the point where
+   anyone would call it blue. The one place this system spends any colour. */
+.dark .cove-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--brand) 7%, transparent) 50%,
+    transparent 80%
+  );
+}
+
 /* Radix reports the natural height, so the outline can slide open. */
 @keyframes cove-collapse-open {
   from { height: 0; opacity: 0; }
@@ -419,6 +476,13 @@ h1, h2, h3, h4 {
 
 @media (prefers-reduced-motion: reduce) {
   .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse, .cove-hint-in { animation: none !important; }
+  /* More than `animation: none`: without the sweep the field still has to be
+     visible, and `opacity: 0` is the resting state the fade-in undoes. */
+  .cove-skeleton {
+    animation: none !important;
+    background-image: none;
+    opacity: 1;
+  }
 }
 
 /* The curriculum navigator's geometry.

@@ -7,6 +7,7 @@ import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { MediaModule } from "../profile/media.module.js";
 import { TeachModule } from "../teach/teach.module.js";
+import { AcademyFeaturesService } from "./academy-features.service.js";
 import { AcademyOperationsProfileService } from "./academy-profile.service.js";
 import { AcademyMediaController } from "./academy-media.controller.js";
 import { AcademyMediaService } from "./academy-media.service.js";
@@ -53,6 +54,7 @@ import { PeopleImportService } from "./people-import.service.js";
     ManagerScopeService,
     ManagerOverviewRepository,
     ManagerOverviewService,
+    AcademyFeaturesService,
     AcademyOperationsProfileService,
     AcademyMediaService,
     PeopleDirectoryService,
@@ -67,6 +69,7 @@ import { PeopleImportService } from "./people-import.service.js";
   ],
   exports: [
     ManagerOverviewService,
+    AcademyFeaturesService,
     AcademyOperationsProfileService,
     PeopleDirectoryService,
     PeopleImportService,

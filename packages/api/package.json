@@ -28,7 +28,8 @@
     "db:demo:reset": "tsx prisma/seed/demo/reset.ts",
     "platform:bootstrap-admin": "tsx src/platform/bootstrap-admin.ts",
     "migrate:mvp-curriculum": "tsx src/migrations/mvp-curriculum/cli.ts",
-    "bootstrap:dlab-mapo-staff": "tsx src/migrations/dlab-mapo-bootstrap/cli.ts"
+    "bootstrap:dlab-mapo-staff": "tsx src/migrations/dlab-mapo-bootstrap/cli.ts",
+    "db:backfill:features": "tsx prisma/seed/backfill-academy-features.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

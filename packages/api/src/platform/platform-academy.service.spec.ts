@@ -1,3 +1,4 @@
+import { academyFeatureNames } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuditService } from "../academies/audit.service.js";
@@ -51,6 +52,11 @@ function createService(options: {
           profileUpdatedAt: null,
           createdBy: null,
         }),
+    },
+    // A new academy is created with every feature on; the rows are written in
+    // the same transaction as the academy itself.
+    academyFeatureFlag: {
+      createMany: vi.fn().mockResolvedValue({ count: 4 }),
     },
     academyInvitation: {
       create: vi.fn().mockResolvedValue({
@@ -136,6 +142,28 @@ describe("PlatformAcademyService.create", () => {
     expect(transaction.academyInvitation.create).toHaveBeenCalled();
     expect(queueForInvitation).toHaveBeenCalledWith(
       expect.objectContaining({ email: input.managerEmail }),
+    );
+  });
+
+  /*
+   * These began as rollout gates with no way to write them, so an academy
+   * created without them found monitoring and ranking dead and unrevivable.
+   * A new academy gets the whole product; a manager may switch any of it off.
+   */
+  it("switches every feature on for the new academy", async () => {
+    const { service, transaction } = createService();
+
+    await service.create(identity, input);
+
+    expect(transaction.academyFeatureFlag.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: academyFeatureNames.map((feature) => ({
+          academyId: "academy-1",
+          feature,
+          isEnabled: true,
+        })),
+        skipDuplicates: true,
+      }),
     );
   });
 

@@ -7,16 +7,17 @@ import {
   ChevronsUpDown,
   ClipboardList,
   GraduationCap,
-  Presentation,
   LayoutDashboard,
   LogOut,
   Mail,
   MonitorPlay,
+  Presentation,
   School,
+  Settings,
+  Trophy,
+  type LucideIcon,
   UserCheck,
   Users,
-  type LucideIcon,
-  Trophy,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -395,6 +396,15 @@ function studioNavGroups({
           icon: UserCheck,
         },
         { href: `${base}/invitations`, labelKey: 'link.invitations', icon: Mail },
+      ],
+    });
+    // Its own group: the features here decide what every other group shows,
+    // so it does not belong filed under People.
+    groups.push({
+      id: 'settings',
+      labelKey: 'group.settings',
+      items: [
+        { href: `${base}/settings`, labelKey: 'link.settings', icon: Settings },
       ],
     });
   }

@@ -8,7 +8,8 @@
     "content": "Curriculum",
     "teaching": "Teaching",
     "people": "People",
-    "learning": "Learning"
+    "learning": "Learning",
+    "settings": "Settings"
   },
   "link": {
     "overview": "Overview",
@@ -23,7 +24,8 @@
     "my_points": "My points",
     "solution_status": "Solution status",
     "student_analytics": "Student analytics",
-    "class_ranking": "Class ranking"
+    "class_ranking": "Class ranking",
+    "settings": "Academy settings"
   },
   "academy_switcher": {
     "select": "Select academy",

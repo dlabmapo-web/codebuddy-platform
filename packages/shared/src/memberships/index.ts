@@ -1,3 +1,4 @@
+export * from "./academy-features.js";
 export * from "./academy.js";
 export * from "./invitation.js";
 export * from "./join-request.js";

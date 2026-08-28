@@ -29,6 +29,8 @@ import { LearnService } from "../learn/learn.service.js";
 import { StudentOverviewService } from "../learn/student-overview.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
+import { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import { createAcademyFeaturesRouter } from "../manage/academy-features.router.js";
 import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
 import { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
 import { PeopleBulkService } from "../manage/people-bulk.service.js";
@@ -98,6 +100,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     teamLeadOverviewService: app.get(TeamLeadOverviewService, { strict: false }),
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
     managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
+    academyFeaturesService: app.get(AcademyFeaturesService, { strict: false }),
     academyOperationsProfileService: app.get(AcademyOperationsProfileService, {
       strict: false,
     }),
@@ -148,6 +151,7 @@ function createORPCRouter(deps: ORPCDeps) {
   return os.router({
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
+    academyFeatures: createAcademyFeaturesRouter(os, deps),
     ...academyRouters,
     ...contentRouters,
     ...classesRouters,

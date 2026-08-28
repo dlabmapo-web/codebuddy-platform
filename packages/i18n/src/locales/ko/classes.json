@@ -118,7 +118,21 @@
         "5": "금요일",
         "6": "토요일",
         "7": "일요일"
-      }
+      },
+      "weekday_short": {
+        "1": "월",
+        "2": "화",
+        "3": "수",
+        "4": "목",
+        "5": "금",
+        "6": "토",
+        "7": "일"
+      },
+      "days_label": "요일",
+      "no_days": "요일을 하나 이상 선택하세요.",
+      "duration_hours": "{{hours}}시간",
+      "duration_hours_minutes": "{{hours}}시간 {{minutes}}분",
+      "duration_minutes": "{{minutes}}분"
     },
     "teacher_panel": {
       "heading": "담당 강사",

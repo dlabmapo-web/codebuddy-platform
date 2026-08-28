@@ -4,7 +4,7 @@ import {
   legacyAcademyDestination,
   legacyAcademySlug,
 } from '@/lib/legacy-academy-route';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
 
 export default async function LegacyAcademyPage({
@@ -13,7 +13,7 @@ export default async function LegacyAcademyPage({
   params: Promise<{ academyId: string; legacyPath?: string[] }>;
 }) {
   const { academyId, legacyPath } = await params;
-  const account = await createServerORPCClient().auth.me({}).catch(() => null);
+  const account = await getAccount().catch(() => null);
 
   if (!account) {
     redirect(routes.login, RedirectType.replace);

@@ -152,6 +152,46 @@
   --rank-bronze: #9A5B2D;
   --rank-bronze-soft: #FBEEE4;
 
+  /*
+   * Course identity.
+   *
+   * Its own family for the same reason `--peer` and the rank metals have one:
+   * a catalog of four courses with one blue mark on each is a wall of text a
+   * student has to read every time, and colour is what turns it into a shelf
+   * they recognise. That is identity, not status — the hue says *which* course,
+   * never how it is going — so it cannot borrow a token that already means
+   * something. Progress on these cards stays `brand` and `success`.
+   *
+   * Assigned by hashing the course id, so a course keeps its colour between
+   * sessions and across every surface it appears on.
+   *
+   * Confined to the course's own mark: the spine and the icon tile, never the
+   * card, the title, or the counts. The note on the rank metals explains why —
+   * tint the whole thing and you have made a favourite course and, by
+   * contrast, a dull one.
+   *
+   * Four hues, each chosen to stay clear of the palettes that mean something:
+   * not `brand` (links and actions), not `success`/`danger`/`warning`, not
+   * `draft`. `peer` violet and `teal` are the near misses, and neither ever
+   * appears beside a course card — one lives in the shared editor, the other
+   * on measured time.
+   *
+   * Each clears 4.5:1 as text on `card`, so the mark can carry a glyph or a
+   * letter rather than only a fill.
+   */
+  --course-a: #4338CA;
+  --course-a-soft: #EEF0FD;
+  --course-b: #7E22CE;
+  --course-b-soft: #F6EDFD;
+  --course-c: #0E7490;
+  --course-c-soft: #E4F3F8;
+  --course-d: #BE185D;
+  --course-d-soft: #FCEAF2;
+  /* One foreground for all four: every light-theme accent above is dark
+     enough to carry white, and every dark-theme one is light enough to carry
+     near-black. Same split as `--on-brand` and its siblings. */
+  --on-course: #FFFFFF;
+
   --ring: #1B64DA;
   --sidebar: #FFFFFF;
   --sidebar-border: #E9EDF3;
@@ -243,6 +283,18 @@
   --rank-bronze: #D08B58;
   --rank-bronze-soft: #2A1D14;
 
+  /* Lifted to clear 4.5:1 on the dark `card`; the tints stay low so a mark
+     never glows out of the grid. */
+  --course-a: #8B93F8;
+  --course-a-soft: #1B1F3A;
+  --course-b: #C084FC;
+  --course-b-soft: #241A38;
+  --course-c: #22D3EE;
+  --course-c-soft: #0D2830;
+  --course-d: #F472B6;
+  --course-d-soft: #33162A;
+  --on-course: #0B1017;
+
   --ring: #5B93F5;
   --sidebar: #12161F;
   --sidebar-border: #222937;
@@ -308,6 +360,16 @@
   --color-rank-bronze: var(--rank-bronze);
   --color-rank-bronze-soft: var(--rank-bronze-soft);
   --color-unstable-soft: var(--unstable-soft);
+
+  --color-course-a: var(--course-a);
+  --color-course-a-soft: var(--course-a-soft);
+  --color-course-b: var(--course-b);
+  --color-course-b-soft: var(--course-b-soft);
+  --color-course-c: var(--course-c);
+  --color-course-c-soft: var(--course-c-soft);
+  --color-course-d: var(--course-d);
+  --color-course-d-soft: var(--course-d-soft);
+  --color-on-course: var(--on-course);
 
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
@@ -404,6 +466,116 @@ h1, h2, h3, h4 {
 }
 .cove-hint-in { animation: cove-hint-in 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 
+/*
+ * Loading placeholders.
+ *
+ * A directional sweep rather than an opacity pulse. `animate-pulse` throbs the
+ * whole block, and at the scale of a real page — twenty placeholders at once —
+ * twenty independent throbs read as flicker. A highlight travelling in reading
+ * direction across a field held at constant opacity reads instead as being
+ * filled in.
+ *
+ * Every skeleton in one `loading.tsx` mounts in a single commit, so their
+ * animations start on the same tick and the page shimmers in phase: one sheet
+ * being scanned rather than twenty rectangles each doing their own thing. That
+ * costs nothing beyond sharing one keyframe name and one duration, which is
+ * why nothing here is ever given a per-element delay.
+ *
+ * The 120ms delay paired with `opacity: 0` at rest is the anti-flash rule: a
+ * navigation that resolves inside it never paints a placeholder at all, and a
+ * placeholder shown and removed inside 200ms reads as a glitch rather than as
+ * feedback. `next/link`'s own pending-hint guidance recommends the same shape.
+ */
+@keyframes cove-skeleton-sweep {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes cove-skeleton-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cove-skeleton {
+  background-color: var(--accent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--card) 65%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation:
+    cove-skeleton-in 160ms ease-out 120ms forwards,
+    cove-skeleton-sweep 1600ms linear 120ms infinite;
+}
+
+/*
+ * The nav item that was clicked, while its destination is on the wire.
+ *
+ * A dot on the item itself rather than a bar across the top of the page: it
+ * says *which* destination is loading, which a global indicator cannot, and it
+ * appears in the place the reader is already looking. Most navigations never
+ * show it — the route skeletons make them instant — so this is what is left
+ * for the ones that are genuinely slow.
+ *
+ * Always rendered, never resized: only opacity changes, so an appearing hint
+ * cannot nudge the label beside it. The 120ms delay is the same anti-flash
+ * rule the skeletons use — a prefetched route resolves inside it and the dot
+ * never becomes visible at all.
+ */
+.cove-link-hint {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  flex-shrink: 0;
+}
+.cove-link-hint[data-pending='true'] {
+  animation:
+    cove-hint-fade 200ms ease 120ms forwards,
+    cove-hint-pulse 1s ease-in-out 120ms infinite;
+}
+@keyframes cove-hint-fade { to { opacity: 0.55; } }
+@keyframes cove-hint-pulse { 50% { opacity: 0.2; } }
+
+/*
+ * The page going quiet while a signed-out form submits.
+ *
+ * Same 120ms hesitation as everything else here: a sign-in answered inside it
+ * never dims the page at all, and one that covers and uncovers the screen in
+ * under a fifth of a second is a flinch rather than feedback.
+ */
+@keyframes cove-busy-in { from { opacity: 0; } to { opacity: 1; } }
+.cove-busy-overlay {
+  opacity: 0;
+  animation: cove-busy-in 180ms ease-out 120ms forwards;
+}
+
+/*
+ * The spinner on a control that is working.
+ *
+ * Slower than the 1s Tailwind default: at a full second the ring reads as
+ * urgent, and sign-in is not an emergency. 800ms of travel with a calm easing
+ * is the difference between "working" and "hurry up".
+ */
+@keyframes cove-spin { to { transform: rotate(360deg); } }
+.cove-spinner { animation: cove-spin 800ms linear infinite; }
+
+/* Grey on grey reads as noise on the dark canvas, so the highlight borrows the
+   faintest blue instead — enough to read as light, far below the point where
+   anyone would call it blue. The one place this system spends any colour. */
+.dark .cove-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--brand) 7%, transparent) 50%,
+    transparent 80%
+  );
+}
+
 /* Radix reports the natural height, so the outline can slide open. */
 @keyframes cove-collapse-open {
   from { height: 0; opacity: 0; }
@@ -419,6 +591,28 @@ h1, h2, h3, h4 {
 
 @media (prefers-reduced-motion: reduce) {
   .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse, .cove-hint-in { animation: none !important; }
+  /* More than `animation: none`: without the sweep the field still has to be
+     visible, and `opacity: 0` is the resting state the fade-in undoes. */
+  .cove-skeleton {
+    animation: none !important;
+    background-image: none;
+    opacity: 1;
+  }
+  /* The hint still has to appear — it is the only feedback a slow navigation
+     gets — so reduced motion drops the pulse and keeps a steady dot. */
+  .cove-link-hint[data-pending='true'] {
+    animation: none !important;
+    opacity: 0.55;
+  }
+  /*
+   * Slowed rather than stopped. A spinner is the only thing on a submitting
+   * button that says the click was taken, and a ring frozen mid-rotation says
+   * the opposite — that something hung. Reduced motion asks for less movement,
+   * not for a control that lies about its state.
+   */
+  .cove-spinner { animation-duration: 2.4s !important; }
+  /* The page still has to dim — it is the feedback — so only the fade goes. */
+  .cove-busy-overlay { animation: none !important; opacity: 1; }
 }
 
 /* The curriculum navigator's geometry.

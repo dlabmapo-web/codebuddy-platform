@@ -4,14 +4,15 @@ import { teachNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 
 /**
- * The teaching routes mount their own copy.
+ * The teaching copy for live monitoring, which sits outside `(framed)`.
  *
- * Live monitoring and Solution status are Teacher-only surfaces, so both
- * namespaces are paid for by these pages rather than riding in every page's
- * RSC payload. The shell keeps its own i18next context, so the sidebar and
- * header are unaffected by what this provides.
+ * A second copy of `(framed)/teach/layout.tsx` rather than one shared layout a
+ * level up: the two groups have separate layout chains by construction, and
+ * hoisting this to `[academySlug]` would put the whole teaching vocabulary in
+ * a student's payload on every academy route. Duplicating four lines is the
+ * cheaper of the two.
  */
-export default async function TeachLayout({
+export default async function LiveTeachLayout({
   children,
 }: {
   children: React.ReactNode;

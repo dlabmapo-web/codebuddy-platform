@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 
-import { ConnectionBadge } from '../../../../../../_components/live-badges';
+import { ConnectionBadge } from '@/app/(studio)/academy/[academySlug]/(framed)/teach/_components/live-badges';
 
 const difficultyStyles = {
   EASY: 'bg-success/10 text-success',

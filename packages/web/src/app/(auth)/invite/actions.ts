@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { authDestination } from '@/lib/academy-access-state';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 
 export type InvitationActionState = { message?: string };
 
@@ -42,7 +42,7 @@ export async function dismissInvitationAction(): Promise<void> {
 
   let destination = '/welcome';
   try {
-    destination = authDestination(await createServerORPCClient().auth.me({}));
+    destination = authDestination(await getAccount());
   } catch {
     // An unreadable account still gets out of here; the welcome page resolves
     // where they belong on its own.

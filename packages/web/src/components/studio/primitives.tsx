@@ -67,15 +67,12 @@ function Separator({
 
 /* --------------------------------------------------------------- skeleton */
 
-function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      className={cn('animate-pulse rounded-md bg-accent', className)}
-      data-slot="skeleton"
-      {...props}
-    />
-  );
-}
+/*
+ * Re-exported rather than defined here: the loading shapes live together in
+ * `skeletons.tsx`, and this keeps the existing `from '@/components/studio/
+ * primitives'` imports working while they inherit the shared sweep.
+ */
+export { Skeleton } from './skeletons';
 
 /* ---------------------------------------------------------------- tooltip */
 
@@ -231,7 +228,6 @@ export {
   Separator,
   Sheet,
   SheetContent,
-  Skeleton,
   Textarea,
   Tooltip,
   TooltipContent,

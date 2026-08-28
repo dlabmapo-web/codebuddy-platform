@@ -1,7 +1,7 @@
 import { notFound, redirect, RedirectType } from 'next/navigation';
 import { cache } from 'react';
 
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
 import {
   academyIdentityFromAccount,
@@ -13,7 +13,7 @@ export type { AcademyRouteIdentity } from '@/lib/academy-route-policy';
 export const resolveAcademyRoute = cache(
   async (academySlug: string): Promise<AcademyRouteIdentity | null> => {
     try {
-      const account = await createServerORPCClient().auth.me({});
+      const account = await getAccount();
       return academyIdentityFromAccount(account, academySlug);
     } catch {
       return null;

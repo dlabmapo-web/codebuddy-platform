@@ -32,6 +32,15 @@
     "no_actions": "가능한 작업 없음",
     "search_placeholder": "검색…"
   },
+  "boundary": {
+    "error_title": "페이지를 끝까지 불러오지 못했습니다",
+    "error_body": "불러오는 중 문제가 발생했습니다. 다시 시도하고, 계속 발생하면 관리자에게 알려주세요.",
+    "not_found_title": "존재하지 않는 페이지입니다",
+    "not_found_body": "링크가 오래되었거나 페이지가 이동했을 수 있습니다.",
+    "not_found_home": "코브 스튜디오로 이동",
+    "academy_not_found_title": "이용할 수 없는 학원입니다",
+    "academy_not_found_body": "학원 이름이 변경되었거나 소속이 종료되었을 수 있습니다. 링크를 확인하거나 학원 관리자에게 문의하세요."
+  },
   "pagination": {
     "label": "{{total}}페이지 중 {{current}}페이지",
     "previous": "이전",

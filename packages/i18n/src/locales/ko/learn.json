@@ -12,10 +12,15 @@
     "empty_body": "학원에서 공개한 코스가 없습니다. 팀 리드가 코스를 공개하면 여기에 표시됩니다.",
     "forbidden_title": "학습 화면을 볼 수 없습니다",
     "forbidden_body": "학습하려면 활성 상태의 학원 멤버십이 필요합니다. 학원 관리자에게 계정 확인을 요청하세요.",
-    "counts": "모듈 {{modules}} · 강의 {{lectures}} · 문제 {{exercises}}",
     "progress_started_other": "문제 {{count}}개 진행 중",
     "progress_none": "아직 시작하지 않음",
-    "open": "코스 열기"
+    "open": "코스 열기",
+    "problems_other": "문제 {{count}}개",
+    "structure_other": "모듈 {{modules}} · 강의 {{lectures}}",
+    "start": "시작하기",
+    "resume": "이어서 풀기",
+    "complete": "완료",
+    "solved_of": "{{total}}문제 중 {{solved}}문제 해결"
   },
   "classes": {
     "title": "내 반",
@@ -40,7 +45,10 @@
     "lines_other": "코드 {{count}}줄 저장됨",
     "empty_lines": "빈 코드",
     "discard": "저장된 코드 삭제",
-    "discarding": "삭제 중…"
+    "discarding": "삭제 중…",
+    "show_all_other": "{{count}}개 더 보기",
+    "show_fewer": "접기",
+    "saved_now": "방금 저장됨"
   },
   "outline": {
     "back": "전체 코스",

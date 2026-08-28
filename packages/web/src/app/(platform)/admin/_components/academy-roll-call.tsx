@@ -11,7 +11,7 @@ import { routes } from '@/lib/routes';
 import {
   EmptyState,
   Panel,
-} from '@/app/(studio)/academy/[academySlug]/_components/overview-ui/panel';
+} from '@/app/(studio)/academy/[academySlug]/(framed)/_components/overview-ui/panel';
 import {
   academyCondition,
   stakesParts,

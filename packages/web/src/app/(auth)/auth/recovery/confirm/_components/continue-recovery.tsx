@@ -1,10 +1,12 @@
 'use client';
 
 import { KeyRound, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { RecoverySteps } from '../../../../_components/recovery-steps';
+import { AuthSubmitButton } from '../../../../_components/submit-button';
 import { confirmPasswordRecoveryAction } from '../../actions';
 
 /**
@@ -41,19 +43,31 @@ export function ContinueRecovery({ tokenHash }: { tokenHash: string }) {
   );
 }
 
+/**
+ * Busy from the click until this page is replaced.
+ *
+ * `useFormStatus` rather than a form state, because this action has no answer
+ * to give: it either spends the token and redirects, or it throws. So once
+ * `pending` has been true the button stays busy — there is no return trip that
+ * would need it back, and letting it settle would say the click was lost while
+ * the redirect is still in flight.
+ */
 function ContinueButton() {
   const { t } = useTranslation('auth');
   const { pending } = useFormStatus();
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    if (pending) setStarted(true);
+  }, [pending]);
 
   return (
-    <button
-      aria-busy={pending}
-      className="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-      disabled={pending}
-      type="submit"
+    <AuthSubmitButton
+      busy={pending || started}
+      busyLabel={t('confirm.submitting')}
+      icon={KeyRound}
     >
-      <KeyRound aria-hidden size={20} strokeWidth={2} />
-      {pending ? t('confirm.submitting') : t('confirm.submit')}
-    </button>
+      {t('confirm.submit')}
+    </AuthSubmitButton>
   );
 }

@@ -9,9 +9,9 @@ import { exerciseNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
-import { safeReturnTo } from '../../records/_lib/records-url';
+import { safeReturnTo } from '@/app/(studio)/academy/[academySlug]/(framed)/learn/records/_lib/records-url';
 import { Workspace } from './_components/workspace';
-import { LearningClassChoice } from '../../_components/learning-class-choice';
+import { LearningClassChoice } from '@/app/(studio)/academy/[academySlug]/(framed)/learn/_components/learning-class-choice';
 
 /**
  * Fullscreen: this page deliberately does not render `StudioShell`. The studio

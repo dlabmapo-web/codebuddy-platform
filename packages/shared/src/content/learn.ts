@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
   exerciseDifficultySchema,
   exerciseLanguageSchema,
@@ -120,12 +121,23 @@ export type LearnCourseSummary = z.infer<typeof learnCourseSummarySchema>;
 export const learnClassTeacherSchema = z
   .object({
     /**
-     * The assigned teacher's own display name, and only that. Never an email,
-     * username, or id: those identify an account, and a student is being told
-     * who teaches them, not who to contact. An absent or blank name makes the
-     * whole teacher `null` rather than producing an empty label.
+     * The assigned teacher's own display name. Never an email, username, or
+     * id: those identify an account, and a student is being told who teaches
+     * them, not who to contact. An absent or blank name makes the whole
+     * teacher `null` rather than producing an empty label.
      */
     displayName: z.string().trim().min(1).max(200),
+    /**
+     * The photo shown beside that name, as the same three links every other
+     * member surface carries.
+     *
+     * Three rather than one pre-resolved URL because the fallback is a
+     * read-time decision — see `memberAvatarUrlsSchema`. They are the only
+     * addition this schema has ever taken beyond a name, and they are images
+     * rather than identifiers: none of them can be used to reach the teacher,
+     * which is the line §7.2 draws.
+     */
+    ...memberAvatarUrlsShape,
   })
   .strict();
 export type LearnClassTeacher = z.infer<typeof learnClassTeacherSchema>;

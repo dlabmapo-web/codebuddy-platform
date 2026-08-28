@@ -9,7 +9,10 @@ import { publicConfig } from '@/lib/config';
 
 import { TextField } from '../../_components/form-fields';
 import { RecoverySteps } from '../../_components/recovery-steps';
+import { Spinner } from '../../_components/spinner';
+import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import {
   requestPasswordRecoveryAction,
   type RecoveryRequestState,
@@ -27,14 +30,16 @@ const initialState: RecoveryRequestState = { status: 'idle' };
  */
 const resendCooldownSeconds = 60;
 
-const submitButton =
-  'h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50';
-
 export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
   const { t } = useTranslation('auth');
   const [state, dispatch, pending] = useActionState(
     requestPasswordRecoveryAction,
     initialState,
+  );
+  const submission = useAuthSubmission(
+    state,
+    pending,
+    (answer) => answer.status !== 'idle',
   );
   const [username, setUsername] = useState('');
   const [cooldown, setCooldown] = useState(0);
@@ -44,6 +49,7 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
   const accepted = state.status === 'accepted';
 
   function submit(formData: FormData) {
+    if (!submission.begin()) return;
     setUsername(String(formData.get('username') ?? ''));
     // Counted from the request, not from the answer: what it throttles is how
     // often somebody asks, and the page always answers the same way.
@@ -118,17 +124,13 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
               </p>
             ) : null}
 
-            <button
-              aria-busy={pending}
-              className={submitButton}
-              disabled={
-                pending ||
-                Boolean(publicConfig.turnstileSiteKey && !captchaToken)
-              }
-              type="submit"
+            <AuthSubmitButton
+              busy={submission.busy}
+              busyLabel={t('forgot.submitting')}
+              disabled={Boolean(publicConfig.turnstileSiteKey && !captchaToken)}
             >
-              {pending ? t('forgot.submitting') : t('forgot.submit')}
-            </button>
+              {t('forgot.submit')}
+            </AuthSubmitButton>
           </>
         )}
 
@@ -161,18 +163,18 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
             </div>
 
             <button
-              aria-busy={pending}
-              className="mt-6 text-[15px] font-bold text-brand transition-colors hover:text-brand-deep disabled:text-sub/70"
+              aria-busy={submission.busy}
+              className="mt-6 inline-flex items-center gap-2 text-[15px] font-bold text-brand transition-colors hover:text-brand-deep disabled:text-sub/70"
               disabled={
-                pending ||
                 cooldown > 0 ||
                 Boolean(publicConfig.turnstileSiteKey && !captchaToken)
               }
               type="submit"
             >
+              {submission.busy ? <Spinner size={16} /> : null}
               {cooldown > 0
                 ? t('forgot.resend_in', { seconds: cooldown })
-                : pending
+                : submission.busy
                   ? t('forgot.submitting')
                   : t('forgot.resend')}
             </button>

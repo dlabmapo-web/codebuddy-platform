@@ -32,6 +32,15 @@
     "no_actions": "No actions",
     "search_placeholder": "Search…"
   },
+  "boundary": {
+    "error_title": "This page stopped before it finished",
+    "error_body": "Something went wrong while loading it. Try again — and tell your administrator if it keeps happening.",
+    "not_found_title": "This page does not exist",
+    "not_found_body": "The link may be out of date, or the page may have moved.",
+    "not_found_home": "Go to Cove Studio",
+    "academy_not_found_title": "This academy is not available",
+    "academy_not_found_body": "It may have been renamed, or your membership here may have ended. Check the link, or ask an academy manager."
+  },
   "pagination": {
     "label": "Page {{current}} of {{total}}",
     "previous": "Previous",

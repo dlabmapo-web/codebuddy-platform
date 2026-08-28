@@ -11,7 +11,9 @@ import { loginAction, type AuthFormState } from '../../actions';
 import { AuthDivider } from '../../_components/auth-divider';
 import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
+import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { useAuthSubmission } from '../../_lib/use-auth-submission';
 
 const initialState: AuthFormState = {};
 
@@ -27,8 +29,14 @@ export function LoginForm({
   const [state, action, pending] = useActionState(loginAction, initialState);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [challengeKey, setChallengeKey] = useState(0);
+  // A correct sign-in ends in a redirect, so this form is never re-rendered
+  // with an answer — it is replaced. `busy` therefore has to outlive `pending`
+  // and carry through to the destination, or the button snaps back to "Sign in"
+  // while the browser is still fetching it.
+  const submission = useAuthSubmission(state, pending);
 
   function submit(formData: FormData) {
+    if (!submission.begin()) return;
     setCaptchaToken(null);
     setChallengeKey((current) => current + 1);
     action(formData);
@@ -101,15 +109,13 @@ export function LoginForm({
           </p>
         ) : null}
 
-        <button
-          className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          disabled={
-            pending || Boolean(publicConfig.turnstileSiteKey && !captchaToken)
-          }
-          type="submit"
+        <AuthSubmitButton
+          busy={submission.busy}
+          busyLabel={t('login.submitting')}
+          disabled={Boolean(publicConfig.turnstileSiteKey && !captchaToken)}
         >
-          {pending ? t('login.submitting') : t('login.submit')}
-        </button>
+          {t('login.submit')}
+        </AuthSubmitButton>
       </form>
 
       <p className="mt-7 text-center text-[15px] text-sub">

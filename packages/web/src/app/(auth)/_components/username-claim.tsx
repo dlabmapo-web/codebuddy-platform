@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 
 import { setUsernameAction, type AuthFormState } from '../actions';
 import { TextField } from './form-fields';
+import { AuthSubmitButton } from './submit-button';
+import { useAuthSubmission } from '../_lib/use-auth-submission';
 
 const initialState: AuthFormState = {};
 
@@ -22,6 +24,12 @@ export function UsernameClaim() {
     setUsernameAction,
     initialState,
   );
+  const submission = useAuthSubmission(state, pending);
+
+  function submit(formData: FormData) {
+    if (!submission.begin()) return;
+    action(formData);
+  }
 
   return (
     <div className="rounded-xl border border-border p-5">
@@ -32,7 +40,7 @@ export function UsernameClaim() {
         {t('welcome.choose_username_description')}
       </p>
 
-      <form action={action} className="mt-4 space-y-4">
+      <form action={submit} className="mt-4 space-y-4">
         <TextField
           autoComplete="username"
           hint={t('field.username_hint')}
@@ -47,15 +55,13 @@ export function UsernameClaim() {
           <p className="text-[14px] text-danger">{state.message}</p>
         ) : null}
 
-        <button
-          className="h-12 w-full rounded-xl bg-brand text-[16px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          disabled={pending}
-          type="submit"
+        <AuthSubmitButton
+          busy={submission.busy}
+          busyLabel={t('welcome.choose_username_submitting')}
+          size="md"
         >
-          {pending
-            ? t('welcome.choose_username_submitting')
-            : t('welcome.choose_username_submit')}
-        </button>
+          {t('welcome.choose_username_submit')}
+        </AuthSubmitButton>
       </form>
     </div>
   );

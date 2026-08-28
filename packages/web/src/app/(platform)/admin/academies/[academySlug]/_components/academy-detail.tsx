@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
   Panel,
-} from '@/app/(studio)/academy/[academySlug]/_components/overview-ui/panel';
+} from '@/app/(studio)/academy/[academySlug]/(framed)/_components/overview-ui/panel';
 import { Button } from '@/components/studio/button';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLocale } from '@/i18n';

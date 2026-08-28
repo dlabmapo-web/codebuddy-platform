@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { PasswordField } from '../../_components/form-fields';
 import { RecoverySteps } from '../../_components/recovery-steps';
 import { passwordMinLength } from '../../_lib/password-reset';
+import { AuthSubmitButton } from '../../_components/submit-button';
+import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import {
   resetPasswordAction,
   type PasswordResetState,
@@ -21,12 +23,22 @@ export function ResetPasswordForm() {
     resetPasswordAction,
     initialState,
   );
+  const submission = useAuthSubmission(
+    state,
+    pending,
+    (answer) => answer.status !== 'idle',
+  );
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const newPasswordRef = useRef<HTMLInputElement>(null);
   const confirmationRef = useRef<HTMLInputElement>(null);
   const summaryRef = useRef<HTMLParagraphElement>(null);
   const requirementsId = useId();
+
+  function submit(formData: FormData) {
+    if (!submission.begin()) return;
+    action(formData);
+  }
 
   const longEnough = password.length >= passwordMinLength;
   const matches = password.length > 0 && password === confirmation;
@@ -64,7 +76,7 @@ export function ResetPasswordForm() {
     <div>
       <RecoverySteps current="password" />
 
-      <form action={action} className="space-y-5">
+      <form action={submit} className="space-y-5">
         <PasswordField
           autoComplete="new-password"
           describedBy={requirementsId}
@@ -101,14 +113,12 @@ export function ResetPasswordForm() {
           </p>
         ) : null}
 
-        <button
-          aria-busy={pending}
-          className="h-14 w-full rounded-xl bg-brand text-[17px] font-bold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-          disabled={pending}
-          type="submit"
+        <AuthSubmitButton
+          busy={submission.busy}
+          busyLabel={t('reset.submitting')}
         >
-          {pending ? t('reset.submitting') : t('reset.submit')}
-        </button>
+          {t('reset.submit')}
+        </AuthSubmitButton>
       </form>
 
       <p className="mt-7 text-center text-[14px] text-sub">

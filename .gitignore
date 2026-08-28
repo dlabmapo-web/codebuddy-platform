@@ -71,3 +71,5 @@ deploy/secrets/*
 deploy/generated/*
 !deploy/generated/.gitkeep
 deploy/load/results/
+.env-backups/
+docs/operations/*.local.md

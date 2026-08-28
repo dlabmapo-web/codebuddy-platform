@@ -2,7 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 
-import { Spinner } from './spinner';
+import { AuthBusyOverlay } from './busy-overlay';
 
 const heights = {
   lg: 'h-14 text-[17px]',
@@ -23,12 +23,14 @@ const heights = {
  * that this leaves possible.
  *
  * It says what is happening rather than only that something is. `busyLabel` is
- * the verb in progress — "Signing in…", "Creating account…" — because the
- * spinner alone cannot distinguish a slow network from a stuck form.
+ * the verb in progress — "Signing in…", "Creating account…" — and it is the
+ * screen reader's announcement, since the overlay below is `aria-hidden`.
  *
- * And it holds its size. Both states are centred inside the same fixed height,
- * so the card behind it never reflows and the button never jumps out from
- * under a cursor that is still on it.
+ * And the spinner is not on the button. Submitting one of these forms is not a
+ * control doing something, it is the screen on its way to being replaced, so
+ * the ring belongs to the page: `AuthBusyOverlay` renders alongside. The button
+ * keeps the label and the semantics, and holds its size — both states are
+ * centred inside the same fixed height, so nothing reflows behind the wash.
  *
  * `disabled` is kept for preconditions only — a captcha not yet solved, an
  * academy not yet chosen. Those are states where the control genuinely cannot
@@ -54,33 +56,33 @@ export function AuthSubmitButton({
   size?: keyof typeof heights;
 }) {
   return (
-    <button
-      aria-busy={busy}
-      aria-disabled={busy || disabled}
-      className={[
-        'flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand font-bold text-on-brand',
-        'transition-[background-color,opacity] duration-200 motion-reduce:transition-none',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
-        heights[size],
-        busy
-          ? 'cursor-progress opacity-80'
-          : 'hover:bg-brand-deep aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-        className,
-      ].join(' ')}
-      disabled={disabled}
-      type="submit"
-    >
-      {busy ? (
-        <>
-          <Spinner size={20} />
-          {busyLabel}
-        </>
-      ) : (
-        <>
-          {Icon ? <Icon aria-hidden size={20} strokeWidth={2} /> : null}
-          {children}
-        </>
-      )}
-    </button>
+    <>
+      <button
+        aria-busy={busy}
+        aria-disabled={busy || disabled}
+        className={[
+          'flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand font-bold text-on-brand',
+          'transition-[background-color,opacity] duration-200 motion-reduce:transition-none',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+          heights[size],
+          busy
+            ? 'cursor-progress'
+            : 'hover:bg-brand-deep aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
+          className,
+        ].join(' ')}
+        disabled={disabled}
+        type="submit"
+      >
+        {busy ? (
+          busyLabel
+        ) : (
+          <>
+            {Icon ? <Icon aria-hidden size={20} strokeWidth={2} /> : null}
+            {children}
+          </>
+        )}
+      </button>
+      {busy ? <AuthBusyOverlay label={busyLabel} /> : null}
+    </>
   );
 }

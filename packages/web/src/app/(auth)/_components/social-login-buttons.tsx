@@ -7,7 +7,7 @@ import type { SocialAuthProvider } from '@cove/shared';
 import { startSocialAuthAction } from '../actions';
 
 import { availableSocialProviders } from './social-providers';
-import { Spinner } from './spinner';
+import { AuthBusyOverlay } from './busy-overlay';
 
 /**
  * The row is sized to what it renders. Tailwind needs the whole class name in
@@ -53,6 +53,10 @@ export function SocialLoginButtons({
 
   if (providers.length === 0) return null;
 
+  const pendingLabel = providers.find(
+    (provider) => provider.id === pending,
+  )?.label;
+
   return (
     <div>
       <div
@@ -81,19 +85,18 @@ export function SocialLoginButtons({
               onClick={() => void signIn(id)}
               type="button"
             >
-              {isPending ? (
-                <>
-                  <Spinner className="text-brand" />
-                  <span className="hidden text-brand sm:inline">
-                    {t('social.connecting')}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Icon className="h-6 w-6" />
-                  <span className="hidden sm:inline">{label}</span>
-                </>
-              )}
+              <Icon
+                className={isPending ? 'h-6 w-6 text-brand' : 'h-6 w-6'}
+              />
+              <span
+                className={
+                  isPending
+                    ? 'hidden text-brand sm:inline'
+                    : 'hidden sm:inline'
+                }
+              >
+                {isPending ? t('social.connecting') : label}
+              </span>
             </button>
           );
         })}
@@ -102,6 +105,20 @@ export function SocialLoginButtons({
         <p aria-live="polite" className="mt-3 text-[14px] text-danger" role="status">
           {error}
         </p>
+      ) : null}
+      {/*
+       * The same page-level wash the password form uses. Handing off to a
+       * provider is the screen leaving, exactly as signing in is, and one of
+       * the two showing a full-page state while the other marked a single
+       * button would make the same moment look like two different things.
+       *
+       * The label names the provider, which is the one thing this can say and
+       * a generic "Signing in…" cannot: whose sign-in page is about to open.
+       */}
+      {pendingLabel ? (
+        <AuthBusyOverlay
+          label={t('social.connecting_to', { provider: pendingLabel })}
+        />
       ) : null}
     </div>
   );

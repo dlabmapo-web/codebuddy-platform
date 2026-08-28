@@ -480,6 +480,19 @@ h1, h2, h3, h4 {
 @keyframes cove-hint-pulse { 50% { opacity: 0.2; } }
 
 /*
+ * The page going quiet while a signed-out form submits.
+ *
+ * Same 120ms hesitation as everything else here: a sign-in answered inside it
+ * never dims the page at all, and one that covers and uncovers the screen in
+ * under a fifth of a second is a flinch rather than feedback.
+ */
+@keyframes cove-busy-in { from { opacity: 0; } to { opacity: 1; } }
+.cove-busy-overlay {
+  opacity: 0;
+  animation: cove-busy-in 180ms ease-out 120ms forwards;
+}
+
+/*
  * The spinner on a control that is working.
  *
  * Slower than the 1s Tailwind default: at a full second the ring reads as
@@ -536,6 +549,8 @@ h1, h2, h3, h4 {
    * not for a control that lies about its state.
    */
   .cove-spinner { animation-duration: 2.4s !important; }
+  /* The page still has to dim — it is the feedback — so only the fade goes. */
+  .cove-busy-overlay { animation: none !important; opacity: 1; }
 }
 
 /* The curriculum navigator's geometry.

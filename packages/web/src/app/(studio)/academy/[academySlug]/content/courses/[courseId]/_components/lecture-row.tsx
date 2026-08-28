@@ -11,6 +11,7 @@ import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseLecture } from '../_lib/course-tree';
 import { VisibilityIndicator } from './builder-controls';
 import { DeleteModal } from './delete-modal';
+import { MoveModal } from './move-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
 
@@ -53,6 +54,7 @@ function ExerciseRow({
   material,
   outlineNumber,
   parentEffectivelyVisible,
+  siblings,
 }: {
   builder: CourseBuilderState;
   exerciseBasePath: string;
@@ -60,10 +62,13 @@ function ExerciseRow({
   material: CourseMaterial;
   outlineNumber: string;
   parentEffectivelyVisible: boolean;
+  siblings: readonly CourseMaterial[];
 }) {
   const { t } = useLayoutTranslation('content');
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const materialIndex = siblings.findIndex((item) => item.id === material.id);
   const href = `${exerciseBasePath}/${lectureId}/exercises/${material.id}`;
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
@@ -106,6 +111,7 @@ function ExerciseRow({
           kindLabel={t('row.kind_exercise')}
           label={material.title}
           onDelete={() => setDeleting(true)}
+          onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() => router.push(href)}
@@ -114,6 +120,21 @@ function ExerciseRow({
           }
         />
       ) : null}
+      <MoveModal
+        currentIndex={materialIndex}
+        kind="exercise"
+        onCancel={() => setMoving(false)}
+        onMove={(toIndex) => {
+          setMoving(false);
+          builder.moveExercise(lectureId, material.id, toIndex);
+        }}
+        open={moving}
+        siblings={siblings.map((item) => ({
+          id: item.id,
+          isVisible: item.isVisible,
+          title: item.title,
+        }))}
+      />
       <DeleteModal
         itemTitle={material.title}
         kind="exercise"
@@ -132,12 +153,14 @@ export function LectureRow({
   builder,
   exerciseBasePath,
   lecture,
+  moduleId,
   moduleNumber,
   parentEffectivelyVisible,
 }: {
   builder: CourseBuilderState;
   exerciseBasePath: string;
   lecture: CourseLecture;
+  moduleId: string;
   moduleNumber: number;
   parentEffectivelyVisible: boolean;
 }) {
@@ -145,6 +168,10 @@ export function LectureRow({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const siblings =
+    builder.tree.modules.find((item) => item.id === moduleId)?.lectures ?? [];
+  const lectureIndex = siblings.findIndex((item) => item.id === lecture.id);
   const effectivelyVisible = parentEffectivelyVisible && lecture.isVisible;
   const lectureNumber = `${moduleNumber}-${lecture.position}`;
   const open = !builder.isCollapsed(lecture.id);
@@ -202,6 +229,7 @@ export function LectureRow({
               kindLabel={t('row.kind_lecture')}
               label={lecture.title}
               onDelete={() => setDeleting(true)}
+              onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
               onRename={() => setRenaming(true)}
               onToggleVisible={(next) => {
                 if (!next) {
@@ -228,6 +256,7 @@ export function LectureRow({
                   material={material}
                   outlineNumber={`${lectureNumber}-${material.position}`}
                   parentEffectivelyVisible={effectivelyVisible}
+                  siblings={lecture.materials}
                 />
               ))}
             </ol>
@@ -256,6 +285,21 @@ export function LectureRow({
             value={lecture.title}
           />
         ) : null}
+        <MoveModal
+          currentIndex={lectureIndex}
+          kind="lecture"
+          onCancel={() => setMoving(false)}
+          onMove={(toIndex) => {
+            setMoving(false);
+            builder.moveLecture(moduleId, lecture.id, toIndex);
+          }}
+          open={moving}
+          siblings={siblings.map((item) => ({
+            id: item.id,
+            isVisible: item.isVisible,
+            title: item.title,
+          }))}
+        />
         <DeleteModal
           cascade={{ exercises: lecture.materials.length }}
           itemTitle={lecture.title}

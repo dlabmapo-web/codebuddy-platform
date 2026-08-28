@@ -8,6 +8,7 @@ import { orpc } from '@/lib/orpc';
 import {
   countLectures,
   courseTreeQueryKey,
+  reordered,
   type CourseTree,
 } from '../_lib/course-tree';
 
@@ -205,6 +206,46 @@ export function useCourseBuilder({
       deleteLectureMutation.mutate(lectureId),
     deleteExercise: (lectureId: string, materialId: string) =>
       deleteExerciseMutation.mutate({ lectureId, materialId }),
+    /*
+     * The three moves. Each rebuilds the whole sibling ordering from the tree
+     * already in hand, because the endpoint verifies the set it receives
+     * matches the parent's children exactly. Callers report a destination
+     * index and nothing else; the arithmetic lives here rather than in a row.
+     */
+    moveModule: (moduleId: string, toIndex: number) => {
+      const ids = tree.modules.map((item) => item.id);
+      const from = ids.indexOf(moduleId);
+      if (from < 0 || from === toIndex) return;
+      reorderModulesMutation.mutate(reordered(ids, from, toIndex));
+    },
+    moveLecture: (moduleId: string, lectureId: string, toIndex: number) => {
+      const parent = tree.modules.find((item) => item.id === moduleId);
+      if (!parent) return;
+      const ids = parent.lectures.map((item) => item.id);
+      const from = ids.indexOf(lectureId);
+      if (from < 0 || from === toIndex) return;
+      reorderLecturesMutation.mutate({
+        moduleId,
+        orderedLectureIds: reordered(ids, from, toIndex),
+      });
+    },
+    moveExercise: (lectureId: string, materialId: string, toIndex: number) => {
+      const parent = tree.modules
+        .flatMap((item) => item.lectures)
+        .find((item) => item.id === lectureId);
+      if (!parent) return;
+      const ids = parent.materials.map((item) => item.id);
+      const from = ids.indexOf(materialId);
+      if (from < 0 || from === toIndex) return;
+      reorderExercisesMutation.mutate({
+        lectureId,
+        orderedMaterialIds: reordered(ids, from, toIndex),
+      });
+    },
+    movePending:
+      reorderModulesMutation.isPending ||
+      reorderLecturesMutation.isPending ||
+      reorderExercisesMutation.isPending,
     setExerciseVisible: (
       lectureId: string,
       materialId: string,

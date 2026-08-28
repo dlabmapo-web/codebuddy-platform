@@ -5,14 +5,21 @@ import { LogOut } from 'lucide-react';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 
+/**
+ * The question, and only the question.
+ *
+ * It carries no busy state of its own any more. Signing out takes the whole
+ * page with it, so the waiting belongs to the page — `SignOutControl` swaps
+ * this dialog for the same wash the sign-in form uses. A dialog that both
+ * asked and then sat there spinning was reporting a page-level event in a
+ * box the reader was about to lose anyway.
+ */
 export function SignOutConfirmModal({
   onCancel,
   onConfirm,
-  pending = false,
 }: {
   onCancel: () => void;
   onConfirm: () => void;
-  pending?: boolean;
 }) {
   const { t } = useLayoutTranslation('common');
 
@@ -42,23 +49,19 @@ export function SignOutConfirmModal({
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
-            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas disabled:opacity-50"
-            disabled={pending}
+            className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
             onClick={onCancel}
             type="button"
           >
             {t('action.cancel')}
           </button>
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-50"
-            disabled={pending}
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep"
             onClick={onConfirm}
             type="button"
           >
             <LogOut className="size-4" />
-            {pending
-              ? t('sign_out_confirm.confirming')
-              : t('sign_out_confirm.confirm')}
+            {t('sign_out_confirm.confirm')}
           </button>
         </div>
       </ModalContent>

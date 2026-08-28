@@ -75,6 +75,7 @@ export function StudioSidebar({
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canReviewApplications,
   canMonitor,
   hasPoints,
   isStudent,
@@ -85,6 +86,7 @@ export function StudioSidebar({
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canReviewApplications: boolean;
   canMonitor: boolean;
   hasPoints: boolean;
   isStudent: boolean;
@@ -98,6 +100,7 @@ export function StudioSidebar({
     canManageAcademy,
     canManageClasses,
     canManageContent,
+    canReviewApplications,
     canMonitor,
     hasPoints,
     isStudent,
@@ -262,12 +265,13 @@ function AcademySwitcher({
   );
 }
 
-function studioNavGroups({
+export function studioNavGroups({
   academySlug,
   canLearn,
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canReviewApplications,
   canMonitor,
   hasPoints,
   isStudent,
@@ -277,6 +281,7 @@ function studioNavGroups({
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canReviewApplications: boolean;
   canMonitor: boolean;
   /** §5 — the academy switched points on. Off means the link is not there. */
   hasPoints: boolean;
@@ -389,20 +394,28 @@ function studioNavGroups({
     groups.push({ id: 'teaching', labelKey: 'group.teaching', items: teaching });
   }
 
+  const people: NavLink[] = [];
   if (canManageAcademy) {
+    people.push({ href: `${base}/people`, labelKey: 'link.members', icon: Users });
+  }
+  if (canReviewApplications) {
+    people.push({
+      href: `${base}/applications`,
+      labelKey: 'link.applications',
+      icon: UserCheck,
+    });
+  }
+  if (canManageAcademy) {
+    people.push({ href: `${base}/invitations`, labelKey: 'link.invitations', icon: Mail });
+  }
+  if (people.length > 0) {
     groups.push({
       id: 'people',
       labelKey: 'group.people',
-      items: [
-        { href: `${base}/people`, labelKey: 'link.members', icon: Users },
-        {
-          href: `${base}/applications`,
-          labelKey: 'link.applications',
-          icon: UserCheck,
-        },
-        { href: `${base}/invitations`, labelKey: 'link.invitations', icon: Mail },
-      ],
+      items: people,
     });
+  }
+  if (canManageAcademy) {
     // Its own group: the features here decide what every other group shows,
     // so it does not belong filed under People.
     groups.push({

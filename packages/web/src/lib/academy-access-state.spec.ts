@@ -12,6 +12,7 @@ import {
   canManageExercises,
   canPublishContent,
   canReviewContent,
+  canReviewApplications,
   isStudent,
   pendingStateView,
   resolveAcademyAccessState,
@@ -137,6 +138,14 @@ describe('resolveAcademyAccessState', () => {
     expect(canManageAcademy('TEACHER')).toBe(false);
     expect(canManageAcademy('STUDENT')).toBe(false);
     expect(canManageAcademy(null)).toBe(false);
+  });
+
+  it('lets managers and team leads review applications', () => {
+    expect(canReviewApplications('MANAGER')).toBe(true);
+    expect(canReviewApplications('TEAM_LEAD')).toBe(true);
+    expect(canReviewApplications('TEACHER')).toBe(false);
+    expect(canReviewApplications('STUDENT')).toBe(false);
+    expect(canReviewApplications(null)).toBe(false);
   });
 
   it('lets managers review content without exposing authoring controls', () => {

@@ -1,5 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import type { ReviewAcademyJoinRequest } from "@cove/shared";
+import {
+  canApproveAs,
+  type ReviewAcademyJoinRequest,
+} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -31,7 +34,7 @@ export class AcademyJoinRequestService {
     await this.access.requirePermission(
       identity.authUserId,
       academyId,
-      "academy.members.manage",
+      "academy.applications.review",
     );
     const requests = await this.prisma.academyJoinRequest.findMany({
       where: { academyId, status: "PENDING" },
@@ -60,8 +63,15 @@ export class AcademyJoinRequestService {
     const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
-      "academy.members.manage",
+      "academy.applications.review",
     );
+
+    if (input.decision === "APPROVE" && !canApproveAs(actor.role, input.role)) {
+      throw new AppException(
+        "JOIN_REQUEST_ROLE_NOT_PERMITTED",
+        HttpStatus.FORBIDDEN,
+      );
+    }
 
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`

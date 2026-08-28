@@ -19,18 +19,23 @@ export function ReviewModal({
   onClose,
   onReject,
   request,
+  roles,
 }: {
   disabled: boolean;
   onApprove: (role: AcademyRole, reason?: string) => void;
   onClose: () => void;
   onReject: (reason: string) => void;
   request: ApplicationRequest | null;
+  roles: readonly AcademyRole[];
 }) {
   const { t } = useLayoutTranslation(['applications', 'common']);
   const [role, setRole] = useState<AcademyRole>('STUDENT');
   const [reason, setReason] = useState('');
 
   if (!request) return null;
+  if (!roles.includes(role)) {
+    throw new Error('The selected application role is not approvable.');
+  }
 
   const applicant =
     request.user.displayName ?? request.user.email ?? t('common:fallback.user');
@@ -58,6 +63,7 @@ export function ReviewModal({
             <RoleSelector
               onChange={setRole}
               popoverClassName="w-64"
+              roles={roles}
               value={role}
             />
           </div>

@@ -75,6 +75,12 @@ export const academyPermissions = [
   "academy.settings.manage",
   "academy.members.read",
   "academy.members.manage",
+  /**
+   * Read and review pending academy applications. This does not authorize
+   * changing an existing member's role, suspending one, or sending an
+   * invitation; those remain separate membership-management capabilities.
+   */
+  "academy.applications.review",
   "academy.analytics.read",
   "curriculum.read",
   "curriculum.review",
@@ -135,6 +141,7 @@ export const academyRolePermissions = {
   TEAM_LEAD: [
     "academy.read",
     "academy.members.read",
+    "academy.applications.review",
     "academy.analytics.read",
     "curriculum.read",
     "curriculum.review",
@@ -154,6 +161,7 @@ export const academyRolePermissions = {
     "academy.settings.manage",
     "academy.members.read",
     "academy.members.manage",
+    "academy.applications.review",
     "academy.analytics.read",
     "curriculum.read",
     "curriculum.review",
@@ -171,4 +179,30 @@ export function roleHasPermission(
   return (academyRolePermissions[role] as readonly AcademyPermission[]).includes(
     permission,
   );
+}
+
+/**
+ * The roles this actor may grant when approving an application.
+ *
+ * A Manager seats anybody. A Team Lead seats the two roles below them and
+ * neither their own nor their supervisor's. Every role without application
+ * review permission gets an empty list, so an omitted permission check still
+ * fails in the safe direction.
+ *
+ * Ordered as `academyRoles` is, so shared options stay in the same positions.
+ */
+export function approvableRoles(
+  actor: AcademyRole,
+): readonly AcademyRole[] {
+  if (!roleHasPermission(actor, "academy.applications.review")) return [];
+  return actor === "MANAGER"
+    ? academyRoles
+    : (["STUDENT", "TEACHER"] as const);
+}
+
+export function canApproveAs(
+  actor: AcademyRole,
+  target: AcademyRole,
+): boolean {
+  return approvableRoles(actor).includes(target);
 }

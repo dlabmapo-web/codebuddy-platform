@@ -4,6 +4,7 @@ import type { implement } from "@orpc/server";
 import type { Request } from "express";
 import type { appContract } from "@cove/shared";
 
+import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import type { AuthService } from "../auth/auth.service.js";
 import type { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import type { PasswordRecoveryService } from "../auth/password-recovery.service.js";
@@ -47,6 +48,7 @@ export type ORPCImplementer = ReturnType<
 >;
 
 export type ORPCDeps = {
+  academyAccessService: AcademyAccessService;
   authService: AuthService;
   oauthOnboardingIntentService: OAuthOnboardingIntentService;
   passwordRecoveryService: PasswordRecoveryService;

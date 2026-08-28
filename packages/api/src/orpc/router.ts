@@ -11,6 +11,7 @@ import { AcademyMembershipService } from "../academies/academy-membership.servic
 import { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import { createAcademiesRouters } from "../academies/academies.router.js";
 import { RateLimitService } from "../academies/rate-limit.service.js";
+import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import { PasswordRecoveryService } from "../auth/password-recovery.service.js";
@@ -61,6 +62,7 @@ import { toORPCError } from "./error-mapping.js";
 
 export function registerORPCRoutes(app: NestExpressApplication): void {
   const router = createORPCRouter({
+    academyAccessService: app.get(AcademyAccessService, { strict: false }),
     authService: app.get(AuthService, { strict: false }),
     oauthOnboardingIntentService: app.get(OAuthOnboardingIntentService, {
       strict: false,

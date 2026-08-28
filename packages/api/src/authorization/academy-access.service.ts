@@ -59,4 +59,35 @@ export class AcademyAccessService {
 
     return { userId: user.id, academyId, role: membership.role };
   }
+
+  /**
+   * Whether this account is a student of any academy.
+   *
+   * The thirty-minute inactivity lease is a *student* policy, but the lease
+   * itself is keyed on the Supabase session rather than on a membership — one
+   * session, one lease, whatever academies the person belongs to. So the
+   * question the guard has to ask is the session-shaped one: is this person a
+   * student anywhere. Asking per academy would be a different question, and
+   * the lease has no way to answer it.
+   *
+   * Staff answer `false` and are not held to the policy. That is not leniency:
+   * §5.2 keeps staff session policy separate, and until now a manager was
+   * being given a student's lease at sign-in with nothing to renew it — which
+   * expired thirty minutes later and locked them out of curriculum they are
+   * entitled to read.
+   *
+   * A `count` against the composite index, not a membership load: the answer
+   * is one bit and this runs on every request to the learning surfaces.
+   */
+  async isStudentAnywhere(authUserId: string): Promise<boolean> {
+    const count = await this.prisma.academyMembership.count({
+      where: {
+        role: "STUDENT",
+        status: "ACTIVE",
+        user: { authUserId },
+        academy: { status: "ACTIVE" },
+      },
+    });
+    return count > 0;
+  }
 }

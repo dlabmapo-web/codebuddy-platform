@@ -40,22 +40,34 @@ export default async function AcademyLayout({
   const { academySlug } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
 
-  let isStudent = false;
+  // Presence is about *this* academy: a roster shows the students of one
+  // academy, so somebody is present here only if they are a student here.
+  let isStudentHere = false;
+  // The inactivity lease is not. It is keyed on the Supabase session — one
+  // session, one lease, whatever academies the person belongs to — so the
+  // countdown that renews it has to run wherever they are. A student who is
+  // also a teaching assistant in a second academy used to have their lease
+  // quietly expire while they worked in that one, and then find their own
+  // coursework refusing to load.
+  let isStudentAnywhere = false;
   try {
     // `getAccount` captures the request's token before building the RPC link.
     // Resolving it lazily inside a parallel layout/page render can lose the
     // request context, which would fail open by omitting this guard.
     const account = await getAccount();
-    isStudent = account.user.memberships.some(
+    const studentSeats = account.user.memberships.filter(
       (membership) =>
-        membership.academy.id === academyId &&
-        membership.status === 'ACTIVE' &&
-        membership.role === 'STUDENT',
+        membership.status === 'ACTIVE' && membership.role === 'STUDENT',
+    );
+    isStudentAnywhere = studentSeats.length > 0;
+    isStudentHere = studentSeats.some(
+      (membership) => membership.academy.id === academyId,
     );
   } catch {
     // Presence is not what this page is for. A failed lookup costs the student
     // their row on a roster; it must not cost them their coursework.
-    isStudent = false;
+    isStudentHere = false;
+    isStudentAnywhere = false;
   }
 
   const scoped = (
@@ -64,13 +76,13 @@ export default async function AcademyLayout({
     </AcademyRouteProvider>
   );
 
-  if (!isStudent) return scoped;
+  if (!isStudentAnywhere) return scoped;
 
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, sessionNamespaces);
 
-  return (
-    <StudentPresenceProvider academyId={academyId}>
+  const counted = (
+    <>
       <PageTranslationsProvider
         locale={locale}
         namespaces={sessionNamespaces}
@@ -80,6 +92,14 @@ export default async function AcademyLayout({
         <ResumePrompt />
       </PageTranslationsProvider>
       {scoped}
+    </>
+  );
+
+  if (!isStudentHere) return counted;
+
+  return (
+    <StudentPresenceProvider academyId={academyId}>
+      {counted}
     </StudentPresenceProvider>
   );
 }

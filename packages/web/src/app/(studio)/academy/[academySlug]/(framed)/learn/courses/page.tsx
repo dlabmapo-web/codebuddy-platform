@@ -3,8 +3,8 @@ import type { LearnCourseSummary, LearnDraftSummary } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { toApiError } from '@/lib/api-errors';
+import { logoutAction } from '@/app/(auth)/actions';
 import { createServerORPCClient } from '@/lib/orpc-server';
-import { routes } from '@/lib/routes';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { CourseCatalog } from './_components/course-catalog';
@@ -56,16 +56,28 @@ export default async function LearnCoursesPage({
           initialDrafts={drafts}
         />
       ) : sessionEnded ? (
+        /*
+         * Reached only by a student whose inactivity lease lapsed between the
+         * countdown and this render. Staff never see it: the policy is theirs
+         * alone, and the API no longer asks a non-student for a lease.
+         *
+         * The action signs out rather than linking to `/login`. That link was
+         * the bug that made this state a dead end — the auth session is still
+         * valid at this point, so `/login` sent the reader straight back to
+         * their overview and the button appeared to do nothing at all.
+         */
         <div className="rounded-card border border-border bg-card p-5">
           <p className="text-[14px] leading-6 text-sub">
             {t('errors:STUDENT_SESSION_EXPIRED')}
           </p>
-          <a
-            className="mt-3 inline-flex items-center rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-on-brand"
-            href={routes.login}
-          >
-            {t('auth:login.submit')}
-          </a>
+          <form action={logoutAction}>
+            <button
+              className="mt-3 inline-flex items-center rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-on-brand transition-opacity hover:opacity-90"
+              type="submit"
+            >
+              {t('auth:login.submit')}
+            </button>
+          </form>
         </div>
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">

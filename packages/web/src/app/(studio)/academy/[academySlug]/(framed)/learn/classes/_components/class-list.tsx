@@ -16,13 +16,7 @@ import { ClassCard } from './class-card';
  * because telling a student they have no classes when the service was down is
  * the one wrong answer this surface can give.
  */
-export function ClassList({
-  academyId,
-  classes,
-}: {
-  academyId: string;
-  classes: LearnClassSummary[];
-}) {
+export function ClassList({ classes }: { classes: LearnClassSummary[] }) {
   const { t } = useLayoutTranslation('learn');
 
   if (classes.length === 0) {
@@ -43,7 +37,7 @@ export function ClassList({
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {classes.map((summary) => (
         <li key={summary.classId}>
-          <ClassCard academyId={academyId} summary={summary} />
+          <ClassCard summary={summary} />
         </li>
       ))}
     </ul>

@@ -5,8 +5,13 @@ import { notFound } from 'next/navigation';
 import { toApiError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { routes } from '@/lib/routes';
+
 import { ClassDetail } from './_components/class-detail';
+import { splitSchedule } from '../_lib/class-schedule';
 
 export default async function LearnClassPage({
   params,
@@ -15,6 +20,7 @@ export default async function LearnClassPage({
 }) {
   const { academySlug, classId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
+  const { t } = await getServerTranslation(['learn']);
   let detail: LearnClassDetail | null = null;
   try {
     detail = await createServerORPCClient().learn.getClass({
@@ -34,10 +40,20 @@ export default async function LearnClassPage({
   }
   if (!detail) notFound();
 
+  // The heading shows the description without its schedule prefix, which the
+  // strip below renders as a chip. Printing both would say the time twice.
+  const { description } = splitSchedule(detail.description);
+
   return (
     <StudioPage
+      back={
+        <BackLink
+          href={`${routes.academy(academySlug)}/learn/classes`}
+          label={t('classes.back')}
+        />
+      }
       bleed
-      description={detail.description || undefined}
+      description={description || undefined}
       title={detail.name}
     >
       <ClassDetail academyId={academyId} detail={detail} />

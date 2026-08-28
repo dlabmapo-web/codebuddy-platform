@@ -5,6 +5,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
+import { MediaModule } from "../profile/media.module.js";
 import { AnswerRecordsService } from "./answer-records.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
@@ -22,7 +23,8 @@ import { SubmissionService } from "./submission.service.js";
  * boots and every read keeps working when grading is unavailable.
  */
 @Module({
-  imports: [AcademiesModule, AuthModule, AuthorizationModule],
+  // `MediaModule` signs the assigned teacher's photo for the class pages.
+  imports: [AcademiesModule, AuthModule, AuthorizationModule, MediaModule],
   controllers: [SubmissionController],
   providers: [
     AnswerRecordsService,

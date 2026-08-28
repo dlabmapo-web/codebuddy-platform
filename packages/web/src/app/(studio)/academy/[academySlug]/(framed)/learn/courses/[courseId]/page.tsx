@@ -5,7 +5,9 @@ import { notFound } from 'next/navigation';
 
 import { createServerORPCClient } from '@/lib/orpc-server';
 
+import { BackLink } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/back-link';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { CourseOutline } from './_components/course-outline';
 import { LearningClassChoice } from '../../_components/learning-class-choice';
 
@@ -19,6 +21,7 @@ export default async function LearnCoursePage({
   const { academySlug, courseId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
   const requestedClassId = single((await searchParams).classId);
+  const { t } = await getServerTranslation(['learn']);
   let outline: LearnCourseOutlineResult | null = null;
   try {
     outline = await createServerORPCClient().learn.getCourseOutline({
@@ -35,6 +38,12 @@ export default async function LearnCoursePage({
 
   return (
     <StudioPage
+      back={
+        <BackLink
+          href={`${routes.academy(academySlug)}/learn/courses`}
+          label={t('outline.back')}
+        />
+      }
       bleed
       description={outline.course.description || undefined}
       title={outline.course.title}

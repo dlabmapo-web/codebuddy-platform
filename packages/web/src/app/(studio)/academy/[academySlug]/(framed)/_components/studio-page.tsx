@@ -15,6 +15,7 @@ export function StudioPage({
   title,
   description,
   actions,
+  back,
   bleed = false,
   showPageHeading = true,
   children,
@@ -22,6 +23,15 @@ export function StudioPage({
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  /**
+   * The way back out of a detail page, rendered above the heading.
+   *
+   * A slot rather than something each page puts in its own content, because
+   * the content is *below* the title — which is where the two learn detail
+   * pages were drawing theirs, leaving a reader looking at a heading with the
+   * escape hatch underneath it. Back goes before the thing it backs out of.
+   */
+  back?: React.ReactNode;
   /** Skip the white content card so a page can lay out its own panels. */
   bleed?: boolean;
   /** Hide the heading when the page owns a live, interactive one. */
@@ -30,6 +40,7 @@ export function StudioPage({
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
+      {back ? <div className="mb-3">{back}</div> : null}
       {showPageHeading ? (
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">

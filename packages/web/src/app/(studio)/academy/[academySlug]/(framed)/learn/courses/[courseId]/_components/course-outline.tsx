@@ -5,8 +5,7 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import type { LearnCourseOutlineResult, LearningClassContext } from '@cove/shared';
-import { ArrowLeft, BookOpen, Search, X } from 'lucide-react';
-import Link from 'next/link';
+import { BookOpen, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
@@ -68,23 +67,45 @@ export function CourseOutline({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-sub transition-colors hover:bg-canvas hover:text-ink"
-            href={`${routes.academy(academySlug)}/learn/courses`}
-          >
-            <ArrowLeft className="size-3.5" />
-            {t('outline.back')}
-          </Link>
-          {isPreview ? null : (
-            <span className="text-[12.5px] text-sub">
+        {/*
+         * The way back left this row for `StudioPage`'s `back` slot, above the
+         * heading. What is left is the pair a reader actually uses here: how
+         * far through they are, and the way to find one problem among forty.
+         *
+         * Progress is drawn rather than stated. "0 of 4 solved" in grey was the
+         * only report of the one thing this page is measuring, and a bar says
+         * at a glance what the sentence made you read.
+         */}
+        {isPreview ? (
+          <span />
+        ) : (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="tabular shrink-0 text-[13px] font-bold">
               {t('outline.progress', {
                 solved: outline.progress.solved,
                 total: outline.progress.total,
               })}
             </span>
-          )}
-        </div>
+            <span
+              aria-hidden
+              className="h-1.5 w-24 overflow-hidden rounded-full bg-accent"
+            >
+              <span
+                className="block h-full rounded-full bg-brand transition-[width] duration-300 motion-reduce:transition-none"
+                style={{
+                  width: `${
+                    outline.progress.total > 0
+                      ? Math.round(
+                          (outline.progress.solved / outline.progress.total) *
+                            100,
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </span>
+          </div>
+        )}
 
         <label className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub/60" />

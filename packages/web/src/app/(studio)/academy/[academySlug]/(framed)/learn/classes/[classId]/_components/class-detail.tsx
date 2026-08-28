@@ -1,24 +1,24 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
-
 import type { LearnClassDetail } from '@cove/shared';
-import { ArrowLeft, BookOpen } from 'lucide-react';
-import Link from 'next/link';
+import { BookOpen } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
 import { CourseCard } from '../../../_components/course-card';
+import { splitSchedule } from '../../_lib/class-schedule';
+import { ClassScheduleChip } from '../../_components/class-schedule-chip';
 import { ClassTeacher } from '../../_components/class-teacher';
 
 /**
- * One class: what it is, who runs it, and what it currently opens up.
+ * One class: when it meets, who runs it, and what it currently opens up.
  *
- * The header row is the course outline's, mirrored — the way back on the left,
- * the one fact that qualifies the page on the right — so a student moving
- * between a class and a course finds the same furniture in the same place.
+ * Those three facts sit together in one strip under the heading. They used to
+ * be scattered — the way back on the left of a row, the teacher pushed to the
+ * far right of it, the course count floating above the grid — which read as
+ * three unrelated fragments rather than as the identity of the class the
+ * heading had just named. The way back left the row entirely: it belongs above
+ * the title, and `StudioPage` renders it there.
  *
  * Course rendering is delegated whole to the shared card. A class is an access
  * path, not a second curriculum, so a course reached through one must look and
@@ -31,31 +31,23 @@ export function ClassDetail({
   academyId: string;
   detail: LearnClassDetail;
 }) {
-  const academySlug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
+  const { schedule } = splitSchedule(detail.description);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <Link
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-sub transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-          href={`${routes.academy(academySlug)}/learn/classes`}
-        >
-          <ArrowLeft aria-hidden className="size-3.5" />
-          {t('classes.back')}
-        </Link>
-        <ClassTeacher teacher={detail.teacher} />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-card border border-border bg-card px-5 py-4">
+        {schedule ? <ClassScheduleChip schedule={schedule} /> : null}
+        <ClassTeacher size="md" teacher={detail.teacher} />
+        <span className="tabular ml-auto shrink-0 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-bold text-brand">
+          {t('classes.course_count', { count: detail.courses.length })}
+        </span>
       </div>
 
       <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-[16px] font-bold tracking-[-0.01em]">
-            {t('classes.courses_title')}
-          </h2>
-          <span className="tabular text-[12.5px] text-sub">
-            {t('classes.course_count', { count: detail.courses.length })}
-          </span>
-        </div>
+        <h2 className="text-[16px] font-bold tracking-[-0.01em]">
+          {t('classes.courses_title')}
+        </h2>
 
         {detail.courses.length === 0 ? (
           // Deliberately says nothing about *what* is missing: an unassigned

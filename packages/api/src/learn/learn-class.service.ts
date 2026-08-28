@@ -4,6 +4,7 @@ import type {
   LearnClassSummary,
   LearnClassTeacher,
   LearnCourseSummary,
+  MemberAvatarUrls,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -12,6 +13,12 @@ import { enrolledClassWhere } from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import {
+  memberAvatarSelect,
+  noMemberAvatar,
+  resolveMemberAvatars,
+} from "../profile/member-avatars.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 import {
   courseSummaryFor,
   CurriculumOutlineService,
@@ -39,8 +46,9 @@ import {
  * Everything one class page needs, and nothing that identifies an account.
  *
  * The teacher select carries no id, email, username, or membership — only the
- * four facts §7.2 tests and the display name it may report. A student is being
- * told who teaches them, not handed a way to reach them.
+ * four facts §7.2 tests, the display name it may report, and the photo shown
+ * beside it. A student is being told who teaches them and what they look like,
+ * not handed a way to reach them.
  */
 function studentClassSelect(academyId: string) {
   return {
@@ -52,7 +60,17 @@ function studentClassSelect(academyId: string) {
         academyId: true,
         status: true,
         role: true,
-        user: { select: { status: true, displayName: true } },
+        // The same fragment the roster and the six other member surfaces use,
+        // so a teacher's photo cannot resolve differently here than it does
+        // anywhere else in the academy.
+        ...memberAvatarSelect,
+        user: {
+          select: {
+            ...memberAvatarSelect.user.select,
+            status: true,
+            displayName: true,
+          },
+        },
       },
     },
     courseAssignments: {
@@ -82,6 +100,7 @@ export class LearnClassService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly curriculum: CurriculumOutlineService,
+    private readonly media: ProfileMediaService,
   ) {}
 
   async listClasses(
@@ -98,9 +117,11 @@ export class LearnClassService {
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
 
+    const photos = await teacherPhotos(classes, academyId, this.media);
+
     return {
       classes: classes.map((record) => ({
-        ...projectClass(record, academyId),
+        ...projectClass(record, academyId, photos),
         availableCourseCount: availableCourses(record, noProgress).length,
       })),
     };
@@ -129,6 +150,8 @@ export class LearnClassService {
     // Hidden curriculum contributes no ids, so this asks about exactly the
     // exercises the cards will count. Existing aggregate rows answer it; no
     // student page reads submission history.
+    const photos = await teacherPhotos([record], academyId, this.media);
+
     const statuses = await this.curriculum.statusByMaterial(
       userId,
       record.courseAssignments.flatMap((assignment) =>
@@ -138,7 +161,7 @@ export class LearnClassService {
     const courses = availableCourses(record, statuses);
 
     return {
-      ...projectClass(record, academyId),
+      ...projectClass(record, academyId, photos),
       availableCourseCount: courses.length,
       courses,
     };
@@ -171,13 +194,45 @@ export class LearnClassService {
 function projectClass(
   record: StudentClass,
   academyId: string,
+  photos: ReadonlyMap<string, MemberAvatarUrls>,
 ): Omit<LearnClassSummary, "availableCourseCount"> {
   return {
     classId: record.id,
     name: record.name,
     description: record.description,
-    teacher: effectiveTeacher(record.assignedTeacher, academyId),
+    teacher: effectiveTeacher(
+      record.assignedTeacher,
+      academyId,
+      photos.get(record.id) ?? noMemberAvatar,
+    ),
   };
+}
+
+/**
+ * Every teacher photo these classes will draw, signed in one round trip.
+ *
+ * Batched through the shared resolver for the reason it exists: a student in
+ * eight classes must not cost eight storage requests. Only teachers this
+ * student may actually be told about are collected, so a suspended teacher's
+ * photo is never signed, let alone sent.
+ *
+ * A signing failure is not a page failure — the resolver returns no URLs, the
+ * chain ends in the placeholder, and the card renders as it did before there
+ * were photos at all.
+ */
+async function teacherPhotos(
+  records: StudentClass[],
+  academyId: string,
+  media: ProfileMediaService,
+): Promise<Map<string, MemberAvatarUrls>> {
+  return resolveMemberAvatars(
+    media,
+    records.flatMap((record) => {
+      const assigned = record.assignedTeacher;
+      if (!assigned || !tellableTeacher(assigned, academyId)) return [];
+      return [{ ...assigned, key: record.id }];
+    }),
+  );
 }
 
 /**
@@ -212,13 +267,29 @@ function availableCourses(
 function effectiveTeacher(
   assigned: StudentClass["assignedTeacher"],
   academyId: string,
+  avatar: MemberAvatarUrls,
 ): LearnClassTeacher | null {
-  if (!assigned) return null;
+  if (!assigned || !tellableTeacher(assigned, academyId)) return null;
+  const displayName = assigned.user.displayName?.trim();
+  if (!displayName) return null;
+  return { displayName, ...avatar };
+}
+
+/**
+ * Whether this assignment names somebody the student may be told about.
+ *
+ * Split out so the photo collector and the projection ask the same question.
+ * If they could drift, the batch would sign an image for a teacher the
+ * projection then refuses to name — work done to produce a URL for nobody, and
+ * a signed URL for a person the student was not meant to learn about.
+ */
+function tellableTeacher(
+  assigned: NonNullable<StudentClass["assignedTeacher"]>,
+  academyId: string,
+): boolean {
   // The stored key cannot prove same-academy on its own, so the academy is
   // checked here as well as on the class.
-  if (assigned.academyId !== academyId) return null;
-  if (assigned.status !== "ACTIVE" || assigned.role !== "TEACHER") return null;
-  if (assigned.user.status !== "ACTIVE") return null;
-  const displayName = assigned.user.displayName?.trim();
-  return displayName ? { displayName } : null;
+  if (assigned.academyId !== academyId) return false;
+  if (assigned.status !== "ACTIVE" || assigned.role !== "TEACHER") return false;
+  return assigned.user.status === "ACTIVE";
 }

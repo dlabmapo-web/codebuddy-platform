@@ -10,6 +10,7 @@ import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
 import type { LearningClassContextService } from "./learning-class-context.service.js";
 import type { SubmissionService } from "./submission.service.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
@@ -95,14 +96,26 @@ function emptyCourse() {
   });
 }
 
-function activeTeacher() {
+function activeTeacher(overrides: Record<string, unknown> = {}) {
   return {
     academyId,
     status: "ACTIVE",
     role: "TEACHER",
-    user: { status: "ACTIVE", displayName: "Kim Minji" },
+    memberProfile: null,
+    user: {
+      status: "ACTIVE",
+      displayName: "Kim Minji",
+      avatarUrl: null,
+      avatarAsset: null,
+    },
+    ...overrides,
   };
 }
+
+/** Signs nothing, which is the state every teacher fixture here is in. */
+const media = {
+  signMany: vi.fn().mockResolvedValue([]),
+} as unknown as ProfileMediaService;
 
 function studentClass(overrides: Record<string, unknown> = {}) {
   return {
@@ -121,6 +134,7 @@ function createService(options?: {
   role?: AcademyRole;
   progress?: Array<{ materialId: string; status: string; bestScore: number }>;
   drafts?: Array<{ materialId: string }>;
+  media?: ProfileMediaService;
 }) {
   const prisma = {
     class: {
@@ -151,7 +165,12 @@ function createService(options?: {
   const curriculum = new CurriculumOutlineService(prisma);
   return {
     prisma,
-    service: new LearnClassService(prisma, access, curriculum),
+    service: new LearnClassService(
+      prisma,
+      access,
+      curriculum,
+      options?.media ?? media,
+    ),
     courses: new LearnService(
       prisma,
       access,
@@ -306,12 +325,60 @@ describe("LearnClassService detail", () => {
     ).rejects.toMatchObject({ code: "CLASS_NOT_FOUND" });
   });
 
+  it("sends the assigned teacher's photo, signed once for the whole page", async () => {
+    const signMany = vi
+      .fn()
+      .mockResolvedValue([{ assetId: "asset-1", url: "https://signed/photo" }]);
+    const { service } = createService({
+      detail: studentClass({
+        assignedTeacher: activeTeacher({
+          memberProfile: {
+            avatarAsset: { id: "asset-1", bucket: "b", objectKey: "k" },
+          },
+        }),
+      }),
+      media: { signMany } as unknown as ProfileMediaService,
+    });
+
+    const detail = await service.getClass(identity, { academyId, classId });
+
+    expect(detail.teacher?.academyImageUrl).toBe("https://signed/photo");
+    expect(signMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs nothing for a teacher the student may not be told about", async () => {
+    // A suspended teacher is reported as no teacher at all, so producing a
+    // signed URL for their photo would be work done to leak a face.
+    const signMany = vi.fn().mockResolvedValue([]);
+    const { service } = createService({
+      detail: studentClass({
+        assignedTeacher: activeTeacher({
+          status: "SUSPENDED",
+          memberProfile: {
+            avatarAsset: { id: "asset-1", bucket: "b", objectKey: "k" },
+          },
+        }),
+      }),
+      media: { signMany } as unknown as ProfileMediaService,
+    });
+
+    const detail = await service.getClass(identity, { academyId, classId });
+
+    expect(detail.teacher).toBeNull();
+    expect(signMany).not.toHaveBeenCalled();
+  });
+
   it("names an active assigned teacher", async () => {
     const { service } = createService();
 
     const detail = await service.getClass(identity, { academyId, classId });
 
-    expect(detail.teacher).toEqual({ displayName: "Kim Minji" });
+    expect(detail.teacher).toEqual({
+      displayName: "Kim Minji",
+      academyImageUrl: null,
+      globalImageUrl: null,
+      externalAvatarUrl: null,
+    });
   });
 
   it.each([

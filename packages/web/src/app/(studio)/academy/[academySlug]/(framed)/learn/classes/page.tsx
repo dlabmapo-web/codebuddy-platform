@@ -40,7 +40,7 @@ export default async function LearnClassesPage({
       title={t('classes.title')}
     >
       {classes ? (
-        <ClassList academyId={academyId} classes={classes} />
+        <ClassList classes={classes} />
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">
           <h2 className="text-[15px] font-bold text-danger">

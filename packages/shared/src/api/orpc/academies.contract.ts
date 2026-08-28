@@ -44,6 +44,18 @@ export const academyJoinRequestsContract = {
   list: oc
     .input(academyInputSchema)
     .output(z.object({ requests: z.array(academyJoinRequestDetailSchema) })),
+  /**
+   * How many applicants are waiting, and nothing else.
+   *
+   * Its own procedure rather than `list().requests.length`: the nav asks this
+   * on every studio page entry for every manager and team lead, and `list`
+   * signs a profile-image URL per applicant to draw a table this caller never
+   * renders. One indexed count against `(academyId, status, createdAt)` is the
+   * whole answer.
+   */
+  pendingCount: oc
+    .input(academyInputSchema)
+    .output(z.object({ count: z.number().int().nonnegative() })),
   review: oc
     .input(reviewAcademyJoinRequestSchema)
     .output(academyJoinRequestDetailSchema),

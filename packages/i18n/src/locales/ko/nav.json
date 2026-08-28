@@ -33,5 +33,9 @@
     "switch": "학원 전환",
     "search": "학원 검색…"
   },
-  "my_page": "마이 페이지"
+  "my_page": "마이 페이지",
+  "badge": {
+    "pending_applications": "{{pending}}명 승인 대기 중",
+    "pending_applications_tooltip": "{{link}} · {{pending}}명 대기"
+  }
 }

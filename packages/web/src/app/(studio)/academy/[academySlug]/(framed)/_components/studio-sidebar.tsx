@@ -46,6 +46,8 @@ import {
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation, type TranslationKey } from '@/i18n';
 import { NavPendingHint } from './nav-pending-hint';
+import { NavCountBadge, NavCountDot } from './nav-count-badge';
+import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -56,6 +58,14 @@ type NavLink = {
   href: string;
   labelKey: TranslationKey<'nav'>;
   icon: LucideIcon;
+  /**
+   * Whether this row carries the count of applicants waiting.
+   *
+   * A flag rather than the number itself, so `studioNavGroups` stays a pure
+   * function of what the reader may see — it decides which rows exist, and
+   * the count is a live value that would make it untestable.
+   */
+  showPendingApplications?: boolean;
 };
 type NavGroup = {
   id: string;
@@ -111,6 +121,14 @@ export function StudioSidebar({
     pathname,
     groups.flatMap((group) => group.items.map((item) => item.href)),
   );
+  // Asked once for the whole sidebar rather than by the badge itself: the
+  // collapsed rail puts the same number in a tooltip the button owns, and two
+  // components reading it separately is how a dot and its tooltip end up
+  // disagreeing about how many people are waiting.
+  const pendingApplications = usePendingApplicationsCount(
+    academyId,
+    canReviewApplications,
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -120,7 +138,12 @@ export function StudioSidebar({
       <SidebarSeparator />
       <SidebarContent>
         {groups.map((group) => (
-          <NavSection activeHref={activeHref} group={group} key={group.id} />
+          <NavSection
+            activeHref={activeHref}
+            group={group}
+            key={group.id}
+            pendingApplications={pendingApplications}
+          />
         ))}
       </SidebarContent>
       <SidebarFooter>
@@ -147,9 +170,11 @@ export function StudioSidebar({
 function NavSection({
   activeHref,
   group,
+  pendingApplications,
 }: {
   activeHref: string | null;
   group: NavGroup;
+  pendingApplications: number;
 }) {
   const { t } = useLayoutTranslation(['nav', 'common']);
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -162,12 +187,27 @@ function NavSection({
         {group.items.map((item) => {
           const active = item.href === activeHref;
           const label = t(item.labelKey);
+          const waiting = item.showPendingApplications
+            ? pendingApplications
+            : 0;
+          const waitingLabel = t('badge.pending_applications', {
+            pending: waiting,
+          });
           return (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
                 isActive={active}
-                tooltip={collapsed ? label : undefined}
+                tooltip={
+                  collapsed
+                    ? waiting > 0
+                      ? t('badge.pending_applications_tooltip', {
+                          link: label,
+                          pending: waiting,
+                        })
+                      : label
+                    : undefined
+                }
               >
                 <Link href={item.href} onClick={() => setOpenMobile(false)}>
                   <item.icon />
@@ -175,9 +215,18 @@ function NavSection({
                   {/* Hidden while the rail is collapsed to icons: there is no
                       room beside a glyph, and a dot crowding one would be read
                       as part of the icon rather than as a state. */}
+                  {collapsed ? null : (
+                    <NavCountBadge count={waiting} label={waitingLabel} />
+                  )}
                   {collapsed ? null : <NavPendingHint />}
                 </Link>
               </SidebarMenuButton>
+              {/* The collapsed rail's version of the same number. Outside the
+                  button so the dot is positioned against the item rather than
+                  inside a flex row that has no space left. */}
+              {collapsed ? (
+                <NavCountDot count={waiting} label={waitingLabel} />
+              ) : null}
             </SidebarMenuItem>
           );
         })}
@@ -403,6 +452,7 @@ export function studioNavGroups({
       href: `${base}/applications`,
       labelKey: 'link.applications',
       icon: UserCheck,
+      showPendingApplications: true,
     });
   }
   if (canManageAcademy) {

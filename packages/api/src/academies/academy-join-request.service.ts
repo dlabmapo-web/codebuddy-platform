@@ -59,6 +59,25 @@ export class AcademyJoinRequestService {
     };
   }
 
+  /**
+   * The count behind the nav badge.
+   *
+   * Gated exactly as `list` is: the number of people waiting to be let into an
+   * academy is a fact about that academy, and somebody who may not read the
+   * queue may not read its size either.
+   */
+  async pendingCount(identity: SupabaseIdentity, academyId: string) {
+    await this.access.requirePermission(
+      identity.authUserId,
+      academyId,
+      "academy.applications.review",
+    );
+    const count = await this.prisma.academyJoinRequest.count({
+      where: { academyId, status: "PENDING" },
+    });
+    return { count };
+  }
+
   async review(identity: SupabaseIdentity, input: ReviewAcademyJoinRequest) {
     const actor = await this.access.requirePermission(
       identity.authUserId,

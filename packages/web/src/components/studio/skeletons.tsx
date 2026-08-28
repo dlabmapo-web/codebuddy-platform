@@ -352,3 +352,63 @@ export function SkeletonColumn({
     </div>
   );
 }
+
+/**
+ * The studio frame, drawn rather than fetched.
+ *
+ * Only for cold entry, where the real chrome is itself still rendering — a
+ * refresh, or a first arrival from outside the studio. Every navigation *once
+ * inside* keeps the real sidebar on screen, because the chrome is a layout and
+ * Next does not re-render it; those routes use a content-only skeleton and
+ * never this.
+ *
+ * The rail is `15.5rem` because `SIDEBAR_WIDTH` is, and the bar is `h-14`
+ * because the header is. Both are copied deliberately: this has to line up
+ * with the thing that replaces it to the pixel, and a shared constant that
+ * silently changed one without the other would be worse than the duplication.
+ */
+export function SkeletonChrome({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div aria-busy="true" className="flex min-h-svh w-full bg-canvas">
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+
+      <div className="hidden w-[15.5rem] shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-3 md:flex">
+        <Skeleton className="h-11 w-full rounded-lg" />
+        <div className="mt-4 flex flex-col gap-1.5">
+          {/* Roughly the nav a signed-in reader sees: two groups, and the
+              longest is six links. Drawn short rather than long — a rail that
+              overshoots leaves a gap when the real nav is briefer. */}
+          {[3, 6].map((count, group) => (
+            <div className="mb-3 flex flex-col gap-1.5" key={group}>
+              <Skeleton className="mb-1 h-3 w-20" />
+              {Array.from({ length: count }, (_, index) => (
+                <Skeleton className="h-8 w-full rounded-lg" key={index} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+          <Skeleton className="size-7 rounded-md" />
+          <Skeleton className="h-4 w-36" />
+          <div className="ml-auto flex items-center gap-2">
+            <Skeleton className="size-9 rounded-lg" />
+            <Skeleton className="size-9 rounded-lg" />
+            <SkeletonCircle size={32} />
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

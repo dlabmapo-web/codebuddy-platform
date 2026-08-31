@@ -10,7 +10,9 @@ import {
 } from "../../memberships/academy.js";
 import {
   acceptAcademyInvitationSchema,
+  academyInvitationPreviewSchema,
   createAcademyInvitationSchema,
+  previewAcademyInvitationSchema,
   revokeAcademyInvitationSchema,
 } from "../../memberships/invitation.js";
 import {
@@ -77,6 +79,18 @@ export const academyInvitationsContract = {
   accept: oc
     .input(acceptAcademyInvitationSchema)
     .output(academyMemberSchema),
+  /**
+   * Unauthenticated on purpose: it is read before anybody has an account.
+   *
+   * The recipient of an invitation may already have a Cove account or may not,
+   * and until this existed the link guessed — signed out meant "send them to
+   * signup" — which stranded everyone in the first group at a form that could
+   * only reject them. The answer to the guess is to stop guessing and let the
+   * invitation say what it is, so the page can offer both doors.
+   */
+  preview: oc
+    .input(previewAcademyInvitationSchema)
+    .output(academyInvitationPreviewSchema),
 };
 
 export const academyMembersContract = {

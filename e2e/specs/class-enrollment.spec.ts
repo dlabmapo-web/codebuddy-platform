@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -24,15 +25,15 @@ const CLASS_NAME = `Playwright Cohort ${Date.now()}`;
 const SANDBOX_COURSE = 'Manual Testing Sandbox';
 const E2E_COURSE = 'E2E Python Basics';
 
-let academyId = '';
+let academySlug = '';
 let classId = '';
 
 async function signIn(page: Page, email: string) {
-  academyId = await signInAs({ page, identifier: email, password: PASSWORD });
+  academySlug = await signInAs({ page, identifier: email, password: PASSWORD });
 }
 
 function classesUrl() {
-  return `/studio/academies/${academyId}/classes`;
+  return routes.academyClasses(academySlug);
 }
 
 test('a team lead creates a class and assigns more than one course', async ({
@@ -90,7 +91,7 @@ test('a manager enrolls a student', async ({ page }) => {
 
 test('the student sees the newly assigned course', async ({ page }) => {
   await signIn(page, STUDENT_EMAIL);
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
 
   // Reached only through the class created above; the student journey fixture
   // never assigns the sandbox course.
@@ -112,7 +113,7 @@ test('archiving the class revokes its access path, restoring returns it', async 
   const studentContext = await browser.newContext();
   const studentPage = await studentContext.newPage();
   await signIn(studentPage, STUDENT_EMAIL);
-  await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
+  await studentPage.goto(routes.academyLearnCourses(academySlug));
   await expect(
     studentPage.getByRole('heading', { name: SANDBOX_COURSE }),
   ).toHaveCount(0);
@@ -134,7 +135,7 @@ test('removing the course revokes access, reassigning restores the same work', a
   const studentContext = await browser.newContext();
   const studentPage = await studentContext.newPage();
   await signIn(studentPage, STUDENT_EMAIL);
-  const catalog = `/studio/academies/${academyId}/learn/courses`;
+  const catalog = routes.academyLearnCourses(academySlug);
 
   await signIn(page, MANAGER_EMAIL);
   await page.goto(`${classesUrl()}/${classId}`);
@@ -189,7 +190,7 @@ test('a direct URL cannot bypass the assignment check', async ({
   const studentPage = await studentContext.newPage();
   await signIn(studentPage, STUDENT_EMAIL);
   await studentPage.goto(
-    `/studio/academies/${academyId}/learn/courses/${courseId}`,
+    routes.academyLearnCourse(academySlug, courseId),
   );
 
   // The response must not name the course it is refusing.

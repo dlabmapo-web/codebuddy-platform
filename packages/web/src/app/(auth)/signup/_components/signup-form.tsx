@@ -13,6 +13,7 @@ import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
 import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { signupSubmitBlock } from '../../_lib/submit-block';
 import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import { useSignupAcademies } from '../_hooks/use-signup-academies';
 import { AcademySelectorField } from './academy-selector-field';
@@ -37,6 +38,23 @@ export function SignupForm({
   // your email" notice. Only the second is an answer, and only the second
   // releases the button.
   const submission = useAuthSubmission(state, pending);
+
+  // Three independent reasons used to collapse into one dead button, and a
+  // person looking at it could not tell whether they were waiting on the
+  // security check or had simply not picked an academy yet. The button still
+  // refuses; it just says which of them it is waiting for. A spent form gets
+  // no hint — the message above it already is one.
+  const block = signupSubmitBlock({
+    succeeded: Boolean(state.success),
+    academyId: academies.academyId,
+    captchaRequired: Boolean(publicConfig.turnstileSiteKey),
+    captchaToken,
+  });
+  const blockedHint = block === 'academy_missing'
+    ? t('signup.choose_academy_first')
+    : block === 'captcha_pending'
+      ? t('captcha.pending')
+      : null;
 
   function submit(formData: FormData) {
     if (!submission.begin()) return;
@@ -121,14 +139,15 @@ export function SignupForm({
         <AuthSubmitButton
           busy={submission.busy}
           busyLabel={t('signup.submitting')}
-          disabled={
-            Boolean(state.success) ||
-            !academies.academyId ||
-            Boolean(publicConfig.turnstileSiteKey && !captchaToken)
-          }
+          disabled={block !== null}
         >
           {t('signup.submit')}
         </AuthSubmitButton>
+        {blockedHint ? (
+          <p aria-live="polite" className="text-[13px] text-sub">
+            {blockedHint}
+          </p>
+        ) : null}
       </form>
 
       <AuthDivider label={t('divider.or_continue_with')} />

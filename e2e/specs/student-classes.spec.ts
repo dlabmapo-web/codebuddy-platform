@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -29,16 +30,16 @@ const SECOND_CLASS = `Playwright Class ${Date.now()}`;
 const UNREGISTERED_CLASS = `Playwright Unregistered ${Date.now()}`;
 const E2E_COURSE = 'E2E Python Basics';
 
-let academyId = '';
+let academySlug = '';
 let secondClassId = '';
 let unregisteredClassId = '';
 
 async function signIn(page: Page, email: string) {
-  academyId = await signInAs({ page, identifier: email, password: PASSWORD });
+  academySlug = await signInAs({ page, identifier: email, password: PASSWORD });
 }
 
 function classesUrl() {
-  return `/studio/academies/${academyId}/learn/classes`;
+  return routes.academyLearnClasses(academySlug);
 }
 
 /** A class card, matched by the heading that names it. */
@@ -52,7 +53,7 @@ test('a manager sets up a second class for the same student', async ({
   page,
 }) => {
   await signIn(page, MANAGER_EMAIL);
-  await page.goto(`/studio/academies/${academyId}/classes`);
+  await page.goto(routes.academyClasses(academySlug));
 
   await page.getByRole('button', { name: /new class|새 반/i }).click();
   await page.getByRole('textbox').first().fill(SECOND_CLASS);
@@ -80,7 +81,7 @@ test('a manager sets up a second class for the same student', async ({
 
   // Active and in the same academy, but with no enrollment for the student.
   // This is the negative control for the student list and direct detail URL.
-  await page.goto(`/studio/academies/${academyId}/classes`);
+  await page.goto(routes.academyClasses(academySlug));
   await page.getByRole('button', { name: /new class|새 반/i }).click();
   await page.getByRole('textbox').first().fill(UNREGISTERED_CLASS);
   await page.getByRole('button', { name: /create and open|만들고 열기/i }).click();
@@ -95,8 +96,8 @@ test('a student lands on My Courses and finds both classes beside it', async ({
   await signIn(page, STUDENT_EMAIL);
 
   // Adding the second nav entry must not move where a student arrives.
-  await page.goto(`/studio/academies/${academyId}`);
-  await expect(page).toHaveURL(new RegExp(`${academyId}/learn/courses$`));
+  await page.goto(routes.academy(academySlug));
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/learn/courses$`));
 
   await page
     .getByRole('link', { name: /my classes|내 반/i })
@@ -145,7 +146,7 @@ test('My Courses still shows one card when two classes grant the course', async 
   page,
 }) => {
   await signIn(page, STUDENT_EMAIL);
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
 
   await expect(page.getByRole('heading', { name: E2E_COURSE })).toHaveCount(1);
 });
@@ -155,7 +156,7 @@ test('removing the enrollment removes the class and its remembered URL', async (
   browser,
 }) => {
   await signIn(page, MANAGER_EMAIL);
-  await page.goto(`/studio/academies/${academyId}/classes/${secondClassId}`);
+  await page.goto(routes.academyClass(academySlug, secondClassId));
   await page
     .getByRole('button', { name: new RegExp(`actions for ${STUDENT_NAME}|${STUDENT_NAME}.*작업`, 'i') })
     .click();
@@ -184,7 +185,7 @@ test('staff previewing curriculum get neither the link nor the pages', async ({
   page,
 }) => {
   await signIn(page, TEAM_LEAD_EMAIL);
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
 
   // A Team Lead holds `curriculum.read` and can walk the courses they wrote.
   // That is not a class to belong to.

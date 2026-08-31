@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -29,7 +30,7 @@ const TEACHER_NAME = 'Cove Teacher';
 const CLASS_NAME = 'E2E Cohort';
 const SUM_TITLE = 'Sum two numbers';
 
-let academyId = '';
+let academySlug = '';
 let studentContext: BrowserContext;
 let teacherContext: BrowserContext;
 let studentPage: Page;
@@ -88,7 +89,7 @@ test.beforeAll(async ({ browser }) => {
   studentPage = await studentContext.newPage();
   teacherPage = await teacherContext.newPage();
 
-  academyId = await signIn(studentPage, STUDENT_EMAIL);
+  academySlug = await signIn(studentPage, STUDENT_EMAIL);
   await signIn(teacherPage, TEACHER_EMAIL);
 });
 
@@ -98,7 +99,7 @@ test.afterAll(async () => {
 });
 
 test('the assigned teacher sees only their own classes', async () => {
-  await teacherPage.goto(`/studio/academies/${academyId}/teach/classes`);
+  await teacherPage.goto(routes.academyTeachClasses(academySlug));
   await expect(
     teacherPage.getByRole('heading', { name: CLASS_NAME }),
   ).toBeVisible();
@@ -113,8 +114,8 @@ test('a team lead cannot reach the teaching routes', async () => {
   const context = await teacherPage.context().browser()!.newContext();
   const page = await context.newPage();
   try {
-    const leadAcademyId = await signIn(page, TEAM_LEAD_EMAIL);
-    await page.goto(`/studio/academies/${leadAcademyId}/teach/classes`);
+    const leadAcademySlug = await signIn(page, TEAM_LEAD_EMAIL);
+    await page.goto(routes.academyTeachClasses(leadAcademySlug));
     // Denied, not merely empty: a Team Lead holds `classes.assigned.manage`
     // and must still be refused monitoring.
     await expect(page.getByText(/not available|이용할 수 없습니다/i)).toBeVisible();
@@ -128,8 +129,8 @@ test('a student appears live when the teacher opened the roster first', async ()
   // Open the teacher's socket room while the student is outside an exercise.
   // This is the ordering that snapshots alone cannot cover: the row has to
   // change from a presence delta without a teacher navigation or reload.
-  await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
-  await teacherPage.goto(`/studio/academies/${academyId}/teach/classes`);
+  await studentPage.goto(routes.academyLearnCourses(academySlug));
+  await teacherPage.goto(routes.academyTeachClasses(academySlug));
   await teacherPage.getByRole('heading', { name: CLASS_NAME }).click();
   await teacherPage.waitForURL(/\/teach\/classes\/[0-9a-f-]+$/, {
     timeout: 30_000,
@@ -796,7 +797,7 @@ test('student markers clear when the student leaves the problem page', async () 
     timeout: 30_000,
   });
 
-  await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
+  await studentPage.goto(routes.academyLearnCourses(academySlug));
 
   await expect(teacherPage.getByTestId('peer-pointer')).toHaveCount(0, {
     timeout: 30_000,

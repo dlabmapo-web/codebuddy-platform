@@ -1,0 +1,139 @@
+name: End-to-end
+
+# Separate from `ci.yml` on purpose. This is the only workflow that talks to a
+# real database, so it is the only one that can be slow, flaky, or destructive —
+# and keeping it apart means a browser hiccup never blocks a typecheck.
+on:
+  pull_request:
+  push:
+    branches: [main, feat/cove-studio-v2]
+  workflow_dispatch:
+
+concurrency:
+  # Never two at once: the suite creates academies and archives them by name in
+  # one shared development database. Overlapping runs would review each other's
+  # fixtures. Not cancel-in-progress — a half-finished run leaves fixtures
+  # behind, so it is allowed to reach its own cleanup.
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip cleanly when the suite has no database of its own, and refuse
+      # outright when it has the wrong one. Those are different situations and
+      # they must not share an outcome.
+      #
+      # Missing secrets are not a failure. Until somebody adds them this
+      # workflow has nothing to run against, and a red ✗ on every push for a
+      # setup step nobody has done yet teaches people to ignore CI — which
+      # costs more than the coverage is worth. It reports "skipped" and says
+      # how to switch it on.
+      #
+      # A *wrong* database is a failure, and a loud one. `NEXT_PUBLIC_SUPABASE_URL`
+      # already exists as a repository variable and points at the production
+      # project, and this suite signs in as seeded users, creates academies, and
+      # archives them. So the job reads its own `E2E_*` secrets and never falls
+      # back: pointed at production it would write to the database holding real
+      # students.
+      - name: Check for a development database
+        id: preflight
+        env:
+          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.E2E_DIRECT_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
+          PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          missing=""
+          for name in SUPABASE_URL DATABASE_URL DIRECT_URL \
+                      SUPABASE_SECRET_KEY PUBLISHABLE_KEY; do
+            [ -n "${!name}" ] || missing="$missing E2E_$name"
+          done
+          if [ -n "$missing" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::End-to-end tests skipped - no development database configured."
+            echo "To switch them on, add these repository secrets:$missing"
+            echo "Point them at the DEVELOPMENT Supabase project, never production."
+            exit 0
+          fi
+          # Independent of the above. Even with every secret set, a paste of the
+          # production project id must not start a run against real student data.
+          case "$SUPABASE_URL" in
+            *sfesugoedobirmeqjcvp*)
+              echo "::error::E2E_SUPABASE_URL points at the production project. Refusing to run."
+              exit 1
+              ;;
+          esac
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.preflight.outputs.configured == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.preflight.outputs.configured == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        if: steps.preflight.outputs.configured == 'true'
+
+      - name: Build shared packages
+        if: steps.preflight.outputs.configured == 'true'
+        run: pnpm --filter @cove/shared --filter @cove/i18n build
+
+      - name: Generate Prisma client
+        if: steps.preflight.outputs.configured == 'true'
+        run: pnpm --filter @cove/api db:generate
+
+      - name: Install Playwright browsers
+        if: steps.preflight.outputs.configured == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the suite
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          # The API reads these from the environment; `db:seed` refuses to run
+          # unless NODE_ENV is development, which is a second guard on top of
+          # the project check above.
+          NODE_ENV: development
+          DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.E2E_DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.E2E_SUPABASE_SECRET_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api/rpc
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          # Cloudflare's documented always-pass key. The suite exercises the
+          # real widget rather than switching CAPTCHA off, so the sign-in path
+          # under test is the one people actually meet.
+          E2E_TURNSTILE_SITE_KEY: '1x00000000000000000000AA'
+          REDIS_URL: redis://localhost:6379
+          CI: 'true'
+        run: pnpm e2e
+
+      - name: Upload the report
+        if: ${{ !cancelled() && steps.preflight.outputs.configured == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+    services:
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5

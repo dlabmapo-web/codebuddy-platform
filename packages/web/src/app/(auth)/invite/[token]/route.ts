@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { publicConfig } from '@/lib/config';
-import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -14,18 +13,17 @@ export async function GET(
     return NextResponse.redirect(new URL('/login?error=invitation', publicConfig.siteUrl));
   }
 
-  const academyId = request.nextUrl.searchParams.get('academy');
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const destination = data?.claims
-    ? new URL('/invite', publicConfig.siteUrl)
-    : new URL('/signup', publicConfig.siteUrl);
-  if (!data?.claims && academyId) {
-    destination.searchParams.set('invited', '1');
-    destination.searchParams.set('academy', academyId);
-  }
-
-  const response = NextResponse.redirect(destination);
+  // One destination, signed in or not.
+  //
+  // This used to branch: a visitor with no session was sent to `/signup`, on
+  // the assumption that somebody being invited has no account yet. That is a
+  // guess, and it is wrong for exactly the people it strands — a manager who
+  // already has a Cove account from another academy met a form that could only
+  // reject them, with no sentence anywhere saying why. `/invite` reads the
+  // invitation and offers both doors instead of choosing one for them.
+  const response = NextResponse.redirect(
+    new URL('/invite', publicConfig.siteUrl),
+  );
   response.cookies.set('cove_invitation', token, {
     httpOnly: true,
     maxAge: 60 * 60,

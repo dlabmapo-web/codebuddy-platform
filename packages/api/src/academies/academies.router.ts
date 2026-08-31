@@ -96,6 +96,19 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.academyInvitationService.revoke(context.identity, input)
         ),
+      // No `access.authenticated`: read before an account exists. Limited by
+      // address rather than by identity for the same reason — there is no
+      // identity yet — and tightly, since a legitimate recipient reads one
+      // invitation a handful of times while a scanner would need billions.
+      preview: os.academyInvitations.preview
+        .handler(({ context, input }) => {
+          deps.rateLimitService.assert(
+            `invitation:preview:${requestAddress(context.req)}`,
+            30,
+            10 * 60_000,
+          );
+          return deps.academyInvitationService.preview(input.token);
+        }),
       accept: os.academyInvitations.accept
         .use(access.authenticated)
         .handler(({ context, input }) => {

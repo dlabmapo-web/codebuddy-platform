@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 test.describe.configure({ mode: 'serial' });
@@ -31,7 +32,7 @@ async function signInAsOperator(page: Page) {
     page,
     identifier: ADMIN,
     password: PASSWORD,
-    landing: /\/platform/,
+    landing: /\/admin/,
   });
 }
 
@@ -43,7 +44,7 @@ test('an operator signing in lands on the console, not the welcome page', async 
   // The bug this guards: an operator belongs to no academy by design, so the
   // membership-only routing sent them to a screen telling them to ask a
   // manager for an invitation they do not need.
-  await expect(page).toHaveURL(/\/platform$/);
+  await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Academies', level: 1 }))
     .toBeVisible();
   await expect(page.getByRole('link', { name: /New academy/ })).toBeVisible();
@@ -53,14 +54,14 @@ test('the console offers a way back to the operator’s own account', async ({
   page,
 }) => {
   await signInAsOperator(page);
-  await page.goto('/platform');
+  await page.goto(routes.admin);
 
   // An operator with no academy has no sidebar and no academy switcher. Without
   // this link the console is somewhere they can reach and never leave.
   await page.getByRole('link', { name: /my page|마이 페이지/i }).click();
-  await expect(page).toHaveURL(/\/studio\/my-page/);
+  await expect(page).toHaveURL(/\/account/);
   await page.getByRole('link', { name: /back|스튜디오/i }).first().click();
-  await expect(page).toHaveURL(/\/platform$/);
+  await expect(page).toHaveURL(/\/admin$/);
 
   // And the sidebar carries the sign-out every other Cove surface has.
   await expect(page.getByRole('button', { name: /sign out|로그아웃/i }))
@@ -69,7 +70,7 @@ test('the console offers a way back to the operator’s own account', async ({
 
 test('creating an academy invites its first manager', async ({ page }) => {
   await signInAsOperator(page);
-  await page.goto('/platform/academies/new');
+  await page.goto(routes.adminAcademyNew);
 
   await page.getByLabel('Academy name').fill(academy.name);
   // The slug is proposed from the name and must be visible before submit,
@@ -91,16 +92,16 @@ test('creating an academy invites its first manager', async ({ page }) => {
   const link = page.getByLabel('Invitation link');
   await expect(link).toBeVisible();
   invitationLink = await link.inputValue();
-  expect(invitationLink).toContain('/auth/invitations/');
+  expect(invitationLink).toContain('/invite/');
 
   await page.getByRole('link', { name: 'Open academy' }).click();
-  await expect(page).toHaveURL(/\/platform\/academies\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/admin\/academies\/[a-z0-9-]+$/);
   academyUrl = new URL(page.url()).pathname;
 });
 
 test('a new academy waits for its manager in the roll call', async ({ page }) => {
   await signInAsOperator(page);
-  await page.goto('/platform');
+  await page.goto(routes.admin);
 
   const row = page.getByRole('listitem').filter({ hasText: academy.name });
   await expect(row).toBeVisible();
@@ -198,7 +199,7 @@ test('archiving is terminal and leaves no way back', async ({ page }) => {
 
   // And it drops out of the roll call: an archived academy is finished, not
   // something anybody needs to act on.
-  await page.goto('/platform');
+  await page.goto(routes.admin);
   await expect(
     page.getByRole('listitem').filter({ hasText: academy.name }),
   ).toHaveCount(0);
@@ -215,7 +216,7 @@ test('the console is invisible to everyone who is not an operator', async ({
   await signInAs({ page, identifier: STUDENT, password: PASSWORD });
 
   // 404, not 403: a non-admin should not learn the surface exists.
-  const response = await page.goto('/platform');
+  const response = await page.goto(routes.admin);
   expect(response?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'Academies', level: 1 }))
     .toHaveCount(0);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -27,7 +28,7 @@ const acceptedPanel = /If an account exists for this username|이 아이디로 �
 const submitLabel = /Send reset link|재설정 링크 보내기/;
 
 async function requestRecovery(page: Page, username: string): Promise<string> {
-  await page.goto('/auth/forgot');
+  await page.goto(routes.forgotPassword);
   await page.locator('input[name="username"]').fill(username);
   const submit = page.getByRole('button', { name: submitLabel });
   await expect(submit).toBeEnabled();
@@ -50,7 +51,7 @@ test('a known and an unknown username produce the same answer', async ({ page })
 });
 
 test('a malformed username is rejected without asking the server', async ({ page }) => {
-  await page.goto('/auth/forgot');
+  await page.goto(routes.forgotPassword);
   await page.locator('input[name="username"]').fill('min');
   const submit = page.getByRole('button', { name: submitLabel });
   await expect(submit).toBeEnabled();
@@ -108,7 +109,7 @@ test('opening a recovery link does not spend its token', async ({ page }) => {
 
 test('an ordinary signed-in session cannot reach the reset form', async ({ page }) => {
   await signInAs({ page, identifier: STUDENT, password: PASSWORD });
-  await page.goto('/auth/reset-password');
+  await page.goto(routes.resetPassword);
 
   await expect(
     page.getByRole('heading', { name: /cannot be used|사용할 수 없는/ }),
@@ -124,7 +125,7 @@ test('Kakao is absent from sign in and sign up while its flag is off', async ({
     'Kakao is enabled in this environment.',
   );
 
-  for (const path of ['/auth/login', '/auth/signup']) {
+  for (const path of ['/login', '/signup']) {
     await page.goto(path);
     await expect(page.getByRole('button', { name: /Google/ })).toBeVisible();
 

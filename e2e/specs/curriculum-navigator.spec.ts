@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -21,7 +22,7 @@ const COURSE_TITLE = 'E2E Python Basics';
 const EXERCISE_TITLE = 'Echo the input';
 
 async function openWorkspace(page: Page) {
-  const academyId = await signInAs({
+  const academySlug = await signInAs({
     page,
     identifier: STUDENT_USERNAME,
     password: STUDENT_PASSWORD,
@@ -30,7 +31,7 @@ async function openWorkspace(page: Page) {
   // Start from the course list explicitly rather than from wherever signing in
   // happens to land. A student now arrives on their academy overview, which
   // has no course link for this filter to find.
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })

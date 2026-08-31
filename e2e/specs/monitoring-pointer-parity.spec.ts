@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -28,7 +29,7 @@ const CLASS_NAME = 'E2E Cohort';
 /** The hinted exercise: the two roles used to render it at different heights. */
 const HINTED_TITLE = 'Echo the input';
 
-let academyId = '';
+let academySlug = '';
 let studentContext: BrowserContext;
 let teacherContext: BrowserContext;
 let studentPage: Page;
@@ -53,7 +54,7 @@ test.beforeAll(async ({ browser }) => {
   studentPage = await studentContext.newPage();
   teacherPage = await teacherContext.newPage();
 
-  academyId = await signInAs({
+  academySlug = await signInAs({
     page: studentPage,
     identifier: STUDENT_EMAIL,
     password: PASSWORD,
@@ -71,8 +72,8 @@ test.afterAll(async () => {
 });
 
 test('the teacher opens a live watch on the hinted exercise', async () => {
-  await studentPage.goto(`/studio/academies/${academyId}/learn/courses`);
-  await teacherPage.goto(`/studio/academies/${academyId}/teach/classes`);
+  await studentPage.goto(routes.academyLearnCourses(academySlug));
+  await teacherPage.goto(routes.academyTeachClasses(academySlug));
   await teacherPage.getByRole('heading', { name: CLASS_NAME }).click();
   await teacherPage.waitForURL(/\/teach\/classes\/[0-9a-f-]+$/, {
     timeout: 30_000,

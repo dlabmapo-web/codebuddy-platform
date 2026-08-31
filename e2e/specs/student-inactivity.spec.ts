@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 const PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
@@ -34,12 +35,12 @@ test('student warning, continuation, cross-tab activity, video, and expiry', asy
 
   await page.clock.install({ time: startedAt });
   await installLeaseReply(page);
-  const academyId = await signInAs({
+  const academySlug = await signInAs({
     page,
     identifier: 'student@cove.test',
     password: PASSWORD,
   });
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await expect(page.getByTestId('inactivity-guard')).toHaveCount(1);
 
   // One minute past the boundary avoids coupling the browser assertion to the
@@ -54,7 +55,7 @@ test('student warning, continuation, cross-tab activity, video, and expiry', asy
   const second = await context.newPage();
   await second.clock.install({ time: startedAt });
   await installLeaseReply(second);
-  await second.goto(`/studio/academies/${academyId}/learn/courses`);
+  await second.goto(routes.academyLearnCourses(academySlug));
   await second.clock.fastForward(16 * minute);
 
   virtualNow += 16 * minute;
@@ -92,6 +93,6 @@ test('student warning, continuation, cross-tab activity, video, and expiry', asy
   await second.close();
   virtualNow += 31 * minute;
   await page.clock.fastForward(31 * minute);
-  await expect(page).toHaveURL(/\/auth\/login/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/login/, { timeout: 30_000 });
   await context.close();
 });

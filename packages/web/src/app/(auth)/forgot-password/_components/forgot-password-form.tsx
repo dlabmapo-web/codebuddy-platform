@@ -12,6 +12,7 @@ import { RecoverySteps } from '../../_components/recovery-steps';
 import { Spinner } from '../../_components/spinner';
 import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { loginSubmitBlock } from '../../_lib/submit-block';
 import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import {
   requestPasswordRecoveryAction,
@@ -47,6 +48,13 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
   const [challengeKey, setChallengeKey] = useState(0);
   const usernameRef = useRef<HTMLInputElement>(null);
   const accepted = state.status === 'accepted';
+  // The same reason the other two signed-out forms name. Recovery is where a
+  // person arrives already stuck, so a second unexplained dead button is the
+  // last thing that should meet them.
+  const waitingForCaptcha = loginSubmitBlock({
+    captchaRequired: Boolean(publicConfig.turnstileSiteKey),
+    captchaToken,
+  }) !== null;
 
   function submit(formData: FormData) {
     if (!submission.begin()) return;
@@ -127,10 +135,15 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
             <AuthSubmitButton
               busy={submission.busy}
               busyLabel={t('forgot.submitting')}
-              disabled={Boolean(publicConfig.turnstileSiteKey && !captchaToken)}
+              disabled={waitingForCaptcha}
             >
               {t('forgot.submit')}
             </AuthSubmitButton>
+            {waitingForCaptcha ? (
+              <p aria-live="polite" className="text-[13px] text-sub">
+                {t('captcha.pending')}
+              </p>
+            ) : null}
           </>
         )}
 
@@ -165,10 +178,7 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
             <button
               aria-busy={submission.busy}
               className="mt-6 inline-flex items-center gap-2 text-[15px] font-bold text-brand transition-colors hover:text-brand-deep disabled:text-sub/70"
-              disabled={
-                cooldown > 0 ||
-                Boolean(publicConfig.turnstileSiteKey && !captchaToken)
-              }
+              disabled={cooldown > 0 || waitingForCaptcha}
               type="submit"
             >
               {submission.busy ? <Spinner size={16} /> : null}
@@ -178,6 +188,14 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
                   ? t('forgot.submitting')
                   : t('forgot.resend')}
             </button>
+            {/* The cooldown speaks for itself in the label above; a stalled
+                challenge did not, and left the only control on this screen
+                dead and silent. */}
+            {waitingForCaptcha && cooldown === 0 ? (
+              <p aria-live="polite" className="mt-2 text-[13px] text-sub">
+                {t('captcha.pending')}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </form>

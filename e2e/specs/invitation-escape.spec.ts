@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 const PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
@@ -22,9 +23,9 @@ test('a stray invitation cookie never traps the next sign-in', async ({ page }) 
     page,
     identifier: ADMIN,
     password: PASSWORD,
-    landing: /\/platform/,
+    landing: /\/admin/,
   });
-  await page.goto('/platform/academies/new');
+  await page.goto(routes.adminAcademyNew);
   await page.getByLabel('Academy name').fill(`Escape ${suffix}`);
   await page.getByLabel('Address').fill(slug);
   await page.getByLabel('Time zone').selectOption('Asia/Seoul');
@@ -34,32 +35,32 @@ test('a stray invitation cookie never traps the next sign-in', async ({ page }) 
   await page.goto(link);
 
   // A student signs in on the same browser. The invitation is not theirs.
-  await page.goto('/auth/login');
+  await page.goto(routes.login);
   await page.locator('input[name="identifier"]').fill(STUDENT);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/auth\/invitation/);
+  await page.waitForURL(/\/invite/);
 
   // The way out, and it must land them where they actually belong.
   await page.getByRole('button', { name: /Not now/ }).click();
-  await page.waitForURL(/\/studio\/academies\//);
+  await page.waitForURL(/\/academy\//);
 
   // And the cookie is gone, so the next sign-in is not trapped either.
-  await page.goto('/auth/login');
+  await page.goto(routes.login);
   await page.locator('input[name="identifier"]').fill(STUDENT);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in|로그인/i }).click();
-  await page.waitForURL(/\/studio\/academies\//);
-  expect(page.url()).not.toContain('/auth/invitation');
+  await page.waitForURL(/\/academy\//);
+  expect(page.url()).not.toContain('/invite');
 
   // Leave nothing behind in the roll call.
   await signInAs({
     page,
     identifier: ADMIN,
     password: PASSWORD,
-    landing: /\/platform/,
+    landing: /\/admin/,
   });
-  await page.goto('/platform');
+  await page.goto(routes.admin);
   await page.getByPlaceholder(/Search/i).fill(slug);
   await page.getByRole('link', { name: /Open/ }).first().click();
   await page.getByRole('button', { name: 'Archive' }).click();

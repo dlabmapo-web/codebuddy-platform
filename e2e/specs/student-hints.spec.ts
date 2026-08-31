@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -32,7 +33,7 @@ const HINTS = [
 /** Seeded with no hints at all, which is its own branch of the design. */
 const UNHINTED_TITLE = 'Sum two numbers';
 
-let academyId = '';
+let academySlug = '';
 
 async function signIn(page: Page): Promise<string> {
   return signInAs({
@@ -51,7 +52,7 @@ async function signIn(page: Page): Promise<string> {
  * before it reached anything this file is about.
  */
 async function openExercise(page: Page, title: string) {
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
@@ -91,7 +92,7 @@ async function settledStatementHeight(page: Page): Promise<number> {
 }
 
 test.beforeEach(async ({ page }) => {
-  academyId = await signIn(page);
+  academySlug = await signIn(page);
 });
 
 test('one activation reveals one hint, in authored order', async ({ page }) => {

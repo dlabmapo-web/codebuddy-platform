@@ -5,6 +5,7 @@ import {
   type Page,
 } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -39,7 +40,7 @@ const HIDDEN_EXERCISE = 'Never visible to students';
 /** Seeded into every hidden test case. Must never reach the browser. */
 const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
 
-let academyId = '';
+let academySlug = '';
 let classId = '';
 let teacherContext: BrowserContext;
 let teacherPage: Page;
@@ -91,13 +92,13 @@ async function rpc(
 }
 
 function progressUrl(search = ''): string {
-  const base = `/studio/academies/${academyId}/teach/classes/${classId}/progress`;
+  const base = routes.academyTeachProgress(academySlug, classId);
   return search ? `${base}?${search}` : base;
 }
 
 /** Opens the class through the teaching list, the way a teacher arrives. */
 async function openClass(page: Page) {
-  await page.goto(`/studio/academies/${academyId}/teach/classes`);
+  await page.goto(routes.academyTeachClasses(academySlug));
   await page.getByRole('heading', { name: CLASS_NAME }).click();
   await page.waitForURL(/\/teach\/classes\/[0-9a-f-]+$/, { timeout: 30_000 });
   classId = /\/teach\/classes\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? '';
@@ -111,7 +112,7 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(240_000);
   teacherContext = await browser.newContext();
   teacherPage = await teacherContext.newPage();
-  academyId = await signIn(teacherPage, TEACHER_EMAIL);
+  academySlug = await signIn(teacherPage, TEACHER_EMAIL);
   await openClass(teacherPage);
   await teacherPage.goto(progressUrl(), { timeout: 180_000 });
   await expect(teacherPage.getByTestId('progress-students')).toBeVisible({
@@ -125,7 +126,7 @@ test.afterAll(async () => {
 
 test('the class links its two destinations and Solution status opens on the roster', async () => {
   const page = teacherPage;
-  await page.goto(`/studio/academies/${academyId}/teach/classes/${classId}`);
+  await page.goto(routes.academyTeachClass(academySlug, classId));
   await page.getByRole('link', { name: /solution status|풀이 현황/i }).click();
   await page.waitForURL(/\/progress$/, { timeout: 30_000 });
 
@@ -318,7 +319,7 @@ test('another teacher cannot open the class or guess its detail URLs', async ({
 
     // And the server says the same thing when asked without a page.
     const denied = await rpc(page, 'teacherProgress/listStudents', {
-      academyId,
+      academySlug,
       classId,
     });
     expect(denied.status).toBeGreaterThanOrEqual(400);
@@ -334,10 +335,10 @@ test('a team lead does not gain the teacher workspace', async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
-    const leadAcademyId = await signIn(page, TEAM_LEAD_EMAIL);
+    const leadAcademySlug = await signIn(page, TEAM_LEAD_EMAIL);
     // `classes.assigned.manage` alone is not the rule; being the teacher is.
     const denied = await rpc(page, 'teacherProgress/listStudents', {
-      academyId: leadAcademyId,
+      academySlug: leadAcademySlug,
       classId,
     });
     expect(denied.status).toBeGreaterThanOrEqual(400);
@@ -364,7 +365,7 @@ test('reassigning the class revokes the teacher on their next request', async ({
 
     await signIn(managerPage, MANAGER_EMAIL);
     const before = await rpc(managerPage, 'academyClasses/get', {
-      academyId,
+      academySlug,
       classId,
     });
     const original = before.body as {
@@ -375,7 +376,7 @@ test('reassigning the class revokes the teacher on their next request', async ({
     expect(original.updatedAt).toBeTruthy();
 
     const teachers = await rpc(managerPage, 'academyClasses/listEligibleTeachers', {
-      academyId,
+      academySlug,
       classId,
     });
     const replacement = (
@@ -386,7 +387,7 @@ test('reassigning the class revokes the teacher on their next request', async ({
     expect(replacement).toBeTruthy();
 
     const reassigned = await rpc(managerPage, 'academyClasses/setTeacher', {
-      academyId,
+      academySlug,
       classId,
       teacherMembershipId: replacement!.membershipId,
       expectedUpdatedAt: original.updatedAt,
@@ -396,7 +397,7 @@ test('reassigning the class revokes the teacher on their next request', async ({
 
     // The already-open teacher is refused on the very next read.
     const revoked = await rpc(teacherPage, 'teacherProgress/listStudents', {
-      academyId,
+      academySlug,
       classId,
     });
     expect(revoked.status).toBeGreaterThanOrEqual(400);
@@ -406,11 +407,11 @@ test('reassigning the class revokes the teacher on their next request', async ({
 
     // Put the fixture back before anything else reads it.
     const current = await rpc(managerPage, 'academyClasses/get', {
-      academyId,
+      academySlug,
       classId,
     });
     const restore = await rpc(managerPage, 'academyClasses/setTeacher', {
-      academyId,
+      academySlug,
       classId,
       teacherMembershipId: originalMembershipId,
       expectedUpdatedAt: (current.body as { updatedAt?: string }).updatedAt,
@@ -422,7 +423,7 @@ test('reassigning the class revokes the teacher on their next request', async ({
       .poll(
         async () =>
           (await rpc(teacherPage, 'teacherProgress/listStudents', {
-            academyId,
+            academySlug,
             classId,
           })).status,
         { timeout: 15_000 },
@@ -432,11 +433,11 @@ test('reassigning the class revokes the teacher on their next request', async ({
     if (assignmentChanged && !restored && originalMembershipId !== undefined) {
       try {
         const current = await rpc(managerPage, 'academyClasses/get', {
-          academyId,
+          academySlug,
           classId,
         });
         const restore = await rpc(managerPage, 'academyClasses/setTeacher', {
-          academyId,
+          academySlug,
           classId,
           teacherMembershipId: originalMembershipId,
           expectedUpdatedAt: (current.body as { updatedAt?: string }).updatedAt,

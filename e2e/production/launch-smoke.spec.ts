@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
+
 const studioUrl = process.env.PRODUCTION_BASE_URL!;
 const homeUrl = process.env.PRODUCTION_HOME_URL!;
 const apiUrl = process.env.PRODUCTION_API_URL!;
@@ -41,8 +43,8 @@ async function signIn(page: Page, role: ProductionRole) {
   const destination = role === 'admin'
     ? /\/admin(?:\/|$)/
     : role === 'student'
-      ? new RegExp(`/academy/${academySlug}/learn/courses(?:/|$)`)
-      : new RegExp(`/academy/${academySlug}(?:/|$)`);
+      ? new RegExp(`${routes.academyLearnCourses(academySlug)}(?:/|$)`)
+      : new RegExp(`${routes.academy(academySlug)}(?:/|$)`);
   await page.waitForURL(destination, { timeout: 30_000 });
 }
 
@@ -73,14 +75,14 @@ for (const role of ['student', 'teacher', 'team_lead', 'manager', 'admin'] as co
 
 test('student can open the migrated course catalog without a server error', async ({ page }) => {
   await signIn(page, 'student');
-  await page.goto(`${studioUrl}/academy/${academySlug}/learn/courses`);
+  await page.goto(`${studioUrl}${routes.academyLearnCourses(academySlug)}`);
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/could not load|server error/i);
 });
 
 test('manager can open migrated curriculum without output validation failure', async ({ page }) => {
   await signIn(page, 'manager');
-  await page.goto(`${studioUrl}/academy/${academySlug}/content/courses`);
+  await page.goto(`${studioUrl}${routes.academyCourses(academySlug)}`);
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/could not load|output validation failed/i);
 });

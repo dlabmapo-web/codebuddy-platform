@@ -165,6 +165,47 @@ export class AcademyInvitationService {
     });
   }
 
+  /**
+   * What the link says about itself, for somebody who is not signed in.
+   *
+   * Deliberately unauthenticated. The whole point is to be readable before an
+   * account exists — that is the moment the recipient has to decide whether to
+   * sign in or sign up, and the moment they need to be told which address the
+   * invitation was sent to.
+   *
+   * Possession of the token is the authorization. It is 32 random bytes, only
+   * its hash is stored, it dies in seven days, and it is single-use; what it
+   * discloses is one academy name, one role, and the address its holder was
+   * already emailed at. A caller without the token learns nothing, because
+   * there is nothing here to enumerate.
+   */
+  async preview(token: string) {
+    const invitation = await this.prisma.academyInvitation.findUnique({
+      where: { tokenHash: hashInvitationToken(token) },
+      select: {
+        academyId: true,
+        email: true,
+        role: true,
+        status: true,
+        expiresAt: true,
+        academy: { select: { name: true } },
+      },
+    });
+    if (!invitation || invitation.status !== "PENDING") {
+      throw new AppException("INVITATION_INVALID", HttpStatus.NOT_FOUND);
+    }
+    if (invitation.expiresAt <= new Date()) {
+      throw new AppException("INVITATION_EXPIRED", HttpStatus.GONE);
+    }
+    return {
+      academyId: invitation.academyId,
+      academyName: invitation.academy.name,
+      email: invitation.email,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt.toISOString(),
+    };
+  }
+
   async accept(identity: SupabaseIdentity, token: string) {
     if (!identity.emailVerified || !identity.email) {
       throw new AppException(

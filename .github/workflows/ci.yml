@@ -50,6 +50,12 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
+      # `pnpm -r typecheck` walks workspace packages, and `e2e/` is not one, so
+      # nothing had ever compiled the suite. It shipped a real type error for
+      # months as a result.
+      - name: Typecheck end-to-end suite
+        run: pnpm typecheck:e2e
+
       - name: Lint
         run: pnpm -r lint
 

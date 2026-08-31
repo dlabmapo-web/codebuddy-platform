@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -29,16 +30,16 @@ const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000/api/rpc';
 const FIRST_CLASS = `Playwright Teaching A ${Date.now()}`;
 const SECOND_CLASS = `Playwright Teaching B ${Date.now()}`;
 
-let academyId = '';
+let academySlug = '';
 let firstClassId = '';
 let secondClassId = '';
 
 async function signIn(page: Page, email: string) {
-  academyId = await signInAs({ page, identifier: email, password: PASSWORD });
+  academySlug = await signInAs({ page, identifier: email, password: PASSWORD });
 }
 
 function classesUrl() {
-  return `/studio/academies/${academyId}/classes`;
+  return routes.academyClasses(academySlug);
 }
 
 /**
@@ -100,7 +101,10 @@ async function createClass(page: Page, name: string): Promise<string> {
 }
 
 /** Picks a teacher in the assignment dialog and saves. */
-async function assignTeacher(page: Page, name: string) {
+// `string | RegExp` because both callers pass a RegExp, which is what
+// `getByRole` accepts anyway. Narrowing it to `string` never failed a run:
+// nothing typechecked this directory until it had a tsconfig.
+async function assignTeacher(page: Page, name: string | RegExp) {
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox').click();
   await page.getByRole('option', { name }).click();
@@ -196,7 +200,7 @@ test('a teacher cannot manage assignments through the UI or the API', async ({
 
   // And the button being absent is not the boundary — the server is.
   const denied = await rpc(page, 'academyClasses/setTeacher', {
-    academyId,
+    academySlug,
     classId: firstClassId,
     teacherMembershipId: null,
     expectedUpdatedAt: new Date().toISOString(),
@@ -205,7 +209,7 @@ test('a teacher cannot manage assignments through the UI or the API', async ({
   expect(denied.body.code).toBe('PERMISSION_DENIED');
 
   const listed = await rpc(page, 'academyClasses/listEligibleTeachers', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   expect(listed.body.code).toBe('PERMISSION_DENIED');
@@ -216,14 +220,14 @@ test('an ineligible membership cannot be assigned', async ({ page }) => {
   await page.goto(`${classesUrl()}/${firstClassId}`);
 
   const detail = await rpc(page, 'academyClasses/get', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   const revision = detail.body.updatedAt as string;
 
   // A real, same-academy membership that is simply not a teacher.
   const students = await rpc(page, 'academyClasses/listEligibleStudents', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   const studentMembershipId = (
@@ -232,7 +236,7 @@ test('an ineligible membership cannot be assigned', async ({ page }) => {
   expect(studentMembershipId).toBeTruthy();
 
   const wrongRole = await rpc(page, 'academyClasses/setTeacher', {
-    academyId,
+    academySlug,
     classId: firstClassId,
     teacherMembershipId: studentMembershipId,
     expectedUpdatedAt: revision,
@@ -242,7 +246,7 @@ test('an ineligible membership cannot be assigned', async ({ page }) => {
   // A membership this academy has never seen answers identically, so the
   // caller cannot use the error to probe for one that exists elsewhere.
   const unknown = await rpc(page, 'academyClasses/setTeacher', {
-    academyId,
+    academySlug,
     classId: firstClassId,
     teacherMembershipId: '11111111-1111-4111-8111-111111111111',
     expectedUpdatedAt: revision,
@@ -258,14 +262,14 @@ test('two stale dialogs cannot silently overwrite each other', async ({
   await page.goto(`${classesUrl()}/${firstClassId}`);
 
   const detail = await rpc(page, 'academyClasses/get', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   // The revision both dialogs loaded before either of them saved.
   const stale = detail.body.updatedAt as string;
 
   const teachers = await rpc(page, 'academyClasses/listEligibleTeachers', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   const candidates = teachers.body.teachers as {
@@ -279,7 +283,7 @@ test('two stale dialogs cannot silently overwrite each other', async ({
   expect(first && second).toBeTruthy();
 
   const winner = await rpc(page, 'academyClasses/setTeacher', {
-    academyId,
+    academySlug,
     classId: firstClassId,
     teacherMembershipId: first!.membershipId,
     expectedUpdatedAt: stale,
@@ -287,7 +291,7 @@ test('two stale dialogs cannot silently overwrite each other', async ({
   expect(winner.status).toBe(200);
 
   const loser = await rpc(page, 'academyClasses/setTeacher', {
-    academyId,
+    academySlug,
     classId: firstClassId,
     teacherMembershipId: second!.membershipId,
     expectedUpdatedAt: stale,
@@ -296,7 +300,7 @@ test('two stale dialogs cannot silently overwrite each other', async ({
 
   // The first decision stands. The second is refused, never merged.
   const after = await rpc(page, 'academyClasses/get', {
-    academyId,
+    academySlug,
     classId: firstClassId,
   });
   expect(

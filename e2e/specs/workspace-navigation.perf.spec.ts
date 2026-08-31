@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -22,10 +23,10 @@ const SUM_TITLE = 'Sum two numbers';
  */
 const NAVIGATION_BUDGET_MS = 300;
 
-let academyId = '';
+let academySlug = '';
 
 async function signIn(page: Page) {
-  academyId = await signInAs({
+  academySlug = await signInAs({
     page,
     identifier: STUDENT_EMAIL,
     password: STUDENT_PASSWORD,
@@ -33,7 +34,7 @@ async function signIn(page: Page) {
 }
 
 async function openEcho(page: Page) {
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })

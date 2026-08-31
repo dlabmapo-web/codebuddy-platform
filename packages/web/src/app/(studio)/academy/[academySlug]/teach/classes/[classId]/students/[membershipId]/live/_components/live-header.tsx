@@ -31,7 +31,6 @@ const difficultyStyles = {
  * on?
  */
 export function LiveHeader({
-  academyId,
   classId,
   connection,
   context,
@@ -39,8 +38,8 @@ export function LiveHeader({
   exercise,
   liveStatus,
   unsaved,
+  answer,
 }: {
-  academyId: string;
   classId: string;
   connection: React.ComponentProps<typeof ConnectionBadge>['state'];
   context: MonitoringStudentContext;
@@ -56,6 +55,7 @@ export function LiveHeader({
   /** Where the student actually is, said separately from where the screen is. */
   liveStatus?: string;
   unsaved: boolean;
+  answer?: React.ReactNode;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -120,6 +120,7 @@ export function LiveHeader({
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        {answer}
         <span
           aria-live="polite"
           className={`text-[12px] font-semibold ${

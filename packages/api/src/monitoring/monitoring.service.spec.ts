@@ -29,6 +29,7 @@ const materialId = "80000000-0000-4000-8000-000000000001";
 const otherMaterialId = "80000000-0000-4000-8000-000000000002";
 const courseId = "90000000-0000-4000-8000-000000000001";
 const draftId = "a0000000-0000-4000-8000-000000000001";
+const visitId = "b0000000-0000-4000-8000-000000000001";
 const updatedAt = new Date("2026-08-04T09:00:00.000Z");
 
 const actor = { userId: teacherUserId, academyId, membershipId: teacherMembershipId };
@@ -196,6 +197,7 @@ function createService(options?: {
   studentSelfError?: AppException;
   materialError?: AppException;
   outline?: LearnCourseOutline | null;
+  visit?: { id: string; material: { programmingExercise: { solutionCode: string | null } | null } | null } | null;
 }) {
   const prisma = {
     class: {
@@ -219,12 +221,30 @@ function createService(options?: {
         options?.draft === undefined ? { id: draftId } : options.draft,
       ),
     },
+    programmingExercise: {
+      findUnique: vi.fn().mockResolvedValue({ solutionCode: "print('answer')\n" }),
+    },
+    teacherMonitoringVisit: {
+      findFirst: vi.fn().mockResolvedValue(
+        options?.visit === undefined
+          ? {
+              id: visitId,
+              material: {
+                programmingExercise: { solutionCode: "print('answer')\n" },
+              },
+            }
+          : options.visit,
+      ),
+    },
     teacherFeedback: {
       findMany: vi.fn().mockResolvedValue(options?.feedback ?? []),
       updateMany: vi
         .fn()
         .mockResolvedValue({ count: options?.readCount ?? 0 }),
     },
+    $transaction: vi.fn(async (callback: (tx: object) => Promise<unknown>) =>
+      callback({}),
+    ),
   } as unknown as PrismaService;
 
   const access = {
@@ -290,9 +310,16 @@ function createService(options?: {
       options?.outline === undefined ? courseOutline() : options.outline,
     ),
   } as unknown as CurriculumOutlineService;
+  const audit = { write: vi.fn().mockResolvedValue(undefined) };
 
   return {
-    service: new MonitoringService(prisma, access, broadcaster, curriculum),
+    service: new MonitoringService(
+      prisma,
+      access,
+      broadcaster,
+      curriculum,
+      audit as never,
+    ),
     curriculum: curriculum as unknown as Record<
       string,
       ReturnType<typeof vi.fn>
@@ -308,12 +335,14 @@ function createService(options?: {
       };
       material: { findFirst: ReturnType<typeof vi.fn> };
       exerciseDraft: { findUnique: ReturnType<typeof vi.fn> };
+      teacherMonitoringVisit: { findFirst: ReturnType<typeof vi.fn> };
       teacherFeedback: {
         findMany: ReturnType<typeof vi.fn>;
         updateMany: ReturnType<typeof vi.fn>;
       };
     },
     access: access as unknown as Record<string, ReturnType<typeof vi.fn>>,
+    audit,
   };
 }
 
@@ -461,6 +490,7 @@ describe("getStudentContext", () => {
     ]);
     expect(context.exercise?.exercise.hiddenTestCaseCount).toBe(1);
     expect(JSON.stringify(context)).not.toContain("999 1");
+    expect(context.exercise?.hasSolution).toBe(true);
   });
 
   it("names the draft room only once the student has a draft", async () => {
@@ -496,6 +526,62 @@ describe("getStudentContext", () => {
         classId,
         membershipId: studentMembershipId,
       }),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+  });
+});
+
+describe("getExerciseSolution", () => {
+  const input = {
+    academyId,
+    classId,
+    membershipId: studentMembershipId,
+    materialId,
+    visitId,
+  };
+
+  it("returns the answer only through the exact active visit and audits metadata", async () => {
+    const { service, prisma, audit } = createService();
+
+    await expect(service.getExerciseSolution(identity, input)).resolves.toEqual({
+      materialId,
+      solutionCode: "print('answer')\n",
+    });
+    expect(prisma.teacherMonitoringVisit.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: visitId,
+          teacherMembershipRef: teacherMembershipId,
+          studentMembershipRef: studentMembershipId,
+          materialId,
+          endedAt: null,
+        }),
+      }),
+    );
+    expect(audit.write).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "monitoring.exercise_solution.viewed",
+        targetId: materialId,
+      }),
+    );
+  });
+
+  it("refuses an ended, mismatched, or missing visit without returning code", async () => {
+    const { service } = createService({ visit: null });
+    await expect(
+      service.getExerciseSolution(identity, input),
+    ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+  });
+
+  it("refuses a legacy problem with no answer", async () => {
+    const { service } = createService({
+      visit: {
+        id: visitId,
+        material: { programmingExercise: { solutionCode: null } },
+      },
+    });
+    await expect(
+      service.getExerciseSolution(identity, input),
     ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
   });
 });

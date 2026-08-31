@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   academyPermissions,
+  academyRolePermissions,
   academyRoles,
   approvableRoles,
   canApproveAs,
@@ -62,7 +63,10 @@ describe("roleHasPermission", () => {
     expect(roleHasPermission("TEAM_LEAD", "ai-feedback-rules.manage")).toBe(true);
   });
 
-  it("makes managers read-only reviewers of curriculum", () => {
+  it("lets a manager author the curriculum a team lead authors", () => {
+    // An academy with no Team Lead is ordinary, not incomplete: on a small
+    // campus the Manager runs the curriculum too, and used to be able to open
+    // a course and change nothing in it.
     for (const permission of [
       "curriculum.draft",
       "curriculum.manage",
@@ -71,7 +75,36 @@ describe("roleHasPermission", () => {
       "content.import",
       "ai-feedback-rules.manage",
     ] as const) {
-      expect(roleHasPermission("MANAGER", permission)).toBe(false);
+      expect(roleHasPermission("MANAGER", permission)).toBe(true);
+    }
+  });
+
+  // The property, not the list. A permission added to the team lead set must
+  // reach a manager without a second edit — otherwise the two drift apart one
+  // forgotten line at a time, which is the failure this composition prevents.
+  it("keeps a manager a superset of a team lead", () => {
+    for (const permission of academyRolePermissions.TEAM_LEAD) {
+      expect(academyRolePermissions.MANAGER).toContain(permission);
+    }
+  });
+
+  it("does not hand a team lead the academy's own administration", () => {
+    for (const permission of [
+      "academy.settings.manage",
+      "academy.members.manage",
+      "class-enrollments.manage",
+      "class-schedule.manage",
+    ] as const) {
+      expect(roleHasPermission("TEAM_LEAD", permission)).toBe(false);
+      expect(roleHasPermission("MANAGER", permission)).toBe(true);
+    }
+  });
+
+  // Composition must not produce a role that holds the same permission twice.
+  it("lists every permission once per role", () => {
+    for (const role of academyRoles) {
+      const held = academyRolePermissions[role];
+      expect(new Set(held).size).toBe(held.length);
     }
   });
 

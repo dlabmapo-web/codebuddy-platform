@@ -12,6 +12,7 @@ import {
   deleteProgrammingExerciseSchema,
   exerciseAuthoringContextSchema,
   exerciseMaterialInputSchema,
+  exerciseSolutionSchema,
   deleteCourseModuleSchema,
   deleteLectureSchema,
   reorderCourseModulesSchema,
@@ -56,6 +57,9 @@ export const academyCoursesContract = {
   getExercise: oc
     .input(exerciseMaterialInputSchema)
     .output(exerciseAuthoringContextSchema),
+  getExerciseSolution: oc
+    .input(exerciseMaterialInputSchema)
+    .output(exerciseSolutionSchema),
   createExercise: oc
     .input(createProgrammingExerciseSchema)
     .output(exerciseAuthoringContextSchema),

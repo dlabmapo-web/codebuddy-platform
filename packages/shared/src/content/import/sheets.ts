@@ -78,6 +78,7 @@ export const problemColumns = [
   "output_format",
   "constraints",
   "starter_code",
+  "solution_code",
   "ai_feedback_enabled",
 ] as const;
 export type ProblemColumn = (typeof problemColumns)[number];
@@ -88,6 +89,7 @@ export const requiredProblemColumns: readonly ProblemColumn[] = [
   "title",
   "difficulty",
   "description",
+  "solution_code",
 ];
 
 export const testCaseColumns = [

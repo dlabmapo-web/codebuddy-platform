@@ -885,6 +885,7 @@ export class ContentImportService {
       outputFormat: planned.outputFormat,
       constraints: planned.constraints,
       starterCode: planned.starterCode,
+      solutionCode: planned.solutionCode,
       aiFeedbackEnabled: planned.aiFeedbackEnabled,
     };
 
@@ -1169,6 +1170,7 @@ function toProjection(course: CourseWithContent): CourseProjection {
               outputFormat: exercise.outputFormat,
               constraints: exercise.constraints,
               starterCode: exercise.starterCode,
+              solutionCode: exercise.solutionCode,
               aiFeedbackEnabled: exercise.aiFeedbackEnabled,
               testCases: exercise.testCases.map((testCase) => ({
                 position: testCase.position,

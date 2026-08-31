@@ -51,12 +51,14 @@
     },
     "basic_help": "기존 수동 문제 등록과 같은 항목을 숨겨진 단계 없이 한곳에서 작성합니다.",
     "code_help": "학생이 문제를 처음 열 때 보게 되는 선택 사항 코드입니다.",
+    "solution_code_help": "필수 Python 정답 코드입니다. 권한이 있는 문제 작성자와 배정된 학생을 실시간 모니터링 중인 교사만 볼 수 있습니다.",
     "language_python": "Python 3",
     "required": {
       "title": "문제 제목",
       "difficulty": "난이도",
       "description": "문제 설명",
-      "test": "공개 예시 1개"
+      "test": "공개 예시 1개",
+      "solution": "정답 코드"
     },
     "field": {
       "title": "문제 제목",
@@ -67,6 +69,7 @@
       "description": "문제 설명",
       "constraints": "조건 및 제약 사항 (선택)",
       "starter_code": "초기 코드 (에디터 기본값)",
+      "solution_code": "정답 코드",
       "input_format": "입력 형식 (선택)",
       "output_format": "출력 형식 (선택)",
       "is_visible": "학생에게 공개",
@@ -123,7 +126,8 @@
       "title": "문제 제목을 입력해주세요.",
       "difficulty": "난이도를 선택해주세요.",
       "description": "문제 설명을 입력해주세요.",
-      "test": "학생에게 공개할 예시 정답을 1개 이상 입력해주세요."
+      "test": "학생에게 공개할 예시 정답을 1개 이상 입력해주세요.",
+      "solution": "정답 코드를 입력해주세요."
     },
     "location": "문제 위치",
     "preview_format": "입출력 형식",

@@ -11,6 +11,8 @@ import {
   monitoringClassRosterSchema,
   monitoringClassSummarySchema,
   monitoringExercisePreviewSchema,
+  monitoringExerciseSolutionInputSchema,
+  monitoringExerciseSolutionSchema,
   monitoringFeedbackSchema,
   monitoringMaterialInputSchema,
   monitoringStudentContextInputSchema,
@@ -68,6 +70,9 @@ export const monitoringContract = {
   getExercisePreview: oc
     .input(monitoringMaterialInputSchema)
     .output(monitoringExercisePreviewSchema),
+  getExerciseSolution: oc
+    .input(monitoringExerciseSolutionInputSchema)
+    .output(monitoringExerciseSolutionSchema),
   listFeedback: oc.input(listFeedbackInputSchema).output(
     z.object({
       feedback: z.array(monitoringFeedbackSchema),

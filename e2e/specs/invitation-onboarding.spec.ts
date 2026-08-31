@@ -13,7 +13,7 @@ const EXISTING_EMAIL = 'student@cove.test';
 // or fail on a cookie nobody set deliberately.
 const CAPTCHA_UNAVAILABLE = /could not load|불러오지 못했습니다/;
 const CAPTCHA_RETRY = /Try the check again|보안 확인 다시 시도/;
-const CAPTCHA_PENDING = /Waiting for the security check|보안 확인이 끝나기를/;
+const CAPTCHA_PENDING = /Complete the security check|보안 확인을 완료/;
 const SIGN_IN_TO_ACCEPT = /Sign in to accept|로그인하고 수락/;
 const CREATE_AN_ACCOUNT = /Create an account|계정 만들기/;
 const CHOOSE_ACADEMY = /Choose your academy to continue|아카데미를 선택하세요/;

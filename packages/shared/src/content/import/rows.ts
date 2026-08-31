@@ -82,6 +82,8 @@ export type NormalizedProblemRow = RowLocation & {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  /** Null means the cell was blank; the planner applies legacy update rules. */
+  solutionCode: string | null;
   /** Null means the cell was blank: create as false, preserve on update. */
   aiFeedbackEnabled: boolean | null;
 };
@@ -531,6 +533,13 @@ export function readProblemsSheet(grid: SheetGrid): {
         issues,
         problemKey,
       ),
+      solutionCode: readSensitiveCode(
+        location,
+        get("solution_code"),
+        "solution_code",
+        issues,
+        problemKey,
+      ),
       aiFeedbackEnabled,
     });
   }
@@ -560,6 +569,21 @@ function readCode(
     issues.push(issue(location, "code_too_long", column, raw, entityKey));
   }
   return text;
+}
+
+/** Correct answers are never copied into issue previews or reports. */
+function readSensitiveCode(
+  location: RowLocation,
+  raw: string,
+  column: string,
+  issues: ContentImportIssue[],
+  entityKey: string | null,
+): string | null {
+  const text = normalizeCellText(raw);
+  if (text.length > CONTENT_IMPORT_MAX_CODE_LENGTH) {
+    issues.push(issue(location, "code_too_long", column, null, entityKey));
+  }
+  return text.trim().length > 0 ? text : null;
 }
 
 export function readTestCasesSheet(grid: SheetGrid): {

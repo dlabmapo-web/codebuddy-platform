@@ -67,6 +67,7 @@ export const contentImportErrorCodes = [
   "difficulty_missing",
   "difficulty_invalid",
   "description_missing",
+  "solution_code_missing",
   "description_format_invalid",
   "boolean_invalid",
   "order_missing",

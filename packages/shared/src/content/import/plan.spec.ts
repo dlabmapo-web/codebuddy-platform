@@ -37,6 +37,8 @@ const header = <Sheet extends keyof typeof contentImportColumns>(
   sheet: Sheet,
 ): string[] => [...contentImportColumns[sheet]];
 
+const fixtureSolution = "name = input()\nprint(f'Hello, {name}!')\n";
+
 function workbook(input: {
   structure?: string[][];
   problems?: string[][];
@@ -46,7 +48,14 @@ function workbook(input: {
 }) {
   return readWorkbookRows({
     Structure: [header("Structure"), ...(input.structure ?? [])],
-    Problems: [header("Problems"), ...(input.problems ?? [])],
+    Problems: [
+      header("Problems"),
+      ...(input.problems ?? []).map((row) =>
+        row.length === 12
+          ? [...row.slice(0, 11), fixtureSolution, ...row.slice(11)]
+          : row
+      ),
+    ],
     "Test Cases": [header("Test Cases"), ...(input.tests ?? [])],
     Hints: input.hints ? [header("Hints"), ...input.hints] : [],
     unknownSheets: input.unknownSheets,
@@ -95,6 +104,7 @@ const existingCourse: CourseProjection = {
               outputFormat: "A greeting.",
               constraints: "",
               starterCode: "name = input()\n",
+              solutionCode: fixtureSolution,
               aiFeedbackEnabled: false,
               testCases: [
                 {
@@ -219,6 +229,74 @@ describe("planContentImport", () => {
     // §12 — nothing arrives visible, at any level.
     expect(module.isVisible).toBe(false);
     expect(module.lectures[0].problems[0].isVisible).toBe(false);
+  });
+
+  it("blocks a new problem whose solution_code is blank", () => {
+    const plan = planContentImport({
+      workbook: workbook({
+        structure: [
+          ["PY-BASICS", "1", "Python Basics", "", "VARIABLES", "1", "Variables", ""],
+        ],
+        problems: [[
+          "VAR-001", "VARIABLES", "1", "Create a variable", "EASY",
+          "Greet.", "PLAIN_TEXT", "", "", "", "", "", "FALSE",
+        ]],
+        tests: [["VAR-001", "1", "Minji", "Hello, Minji!", "SAMPLE"]],
+      }),
+      course: courseWith(),
+    });
+
+    expect(collectPlanIssues(plan).map((issue) => issue.code)).toContain(
+      "solution_code_missing",
+    );
+    expect(
+      canCommitPlan({ counts: plan.counts, acknowledgeWarnings: false }),
+    ).toBe(false);
+  });
+
+  it("allows an untouched legacy problem without an answer but requires one when changed", () => {
+    const legacyCourse: CourseProjection = {
+      ...existingCourse,
+      modules: existingCourse.modules.map((module) => ({
+        ...module,
+        lectures: module.lectures.map((lecture) => ({
+          ...lecture,
+          problems: lecture.problems.map((problem) => ({
+            ...problem,
+            solutionCode: null,
+          })),
+        })),
+      })),
+    };
+    const blankSolutionRows = {
+      ...unchangedRows,
+      problems: unchangedRows.problems.map((row) => [
+        ...row.slice(0, 11),
+        "",
+        ...row.slice(11),
+      ]),
+    };
+
+    const unchanged = planContentImport({
+      workbook: workbook(blankSolutionRows),
+      course: legacyCourse,
+    });
+    expect(unchanged.counts.errors).toBe(0);
+
+    const changed = planContentImport({
+      workbook: workbook({
+        ...blankSolutionRows,
+        problems: blankSolutionRows.problems.map((row) => {
+          const next = [...row];
+          next[3] = "Changed title";
+          return next;
+        }),
+      }),
+      course: legacyCourse,
+    });
+    expect(collectPlanIssues(changed).map((issue) => issue.code)).toContain(
+      "solution_code_missing",
+    );
   });
 
   it("plans an untouched workbook as entirely unchanged", () => {

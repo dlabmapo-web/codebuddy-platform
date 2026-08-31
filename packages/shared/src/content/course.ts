@@ -19,6 +19,7 @@ export type TestCaseVisibility = z.infer<typeof testCaseVisibilitySchema>;
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(10_000);
 export const programmingExerciseDescriptionMaxLength = 500_000;
+export const programmingExerciseSolutionMaxLength = 100_000;
 const programmingExerciseDescriptionSchema = z
   .string()
   .max(programmingExerciseDescriptionMaxLength);
@@ -200,6 +201,12 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
+  solutionCode: z
+    .string()
+    .max(programmingExerciseSolutionMaxLength)
+    .refine((value) => value.trim().length > 0, {
+      error: "A correct answer is required.",
+    }),
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
   testCases: z.array(exerciseTestCaseDraftSchema).min(1).max(50),
@@ -237,6 +244,11 @@ export const createProgrammingExerciseSchema = exerciseParentInputSchema
 
 export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
   materialId: z.uuid(),
+});
+
+export const exerciseSolutionSchema = z.object({
+  materialId: z.uuid(),
+  solutionCode: z.string().nullable(),
 });
 
 /**

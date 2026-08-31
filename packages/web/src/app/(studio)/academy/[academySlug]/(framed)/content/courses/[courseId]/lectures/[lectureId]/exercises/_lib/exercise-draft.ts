@@ -26,6 +26,7 @@ export type ExerciseDraft = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  solutionCode: string;
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
   testCases: TestCaseDraft[];
@@ -40,6 +41,7 @@ export type ExerciseDraftUpdate = <K extends ExerciseDraftKey>(
 
 export function contextToDraft(
   context: ExerciseAuthoringContext,
+  solutionCode = '',
 ): ExerciseDraft {
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
@@ -51,6 +53,7 @@ export function contextToDraft(
       outputFormat: '',
       constraints: '',
       starterCode: '',
+      solutionCode,
       aiFeedbackEnabled: false,
       isVisible: false,
       testCases: [
@@ -73,6 +76,7 @@ export function contextToDraft(
     outputFormat: exercise.outputFormat,
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
+    solutionCode,
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
     isVisible: context.material!.isVisible,
     testCases: exercise.testCases.map((testCase) => ({
@@ -98,6 +102,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
+    solutionCode: draft.solutionCode,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
     testCases: draft.testCases
@@ -124,6 +129,7 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
       id: 'description',
       complete: richTextToPlainText(draft.description).length > 0,
     },
+    { id: 'solution', complete: draft.solutionCode.trim().length > 0 },
     {
       id: 'test',
       complete: hasSampleTestCase(draft.testCases),

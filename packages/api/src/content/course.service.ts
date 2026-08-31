@@ -92,6 +92,7 @@ type ExerciseWriteInput = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  solutionCode: string;
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
   testCases: Array<{
@@ -568,6 +569,29 @@ export class CourseService {
     return toExerciseAuthoringContext(await this.requireExercise(input));
   }
 
+  async getExerciseSolution(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      lectureId: string;
+      materialId: string;
+    },
+  ) {
+    await this.requireExerciseManager(identity, input.academyId);
+    const material = await this.requireExercise(input);
+    // A material that is not a programming exercise answers the same way a
+    // missing one does. The non-null assertion this replaces would have been a
+    // 500 the first time that assumption stopped holding.
+    if (!material.programmingExercise) {
+      throw new AppException("EXERCISE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    return {
+      materialId: material.id,
+      solutionCode: material.programmingExercise.solutionCode,
+    };
+  }
+
   async createExercise(
     identity: SupabaseIdentity,
     input: ExerciseWriteInput,
@@ -596,6 +620,7 @@ export class CourseService {
               outputFormat: input.outputFormat,
               constraints: input.constraints,
               starterCode: input.starterCode,
+              solutionCode: input.solutionCode,
               language: "PYTHON",
               timeLimitMs: 3000,
               memoryLimitMb: 256,
@@ -648,6 +673,7 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
+          solutionCode: input.solutionCode,
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged ? { gradingRevision: nextRevision } : {}),
         },
@@ -1061,6 +1087,7 @@ function exerciseAuditFromInput(
       (testCase) => testCase.visibility === "SAMPLE",
     ).length,
     hintCount: input.hints.length,
+    hasSolution: input.solutionCode.trim().length > 0,
   };
 }
 
@@ -1081,6 +1108,7 @@ function exerciseRecordAudit(record: ExerciseRecord) {
       (testCase) => testCase.visibility === "SAMPLE",
     ).length,
     hintCount: exercise.hints.length,
+    hasSolution: Boolean(exercise.solutionCode?.trim()),
   };
 }
 

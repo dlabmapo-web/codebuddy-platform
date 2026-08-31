@@ -68,6 +68,7 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
       "Test and hint rows replace the whole set for that problem. Leave a problem's tests in the file to keep them.",
       "New modules, lectures, and problems arrive hidden from students. Make them visible in the course builder.",
       "difficulty accepts EASY, MEDIUM, or HARD. visibility accepts SAMPLE or HIDDEN.",
+      "Every new or changed problem needs solution_code. It is the private correct Python answer teachers can reveal while monitoring.",
       "Do not rename the sheets or the header row.",
     ],
     versionLabel: "template_version",
@@ -90,6 +91,7 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
       "테스트와 힌트 행은 해당 문제의 전체 목록을 대체합니다. 유지하려면 파일에 그대로 두세요.",
       "새로 만든 모듈·강의·문제는 학생에게 숨겨진 상태로 추가됩니다. 코스 빌더에서 공개하세요.",
       "difficulty는 EASY, MEDIUM, HARD만 허용합니다. visibility는 SAMPLE 또는 HIDDEN입니다.",
+      "새 문제와 변경하는 모든 문제에는 solution_code가 필요합니다. 교사가 모니터링 중 확인할 수 있는 비공개 Python 정답입니다.",
       "시트 이름과 머리글 행은 바꾸지 마세요.",
     ],
     versionLabel: "template_version",
@@ -156,6 +158,7 @@ const sampleProblems: string[][] = [
     "One greeting line.",
     "The name is at most 50 characters.",
     "name = input()\n",
+    "name = input()\nprint(f'Hello, {name}!')\n",
     "FALSE",
   ],
   [
@@ -170,6 +173,7 @@ const sampleProblems: string[][] = [
     "The message, once per line.",
     "1 <= n <= 100",
     "message = input()\nn = int(input())\n",
+    "message = input()\nn = int(input())\nfor _ in range(n):\n    print(message)\n",
     "TRUE",
   ],
 ];
@@ -256,6 +260,7 @@ export function buildCurrentCourseWorkbook(input: {
           problem.outputFormat,
           problem.constraints,
           problem.starterCode,
+          problem.solutionCode ?? "",
           problem.aiFeedbackEnabled ? "TRUE" : "FALSE",
         ]);
 

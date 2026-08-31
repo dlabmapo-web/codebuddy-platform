@@ -102,6 +102,11 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.courseService.getExercise(context.identity, input)
         ),
+      getExerciseSolution: os.academyCourses.getExerciseSolution
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.getExerciseSolution(context.identity, input)
+        ),
       createExercise: os.academyCourses.createExercise
         .use(access.authenticated)
         .handler(({ context, input }) =>

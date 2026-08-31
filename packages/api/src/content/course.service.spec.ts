@@ -287,6 +287,7 @@ function exerciseRecord() {
       outputFormat: "One integer",
       constraints: "",
       starterCode: "",
+      solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
       language: "PYTHON",
       timeLimitMs: 3_000,
       memoryLimitMb: 256,
@@ -324,6 +325,7 @@ const exerciseInput = {
   outputFormat: "One integer",
   constraints: "",
   starterCode: "",
+  solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
   aiFeedbackEnabled: false,
   isVisible: true,
   testCases: [
@@ -390,12 +392,34 @@ function createExerciseService() {
       { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
     ),
     prisma,
+    access,
     audit,
     transaction,
   };
 }
 
 describe("CourseService direct problem editing", () => {
+  it("reads a solution only through the exercises.manage operation", async () => {
+    const { service, access } = createExerciseService();
+
+    await expect(
+      service.getExerciseSolution(identity, {
+        academyId,
+        courseId,
+        lectureId,
+        materialId,
+      }),
+    ).resolves.toEqual({
+      materialId,
+      solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
+    });
+    expect(access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "exercises.manage",
+    );
+  });
+
   it("bumps the course content revision so an open import preview goes stale", async () => {
     const { service, transaction } = createExerciseService();
 
@@ -461,6 +485,29 @@ describe("CourseService direct problem editing", () => {
       description: "<p>A clearer explanation.</p>",
     });
 
+    expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ gradingRevision: 2 }),
+      }),
+    );
+    expect(transaction.studentExerciseProgress.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("stores a changed model solution without changing the grading revision", async () => {
+    const { service, transaction } = createExerciseService();
+
+    await service.updateExercise(identity, {
+      ...exerciseInput,
+      solutionCode: "print(sum(map(int, input().split())))\n",
+    });
+
+    expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          solutionCode: "print(sum(map(int, input().split())))\n",
+        }),
+      }),
+    );
     expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.not.objectContaining({ gradingRevision: 2 }),

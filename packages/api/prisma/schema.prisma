@@ -1132,6 +1132,7 @@ model ProgrammingExercise {
   outputFormat      String             @default("") @map("output_format")
   constraints       String             @default("")
   starterCode       String             @default("") @map("starter_code")
+  solutionCode      String?            @map("solution_code") @db.Text
   language          ExerciseLanguage   @default(PYTHON)
   timeLimitMs       Int                @default(3000) @map("time_limit_ms")
   memoryLimitMb     Int                @default(256) @map("memory_limit_mb")

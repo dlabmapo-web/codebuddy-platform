@@ -10,6 +10,7 @@ import { ExerciseHeader } from './exercise-header';
 import { HintsEditor } from './hints-editor';
 import { PreviewModal } from './preview-modal';
 import { StarterCodeEditor } from './starter-code-editor';
+import { SolutionCodeEditor } from './solution-code-editor';
 
 export function ExerciseWorkspace({
   academyId,
@@ -17,17 +18,20 @@ export function ExerciseWorkspace({
   lectureId,
   initialContext,
   canEdit,
+  initialSolutionCode,
 }: {
   academyId: string;
   courseId: string;
   lectureId: string;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
+  initialSolutionCode: string;
 }) {
   const authoring = useExerciseAuthoring({
     target: { academyId, courseId, lectureId },
     initialContext,
     canEdit,
+    initialSolutionCode,
   });
   const { draft, editable, update } = authoring;
 
@@ -47,6 +51,13 @@ export function ExerciseWorkspace({
           onChange={(starterCode) => update('starterCode', starterCode)}
           value={draft.starterCode}
         />
+        {editable ? (
+          <SolutionCodeEditor
+            error={authoring.errorFor('solution')}
+            onChange={(solutionCode) => update('solutionCode', solutionCode)}
+            value={draft.solutionCode}
+          />
+        ) : null}
         <AnswersEditor
           editable={editable}
           error={authoring.errorFor('test')}

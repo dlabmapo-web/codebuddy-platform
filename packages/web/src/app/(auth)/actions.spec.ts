@@ -57,6 +57,8 @@ vi.mock('./_lib/client-address', () => ({
   clientAddress: () => Promise.resolve(undefined),
 }));
 
+import { ORPCError } from '@orpc/client';
+
 import {
   loginAction,
   signupAction,
@@ -190,6 +192,184 @@ describe('signupAction CAPTCHA', () => {
       {},
       formData({ ...signupFields, captchaToken: 'turnstile-token' }),
     );
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
+  });
+});
+
+describe('loginAction failure reporting', () => {
+  const withCaptcha = { ...loginFields, captchaToken: 'turnstile-token' };
+
+  // The trap this replaced: being told the password is wrong is an invitation
+  // to type it again, which is the one action that extends a rate limit.
+  it('names a rate limit instead of blaming the password', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: { code: 'over_request_rate_limit' },
+    });
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.too_many_attempts',
+    });
+  });
+
+  it('names a suspended account instead of sending it to a password reset', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: { code: 'user_banned' },
+    });
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.account_suspended',
+    });
+  });
+
+  it('names an unconfirmed address', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: { code: 'email_not_confirmed' },
+    });
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.email_not_confirmed',
+    });
+  });
+
+  // The uniform answer stays uniform. A wrong name and a wrong password must
+  // remain indistinguishable, or the form becomes a way to enumerate accounts.
+  it('keeps one answer for anything that would reveal whether an account exists', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: { code: 'invalid_credentials' },
+    });
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.credentials_rejected',
+    });
+  });
+
+  // The resolver runs before Supabase, and its own limit used to arrive as
+  // "Sign in could not be completed. Try again." — advice that extends it.
+  it('names a rate-limited username resolver instead of inviting a retry', async () => {
+    mocks.resolveSignInEmail.mockRejectedValue(
+      new ORPCError('TOO_MANY_REQUESTS', {
+        status: 429,
+        data: { code: 'RATE_LIMITED' },
+      }),
+    );
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.too_many_attempts',
+    });
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('still reports an unreachable resolver as an outage', async () => {
+    mocks.resolveSignInEmail.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.sign_in_failed',
+    });
+  });
+
+  // The account exists and the password was right; a Redis outage must not
+  // turn that into a sign-in nobody can complete.
+  it('signs in even when the student session lease fails', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'access-token' } },
+      error: null,
+    });
+    mocks.beginStudentSession.mockRejectedValue(new Error('redis down'));
+
+    await loginAction({}, formData(withCaptcha));
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
+  });
+});
+
+describe('signupAction failure reporting', () => {
+  const withCaptcha = { ...signupFields, captchaToken: 'turnstile-token' };
+
+  it('names an address that already has an account', async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { code: 'user_already_exists' },
+    });
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.email_taken',
+    });
+  });
+
+  // The enumeration-protected answer: no error, no session, and a user with no
+  // identities. Read as success it produced "check your email" for a message
+  // Supabase never sends.
+  it('names an address behind the decoy user Supabase returns', async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { session: null, user: { identities: [] } },
+      error: null,
+    });
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.email_taken',
+    });
+  });
+
+  it('still asks for verification when the account is genuinely new', async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { session: null, user: { identities: [{ id: 'identity' }] } },
+      error: null,
+    });
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      success: true,
+      message: 'error.signup_verify_email',
+    });
+  });
+
+  it('separates a rejected password from an unexplained failure', async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { code: 'weak_password' },
+    });
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.password_weak',
+    });
+  });
+
+  it('reports a rate-limited username check as rate limiting', async () => {
+    mocks.checkUsernameAvailable.mockRejectedValue(
+      new ORPCError('TOO_MANY_REQUESTS', {
+        status: 429,
+        data: { code: 'RATE_LIMITED' },
+      }),
+    );
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.too_many_attempts',
+    });
+  });
+
+  it('reports an unreachable username check as an outage, not a bad form', async () => {
+    mocks.checkUsernameAvailable.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    await expect(signupAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.signup_unavailable',
+    });
+  });
+
+  // The account exists in Supabase by the time the lease is attempted, so a
+  // Redis outage must not report "unable to create the account" and sign the
+  // person out of one that was just created.
+  it('completes signup even when the student session lease fails', async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { session: { access_token: 'access-token' }, user: { identities: [{}] } },
+      error: null,
+    });
+    mocks.beginStudentSession.mockRejectedValue(new Error('redis down'));
+
+    await signupAction({}, formData(withCaptcha));
 
     expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
   });

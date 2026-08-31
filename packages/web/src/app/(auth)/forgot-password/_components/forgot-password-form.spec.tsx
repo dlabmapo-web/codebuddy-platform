@@ -14,6 +14,7 @@ vi.mock('@/lib/config', () => ({
 }));
 
 import { publicConfig } from '@/lib/config';
+import { ThemeProvider } from '@/lib/theme/theme-provider';
 import { ForgotPasswordForm } from './forgot-password-form';
 
 const config = publicConfig as { turnstileSiteKey: string | null };
@@ -51,10 +52,17 @@ describe('ForgotPasswordForm', () => {
       .not.toContain('recovery.link_invalid');
   });
 
+  // The challenge reads the reader's theme, so it needs the provider the root
+  // layout gives it in the app. Rendered bare, it would only prove that a
+  // component outside its provider throws.
   it('requires a Turnstile response when a site key is configured', () => {
     config.turnstileSiteKey = 'test-site-key';
 
-    const html = renderToStaticMarkup(<ForgotPasswordForm />);
+    const html = renderToStaticMarkup(
+      <ThemeProvider initialTheme="light">
+        <ForgotPasswordForm />
+      </ThemeProvider>,
+    );
 
     expect(html).toContain('name="captchaToken"');
     expect(html).toContain('aria-label="captcha.label"');

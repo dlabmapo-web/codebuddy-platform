@@ -13,6 +13,7 @@ import { PasswordField, TextField } from '../../_components/form-fields';
 import { SocialLoginButtons } from '../../_components/social-login-buttons';
 import { AuthSubmitButton } from '../../_components/submit-button';
 import { TurnstileChallenge } from '../../_components/turnstile-challenge';
+import { loginSubmitBlock } from '../../_lib/submit-block';
 import { useAuthSubmission } from '../../_lib/use-auth-submission';
 
 const initialState: AuthFormState = {};
@@ -34,6 +35,10 @@ export function LoginForm({
   // and carry through to the destination, or the button snaps back to "Sign in"
   // while the browser is still fetching it.
   const submission = useAuthSubmission(state, pending);
+  const waitingForCaptcha = loginSubmitBlock({
+    captchaRequired: Boolean(publicConfig.turnstileSiteKey),
+    captchaToken,
+  }) !== null;
 
   function submit(formData: FormData) {
     if (!submission.begin()) return;
@@ -112,10 +117,17 @@ export function LoginForm({
         <AuthSubmitButton
           busy={submission.busy}
           busyLabel={t('login.submitting')}
-          disabled={Boolean(publicConfig.turnstileSiteKey && !captchaToken)}
+          disabled={waitingForCaptcha}
         >
           {t('login.submit')}
         </AuthSubmitButton>
+        {/* A disabled button that says nothing reads as a broken one. The only
+            thing that holds this one is the security check, so it says so. */}
+        {waitingForCaptcha ? (
+          <p aria-live="polite" className="text-[13px] text-sub">
+            {t('captcha.pending')}
+          </p>
+        ) : null}
       </form>
 
       <p className="mt-7 text-center text-[15px] text-sub">

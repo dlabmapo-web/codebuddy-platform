@@ -1,8 +1,10 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useTheme } from '@/lib/theme/theme-provider';
 
 type TurnstileWidgetId = string;
 
@@ -12,7 +14,7 @@ type TurnstileApi = {
     options: {
       sitekey: string;
       action: string;
-      theme: 'auto';
+      theme: 'light' | 'dark';
       size: 'flexible';
       callback(token: string): void;
       'error-callback'(code?: string): void;
@@ -21,6 +23,8 @@ type TurnstileApi = {
     },
   ): TurnstileWidgetId;
   remove(widgetId: TurnstileWidgetId): void;
+  /** Re-runs the challenge on a widget that is already on the page. */
+  reset(widgetId: TurnstileWidgetId): void;
 };
 
 declare global {
@@ -28,6 +32,20 @@ declare global {
     turnstile?: TurnstileApi;
   }
 }
+
+/**
+ * How long the widget may take to appear before the page admits it has not.
+ *
+ * The failure this guards is silence, not error. An ad blocker, a school
+ * proxy, or a filtered network can leave the request to Cloudflare hanging:
+ * `onReady` never fires, `onError` never fires, no widget renders, and the
+ * submit button stays disabled with an empty gap above it and no way in. Ten
+ * seconds is far longer than a working load and far shorter than a person's
+ * patience with a form that will not explain itself.
+ */
+const loadTimeoutMs = 10_000;
+
+type ChallengeStatus = 'loading' | 'ready' | 'failed';
 
 /** A fresh, single-use Turnstile challenge for one authentication attempt. */
 export function TurnstileChallenge({
@@ -40,11 +58,24 @@ export function TurnstileChallenge({
   onTokenChange(token: string | null): void;
 }) {
   const { t } = useTranslation('auth');
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<TurnstileWidgetId | undefined>(undefined);
-  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState<ChallengeStatus>('loading');
+  const [failureCode, setFailureCode] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
-  function renderWidget() {
+  const fail = useCallback(
+    (code: string) => {
+      console.error('[turnstile] challenge unavailable', { action, code });
+      setFailureCode(code);
+      setStatus('failed');
+      onTokenChange(null);
+    },
+    [action, onTokenChange],
+  );
+
+  const renderWidget = useCallback(() => {
     const api = window.turnstile;
     const container = containerRef.current;
     if (!api || !container || widgetIdRef.current) return;
@@ -52,20 +83,41 @@ export function TurnstileChallenge({
     widgetIdRef.current = api.render(container, {
       sitekey: siteKey,
       action,
-      theme: 'auto',
+      // The reader's own choice, not the operating system's. This product has
+      // no `system` theme — the toggle in the header is the whole answer — so
+      // Turnstile's `auto` would have followed something the rest of the page
+      // ignores, and put a light widget on a dark card.
+      //
+      // Read once, at render. Re-rendering to follow a mid-form toggle would
+      // discard a challenge the person has already solved, which is a worse
+      // trade than a widget that keeps the theme it opened in.
+      theme,
       size: 'flexible',
       callback: (token) => {
-        setFailed(false);
+        setStatus('ready');
+        setFailureCode(null);
         onTokenChange(token);
       },
-      'error-callback': () => {
-        setFailed(true);
-        onTokenChange(null);
-      },
+      // The code is kept rather than dropped. A deployment whose site key is
+      // wrong answers 110100 and one serving an unlisted domain answers
+      // 110200; both used to arrive as the same sentence with nothing to look
+      // up, which is the state a broken key would sit in indefinitely.
+      'error-callback': (code) => fail(code ?? 'unknown'),
+      // Neither of these is a failure. The widget is on the page and refreshes
+      // itself, so only the token is dropped — the button waits for the
+      // replacement instead of accusing the network of being down.
       'expired-callback': () => onTokenChange(null),
       'timeout-callback': () => onTokenChange(null),
     });
-  }
+  }, [action, fail, onTokenChange, siteKey, theme]);
+
+  // Re-armed on every attempt, so a retry that also goes nowhere is reported
+  // the same way the first one was.
+  useEffect(() => {
+    if (status !== 'loading') return;
+    const timer = setTimeout(() => fail('load_timeout'), loadTimeoutMs);
+    return () => clearTimeout(timer);
+  }, [attempt, fail, status]);
 
   useEffect(() => () => {
     const widgetId = widgetIdRef.current;
@@ -75,23 +127,72 @@ export function TurnstileChallenge({
     }
   }, []);
 
+  /**
+   * The way out of a failed challenge, without reloading the page.
+   *
+   * Two different repairs behind one button. A widget that rendered and then
+   * errored is reset in place; one that never rendered at all means the script
+   * never arrived, so the render is attempted from the top. Losing a page of
+   * typed credentials to an F5 was the only previous cure.
+   */
+  function retry() {
+    setFailureCode(null);
+    setStatus('loading');
+    setAttempt((current) => current + 1);
+    onTokenChange(null);
+
+    const api = window.turnstile;
+    const widgetId = widgetIdRef.current;
+    if (api && widgetId) {
+      try {
+        api.reset(widgetId);
+        return;
+      } catch {
+        // A widget id the script no longer recognises. Drop it and rebuild.
+      }
+      try {
+        api.remove(widgetId);
+      } catch {
+        // Already gone, which is the state this wanted anyway.
+      }
+      widgetIdRef.current = undefined;
+    }
+    renderWidget();
+  }
+
   return (
-    <div aria-label={t('captcha.label')}>
+    <div aria-label={t('captcha.label')} role="group">
       <div className="min-h-[65px]" ref={containerRef} />
       <Script
         id="cloudflare-turnstile"
-        onError={() => {
-          setFailed(true);
-          onTokenChange(null);
-        }}
+        onError={() => fail('script_blocked')}
         onReady={renderWidget}
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
       />
-      {failed ? (
-        <p className="mt-2 text-[14px] text-danger" role="alert">
-          {t('captcha.load_error')}
-        </p>
+      {status === 'failed' ? (
+        <div className="mt-2 space-y-2">
+          <p className="text-[14px] leading-6 text-danger" role="alert">
+            {t('captcha.load_error')}
+            {failureCode ? (
+              // Shown, not only logged. A person who cannot sign in reaches
+              // their manager, not this console, and a code in the screenshot
+              // is the difference between a guess and a lookup.
+              <span className="ml-1.5 font-mono text-[12px] text-sub">
+                ({failureCode})
+              </span>
+            ) : null}
+          </p>
+          <button
+            className="rounded-lg border border-border px-3 py-1.5 text-[14px] font-semibold text-sub transition-colors hover:text-ink"
+            onClick={retry}
+            // Inside a form: without this it would submit one instead of
+            // repairing the check that is blocking the submission.
+            type="button"
+          >
+            {t('captcha.retry')}
+          </button>
+        </div>
       ) : null}
     </div>
   );

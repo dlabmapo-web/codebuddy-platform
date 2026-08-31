@@ -115,6 +115,59 @@ export const academyPermissions = [
 export const academyPermissionSchema = z.enum(academyPermissions);
 export type AcademyPermission = z.infer<typeof academyPermissionSchema>;
 
+/**
+ * Everything the academy's curriculum owner may do.
+ *
+ * Named once because two roles hold it. An academy with no Team Lead is the
+ * ordinary case rather than an incomplete setup — in a small campus the
+ * Manager runs the curriculum as well as the academy — and before this they
+ * could open a course and change nothing in it.
+ *
+ * `MANAGER` spreads this array rather than restating it, so a permission added
+ * here reaches both roles in one edit. A future exception must be written as an
+ * exception, visibly, instead of appearing as a line somebody forgot to copy.
+ */
+const teamLeadPermissions = [
+  "academy.read",
+  "academy.members.read",
+  "academy.applications.review",
+  "academy.analytics.read",
+  "curriculum.read",
+  "curriculum.review",
+  "curriculum.draft",
+  "curriculum.manage",
+  "curriculum.publish",
+  "exercises.manage",
+  "content.import",
+  "ai-feedback-rules.manage",
+  "classes.manage",
+  "class-teachers.manage",
+  /*
+   * Inherited deliberately, and inert for both roles. The teaching surfaces
+   * that read these also demand an exact active `TEACHER` — `roleCanMonitor`,
+   * `requireAssignedTeacherActor` — so holding them grants a Manager no more
+   * than it grants a Team Lead today. They stay in the shared set because the
+   * property worth keeping is that Manager is a true superset: a permission
+   * that is inert now must not become the one line that silently is not.
+   */
+  "classes.assigned.manage",
+  "submissions.assigned.review",
+] as const satisfies readonly AcademyPermission[];
+
+/**
+ * Administration of the academy itself, which a Team Lead does not get.
+ *
+ * The boundary is ownership rather than seniority: who may change what the
+ * academy *is* — its settings, who belongs to it, who is enrolled, and when
+ * classes meet — as opposed to what it teaches.
+ */
+const managerOnlyPermissions = [
+  "academy.settings.manage",
+  "academy.members.manage",
+  "class-enrollments.manage",
+  "class-schedule.manage",
+] as const satisfies readonly AcademyPermission[];
+
 export const academyRolePermissions = {
   STUDENT: ["academy.read", "curriculum.read", "submissions.own.create"],
   TEACHER: [
@@ -138,38 +191,11 @@ export const academyRolePermissions = {
     "classes.assigned.manage",
     "submissions.assigned.review",
   ],
-  TEAM_LEAD: [
-    "academy.read",
-    "academy.members.read",
-    "academy.applications.review",
-    "academy.analytics.read",
-    "curriculum.read",
-    "curriculum.review",
-    "curriculum.draft",
-    "curriculum.manage",
-    "curriculum.publish",
-    "exercises.manage",
-    "content.import",
-    "ai-feedback-rules.manage",
-    "classes.manage",
-    "class-teachers.manage",
-    "classes.assigned.manage",
-    "submissions.assigned.review",
-  ],
-  MANAGER: [
-    "academy.read",
-    "academy.settings.manage",
-    "academy.members.read",
-    "academy.members.manage",
-    "academy.applications.review",
-    "academy.analytics.read",
-    "curriculum.read",
-    "curriculum.review",
-    "classes.manage",
-    "class-enrollments.manage",
-    "class-teachers.manage",
-    "class-schedule.manage",
-  ],
+  TEAM_LEAD: teamLeadPermissions,
+  // A superset, not a hierarchy. The actor stays a `MANAGER`: they keep the
+  // control tower, and the surfaces that ask for an exact role — the Team Lead
+  // curriculum overview, every teaching page — still refuse them.
+  MANAGER: [...teamLeadPermissions, ...managerOnlyPermissions],
 } as const satisfies Record<AcademyRole, readonly AcademyPermission[]>;
 
 export function roleHasPermission(

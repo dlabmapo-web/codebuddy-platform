@@ -74,8 +74,16 @@ References:
 | Student | No | No | No |
 | Teacher | No | No | Yes, only for their effective assigned class and active watch |
 | Team Lead | Create and edit | Download, preview, and commit | No |
-| Manager | No | No | No |
+| Manager | Yes | Yes | No |
 | Platform admin without academy membership | No | No | No |
+
+> **Amended 2026-08-31.** Manager originally held none of these. The manager
+> inherits team lead permissions design makes `MANAGER` a permission superset
+> of `TEAM_LEAD`, so a Manager now authors problems and imports workbooks —
+> and therefore reads and writes model solutions — through the same
+> `exercises.manage` and `content.import` boundaries a Team Lead uses. The
+> monitoring column is unchanged: that surface needs an open teaching visit,
+> which no Manager has.
 
 The authoring boundary is `exercises.manage`. The monitoring boundary remains
 the existing strict teacher predicate plus class assignment, active academy and

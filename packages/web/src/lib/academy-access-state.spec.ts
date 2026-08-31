@@ -10,6 +10,7 @@ import {
   canManageClassTeachers,
   canManageEnrollment,
   canManageExercises,
+  canMonitorClasses,
   canPublishContent,
   canReviewContent,
   canReviewApplications,
@@ -148,11 +149,20 @@ describe('resolveAcademyAccessState', () => {
     expect(canReviewApplications(null)).toBe(false);
   });
 
-  it('lets managers review content without exposing authoring controls', () => {
+  it('gives managers the same authoring controls as team leads', () => {
     expect(canReviewContent('MANAGER')).toBe(true);
-    expect(canManageContent('MANAGER')).toBe(false);
-    expect(canManageExercises('MANAGER')).toBe(false);
-    expect(canPublishContent('MANAGER')).toBe(false);
+    expect(canManageContent('MANAGER')).toBe(true);
+    expect(canManageExercises('MANAGER')).toBe(true);
+    expect(canPublishContent('MANAGER')).toBe(true);
+  });
+
+  // The line that does not move. A manager authors the curriculum now, but
+  // monitoring is not a curriculum capability: it belongs to the teacher a
+  // class is assigned to, and every page and socket re-checks that assignment.
+  it('keeps live monitoring with the assigned teacher', () => {
+    expect(canMonitorClasses('TEACHER')).toBe(true);
+    expect(canMonitorClasses('MANAGER')).toBe(false);
+    expect(canMonitorClasses('TEAM_LEAD')).toBe(false);
   });
 
   it('exposes content authoring to team leads', () => {

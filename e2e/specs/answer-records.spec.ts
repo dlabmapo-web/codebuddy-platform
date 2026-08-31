@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -21,10 +22,10 @@ const LECTURE_ONE_DESCRIPTION = 'Read a line of input and print it back out.';
 /** Seeded into every hidden test case. Must never reach the browser. */
 const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
 
-let academyId = '';
+let academySlug = '';
 
 async function signIn(page: Page) {
-  academyId = await signInAs({
+  academySlug = await signInAs({
     page,
     identifier: STUDENT_USERNAME,
     password: STUDENT_PASSWORD,
@@ -32,7 +33,7 @@ async function signIn(page: Page) {
 }
 
 function recordsUrl() {
-  return `/studio/academies/${academyId}/learn/records`;
+  return routes.academyLearnRecords(academySlug);
 }
 
 /**
@@ -62,7 +63,7 @@ async function typeIntoEditor(page: Page, code: string) {
 }
 
 async function openEcho(page: Page): Promise<string> {
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
@@ -282,7 +283,7 @@ test('another student’s submission cannot be opened by editing the URL', async
   // A well-formed id that is nobody's submission behaves exactly like one
   // belonging to another student: the workspace opens, the attempt does not.
   await page.goto(
-    `/studio/academies/${academyId}/learn/exercises/${materialId}` +
+    routes.academyLearnExercise(academySlug, materialId) +
       '?submission=00000000-0000-4000-8000-0000000000ff',
   );
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
@@ -300,7 +301,7 @@ test('a crafted returnTo cannot redirect off the site', async ({ page }) => {
   const materialId = /exercises\/([0-9a-f-]+)/.exec(href ?? '')?.[1] ?? '';
 
   await page.goto(
-    `/studio/academies/${academyId}/learn/exercises/${materialId}` +
+    routes.academyLearnExercise(academySlug, materialId) +
       `?returnTo=${encodeURIComponent('https://evil.example/steal')}`,
   );
   await page
@@ -308,13 +309,13 @@ test('a crafted returnTo cannot redirect off the site', async ({ page }) => {
     .first()
     .click();
   // Back lands on this academy's own records root, never off-site.
-  await expect(page).toHaveURL(new RegExp(`${academyId}/learn/records`));
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/learn/records`));
 });
 
 test('the course outline shows lecture descriptions and progress', async ({
   page,
 }) => {
-  await page.goto(`/studio/academies/${academyId}/learn/courses`);
+  await page.goto(routes.academyLearnCourses(academySlug));
   await page
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })

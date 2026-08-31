@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -31,10 +32,10 @@ const HIDDEN_SENTINEL = 'E2E_HIDDEN_SENTINEL';
  * `/` still belongs to v1 and redirects into the v1 app, so v2 URLs are built
  * from the academy id captured at sign-in rather than by navigating to root.
  */
-let academyId = '';
+let academySlug = '';
 
 async function signIn(page: Page) {
-  academyId = await signInAs({
+  academySlug = await signInAs({
     page,
     identifier: STUDENT_USERNAME,
     password: STUDENT_PASSWORD,
@@ -42,7 +43,7 @@ async function signIn(page: Page) {
 }
 
 function catalogUrl() {
-  return `/studio/academies/${academyId}/learn/courses`;
+  return routes.academyLearnCourses(academySlug);
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   type Page,
 } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -45,7 +46,7 @@ const SECTIONS = [
   'difficult-problems',
 ] as const;
 
-let academyId = '';
+let academySlug = '';
 let teacherContext: BrowserContext;
 let teacherPage: Page;
 
@@ -118,12 +119,12 @@ const COURSE_FILTER = /^(Course|코스)$/;
 const ALL_COURSES = /^(All courses|코스 전체)$/;
 
 function overviewUrl(search = ''): string {
-  const base = `/studio/academies/${academyId}`;
+  const base = routes.academy(academySlug);
   return search ? `${base}?${search}` : base;
 }
 
 function studentsUrl(search = ''): string {
-  const base = `/studio/academies/${academyId}/teach/students`;
+  const base = routes.academyTeachStudents(academySlug);
   return search ? `${base}?${search}` : base;
 }
 
@@ -134,7 +135,7 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(240_000);
   teacherContext = await browser.newContext();
   teacherPage = await teacherContext.newPage();
-  academyId = await signIn(teacherPage, TEACHER_EMAIL);
+  academySlug = await signIn(teacherPage, TEACHER_EMAIL);
   await teacherPage.goto(overviewUrl(), { timeout: 180_000 });
   await expect(teacherPage.getByTestId('student-participation')).toBeVisible({
     timeout: 120_000,
@@ -442,7 +443,7 @@ test('a teacher sees only their own classes, and the server agrees', async ({
     'academyTeacherStudents/list',
   ]) {
     const response = await rpc(page, path, {
-      academyId: otherAcademyId,
+      academySlug: otherAcademyId,
       range: '7d',
     });
     expect(response.status).toBe(200);
@@ -463,7 +464,7 @@ test('a student is redirected and a manager never receives teacher analytics', a
   const studentContext = await browser.newContext();
   const studentPage = await studentContext.newPage();
   const studentAcademy = await signIn(studentPage, STUDENT_EMAIL);
-  await studentPage.goto(`/studio/academies/${studentAcademy}`);
+  await studentPage.goto(routes.academy(studentAcademy));
   await studentPage.waitForURL(/\/learn\/courses/, { timeout: 30_000 });
 
   for (const path of [
@@ -471,7 +472,7 @@ test('a student is redirected and a manager never receives teacher analytics', a
     'academyTeacherStudents/list',
   ]) {
     const denial = await rpc(studentPage, path, {
-      academyId: studentAcademy,
+      academySlug: studentAcademy,
       range: '7d',
     });
     expect(denial.status).toBeGreaterThanOrEqual(400);
@@ -481,12 +482,12 @@ test('a student is redirected and a manager never receives teacher analytics', a
   const managerContext = await browser.newContext();
   const managerPage = await managerContext.newPage();
   const managerAcademy = await signIn(managerPage, MANAGER_EMAIL);
-  await managerPage.goto(`/studio/academies/${managerAcademy}`);
+  await managerPage.goto(routes.academy(managerAcademy));
   // The management overview, not the teaching one.
   await expect(managerPage.getByTestId('teaching-queue')).toHaveCount(0);
 
   const managerDenial = await rpc(managerPage, 'academyTeacherOverview/get', {
-    academyId: managerAcademy,
+    academySlug: managerAcademy,
     range: '7d',
   });
   expect(managerDenial.status).toBeGreaterThanOrEqual(400);

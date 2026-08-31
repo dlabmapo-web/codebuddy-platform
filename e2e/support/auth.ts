@@ -3,7 +3,7 @@ import { expect, type BrowserContext, type Page } from '@playwright/test';
 type StoredState = Awaited<ReturnType<BrowserContext['storageState']>>;
 type StoredSession = {
   state: StoredState;
-  academyId: string;
+  academySlug: string;
   landingPath: string;
 };
 
@@ -20,7 +20,7 @@ export async function signInAs({
   page,
   identifier,
   password,
-  landing = /\/studio\/academies\//,
+  landing = /\/academy\//,
 }: {
   page: Page;
   identifier: string;
@@ -40,10 +40,10 @@ export async function signInAs({
   if (cached) {
     await page.context().addCookies(cached.state.cookies);
     await page.goto(cached.landingPath);
-    return cached.academyId;
+    return cached.academySlug;
   }
 
-  await page.goto('/auth/login');
+  await page.goto('/login');
   await page.locator('input[name="identifier"]').fill(identifier);
   await page.locator('input[type="password"]').fill(password);
   const submit = page.getByRole('button', { name: /sign in|로그인/i });
@@ -53,15 +53,23 @@ export async function signInAs({
 
   // Empty for an account with no academy. Callers that need one pass a landing
   // pattern that guarantees it.
-  const academyId = academyIdFrom(page);
+  const academySlug = academySlugFrom(page);
   sessions.set(key, {
-    academyId,
+    academySlug,
     landingPath: new URL(page.url()).pathname,
     state: await page.context().storageState(),
   });
-  return academyId;
+  return academySlug;
 }
 
-function academyIdFrom(page: Page): string {
-  return /\/studio\/academies\/([0-9a-f-]+)/.exec(page.url())?.[1] ?? '';
+/**
+ * The academy in the URL, which is now a slug rather than a UUID.
+ *
+ * `/studio/academies/<uuid>` was retired for `/academy/<slug>`, and this read
+ * the old shape. It did not fail loudly: it returned an empty string, every
+ * caller built `/studio/academies//…` from it, and the suite reported broken
+ * routes as missing content.
+ */
+function academySlugFrom(page: Page): string {
+  return /\/academy\/([^/?#]+)/.exec(page.url())?.[1] ?? '';
 }

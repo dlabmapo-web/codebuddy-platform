@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 test.describe.configure({ mode: 'serial' });
@@ -10,11 +11,11 @@ const MANAGER = process.env.E2E_MANAGER_EMAIL ?? 'manager@cove.test';
 const SECOND_ACADEMY_ID = 'e1000000-0000-4000-8000-000000000001';
 
 async function openMyPage(page: Page, identifier = STUDENT) {
-  const academyId = await signInAs({ page, identifier, password: PASSWORD });
-  await page.goto(`/studio/my-page?academy=${academyId}`);
+  const academySlug = await signInAs({ page, identifier, password: PASSWORD });
+  await page.goto(`/account?academy=${academySlug}`);
   await expect(page.getByRole('heading', { name: /Cove Student|Cove Academy Manager/ }))
     .toBeVisible();
-  return academyId;
+  return academySlug;
 }
 
 test('a student can save their academy profile and keep global security separate', async ({
@@ -46,14 +47,14 @@ test('a student can save their academy profile and keep global security separate
 });
 
 test('academy switching asks before discarding an unsaved draft', async ({ page }) => {
-  const academyId = await openMyPage(page);
+  const academySlug = await openMyPage(page);
   await page.getByLabel('Name in this academy').fill(`Unsaved ${Date.now()}`);
 
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Unsaved changes' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page).toHaveURL(new RegExp(`academy=${academyId}`));
+  await expect(page).toHaveURL(new RegExp(`academy=${academySlug}`));
 
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   await dialog.getByRole('button', { name: 'Discard and switch' }).click();
@@ -113,8 +114,8 @@ test('password confirmation is validated before any credential request', async (
 });
 
 test('a manager sees academy fields but not the member credential controls', async ({ page }) => {
-  const academyId = await openMyPage(page, MANAGER);
-  await page.goto(`/studio/academies/${academyId}/members`);
+  const academySlug = await openMyPage(page, MANAGER);
+  await page.goto(routes.academyPeople(academySlug));
   const studentRow = page.getByRole('row').filter({ hasText: 'student@cove.test' });
   await studentRow.getByRole('link', { name: /Profile/ }).click();
   await expect(page.getByRole('heading', { name: 'Cove Student' })).toBeVisible();

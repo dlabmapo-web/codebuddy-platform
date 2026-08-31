@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
@@ -38,10 +39,10 @@ const SUM_ID = 'e0000000-0000-4000-8000-000000000031';
  */
 const VERDICT_BUDGET_MS = 8_000;
 
-let academyId = '';
+let academySlug = '';
 
 async function signIn(page: Page) {
-  academyId = await signInAs({
+  academySlug = await signInAs({
     page,
     identifier: STUDENT_EMAIL,
     password: STUDENT_PASSWORD,
@@ -49,7 +50,7 @@ async function signIn(page: Page) {
 }
 
 function catalogUrl() {
-  return `/studio/academies/${academyId}/learn/courses`;
+  return routes.academyLearnCourses(academySlug);
 }
 
 function courseCard(page: Page) {
@@ -59,7 +60,7 @@ function courseCard(page: Page) {
 }
 
 function exerciseUrl(materialId: string) {
-  return `/studio/academies/${academyId}/learn/exercises/${materialId}`;
+  return routes.academyLearnExercise(academySlug, materialId);
 }
 
 async function typeIntoEditor(page: Page, code: string) {
@@ -161,7 +162,7 @@ test('an infinite loop is cut off as a time limit, not a hang', async ({
 
   // The API must still be serving: a runaway program cannot take request
   // handling down with it.
-  const health = await page.request.get('/studio/academies/' + academyId + '/learn/courses');
+  const health = await page.request.get('/academy/' + academySlug + '/learn/courses');
   expect(health.ok()).toBe(true);
 });
 

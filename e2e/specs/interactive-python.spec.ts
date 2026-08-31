@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 const STUDENT_EMAIL = process.env.E2E_STUDENT_EMAIL ?? 'student@cove.test';
@@ -7,7 +8,7 @@ const STUDENT_PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const ECHO_ID = 'e0000000-0000-4000-8000-000000000030';
 
 async function signIn(page: Page): Promise<string> {
-  const response = await page.goto('/auth/login');
+  const response = await page.goto(routes.login);
   expect(response?.headers()['cross-origin-opener-policy']).toBe('same-origin');
   expect(response?.headers()['cross-origin-embedder-policy']).toBe('require-corp');
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
@@ -42,14 +43,14 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   page,
 }) => {
   test.setTimeout(120_000);
-  const academyId = await signIn(page);
+  const academySlug = await signIn(page);
 
   const workerResponse = await page.request.get('/pyodide-worker.js?v=6');
   expect(workerResponse.headers()['cross-origin-resource-policy']).toBe('same-origin');
   expect(workerResponse.headers()['cache-control']).toContain('immutable');
 
   await page.goto(
-    `/studio/academies/${academyId}/learn/exercises/${ECHO_ID}`,
+    routes.academyLearnExercise(academySlug, ECHO_ID),
   );
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
   await expect(page.getByText(/browser cannot run interactive input/i)).toHaveCount(0);
@@ -73,9 +74,9 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
 
 test('a failing run opens the error coach', async ({ page }) => {
   test.setTimeout(120_000);
-  const academyId = await signIn(page);
+  const academySlug = await signIn(page);
 
-  await page.goto(`/studio/academies/${academyId}/learn/exercises/${ECHO_ID}`);
+  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
 
   const run = page.getByRole('button', { name: /^run$|^실행$/i });
   const coachTab = page.getByRole('tab', {

@@ -12,6 +12,7 @@ import { MonitoringRevocationModule } from "./monitoring-revocation.module.js";
 import { MonitoringService } from "./monitoring.service.js";
 import { PresenceRegistry } from "./presence.registry.js";
 import { TeachModule } from "../teach/teach.module.js";
+import { AcademiesModule } from "../academies/academies.module.js";
 
 /**
  * Live teacher monitoring: composition only.
@@ -29,6 +30,7 @@ import { TeachModule } from "../teach/teach.module.js";
 @Module({
   imports: [
     AuthModule,
+    AcademiesModule,
     AuthorizationModule,
     // For the outline builder only: a teacher's copy of a student's curriculum
     // is the student's own outline, read through a teacher's claim.

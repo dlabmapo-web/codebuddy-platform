@@ -172,5 +172,17 @@
   "live": {
     "not_solving": "Student is not currently solving an exercise",
     "on_exercise": "Live on {{title}}"
+  },
+  "answer": {
+    "show": "Show answer",
+    "title": "Correct answer",
+    "description": "Use this read-only solution while checking the student's work.",
+    "loading": "Loading the correct answer…",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copy_failed": "The answer could not be copied. Select the code and copy it manually.",
+    "close": "Close",
+    "missing": "No answer added yet.",
+    "failed": "The answer is no longer available. Close this window and confirm the live session is still active."
   }
 }

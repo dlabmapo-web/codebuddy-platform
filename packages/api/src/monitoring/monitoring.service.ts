@@ -11,6 +11,7 @@ import {
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import { AuditService } from "../academies/audit.service.js";
 import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -37,6 +38,7 @@ export class MonitoringService {
     private readonly access: MonitoringAccessService,
     private readonly broadcaster: MonitoringFeedbackBroadcaster,
     private readonly curriculum: CurriculumOutlineService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -302,6 +304,72 @@ export class MonitoringService {
   }
 
   /**
+   * The private model solution for the exact visit that is active now.
+   * Every fact is rechecked on this request; possession of ids is not access.
+   */
+  async getExerciseSolution(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      membershipId: string;
+      materialId: string;
+      visitId: string;
+    },
+  ): Promise<{ materialId: string; solutionCode: string }> {
+    const claim = await this.requireClass(identity, input);
+    const student = await this.access.requireMonitorableStudent(
+      claim,
+      input.membershipId,
+    );
+    await this.access.requireMonitorableMaterial(student, input.materialId);
+
+    const visit = await this.prisma.teacherMonitoringVisit.findFirst({
+      where: {
+        id: input.visitId,
+        academyId: claim.academyId,
+        classId: claim.classId,
+        teacherMembershipRef: claim.membershipId,
+        studentMembershipRef: student.studentMembershipId,
+        materialId: input.materialId,
+        endedAt: null,
+      },
+      select: {
+        id: true,
+        material: {
+          select: {
+            programmingExercise: { select: { solutionCode: true } },
+          },
+        },
+      },
+    });
+    const solutionCode = visit?.material?.programmingExercise?.solutionCode;
+    if (!solutionCode?.trim()) {
+      throw new AppException(
+        "MONITORING_STUDENT_UNAVAILABLE",
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    await this.prisma.$transaction((tx) =>
+      this.audit.write(tx, {
+        actorUserId: claim.userId,
+        academyId: claim.academyId,
+        action: "monitoring.exercise_solution.viewed",
+        targetType: "Material",
+        targetId: input.materialId,
+        after: {
+          classId: claim.classId,
+          studentMembershipId: student.studentMembershipId,
+          visitId: input.visitId,
+        },
+      }),
+    );
+
+    return { materialId: input.materialId, solutionCode };
+  }
+
+  /**
    * The current notes on one student, newest first — one per teacher.
    *
    * Read through the same access claim as the live workspace, so a teacher who
@@ -445,12 +513,18 @@ export class MonitoringService {
     const preview = await this.loadPublicExercise(claim, materialId);
     if (!preview) return null;
 
-    const draft = await this.prisma.exerciseDraft.findUnique({
-      where: {
-        userId_materialId: { userId: studentUserId, materialId },
-      },
-      select: { id: true },
-    });
+    const [draft, answer] = await Promise.all([
+      this.prisma.exerciseDraft.findUnique({
+        where: {
+          userId_materialId: { userId: studentUserId, materialId },
+        },
+        select: { id: true },
+      }),
+      this.prisma.programmingExercise.findUnique({
+        where: { materialId },
+        select: { solutionCode: true },
+      }),
+    ]);
 
     return {
       ...preview,
@@ -458,6 +532,7 @@ export class MonitoringService {
       // document is created lazily, and naming a room for a draft that does
       // not exist is how a client ends up inventing one.
       draftId: draft?.id ?? null,
+      hasSolution: Boolean(answer?.solutionCode?.trim()),
     };
   }
 
@@ -487,8 +562,22 @@ export class MonitoringService {
             },
           },
         },
+        // Named columns rather than `include`. An include pulls every scalar
+        // on the table, which since the model solution landed means the answer
+        // was read into memory on every preview and then dropped by the
+        // mapping below — safe only for as long as nobody spreads it. The
+        // answer has exactly one route out of this service, and it is audited.
         programmingExercise: {
-          include: {
+          select: {
+            difficulty: true,
+            language: true,
+            description: true,
+            inputFormat: true,
+            outputFormat: true,
+            constraints: true,
+            starterCode: true,
+            timeLimitMs: true,
+            memoryLimitMb: true,
             testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
             hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
           },

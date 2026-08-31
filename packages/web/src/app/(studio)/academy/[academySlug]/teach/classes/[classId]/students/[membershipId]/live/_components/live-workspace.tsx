@@ -39,6 +39,7 @@ import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
 import { PreviewBanner } from './preview-banner';
 import { PreviewEditor } from './preview-editor';
+import { AnswerCodeModal } from './answer-code-modal';
 
 /**
  * One student's exercise, opened beside them.
@@ -273,7 +274,20 @@ export function LiveWorkspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
-          academyId={academyId}
+          answer={
+            display.isLive && live.session && liveExercise ? (
+              <AnswerCodeModal
+                academyId={academyId}
+                classId={classId}
+                fontSize={preferences.fontSize}
+                hasSolution={liveExercise.hasSolution}
+                key={live.session.visitId}
+                materialId={live.session.materialId}
+                membershipId={membershipId}
+                visitId={live.session.visitId}
+              />
+            ) : undefined
+          }
           classId={classId}
           connection={live.state}
           context={context}

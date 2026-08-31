@@ -101,6 +101,7 @@ export const plannedProblemSchema = z
     outputFormat: z.string(),
     constraints: z.string(),
     starterCode: z.string(),
+    solutionCode: z.string().nullable(),
     aiFeedbackEnabled: z.boolean(),
     /** Explicit order from the workbook, or null to preserve or append. */
     order: z.number().int().positive().nullable(),
@@ -199,6 +200,7 @@ export type ExistingProblem = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  solutionCode?: string | null;
   aiFeedbackEnabled: boolean;
   testCases: Array<{
     position: number;
@@ -1061,6 +1063,8 @@ function planProblem(input: {
     row.aiFeedbackEnabled ?? current?.problem.aiFeedbackEnabled ?? false;
 
   const difficulty = row.difficulty ?? current?.problem.difficulty ?? "EASY";
+  const currentSolutionCode = current?.problem.solutionCode ?? null;
+  const solutionCode = row.solutionCode ?? currentSolutionCode;
 
   const changedFields = current
     ? diffFields([
@@ -1071,6 +1075,13 @@ function planProblem(input: {
         ["output_format", row.outputFormat, current.problem.outputFormat],
         ["constraints", row.constraints, current.problem.constraints],
         ["starter_code", row.starterCode, current.problem.starterCode],
+        ...(row.solutionCode !== null
+          ? [[
+              "solution_code",
+              row.solutionCode,
+              currentSolutionCode,
+            ] as [string, unknown, unknown]]
+          : []),
         [
           "ai_feedback_enabled",
           aiFeedbackEnabled,
@@ -1103,6 +1114,16 @@ function planProblem(input: {
   // does.
   const gradingChanged = action === "UPDATE" && testsChanged;
 
+  if (
+    (!current && solutionCode === null) ||
+    (current && currentSolutionCode !== null && row.solutionCode === null) ||
+    (action === "UPDATE" && solutionCode === null)
+  ) {
+    issues.push(
+      error("solution_code_missing", problem.key, "Problems", row.rowNumber),
+    );
+  }
+
   if (action === "UPDATE") {
     if (current?.problem.isVisible) {
       issues.push(warning("updates_visible_content", problem.key, "Problems"));
@@ -1133,6 +1154,7 @@ function planProblem(input: {
     outputFormat: row.outputFormat,
     constraints: row.constraints,
     starterCode: row.starterCode,
+    solutionCode,
     aiFeedbackEnabled,
     order: row.problemOrder,
     testCases,

@@ -125,6 +125,7 @@
     "difficulty_missing": "Set the difficulty to EASY, MEDIUM, or HARD.",
     "difficulty_invalid": "Difficulty must be EASY, MEDIUM, or HARD.",
     "description_missing": "Every problem needs a description.",
+    "solution_code_missing": "Add the correct Python answer in solution_code. Existing answers cannot be cleared.",
     "description_format_invalid": "description_format must be PLAIN_TEXT or RICH_TEXT_HTML.",
     "boolean_invalid": "Use TRUE or FALSE.",
     "order_missing": "This row needs an order number.",

@@ -53,12 +53,14 @@
     },
     "basic_help": "The same fields as the original manual problem form, presented together without hidden sections.",
     "code_help": "Optional code students see when they first open the problem.",
+    "solution_code_help": "Required correct Python solution. Only authorized problem authors and a teacher actively monitoring the assigned student can view it.",
     "language_python": "Python 3",
     "required": {
       "title": "Problem title",
       "difficulty": "Difficulty",
       "description": "Problem description",
-      "test": "One sample answer"
+      "test": "One sample answer",
+      "solution": "Correct answer code"
     },
     "field": {
       "title": "Problem title",
@@ -69,6 +71,7 @@
       "description": "Problem description",
       "constraints": "Conditions and constraints (optional)",
       "starter_code": "Initial code (editor default)",
+      "solution_code": "Correct answer code",
       "input_format": "Input format (optional)",
       "output_format": "Output format (optional)",
       "is_visible": "Visible to students",
@@ -125,7 +128,8 @@
       "title": "Enter a problem title.",
       "difficulty": "Pick a difficulty.",
       "description": "Write the problem description.",
-      "test": "Add at least one sample answer students can see."
+      "test": "Add at least one sample answer students can see.",
+      "solution": "Add the correct answer code."
     },
     "location": "Problem location",
     "preview_format": "Input and output format",

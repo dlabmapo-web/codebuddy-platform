@@ -678,6 +678,8 @@ export const monitoringExerciseContextSchema =
   monitoringPublicExerciseSchema.extend({
     /** The collaboration room is derived from this server-side, never named by a client. */
     draftId: z.uuid().nullable(),
+    /** Availability only. The correct answer is fetched through a live visit. */
+    hasSolution: z.boolean(),
   });
 export type MonitoringExerciseContext = z.infer<
   typeof monitoringExerciseContextSchema
@@ -791,6 +793,16 @@ export const monitoringMaterialInputSchema =
   monitoringStudentInputSchema.extend({
     materialId: z.uuid(),
   });
+
+export const monitoringExerciseSolutionInputSchema =
+  monitoringMaterialInputSchema.extend({
+    visitId: z.uuid(),
+  });
+
+export const monitoringExerciseSolutionSchema = z.object({
+  materialId: z.uuid(),
+  solutionCode: z.string(),
+});
 
 export const listFeedbackInputSchema = monitoringStudentInputSchema.extend({
   materialId: z.uuid().optional(),

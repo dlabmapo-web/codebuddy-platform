@@ -19,7 +19,7 @@
  * mean — is the failure mode the version exists to prevent: a future format
  * gets a new number rather than quietly changing what column six means.
  */
-export const CONTENT_IMPORT_TEMPLATE_VERSION = 1;
+export const CONTENT_IMPORT_TEMPLATE_VERSION = 2;
 
 /** §10 — the compressed upload cap, enforced while the body streams. */
 export const CONTENT_IMPORT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;

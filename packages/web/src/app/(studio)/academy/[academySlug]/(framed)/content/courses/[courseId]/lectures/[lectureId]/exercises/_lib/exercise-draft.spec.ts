@@ -16,6 +16,7 @@ function draft(overrides: Partial<ExerciseDraft> = {}): ExerciseDraft {
     outputFormat: '',
     constraints: '',
     starterCode: '',
+    solutionCode: 'print(sum(map(int, input().split())))\n',
     aiFeedbackEnabled: false,
     isVisible: true,
     testCases: [

@@ -32,18 +32,20 @@ export function useExerciseAuthoring({
   target,
   initialContext,
   canEdit,
+  initialSolutionCode,
 }: {
   target: AuthoringTarget;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
+  initialSolutionCode: string;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useLayoutTranslation('content');
   const router = useRouter();
   const queryClient = useQueryClient();
   const initialDraft = React.useMemo(
-    () => contextToDraft(initialContext),
-    [initialContext],
+    () => contextToDraft(initialContext, initialSolutionCode),
+    [initialContext, initialSolutionCode],
   );
   const [draft, setDraft] = React.useState(initialDraft);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -125,9 +127,9 @@ export function useExerciseAuthoring({
   }
 
   /** Errors surface per field, next to the input that needs fixing. */
-  function errorFor(field: 'title' | 'difficulty' | 'description' | 'test') {
+  function errorFor(field: 'title' | 'difficulty' | 'description' | 'solution' | 'test') {
     if (!editable) return null;
-    const key = field === 'test' ? 'testCases' : field;
+    const key = field === 'test' ? 'testCases' : field === 'solution' ? 'solutionCode' : field;
     if (!touched.has(key)) return null;
     return missing.includes(field) ? t(`exercise.error.${field}`) : null;
   }

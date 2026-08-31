@@ -18,6 +18,7 @@ const validExercise = {
   outputFormat: "",
   constraints: "",
   starterCode: "",
+  solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
   aiFeedbackEnabled: false,
   isVisible: true,
   testCases: [{
@@ -29,9 +30,16 @@ const validExercise = {
 };
 
 describe("manual programming exercise schemas", () => {
-  it("accepts the v1 manual authoring fields", () => {
+  it("accepts the manual authoring fields with a correct answer", () => {
     expect(createProgrammingExerciseSchema.safeParse(validExercise).success)
       .toBe(true);
+  });
+
+  it("requires a nonblank correct answer without trimming valid code", () => {
+    expect(createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      solutionCode: "  \n",
+    }).success).toBe(false);
   });
 
   it("accepts large lesson-style exercise descriptions for reads and writes", () => {

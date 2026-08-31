@@ -34,18 +34,28 @@ declare global {
 }
 
 /**
- * How long the widget may take to appear before the page admits it has not.
+ * How long the widget may take to *appear* before the page admits it has not.
  *
  * The failure this guards is silence, not error. An ad blocker, a school
  * proxy, or a filtered network can leave the request to Cloudflare hanging:
  * `onReady` never fires, `onError` never fires, no widget renders, and the
- * submit button stays disabled with an empty gap above it and no way in. Ten
- * seconds is far longer than a working load and far shorter than a person's
- * patience with a form that will not explain itself.
+ * submit button stays disabled with an empty gap above it and no way in.
+ *
+ * It measures the widget arriving, never the challenge being solved. A managed
+ * widget shows a checkbox and waits for a person, who owes it no particular
+ * promptness — timing that would call every unhurried reader a network fault
+ * and tell them, under a working checkbox, that it had failed to load.
  */
 const loadTimeoutMs = 10_000;
 
-type ChallengeStatus = 'loading' | 'ready' | 'failed';
+type ChallengeStatus =
+  /** No widget on the page yet; the watchdog is running. */
+  | 'loading'
+  /** On screen and waiting — for Cloudflare, or for a person to tick a box. */
+  | 'rendered'
+  /** A token has arrived. */
+  | 'ready'
+  | 'failed';
 
 /** A fresh, single-use Turnstile challenge for one authentication attempt. */
 export function TurnstileChallenge({
@@ -80,7 +90,7 @@ export function TurnstileChallenge({
     const container = containerRef.current;
     if (!api || !container || widgetIdRef.current) return;
 
-    widgetIdRef.current = api.render(container, {
+    const widgetId = api.render(container, {
       sitekey: siteKey,
       action,
       // The reader's own choice, not the operating system's. This product has
@@ -109,6 +119,10 @@ export function TurnstileChallenge({
       'expired-callback': () => onTokenChange(null),
       'timeout-callback': () => onTokenChange(null),
     });
+    widgetIdRef.current = widgetId;
+    // The widget exists, so the thing the watchdog was waiting for happened.
+    // Whether it now solves itself or waits for a click is not its business.
+    setStatus((current) => (current === 'loading' ? 'rendered' : current));
   }, [action, fail, onTokenChange, siteKey, theme]);
 
   // Re-armed on every attempt, so a retry that also goes nowhere is reported
@@ -146,6 +160,10 @@ export function TurnstileChallenge({
     if (api && widgetId) {
       try {
         api.reset(widgetId);
+        // Still on the page, so the watchdog has nothing left to wait for —
+        // re-arming it here would fail a widget that is merely waiting for a
+        // click, which is the whole defect this retry exists to recover from.
+        setStatus('rendered');
         return;
       } catch {
         // A widget id the script no longer recognises. Drop it and rebuild.

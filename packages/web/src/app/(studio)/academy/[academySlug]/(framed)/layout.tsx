@@ -31,7 +31,11 @@ export default async function FramedAcademyLayout({
   const { academySlug } = await params;
   // Memoised per request, and the parent layout has already resolved it, so
   // this costs a map lookup rather than a second round trip.
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const { academyId, role } = await requireAcademyRoute(academySlug);
 
-  return <StudioChrome academyId={academyId}>{children}</StudioChrome>;
+  return (
+    <StudioChrome academyId={academyId} academySlug={academySlug} routeRole={role}>
+      {children}
+    </StudioChrome>
+  );
 }

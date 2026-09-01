@@ -48,18 +48,22 @@ export default async function AcademyPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academySlug } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  // The role comes from the guard, which resolves it from a membership or
+  // from a live support grant. Re-deriving it here from `auth.me` was the
+  // reason an operator holding a grant reached this page and was told they
+  // had no access to it: the API had authorized them and this lookup had not.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['academy']);
 
-  let role = null;
   let hasLeaderboard = false;
   try {
     const account = await getAccount();
     const membership = account.user.memberships.find(
-      (entry) =>
-        entry.status === 'ACTIVE' && entry.academy.id === academyId,
+      (entry) => entry.status === 'ACTIVE' && entry.academy.id === academyId,
     );
-    role = membership?.role ?? null;
+    // Feature flags stay membership-derived. An operator on a grant holds no
+    // membership and so sees no leaderboard, which is the right default: the
+    // board is a student-facing feature of an academy they are visiting.
     const features = new Set(membership?.features ?? []);
     hasLeaderboard =
       features.has('STUDENT_POINTS') &&

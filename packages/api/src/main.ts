@@ -1,4 +1,6 @@
 import { NestFactory } from "@nestjs/core";
+
+import { runInRequestContext } from "./common/request-context.js";
 import { ConfigService } from "@nestjs/config";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 
@@ -19,6 +21,13 @@ async function bootstrap(): Promise<void> {
     rawBody: true,
   });
   const configService = app.get(ConfigService<ApiEnvironment, true>);
+
+  // Before every route, so anything the request establishes about itself —
+  // today, the support grant an academy act was authorized by — reaches the
+  // audit writer without being threaded through every service between them.
+  app.use((_request: unknown, _response: unknown, next: () => void) => {
+    runInRequestContext(next);
+  });
 
   app.setGlobalPrefix("api");
   app.enableCors({

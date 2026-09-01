@@ -1,0 +1,90 @@
+{
+  "title": "Support access",
+  "subtitle": "Every time Cove has worked inside an academy, and why.",
+  "back": "Back to support access",
+  "role": {
+    "MANAGER": "Manager",
+    "TEACHER": "Teacher"
+  },
+  "state": {
+    "live": "Live",
+    "scheduled": "Scheduled",
+    "expired": "Ended",
+    "revoked": "Revoked"
+  },
+  "banner": {
+    "title": "You are inside {{academy}}",
+    "read_only": "Read-only",
+    "writing": "Acting as {{role}}",
+    "remaining_one": "1 minute left",
+    "remaining_other": "{{count}} minutes left",
+    "ending": "Ending now",
+    "manage": "Manage"
+  },
+  "list": {
+    "live_heading_one": "1 session open now",
+    "live_heading_other": "{{count}} sessions open now",
+    "live_none": "No session is open",
+    "live_none_body": "Nobody at Cove is inside a customer's academy right now.",
+    "history": "History",
+    "empty": "No support session has ever been opened.",
+    "academy": "Academy",
+    "operator": "Operator",
+    "access": "Access",
+    "opened": "Opened",
+    "state": "State",
+    "actions": "Actions",
+    "open": "Open",
+    "read_only": "Read-only",
+    "read_write": "Read and write",
+    "monitoring": "Includes live monitoring"
+  },
+  "open": {
+    "cta": "Enter academy",
+    "title": "Enter {{academy}}",
+    "subtitle": "Support access is time-limited, recorded, and visible to the academy.",
+    "reason_label": "Why do you need to go in?",
+    "reason_hint": "The academy can read this. Write it for them, not for yourself.",
+    "role_label": "Act as",
+    "role_manager_hint": "Everything a manager can do: people, classes, curriculum, settings.",
+    "role_teacher_hint": "What an assigned teacher sees: their classes and student work.",
+    "access_label": "Access",
+    "read_only": "Read-only",
+    "read_only_hint": "Recommended. You can look at everything the role can, and change nothing.",
+    "read_write": "Read and write",
+    "read_write_hint": "Only when you need to fix something for them.",
+    "monitoring_label": "Include live monitoring",
+    "monitoring_hint": "Lets you watch a student's editor in real time. Leave off unless the report is about live monitoring itself.",
+    "duration_label": "For how long",
+    "duration_hours_one": "1 hour",
+    "duration_hours_other": "{{count}} hours",
+    "submit": "Open session and enter",
+    "submitting": "Opening…",
+    "cancel": "Cancel"
+  },
+  "detail": {
+    "title": "Support session",
+    "subtitle": "What was done inside {{academy}}, and by whom.",
+    "academy": "Academy",
+    "operator": "Operator",
+    "reason": "Stated reason",
+    "access": "Access",
+    "opened": "Opened",
+    "expires": "Ends",
+    "expired": "Ended",
+    "revoked": "Revoked",
+    "revoked_by": "Revoked by {{name}}",
+    "revoke": "End session now",
+    "revoking": "Ending…",
+    "revoke_hint": "Ends this session immediately. The operator loses access on their next click.",
+    "enter": "Go to academy",
+    "activity": "What was done",
+    "activity_empty": "Nothing was changed",
+    "activity_empty_body": "This session made no changes to the academy.",
+    "activity_hint": "Every change made during this session, on the academy's own audit trail too."
+  },
+  "unavailable": {
+    "title": "Support sessions are unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

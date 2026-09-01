@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
+import { currentSupportGrantId } from "../common/request-context.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 export type AuditInput = {
@@ -19,6 +20,12 @@ export type AuditInput = {
   after?: Prisma.InputJsonValue;
   reason?: string;
   requestId?: string;
+  /**
+   * Normally omitted. The writer reads the request's own grant, so an act
+   * performed under support access is attributed whether or not the service
+   * doing it knows support access exists.
+   */
+  supportGrantId?: string;
 };
 
 @Injectable()
@@ -35,6 +42,7 @@ export class AuditService {
         after: input.after,
         reason: input.reason,
         requestId: input.requestId,
+        supportGrantId: input.supportGrantId ?? currentSupportGrantId(),
       },
     });
   }

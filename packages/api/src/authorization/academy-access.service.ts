@@ -1,23 +1,64 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  grantHasPermission,
   roleHasPermission,
   type AcademyPermission,
   type AcademyRole,
 } from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
+import { setRequestSupportGrant } from "../common/request-context.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { SupportGrantResolver } from "./support-grant.resolver.js";
 
 export type AcademyAccess = {
   userId: string;
   academyId: string;
   role: AcademyRole;
+  /**
+   * Which axis answered.
+   *
+   * Never consulted to widen anything — every caller downstream reads `role`
+   * exactly as before. It exists so the audit writer can stamp the grant onto
+   * whatever this request goes on to do, which is the entire accountability
+   * story for support access.
+   */
+  via: "membership" | "support";
+  /** Present only when `via === "support"`. */
+  supportGrantId?: string;
 };
 
 @Injectable()
 export class AcademyAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supportGrants: SupportGrantResolver,
+  ) {}
 
+  /**
+   * The one gate every academy read and write passes through.
+   *
+   * Two sources of authority, tried in a fixed order, and the order is the
+   * design:
+   *
+   * 1. **Account status first, ahead of both.** A suspended account is
+   *    suspended everywhere; a grant must not be a way around that.
+   * 2. **Membership second.** An operator who is genuinely a member of this
+   *    academy acts as that member. Letting a forgotten open grant silently
+   *    upgrade somebody's real role would make "what could they do" depend on
+   *    a row they were not thinking about.
+   * 3. **A live support grant last**, and only where a membership would have
+   *    refused for *absence*. A suspended membership stays a refusal: that
+   *    academy made a decision about this person, and support access is not
+   *    the tool for overruling it.
+   *
+   * Academy status is read differently on the two paths, deliberately. A
+   * SUSPENDED academy accepts a grant — that is precisely when support is
+   * needed, and refusing would make the console useless in the one situation
+   * it exists for — while an ARCHIVED academy accepts only a read-only one,
+   * because archived is terminal and reading its history is support where
+   * writing to it is not.
+   */
   async requirePermission(
     authUserId: string,
     academyId: string,
@@ -42,6 +83,12 @@ export class AcademyAccessService {
       include: { academy: { select: { status: true } } },
     });
     if (!membership) {
+      const viaSupport = await this.requireSupportGrant(
+        user.id,
+        academyId,
+        permission,
+      );
+      if (viaSupport) return viaSupport;
       throw new AppException(
         "ACADEMY_MEMBERSHIP_REQUIRED",
         HttpStatus.FORBIDDEN,
@@ -57,7 +104,70 @@ export class AcademyAccessService {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     }
 
-    return { userId: user.id, academyId, role: membership.role };
+    return {
+      userId: user.id,
+      academyId,
+      role: membership.role,
+      via: "membership",
+    };
+  }
+
+  /**
+   * Support authority for this permission, or null to fall through.
+   *
+   * Returns rather than throws on the ordinary "no grant" case, so a caller
+   * with neither membership nor grant still gets the membership refusal it
+   * always got — an operator probing an academy must not be able to tell the
+   * two apart from the error code.
+   *
+   * The one refusal it does raise is `SUPPORT_GRANT_READ_ONLY`, and only when
+   * a live grant exists and would have allowed this permission with writes.
+   * That is a recoverable mistake by somebody already authorized to be here,
+   * and telling them which mistake saves a support session.
+   */
+  private async requireSupportGrant(
+    userId: string,
+    academyId: string,
+    permission: AcademyPermission,
+  ): Promise<AcademyAccess | null> {
+    const grant = await this.supportGrants.findLive(userId, academyId);
+    if (!grant) return null;
+
+    const academy = await this.prisma.academy.findUnique({
+      where: { id: academyId },
+      select: { status: true },
+    });
+    if (!academy) return null;
+    if (academy.status === "ARCHIVED" && !grant.readOnly) return null;
+
+    if (grantHasPermission(grant, permission)) {
+      // Attribution, not authority. Every audit record this request goes on to
+      // write now names the grant, without 18 services having to remember to
+      // pass it.
+      setRequestSupportGrant(grant.id);
+      return {
+        userId,
+        academyId,
+        role: grant.assumedRole,
+        via: "support",
+        supportGrantId: grant.id,
+      };
+    }
+
+    if (
+      grant.readOnly &&
+      grantHasPermission(
+        { ...grant, readOnly: false },
+        permission,
+      )
+    ) {
+      throw new AppException(
+        "SUPPORT_GRANT_READ_ONLY",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return null;
   }
 
   /**

@@ -316,6 +316,8 @@ model User {
   contentImports        ContentImportSession[]    @relation("ContentImportActor")
   peopleBulkOperations  PeopleBulkOperation[]     @relation("PeopleBulkActor")
   academiesCreated      Academy[]                 @relation("AcademyCreator")
+  supportGrants         PlatformSupportGrant[]    @relation("SupportGrantAdmin")
+  supportGrantsRevoked  PlatformSupportGrant[]    @relation("SupportGrantRevoker")
 
   @@index([status])
   @@map("users")
@@ -537,6 +539,7 @@ model Academy {
   bulkOperations         PeopleBulkOperation[]
   pointAwards            PointAward[]
   pointPolicy            AcademyPointPolicy?
+  supportGrants          PlatformSupportGrant[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -912,13 +915,79 @@ model AuditLog {
   reason      String?
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  actor   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  academy Academy? @relation(fields: [academyId], references: [id], onDelete: SetNull)
+  /// The support grant this act was performed under, when it was one.
+  ///
+  /// Null for every ordinary act. Set for every write made while
+  /// `AcademyAccessService` answered `via: "support"` — which is what makes
+  /// the platform's grant page and the academy's own audit page tell the same
+  /// story about the same edit.
+  supportGrantId String? @map("support_grant_id") @db.Uuid
 
+  actor        User?                 @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  academy      Academy?              @relation(fields: [academyId], references: [id], onDelete: SetNull)
+  supportGrant PlatformSupportGrant? @relation(fields: [supportGrantId], references: [id], onDelete: SetNull)
+
+  @@index([supportGrantId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([academyId, createdAt])
   @@index([targetType, targetId])
   @@map("audit_logs")
+}
+
+/// One operator's time-limited authority inside one academy.
+///
+/// The bridge between the two authority axes, and the only one. It is a row
+/// rather than a role because every property that makes deep access acceptable
+/// — a stated reason, an end time, a revoke button, a trail — is a column here
+/// and would be nothing at all in a permission-map entry.
+///
+/// See §3.2 of the platform admin console design.
+model PlatformSupportGrant {
+  id          String      @id @default(uuid()) @db.Uuid
+  academyId   String      @map("academy_id") @db.Uuid
+  adminUserId String      @map("admin_user_id") @db.Uuid
+
+  /// Which role's permission set answers while this grant is live.
+  ///
+  /// Required, because `ManagerScopeService` and `LeadScopeService` assert an
+  /// exact role after their permission check. A grant carrying permissions and
+  /// no role would open half the academy surface and refuse the rest.
+  assumedRole AcademyRole @map("assumed_role")
+
+  /// Default true. False does not narrow anything — it widens — so it is the
+  /// flag an operator has to reach for deliberately.
+  readOnly Boolean @default(true) @map("read_only")
+
+  /// Opt-in per grant. Live monitoring watches a named child's editor in real
+  /// time, which is a different consent question from reading a stored
+  /// submission and must not follow from picking TEACHER in a dropdown.
+  allowMonitoring Boolean @default(false) @map("allow_monitoring")
+
+  /// Required free text. This is what the academy reads on its own audit page,
+  /// so it is written for them rather than for the operator.
+  reason String
+
+  startsAt  DateTime @default(now()) @map("starts_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedByUserId String?   @map("revoked_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  /// Restrict, matching `Course.createdBy`: an operator's account must not be
+  /// removable while these rows record what they did with it.
+  admin     User       @relation("SupportGrantAdmin", fields: [adminUserId], references: [id], onDelete: Restrict)
+  revokedBy User?      @relation("SupportGrantRevoker", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  auditLogs AuditLog[]
+
+  /// The authorization read, run on every academy request an operator makes:
+  /// is there a live grant for this pair, right now.
+  @@index([academyId, adminUserId, expiresAt])
+  /// The console's history list, newest first.
+  @@index([adminUserId, createdAt(sort: Desc)])
+  @@map("platform_support_grants")
 }
 
 model Course {

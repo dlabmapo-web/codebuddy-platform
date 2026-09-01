@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AcademyAccessService } from "./academy-access.service.js";
+import type { SupportGrantResolver } from "./support-grant.resolver.js";
 import type { PrismaService } from "../database/prisma.service.js";
 
 const authUserId = "10000000-0000-4000-8000-000000000001";
@@ -8,7 +9,17 @@ const authUserId = "10000000-0000-4000-8000-000000000001";
 function serviceWith(count: number) {
   const academyMembership = { count: vi.fn().mockResolvedValue(count) };
   const prisma = { academyMembership } as unknown as PrismaService;
-  return { service: new AcademyAccessService(prisma), academyMembership };
+  // A resolver that never finds a grant. `isStudentAnywhere` reads memberships
+  // directly and must keep doing so: a support grant must never put an
+  // operator under the student inactivity lease, nor lift it for anybody else.
+  const supportGrants = {
+    findLive: vi.fn().mockResolvedValue(null),
+  } as unknown as SupportGrantResolver;
+  return {
+    service: new AcademyAccessService(prisma, supportGrants),
+    academyMembership,
+    supportGrants,
+  };
 }
 
 /**

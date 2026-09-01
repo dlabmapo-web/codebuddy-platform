@@ -3,7 +3,17 @@
 import type { AcademyStatus, PlatformAcademyDetail } from '@cove/shared';
 import { canTransitionAcademyStatus } from '@cove/shared';
 import { formatShortDate } from '@cove/i18n/format';
-import { MailWarning, Power, School, Send, UserRoundPlus, Users } from 'lucide-react';
+import {
+  DoorOpen,
+  MailWarning,
+  Power,
+  School,
+  ScrollText,
+  Send,
+  UserRoundPlus,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -53,7 +63,10 @@ export function AcademyDetail({
         <PeoplePanel academy={academy} />
         <DetailsPanel academy={academy} />
       </div>
-      <LifecyclePanel academy={academy} onChange={setAcademy} />
+      <div className="grid gap-6">
+        <EnterAcademyPanel academy={academy} />
+        <LifecyclePanel academy={academy} onChange={setAcademy} />
+      </div>
     </div>
   );
 }
@@ -269,6 +282,50 @@ function FirstManagerPanel({
 }
 
 /* -------------------------------------------------------------- lifecycle */
+
+/**
+ * The way in.
+ *
+ * Deliberately a link to a form rather than a button that opens a session.
+ * Entering a customer's academy takes a written reason and three decisions
+ * about how much authority to take, and none of that fits behind one click —
+ * nor should it, because the friction is the feature.
+ *
+ * Absent for an archived academy: there is nothing running to support, and the
+ * only grant that would be allowed there is read-only, which the operator can
+ * still open from the support console if they genuinely need the history.
+ */
+function EnterAcademyPanel({ academy }: { academy: PlatformAcademyDetail }) {
+  const { t } = useTranslation('platform-support');
+
+  if (academy.status === 'ARCHIVED') return null;
+
+  return (
+    <Panel icon={DoorOpen} title={t('title')}>
+      <div className={cn(body, 'flex flex-wrap items-center justify-between gap-3')}>
+        <p className="max-w-prose text-[13.5px] leading-6 text-sub">
+          {t('open.subtitle')}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {/* Before going in, what previous sessions did. An operator about to
+              open one is exactly the person who should see the last. */}
+          <Button asChild variant="ghost">
+            <Link href={`/admin/audit?academy=${academy.id}`}>
+              <ScrollText className="size-4" />
+              {t('detail.activity')}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href={`/admin/access/new?academy=${academy.id}`}>
+              <DoorOpen className="size-4" />
+              {t('open.cta')}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
 
 function LifecyclePanel({
   academy,

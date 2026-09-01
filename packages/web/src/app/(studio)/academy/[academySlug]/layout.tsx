@@ -70,6 +70,10 @@ export default async function AcademyLayout({
     isStudentAnywhere = false;
   }
 
+  // Whether the person reading this is here on a support grant rather than a
+  // membership. Answered for everyone, because the one case that must never
+  // happen is an operator working inside an academy with no banner — and a
+  // member simply gets `null`, which costs one cheap indexed read.
   const scoped = (
     <AcademyRouteProvider academySlug={academySlug}>
       {children}
@@ -103,3 +107,4 @@ export default async function AcademyLayout({
     </StudentPresenceProvider>
   );
 }
+

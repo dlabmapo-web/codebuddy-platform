@@ -10,14 +10,57 @@ import {
 
 export type { AcademyRouteIdentity } from '@/lib/academy-route-policy';
 
+/**
+ * The caller's live support grant for this academy, or null.
+ *
+ * Cached per request, because the layout draws its banner from the same answer
+ * the guard resolves the route with — one round trip, not two.
+ */
+export const activeSupportGrant = cache(async (academySlug: string) => {
+  try {
+    return await createServerORPCClient().platformSupport.active({
+      academySlug,
+    });
+  } catch {
+    // A failed lookup is not authority. An outage must leave an operator
+    // outside the academy, not inside it without a banner.
+    return null;
+  }
+});
+
+/**
+ * Who this person is inside this academy, from either source of authority.
+ *
+ * Membership first, and a grant only when there is none — the same order
+ * `AcademyAccessService` uses on the API, and for the same reason: an operator
+ * who is genuinely a member acts as that member, and a forgotten open grant
+ * must not silently change what their own pages do.
+ *
+ * Without this fallback the API would authorize an operator holding a grant
+ * and the web route would still answer 404, because `auth.me` reports
+ * memberships and a grant is not one.
+ */
 export const resolveAcademyRoute = cache(
   async (academySlug: string): Promise<AcademyRouteIdentity | null> => {
     try {
       const account = await getAccount();
-      return academyIdentityFromAccount(account, academySlug);
+      const membership = academyIdentityFromAccount(account, academySlug);
+      if (membership) return membership;
     } catch {
       return null;
     }
+
+    const grant = await activeSupportGrant(academySlug);
+    return grant
+      ? {
+          academyId: grant.academyId,
+          academySlug: grant.academySlug,
+          // The role the grant assumes. Every surface below branches on this
+          // exactly as it does for a member, which is the whole point of the
+          // grant carrying one.
+          role: grant.assumedRole,
+        }
+      : null;
   },
 );
 

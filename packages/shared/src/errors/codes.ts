@@ -126,6 +126,10 @@ export const appErrorCodes = [
   /** Revoking the platform's last operator. §3.6 of the console people
    * operations design — the platform-role sibling of `LAST_MANAGER_REQUIRED`. */
   "LAST_ADMIN_REQUIRED",
+  /** More accounts match than one download may carry. Refused rather than
+   * truncated: a file holding the first five thousand of six looks complete.
+   * §2.4 of the console user directory export design. */
+  "PLATFORM_EXPORT_TOO_LARGE",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -323,4 +327,6 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
     "Type the academy's address exactly to confirm deletion.",
   CONFIRMATION_MISMATCH: "Type the account's email or username exactly to confirm.",
   LAST_ADMIN_REQUIRED: "The platform must keep at least one operator.",
+  PLATFORM_EXPORT_TOO_LARGE:
+    "Too many accounts to download at once. Narrow the filter and try again.",
 };

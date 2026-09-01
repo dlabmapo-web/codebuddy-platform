@@ -113,5 +113,6 @@
   "ACADEMY_DELETE_NOT_CONFIRMED": "Type the academy's address exactly to confirm deletion.",
   "CONFIRMATION_MISMATCH": "Type the account's email or username exactly to confirm.",
   "LAST_ADMIN_REQUIRED": "The platform must keep at least one operator.",
+  "PLATFORM_EXPORT_TOO_LARGE": "Too many accounts to download at once. Narrow the filter and try again.",
   "UNKNOWN": "Something went wrong. Try again."
 }

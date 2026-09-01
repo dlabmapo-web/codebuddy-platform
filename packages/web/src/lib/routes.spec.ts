@@ -43,6 +43,18 @@ describe('canonical Cove Studio routes', () => {
     expect(routes.adminAcademies).toBe('/admin/academies');
     expect(routes.adminAcademyNew).toBe('/admin/academies/new');
     expect(routes.adminAcademy('cove-seoul')).toBe('/admin/academies/cove-seoul');
+    expect(routes.adminAcademyCourses('cove-seoul')).toBe(
+      '/admin/academies/cove-seoul/courses',
+    );
+    expect(routes.adminAcademyCourse('cove-seoul', 'course/1')).toBe(
+      '/admin/academies/cove-seoul/courses/course%2F1',
+    );
+    expect(routes.adminAcademyClasses('cove-seoul')).toBe(
+      '/admin/academies/cove-seoul/classes',
+    );
+    expect(routes.adminAcademyClass('cove-seoul', 'class-1')).toBe(
+      '/admin/academies/cove-seoul/classes/class-1',
+    );
   });
 
   it('keeps only the approved temporary redirects', () => {

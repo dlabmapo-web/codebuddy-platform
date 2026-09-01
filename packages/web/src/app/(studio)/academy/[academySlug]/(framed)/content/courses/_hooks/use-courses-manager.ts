@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type { CourseSummary } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +16,7 @@ export function useCoursesManager({
   academyId: string;
   initialCourses: CourseSummary[];
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
@@ -36,11 +34,9 @@ export function useCoursesManager({
 
   const openCourse = useCallback(
     (course: CourseSummary) => {
-      router.push(
-        `${routes.academy(academySlug)}/content/courses/${course.id}`,
-      );
+      router.push(contentPaths.course(course.id));
     },
-    [academySlug, router],
+    [contentPaths, router],
   );
 
   const createMutation = useMutation({
@@ -84,6 +80,20 @@ export function useCoursesManager({
     setDescription('');
   };
 
+  /**
+   * Destroy a course and everything under it.
+   *
+   * Hiding stays the reversible answer for a course that should stop being
+   * taught. The server refuses this one outright once a student has submitted
+   * through it, so what is lost here is only ever curriculum nobody has
+   * answered yet.
+   */
+  const deleteMutation = useMutation({
+    mutationFn: (input: { courseId: string; confirmTitle: string }) =>
+      orpc.academyCourses.delete({ academyId, ...input }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
   return {
     courses: coursesQuery.data.courses,
     showCreate,
@@ -113,6 +123,10 @@ export function useCoursesManager({
     setVisible: (courseId: string, isVisible: boolean) =>
       visibilityMutation.mutate({ courseId, isVisible }),
     visibilityError: visibilityMutation.error,
+    deleteCourse: (courseId: string, confirmTitle: string) =>
+      deleteMutation.mutateAsync({ courseId, confirmTitle }),
+    deletePending: deleteMutation.isPending,
+    deleteError: deleteMutation.error,
   };
 }
 

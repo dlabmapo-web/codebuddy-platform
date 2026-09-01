@@ -21,7 +21,8 @@
     "ending": "Ending now",
     "manage": "Manage",
     "viewing": "Viewing {{academy}} as a platform operator",
-    "viewing_hint": "Read-only. Open a support session to change anything."
+    "viewing_hint": "You have this role's full access here. Changes are recorded against your account.",
+    "viewing_as": "Standing in as {{role}}"
   },
   "list": {
     "live_heading_one": "1 session open now",
@@ -88,5 +89,23 @@
   "unavailable": {
     "title": "Support sessions are unavailable",
     "body": "The platform could not be reached. Try again shortly."
+  },
+  "enter": {
+    "title": "View this academy as a role",
+    "description": "Opens the academy's own studio with that role's navigation and permissions. Course and class administration stays in the platform console.",
+    "as": "View as",
+    "cta": "Enter academy",
+    "session_hint": "Need time-limited support access?",
+    "open_session": "Open a support session"
+  },
+  "role_view": {
+    "MANAGER": "Manager",
+    "TEAM_LEAD": "Team lead",
+    "TEACHER": "Teacher"
+  },
+  "role_view_hint": {
+    "MANAGER": "The control tower: people, classes, settings.",
+    "TEAM_LEAD": "The curriculum overview and course authoring.",
+    "TEACHER": "Classes and the student work in them."
   }
 }

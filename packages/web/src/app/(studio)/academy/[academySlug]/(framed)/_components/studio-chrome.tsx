@@ -1,4 +1,5 @@
-import type { AcademyRole } from '@cove/shared';
+import type { AcademyRole, PlatformViewRole } from '@cove/shared';
+import { isPlatformViewRole } from '@cove/shared';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -17,7 +18,7 @@ import {
   canReviewContent,
   isStudent,
 } from '@/lib/academy-access-state';
-import { getAccount } from '@/lib/orpc-server';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import { SupportBanner } from '@/components/studio/support-banner';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -118,6 +119,11 @@ export async function StudioChrome({
   // lookup rather than a second round trip.
   const support = await activeSupportGrant(academySlug);
   if (!selectedMembershipFound) {
+    // Feature flags belong to the *academy*, not to a membership — an operator
+    // has none, so reading them from one left every flagged surface hidden.
+    // Class ranking was the visible casualty: a Team Lead view with the Team
+    // Lead's own board missing.
+    hasPoints = await academyPointsEnabled(academyId);
     // No membership: the name has to come from the operator's own seam, since
     // `auth.me` only knows the academies this account belongs to. Memoised per
     // request, and the route guard has already asked, so this is a map lookup.
@@ -130,15 +136,11 @@ export async function StudioChrome({
   // True for every member, and for a support session that took write access.
   // False for an operator reading on their standing permission, who has no
   // session at all.
-  // A member writes as their role. A session writes if it took write access.
-  // An operator on the standing read writes nothing — `!support?.readOnly` was
-  // true for them, because there is no session to be read-only, which put
-  // Applications and Classes back in a nav that could not open either.
-  const writable = selectedMembershipFound
-    ? true
-    : support
-      ? !support.readOnly
-      : false;
+  // A member acts as their role. A session is bounded by the access it took.
+  // A platform operator standing in a role holds that role's own set — several
+  // manager surfaces gate a read behind a write-named permission, so anything
+  // narrower produced a Manager sidebar with most of the Manager missing.
+  const writable = support ? !support.readOnly : true;
   // Here without a membership and without a session: the standing read.
   const visiting = !selectedMembershipFound && !support;
 
@@ -162,7 +164,15 @@ export async function StudioChrome({
         canManageClasses={canManageClasses(role) && writable}
         canManageContent={canReviewContent(role)}
         canReviewApplications={canReviewApplications(role) && writable}
-        canMonitor={canMonitorClasses(role) && (support?.allowMonitoring ?? true)}
+        /*
+         * This gates the *classes* link, not the live watch. A platform
+         * operator standing as Teacher covers the academy's classes, so the
+         * link belongs there; the watch itself is refused deeper down by
+         * `MonitoringAccessService`, which needs a real membership.
+         */
+        canMonitor={
+          canMonitorClasses(role) && (support ? support.allowMonitoring : true)
+        }
         hasPoints={hasPoints}
         isStudent={isStudent(role)}
       />
@@ -171,7 +181,11 @@ export async function StudioChrome({
             of the shell it rendered behind a full-height fixed layout, which
             is the one place a warning must never be. */}
         {support || visiting ? (
-          <SupportGrantNotice academyName={academyName} grant={support} />
+          <SupportGrantNotice
+            academyName={academyName}
+            grant={support}
+            viewRole={isPlatformViewRole(role) ? role : 'MANAGER'}
+          />
         ) : null}
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" />
@@ -204,12 +218,35 @@ export async function StudioChrome({
  * must not carry the vocabulary of Cove staff being inside their academy. This
  * renders only while a grant is live.
  */
+/**
+ * Whether this academy runs the point economy.
+ *
+ * Read from the academy rather than from a membership, for a viewer who has
+ * none. Gated on `academy.read`, which every role a platform operator may
+ * stand in holds, and answers false on any failure — a nav link that leads to
+ * an empty board is worse than one that is absent.
+ */
+async function academyPointsEnabled(academyId: string): Promise<boolean> {
+  try {
+    const { features } = await createServerORPCClient().academyFeatures.list({
+      academyId,
+    });
+    return features.some(
+      (feature) => feature.feature === 'STUDENT_POINTS' && feature.isEnabled,
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function SupportGrantNotice({
   academyName,
   grant,
+  viewRole,
 }: {
   academyName: string;
   grant: Awaited<ReturnType<typeof activeSupportGrant>>;
+  viewRole: PlatformViewRole;
 }) {
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, supportNamespaces);
@@ -219,7 +256,11 @@ async function SupportGrantNotice({
       namespaces={supportNamespaces}
       resources={resources}
     >
-      <SupportBanner academyName={academyName} grant={grant} />
+      <SupportBanner
+        academyName={academyName}
+        grant={grant}
+        viewRole={viewRole}
+      />
     </PageTranslationsProvider>
   );
 }

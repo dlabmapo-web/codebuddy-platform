@@ -166,6 +166,7 @@
     "student_impact": "학생은 이 콘텐츠를 더 이상 보거나 열 수 없습니다.",
     "also_hidden": "함께 숨겨지는 콘텐츠",
     "preserved": "내부 공개 설정은 그대로 저장됩니다. 다시 공개하면 이전 공개 상태가 복원됩니다.",
+    "submitting": "숨기는 중…",
     "confirm": "학생에게 숨기기",
     "lectures": "강의",
     "problems": "문제"

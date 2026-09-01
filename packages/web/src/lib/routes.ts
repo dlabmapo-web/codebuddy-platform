@@ -39,6 +39,21 @@ export const routes = {
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,
+  adminAcademyCourses: (academySlug: string) =>
+    `/admin/academies/${segment(academySlug)}/courses`,
+  adminAcademyCourse: (academySlug: string, courseId: string) =>
+    `/admin/academies/${segment(academySlug)}/courses/${segment(courseId)}`,
+  adminAcademyClasses: (academySlug: string) =>
+    `/admin/academies/${segment(academySlug)}/classes`,
+  adminAcademyClass: (academySlug: string, classId: string) =>
+    `/admin/academies/${segment(academySlug)}/classes/${segment(classId)}`,
+  adminAcademyExercise: (
+    academySlug: string,
+    courseId: string,
+    lectureId: string,
+    materialId: string,
+  ) =>
+    `/admin/academies/${segment(academySlug)}/courses/${segment(courseId)}/lectures/${segment(lectureId)}/exercises/${segment(materialId)}`,
   academy: (academySlug: string) => academyRoot(academySlug),
   academyClasses: (academySlug: string) =>
     `${academyRoot(academySlug)}/classes`,

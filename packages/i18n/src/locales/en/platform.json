@@ -48,7 +48,8 @@
     "empty": "No academies yet.",
     "empty_filtered": "No academy matches these filters.",
     "actions": "Actions",
-    "open": "Open"
+    "open": "Open",
+    "more": "More actions"
   },
   "state": {
     "ACTIVE": "Active",
@@ -200,5 +201,44 @@
       "problems_without_tests_one": "1 problem cannot grade",
       "problems_without_tests_other": "{{count}} problems cannot grade"
     }
+  },
+  "delete": {
+    "action": "Delete academy",
+    "title": "Delete {{name}}?",
+    "body": "This cannot be undone. There is no archive to restore from and no backup this console can reach.",
+    "stakes": "Everything {{name}} owns goes: {{people}} accounts lose their membership, and every class, course, problem and submission is destroyed. The audit trail of what was done here survives.",
+    "confirm_label": "Type {{slug}} to confirm",
+    "confirm": "Delete permanently",
+    "working": "Deleting…"
+  },
+  "content_panel": {
+    "courses": "Courses",
+    "classes": "Classes",
+    "add_course": "Add a course",
+    "add_class": "Add a class",
+    "courses_empty": "No curriculum yet",
+    "courses_empty_body": "Add a course to give this academy something to teach.",
+    "classes_empty": "No classes yet",
+    "classes_empty_body": "Add a class to start enrolling students.",
+    "problem_count_one": "{{count}} problem",
+    "problem_count_other": "{{count}} problems",
+    "student_count_one": "{{count}} student",
+    "student_count_other": "{{count}} students",
+    "course_count_one": "{{count}} course",
+    "course_count_other": "{{count}} courses",
+    "view_all_one": "View 1",
+    "view_all_other": "View all {{count}}",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "problems": "Problems",
+    "edit": "Edit",
+    "delete_course": "Delete course",
+    "delete_class": "Delete class"
+  },
+  "content_delete": {
+    "title": "Delete {{name}}?",
+    "course_body": "This removes the course and every module, lecture and problem in it. Refused if any student has submitted through it — hide it instead.",
+    "class_body": "This removes the class, its roster and its schedule. Refused if any student has submitted through it — archive it instead.",
+    "confirm_label": "Type {{name}} to confirm"
   }
 }

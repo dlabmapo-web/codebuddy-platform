@@ -48,7 +48,8 @@
     "empty": "아직 아카데미가 없습니다.",
     "empty_filtered": "조건에 맞는 아카데미가 없습니다.",
     "actions": "작업",
-    "open": "열기"
+    "open": "열기",
+    "more": "추가 작업"
   },
   "state": {
     "ACTIVE": "운영 중",
@@ -200,5 +201,44 @@
       "problems_without_tests_one": "채점할 수 없는 문제 1개",
       "problems_without_tests_other": "채점할 수 없는 문제 {{count}}개"
     }
+  },
+  "delete": {
+    "action": "아카데미 삭제",
+    "title": "{{name}}을(를) 삭제할까요?",
+    "body": "되돌릴 수 없습니다. 복구할 보관본도, 이 콘솔이 접근할 수 있는 백업도 없습니다.",
+    "stakes": "{{name}}의 모든 것이 삭제됩니다: {{people}}개 계정의 소속이 사라지고 모든 반, 코스, 문제, 제출물이 삭제됩니다. 여기에서 수행된 작업의 감사 기록은 남습니다.",
+    "confirm_label": "확인하려면 {{slug}} 을(를) 입력하세요",
+    "confirm": "영구 삭제",
+    "working": "삭제하는 중…"
+  },
+  "content_panel": {
+    "courses": "코스",
+    "classes": "반",
+    "add_course": "코스 추가",
+    "add_class": "반 추가",
+    "courses_empty": "커리큘럼이 없습니다",
+    "courses_empty_body": "코스를 추가하면 이 아카데미가 가르칠 내용이 생깁니다.",
+    "classes_empty": "반이 없습니다",
+    "classes_empty_body": "반을 추가하면 학생을 등록할 수 있습니다.",
+    "problem_count_one": "문제 {{count}}개",
+    "problem_count_other": "문제 {{count}}개",
+    "student_count_one": "학생 {{count}}명",
+    "student_count_other": "학생 {{count}}명",
+    "course_count_one": "코스 {{count}}개",
+    "course_count_other": "코스 {{count}}개",
+    "view_all_one": "1개 보기",
+    "view_all_other": "{{count}}개 모두 보기",
+    "modules": "모듈",
+    "lectures": "강의",
+    "problems": "문제",
+    "edit": "수정",
+    "delete_course": "코스 삭제",
+    "delete_class": "반 삭제"
+  },
+  "content_delete": {
+    "title": "{{name}}을(를) 삭제할까요?",
+    "course_body": "코스와 그 안의 모든 모듈, 강의, 문제가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 숨기기를 사용하세요.",
+    "class_body": "반과 학생 명단, 시간표가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 보관을 사용하세요.",
+    "confirm_label": "확인하려면 {{name}} 을(를) 입력하세요"
   }
 }

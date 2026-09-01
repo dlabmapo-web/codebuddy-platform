@@ -1,5 +1,6 @@
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { AcademyRouteProvider } from '@/components/studio/academy-route-provider';
+import { ContentBasePathProvider } from '@/components/studio/content-base-path-provider';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { sessionNamespaces } from '@/i18n/namespaces';
@@ -76,7 +77,9 @@ export default async function AcademyLayout({
   // member simply gets `null`, which costs one cheap indexed read.
   const scoped = (
     <AcademyRouteProvider academySlug={academySlug}>
-      {children}
+      <ContentBasePathProvider academySlug={academySlug} surface="academy">
+        {children}
+      </ContentBasePathProvider>
     </AcademyRouteProvider>
   );
 
@@ -107,4 +110,3 @@ export default async function AcademyLayout({
     </StudentPresenceProvider>
   );
 }
-

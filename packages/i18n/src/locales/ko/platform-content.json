@@ -46,7 +46,22 @@
       "EASY": "쉬움",
       "MEDIUM": "보통",
       "HARD": "어려움"
-    }
+    },
+    "visibility": "공개 여부",
+    "status": "상태",
+    "assigned_courses": "배정된 코스",
+    "assigned_teacher": "담당 선생님",
+    "last_change": "최근 변경",
+    "visible": "공개",
+    "hidden": "비공개",
+    "modules": "모듈",
+    "lectures": "강의",
+    "problems": "문제",
+    "no_description": "아직 설명이 없습니다.",
+    "no_courses": "배정된 코스 없음",
+    "courses_more": "+{{count}}",
+    "courses_aria": "{{count}}개 배정: {{titles}}",
+    "teacher_role": "선생님"
   },
   "unavailable": {
     "title": "콘텐츠를 불러올 수 없습니다",

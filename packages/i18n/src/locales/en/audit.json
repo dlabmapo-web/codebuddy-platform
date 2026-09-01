@@ -20,6 +20,7 @@
     "class.created": "Created a class",
     "class.updated": "Updated a class",
     "class.archived": "Archived a class",
+    "class.deleted": "Deleted a class",
     "class.restored": "Restored a class",
     "class.courses.updated": "Changed a class's courses",
     "class.schedule.updated": "Changed when a class meets",

@@ -1,7 +1,5 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
 import type { CourseSummary } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -9,13 +7,15 @@ import {
   Eye,
   EyeOff,
   MoreHorizontal,
+  Trash2,
   Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 
+import { DeleteConfirmDialog } from '@/components/studio/delete-confirm-dialog';
 import { DataTable } from '@/components/studio/data-table';
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,15 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { useTranslation } from 'react-i18next';
+
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 import { useContentDate } from '../../_components/content-date';
 import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
-
-function curriculumPath(academySlug: string, course: CourseSummary) {
-  return `${routes.academy(academySlug)}/content/courses/${course.id}`;
-}
 
 function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
   const { t } = useLayoutTranslation('courses');
@@ -68,20 +66,23 @@ function CountCell({ value }: { value: number }) {
 }
 
 export function CoursesTable({
-  academyId,
   canEdit,
   manager,
   toolbarActions,
 }: {
-  academyId: string;
   canEdit: boolean;
   manager: CoursesManagerState;
   toolbarActions?: ReactNode;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('courses');
+  // The delete words live in their own namespace: `courses` is a layout one,
+  // and an irreversible act two staff surfaces offer should not ride in
+  // every student's payload.
+  const { t: destructive } = useTranslation('destructive');
   const contentDate = useContentDate();
   const [courseToHide, setCourseToHide] = useState<CourseSummary | null>(null);
+  const [toDelete, setToDelete] = useState<CourseSummary | null>(null);
 
   const columns = useMemo<ColumnDef<CourseSummary>[]>(
     () => [
@@ -144,7 +145,7 @@ export function CoursesTable({
         enableSorting: false,
         cell: ({ row }) => {
           const course = row.original;
-          const href = curriculumPath(academySlug, course);
+          const href = contentPaths.course(course.id);
           return (
             <div className="flex items-center justify-end gap-1">
               <Link
@@ -194,6 +195,14 @@ export function CoursesTable({
                       )}
                       {course.isVisible ? t('hide') : t('show')}
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {/* Hiding is the reversible answer for a course that should
+                        stop being taught; this unmakes one. The server refuses
+                        it once a student has submitted through the course. */}
+                    <DropdownMenuItem onSelect={() => setToDelete(course)}>
+                      <Trash2 className="text-danger" />
+                      <span className="text-danger">{destructive('course.delete')}</span>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
@@ -202,7 +211,7 @@ export function CoursesTable({
         },
       },
     ],
-    [academyId, academySlug, canEdit, contentDate, manager, t],
+    [canEdit, contentDate, contentPaths, destructive, manager, t],
   );
 
   return (
@@ -224,6 +233,19 @@ export function CoursesTable({
         pageSize={10}
         searchPlaceholder={t('search_placeholder')}
         toolbarActions={toolbarActions}
+      />
+      <DeleteConfirmDialog
+        body={destructive('course.delete_body')}
+        cancelLabel={destructive('course.cancel')}
+        confirmLabel={destructive('course.delete_confirm')}
+        fieldLabel={destructive('course.delete_confirm_label', { name: toDelete?.title ?? '' })}
+        workingLabel={destructive('course.delete_working')}
+        confirmValue={toDelete?.title ?? ''}
+        onClose={() => setToDelete(null)}
+        onConfirm={(typed) => manager.deleteCourse(toDelete!.id, typed)}
+        open={toDelete !== null}
+        pending={manager.deletePending}
+        title={destructive('course.delete_title', { name: toDelete?.title ?? '' })}
       />
       {courseToHide ? (
         <VisibilityConfirmModal

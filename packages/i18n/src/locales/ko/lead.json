@@ -99,6 +99,7 @@
       "content.course.created": "생성함",
       "content.course.updated": "수정함",
       "content.course.visibility_changed": "공개 상태 변경",
+      "content.course.deleted": "코스를 삭제했습니다",
       "content.course_module.created": "모듈 추가",
       "content.course_module.updated": "모듈 수정",
       "content.course_module.visibility_changed": "모듈 공개 상태 변경",

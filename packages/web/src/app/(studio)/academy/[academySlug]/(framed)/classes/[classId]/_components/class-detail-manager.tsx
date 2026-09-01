@@ -49,7 +49,7 @@ export function ClassDetailManager({
 
   return (
     <div className="space-y-5">
-      <ClassHeader academyId={academyId} manager={manager} />
+      <ClassHeader manager={manager} />
 
       <ClassOverviewCard detail={manager.detail} />
 
@@ -59,14 +59,12 @@ export function ClassDetailManager({
           bound, so it goes last rather than pushing a one-line answer below a
           page of rows. */}
       <ClassCoursesPanel
-        academyId={academyId}
         canAssign={canAssignCourses}
         manager={manager}
       />
       <ClassSchedulePanel canEdit={canSetSchedule} manager={manager} />
       <ClassTeacherPanel canAssign={canAssignTeacher} manager={manager} />
       <ClassStudentsPanel
-        academyId={academyId}
         canEnroll={canEnroll}
         manager={manager}
       />

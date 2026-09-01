@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import {
-  academyRoleFor,
   canManageExercises,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
@@ -20,7 +19,10 @@ export default async function ExercisePage({
   }>;
 }) {
   const { academySlug, courseId, lectureId, materialId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+    // The role comes from the guard, which resolves it from a membership or from
+  // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
+  // write control from an operator the API would have allowed.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
   let context;
   let account;
@@ -38,7 +40,7 @@ export default async function ExercisePage({
   } catch {
     notFound();
   }
-  const canEdit = canManageExercises(academyRoleFor(account, academyId));
+  const canEdit = canManageExercises(role);
   if (canEdit) {
     // Its own request, and its own failure. The model solution is the one
     // field this page can open without: legacy problems have none, and the

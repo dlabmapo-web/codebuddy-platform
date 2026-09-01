@@ -1,5 +1,7 @@
 import type { ContentLens } from '@cove/shared';
 
+import { routes } from '@/lib/routes';
+
 /** Where each content lens lives, so the tabs and the router agree. */
 export const contentLensHrefs: Record<ContentLens, string> = {
   courses: '/admin/content/courses',
@@ -23,7 +25,7 @@ export function editInAcademyHref(input: {
   academySlug: string;
   path: string;
 }): string {
-  const next = `/academy/${encodeURIComponent(input.academySlug)}${input.path}`;
+  const next = `${routes.academy(input.academySlug)}${input.path}`;
   return `/admin/access/new?academy=${input.academyId}&next=${encodeURIComponent(next)}`;
 }
 

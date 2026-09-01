@@ -1,0 +1,20 @@
+{
+  "course": {
+    "delete": "코스 삭제",
+    "delete_title": "{{name}}을(를) 삭제할까요?",
+    "delete_body": "코스와 그 안의 모든 모듈, 강의, 문제가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 숨기기를 사용하세요.",
+    "delete_confirm_label": "확인하려면 {{name}} 을(를) 입력하세요",
+    "delete_confirm": "영구 삭제",
+    "delete_working": "삭제하는 중…",
+    "cancel": "취소"
+  },
+  "class": {
+    "delete": "반 삭제",
+    "delete_title": "{{name}}을(를) 삭제할까요?",
+    "delete_body": "반과 학생 명단, 시간표가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 보관을 사용하세요.",
+    "delete_confirm_label": "확인하려면 {{name}} 을(를) 입력하세요",
+    "delete_confirm": "영구 삭제",
+    "delete_working": "삭제하는 중…",
+    "cancel": "취소"
+  }
+}

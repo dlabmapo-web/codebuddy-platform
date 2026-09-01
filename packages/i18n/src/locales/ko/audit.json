@@ -20,6 +20,7 @@
     "class.created": "반 생성",
     "class.updated": "반 수정",
     "class.archived": "반 보관",
+    "class.deleted": "반을 삭제했습니다",
     "class.restored": "반 복구",
     "class.courses.updated": "반 과정 변경",
     "class.schedule.updated": "수업 시간표를 변경했습니다",

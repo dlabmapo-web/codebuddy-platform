@@ -1,4 +1,8 @@
 import { requireAcademyRoute } from '@/lib/academy-route';
+import { PageTranslationsProvider } from '@/i18n';
+import { initTranslations } from '@/i18n/init-translations';
+import { destructiveNamespaces } from '@/i18n/namespaces';
+import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -33,7 +37,18 @@ export default async function ClassesPage({
     denied = isAccessDeniedError(error);
   }
 
+  const locale = await getLocale();
+  const { resources: destructiveResources } = await initTranslations(
+    locale,
+    destructiveNamespaces,
+  );
+
   return (
+    <PageTranslationsProvider
+      locale={locale}
+      namespaces={destructiveNamespaces}
+      resources={destructiveResources}
+    >
     <StudioPage
       bleed
       description={t('description')}
@@ -52,5 +67,6 @@ export default async function ClassesPage({
         </div>
       )}
     </StudioPage>
+    </PageTranslationsProvider>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import {
+  useContentAcademySlug,
+  useContentSurface,
+} from '@/components/studio/content-base-path-provider';
 
 import type { EnrolledStudentSummary } from '@cove/shared';
 import { enrollmentGrantsAccess } from '@cove/shared';
@@ -15,6 +16,7 @@ import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation } from '@/i18n';
+import { routes } from '@/lib/routes';
 
 import { useContentDate } from '../../../content/_components/content-date';
 import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager';
@@ -25,15 +27,14 @@ import { ClassRowActions } from './class-row-actions';
 const PAGE_SIZE = 10;
 
 export function ClassStudentsPanel({
-  academyId,
   canEnroll,
   manager,
 }: {
-  academyId: string;
   canEnroll: boolean;
   manager: ClassDetailManagerState;
 }) {
-  const academySlug = useAcademySlug();
+  const contentSurface = useContentSurface();
+  const academySlug = useContentAcademySlug();
   const { t } = useLayoutTranslation('classes');
   const contentDate = useContentDate();
   const { detail } = manager;
@@ -139,12 +140,17 @@ export function ClassStudentsPanel({
                * and an academy without points answers with its own not-found
                * page.
                */}
-              <Link
-                className="whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
-                href={`${routes.academy(academySlug)}/points/students/${student.membershipId}`}
-              >
-                {t('detail.students_panel.points')}
-              </Link>
+              {contentSurface === 'academy' ? (
+                <Link
+                  className="whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
+                  href={routes.academyStudentPoints(
+                    academySlug,
+                    student.membershipId,
+                  )}
+                >
+                  {t('detail.students_panel.points')}
+                </Link>
+              ) : null}
               {editable ? (
                 <ClassRowActions
                   disabled={manager.removalPending}
@@ -162,7 +168,7 @@ export function ClassStudentsPanel({
         },
       },
     ],
-    [academyId, academySlug, contentDate, displayName, editable, manager, t],
+    [academySlug, contentDate, contentSurface, displayName, editable, manager, t],
   );
 
   return (

@@ -38,7 +38,6 @@ export function CoursesManager({
       {canEdit ? <CourseModal manager={manager} /> : null}
 
       <CoursesTable
-        academyId={academyId}
         canEdit={canEdit}
         manager={manager}
         toolbarActions={

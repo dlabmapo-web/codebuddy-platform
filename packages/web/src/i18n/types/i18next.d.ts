@@ -13,6 +13,7 @@ import type common from '@cove/i18n/locales/en/common.json';
 import type content from '@cove/i18n/locales/en/content.json';
 import type contentImport from '@cove/i18n/locales/en/content-import.json';
 import type courses from '@cove/i18n/locales/en/courses.json';
+import type destructive from '@cove/i18n/locales/en/destructive.json';
 import type errors from '@cove/i18n/locales/en/errors.json';
 import type invitations from '@cove/i18n/locales/en/invitations.json';
 import type lead from '@cove/i18n/locales/en/lead.json';
@@ -49,6 +50,7 @@ declare module 'i18next' {
       content: typeof content;
       'content-import': typeof contentImport;
       courses: typeof courses;
+      destructive: typeof destructive;
       errors: typeof errors;
       invitations: typeof invitations;
       lead: typeof lead;

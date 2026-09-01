@@ -1,6 +1,7 @@
 'use client';
 
 import { Archive, RotateCcw } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
@@ -12,6 +13,7 @@ import { useLayoutTranslation } from '@/i18n';
  */
 export function ArchiveClassDialog({
   courseCount,
+  error,
   name,
   onCancel,
   onConfirm,
@@ -19,6 +21,7 @@ export function ArchiveClassDialog({
   studentCount,
 }: {
   courseCount: number;
+  error?: ReactNode;
   name: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -67,6 +70,11 @@ export function ArchiveClassDialog({
             <RotateCcw className="mt-0.5 size-4 shrink-0 text-success" />
             <p>{t('archive_dialog.preserved')}</p>
           </div>
+          {error ? (
+            <p className="mt-3 text-[13px] text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">

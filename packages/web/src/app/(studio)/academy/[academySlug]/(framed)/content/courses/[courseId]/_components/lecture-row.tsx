@@ -49,7 +49,7 @@ function OutlineNumber({
 
 function ExerciseRow({
   builder,
-  exerciseBasePath,
+  exercisePath,
   lectureId,
   material,
   outlineNumber,
@@ -57,7 +57,7 @@ function ExerciseRow({
   siblings,
 }: {
   builder: CourseBuilderState;
-  exerciseBasePath: string;
+  exercisePath: (lectureId: string, materialId: string) => string;
   lectureId: string;
   material: CourseMaterial;
   outlineNumber: string;
@@ -69,7 +69,7 @@ function ExerciseRow({
   const [deleting, setDeleting] = useState(false);
   const [moving, setMoving] = useState(false);
   const materialIndex = siblings.findIndex((item) => item.id === material.id);
-  const href = `${exerciseBasePath}/${lectureId}/exercises/${material.id}`;
+  const href = exercisePath(lectureId, material.id);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
 
@@ -151,14 +151,14 @@ function ExerciseRow({
 
 export function LectureRow({
   builder,
-  exerciseBasePath,
+  exercisePath,
   lecture,
   moduleId,
   moduleNumber,
   parentEffectivelyVisible,
 }: {
   builder: CourseBuilderState;
-  exerciseBasePath: string;
+  exercisePath: (lectureId: string, materialId: string) => string;
   lecture: CourseLecture;
   moduleId: string;
   moduleNumber: number;
@@ -250,7 +250,7 @@ export function LectureRow({
               {lecture.materials.map((material) => (
                 <ExerciseRow
                   builder={builder}
-                  exerciseBasePath={exerciseBasePath}
+                  exercisePath={exercisePath}
                   key={material.id}
                   lectureId={lecture.id}
                   material={material}
@@ -265,7 +265,7 @@ export function LectureRow({
           {builder.exerciseEditable ? (
             <Link
               className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand hover:text-brand-deep"
-              href={`${exerciseBasePath}/${lecture.id}/exercises/new`}
+              href={exercisePath(lecture.id, 'new')}
             >
               <Plus className="size-3.5" />
               {t('exercise.add')}

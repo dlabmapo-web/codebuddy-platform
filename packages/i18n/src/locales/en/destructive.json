@@ -1,0 +1,20 @@
+{
+  "course": {
+    "delete": "Delete course",
+    "delete_title": "Delete {{name}}?",
+    "delete_body": "This removes the course and every module, lecture and problem in it. Refused if any student has submitted through it — hide it instead.",
+    "delete_confirm_label": "Type {{name}} to confirm",
+    "delete_confirm": "Delete permanently",
+    "delete_working": "Deleting…",
+    "cancel": "Cancel"
+  },
+  "class": {
+    "delete": "Delete class",
+    "delete_title": "Delete {{name}}?",
+    "delete_body": "This removes the class, its roster and its schedule. Refused if any student has submitted through it — archive it instead.",
+    "delete_confirm_label": "Type {{name}} to confirm",
+    "delete_confirm": "Delete permanently",
+    "delete_working": "Deleting…",
+    "cancel": "Cancel"
+  }
+}

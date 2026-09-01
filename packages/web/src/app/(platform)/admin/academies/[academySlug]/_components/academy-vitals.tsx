@@ -3,8 +3,11 @@
 import type { PlatformAcademyDetail } from '@cove/shared';
 import {
   AlertTriangle,
+  Backpack,
+  BookMarked,
   BookOpen,
   GraduationCap,
+  LayoutDashboard,
   LayoutGrid,
   Users,
 } from 'lucide-react';
@@ -66,6 +69,7 @@ export function AcademyVitals({
     <div className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
+          tone="bg-course-a-soft text-course-a"
           detail={
             counts.total === 0
               ? t('vitals.people_empty')
@@ -77,6 +81,7 @@ export function AcademyVitals({
           value={counts.total}
         />
         <Stat
+          tone="bg-course-b-soft text-course-b"
           detail={
             classes.total === 0
               ? t('vitals.classes_empty')
@@ -91,6 +96,7 @@ export function AcademyVitals({
           value={classes.active}
         />
         <Stat
+          tone="bg-course-c-soft text-course-c"
           detail={
             content.courses === 0
               ? t('vitals.courses_empty')
@@ -105,6 +111,7 @@ export function AcademyVitals({
           value={content.courses}
         />
         <Stat
+          tone="bg-course-d-soft text-course-d"
           detail={
             content.problems === 0
               ? t('vitals.problems_empty')
@@ -137,18 +144,26 @@ export function AcademyVitals({
         <div className="grid grid-cols-2 divide-border sm:grid-cols-4 sm:divide-x">
           {(
             [
-              ['managers', counts.managers],
-              ['team_leads', counts.teamLeads],
-              ['teachers', counts.teachers],
-              ['students', counts.students],
+              ['managers', counts.managers, LayoutDashboard, 'bg-course-a-soft text-course-a'],
+              ['team_leads', counts.teamLeads, BookMarked, 'bg-course-b-soft text-course-b'],
+              ['teachers', counts.teachers, GraduationCap, 'bg-course-c-soft text-course-c'],
+              ['students', counts.students, Backpack, 'bg-course-d-soft text-course-d'],
             ] as const
-          ).map(([role, value]) => (
+          ).map(([role, value, Icon, tone]) => (
             <Link
               className="group px-4 py-3.5 transition-colors hover:bg-canvas"
               href={`/admin/users?academy=${academy.id}`}
               key={role}
             >
-              <span className="block text-[12px] font-semibold uppercase tracking-wide text-sub">
+              {/* The same hue this role carries on the Enter panel above, so
+                  one colour means one role for the length of the page. */}
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-sub">
+                <span
+                  aria-hidden
+                  className={`grid size-5 shrink-0 place-items-center rounded ${tone}`}
+                >
+                  <Icon className="size-3" />
+                </span>
                 {t(`role_label.${role}`)}
               </span>
               <span
@@ -172,37 +187,57 @@ export function AcademyVitals({
   );
 }
 
+/**
+ * One measurement, with a coloured mark.
+ *
+ * The hue is identity, not health: it says *which* of the four this is, so the
+ * row reads as a shelf rather than four blue boxes an operator has to read
+ * every time. It is the family `globals.css` documents for exactly that, and it
+ * stays on the mark — never the number, never the card — because tinting the
+ * whole tile would make one of the four look good and, by contrast, another
+ * look bad. Health is said by the fault chips below, in `danger`, and nowhere
+ * else on this page.
+ */
 function Stat({
   detail,
   href,
   icon: Icon,
   label,
+  tone,
   value,
 }: {
   detail: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  tone: string;
   value: number;
 }) {
   return (
     <Link
-      className="group rounded-card border border-border bg-card p-4 transition-colors hover:border-brand"
+      className="group flex items-start gap-3 rounded-card border border-border bg-card p-4 transition-colors hover:border-brand"
       href={href}
     >
-      <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-sub">
-        <Icon className="size-3.5" />
-        {label}
-      </span>
       <span
-        className={`mt-1 block font-mono text-[30px] font-bold leading-none tabular-nums ${
-          value === 0 ? 'text-sub/40' : 'text-ink group-hover:text-brand'
-        }`}
+        aria-hidden
+        className={`grid size-9 shrink-0 place-items-center rounded-lg ${tone}`}
       >
-        {value}
+        <Icon className="size-[1.1rem]" />
       </span>
-      <span className="mt-1.5 block text-[12.5px] leading-5 text-sub">
-        {detail}
+      <span className="min-w-0">
+        <span className="block text-[12px] font-semibold uppercase tracking-wide text-sub">
+          {label}
+        </span>
+        <span
+          className={`mt-0.5 block font-mono text-[26px] font-bold leading-none tabular-nums ${
+            value === 0 ? 'text-sub/40' : 'text-ink group-hover:text-brand'
+          }`}
+        >
+          {value}
+        </span>
+        <span className="mt-1.5 block text-[12.5px] leading-5 text-sub">
+          {detail}
+        </span>
       </span>
     </Link>
   );

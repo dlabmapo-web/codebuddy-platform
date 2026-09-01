@@ -67,7 +67,7 @@ export default async function NewSupportGrantPage({
  */
 function safeNext(next: string | undefined, slug: string): string | undefined {
   if (!next) return undefined;
-  const prefix = `/academy/${encodeURIComponent(slug)}`;
+  const prefix = routes.academy(slug);
   if (!next.startsWith('/') || next.startsWith('//')) return undefined;
   return next === prefix || next.startsWith(`${prefix}/`) ? next : undefined;
 }

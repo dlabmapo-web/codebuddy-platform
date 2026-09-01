@@ -214,9 +214,20 @@ export type PageNamespace =
   | (typeof learningNamespaces)[number]
   | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
+  | (typeof destructiveNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof supportNamespaces)[number]
   | (typeof contentImportNamespaces)[number]
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number]
   | (typeof pointsNamespaces)[number];
+
+/**
+ * The confirmation copy for deleting a course or a class.
+ *
+ * Its own list rather than more keys in `courses` and `classes`, which are
+ * layout namespaces: the words for an irreversible act two staff surfaces
+ * offer should not ride in every student's payload. The budget in
+ * `@cove/i18n`'s `locales.spec.ts` asked for exactly this split.
+ */
+export const destructiveNamespaces = ['destructive'] as const;

@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,7 +37,7 @@ export function useExerciseAuthoring({
   canEdit: boolean;
   initialSolutionCode: string;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('content');
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -74,7 +72,7 @@ export function useExerciseAuthoring({
     .filter((item) => !item.complete)
     .map((item) => item.id);
 
-  const builderPath = `${routes.academy(academySlug)}/content/courses/${target.courseId}`;
+  const builderPath = contentPaths.course(target.courseId);
 
   React.useEffect(() => {
     if (!dirty) return;

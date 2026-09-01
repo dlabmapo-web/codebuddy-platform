@@ -20,6 +20,7 @@ import { useLocale } from '@/i18n';
 import { routes } from '@/lib/routes';
 
 import { academyCondition } from '../_lib/platform-view';
+import { AcademyRowActions } from './academy-row-actions';
 import { AcademyStateBadge } from './academy-state-badge';
 
 /**
@@ -103,18 +104,8 @@ export function AcademyTable({
         id: 'actions',
         header: t('table.actions'),
         enableSorting: false,
-        cell: ({ row }) => (
-          <div className="flex justify-end">
-            <Link
-              className="group inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3.5 text-[13.5px] font-bold text-brand transition-colors hover:bg-brand hover:text-on-brand"
-              href={routes.adminAcademy(row.original.slug)}
-              onClick={(event) => event.stopPropagation()}
-            >
-              {t('table.open')}
-              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-        ),
+        size: 150,
+        cell: ({ row }) => <AcademyRowActions academy={row.original} />,
       },
     ],
     [locale, t],

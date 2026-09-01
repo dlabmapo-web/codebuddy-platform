@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import { Archive, ArrowLeft, Pencil, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -14,13 +12,11 @@ import { ClassStatusBadge } from '../../_components/class-status-badge';
 import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager';
 
 export function ClassHeader({
-  academyId,
   manager,
 }: {
-  academyId: string;
   manager: ClassDetailManagerState;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('classes');
   const { detail } = manager;
   const archived = detail.status === 'ARCHIVED';
@@ -29,7 +25,7 @@ export function ClassHeader({
     <header className="space-y-4">
       <Link
         className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-sub transition-colors hover:text-brand"
-        href={`${routes.academy(academySlug)}/classes`}
+        href={contentPaths.classes()}
       >
         <ArrowLeft className="size-3.5" />
         {t('detail.back')}

@@ -36,7 +36,6 @@ export function ClassesManager({
       <ClassModal manager={manager} />
 
       <ClassesTable
-        academyId={academyId}
         manager={manager}
         toolbarActions={
           <Button onClick={manager.openCreate}>

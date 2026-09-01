@@ -1,18 +1,17 @@
-import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import Link from 'next/link';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
+import { createServerORPCClient } from '@/lib/orpc-server';
 import {
-  academyRoleFor,
   canImportContent,
   canManageContent,
   canManageExercises,
 } from '@/lib/academy-access-state';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { CourseBuilder } from './_components/course-builder';
+import { createContentPaths } from '@/components/studio/content-paths';
 
 export default async function CourseBuilderPage({
   params,
@@ -23,7 +22,11 @@ export default async function CourseBuilderPage({
   }>;
 }) {
   const { academySlug, courseId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const contentPaths = createContentPaths(academySlug, 'academy');
+    // The role comes from the guard, which resolves it from a membership or from
+  // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
+  // write control from an operator the API would have allowed.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['content']);
   let initialTree = null;
   let canEditCurriculum = false;
@@ -33,12 +36,7 @@ export default async function CourseBuilderPage({
 
   try {
     const client = createServerORPCClient();
-    const [tree, account] = await Promise.all([
-      client.academyCourses.getTree({ academyId, courseId }),
-      getAccount(),
-    ]);
-    initialTree = tree;
-    const role = academyRoleFor(account, academyId);
+    initialTree = await client.academyCourses.getTree({ academyId, courseId });
     canEditCurriculum = canManageContent(role);
     canEditExercises = canManageExercises(role);
     canImport = canImportContent(role);
@@ -84,7 +82,7 @@ export default async function CourseBuilderPage({
           </p>
           <Link
             className="mt-4 inline-block text-[14px] font-bold text-brand underline underline-offset-4"
-            href={`${routes.academy(academySlug)}/content/courses`}
+            href={contentPaths.courses()}
           >
             {t('builder.back_to_courses')}
           </Link>

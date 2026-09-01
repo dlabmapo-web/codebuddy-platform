@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { canManageClasses } from '@/lib/academy-access-state';
-import { getAccount } from '@/lib/orpc-server';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { ClassRankingWorkspace } from './_components/class-ranking-workspace';
@@ -32,20 +31,13 @@ export default async function ClassRankingPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  // The role comes from the guard, which resolves it from a membership or from
+  // a platform operator's chosen view. Re-deriving it from `auth.me` here sent
+  // an operator standing as Team Lead to the not-found page, on a link their
+  // own sidebar had just offered them.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['points']);
 
-  let role = null;
-  try {
-    const account = await getAccount();
-    role =
-      account.user.memberships.find(
-        (membership) =>
-          membership.academy.id === academyId && membership.status === 'ACTIVE',
-      )?.role ?? null;
-  } catch {
-    notFound();
-  }
   if (!canManageClasses(role)) notFound();
 
   return (

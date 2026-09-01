@@ -1,6 +1,11 @@
 'use client';
 
-import type { AcademyStatus, PlatformAcademyDetail } from '@cove/shared';
+import type {
+  AcademyStatus,
+  PlatformAcademyDetail,
+  PlatformClass,
+  PlatformCourse,
+} from '@cove/shared';
 import { canTransitionAcademyStatus } from '@cove/shared';
 import { formatShortDate } from '@cove/i18n/format';
 import {
@@ -28,7 +33,9 @@ import { useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
+import { AcademyContent } from './academy-content';
 import { AcademyVitals } from './academy-vitals';
+import { EnterAcademyPanel } from './enter-academy';
 import { IdentityPanel } from './identity-panel';
 import { cn } from '@/lib/utils';
 
@@ -58,28 +65,36 @@ const body = 'px-4 py-4';
  */
 export function AcademyDetail({
   academy: initial,
+  classes,
+  courses,
 }: {
   academy: PlatformAcademyDetail;
+  classes: PlatformClass[];
+  courses: PlatformCourse[];
 }) {
   const [academy, setAcademy] = React.useState(initial);
 
+  /*
+   * One column, in the order an operator needs it.
+   *
+   * The page used to split into a wide column and a rail, which put the two
+   * things people come here to do — go in, and switch it off — beside
+   * whatever happened to be tall enough to reach them. Down one column the
+   * order can be the argument: what is this, is it working, what is wrong, who
+   * is in it, how do I get in, and only then the administration.
+   */
   return (
-    <div className="grid gap-6">
-      {/* What the academy *is doing*, first. Everything below it is
-          administration, and an operator opening this page is almost always
-          asking the question these four numbers answer. */}
+    <div className="grid gap-5">
       <AcademyVitals academy={academy} />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <div className="grid content-start gap-6">
-        <FirstManagerPanel academy={academy} onChange={setAcademy} />
-        <IdentityPanel academy={academy} onChange={setAcademy} />
-      </div>
-      <div className="grid content-start gap-6">
-        <EnterAcademyPanel academy={academy} />
+      {/* What it teaches, and the way into the screens that change it. */}
+      <AcademyContent academy={academy} classes={classes} courses={courses} />
+      <EnterAcademyPanel academy={academy} />
+      <FirstManagerPanel academy={academy} onChange={setAcademy} />
+      <IdentityPanel academy={academy} onChange={setAcademy} />
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <LifecyclePanel academy={academy} onChange={setAcademy} />
         <DetailsPanel academy={academy} />
-      </div>
       </div>
     </div>
   );
@@ -269,38 +284,6 @@ function FirstManagerPanel({
  * only grant that would be allowed there is read-only, which the operator can
  * still open from the support console if they genuinely need the history.
  */
-function EnterAcademyPanel({ academy }: { academy: PlatformAcademyDetail }) {
-  const { t } = useTranslation('platform-support');
-
-  if (academy.status === 'ARCHIVED') return null;
-
-  return (
-    <Panel icon={DoorOpen} title={t('title')}>
-      <div className={cn(body, 'flex flex-wrap items-center justify-between gap-3')}>
-        <p className="max-w-prose text-[13.5px] leading-6 text-sub">
-          {t('open.subtitle')}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {/* Before going in, what previous sessions did. An operator about to
-              open one is exactly the person who should see the last. */}
-          <Button asChild variant="ghost">
-            <Link href={`/admin/audit?academy=${academy.id}`}>
-              <ScrollText className="size-4" />
-              {t('detail.activity')}
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href={`/admin/access/new?academy=${academy.id}`}>
-              <DoorOpen className="size-4" />
-              {t('open.cta')}
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
 function LifecyclePanel({
   academy,
   onChange,

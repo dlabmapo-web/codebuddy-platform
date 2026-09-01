@@ -8,7 +8,7 @@ import { initTranslations } from '@/i18n/init-translations';
 import { contentImportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
+import { createServerORPCClient } from '@/lib/orpc-server';
 import { academyRoleFor, canImportContent } from '@/lib/academy-access-state';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { CourseImportWizard } from '../_components/course-import-wizard';
@@ -30,7 +30,10 @@ export default async function NewCourseImportPage({
   params: Promise<{ academySlug: string; courseId: string }>;
 }) {
   const { academySlug, courseId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+    // The role comes from the guard, which resolves it from a membership or from
+  // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
+  // write control from an operator the API would have allowed.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const locale = await getLocale();
   const [{ t }, { resources }] = await Promise.all([
     getServerTranslation(['content-import']),
@@ -44,10 +47,7 @@ export default async function NewCourseImportPage({
 
   try {
     const client = createServerORPCClient();
-    const [tree, account] = await Promise.all([
-      client.academyCourses.getTree({ academyId, courseId }),
-      getAccount(),
-    ]);
+    const tree = await client.academyCourses.getTree({ academyId, courseId });
     courseTitle = tree.course.title;
     // §4.3 — Prepare needs to know whether the current-course workbook would
     // exceed the importer's own cap, so it can say so before offering it.
@@ -64,7 +64,7 @@ export default async function NewCourseImportPage({
         ),
       0,
     );
-    allowed = canImportContent(academyRoleFor(account, academyId));
+    allowed = canImportContent(role);
   } catch (error) {
     // Only access denial gets the unavailable state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.

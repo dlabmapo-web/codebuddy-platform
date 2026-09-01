@@ -1,6 +1,6 @@
 'use client';
 
-import type { ActiveSupportGrant } from '@cove/shared';
+import type { ActiveSupportGrant, PlatformViewRole } from '@cove/shared';
 import { Eye, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -25,9 +25,14 @@ import { useTranslation } from 'react-i18next';
 export function SupportBanner({
   academyName,
   grant,
+  viewRole,
 }: {
   academyName: string;
   grant: ActiveSupportGrant;
+  /** Which role the operator chose to stand in. Named on the banner because
+   *  three roles see three different products, and "why can I not see the
+   *  roster" is answered by reading it. */
+  viewRole: PlatformViewRole;
 }) {
   const { t } = useTranslation('platform-support');
   const [remaining, setRemaining] = React.useState(() =>
@@ -57,7 +62,10 @@ export function SupportBanner({
           <Eye aria-hidden className="size-3.5 shrink-0" />
           {t('banner.viewing', { academy: academyName })}
         </span>
-        <span>{t('banner.viewing_hint')}</span>
+        <span>
+          {t('banner.viewing_as', { role: t(`role_view.${viewRole}`) })}
+        </span>
+        <span className="text-sub/70">{t('banner.viewing_hint')}</span>
       </div>
     );
   }

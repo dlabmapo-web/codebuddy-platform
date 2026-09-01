@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import { BookOpen, EyeOff, Plus, Unlink } from 'lucide-react';
 import Link from 'next/link';
@@ -15,15 +13,13 @@ import { ClassPanel, ClassPanelEmpty } from './class-panel';
 import { ClassRowActions } from './class-row-actions';
 
 export function ClassCoursesPanel({
-  academyId,
   canAssign,
   manager,
 }: {
-  academyId: string;
   canAssign: boolean;
   manager: ClassDetailManagerState;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('classes');
   const { detail } = manager;
   const editable = canAssign && detail.status === 'ACTIVE';
@@ -64,7 +60,7 @@ export function ClassCoursesPanel({
               <div className="min-w-0 flex-1">
                 <Link
                   className="text-[14.5px] font-bold text-ink transition-colors hover:text-brand"
-                  href={`${routes.academy(academySlug)}/content/courses/${course.id}`}
+                  href={contentPaths.course(course.id)}
                 >
                   {course.title}
                 </Link>

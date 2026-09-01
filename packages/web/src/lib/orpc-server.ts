@@ -2,6 +2,7 @@ import { createORPCClient } from '@orpc/client';
 import { RPCLink } from '@orpc/client/fetch';
 import type { ContractRouterClient } from '@orpc/contract';
 import type { AppContract, AuthMeResponse } from '@cove/shared';
+import { cookies } from 'next/headers';
 import { cache } from 'react';
 
 import { publicConfig } from '@/lib/config';
@@ -10,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 export function createServerORPCClient(
   accessToken?: string,
   forwardedClientAddress?: string,
+  forwardViewRole = true,
 ): ContractRouterClient<AppContract> {
   const link = new RPCLink({
     url: publicConfig.apiUrl,
@@ -23,6 +25,14 @@ export function createServerORPCClient(
           headers.Authorization = `Bearer ${data.session.access_token}`;
         }
       }
+      // Which academy role a platform operator is viewing as. Console-owned
+      // administration opts out below; academy-owned diagnostic routes keep
+      // forwarding it so server render and browser refetch agree.
+      if (forwardViewRole) {
+        const viewRole = (await cookies()).get('cove_view_role')?.value;
+        if (viewRole) headers['X-Cove-View-Role'] = viewRole;
+      }
+
       const bffSecret = process.env.BFF_SHARED_SECRET;
       if (bffSecret) {
         headers['X-Cove-Bff-Secret'] = bffSecret;
@@ -34,6 +44,16 @@ export function createServerORPCClient(
     },
   });
   return createORPCClient(link);
+}
+
+/**
+ * The console's API client.
+ *
+ * Console-owned academy editors use the platform Manager permission set and
+ * must be independent of a role-view cookie left by an earlier diagnostic.
+ */
+export function createPlatformServerORPCClient(): ContractRouterClient<AppContract> {
+  return createServerORPCClient(undefined, undefined, false);
 }
 
 /**

@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type { ClassSummary } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,7 +24,7 @@ export function useClassesManager({
   academyId: string;
   initialClasses: ClassSummary[];
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
@@ -57,7 +55,7 @@ export function useClassesManager({
       await queryClient.invalidateQueries({ queryKey });
       // Creation stays small on purpose; the class page is where courses and
       // students are added, so go straight there.
-      router.push(`${routes.academy(academySlug)}/classes/${created.id}`);
+      router.push(contentPaths.class(created.id));
     },
   });
 
@@ -79,6 +77,20 @@ export function useClassesManager({
   const statusMutation = useMutation({
     mutationFn: (input: { classId: string; status: 'ACTIVE' | 'ARCHIVED' }) =>
       orpc.academyClasses.setStatus({ academyId, ...input }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  /**
+   * Destroy a class outright.
+   *
+   * Archiving stays the ordinary end of a class and keeps its history; this is
+   * for one created by mistake. The server refuses it once anybody has
+   * submitted through the class, which is the guarantee that matters — this
+   * hook only carries the name back for the confirmation.
+   */
+  const deleteMutation = useMutation({
+    mutationFn: (input: { classId: string; confirmName: string }) =>
+      orpc.academyClasses.delete({ academyId, ...input }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
@@ -115,6 +127,10 @@ export function useClassesManager({
       ? statusMutation.variables.classId
       : null,
     statusError: statusMutation.error,
+    deleteClass: (classId: string, confirmName: string) =>
+      deleteMutation.mutateAsync({ classId, confirmName }),
+    deletePending: deleteMutation.isPending,
+    deleteError: deleteMutation.error,
   };
 }
 

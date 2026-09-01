@@ -46,7 +46,22 @@
       "EASY": "Easy",
       "MEDIUM": "Medium",
       "HARD": "Hard"
-    }
+    },
+    "visibility": "Visibility",
+    "status": "Status",
+    "assigned_courses": "Assigned courses",
+    "assigned_teacher": "Assigned teacher",
+    "last_change": "Last change",
+    "visible": "Visible",
+    "hidden": "Hidden",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "problems": "Problems",
+    "no_description": "No description yet.",
+    "no_courses": "No courses assigned",
+    "courses_more": "+{{count}}",
+    "courses_aria": "{{count}} assigned: {{titles}}",
+    "teacher_role": "Teacher"
   },
   "unavailable": {
     "title": "Content is unavailable",

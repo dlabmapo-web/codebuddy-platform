@@ -5,10 +5,9 @@ import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import {
-  academyRoleFor,
   canManageExercises,
 } from '@/lib/academy-access-state';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
+import { createServerORPCClient } from '@/lib/orpc-server';
 import { ExerciseWorkspace } from '../_components/exercise-workspace';
 
 export default async function NewExercisePage({
@@ -21,12 +20,12 @@ export default async function NewExercisePage({
   }>;
 }) {
   const { academySlug, courseId, lectureId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+    // The role comes from the guard, which resolves it from a membership or from
+  // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
+  // write control from an operator the API would have allowed.
+  const { academyId, role } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
-  const [tree, account] = await Promise.all([
-    client.academyCourses.getTree({ academyId, courseId }),
-    getAccount(),
-  ]);
+  const tree = await client.academyCourses.getTree({ academyId, courseId });
   const courseModule = tree.modules.find((item) =>
     item.lectures.some((lecture) => lecture.id === lectureId),
   );
@@ -39,7 +38,7 @@ export default async function NewExercisePage({
     lecture: { id: lecture.id, title: lecture.title },
     material: null,
   };
-  const canEdit = canManageExercises(academyRoleFor(account, academyId));
+  const canEdit = canManageExercises(role);
   if (!canEdit) notFound();
 
   return (

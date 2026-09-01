@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type { CourseTree } from '@cove/shared';
 import { Plus } from 'lucide-react';
@@ -29,7 +27,7 @@ export function CourseBuilder({
   courseId: string;
   initialTree: CourseTree;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('content');
   const errorText = useErrorText();
   const builder = useCourseBuilder({
@@ -38,12 +36,12 @@ export function CourseBuilder({
     canEditCurriculum,
     canEditExercises,
   });
-  const exerciseBasePath = `${routes.academy(academySlug)}/content/courses/${courseId}/lectures`;
+  const exercisePath = (lectureId: string, materialId: string) =>
+    contentPaths.exercise(courseId, lectureId, materialId);
 
   return (
     <div className="space-y-5">
       <BuilderHeader
-        academySlug={academySlug}
         builder={builder}
         canImport={canImport}
         courseId={courseId}
@@ -63,7 +61,7 @@ export function CourseBuilder({
               <ModuleCard
                 builder={builder}
                 courseModule={courseModule}
-                exerciseBasePath={exerciseBasePath}
+                exercisePath={exercisePath}
                 key={courseModule.id}
               />
             ))

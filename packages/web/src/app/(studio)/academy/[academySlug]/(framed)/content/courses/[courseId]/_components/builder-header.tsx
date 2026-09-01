@@ -1,4 +1,3 @@
-import { routes } from '@/lib/routes';
 import {
   ArrowLeft,
   ChevronsDownUp,
@@ -7,29 +6,29 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import { VisibilityIndicator } from './builder-controls';
 
 export function BuilderHeader({
-  academySlug,
   builder,
   canImport,
   courseId,
 }: {
-  academySlug: string;
   builder: CourseBuilderState;
   canImport: boolean;
   courseId: string;
 }) {
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('content');
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Link
         className="inline-flex items-center gap-1.5 text-[14.5px] font-semibold text-sub transition-colors hover:text-ink"
-        href={`${routes.academy(academySlug)}/content/courses`}
+        href={contentPaths.courses()}
       >
         <ArrowLeft className="size-3.5" />
         {t('builder.all_courses')}
@@ -50,7 +49,7 @@ export function BuilderHeader({
         {canImport ? (
           <Link
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
-            href={`${routes.academy(academySlug)}/content/courses/${courseId}/imports/new`}
+            href={`${contentPaths.course(courseId)}/imports/new`}
           >
             <FileSpreadsheet className="size-4" />
             {t('builder.import_excel')}

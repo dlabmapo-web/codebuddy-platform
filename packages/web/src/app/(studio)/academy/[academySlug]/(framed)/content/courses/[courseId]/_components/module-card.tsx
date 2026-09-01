@@ -17,11 +17,11 @@ import { RowMenu } from './row-menu';
 export function ModuleCard({
   builder,
   courseModule,
-  exerciseBasePath,
+  exercisePath,
 }: {
   builder: CourseBuilderState;
   courseModule: CourseModule;
-  exerciseBasePath: string;
+  exercisePath: (lectureId: string, materialId: string) => string;
 }) {
   const { t } = useLayoutTranslation(['content', 'common']);
   const [renaming, setRenaming] = useState(false);
@@ -115,7 +115,7 @@ export function ModuleCard({
         {courseModule.lectures.map((lecture) => (
           <LectureRow
             builder={builder}
-            exerciseBasePath={exerciseBasePath}
+            exercisePath={exercisePath}
             key={lecture.id}
             lecture={lecture}
             moduleId={courseModule.id}

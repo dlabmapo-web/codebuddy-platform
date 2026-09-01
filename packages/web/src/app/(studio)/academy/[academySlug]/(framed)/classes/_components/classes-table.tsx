@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type {
   AssignedCourseSummary,
@@ -16,6 +14,7 @@ import {
   CircleCheck,
   CircleSlash,
   MoreHorizontal,
+  Trash2,
   Pencil,
   RotateCcw,
 } from 'lucide-react';
@@ -23,6 +22,7 @@ import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { DataTable } from '@/components/studio/data-table';
+import { DeleteConfirmDialog } from '@/components/studio/delete-confirm-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
@@ -32,6 +32,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { useTranslation } from 'react-i18next';
+
 import { useLayoutTranslation } from '@/i18n';
 
 import { useContentDate } from '../../content/_components/content-date';
@@ -135,19 +137,22 @@ function TeacherCell({ teacher }: { teacher: AssignedTeacherSummary | null }) {
 }
 
 export function ClassesTable({
-  academyId,
   manager,
   toolbarActions,
 }: {
-  academyId: string;
   manager: ClassesManagerState;
   toolbarActions?: ReactNode;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { t } = useLayoutTranslation('classes');
+  // The delete words live in their own namespace: `classes` is a layout one,
+  // and an irreversible act two staff surfaces offer should not ride in
+  // every student's payload.
+  const { t: destructive } = useTranslation('destructive');
   const contentDate = useContentDate();
   const isMobile = useIsMobile();
   const [toArchive, setToArchive] = useState<ClassSummary | null>(null);
+  const [toDelete, setToDelete] = useState<ClassSummary | null>(null);
 
   const columns = useMemo<ColumnDef<ClassSummary>[]>(
     () => [
@@ -242,7 +247,7 @@ export function ClassesTable({
             <div className="flex items-center justify-end gap-1">
               <Link
                 className="group inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3.5 text-[13.5px] font-bold text-brand transition-colors hover:bg-brand hover:text-on-brand"
-                href={`${routes.academy(academySlug)}/classes/${record.id}`}
+                href={contentPaths.class(record.id)}
               >
                 {t('open')}
                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -285,6 +290,14 @@ export function ClassesTable({
                     )}
                     {archived ? t('restore') : t('archive')}
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {/* Under a separator and in danger: archiving ends a class
+                      and keeps it, this unmakes one. The server refuses it
+                      outright once anybody has submitted through the class. */}
+                  <DropdownMenuItem onSelect={() => setToDelete(record)}>
+                    <Trash2 className="text-danger" />
+                    <span className="text-danger">{destructive('class.delete')}</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -292,7 +305,7 @@ export function ClassesTable({
         },
       },
     ],
-    [academyId, academySlug, contentDate, isMobile, manager, t],
+    [contentDate, contentPaths, destructive, isMobile, manager, t],
   );
 
   return (
@@ -325,6 +338,19 @@ export function ClassesTable({
         pageSize={10}
         searchPlaceholder={t('search_placeholder')}
         toolbarActions={toolbarActions}
+      />
+      <DeleteConfirmDialog
+        body={destructive('class.delete_body')}
+        cancelLabel={destructive('class.cancel')}
+        confirmLabel={destructive('class.delete_confirm')}
+        fieldLabel={destructive('class.delete_confirm_label', { name: toDelete?.name ?? '' })}
+        workingLabel={destructive('class.delete_working')}
+        confirmValue={toDelete?.name ?? ''}
+        onClose={() => setToDelete(null)}
+        onConfirm={(typed) => manager.deleteClass(toDelete!.id, typed)}
+        open={toDelete !== null}
+        pending={manager.deletePending}
+        title={destructive('class.delete_title', { name: toDelete?.name ?? '' })}
       />
       {toArchive ? (
         <ArchiveClassDialog

@@ -1,6 +1,7 @@
 'use client';
 
 import { EyeOff, RotateCcw } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
@@ -17,18 +18,22 @@ type AffectedContent = {
  */
 export function VisibilityConfirmModal({
   affected = [],
+  error,
   itemTitle,
   kindLabel,
   onCancel,
   onConfirm,
   open,
+  pending = false,
 }: {
   affected?: AffectedContent[];
+  error?: ReactNode;
   itemTitle: string;
   kindLabel: string;
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
+  pending?: boolean;
 }) {
   const { t } = useLayoutTranslation(['content', 'common']);
   const visibleAffected = affected.filter(({ value }) => value > 0);
@@ -81,6 +86,11 @@ export function VisibilityConfirmModal({
             <RotateCcw className="mt-0.5 size-4 shrink-0 text-success" />
             <p>{t('visibility_confirm.preserved')}</p>
           </div>
+          {error ? (
+            <p className="mt-3 text-[13px] text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
@@ -92,12 +102,15 @@ export function VisibilityConfirmModal({
             {t('common:action.cancel')}
           </button>
           <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-[14.5px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-40"
+            disabled={pending}
             onClick={onConfirm}
             type="button"
           >
             <EyeOff className="size-4" />
-            {t('visibility_confirm.confirm')}
+            {pending
+              ? t('visibility_confirm.submitting')
+              : t('visibility_confirm.confirm')}
           </button>
         </div>
       </ModalContent>

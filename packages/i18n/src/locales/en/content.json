@@ -168,6 +168,7 @@
     "student_impact": "Students will no longer see or open this content.",
     "also_hidden": "Also hidden with it",
     "preserved": "Visibility choices inside it stay saved. Showing this item again restores the previous visibility of its content.",
+    "submitting": "Hiding…",
     "confirm": "Hide from students",
     "lectures": "lectures",
     "problems": "problems"

@@ -104,6 +104,20 @@ export const appErrorCodes = [
   "PLATFORM_ACCESS_DENIED",
   "ACADEMY_SLUG_CONFLICT",
   "ACADEMY_STATE_CONFLICT",
+  "SUPPORT_GRANT_NOT_FOUND",
+  "SUPPORT_GRANT_EXPIRED",
+  "SUPPORT_GRANT_REVOKED",
+  "SUPPORT_GRANT_ALREADY_ACTIVE",
+  /**
+   * Distinct from `PERMISSION_DENIED` on purpose. An operator who reaches a
+   * write behind a read-only grant has made a recoverable mistake and should
+   * be told which one, rather than refused anonymously and left looking for a
+   * permission they do hold.
+   */
+  "SUPPORT_GRANT_READ_ONLY",
+  "LIBRARY_COURSE_NOT_FOUND",
+  "LIBRARY_ADOPTION_CONFLICT",
+  "PLATFORM_USER_NOT_FOUND",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -286,4 +300,15 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   ACADEMY_STATE_CONFLICT:
     "This academy cannot move to that state from its current one.",
   ACADEMY_MEDIA_NOT_FOUND: "That academy image is not available.",
+  SUPPORT_GRANT_NOT_FOUND: "That support session was not found.",
+  SUPPORT_GRANT_EXPIRED: "This support session has ended. Open a new one.",
+  SUPPORT_GRANT_REVOKED: "This support session was revoked.",
+  SUPPORT_GRANT_ALREADY_ACTIVE:
+    "You already have an open support session for this academy.",
+  SUPPORT_GRANT_READ_ONLY:
+    "This support session is read-only. Open a new one to make changes.",
+  LIBRARY_COURSE_NOT_FOUND: "That library course is not available.",
+  LIBRARY_ADOPTION_CONFLICT:
+    "This academy already has a course with that title.",
+  PLATFORM_USER_NOT_FOUND: "That account was not found.",
 };

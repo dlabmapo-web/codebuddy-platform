@@ -102,5 +102,13 @@
   "PLATFORM_ACCESS_DENIED": "This area is not available for your account.",
   "ACADEMY_SLUG_CONFLICT": "That academy address is already taken. Choose another.",
   "ACADEMY_STATE_CONFLICT": "This academy cannot move to that state from its current one.",
+  "SUPPORT_GRANT_NOT_FOUND": "That support session was not found.",
+  "SUPPORT_GRANT_EXPIRED": "This support session has ended. Open a new one to continue.",
+  "SUPPORT_GRANT_REVOKED": "This support session was revoked.",
+  "SUPPORT_GRANT_ALREADY_ACTIVE": "You already have an open support session for this academy.",
+  "SUPPORT_GRANT_READ_ONLY": "This support session is read-only. Open a new one to make changes.",
+  "LIBRARY_COURSE_NOT_FOUND": "That library course is not available.",
+  "LIBRARY_ADOPTION_CONFLICT": "This academy already has a course with that title.",
+  "PLATFORM_USER_NOT_FOUND": "That account was not found.",
   "UNKNOWN": "Something went wrong. Try again."
 }

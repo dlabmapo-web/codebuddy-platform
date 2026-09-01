@@ -32,18 +32,70 @@ export const platformPermissions = [
    * only by action name.
    */
   "platform.academies.lifecycle",
+
+  /** Organizations, the tenant above the academy. */
+  "platform.organizations.read",
+  "platform.organizations.manage",
+
+  /**
+   * The cross-academy people directories.
+   *
+   * Identity only — who someone is, where they belong, what state their
+   * account is in. It authorizes no learning data: a submission, a grade, a
+   * point balance, and every field of `StudentAcademyProfile` stay behind a
+   * support grant, because a directory that answers those has stopped being a
+   * directory.
+   */
+  "platform.users.read",
+  /** Setting `UserStatus` platform-wide. Apart from `read` for the reason
+   * `lifecycle` is apart from `create`. */
+  "platform.users.suspend",
+
+  "platform.audit.read",
+  /**
+   * Browsing every academy's courses, classes, and problems.
+   *
+   * A read, and only a read. Editing curriculum is academy work reached
+   * through a support grant, so this permission never needs a `.manage`
+   * sibling — if one ever appears, it is a sign the console has started
+   * keeping a second implementation of content mutations.
+   */
+  "platform.content.read",
+  "platform.features.manage",
+  "platform.analytics.read",
+  "platform.health.read",
+
+  /**
+   * Support access — the only authority on this axis that reaches inside an
+   * academy, and the reason the three are separate.
+   *
+   * `read` is held by anyone who may see that support happened. `grant` opens
+   * one. `revoke` ends somebody's — possibly somebody else's, which is why a
+   * support lead may need it without being able to open their own.
+   */
+  "platform.support.read",
+  "platform.support.grant",
+  "platform.support.revoke",
+
+  /** Authoring in the library academy. */
+  "platform.library.manage",
+  /** Pushing a library course into a customer's academy. Apart from `manage`
+   * because writing curriculum and putting it in somebody else's hands are
+   * different acts, and the second is the one an academy sees. */
+  "platform.library.distribute",
+
+  "platform.operators.manage",
 ] as const;
 export const platformPermissionSchema = z.enum(platformPermissions);
 export type PlatformPermission = z.infer<typeof platformPermissionSchema>;
 
 export const platformRolePermissions = {
   USER: [],
-  ADMIN: [
-    "platform.academies.read",
-    "platform.academies.create",
-    "platform.academies.update",
-    "platform.academies.lifecycle",
-  ],
+  // Every permission, because `ADMIN` is the only platform role today. The
+  // list stays fine-grained past the point this role needs the distinction so
+  // a narrower operator — read-only support, billing — is a new entry here
+  // rather than a new branch inside a service.
+  ADMIN: [...platformPermissions],
 } as const satisfies Record<PlatformRole, readonly PlatformPermission[]>;
 
 /**
@@ -231,4 +283,94 @@ export function canApproveAs(
   target: AcademyRole,
 ): boolean {
   return approvableRoles(actor).includes(target);
+}
+
+/* ------------------------------------------------------- support grants */
+
+/**
+ * The roles a platform support grant may assume inside an academy.
+ *
+ * Fewer than `academyRoles`, and deliberately. `MANAGER` is a true superset of
+ * `TEAM_LEAD` (see `academyRolePermissions`), so an operator who needs to fix
+ * a customer's curriculum takes `MANAGER` and a separate Team Lead option
+ * would only be a narrower way to reach the same pages. `STUDENT` is absent
+ * because §3.5 of the platform admin console design forbids a grant that can
+ * submit work, and a student role whose one distinguishing permission is
+ * stripped is not a student — it is a confusing name for a read.
+ */
+export const supportAssumedRoles = ["MANAGER", "TEACHER"] as const;
+export const supportAssumedRoleSchema = z.enum(supportAssumedRoles);
+export type SupportAssumedRole = (typeof supportAssumedRoles)[number];
+
+/**
+ * The permissions a read-only support grant may hold, whatever role it assumes.
+ *
+ * A named set rather than a test on how the permission is spelled.
+ * `curriculum.review` and `academy.applications.review` both end in the same
+ * word and only one of them is a read — the first opens a course detail page,
+ * the second seats a member — so a suffix rule would have handed an operator
+ * the power to approve applications the day it was written.
+ *
+ * Ordered as `academyPermissions` is, so a reader can diff the two lists.
+ */
+export const readOnlyAcademyPermissions = [
+  "academy.read",
+  "academy.members.read",
+  "academy.analytics.read",
+  "curriculum.read",
+  "curriculum.review",
+  "submissions.assigned.review",
+] as const satisfies readonly AcademyPermission[];
+
+/**
+ * What a support grant actually authorizes.
+ *
+ * The one place §3.5's exclusions are enforced, so they hold for every assumed
+ * role and every caller rather than depending on a reviewer noticing:
+ *
+ * - `submissions.own.create` is removed unconditionally. A support operator
+ *   must never be able to submit work that lands in a real student's record.
+ * - `classes.assigned.manage` — which the monitoring surfaces read — survives
+ *   only when the grant explicitly allows monitoring. Watching a named child's
+ *   editor in real time is a different consent question from reading a stored
+ *   submission, and it must not be reachable because somebody picked
+ *   `TEACHER` from a dropdown.
+ *
+ * Pure, and beside `roleHasPermission` rather than in the access service, so
+ * the whole matrix is unit-testable without a database.
+ */
+export function grantEffectivePermissions(grant: {
+  assumedRole: SupportAssumedRole;
+  readOnly: boolean;
+  allowMonitoring: boolean;
+}): readonly AcademyPermission[] {
+  const base = academyRolePermissions[
+    grant.assumedRole
+  ] as readonly AcademyPermission[];
+
+  const readable: readonly AcademyPermission[] = grant.readOnly
+    ? base.filter((permission) =>
+        (readOnlyAcademyPermissions as readonly AcademyPermission[]).includes(
+          permission,
+        ),
+      )
+    : base;
+
+  return readable.filter((permission) => {
+    if (permission === "submissions.own.create") return false;
+    if (permission === "classes.assigned.manage") return grant.allowMonitoring;
+    return true;
+  });
+}
+
+/** Whether a live grant of this shape authorizes one permission. */
+export function grantHasPermission(
+  grant: {
+    assumedRole: SupportAssumedRole;
+    readOnly: boolean;
+    allowMonitoring: boolean;
+  },
+  permission: AcademyPermission,
+): boolean {
+  return grantEffectivePermissions(grant).includes(permission);
 }

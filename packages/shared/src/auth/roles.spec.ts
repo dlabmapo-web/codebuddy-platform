@@ -6,9 +6,13 @@ import {
   academyRoles,
   approvableRoles,
   canApproveAs,
+  grantEffectivePermissions,
+  grantHasPermission,
   platformPermissions,
   platformRoleHasPermission,
+  readOnlyAcademyPermissions,
   roleHasPermission,
+  supportAssumedRoles,
 } from "./roles.js";
 
 describe("application approval roles", () => {
@@ -193,6 +197,132 @@ describe("platformRoleHasPermission", () => {
     const academyNames = new Set<string>(academyPermissions);
     for (const permission of platformPermissions) {
       expect(academyNames.has(permission)).toBe(false);
+    }
+  });
+});
+
+describe("support grant permissions", () => {
+  const write = { readOnly: false, allowMonitoring: false } as const;
+  const read = { readOnly: true, allowMonitoring: false } as const;
+
+  it("never authorizes submitting work, at any assumed role", () => {
+    // §3.5 of the platform admin console design. The single most important
+    // property here: support access must never be able to write into a real
+    // student's record.
+    for (const assumedRole of supportAssumedRoles) {
+      for (const readOnly of [true, false]) {
+        for (const allowMonitoring of [true, false]) {
+          expect(
+            grantHasPermission(
+              { assumedRole, readOnly, allowMonitoring },
+              "submissions.own.create",
+            ),
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("withholds the monitoring permission unless the grant allows it", () => {
+    expect(
+      grantHasPermission(
+        { assumedRole: "TEACHER", ...write },
+        "classes.assigned.manage",
+      ),
+    ).toBe(false);
+    expect(
+      grantHasPermission(
+        { assumedRole: "TEACHER", readOnly: false, allowMonitoring: true },
+        "classes.assigned.manage",
+      ),
+    ).toBe(true);
+  });
+
+  it("gives a read-only grant reads and refuses every write", () => {
+    const granted = grantEffectivePermissions({ assumedRole: "MANAGER", ...read });
+    expect(granted).toContain("academy.read");
+    expect(granted).toContain("curriculum.review");
+    expect(granted).not.toContain("academy.members.manage");
+    expect(granted).not.toContain("curriculum.manage");
+    expect(granted).not.toContain("academy.settings.manage");
+    // `applications.review` reads as a read and seats a member. The named set
+    // exists so this stays out; a suffix rule would have let it through.
+    expect(granted).not.toContain("academy.applications.review");
+  });
+
+  it("gives a manager grant the academy's own administration", () => {
+    const granted = grantEffectivePermissions({ assumedRole: "MANAGER", ...write });
+    expect(granted).toContain("academy.members.manage");
+    expect(granted).toContain("class-enrollments.manage");
+    expect(granted).toContain("curriculum.manage");
+  });
+
+  it("keeps a teacher grant narrower than a manager one", () => {
+    const teacher = grantEffectivePermissions({ assumedRole: "TEACHER", ...write });
+    expect(teacher).not.toContain("academy.members.manage");
+    expect(teacher).not.toContain("curriculum.manage");
+  });
+
+  it("never yields a permission the assumed role does not hold", () => {
+    for (const assumedRole of supportAssumedRoles) {
+      const role = new Set<string>(academyRolePermissions[assumedRole]);
+      for (const readOnly of [true, false]) {
+        for (const allowMonitoring of [true, false]) {
+          for (const permission of grantEffectivePermissions({
+            assumedRole,
+            readOnly,
+            allowMonitoring,
+          })) {
+            expect(role.has(permission)).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it("makes read-only a subset of the same grant with writes", () => {
+    for (const assumedRole of supportAssumedRoles) {
+      const writable = new Set<string>(
+        grantEffectivePermissions({ assumedRole, ...write }),
+      );
+      for (const permission of grantEffectivePermissions({
+        assumedRole,
+        ...read,
+      })) {
+        expect(writable.has(permission)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every read-only permission a real academy permission", () => {
+    const known = new Set<string>(academyPermissions);
+    for (const permission of readOnlyAcademyPermissions) {
+      expect(known.has(permission)).toBe(true);
+    }
+  });
+});
+
+describe("platform permission map", () => {
+  it("grants an admin every platform permission", () => {
+    for (const permission of platformPermissions) {
+      expect(platformRoleHasPermission("ADMIN", permission)).toBe(true);
+    }
+  });
+
+  it("keeps the console's new surfaces behind their own permissions", () => {
+    // Named individually rather than asserted as a count: this list is the
+    // checklist a new surface adds itself to, and a count would pass while
+    // silently protecting the wrong thing.
+    for (const permission of [
+      "platform.users.read",
+      "platform.users.suspend",
+      "platform.audit.read",
+      "platform.support.grant",
+      "platform.support.revoke",
+      "platform.library.distribute",
+    ] as const) {
+      expect(platformPermissions).toContain(permission);
+      expect(platformRoleHasPermission("USER", permission)).toBe(false);
     }
   });
 });

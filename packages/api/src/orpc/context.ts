@@ -33,6 +33,10 @@ import type { ManagerOverviewService } from "../manage/manager-overview.service.
 import type { PeopleDirectoryService } from "../manage/people-directory.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
 import type { PlatformAcademyService } from "../platform/platform-academy.service.js";
+import type { PlatformAuditService } from "../platform/platform-audit.service.js";
+import type { PlatformContentService } from "../platform/platform-content.service.js";
+import type { PlatformUsersService } from "../platform/platform-users.service.js";
+import type { PlatformSupportService } from "../platform/platform-support.service.js";
 import type { PointsService } from "../points/points.service.js";
 import type { PlatformLifecycleService } from "../platform/platform-lifecycle.service.js";
 import type { AcademyProfileService } from "../profile/academy-profile.service.js";
@@ -83,6 +87,10 @@ export type ORPCDeps = {
   peopleBulkService: PeopleBulkService;
   invitationDeliveryService: InvitationDeliveryService;
   platformAcademyService: PlatformAcademyService;
+  platformAuditService: PlatformAuditService;
+  platformContentService: PlatformContentService;
+  platformUsersService: PlatformUsersService;
+  platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;
   pointsService: PointsService;
 };

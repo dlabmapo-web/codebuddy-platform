@@ -1,0 +1,106 @@
+{
+  "title": "Users",
+  "back": "Back to users",
+  "lens": {
+    "label": "Which users",
+    "everyone": "Everyone",
+    "students": "Students",
+    "teachers": "Teachers",
+    "staff": "Team leads & managers"
+  },
+  "lens_description": {
+    "everyone": "Every user account on Cove Studio, across every academy.",
+    "students": "Everyone learning on Cove Studio.",
+    "teachers": "Everyone teaching a class.",
+    "staff": "Everyone who runs an academy or its curriculum."
+  },
+  "table": {
+    "person": "User",
+    "affiliation": "Academy",
+    "status": "Account",
+    "joined": "Joined",
+    "actions": "Actions",
+    "open": "Open",
+    "search": "Search by name, email, or number",
+    "empty": "No account matches these filters.",
+    "loading": "Loading people",
+    "no_academy": "No academy",
+    "more_one": "+1 more",
+    "more_other": "+{{count}} more",
+    "operator": "Platform operator"
+  },
+  "facet": {
+    "academy": "Academy",
+    "role": "Role",
+    "account_status": "Account",
+    "membership_status": "Membership"
+  },
+  "role": {
+    "STUDENT": "Student",
+    "TEACHER": "Teacher",
+    "TEAM_LEAD": "Team lead",
+    "MANAGER": "Manager"
+  },
+  "account_status": {
+    "ACTIVE": "Active",
+    "PENDING_PROFILE": "Finishing signup",
+    "SUSPENDED": "Suspended",
+    "DELETED": "Deleted"
+  },
+  "membership_status": {
+    "INVITED": "Invited",
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "LEFT": "Left"
+  },
+  "invitation_status": {
+    "PENDING": "Waiting",
+    "ACCEPTED": "Accepted",
+    "REVOKED": "Revoked",
+    "EXPIRED": "Expired"
+  },
+  "join_request_status": {
+    "PENDING": "Waiting",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled"
+  },
+  "delivery": {
+    "QUEUED": "Queued",
+    "SENT": "Sent",
+    "DELIVERED": "Delivered",
+    "BOUNCED": "Bounced",
+    "FAILED": "Failed to send"
+  },
+  "detail": {
+    "subtitle": "Who this person is, and where they belong.",
+    "identity": "Account",
+    "operator": "Operator",
+    "username": "Username",
+    "joined": "Joined",
+    "last_sign_in": "Last signed in",
+    "academies": "Academies",
+    "no_email": "No email address",
+    "memberships": "Academies",
+    "memberships_empty": "In no academy",
+    "memberships_empty_body": "This account has not joined an academy yet.",
+    "invitations": "Invitations",
+    "invitations_empty": "No invitations",
+    "invitations_empty_body": "Nothing has been sent to this address.",
+    "join_requests": "Applications",
+    "join_requests_empty": "No applications",
+    "join_requests_empty_body": "This account has not applied to an academy.",
+    "suspend": "Suspend account",
+    "restore": "Restore account",
+    "suspend_hint": "Suspending signs this person out of every academy and blocks them from signing in again.",
+    "restore_hint": "This account is suspended. Restoring lets them sign in again straight away.",
+    "confirm_suspend_title": "Suspend {{name}}?",
+    "confirm_suspend_body": "They are signed out everywhere and cannot sign in until you restore the account. Their work and memberships are kept.",
+    "confirm_restore_title": "Restore {{name}}?",
+    "confirm_restore_body": "They can sign in again straight away, with the academies and roles they had."
+  },
+  "unavailable": {
+    "title": "People are unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

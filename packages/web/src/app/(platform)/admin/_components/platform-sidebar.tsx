@@ -1,6 +1,14 @@
 'use client';
 
-import { LogOut, School, Shield } from 'lucide-react';
+import {
+  BookOpen,
+  KeyRound,
+  LogOut,
+  School,
+  ScrollText,
+  Shield,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -31,17 +39,22 @@ import { activeNavHref } from '@/lib/nav-active';
  * below is the studio's own furniture, including the footer's sign-out, so the
  * console does not become the one page in Cove where a person cannot leave.
  *
- * One destination today. The group exists because the deferred platform
- * surfaces — the audit log, the account directory, the feature switchboard —
- * each land here, and a list that starts as a list does not have to be
- * reinvented when the second item arrives.
+ * The group was written as a list for exactly this: the account directory has
+ * arrived as the second item and needed no rework. The audit log and the
+ * feature switchboard land beside it the same way.
  */
 export function PlatformSidebar() {
   const { t } = useTranslation('platform');
   const { t: common } = useLayoutTranslation('common');
   const pathname = usePathname();
 
-  const items = [{ href: '/admin', label: t('nav.academies'), icon: School }];
+  const items = [
+    { href: '/admin', label: t('nav.academies'), icon: School },
+    { href: '/admin/users', label: t('nav.users'), icon: Users },
+    { href: '/admin/content', label: t('nav.content'), icon: BookOpen },
+    { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
+    { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
+  ];
   const activeHref = activeNavHref(
     pathname,
     items.map((item) => item.href),

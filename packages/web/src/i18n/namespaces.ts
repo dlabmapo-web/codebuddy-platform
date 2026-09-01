@@ -136,7 +136,26 @@ export const peopleOpsNamespaces = [
  * for suspending their academy. `errors` travels with it because every action
  * on this surface is a mutation that can be refused.
  */
-export const platformNamespaces = ['platform', 'errors'] as const;
+export const platformNamespaces = [
+  'platform',
+  'platform-audit',
+  'platform-content',
+  'platform-users',
+  'platform-support',
+  'errors',
+] as const;
+
+/**
+ * The support banner, on its own.
+ *
+ * Mounted by the academy layout whenever a grant is live, which is a handful
+ * of sessions a week — so it carries the banner's own namespace and not the
+ * console's. A student loading their catalog must never pay for the vocabulary
+ * of Cove staff being inside their academy, and `platform-support` is already
+ * split from `platform` because the two together passed the per-namespace
+ * budget in `@cove/i18n`'s `locales.spec.ts`.
+ */
+export const supportNamespaces = ['platform-support'] as const;
 
 /**
  * The curriculum importer.
@@ -196,6 +215,7 @@ export type PageNamespace =
   | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
   | (typeof platformNamespaces)[number]
+  | (typeof supportNamespaces)[number]
   | (typeof contentImportNamespaces)[number]
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number]

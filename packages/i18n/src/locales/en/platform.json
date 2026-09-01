@@ -147,7 +147,11 @@
   },
   "nav": {
     "group": "Platform",
-    "academies": "Academies"
+    "academies": "Academies",
+    "users": "Users",
+    "content": "Content",
+    "access": "Support access",
+    "audit": "Audit trail"
   },
   "unavailable": {
     "title": "Academies are unavailable",

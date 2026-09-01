@@ -20,6 +20,10 @@ import {
   academyPeopleContract,
 } from "./orpc/manager-overview.contract.js";
 import { monitoringContract } from "./orpc/monitoring.contract.js";
+import { platformAuditContract } from "./orpc/platform-audit.contract.js";
+import { platformContentContract } from "./orpc/platform-content.contract.js";
+import { platformUsersContract } from "./orpc/platform-users.contract.js";
+import { platformSupportContract } from "./orpc/platform-support.contract.js";
 import { platformAcademiesContract } from "./orpc/platform.contract.js";
 import { pointsContract } from "./orpc/points.contract.js";
 import {
@@ -52,6 +56,10 @@ export const appContract = {
   learn: learnContract,
   monitoring: monitoringContract,
   platformAcademies: platformAcademiesContract,
+  platformAudit: platformAuditContract,
+  platformContent: platformContentContract,
+  platformUsers: platformUsersContract,
+  platformSupport: platformSupportContract,
   points: pointsContract,
   studentSession: studentSessionContract,
   teacherProgress: teacherProgressContract,

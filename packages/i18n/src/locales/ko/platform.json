@@ -147,7 +147,11 @@
   },
   "nav": {
     "group": "플랫폼",
-    "academies": "아카데미"
+    "academies": "아카데미",
+    "users": "사용자",
+    "content": "콘텐츠",
+    "access": "지원 접근",
+    "audit": "감사 기록"
   },
   "unavailable": {
     "title": "아카데미를 불러올 수 없습니다",

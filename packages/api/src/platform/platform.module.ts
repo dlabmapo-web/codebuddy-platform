@@ -5,6 +5,10 @@ import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { ManageModule } from "../manage/manage.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { PlatformAcademyService } from "./platform-academy.service.js";
+import { PlatformAuditService } from "./platform-audit.service.js";
+import { PlatformContentService } from "./platform-content.service.js";
+import { PlatformUsersService } from "./platform-users.service.js";
+import { PlatformSupportService } from "./platform-support.service.js";
 import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
 
 /**
@@ -24,7 +28,21 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     ManageModule,
     MonitoringRevocationModule,
   ],
-  providers: [PlatformAcademyService, PlatformLifecycleService],
-  exports: [PlatformAcademyService, PlatformLifecycleService],
+  providers: [
+    PlatformAcademyService,
+    PlatformLifecycleService,
+    PlatformUsersService,
+    PlatformSupportService,
+    PlatformAuditService,
+    PlatformContentService,
+  ],
+  exports: [
+    PlatformAcademyService,
+    PlatformLifecycleService,
+    PlatformUsersService,
+    PlatformSupportService,
+    PlatformAuditService,
+    PlatformContentService,
+  ],
 })
 export class PlatformModule {}

@@ -641,6 +641,12 @@ model AcademyMembership {
   @@index([academyId, updatedAt(sort: Desc), id], map: "academy_memberships_academy_updated_idx")
   /// Student growth, bucketed by the local day a membership became active.
   @@index([academyId, role, status, joinedAt], map: "academy_memberships_academy_joined_idx")
+  /// The platform people directory: one role across every academy.
+  ///
+  /// The first index here that does not lead with `academyId`, and it has to
+  /// be. Every other read in the product is already inside one academy; the
+  /// console's is "every teacher on Cove", which none of them can serve.
+  @@index([role, status], map: "academy_memberships_role_status_idx")
   @@map("academy_memberships")
 }
 

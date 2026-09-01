@@ -43,6 +43,14 @@ import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
 import { PlatformAcademyService } from "../platform/platform-academy.service.js";
 import { PlatformLifecycleService } from "../platform/platform-lifecycle.service.js";
+import { PlatformUsersService } from "../platform/platform-users.service.js";
+import { PlatformAuditService } from "../platform/platform-audit.service.js";
+import { createPlatformAuditRouters } from "../platform/platform-audit.router.js";
+import { PlatformContentService } from "../platform/platform-content.service.js";
+import { createPlatformContentRouters } from "../platform/platform-content.router.js";
+import { createPlatformUsersRouters } from "../platform/platform-users.router.js";
+import { PlatformSupportService } from "../platform/platform-support.service.js";
+import { createPlatformSupportRouters } from "../platform/platform-support.router.js";
 import { createPlatformRouters } from "../platform/platform.router.js";
 import { PointsService } from "../points/points.service.js";
 import { createPointsRouter } from "../points/points.router.js";
@@ -113,6 +121,14 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     platformAcademyService: app.get(PlatformAcademyService, { strict: false }),
+    platformAuditService: app.get(PlatformAuditService, { strict: false }),
+    platformContentService: app.get(PlatformContentService, {
+      strict: false,
+    }),
+    platformUsersService: app.get(PlatformUsersService, { strict: false }),
+    platformSupportService: app.get(PlatformSupportService, {
+      strict: false,
+    }),
     pointsService: app.get(PointsService, { strict: false }),
     platformLifecycleService: app.get(PlatformLifecycleService, {
       strict: false,
@@ -150,6 +166,10 @@ function createORPCRouter(deps: ORPCDeps) {
   const profileRouters = createProfileRouters(os, deps);
   const manageRouters = createManageRouters(os, deps);
   const platformRouters = createPlatformRouters(os, deps);
+  const platformUsersRouters = createPlatformUsersRouters(os, deps);
+  const platformAuditRouters = createPlatformAuditRouters(os, deps);
+  const platformContentRouters = createPlatformContentRouters(os, deps);
+  const platformSupportRouters = createPlatformSupportRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
@@ -160,6 +180,10 @@ function createORPCRouter(deps: ORPCDeps) {
     ...profileRouters,
     ...manageRouters,
     ...platformRouters,
+    ...platformUsersRouters,
+    ...platformAuditRouters,
+    ...platformContentRouters,
+    ...platformSupportRouters,
     learn: createLearnRouter(os, deps),
     points: createPointsRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),

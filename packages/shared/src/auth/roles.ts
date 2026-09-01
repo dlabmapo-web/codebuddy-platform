@@ -59,6 +59,23 @@ export const platformPermissions = [
   /** Setting `UserStatus` platform-wide. Apart from `read` for the reason
    * `lifecycle` is apart from `create`. */
   "platform.users.suspend",
+  /**
+   * A person's participation, across the academies they belong to: their
+   * classes, the courses in them, and their totals.
+   *
+   * Apart from `platform.users.read` because it is a genuine widening and
+   * should be refusable on its own. It authorizes structure and totals only —
+   * no `StudentAcademyProfile` field, no submitted code, no feedback text.
+   * Those stay behind a support grant. §3.4 of the console people operations
+   * design.
+   */
+  "platform.users.participation.read",
+  /** Changing an academy membership's role from the console. §3.6 of the
+   * console people operations design. */
+  "platform.users.role",
+  /** Setting `UserStatus.DELETED`. Apart from `suspend` because suspension is
+   * routine and this is not. §3.7 of the console people operations design. */
+  "platform.users.delete",
 
   "platform.audit.read",
   /**

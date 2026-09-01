@@ -32,6 +32,21 @@ export function createPlatformUsersRouters(
         .handler(({ context, input }) =>
           deps.platformUsersService.setStatus(context.identity, input),
         ),
+      participation: os.platformUsers.participation
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformUsersService.participation(context.identity, input),
+        ),
+      setMembershipRole: os.platformUsers.setMembershipRole
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformUsersService.setMembershipRole(context.identity, input),
+        ),
+      setPlatformRole: os.platformUsers.setPlatformRole
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformUsersService.setPlatformRole(context.identity, input),
+        ),
     },
   };
 }

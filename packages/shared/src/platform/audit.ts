@@ -51,6 +51,16 @@ export const listAuditInputSchema = z.object({
   /** Matched against the action name, which is how an operator searches: they
    * remember "suspended", not a target id. */
   action: z.string().trim().max(120).optional(),
+  /**
+   * The records whose own history is wanted — an account's, and its
+   * memberships'.
+   *
+   * A list rather than one id because an account's history is not written
+   * under one target: suspending it is keyed on the user, changing a role is
+   * keyed on the membership, and an Activity panel that asked for only the
+   * first would silently omit the entries an operator most wants to see.
+   */
+  targetIds: z.array(z.string().trim().min(1).max(200)).max(50).optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(200).default(AUDIT_PAGE_SIZE),
 });

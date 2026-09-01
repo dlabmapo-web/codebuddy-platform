@@ -119,6 +119,13 @@ export const appErrorCodes = [
   "LIBRARY_ADOPTION_CONFLICT",
   "PLATFORM_USER_NOT_FOUND",
   "ACADEMY_DELETE_NOT_CONFIRMED",
+  /** The typed handle in a `DELETED` status change did not match the
+   * account's current email or username. §3.7 of the console people
+   * operations design. */
+  "CONFIRMATION_MISMATCH",
+  /** Revoking the platform's last operator. §3.6 of the console people
+   * operations design — the platform-role sibling of `LAST_MANAGER_REQUIRED`. */
+  "LAST_ADMIN_REQUIRED",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -314,4 +321,6 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PLATFORM_USER_NOT_FOUND: "That account was not found.",
   ACADEMY_DELETE_NOT_CONFIRMED:
     "Type the academy's address exactly to confirm deletion.",
+  CONFIRMATION_MISMATCH: "Type the account's email or username exactly to confirm.",
+  LAST_ADMIN_REQUIRED: "The platform must keep at least one operator.",
 };

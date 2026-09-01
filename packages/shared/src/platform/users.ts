@@ -36,6 +36,9 @@ import {
 
 /** One academy this person belongs to, as the directory prints it. */
 export const platformUserMembershipSchema = z.object({
+  /** The membership's own id — what a role change or a participation read
+   * addresses, never the academy id. */
+  membershipId: z.uuid(),
   academyId: z.uuid(),
   academySlug: z.string().min(1),
   academyName: z.string().min(1),
@@ -111,6 +114,39 @@ export type ResolvedListPlatformUsersInput = z.infer<
   typeof listPlatformUsersInputSchema
 >;
 
+/**
+ * Who the directory is currently looking at, as counts.
+ *
+ * The page opens on this rather than on the table, because "49 accounts, 34 of
+ * them students, across 12 academies" is the answer to more support questions
+ * than any single row is — and because a directory that cannot state the shape
+ * of its own population makes an operator filter six times to learn it.
+ *
+ * Every count is measured under the operator's other filters but **not** under
+ * the role facet. Narrowing to teachers must not collapse the strip to
+ * "7 teachers, 0 of everything else": the strip describes the population the
+ * facet is selecting *from*, which is the only reading under which it stays
+ * worth looking at while a filter is on.
+ *
+ * `operators` is counted apart from the four roles and is deliberately not a
+ * fifth segment of the band. `platformRole` is a different axis — an operator
+ * may also be a manager somewhere — so adding them would make the segments sum
+ * to more than the total. §3.3.
+ */
+export const directoryCompositionSchema = z.object({
+  total: z.number().int().nonnegative(),
+  students: z.number().int().nonnegative(),
+  teachers: z.number().int().nonnegative(),
+  teamLeads: z.number().int().nonnegative(),
+  managers: z.number().int().nonnegative(),
+  operators: z.number().int().nonnegative(),
+  /** How many academies these accounts are spread across. An academy with no
+   * members is not one of them: the strip counts where these people are, not
+   * how many rows the academies table has. */
+  academies: z.number().int().nonnegative(),
+});
+export type DirectoryComposition = z.infer<typeof directoryCompositionSchema>;
+
 export const listPlatformUsersResultSchema = z.object({
   people: z.array(platformUserSummarySchema),
   total: z.number().int().nonnegative(),
@@ -125,6 +161,8 @@ export const listPlatformUsersResultSchema = z.object({
       slug: z.string().min(1),
     }),
   ),
+  /** Who these accounts are, as one line. See the schema above. */
+  composition: directoryCompositionSchema,
 });
 export type ListPlatformUsersResult = z.infer<
   typeof listPlatformUsersResultSchema
@@ -190,11 +228,21 @@ export type PlatformUserDetail = z.infer<typeof platformUserDetailSchema>;
  *
  * `PENDING_PROFILE` is absent: it is where an account starts and is cleared by
  * the person completing their profile, so offering it would let an operator
- * push somebody back into onboarding they have already finished. `DELETED` is
- * absent because deletion is not a status change — §1.2 of the console design
- * keeps it out of scope entirely.
+ * push somebody back into onboarding they have already finished.
+ *
+ * `DELETED` joined this list when the console people operations design
+ * reversed §1.2 of the console design: deleting an account now sets this
+ * status rather than staying out of scope. It still is not erasure — every
+ * membership, submission, and history row survives, and both access services
+ * refuse `DELETED` before reading any role, so it locks the account out
+ * everywhere on its next request. Restoring from it is allowed, the identical
+ * mechanism as restoring from `SUSPENDED`. §3.7.
  */
-export const settablePlatformUserStatuses = ["ACTIVE", "SUSPENDED"] as const;
+export const settablePlatformUserStatuses = [
+  "ACTIVE",
+  "SUSPENDED",
+  "DELETED",
+] as const;
 export const settablePlatformUserStatusSchema = z.enum(
   settablePlatformUserStatuses,
 );
@@ -202,17 +250,64 @@ export type SettablePlatformUserStatus = z.infer<
   typeof settablePlatformUserStatusSchema
 >;
 
-export const setPlatformUserStatusInputSchema = z.object({
-  userId: z.uuid(),
-  status: settablePlatformUserStatusSchema,
-  /**
-   * Required, and length-checked. A suspension with no stated reason is a
-   * decision nobody can review later, including the person who made it.
-   */
-  reason: z.string().trim().min(8).max(500),
-});
+export const setPlatformUserStatusInputSchema = z
+  .object({
+    userId: z.uuid(),
+    status: settablePlatformUserStatusSchema,
+    /**
+     * Required, and length-checked. A suspension with no stated reason is a
+     * decision nobody can review later, including the person who made it.
+     */
+    reason: z.string().trim().min(8).max(500),
+    /**
+     * Required for `DELETED` only: the account's email or username, typed by
+     * the operator. The same guard `deletePlatformAcademyInputSchema` puts on
+     * an academy's slug — checked against the current value in the service,
+     * never against one that has since changed. §3.7.
+     */
+    confirmHandle: z.string().trim().min(1).optional(),
+  })
+  .strict();
 export type SetPlatformUserStatusInput = z.infer<
   typeof setPlatformUserStatusInputSchema
+>;
+
+/**
+ * Changing one academy membership's role from the console.
+ *
+ * Per membership, never per account (§3.6): an account is not a student, an
+ * account *holds* a membership that is one. `membershipId` is what makes the
+ * write unambiguous when somebody holds several.
+ */
+export const setPlatformMembershipRoleInputSchema = z
+  .object({
+    userId: z.uuid(),
+    membershipId: z.uuid(),
+    role: academyRoleSchema,
+    reason: z.string().trim().min(8).max(500),
+  })
+  .strict();
+export type SetPlatformMembershipRoleInput = z.infer<
+  typeof setPlatformMembershipRoleInputSchema
+>;
+
+/**
+ * Granting or revoking platform operator status.
+ *
+ * A separate mutation from the membership role change above, gated on its own
+ * permission (`platform.operators.manage`) — §3.3 and §3.6 both say why:
+ * `platformRole` is a different axis from an academy role, not a fifth value
+ * on the same one.
+ */
+export const setPlatformUserRoleInputSchema = z
+  .object({
+    userId: z.uuid(),
+    platformRole: platformRoleSchema,
+    reason: z.string().trim().min(8).max(500),
+  })
+  .strict();
+export type SetPlatformUserRoleInput = z.infer<
+  typeof setPlatformUserRoleInputSchema
 >;
 
 export type PlatformUserInvitation = z.infer<
@@ -223,34 +318,6 @@ export type PlatformUserJoinRequest = z.infer<
 >;
 
 /* ------------------------------------------------------------ url state */
-
-/**
- * The lenses the directory is read through.
- *
- * Three named entrances onto one table, rather than three tables. An operator
- * asked for "the teachers page" and what they want is this table with the role
- * facet already set — so the lens *is* a role selection, and every other facet
- * keeps working inside it.
- *
- * `staff` covers both roles that run an academy. They are one group to an
- * operator taking a support call ("who can I talk to at this academy") and two
- * roles only once you are inside one.
- */
-export const userLenses = [
-  "everyone",
-  "students",
-  "teachers",
-  "staff",
-] as const;
-export const userLensSchema = z.enum(userLenses);
-export type UserLens = (typeof userLenses)[number];
-
-export const userLensRoles = {
-  everyone: [],
-  students: ["STUDENT"],
-  teachers: ["TEACHER"],
-  staff: ["TEAM_LEAD", "MANAGER"],
-} as const satisfies Record<UserLens, readonly ("STUDENT" | "TEACHER" | "TEAM_LEAD" | "MANAGER")[]>;
 
 /**
  * The directory's state, read out of the address.

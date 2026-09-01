@@ -60,6 +60,7 @@ export class PlatformAuditService {
       ...(input.action
         ? { action: { contains: input.action, mode: "insensitive" } }
         : {}),
+      ...(input.targetIds?.length ? { targetId: { in: input.targetIds } } : {}),
     };
 
     const [total, records] = await Promise.all([

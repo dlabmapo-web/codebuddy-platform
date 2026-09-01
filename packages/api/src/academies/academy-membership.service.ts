@@ -5,16 +5,19 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
-import type { Prisma } from "../generated/prisma/client.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { bumpPeopleRevision } from "../manage/people-revision.js";
+import {
+  applyMembershipRoleChange,
+  assertAnotherActiveManager,
+  hasAnotherActiveManager,
+  lockMembershipForUpdate,
+  membershipInclude,
+  toAcademyMember,
+} from "./academy-membership.operations.js";
 import { AuditService } from "./audit.service.js";
 
-const membershipInclude = {
-  user: {
-    select: { id: true, email: true, displayName: true },
-  },
-} as const;
+export { hasAnotherActiveManager, toAcademyMember };
 
 @Injectable()
 export class AcademyMembershipService {
@@ -43,58 +46,36 @@ export class AcademyMembershipService {
     return { members: members.map(toAcademyMember) };
   }
 
+  /**
+   * A manager's own role change on their own academy.
+   *
+   * The invariants live in `applyMembershipRoleChange` (§3.8 of the console
+   * people operations design) — the same function the platform console's
+   * `PlatformUsersService.setMembershipRole` calls after its own
+   * authorization check. This method contributes only `requireManager` and
+   * the follow-up read that shapes the response the members table expects.
+   */
   async changeRole(
     identity: SupabaseIdentity,
     input: { academyId: string; membershipId: string; role: AcademyRole },
   ) {
     const actor = await this.requireManager(identity, input.academyId);
-    const { member, changed } = await this.prisma.$transaction(async (transaction) => {
-      const membership = await this.lockMembership(
-        transaction,
-        input.academyId,
-        input.membershipId,
-      );
-      if (membership.status !== "ACTIVE") {
-        throw new AppException(
-          "MEMBERSHIP_STATE_CONFLICT",
-          HttpStatus.CONFLICT,
-        );
-      }
-      if (membership.role === "MANAGER" && input.role !== "MANAGER") {
-        await this.requireAnotherActiveManager(
-          transaction,
-          input.academyId,
-          membership.id,
-        );
-      }
-      if (membership.role === input.role) {
-        return { member: toAcademyMember(membership), changed: false };
-      }
-
-      const updated = await transaction.academyMembership.update({
-        where: { id: membership.id },
-        data: { role: input.role, approvedByUserId: actor.userId },
-        include: membershipInclude,
-      });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
+    const { changed } = await this.prisma.$transaction((transaction) =>
+      applyMembershipRoleChange(transaction, this.audit, {
         academyId: input.academyId,
-        action: "academy.membership.role_changed",
-        targetType: "AcademyMembership",
-        targetId: membership.id,
-        before: { role: membership.role, status: membership.status },
-        after: { role: updated.role, status: updated.status },
-      });
-      // §8.1 — every membership change moves the academy's people revision,
-      // inside the same transaction, so a bulk selection or an import preview
-      // built before this cannot silently commit over it.
-      await bumpPeopleRevision(transaction, input.academyId);
-      return { member: toAcademyMember(updated), changed: true };
-    });
+        membershipId: input.membershipId,
+        role: input.role,
+        actorUserId: actor.userId,
+      }),
+    );
     if (changed) {
       await this.revocation.revokeMembership(input.membershipId, "ROLE_CHANGED");
     }
-    return member;
+    const updated = await this.prisma.academyMembership.findUniqueOrThrow({
+      where: { id: input.membershipId },
+      include: membershipInclude,
+    });
+    return toAcademyMember(updated);
   }
 
   async suspend(
@@ -103,7 +84,7 @@ export class AcademyMembershipService {
   ) {
     const actor = await this.requireManager(identity, input.academyId);
     const suspended = await this.prisma.$transaction(async (transaction) => {
-      const membership = await this.lockMembership(
+      const membership = await lockMembershipForUpdate(
         transaction,
         input.academyId,
         input.membershipId,
@@ -115,7 +96,7 @@ export class AcademyMembershipService {
         );
       }
       if (membership.role === "MANAGER") {
-        await this.requireAnotherActiveManager(
+        await assertAnotherActiveManager(
           transaction,
           input.academyId,
           membership.id,
@@ -155,7 +136,7 @@ export class AcademyMembershipService {
   ) {
     const actor = await this.requireManager(identity, input.academyId);
     return this.prisma.$transaction(async (transaction) => {
-      const membership = await this.lockMembership(
+      const membership = await lockMembershipForUpdate(
         transaction,
         input.academyId,
         input.membershipId,
@@ -196,73 +177,4 @@ export class AcademyMembershipService {
       "academy.members.manage",
     );
   }
-
-  private async lockMembership(
-    transaction: Prisma.TransactionClient,
-    academyId: string,
-    membershipId: string,
-  ) {
-    await transaction.$queryRaw`
-      SELECT id
-      FROM academy_memberships
-      WHERE id = ${membershipId}::uuid
-        AND academy_id = ${academyId}::uuid
-      FOR UPDATE
-    `;
-    const membership = await transaction.academyMembership.findFirst({
-      where: { id: membershipId, academyId },
-      include: membershipInclude,
-    });
-    if (!membership) {
-      throw new AppException(
-        "ACADEMY_MEMBERSHIP_REQUIRED",
-        HttpStatus.NOT_FOUND,
-      );
-    }
-    return membership;
-  }
-
-  private async requireAnotherActiveManager(
-    transaction: Prisma.TransactionClient,
-    academyId: string,
-    targetMembershipId: string,
-  ): Promise<void> {
-    const managers = await transaction.$queryRaw<Array<{ id: string }>>`
-      SELECT id
-      FROM academy_memberships
-      WHERE academy_id = ${academyId}::uuid
-        AND role = 'MANAGER'
-        AND status = 'ACTIVE'
-      ORDER BY id
-      FOR UPDATE
-    `;
-    if (!hasAnotherActiveManager(managers, targetMembershipId)) {
-      throw new AppException("LAST_MANAGER_REQUIRED", HttpStatus.CONFLICT);
-    }
-  }
-}
-
-export function hasAnotherActiveManager(
-  managers: readonly { id: string }[],
-  targetMembershipId: string,
-): boolean {
-  return managers.some((manager) => manager.id !== targetMembershipId);
-}
-
-export function toAcademyMember(membership: {
-  id: string;
-  role: "STUDENT" | "TEACHER" | "TEAM_LEAD" | "MANAGER";
-  status: "INVITED" | "ACTIVE" | "SUSPENDED" | "LEFT";
-  joinedAt: Date | null;
-  suspendedAt: Date | null;
-  user: { id: string; email: string | null; displayName: string | null };
-}) {
-  return {
-    id: membership.id,
-    user: membership.user,
-    role: membership.role,
-    status: membership.status,
-    joinedAt: membership.joinedAt?.toISOString() ?? null,
-    suspendedAt: membership.suspendedAt?.toISOString() ?? null,
-  };
 }

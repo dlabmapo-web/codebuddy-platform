@@ -1,17 +1,24 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type {
+  DirectoryComposition,
   ListPlatformUsersResult,
+  MembershipParticipation,
   PlatformUserDetail,
   ResolvedListPlatformUsersInput,
+  SetPlatformMembershipRoleInput,
+  SetPlatformUserRoleInput,
   SetPlatformUserStatusInput,
 } from "@cove/shared";
 
+import { applyMembershipRoleChange } from "../academies/academy-membership.operations.js";
 import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PlatformAccessService } from "../authorization/platform-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
+import { PlatformParticipationRepository } from "./platform-participation.repository.js";
 import {
   toUserDetail,
   toUserInvitation,
@@ -30,12 +37,13 @@ import {
  * shared service with a flag would have to choose one and lie about the other.
  *
  * What this service will not return is as much of its definition as what it
- * will. No submission, no grade, no progress, no point balance, and no field
- * of `StudentAcademyProfile` — guardian names, guardian phone numbers, dates
- * of birth, school names. Those belong to children, they belong to the academy
- * that collected them, and an operator who genuinely needs one opens a support
- * grant that states a reason and expires. §3.6 of the platform admin console
- * design.
+ * will. No submission, no grade, no point balance, and no field of
+ * `StudentAcademyProfile` — guardian names, guardian phone numbers, dates of
+ * birth, school names — through `list`, `get`, or any of its mutations.
+ * `participation` alone widens that, and only to structure and totals: §3.4 of
+ * the console people operations design draws the line, and it is its own
+ * permission and its own audited read (§3.5) rather than a field folded onto
+ * `get`.
  */
 @Injectable()
 export class PlatformUsersService {
@@ -43,6 +51,8 @@ export class PlatformUsersService {
     private readonly prisma: PrismaService,
     private readonly access: PlatformAccessService,
     private readonly audit: AuditService,
+    private readonly participationRepo: PlatformParticipationRepository,
+    private readonly revocation: MonitoringRevocationService,
   ) {}
 
   async list(
@@ -56,7 +66,7 @@ export class PlatformUsersService {
 
     const where = buildUsersWhere(input);
 
-    const [total, records, academies] = await Promise.all([
+    const [total, records, academies, composition] = await Promise.all([
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({
         where,
@@ -76,6 +86,7 @@ export class PlatformUsersService {
         select: { id: true, name: true, slug: true },
         orderBy: [{ name: "asc" }, { id: "asc" }],
       }),
+      this.computeComposition(input),
     ]);
 
     return {
@@ -84,6 +95,61 @@ export class PlatformUsersService {
       page: input.page,
       pageSize: input.pageSize,
       academyOptions: academies,
+      composition,
+    };
+  }
+
+  /**
+   * Who the operator is currently looking at, as one line of counts.
+   *
+   * Six `User` counts rather than one grouped read, deliberately: the count is
+   * of **accounts**, not memberships, so somebody who teaches at two campuses
+   * must count once under Teachers — `prisma.user.count` counts distinct
+   * accounts by construction, where a `groupBy` over `AcademyMembership` would
+   * double them.
+   *
+   * Every count drops the caller's own `roles` narrowing and keeps every other
+   * facet. Filtering the table to teachers must not collapse the strip to
+   * "7 teachers and nothing else": the strip describes the population the
+   * facet selects *from*.
+   *
+   * The academy spread is the one read that is not a `User` count. It asks
+   * which academies these accounts are in, so it groups memberships and counts
+   * the distinct academies — an academy with no matching member is not part of
+   * where these people are.
+   */
+  private async computeComposition(
+    input: ResolvedListPlatformUsersInput,
+  ): Promise<DirectoryComposition> {
+    const unroled = { ...input, roles: undefined };
+    const countWith = (extra: Partial<ResolvedListPlatformUsersInput>) =>
+      this.prisma.user.count({ where: buildUsersWhere({ ...unroled, ...extra }) });
+
+    const [total, students, teachers, teamLeads, managers, operators, spread] =
+      await Promise.all([
+        countWith({}),
+        countWith({ roles: ["STUDENT"] }),
+        countWith({ roles: ["TEACHER"] }),
+        countWith({ roles: ["TEAM_LEAD"] }),
+        countWith({ roles: ["MANAGER"] }),
+        // The platform axis, not a fifth role (§3.3). An operator who also
+        // manages an academy is counted in both, which is why this is never a
+        // segment of the band.
+        countWith({ platformRoles: ["ADMIN"] }),
+        this.prisma.academyMembership.groupBy({
+          by: ["academyId"],
+          where: { user: buildUsersWhere(unroled) },
+        }),
+      ]);
+
+    return {
+      total,
+      students,
+      teachers,
+      teamLeads,
+      managers,
+      operators,
+      academies: spread.length,
     };
   }
 
@@ -147,19 +213,21 @@ export class PlatformUsersService {
   }
 
   /**
-   * Suspend or restore an account, platform-wide.
+   * Suspend, restore, or delete an account, platform-wide.
    *
    * Global the moment it is written, with nothing to enforce per surface:
    * `AcademyAccessService` and `PlatformAccessService` both refuse `SUSPENDED`
-   * before reading any role, so the next request from this account is refused
-   * everywhere at once.
+   * and `DELETED` before reading any role, so the next request from this
+   * account is refused everywhere at once.
    *
-   * Two refusals guard the two ways this locks somebody out of their own
-   * platform. An operator may not suspend themselves — the console would be
-   * gone on their next click, and if they were the last admin nobody could
-   * undo it — and may not suspend the last active manager of a running
-   * academy, which would leave that academy leaderless without anyone
-   * deciding to.
+   * `platform.users.suspend` authorizes the mutation; `DELETED` additionally
+   * requires `platform.users.delete`, apart for the reason the permission's
+   * own comment gives — suspension is routine, this is not. Two refusals guard
+   * the two ways this locks somebody out of their own platform: an operator
+   * may not act on themselves, and may not strand the last active manager of a
+   * running academy. `DELETED` also requires the account's current email or
+   * username typed back — §3.7 — checked here, against the current value,
+   * never against one that has since changed.
    */
   async setStatus(
     identity: SupabaseIdentity,
@@ -169,6 +237,12 @@ export class PlatformUsersService {
       identity.authUserId,
       "platform.users.suspend",
     );
+    if (input.status === "DELETED") {
+      await this.access.requirePermission(
+        identity.authUserId,
+        "platform.users.delete",
+      );
+    }
 
     if (actor.userId === input.userId) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
@@ -177,14 +251,28 @@ export class PlatformUsersService {
     const detail = await this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.user.findUnique({
         where: { id: input.userId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, email: true, username: true },
       });
       if (!existing) {
         throw new AppException("PLATFORM_USER_NOT_FOUND", HttpStatus.NOT_FOUND);
       }
 
-      if (input.status === "SUSPENDED") {
+      if (input.status === "SUSPENDED" || input.status === "DELETED") {
         await assertNotLastActiveManager(transaction, input.userId);
+      }
+
+      if (input.status === "DELETED") {
+        const typed = (input.confirmHandle ?? "").trim().toLowerCase();
+        const matches =
+          typed.length > 0 &&
+          (typed === existing.email?.toLowerCase() ||
+            typed === existing.username?.toLowerCase());
+        if (!matches) {
+          throw new AppException(
+            "CONFIRMATION_MISMATCH",
+            HttpStatus.BAD_REQUEST,
+          );
+        }
       }
 
       // A no-op still writes an audit record. An operator who suspends an
@@ -204,7 +292,9 @@ export class PlatformUsersService {
         action:
           input.status === "SUSPENDED"
             ? "platform.user.suspended"
-            : "platform.user.restored",
+            : input.status === "DELETED"
+              ? "platform.user.deleted"
+              : "platform.user.restored",
         targetType: "user",
         targetId: input.userId,
         before: { status: existing.status },
@@ -217,18 +307,332 @@ export class PlatformUsersService {
 
     return this.readDetail(detail);
   }
+
+  /**
+   * One membership's participation — structure and totals, never an artefact.
+   * §3.4.
+   *
+   * A student's card is audited (§3.5): opening it writes one `AuditLog` row,
+   * deduplicated per (actor, membership) per hour, so the academy sees on its
+   * own audit page that Cove looked. A teacher's class list is operational
+   * metadata about the academy's configuration rather than a named child's
+   * participation, so it carries no audit row.
+   */
+  async participation(
+    identity: SupabaseIdentity,
+    input: { userId: string; membershipId: string },
+  ): Promise<MembershipParticipation> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.users.participation.read",
+    );
+
+    const membership = await this.prisma.academyMembership.findUnique({
+      where: { id: input.membershipId },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        joinedAt: true,
+        academyId: true,
+        academy: { select: { name: true, slug: true, timeZone: true } },
+      },
+    });
+    if (!membership || membership.userId !== input.userId) {
+      throw new AppException("PLATFORM_USER_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+
+    const base = {
+      membershipId: membership.id,
+      academyId: membership.academyId,
+      academySlug: membership.academy.slug,
+      academyName: membership.academy.name,
+      role: membership.role,
+      status: membership.status,
+      joinedAt: membership.joinedAt?.toISOString() ?? null,
+    };
+
+    if (membership.role === "STUDENT") {
+      const student = await this.buildStudentParticipation(
+        membership.userId,
+        membership.id,
+        membership.academy.timeZone,
+      );
+      await this.auditParticipationRead(
+        actor.userId,
+        membership.id,
+        membership.academyId,
+      );
+      return { ...base, student, teacher: null, lead: null, manager: null };
+    }
+    if (membership.role === "TEACHER") {
+      const teacher = await this.buildTeacherParticipation(membership.id);
+      return { ...base, student: null, teacher, lead: null, manager: null };
+    }
+    if (membership.role === "TEAM_LEAD") {
+      const lead = await this.buildLeadParticipation(
+        membership.academyId,
+        membership.userId,
+      );
+      return { ...base, student: null, teacher: null, lead, manager: null };
+    }
+    const manager = await this.buildManagerParticipation(membership.academyId);
+    return { ...base, student: null, teacher: null, lead: null, manager };
+  }
+
+  private async buildStudentParticipation(
+    userId: string,
+    membershipId: string,
+    academyTimeZone: string,
+  ) {
+    const classes = await this.participationRepo.studentClasses(membershipId);
+    const courseIds = [
+      ...new Set(classes.flatMap((cls) => cls.courses.map((course) => course.courseId))),
+    ];
+    const courseTitles = new Map(
+      classes.flatMap((cls) => cls.courses).map((course) => [course.courseId, course.title]),
+    );
+
+    const [exerciseTotals, learningDays, lastActiveAt, pointsEarned] =
+      await Promise.all([
+        this.participationRepo.studentExerciseTotals({ userId, courseIds }),
+        this.participationRepo.studentLearningDays(membershipId, courseIds),
+        this.participationRepo.studentLastActiveAt(membershipId),
+        this.participationRepo.studentPoints(membershipId),
+      ]);
+
+    const activeSecondsByCourse = new Map(
+      learningDays.byCourse.map((row) => [row.courseId, row.activeSeconds]),
+    );
+    const exerciseByCourse = new Map(
+      exerciseTotals.byCourse.map((row) => [row.courseId, row]),
+    );
+
+    return {
+      classes: classes.map((cls) => ({
+        classId: cls.classId,
+        name: cls.name,
+        status: cls.status,
+        enrolledAt: cls.enrolledAt.toISOString(),
+        teacherName: cls.teacherName,
+        courses: cls.courses,
+      })),
+      solvedCount: exerciseTotals.overall.solvedCount,
+      attemptedCount: exerciseTotals.overall.attemptedCount,
+      totalAttempts: exerciseTotals.overall.totalAttempts,
+      activeSeconds: learningDays.byCourse.reduce(
+        (sum, row) => sum + row.activeSeconds,
+        0,
+      ),
+      activeDays: learningDays.distinctDates.length,
+      streakDays: computeStreakDays(academyTimeZone, learningDays.distinctDates),
+      pointsEarned,
+      lastActiveAt: lastActiveAt?.toISOString() ?? null,
+      courses: courseIds.map((courseId) => ({
+        courseId,
+        title: courseTitles.get(courseId) ?? "",
+        solved: exerciseByCourse.get(courseId)?.solved ?? 0,
+        total: exerciseByCourse.get(courseId)?.total ?? 0,
+        activeSeconds: activeSecondsByCourse.get(courseId) ?? 0,
+      })),
+    };
+  }
+
+  private async buildTeacherParticipation(membershipId: string) {
+    const [classes, studentReach] = await Promise.all([
+      this.participationRepo.teacherClasses(membershipId),
+      this.participationRepo.teacherRosterReach(membershipId),
+    ]);
+    const courseIds = new Set(
+      classes.flatMap((cls) => cls.courses.map((course) => course.courseId)),
+    );
+    return {
+      classes: classes.map((cls) => ({
+        classId: cls.classId,
+        name: cls.name,
+        status: cls.status,
+        enrolledAt: cls.enrolledAt.toISOString(),
+        teacherName: cls.teacherName,
+        courses: cls.courses,
+        studentCount: cls.studentCount,
+      })),
+      studentReach,
+      courseCount: courseIds.size,
+    };
+  }
+
+  private async buildLeadParticipation(academyId: string, userId: string) {
+    const courses = await this.participationRepo.leadCourses(academyId, userId);
+    return {
+      courses: courses.map((course) => ({
+        courseId: course.courseId,
+        title: course.title,
+        isVisible: course.isVisible,
+        classCount: course.classCount,
+        updatedAt: course.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  private async buildManagerParticipation(academyId: string) {
+    const [scale, counts] = await Promise.all([
+      this.participationRepo.managerScale(academyId),
+      this.participationRepo.managerCounts(academyId),
+    ]);
+    return {
+      scale,
+      classCount: counts.classCount,
+      courseCount: counts.courseCount,
+    };
+  }
+
+  /**
+   * §3.5 — opening a student's membership card is an audited act, deduped per
+   * (actor, membership) per hour so a page refresh is not a fresh row and a
+   * trail of identical entries does not drown the one worth reading.
+   */
+  private async auditParticipationRead(
+    actorUserId: string,
+    membershipId: string,
+    academyId: string,
+  ): Promise<void> {
+    const dedupeSince = new Date(Date.now() - 60 * 60 * 1000);
+    await this.prisma.$transaction(async (transaction) => {
+      const recent = await transaction.auditLog.findFirst({
+        where: {
+          action: "platform.user.participation.read",
+          targetId: membershipId,
+          actorUserId,
+          createdAt: { gt: dedupeSince },
+        },
+        select: { id: true },
+      });
+      if (recent) return;
+
+      await this.audit.write(transaction, {
+        actorUserId,
+        academyId,
+        action: "platform.user.participation.read",
+        targetType: "AcademyMembership",
+        targetId: membershipId,
+      });
+    });
+  }
+
+  /**
+   * A role change reached from the console rather than from inside an
+   * academy. `applyMembershipRoleChange` holds the four invariants (§3.8);
+   * this method contributes only its own authorization check and the
+   * membership lookup that resolves which academy it belongs to.
+   */
+  async setMembershipRole(
+    identity: SupabaseIdentity,
+    input: SetPlatformMembershipRoleInput,
+  ): Promise<PlatformUserDetail> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.users.role",
+    );
+
+    const membership = await this.prisma.academyMembership.findUnique({
+      where: { id: input.membershipId },
+      select: { id: true, userId: true, academyId: true },
+    });
+    if (!membership || membership.userId !== input.userId) {
+      throw new AppException("PLATFORM_USER_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+
+    const { changed } = await this.prisma.$transaction((transaction) =>
+      applyMembershipRoleChange(transaction, this.audit, {
+        academyId: membership.academyId,
+        membershipId: membership.id,
+        role: input.role,
+        actorUserId: actor.userId,
+        reason: input.reason,
+      }),
+    );
+    if (changed) {
+      await this.revocation.revokeMembership(membership.id, "ROLE_CHANGED");
+    }
+
+    return this.readDetail(input.userId);
+  }
+
+  /**
+   * Granting or revoking platform operator status.
+   *
+   * Its own permission and its own confirmation (§3.6) — a radio group beside
+   * the academy role would imply an exclusivity that does not hold, since
+   * `platformRole` is a different axis (§3.3). The same two refusals as
+   * `setStatus`: an operator may not revoke their own access, and may not
+   * revoke the platform's last one.
+   */
+  async setPlatformRole(
+    identity: SupabaseIdentity,
+    input: SetPlatformUserRoleInput,
+  ): Promise<PlatformUserDetail> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.operators.manage",
+    );
+    if (actor.userId === input.userId) {
+      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true, platformRole: true },
+      });
+      if (!existing) {
+        throw new AppException("PLATFORM_USER_NOT_FOUND", HttpStatus.NOT_FOUND);
+      }
+
+      if (existing.platformRole === "ADMIN" && input.platformRole !== "ADMIN") {
+        const others = await transaction.user.count({
+          where: { platformRole: "ADMIN", id: { not: input.userId } },
+        });
+        if (others === 0) {
+          throw new AppException("LAST_ADMIN_REQUIRED", HttpStatus.CONFLICT);
+        }
+      }
+
+      await transaction.user.update({
+        where: { id: input.userId },
+        data: { platformRole: input.platformRole },
+      });
+
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: null,
+        action:
+          input.platformRole === "ADMIN"
+            ? "platform.user.operator_granted"
+            : "platform.user.operator_revoked",
+        targetType: "user",
+        targetId: input.userId,
+        before: { platformRole: existing.platformRole },
+        after: { platformRole: input.platformRole },
+        reason: input.reason,
+      });
+    });
+
+    return this.readDetail(input.userId);
+  }
 }
 
 /**
  * The account may not be the last person able to run an academy.
  *
  * `LAST_MANAGER_REQUIRED` already means exactly this inside one academy's
- * membership service; suspending an account is the same rule reached from the
- * other side, and reusing the code keeps one answer for one situation.
+ * membership service; suspending or deleting an account is the same rule
+ * reached from the other side, and reusing the code keeps one answer for one
+ * situation.
  *
  * Only `ACTIVE` academies count. A suspended or archived academy has nobody
  * signing in to be stranded, and refusing there would make an operator unable
- * to suspend an account precisely when it is least risky.
+ * to act on an account precisely when it is least risky.
  */
 async function assertNotLastActiveManager(
   transaction: Prisma.TransactionClient,
@@ -258,6 +662,51 @@ async function assertNotLastActiveManager(
       throw new AppException("LAST_MANAGER_REQUIRED", HttpStatus.CONFLICT);
     }
   }
+}
+
+/**
+ * Consecutive academy-local days of activity, ending today or yesterday.
+ *
+ * `distinctDates` is `YYYY-MM-DD` strings from `StudentCourseLearningDay`'s
+ * `@db.Date` column, already in the academy's own calendar day. "Today" and
+ * "yesterday" are read in the academy's own zone — a student's streak must not
+ * flicker depending on which time zone the operator reading it happens to be
+ * in — and the walk stops at the first gap.
+ */
+export function computeStreakDays(
+  timeZone: string,
+  distinctDates: readonly string[],
+): number {
+  if (distinctDates.length === 0) return 0;
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayKey = formatter.format(new Date());
+  const yesterdayKey = formatter.format(new Date(Date.now() - 86_400_000));
+
+  const present = new Set(distinctDates);
+  let cursor: string;
+  if (present.has(todayKey)) cursor = todayKey;
+  else if (present.has(yesterdayKey)) cursor = yesterdayKey;
+  else return 0;
+
+  let streak = 0;
+  while (present.has(cursor)) {
+    streak += 1;
+    cursor = shiftDateKey(cursor, -1);
+  }
+  return streak;
+}
+
+function shiftDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 /**

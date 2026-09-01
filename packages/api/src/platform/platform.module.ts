@@ -7,6 +7,7 @@ import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.
 import { PlatformAcademyService } from "./platform-academy.service.js";
 import { PlatformAuditService } from "./platform-audit.service.js";
 import { PlatformContentService } from "./platform-content.service.js";
+import { PlatformParticipationRepository } from "./platform-participation.repository.js";
 import { PlatformUsersService } from "./platform-users.service.js";
 import { PlatformSupportService } from "./platform-support.service.js";
 import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
@@ -32,6 +33,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformAcademyService,
     PlatformLifecycleService,
     PlatformUsersService,
+    PlatformParticipationRepository,
     PlatformSupportService,
     PlatformAuditService,
     PlatformContentService,

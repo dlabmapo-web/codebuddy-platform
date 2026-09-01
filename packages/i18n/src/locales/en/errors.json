@@ -111,5 +111,7 @@
   "LIBRARY_ADOPTION_CONFLICT": "This academy already has a course with that title.",
   "PLATFORM_USER_NOT_FOUND": "That account was not found.",
   "ACADEMY_DELETE_NOT_CONFIRMED": "Type the academy's address exactly to confirm deletion.",
+  "CONFIRMATION_MISMATCH": "Type the account's email or username exactly to confirm.",
+  "LAST_ADMIN_REQUIRED": "The platform must keep at least one operator.",
   "UNKNOWN": "Something went wrong. Try again."
 }

@@ -30,6 +30,7 @@ export const userSummarySelect = {
   createdAt: true,
   memberships: {
     select: {
+      id: true,
       role: true,
       status: true,
       joinedAt: true,
@@ -108,12 +109,14 @@ export function toUserDetail(
 }
 
 function toUserMembership(record: {
+  id: string;
   role: PlatformUserMembership["role"];
   status: PlatformUserMembership["status"];
   joinedAt: Date | null;
   academy: { id: string; name: string; slug: string };
 }): PlatformUserMembership {
   return {
+    membershipId: record.id,
     academyId: record.academy.id,
     academySlug: record.academy.slug,
     academyName: record.academy.name,

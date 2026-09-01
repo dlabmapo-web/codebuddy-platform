@@ -82,7 +82,12 @@ export function LocaleFlag({
       {/* The canton covers the top seven stripes, as it does on the real flag. */}
       <rect fill="#0A3161" height={STRIPE * 7} width="9.6" />
       <g fill="#FFFFFF">
-        {starRows.map((row) =>
+        {/* `flatMap`, not a nested `map`: the nested form hands `<g>` an array
+            of arrays, and React keys each inner *array* — which has no key —
+            so five rows of stars arrive as five children with the same empty
+            key. The circles were always keyed; the arrays around them were
+            not. */}
+        {starRows.flatMap((row) =>
           row.x.map((x) => <circle cx={x} cy={row.y} key={`${x}-${row.y}`} r="0.42" />),
         )}
       </g>

@@ -220,10 +220,15 @@ export function SkeletonTable({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-border bg-canvas">
-              {columns.map((column) => (
+              {/* Keyed by position, not by the label. A column heading is
+                  caller-supplied text: it can repeat, and a skeleton that does
+                  not know which table it is standing in passes blanks — which
+                  made every column key the same empty string. Position is the
+                  identity here anyway, since these cells never reorder. */}
+              {columns.map((column, index) => (
                 <th
                   className="whitespace-nowrap px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-sub"
-                  key={column}
+                  key={index}
                   scope="col"
                 >
                   {column}
@@ -235,7 +240,7 @@ export function SkeletonTable({
             {Array.from({ length: rows }, (_, row) => (
               <tr key={row}>
                 {columns.map((column, index) => (
-                  <td className="px-4 py-3" key={column}>
+                  <td className="px-4 py-3" key={index}>
                     <Skeleton
                       className={cn('h-4', index === 0 ? 'w-40' : 'w-20')}
                     />

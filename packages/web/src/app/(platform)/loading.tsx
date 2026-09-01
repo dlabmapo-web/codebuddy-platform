@@ -14,6 +14,11 @@ export default function PlatformLoading() {
   return (
     <SkeletonChrome label={t('state.loading')}>
       <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
+        {/* Blank headings, deliberately. One `loading.tsx` covers every
+            console route — academies, users, support access, the audit trail
+            — and they do not share a column set, so naming any of them would
+            flash the wrong headings on three routes out of four. The shape is
+            the honest part; the words arrive with the page. */}
         <SkeletonTable columns={['', '', '', '']} rows={6} />
       </div>
     </SkeletonChrome>

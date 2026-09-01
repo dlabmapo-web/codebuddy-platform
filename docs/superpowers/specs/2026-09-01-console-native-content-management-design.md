@@ -257,6 +257,18 @@ Keep the module. §8 still wants it, and it remains correct for what it does.
 Audit the `Add course` / `Add class` buttons in the same pass — they call
 `enterAcademyAs` too, and should point at the new index routes.
 
+### 7.1 Academy-detail action parity
+
+The academy detail page's compact course and class tables keep the same row
+actions as their full manager-side tables. Course rows offer Edit, Show/Hide
+and Delete; class rows offer Edit, Archive/Restore and Delete.
+
+Use the existing visibility and archive confirmation dialogs. Hiding a course
+and archiving a class require confirmation because they remove student access;
+showing and restoring are reversible and apply immediately. All mutations call
+the same academy endpoints as the full tables, surface failures without
+dismissing the action state, and refresh the academy detail after success.
+
 ## 8. What "view as" is still for
 
 Keep the existing Manager, Team Lead and Teacher role picker on the academy

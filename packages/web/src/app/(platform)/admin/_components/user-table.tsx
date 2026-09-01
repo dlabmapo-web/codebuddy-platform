@@ -27,6 +27,7 @@ import {
 } from '../_lib/user-view';
 import { UserAvatar } from './user-avatar';
 import { UserComposition } from './user-composition';
+import { UserExportButton } from './user-export-button';
 import { UserRowActions } from './user-row-actions';
 import { UserRoleCell } from './user-role-cell';
 import { UserStatusChip } from './user-status-chip';
@@ -349,6 +350,9 @@ export function UserTable({
         onRowClick={(person) => router.push(`/admin/users/${person.userId}`)}
         searchPlaceholder={t('table.search')}
         showColumnVisibility={false}
+        toolbarActions={
+          <UserExportButton composition={page?.composition} query={query} />
+        }
       />
     </div>
   );

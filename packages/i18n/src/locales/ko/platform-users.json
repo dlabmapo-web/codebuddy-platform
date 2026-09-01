@@ -32,6 +32,13 @@
     "operators": "운영자",
     "unaffiliated": "소속 없음"
   },
+  "export": {
+    "label": "스프레드시트로 내려받기",
+    "download": "내려받기",
+    "working": "준비하는 중…",
+    "choose": "내려받을 대상 선택",
+    "everything": "현재 목록 전체"
+  },
   "role": {
     "STUDENT": "학생",
     "TEACHER": "선생님",

@@ -32,6 +32,13 @@
     "operators": "Operators",
     "unaffiliated": "No academy"
   },
+  "export": {
+    "label": "Download as a spreadsheet",
+    "download": "Download",
+    "working": "Preparing…",
+    "choose": "Choose what to download",
+    "everything": "Everything in this view"
+  },
   "role": {
     "STUDENT": "Student",
     "TEACHER": "Teacher",

@@ -730,6 +730,7 @@ export const academyAuditActions = [
   "class.created",
   "class.updated",
   "class.archived",
+  "class.deleted",
   "class.restored",
   "class.courses.updated",
   "class.schedule.updated",

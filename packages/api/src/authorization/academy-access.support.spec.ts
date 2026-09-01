@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
+// The role an operator chose travels on the request, so the access service can
+// read it without every caller passing it down.
+vi.mock("../common/request-context.js", () => ({
+  currentViewRole: vi.fn(),
+  setRequestSupportGrant: vi.fn(),
+}));
+
+import { currentViewRole } from "../common/request-context.js";
+
 import { AcademyAccessService } from "./academy-access.service.js";
 import type { LiveSupportGrant, SupportGrantResolver } from "./support-grant.resolver.js";
 import type { PrismaService } from "../database/prisma.service.js";
@@ -308,19 +317,40 @@ describe("AcademyAccessService platform read", () => {
     ).resolves.toMatchObject({ role: "MANAGER", via: "platform" });
   });
 
-  it("refuses every write without one", async () => {
+  it("carries the whole of the role it stands in", async () => {
+    // Several manager surfaces gate a *read* behind a write-named permission —
+    // the roster asks for `academy.members.manage` — so a read-only slice gave
+    // an operator a Manager sidebar whose pages mostly refused to open.
     for (const permission of [
       "academy.members.manage",
       "curriculum.manage",
       "academy.settings.manage",
       "academy.applications.review",
     ] as const) {
-      expect(
-        await codeOf(
-          operator().requirePermission(authUserId, academyId, permission),
-        ),
-      ).toBe("ACADEMY_MEMBERSHIP_REQUIRED");
+      await expect(
+        operator().requirePermission(authUserId, academyId, permission),
+      ).resolves.toMatchObject({ via: "platform", role: "MANAGER" });
     }
+  });
+
+  it("holds nothing the chosen role does not hold", async () => {
+    // Standing as a Teacher is standing as a Teacher: the view is a different
+    // product, not a relabelled Manager.
+    vi.mocked(currentViewRole).mockReturnValue("TEACHER");
+    expect(
+      await codeOf(
+        operator().requirePermission(
+          authUserId,
+          academyId,
+          "academy.members.manage",
+        ),
+      ),
+    ).toBe("ACADEMY_MEMBERSHIP_REQUIRED");
+
+    await expect(
+      operator().requirePermission(authUserId, academyId, "curriculum.read"),
+    ).resolves.toMatchObject({ role: "TEACHER" });
+    vi.mocked(currentViewRole).mockReturnValue(undefined);
   });
 
   it("never lets the standing read submit work", async () => {

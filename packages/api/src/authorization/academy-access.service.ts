@@ -1,15 +1,20 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   grantHasPermission,
+  isPlatformViewRole,
   platformRoleHasPermission,
-  readOnlyAcademyPermissions,
+  platformViewPermissions,
   roleHasPermission,
   type AcademyPermission,
   type AcademyRole,
+  type PlatformViewRole,
 } from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
-import { setRequestSupportGrant } from "../common/request-context.js";
+import {
+  currentViewRole,
+  setRequestSupportGrant,
+} from "../common/request-context.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { SupportGrantResolver } from "./support-grant.resolver.js";
 
@@ -186,36 +191,33 @@ export class AcademyAccessService {
   }
 
   /**
-   * A platform operator's standing read of any academy.
+   * A platform operator standing inside an academy, as one of its roles.
    *
-   * Reads only, enforced by the same named set a read-only grant is bounded
-   * by — so "what an operator can see without a session" and "what a read-only
-   * session can see" are one list rather than two that drift.
+   * The role comes from the request — an operator chooses whether they are
+   * looking at the Manager's product, the Team Lead's, or a Teacher's, because
+   * those are three genuinely different applications and a question about one
+   * cannot be answered from another. It defaults to `MANAGER`, the widest.
    *
-   * The role reported is `MANAGER`, because that is the shape of the reading:
-   * the academy-wide view rather than one teacher's classes. It authorizes
-   * nothing a Manager could not read, and every write falls through to the
-   * refusal below.
+   * `platformViewPermissions` decides what that role may do here, and it is
+   * the role's own set rather than a read-only slice. Several manager surfaces
+   * gate a read behind a write-named permission — the roster asks for
+   * `academy.members.manage` — so a read-only slice produced a Manager view
+   * with most of the Manager's pages refusing to open.
+   *
+   * Two things it never yields, whatever the role: submitting work as a
+   * student, and live monitoring. Both stay out of `platformViewPermissions`.
    */
   private async platformRead(
     userId: string,
     academyId: string,
     permission: AcademyPermission,
   ): Promise<AcademyAccess | null> {
-    if (
-      !(readOnlyAcademyPermissions as readonly AcademyPermission[]).includes(
-        permission,
-      )
-    ) {
-      return null;
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { platformRole: true },
     });
-    // `platformRole` is non-null in the schema, so an absent one means the
-    // row was not read — a caller that is not an operator, or a test double.
+    // `platformRole` is non-null in the schema, so an absent one means the row
+    // was not read — a caller that is not an operator, or a test double.
     // Either way it is not authority.
     if (
       !user?.platformRole ||
@@ -224,7 +226,14 @@ export class AcademyAccessService {
       return null;
     }
 
-    return { userId, academyId, role: "MANAGER", via: "platform" };
+    const requested = currentViewRole();
+    const role: PlatformViewRole = isPlatformViewRole(requested)
+      ? requested
+      : "MANAGER";
+
+    return platformViewPermissions(role).includes(permission)
+      ? { userId, academyId, role, via: "platform" }
+      : null;
   }
 
   /**

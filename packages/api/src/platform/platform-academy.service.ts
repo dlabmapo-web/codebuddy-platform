@@ -6,6 +6,8 @@ import { ConfigService } from "@nestjs/config";
 import {
   academyAttentionRank,
   type CreatePlatformAcademyInput,
+  type DeletePlatformAcademyInput,
+  type DeletePlatformAcademyResult,
   type ListPlatformAcademiesInput,
   type PlatformAcademyDetail,
   type PlatformAcademySummary,
@@ -36,6 +38,7 @@ import {
   academyDetailSelect,
   academySummarySelect,
 } from "./platform-academy.select.js";
+import { purgeAcademy } from "./academy-purge.js";
 import { readAcademyStats } from "./academy-stats.js";
 import { resolvePlatformOrganization } from "./platform-organization.js";
 
@@ -127,6 +130,85 @@ export class PlatformAcademyService {
       readAcademyStats(this.prisma, academyId),
     ]);
     return toAcademyDetail(record, stats);
+  }
+
+  /**
+   * Resolve one live academy by its exact slug.
+   *
+   * Console routes must not emulate this with the fuzzy, paginated directory:
+   * a valid academy can otherwise disappear behind 100 similarly named rows.
+   */
+  async getBySlug(
+    identity: SupabaseIdentity,
+    academySlug: string,
+  ): Promise<PlatformAcademySummary> {
+    await this.access.requirePermission(
+      identity.authUserId,
+      "platform.academies.read",
+    );
+    const record = await this.prisma.academy.findFirst({
+      where: { slug: academySlug },
+      select: academySummarySelect,
+    });
+    if (!record) {
+      throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    return toAcademySummary(record, new Date());
+  }
+
+  /**
+   * Destroy an academy and everything it owns.
+   *
+   * The only irreversible operation on this surface, and the only one whose
+   * safeguards are worth more than its code. The slug is typed back rather
+   * than clicked past, the reason is required, and the audit record is written
+   * *before* the purge — `AuditLog.academyId` is `SetNull`, so the entry
+   * survives the academy it describes and the trail keeps the one fact that
+   * matters most: that this happened, who did it, and why.
+   *
+   * `purgeAcademy` does the work in dependency order. The schema deliberately
+   * refuses to cascade here; see its note.
+   */
+  async delete(
+    identity: SupabaseIdentity,
+    input: DeletePlatformAcademyInput,
+  ): Promise<DeletePlatformAcademyResult> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.academies.delete",
+    );
+
+    return this.prisma.$transaction(async (transaction) => {
+      const academy = await transaction.academy.findUnique({
+        where: { id: input.academyId },
+        select: { id: true, name: true, slug: true, status: true },
+      });
+      if (!academy) {
+        throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
+      }
+      // Compared against the *current* slug, not a retired one: an operator
+      // working from a stale tab should be stopped, not obeyed.
+      if (input.confirmSlug.trim().toLowerCase() !== academy.slug) {
+        throw new AppException(
+          "ACADEMY_DELETE_NOT_CONFIRMED",
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: academy.id,
+        action: "platform.academy.deleted",
+        targetType: "academy",
+        targetId: academy.id,
+        before: { name: academy.name, slug: academy.slug, status: academy.status },
+        reason: input.reason,
+      });
+
+      await purgeAcademy(transaction, academy.id);
+
+      return { academyId: academy.id, name: academy.name, slug: academy.slug };
+    });
   }
 
   /**

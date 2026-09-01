@@ -343,6 +343,80 @@ export class CourseService {
     return this.currentTree(input);
   }
 
+  /**
+   * Destroy a course and everything under it.
+   *
+   * Refused while any student has submitted through it — the same rule the
+   * module and lecture deletes apply, for the same reason: student work is not
+   * the academy's to destroy as a side effect of tidying its curriculum. A
+   * course that should merely stop being taught is hidden, which is reversible.
+   *
+   * The title is typed back. This is the largest thing a Team Lead can delete,
+   * and the only lock worth having is one nobody performs by accident.
+   */
+  async deleteCourse(
+    identity: SupabaseIdentity,
+    input: { academyId: string; courseId: string; confirmTitle: string },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const course = await this.prisma.course.findFirst({
+      where: { id: input.courseId, academyId: input.academyId },
+      select: { id: true, title: true, isVisible: true },
+    });
+    if (!course) {
+      throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    if (input.confirmTitle.trim() !== course.title.trim()) {
+      throw new AppException(
+        "CONTENT_VALIDATION_FAILED",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const submissions = await this.prisma.submission.count({
+      where: { courseId: course.id },
+    });
+    if (submissions > 0) {
+      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Ordered, because `Submission.course` and the draft relations are the
+      // ones the schema refuses to cascade. The submission count above proves
+      // the first is empty; the drafts are the author's own working copies.
+      await tx.exerciseCollaborationDocument.deleteMany({
+        where: { draft: { courseId: course.id } },
+      });
+      await tx.exerciseDraft.deleteMany({ where: { courseId: course.id } });
+      await tx.classCourse.deleteMany({ where: { courseId: course.id } });
+      await tx.contentImportSession.deleteMany({
+        where: { courseId: course.id },
+      });
+      await tx.studentCourseLearningDay.deleteMany({
+        where: { courseId: course.id },
+      });
+      await tx.studentClassCourseLearningDay.deleteMany({
+        where: { courseId: course.id },
+      });
+      // Modules cascade to lectures, materials, exercises, cases and hints.
+      await tx.courseModule.deleteMany({ where: { courseId: course.id } });
+      await tx.course.delete({ where: { id: course.id } });
+
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.deleted",
+        targetType: "Course",
+        targetId: course.id,
+        requestId: context.requestId,
+        before: { title: course.title, isVisible: course.isVisible },
+      });
+    });
+
+    return { courseId: course.id };
+  }
+
   async deleteModule(
     identity: SupabaseIdentity,
     input: { academyId: string; courseId: string; moduleId: string },

@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import { PointsAccessService } from "./points-access.service.js";
+import type { AcademyAccessService } from "../authorization/academy-access.service.js";
+
+/**
+ * An access service that refuses everything.
+ *
+ * These cases are all about a reader who *has* a membership, so the platform
+ * fallback must never be the thing that answers them — a stub that granted
+ * access would let a broken membership path pass by the back door.
+ */
+const deniedAccess = {
+  requirePermission: () => Promise.reject(new Error("no platform access")),
+} as unknown as AcademyAccessService;
 
 const academyId = "10000000-0000-4000-8000-000000000001";
 const classId = "20000000-0000-4000-8000-000000000002";
@@ -51,6 +63,7 @@ describe("PointsAccessService.resolveOverviewBoard", () => {
     const prisma = createPrisma("STUDENT");
     const scope = await new PointsAccessService(
       prisma as unknown as PrismaService,
+      deniedAccess,
     ).resolveOverviewBoard(identity, { academyId });
 
     expect(scope.isSelf).toBe(true);
@@ -62,6 +75,7 @@ describe("PointsAccessService.resolveOverviewBoard", () => {
     const prisma = createPrisma("TEACHER");
     const scope = await new PointsAccessService(
       prisma as unknown as PrismaService,
+      deniedAccess,
     ).resolveOverviewBoard(identity, { academyId, classId });
 
     expect(scope.isSelf).toBe(false);
@@ -80,8 +94,9 @@ describe("PointsAccessService.resolveOverviewBoard", () => {
     const prisma = createPrisma("MANAGER");
     await expect(
       new PointsAccessService(
-        prisma as unknown as PrismaService,
-      ).resolveOverviewBoard(identity, {
+      prisma as unknown as PrismaService,
+      deniedAccess,
+    ).resolveOverviewBoard(identity, {
         academyId,
         classId: "90000000-0000-4000-8000-000000000009",
       }),
@@ -96,8 +111,9 @@ describe("PointsAccessService.resolveOverviewBoard", () => {
 
     await expect(
       new PointsAccessService(
-        prisma as unknown as PrismaService,
-      ).resolveOverviewBoard(identity, { academyId }),
+      prisma as unknown as PrismaService,
+      deniedAccess,
+    ).resolveOverviewBoard(identity, { academyId }),
     ).rejects.toMatchObject({ code: "POINTS_UNAVAILABLE" });
     expect(prisma.class.findMany).not.toHaveBeenCalled();
   });

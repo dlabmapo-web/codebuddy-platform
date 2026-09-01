@@ -217,6 +217,76 @@ export class ClassesService {
     return this.presentDetail(updated);
   }
 
+  /**
+   * Destroy a class.
+   *
+   * Archiving is the ordinary end of a class and keeps everything it taught;
+   * this is for one created by mistake. Refused once anybody has submitted
+   * through it — that work belongs to the students, and a class is not the
+   * right thing to destroy it with.
+   *
+   * The name is typed back, matching how a course and an academy are deleted,
+   * so the three destructive acts in the product ask the same thing of the
+   * person doing them.
+   */
+  async deleteClass(
+    identity: SupabaseIdentity,
+    input: { academyId: string; classId: string; confirmName: string },
+    context: ClassRequestContext = {},
+  ): Promise<{ classId: string }> {
+    const actor = await this.requireClassManager(identity, input.academyId);
+
+    const record = await this.prisma.class.findFirst({
+      where: { id: input.classId, academyId: input.academyId },
+      select: { id: true, name: true, status: true },
+    });
+    if (!record) {
+      throw new AppException("CLASS_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+    if (input.confirmName.trim() !== record.name.trim()) {
+      throw new AppException("CLASS_VALIDATION_FAILED", HttpStatus.BAD_REQUEST);
+    }
+
+    const submissions = await this.prisma.submission.count({
+      where: { classId: record.id },
+    });
+    if (submissions > 0) {
+      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Ordered for the relations the schema refuses to cascade. The
+      // submission count above proves the one that matters is empty.
+      await tx.teacherFeedback.deleteMany({ where: { classId: record.id } });
+      await tx.teacherMonitoringVisit.deleteMany({
+        where: { classId: record.id },
+      });
+      await tx.studentClassCourseLearningDay.deleteMany({
+        where: { classId: record.id },
+      });
+      await tx.pointAward.deleteMany({ where: { classId: record.id } });
+      await tx.exerciseSolveSession.deleteMany({
+        where: { classId: record.id },
+      });
+      await tx.classScheduleSlot.deleteMany({ where: { classId: record.id } });
+      await tx.classEnrollment.deleteMany({ where: { classId: record.id } });
+      await tx.classCourse.deleteMany({ where: { classId: record.id } });
+      await tx.class.delete({ where: { id: record.id } });
+
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "class.deleted",
+        targetType: "Class",
+        targetId: record.id,
+        requestId: context.requestId,
+        before: { name: record.name, status: record.status },
+      });
+    });
+
+    return { classId: record.id };
+  }
+
   async setStatus(
     identity: SupabaseIdentity,
     input: { academyId: string; classId: string; status: ClassStatus },

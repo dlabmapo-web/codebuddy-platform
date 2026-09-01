@@ -21,8 +21,22 @@ import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.
 export type AssignedClassActor = {
   userId: string;
   academyId: string;
-  /** The teacher's own membership, which is what a class assignment stores. */
+  /** The teacher's own membership, which is what a class assignment stores.
+   *  Empty for a platform operator, who has none — see `scope`. */
   membershipId: string;
+  /**
+   * Which classes this actor's teaching surfaces cover.
+   *
+   * `assigned` is every teacher: the classes their own membership is named on.
+   * `academy` is a platform operator standing in the Teacher role, who has no
+   * membership to be named on — "what does a teacher see here" cannot mean one
+   * teacher's classes when the person asking is not one of them, so it means
+   * the academy's.
+   *
+   * Defaulted at every existing call site, so a teacher's reach is unchanged
+   * and widening it stays a thing a caller has to ask for by name.
+   */
+  scope?: 'assigned' | 'academy';
 };
 
 /**
@@ -47,11 +61,19 @@ export async function requireAssignedTeacherActor(input: {
       }) => Promise<{ id: string } | null>;
     };
   };
-  resolveActor: () => Promise<{ userId: string; role: string }>;
+  resolveActor: () => Promise<{
+    userId: string;
+    role: string;
+    via?: "membership" | "support" | "platform";
+  }>;
   academyId: string;
   deniedCode: AppErrorCode;
 }): Promise<AssignedClassActor> {
-  let actor: { userId: string; role: string };
+  let actor: {
+    userId: string;
+    role: string;
+    via?: "membership" | "support" | "platform";
+  };
   try {
     actor = await input.resolveActor();
   } catch (error) {
@@ -69,9 +91,24 @@ export async function requireAssignedTeacherActor(input: {
     },
     select: { id: true },
   });
+
   if (!membership) {
+    // Somebody standing in the Teacher role who is not a member of this
+    // academy — a platform operator, or an operator inside a support session.
+    // Neither holds a membership for a class to be assigned to, so the refusal
+    // below would make the Teacher view permanently empty. Their scope is the
+    // academy's classes instead.
+    if (actor.via === "platform" || actor.via === "support") {
+      return {
+        userId: actor.userId,
+        academyId: input.academyId,
+        membershipId: "",
+        scope: "academy",
+      };
+    }
     throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
   }
+
   return {
     userId: actor.userId,
     academyId: input.academyId,
@@ -82,9 +119,14 @@ export async function requireAssignedTeacherActor(input: {
 export function assignedClassWhere(
   actor: AssignedClassActor,
 ): Prisma.ClassWhereInput {
+  const base = { academyId: actor.academyId, status: "ACTIVE" } as const;
+  // A platform operator has no membership for a class to be assigned to, so
+  // the assignment joins below would select nothing at all. Their Teacher view
+  // covers the academy's active classes instead.
+  if (actor.scope === "academy") return base;
+
   return {
-    academyId: actor.academyId,
-    status: "ACTIVE",
+    ...base,
     teacherMembershipId: actor.membershipId,
     assignedTeacher: {
       academyId: actor.academyId,

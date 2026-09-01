@@ -13,6 +13,7 @@ import {
   exerciseAuthoringContextSchema,
   exerciseMaterialInputSchema,
   exerciseSolutionSchema,
+  deleteCourseSchema,
   deleteCourseModuleSchema,
   deleteLectureSchema,
   reorderCourseModulesSchema,
@@ -32,6 +33,14 @@ export const academyCoursesContract = {
     .output(z.object({ courses: z.array(courseSummarySchema) })),
   create: oc.input(createCourseSchema).output(courseSummarySchema),
   update: oc.input(updateCourseSchema).output(courseSummarySchema),
+  /**
+   * Destroy a course and everything under it.
+   *
+   * Refused while any student has submitted, which is the same rule the module
+   * and lecture deletes already apply — student work is not the academy's to
+   * delete as a side effect of tidying curriculum.
+   */
+  delete: oc.input(deleteCourseSchema).output(z.object({ courseId: z.uuid() })),
   setVisibility: oc
     .input(setCourseVisibilitySchema)
     .output(courseSummarySchema),

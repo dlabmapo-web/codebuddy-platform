@@ -19,6 +19,19 @@ import { AsyncLocalStorage } from "node:async_hooks";
  */
 export type RequestContext = {
   supportGrantId?: string;
+  /**
+   * Which academy role a platform operator is viewing as.
+   *
+   * Travels as a request header rather than a stored preference, because it is
+   * a property of what the operator is looking at right now — two tabs open on
+   * two academies as two different roles is the normal case for somebody
+   * comparing them.
+   *
+   * Never authority on its own. It only narrows which role's set
+   * `AcademyAccessService` consults *after* it has established that the caller
+   * is an operator at all.
+   */
+  viewRole?: string;
 };
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -42,4 +55,13 @@ export function setRequestSupportGrant(grantId: string): void {
 
 export function currentSupportGrantId(): string | undefined {
   return storage.getStore()?.supportGrantId;
+}
+
+export function setRequestViewRole(role: string): void {
+  const context = storage.getStore();
+  if (context) context.viewRole = role;
+}
+
+export function currentViewRole(): string | undefined {
+  return storage.getStore()?.viewRole;
 }

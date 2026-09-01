@@ -12,6 +12,7 @@ import {
   listClassesSchema,
   removeClassStudentSchema,
   setClassCoursesSchema,
+  deleteClassSchema,
   setClassStatusSchema,
   setClassScheduleSchema,
   setClassTeacherSchema,
@@ -31,6 +32,11 @@ export const academyClassesContract = {
   create: oc.input(createClassSchema).output(classDetailSchema),
   update: oc.input(updateClassSchema).output(classDetailSchema),
   setStatus: oc.input(setClassStatusSchema).output(classDetailSchema),
+  /**
+   * Destroy a class. Archiving is the ordinary end of one; this is for a class
+   * created by mistake, and it is refused once anybody has submitted through it.
+   */
+  delete: oc.input(deleteClassSchema).output(z.object({ classId: z.uuid() })),
   setCourses: oc.input(setClassCoursesSchema).output(classDetailSchema),
   /**
    * When the class meets. §8.1 — the whole timetable at once, `MANAGER` only,

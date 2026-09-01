@@ -32,6 +32,8 @@ export const contentAcademySchema = z.object({
 export const platformCourseSchema = contentAcademySchema.extend({
   id: z.uuid(),
   title: z.string().min(1),
+  /** The academy's own one-line description. Empty is the ordinary case. */
+  description: z.string(),
   isVisible: z.boolean(),
   moduleCount: z.number().int().nonnegative(),
   lectureCount: z.number().int().nonnegative(),
@@ -46,10 +48,21 @@ export type PlatformCourse = z.infer<typeof platformCourseSchema>;
 export const platformClassSchema = contentAcademySchema.extend({
   id: z.uuid(),
   name: z.string().min(1),
+  description: z.string(),
   status: classStatusSchema,
+  /**
+   * The courses this class teaches, named rather than counted.
+   *
+   * A count answers "is anything assigned"; the names answer "what is this
+   * class", which is what somebody scanning a roster of eight is actually
+   * asking. Capped by the service, not here.
+   */
+  courses: z.array(z.object({ id: z.uuid(), title: z.string().min(1) })),
   /** Null when nobody is assigned — the condition a manager most needs to see
    *  and the one an operator is most often asked about. */
   teacherName: z.string().nullable(),
+  /** The teacher's photo, for the avatar beside their name. */
+  teacherAvatarUrl: z.string().nullable(),
   studentCount: z.number().int().nonnegative(),
   courseCount: z.number().int().nonnegative(),
   updatedAt: z.iso.datetime(),

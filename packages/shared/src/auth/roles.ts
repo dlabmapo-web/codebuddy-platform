@@ -32,6 +32,15 @@ export const platformPermissions = [
    * only by action name.
    */
   "platform.academies.lifecycle",
+  /**
+   * Destroying an academy and everything it owns.
+   *
+   * Apart from `lifecycle`, which only ever moves an academy between states it
+   * can move back from. This one is the only irreversible act on the platform,
+   * so it is the only permission whose absence is the whole safeguard for an
+   * operator who should be able to suspend and archive but never purge.
+   */
+  "platform.academies.delete",
 
   /** Organizations, the tenant above the academy. */
   "platform.organizations.read",
@@ -313,6 +322,56 @@ export function canApproveAs(
  * stripped is not a student — it is a confusing name for a read.
  */
 export const supportAssumedRoles = ["MANAGER", "TEACHER"] as const;
+
+/**
+ * The roles a platform operator may view an academy as.
+ *
+ * All three staff roles, because they see genuinely different products: the
+ * Manager gets the control tower and the roster, the Team Lead the curriculum
+ * overview, the Teacher their own classes and student work. An operator
+ * answering a question about any of them has to be able to stand where they
+ * stand — a screenshot of the Manager's page does not explain what a Teacher
+ * cannot find.
+ *
+ * `STUDENT` is absent, and stays absent. A student's product is doing the
+ * coursework, and the one thing platform access must never do is put work in a
+ * real student's record.
+ */
+export const platformViewRoles = ["MANAGER", "TEAM_LEAD", "TEACHER"] as const;
+export const platformViewRoleSchema = z.enum(platformViewRoles);
+export type PlatformViewRole = (typeof platformViewRoles)[number];
+
+export function isPlatformViewRole(
+  value: string | undefined | null,
+): value is PlatformViewRole {
+  return (platformViewRoles as readonly string[]).includes(value ?? "");
+}
+
+/**
+ * What an operator may do while viewing an academy as one of its roles.
+ *
+ * The role's own set, minus the one thing platform access may never do
+ * whatever it is standing as: submit work as a student.
+ *
+ * `classes.assigned.manage` stays in, because the Teacher view is unusable
+ * without it and live monitoring is not gated on it alone —
+ * `MonitoringAccessService` requires a real academy membership, which an
+ * operator does not have. That is a stronger guarantee than filtering here,
+ * and it is the one that already existed.
+ *
+ * Wider than `readOnlyAcademyPermissions`, deliberately. Several manager
+ * surfaces gate a *read* behind a write-named permission —
+ * `PeopleDirectoryService.list` asks for `academy.members.manage` — so a
+ * genuinely read-only view cannot open the roster at all, and an operator who
+ * chose "Manager" got a manager's sidebar with most of it missing.
+ */
+export function platformViewPermissions(
+  role: PlatformViewRole,
+): readonly AcademyPermission[] {
+  return (
+    academyRolePermissions[role] as readonly AcademyPermission[]
+  ).filter((permission) => permission !== "submissions.own.create");
+}
 export const supportAssumedRoleSchema = z.enum(supportAssumedRoles);
 export type SupportAssumedRole = (typeof supportAssumedRoles)[number];
 

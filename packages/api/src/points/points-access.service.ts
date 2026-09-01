@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 
@@ -38,7 +39,10 @@ export type PointsScope = {
 
 @Injectable()
 export class PointsAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AcademyAccessService,
+  ) {}
 
   async resolve(
     identity: SupabaseIdentity,
@@ -59,7 +63,15 @@ export class PointsAccessService {
       },
     });
 
-    if (!reader || reader.academy.status !== "ACTIVE") {
+    if (!reader) {
+      // A platform operator standing in one of the academy's roles. They hold
+      // no membership, so the lookup above finds nothing — and the board is a
+      // read of the academy, not of themselves. `AcademyAccessService` is the
+      // authority here, as it is everywhere else; this service resolving its
+      // own reader from a membership row is why it had to be asked separately.
+      return this.platformScope(identity, input);
+    }
+    if (reader.academy.status !== "ACTIVE") {
       throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
     }
 
@@ -106,6 +118,68 @@ export class PointsAccessService {
   }
 
   /**
+   * A platform operator reading an academy's boards.
+   *
+   * No subject: an operator is not on any ranking, so `membershipId` is empty
+   * and `isSelf` is false — which is what keeps `isYou` off every row rather
+   * than landing on whichever row happens to share the blank.
+   *
+   * Every class in the academy is in scope, matching the Teacher view's own
+   * academy-wide reach. The feature flag still decides whether a board renders
+   * at all, so an academy that never switched points on answers the same way
+   * for an operator as it does for its own staff.
+   */
+  private async platformScope(
+    identity: SupabaseIdentity,
+    input: { academyId: string; classId?: string },
+  ): Promise<PointsScope> {
+    let academy: { timeZone: string; status: string } | null = null;
+    try {
+      await this.access.requirePermission(
+        identity.authUserId,
+        input.academyId,
+        "academy.read",
+      );
+      academy = await this.prisma.academy.findUnique({
+        where: { id: input.academyId },
+        select: { timeZone: true, status: true },
+      });
+    } catch {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+    if (!academy || academy.status !== "ACTIVE") {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+
+    const enabled = await this.enabledFeatures(input.academyId);
+    if (!enabled.has("STUDENT_POINTS")) {
+      throw new AppException("POINTS_UNAVAILABLE", HttpStatus.NOT_FOUND);
+    }
+
+    const classes = await this.prisma.class.findMany({
+      where: { academyId: input.academyId, status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+    });
+    if (
+      input.classId &&
+      !classes.some((entry) => entry.id === input.classId)
+    ) {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
+    }
+
+    return {
+      academyId: input.academyId,
+      timeZone: academy.timeZone,
+      membershipId: "",
+      subjectName: "",
+      isSelf: false,
+      classes: classes.map((entry) => ({ classId: entry.id, name: entry.name })),
+      leaderboardEnabled: enabled.has("STUDENT_CLASS_LEADERBOARD"),
+    };
+  }
+
+  /**
    * Staff reading one class's board.
    *
    * Not the same question as `resolve`: there the subject is a student and the
@@ -144,7 +218,19 @@ export class PointsAccessService {
       },
     });
 
-    if (!reader || reader.academy.status !== "ACTIVE" || reader.role === "STUDENT") {
+    if (!reader) {
+      // A platform operator, who holds no membership. Same fallback as
+      // `resolve`, with the class name this board also reports.
+      const scope = await this.platformScope(identity, input);
+      const target = input.classId
+        ? scope.classes.find((entry) => entry.classId === input.classId)
+        : scope.classes[0];
+      if (input.classId && !target) {
+        throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
+      }
+      return { ...scope, className: target?.name ?? null };
+    }
+    if (reader.academy.status !== "ACTIVE" || reader.role === "STUDENT") {
       throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
     }
 
@@ -220,7 +306,15 @@ export class PointsAccessService {
       },
     });
 
-    if (!reader || reader.academy.status !== "ACTIVE") {
+    if (!reader) {
+      // A platform operator standing in one of the academy's roles. They hold
+      // no membership, so the lookup above finds nothing — and the board is a
+      // read of the academy, not of themselves. `AcademyAccessService` is the
+      // authority here, as it is everywhere else; this service resolving its
+      // own reader from a membership row is why it had to be asked separately.
+      return this.platformScope(identity, input);
+    }
+    if (reader.academy.status !== "ACTIVE") {
       throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.FORBIDDEN);
     }
 

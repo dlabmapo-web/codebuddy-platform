@@ -1287,6 +1287,7 @@ export class MonitoringGateway
     classId: string,
   ): Promise<MonitoringClassClaim> {
     const actor = await this.access.requireTeacher(socket.data.identity, academyId);
+    this.access.requireLiveWatch(actor);
     await this.access.requireFeature(academyId);
     return this.access.requireAssignedClass(actor, classId);
   }

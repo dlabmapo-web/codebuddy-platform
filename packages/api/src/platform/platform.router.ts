@@ -23,6 +23,14 @@ export function createPlatformRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.platformAcademyService.get(context.identity, input.academyId),
         ),
+      getBySlug: os.platformAcademies.getBySlug
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformAcademyService.getBySlug(
+            context.identity,
+            input.academySlug,
+          ),
+        ),
       create: os.platformAcademies.create
         .use(access.authenticated)
         .handler(({ context, input }) =>
@@ -42,6 +50,11 @@ export function createPlatformRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .use(access.authenticated)
         .handler(({ context, input }) =>
           deps.platformLifecycleService.setStatus(context.identity, input),
+        ),
+      delete: os.platformAcademies.delete
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformAcademyService.delete(context.identity, input),
         ),
       resendFirstManagerInvitation:
         os.platformAcademies.resendFirstManagerInvitation

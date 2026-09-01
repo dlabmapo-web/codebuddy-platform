@@ -34,6 +34,13 @@ export function createClassesRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      delete: os.academyClasses.delete
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.classesService.deleteClass(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
       setStatus: os.academyClasses.setStatus
         .use(access.authenticated)
         .handler(({ context, input }) =>

@@ -52,6 +52,7 @@ export class PlatformContentService {
         select: {
           id: true,
           title: true,
+          description: true,
           isVisible: true,
           updatedAt: true,
           academy: { select: { id: true, name: true, slug: true } },
@@ -79,6 +80,7 @@ export class PlatformContentService {
       rows: records.map((record) => ({
         id: record.id,
         title: record.title,
+        description: record.description,
         isVisible: record.isVisible,
         academyId: record.academy.id,
         academyName: record.academy.name,
@@ -127,6 +129,7 @@ export class PlatformContentService {
         select: {
           id: true,
           name: true,
+          description: true,
           status: true,
           updatedAt: true,
           academy: { select: { id: true, name: true, slug: true } },
@@ -134,8 +137,20 @@ export class PlatformContentService {
             select: {
               role: true,
               status: true,
-              user: { select: { displayName: true, username: true } },
+              user: {
+                select: {
+                  displayName: true,
+                  username: true,
+                  avatarUrl: true,
+                },
+              },
             },
+          },
+          // Named, not counted: the row is answering "what is this class".
+          courseAssignments: {
+            select: { course: { select: { id: true, title: true } } },
+            orderBy: { course: { title: "asc" } },
+            take: 4,
           },
           _count: { select: { enrollments: true, courseAssignments: true } },
         },
@@ -158,7 +173,12 @@ export class PlatformContentService {
         return {
           id: record.id,
           name: record.name,
+          description: record.description,
           status: record.status,
+          courses: record.courseAssignments.map((row) => ({
+            id: row.course.id,
+            title: row.course.title,
+          })),
           academyId: record.academy.id,
           academyName: record.academy.name,
           academySlug: record.academy.slug,
@@ -167,6 +187,7 @@ export class PlatformContentService {
               teacher.user.username?.trim() ||
               null
             : null,
+          teacherAvatarUrl: usable ? teacher.user.avatarUrl : null,
           studentCount: record._count.enrollments,
           courseCount: record._count.courseAssignments,
           updatedAt: record.updatedAt.toISOString(),

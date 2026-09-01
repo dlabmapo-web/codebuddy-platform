@@ -223,6 +223,7 @@ describe("platform authority is checked by every method", () => {
     const calls: Promise<unknown>[] = [
       service.list(identity, {}),
       service.get(identity, "academy-1"),
+      service.getBySlug(identity, "academy-1"),
       service.create(identity, input),
       service.resendFirstManagerInvitation(identity, {
         academyId: "academy-1",
@@ -231,5 +232,44 @@ describe("platform authority is checked by every method", () => {
     for (const call of calls) {
       expect(await codeOf(call)).toBe("PLATFORM_ACCESS_DENIED");
     }
+  });
+});
+
+describe("PlatformAcademyService.getBySlug", () => {
+  it("uses an exact lookup instead of the paginated directory", async () => {
+    const findFirst = vi.fn().mockResolvedValue({
+      id: "10000000-0000-4000-8000-000000000001",
+      name: "Mapo DLab",
+      slug: "mapo-dlab",
+      status: "ACTIVE",
+      timeZone: "Asia/Seoul",
+      createdAt: new Date("2026-08-18T00:00:00.000Z"),
+      statusChangedAt: null,
+      memberships: [],
+      invitations: [],
+    });
+    const access = {
+      requirePermission: vi.fn().mockResolvedValue({ userId: actorUserId }),
+    };
+    const service = new PlatformAcademyService(
+      { academy: { findFirst } } as never,
+      access as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.getBySlug(identity, "mapo-dlab")).resolves.toMatchObject({
+      id: "10000000-0000-4000-8000-000000000001",
+      slug: "mapo-dlab",
+    });
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { slug: "mapo-dlab" },
+      select: expect.any(Object),
+    });
+    expect(access.requirePermission).toHaveBeenCalledWith(
+      "auth-1",
+      "platform.academies.read",
+    );
   });
 });

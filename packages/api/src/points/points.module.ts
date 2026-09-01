@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { MediaModule } from "../profile/media.module.js";
 import { LeaderboardRepository } from "./leaderboard.repository.js";
 import { PointAwardService } from "./point-award.service.js";
@@ -17,7 +18,7 @@ import { PointsService } from "./points.service.js";
   // needs the batch signer and nothing else, and the storage module exists
   // precisely so a consumer can reach it without depending on the whole
   // profile surface.
-  imports: [MediaModule],
+  imports: [AuthorizationModule, MediaModule],
   providers: [
     LeaderboardRepository,
     PointAwardService,

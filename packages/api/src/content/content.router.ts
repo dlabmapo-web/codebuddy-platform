@@ -55,6 +55,13 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      delete: os.academyCourses.delete
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.deleteCourse(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
       deleteModule: os.academyCourses.deleteModule
         .use(access.authenticated)
         .handler(({ context, input }) =>

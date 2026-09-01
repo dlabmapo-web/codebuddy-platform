@@ -318,3 +318,33 @@ export const resendFirstManagerInvitationInputSchema = z
 export type ResendFirstManagerInvitationInput = z.infer<
   typeof resendFirstManagerInvitationInputSchema
 >;
+
+/**
+ * Destroying an academy, and everything it owns.
+ *
+ * The slug is typed back rather than clicked past. There is no undo, no
+ * archive to restore from, and no backup this console can reach — so the
+ * confirmation has to be something an operator cannot do by accident, and a
+ * second button is exactly that.
+ */
+export const deletePlatformAcademyInputSchema = z
+  .object({
+    academyId: z.uuid(),
+    /** The academy's current slug, typed by the operator. */
+    confirmSlug: z.string().trim().min(1),
+    reason: z.string().trim().min(8).max(500),
+  })
+  .strict();
+export type DeletePlatformAcademyInput = z.infer<
+  typeof deletePlatformAcademyInputSchema
+>;
+
+/** What a deletion destroyed, so the operator sees the size of what they did. */
+export const deletePlatformAcademyResultSchema = z.object({
+  academyId: z.uuid(),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+});
+export type DeletePlatformAcademyResult = z.infer<
+  typeof deletePlatformAcademyResultSchema
+>;

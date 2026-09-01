@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import { academyInvitationDetailSchema } from "../../memberships/academy.js";
 import {
+  academySlugSchema,
   createPlatformAcademyInputSchema,
+  deletePlatformAcademyInputSchema,
+  deletePlatformAcademyResultSchema,
   createPlatformAcademyResultSchema,
   listPlatformAcademiesInputSchema,
   platformAcademyDetailSchema,
@@ -36,6 +39,10 @@ export const platformAcademiesContract = {
   get: oc
     .input(z.object({ academyId: z.uuid() }))
     .output(platformAcademyDetailSchema),
+  /** Exact current-slug lookup for console routes. */
+  getBySlug: oc
+    .input(z.object({ academySlug: academySlugSchema }))
+    .output(platformAcademySummarySchema),
   create: oc
     .input(createPlatformAcademyInputSchema)
     .output(createPlatformAcademyResultSchema),
@@ -56,6 +63,16 @@ export const platformAcademiesContract = {
    * Exists because the ordinary resend is manager-scoped, and an academy still
    * awaiting its first manager has — by definition — no manager to call it.
    */
+  /**
+   * Destroy an academy and everything it owns.
+   *
+   * The only irreversible call on this contract. It sits here rather than
+   * beside `setStatus` because it is not a lifecycle transition: every other
+   * state an academy can be in, it can leave.
+   */
+  delete: oc
+    .input(deletePlatformAcademyInputSchema)
+    .output(deletePlatformAcademyResultSchema),
   resendFirstManagerInvitation: oc
     .input(resendFirstManagerInvitationInputSchema)
     .output(

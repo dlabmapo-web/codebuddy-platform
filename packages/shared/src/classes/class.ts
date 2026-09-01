@@ -261,3 +261,21 @@ export function assignmentGrantsAccess(
     teacher.role === "TEACHER"
   );
 }
+
+/**
+ * Deleting a class outright.
+ *
+ * Archiving is the ordinary end of a class and keeps its history; this is for
+ * one created by mistake. Refused once any student has submitted through it,
+ * because that work is the students' and a class is not the right thing to
+ * destroy it with.
+ */
+export const deleteClassSchema = z
+  .object({
+    academyId: z.uuid(),
+    classId: z.uuid(),
+    /** The class's exact name, typed by the person deleting it. */
+    confirmName: z.string().trim().min(1),
+  })
+  .strict();
+export type DeleteClassInput = z.infer<typeof deleteClassSchema>;

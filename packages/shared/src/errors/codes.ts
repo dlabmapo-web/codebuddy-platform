@@ -118,6 +118,7 @@ export const appErrorCodes = [
   "LIBRARY_COURSE_NOT_FOUND",
   "LIBRARY_ADOPTION_CONFLICT",
   "PLATFORM_USER_NOT_FOUND",
+  "ACADEMY_DELETE_NOT_CONFIRMED",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -311,4 +312,6 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   LIBRARY_ADOPTION_CONFLICT:
     "This academy already has a course with that title.",
   PLATFORM_USER_NOT_FOUND: "That account was not found.",
+  ACADEMY_DELETE_NOT_CONFIRMED:
+    "Type the academy's address exactly to confirm deletion.",
 };

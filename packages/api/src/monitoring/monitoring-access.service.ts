@@ -29,8 +29,23 @@ import type { Prisma } from "../generated/prisma/client.js";
 export type MonitoringTeacherActor = {
   userId: string;
   academyId: string;
-  /** The teacher's own membership, which is what a class assignment stores. */
+  /** The teacher's own membership, which is what a class assignment stores.
+   *  Empty for a platform operator, who holds none. */
   membershipId: string;
+  /**
+   * Which classes this actor's teaching surfaces cover.
+   *
+   * `assigned` is every teacher: the classes their membership is named on.
+   * `academy` is somebody standing in the Teacher role without a membership —
+   * a platform operator, or an operator inside a support session. Neither has
+   * a membership for a class to be assigned to, so the assignment joins would
+   * select nothing and "My classes" would be permanently empty.
+   *
+   * It widens *reading* only — the class list and a class's roster. The live
+   * socket refuses it outright (`requireLiveWatch`), so watching a student's
+   * screen still needs a real assignment.
+   */
+  scope?: 'assigned' | 'academy';
 };
 
 export type MonitoringClassClaim = MonitoringTeacherActor & {
@@ -97,6 +112,17 @@ export class MonitoringAccessService {
       select: { id: true },
     });
     if (!membership) {
+      // A platform operator, or an operator inside a support session. Both
+      // read the academy's classes; `requireLiveWatch` still refuses them the
+      // live watch, which is the thing this service exists to protect.
+      if (actor.via === "platform" || actor.via === "support") {
+        return {
+          userId: actor.userId,
+          academyId,
+          membershipId: "",
+          scope: "academy",
+        };
+      }
       throw new AppException(
         "ACADEMY_MEMBERSHIP_REQUIRED",
         HttpStatus.FORBIDDEN,
@@ -130,6 +156,21 @@ export class MonitoringAccessService {
       );
     }
     return { ...actor, classId, grantedAt: Date.now() };
+  }
+
+  /**
+   * The gate in front of the live socket, and nothing else.
+   *
+   * Reading a class — who is in it, what it teaches — is a read, and a platform
+   * operator standing in the Teacher role does it academy-wide. Watching a
+   * student work is not: it is a live channel into one named child's screen,
+   * and it belongs to the teacher responsible for them. An academy-wide actor
+   * has no such responsibility, so this is where the platform's reach stops.
+   */
+  requireLiveWatch(actor: MonitoringTeacherActor): void {
+    if (actor.scope === "academy") {
+      throw new AppException("MONITORING_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
   }
 
   /** The classes this teacher is currently responsible for, and no others. */

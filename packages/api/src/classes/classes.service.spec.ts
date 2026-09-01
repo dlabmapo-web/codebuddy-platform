@@ -238,6 +238,9 @@ function createService(options?: {
       findFirst: vi.fn().mockResolvedValue(record),
     },
     academyMembership: { findMany: vi.fn().mockResolvedValue([]) },
+    // `deleteClass` asks this before it touches anything: a class carrying
+    // student work is refused outright.
+    submission: { count: vi.fn().mockResolvedValue(0) },
     $transaction: vi.fn(
       async (callback: (tx: typeof transaction) => Promise<unknown>) =>
         callback(transaction),
@@ -1127,11 +1130,32 @@ describe("ClassesService archive and audit", () => {
     });
   });
 
-  it("never exposes a permanent delete", () => {
+  /**
+   * The policy this test used to hold was "a class is archived, never
+   * deleted". That changed deliberately: a class created by mistake had no way
+   * out, and archiving one is a claim about its history rather than a way to
+   * unmake it.
+   *
+   * What replaced the old assertion is the guarantee that actually protects
+   * anybody — a class carrying student work cannot be deleted at all. The
+   * archive path is untouched and remains the ordinary end of a class.
+   */
+  it("exposes exactly one delete, and it refuses a class with student work", async () => {
     expect(
       Object.getOwnPropertyNames(ClassesService.prototype).filter((name) =>
         name.toLowerCase().includes("delete")
       ),
-    ).toEqual([]);
+    ).toEqual(["deleteClass"]);
+
+    const { service, prisma } = createService();
+    vi.mocked(prisma.submission.count).mockResolvedValue(3 as never);
+
+    await expect(
+      service.deleteClass(identity, {
+        academyId,
+        classId,
+        confirmName: "Level 1 Evening",
+      }),
+    ).rejects.toMatchObject({ code: "CONTENT_HAS_SUBMISSIONS" });
   });
 });

@@ -283,3 +283,21 @@ export const exerciseAuthoringContextSchema = z.object({
 export type ExerciseAuthoringContext = z.infer<
   typeof exerciseAuthoringContextSchema
 >;
+
+/**
+ * Deleting a course, with everything under it.
+ *
+ * The academy's own destructive act, and it carries the same lock the
+ * platform's academy deletion does: the title typed back. A course is modules,
+ * lectures and problems somebody spent a term writing, and `setVisibility` is
+ * the reversible answer for a course that should merely stop being taught.
+ */
+export const deleteCourseSchema = z
+  .object({
+    academyId: z.uuid(),
+    courseId: z.uuid(),
+    /** The course's exact title, typed by the person deleting it. */
+    confirmTitle: z.string().trim().min(1),
+  })
+  .strict();
+export type DeleteCourseInput = z.infer<typeof deleteCourseSchema>;

@@ -8,6 +8,15 @@ import type {
   SetPlatformMembershipRoleInput,
   SetPlatformUserRoleInput,
   SetPlatformUserStatusInput,
+  UserExportRow,
+  WorkbookLocale,
+} from "@cove/shared";
+import {
+  PLATFORM_USERS_EXPORT_MAX_ACCOUNTS,
+  buildUserExportSheet,
+  toUserExportRows,
+  userExportCopy,
+  userExportFilename,
 } from "@cove/shared";
 
 import { applyMembershipRoleChange } from "../academies/academy-membership.operations.js";
@@ -17,6 +26,7 @@ import { PlatformAccessService } from "../authorization/platform-access.service.
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { writeWorkbook } from "../common/workbook-writer.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
 import {
@@ -150,6 +160,112 @@ export class PlatformUsersService {
       managers,
       operators,
       academies: spread.length,
+    };
+  }
+
+  /**
+   * The directory as a spreadsheet.
+   *
+   * The filter is the directory's own — `buildUsersWhere` over
+   * `userSummarySelect` — so a row this can return is a row the table would
+   * show. If those two ever diverge, this method is the bug.
+   *
+   * No new permission. `platform.users.read` already lets the caller page
+   * through every one of these rows, and a permission that cannot be withheld
+   * independently of another is theatre. What *is* different is that the rows
+   * leave the system in bulk, in a file that outlives the session — so the act
+   * is audited, and unlike the participation read it is not deduplicated. A
+   * refresh is not a second look; a second download is a second extraction.
+   *
+   * The count and the read share a transaction so a file cannot be written
+   * against a set that grew past the cap between the two statements.
+   *
+   * §2 of the console user directory export design.
+   */
+  async exportDirectory(
+    identity: SupabaseIdentity,
+    input: ResolvedListPlatformUsersInput & {
+      locale: WorkbookLocale;
+      timeZone: string;
+    },
+  ): Promise<{ filename: string; bytes: Buffer }> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      "platform.users.read",
+    );
+
+    const where = buildUsersWhere(input);
+    const { accounts, records } = await this.prisma.$transaction(
+      async (transaction) => {
+        const total = await transaction.user.count({ where });
+        if (total > PLATFORM_USERS_EXPORT_MAX_ACCOUNTS) {
+          // Refused, never truncated. A file holding the first five thousand
+          // of six looks complete, and the reconciliation it was pulled for
+          // then comes out quietly wrong.
+          throw new AppException(
+            "PLATFORM_EXPORT_TOO_LARGE",
+            HttpStatus.PAYLOAD_TOO_LARGE,
+            String(PLATFORM_USERS_EXPORT_MAX_ACCOUNTS),
+          );
+        }
+        return {
+          accounts: total,
+          records: await transaction.user.findMany({
+            where,
+            select: userSummarySelect,
+            // The directory's own order, so a file and the page it came from
+            // start the same way round.
+            orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          }),
+        };
+      },
+    );
+
+    const rows: UserExportRow[] = records
+      .map(toUserSummary)
+      .flatMap((person) => toUserExportRows(person));
+
+    const filename = userExportFilename({
+      accounts,
+      // Named for the role only when the filter picks out exactly one. Two
+      // roles have no shorter honest name than "users".
+      role: input.roles?.length === 1 ? input.roles[0] : null,
+      today: new Date(),
+    });
+
+    await this.prisma.$transaction((transaction) =>
+      this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: null,
+        action: "platform.users.exported",
+        targetType: "platform",
+        targetId: "users",
+        after: {
+          accounts,
+          rows: rows.length,
+          filter: {
+            query: input.query ?? null,
+            academyIds: input.academyIds ?? [],
+            roles: input.roles ?? [],
+            accountStatuses: input.accountStatuses ?? [],
+            membershipStatuses: input.membershipStatuses ?? [],
+            platformRoles: input.platformRoles ?? [],
+            unaffiliatedOnly: input.unaffiliatedOnly ?? false,
+          },
+        },
+      }),
+    );
+
+    return {
+      filename,
+      bytes: writeWorkbook({
+        sheets: [
+          {
+            name: userExportCopy[input.locale].sheet,
+            rows: buildUserExportSheet(rows, input.locale, input.timeZone),
+          },
+        ],
+      }),
     };
   }
 

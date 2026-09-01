@@ -1,5 +1,16 @@
 import { zipSync } from "fflate";
-import type { GeneratedWorkbook } from "@cove/shared";
+
+/**
+ * Anything with named sheets of string rows.
+ *
+ * Structural rather than one feature's type, so the course importer's
+ * `GeneratedWorkbook` and the user directory's export both satisfy it without
+ * either knowing about the other. Widening this is how the codebase keeps the
+ * promise the paragraph below makes — one writer, not one per caller.
+ */
+export type WorkbookData = {
+  sheets: readonly { name: string; rows: readonly (readonly string[])[] }[];
+};
 
 /**
  * A `.xlsx` written by hand, because the alternative is worse.
@@ -24,10 +35,12 @@ import type { GeneratedWorkbook } from "@cove/shared";
  * the text `2024` rather than as a float that Excel renders as `2024` and the
  * reader sees as `2024.0`.
  *
- * See §4.3 and §7.2 of the team lead Excel problem import design.
+ * See §4.3 and §7.2 of the team lead Excel problem import design, and §4 of
+ * the console user directory export design for why this lives in `common/`
+ * rather than beside the importer that first needed it.
  */
 
-export function writeContentWorkbook(workbook: GeneratedWorkbook): Buffer {
+export function writeWorkbook(workbook: WorkbookData): Buffer {
   const sheets = workbook.sheets;
 
   const files: Record<string, Uint8Array> = {
@@ -102,7 +115,7 @@ function workbookRelationships(sheetCount: number): string {
  * over the position — writing them makes the two halves agree about what an
  * empty cell means.
  */
-function worksheetPart(rows: readonly string[][]): string {
+function worksheetPart(rows: readonly (readonly string[])[]): string {
   const body = rows
     .map((row, rowIndex) => {
       const cells = row

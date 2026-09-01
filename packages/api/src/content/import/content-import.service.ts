@@ -40,7 +40,7 @@ import {
   ContentWorkbookError,
   readContentWorkbook,
 } from "./content-workbook-reader.js";
-import { writeContentWorkbook } from "./content-workbook-writer.js";
+import { writeWorkbook } from "../../common/workbook-writer.js";
 import { resolveWorkbookDescription } from "./description-html.js";
 
 /**
@@ -136,7 +136,7 @@ export class ContentImportService {
     if (input.kind === "blank") {
       return {
         filename: workbookFilename({ courseTitle: course.title, kind: "blank" }),
-        bytes: writeContentWorkbook(buildBlankWorkbook(input.locale)),
+        bytes: writeWorkbook(buildBlankWorkbook(input.locale)),
       };
     }
 
@@ -160,7 +160,7 @@ export class ContentImportService {
 
     return {
       filename: workbookFilename({ courseTitle: course.title, kind: "current" }),
-      bytes: writeContentWorkbook(
+      bytes: writeWorkbook(
         buildCurrentCourseWorkbook({ course: projection, locale: input.locale }),
       ),
     };

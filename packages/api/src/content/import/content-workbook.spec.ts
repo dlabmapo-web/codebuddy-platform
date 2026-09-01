@@ -12,7 +12,7 @@ import {
   ContentWorkbookError,
   readContentWorkbook,
 } from "./content-workbook-reader.js";
-import { writeContentWorkbook } from "./content-workbook-writer.js";
+import { writeWorkbook } from "../../common/workbook-writer.js";
 import {
   resolveWorkbookDescription,
   sanitizeDescriptionHtml,
@@ -99,7 +99,7 @@ const projection: CourseProjection = {
 
 describe("content workbook round trip", () => {
   it("reads back every sheet the writer produced, by name", () => {
-    const bytes = writeContentWorkbook(
+    const bytes = writeWorkbook(
       buildCurrentCourseWorkbook({ course: projection, locale: "en" }),
     );
     const read = readContentWorkbook(bytes);
@@ -115,7 +115,7 @@ describe("content workbook round trip", () => {
   });
 
   it("preserves code indentation, markup, and Korean text exactly", () => {
-    const bytes = writeContentWorkbook(
+    const bytes = writeWorkbook(
       buildCurrentCourseWorkbook({ course: projection, locale: "en" }),
     );
     const read = readContentWorkbook(bytes);
@@ -139,7 +139,7 @@ describe("content workbook round trip", () => {
   it("keeps a test whose input is empty distinguishable from a missing cell", () => {
     // The writer omits empty cells entirely, so this only works because the
     // reader addresses columns by their `r=` reference rather than by position.
-    const bytes = writeContentWorkbook(
+    const bytes = writeWorkbook(
       buildCurrentCourseWorkbook({ course: projection, locale: "en" }),
     );
     const read = readContentWorkbook(bytes);
@@ -157,7 +157,7 @@ describe("content workbook round trip", () => {
 
   it("reads the blank template it ships", () => {
     const read = readContentWorkbook(
-      writeContentWorkbook(buildBlankWorkbook("ko")),
+      writeWorkbook(buildBlankWorkbook("ko")),
     );
     const rows = readWorkbookRows({
       Structure: read.sheets.get("Structure") ?? [],

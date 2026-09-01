@@ -1,0 +1,29 @@
+{
+  "title": "Audit trail",
+  "subtitle": "Everything that has happened on Cove, newest first.",
+  "back": "Back to the audit trail",
+  "empty": "Nothing recorded yet",
+  "empty_body": "Actions appear here as people use the platform.",
+  "support_marker": "Support access",
+  "platform_wide": "Platform-wide",
+  "actor_unknown": "Deleted account",
+  "field": {
+    "actor": "Who",
+    "academy": "Academy",
+    "target": "What was changed",
+    "request": "Request",
+    "support": "Authority",
+    "before": "Before",
+    "after": "After"
+  },
+  "pager": {
+    "label": "Audit pages",
+    "position": "Page {{page}} of {{total}}",
+    "previous": "Newer",
+    "next": "Older"
+  },
+  "unavailable": {
+    "title": "The audit trail is unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

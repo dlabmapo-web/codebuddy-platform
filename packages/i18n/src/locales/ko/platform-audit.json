@@ -1,0 +1,29 @@
+{
+  "title": "감사 기록",
+  "subtitle": "Cove에서 일어난 모든 일을 최신순으로 보여줍니다.",
+  "back": "감사 기록으로",
+  "empty": "아직 기록이 없습니다",
+  "empty_body": "플랫폼을 사용하면 여기에 기록이 쌓입니다.",
+  "support_marker": "지원 접근",
+  "platform_wide": "플랫폼 전체",
+  "actor_unknown": "삭제된 계정",
+  "field": {
+    "actor": "수행자",
+    "academy": "아카데미",
+    "target": "변경 대상",
+    "request": "요청",
+    "support": "권한",
+    "before": "이전",
+    "after": "이후"
+  },
+  "pager": {
+    "label": "감사 기록 페이지",
+    "position": "{{total}}쪽 중 {{page}}쪽",
+    "previous": "최신",
+    "next": "이전"
+  },
+  "unavailable": {
+    "title": "감사 기록을 불러올 수 없습니다",
+    "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "title": "콘텐츠",
+  "lens": {
+    "label": "콘텐츠 범위",
+    "courses": "코스",
+    "classes": "반",
+    "problems": "문제"
+  },
+  "lens_description": {
+    "courses": "모든 아카데미의 코스 전체입니다.",
+    "classes": "모든 반과 담당 선생님, 학생 수입니다.",
+    "problems": "모든 프로그래밍 문제와 채점 가능 여부입니다."
+  },
+  "table": {
+    "course": "코스",
+    "class": "반",
+    "problem": "문제",
+    "academy": "아카데미",
+    "contents": "구성",
+    "taught_by": "사용 반",
+    "teacher": "선생님",
+    "students": "학생",
+    "difficulty": "난이도",
+    "tests": "테스트",
+    "updated": "수정일",
+    "actions": "작업",
+    "edit": "편집",
+    "edit_hint": "지원 세션을 시작하고 해당 아카데미의 편집 화면으로 이동합니다.",
+    "published": "공개됨",
+    "draft": "초안",
+    "no_teacher": "담당 없음",
+    "module_count_one": "모듈 {{count}}개",
+    "module_count_other": "모듈 {{count}}개",
+    "exercise_count_one": "문제 {{count}}개",
+    "exercise_count_other": "문제 {{count}}개",
+    "search_courses": "코스 제목으로 검색",
+    "search_classes": "반 이름으로 검색",
+    "search_problems": "문제 제목으로 검색",
+    "empty": "조건에 맞는 항목이 없습니다.",
+    "loading": "콘텐츠를 불러오는 중",
+    "class_status": {
+      "ACTIVE": "운영 중",
+      "ARCHIVED": "보관됨"
+    },
+    "difficulty_value": {
+      "EASY": "쉬움",
+      "MEDIUM": "보통",
+      "HARD": "어려움"
+    }
+  },
+  "unavailable": {
+    "title": "콘텐츠를 불러올 수 없습니다",
+    "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "title": "Content",
+  "lens": {
+    "label": "Which content",
+    "courses": "Courses",
+    "classes": "Classes",
+    "problems": "Problems"
+  },
+  "lens_description": {
+    "courses": "Every course on Cove Studio, across every academy.",
+    "classes": "Every class, who teaches it and who is in it.",
+    "problems": "Every programming problem, and whether it can grade."
+  },
+  "table": {
+    "course": "Course",
+    "class": "Class",
+    "problem": "Problem",
+    "academy": "Academy",
+    "contents": "Contents",
+    "taught_by": "Classes",
+    "teacher": "Teacher",
+    "students": "Students",
+    "difficulty": "Difficulty",
+    "tests": "Tests",
+    "updated": "Updated",
+    "actions": "Actions",
+    "edit": "Edit",
+    "edit_hint": "Opens a support session and takes you to this academy's own editor.",
+    "published": "Published",
+    "draft": "Draft",
+    "no_teacher": "No teacher",
+    "module_count_one": "{{count}} module",
+    "module_count_other": "{{count}} modules",
+    "exercise_count_one": "{{count}} problem",
+    "exercise_count_other": "{{count}} problems",
+    "search_courses": "Search courses by title",
+    "search_classes": "Search classes by name",
+    "search_problems": "Search problems by title",
+    "empty": "Nothing matches these filters.",
+    "loading": "Loading content",
+    "class_status": {
+      "ACTIVE": "Running",
+      "ARCHIVED": "Archived"
+    },
+    "difficulty_value": {
+      "EASY": "Easy",
+      "MEDIUM": "Medium",
+      "HARD": "Hard"
+    }
+  },
+  "unavailable": {
+    "title": "Content is unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

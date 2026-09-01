@@ -2,12 +2,10 @@
 
 import type {
   ListPlatformUsersResult,
-  UserLens,
   ResolvedListPlatformUsersInput,
 } from '@cove/shared';
 import {
   parsePlatformUsersQuery,
-  userLensRoles,
   platformUsersResetsToFirstPage,
   serializePlatformUsersQuery,
 } from '@cove/shared';
@@ -16,8 +14,6 @@ import { useSearchParams } from 'next/navigation';
 import * as React from 'react';
 
 import { orpc } from '@/lib/orpc';
-
-import { lensHrefs } from '../_lib/user-view';
 
 export type PeopleQuery = ResolvedListPlatformUsersInput;
 
@@ -31,13 +27,13 @@ export type PeopleQuery = ResolvedListPlatformUsersInput;
  * Written with `replaceState`. Typing seven characters into the search box must
  * not put seven entries in the operator's history.
  */
-export function usePlatformUsersState(lens: UserLens) {
+export function usePlatformUsersState() {
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
 
   const urlQuery = React.useMemo(
-    () => withLens(parsePlatformUsersQuery(readAll(searchKey)), lens),
-    [searchKey, lens],
+    () => parsePlatformUsersQuery(readAll(searchKey)),
+    [searchKey],
   );
 
   const [query, setQuery] = React.useState<PeopleQuery>(urlQuery);
@@ -47,54 +43,38 @@ export function usePlatformUsersState(lens: UserLens) {
     setQuery(urlQuery);
   }
 
-  const path = peoplePath(lens, query);
+  const path = peoplePath(query);
   React.useEffect(() => {
     if (path !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', path);
     }
   }, [path]);
 
-  const change = React.useCallback(
-    (partial: Partial<PeopleQuery>) => {
-      setQuery((current) => {
-        const next = withLens({ ...current, ...partial }, lens);
-        // Anything that changes *which* rows match sends the reader back to
-        // page one. Staying on page 9 of a result that now has two pages is
-        // the fastest way to make a working table look broken.
-        return platformUsersResetsToFirstPage(current, next)
-          ? { ...next, page: 1 }
-          : next;
-      });
-    },
-    [lens],
-  );
+  const change = React.useCallback((partial: Partial<PeopleQuery>) => {
+    setQuery((current) => {
+      const next = { ...current, ...partial };
+      // Anything that changes *which* rows match sends the reader back to
+      // page one. Staying on page 9 of a result that now has two pages is
+      // the fastest way to make a working table look broken.
+      return platformUsersResetsToFirstPage(current, next)
+        ? { ...next, page: 1 }
+        : next;
+    });
+  }, []);
 
   return { query, path, change };
 }
 
 /**
- * The lens's roles, imposed on whatever the address asked for.
+ * The directory as one address.
  *
- * The lens is not a filter the operator can clear — it is which page they are
- * on — so it is applied after parsing rather than merged with it. A hand-edited
- * `?role=STUDENT` on the teachers page resolves to teachers, which is the
- * honest reading of a URL whose path already said so.
+ * Every narrowing is a query parameter now that the lens paths are gone, so
+ * the whole state round-trips through `serializePlatformUsersQuery` and a
+ * filtered view is one link an operator can paste to a colleague.
  */
-function withLens(query: PeopleQuery, lens: UserLens): PeopleQuery {
-  const roles = userLensRoles[lens];
-  return roles.length > 0 ? { ...query, roles: [...roles] } : query;
-}
-
-export function peoplePath(lens: UserLens, query: PeopleQuery): string {
-  // The lens's own roles never travel in the query string: the path already
-  // carries them, and printing them twice makes a shared link that survives
-  // one paste and not the next.
-  const roles = userLensRoles[lens];
-  const search = serializePlatformUsersQuery(
-    roles.length > 0 ? { ...query, roles: [] } : query,
-  );
-  const base = lensHrefs[lens];
-  return search ? `${base}?${search}` : base;
+export function peoplePath(query: PeopleQuery): string {
+  const search = serializePlatformUsersQuery(query);
+  return search ? `/admin/users?${search}` : '/admin/users';
 }
 
 /**
@@ -105,14 +85,13 @@ export function peoplePath(lens: UserLens, query: PeopleQuery): string {
  * operator's place on every page turn.
  */
 export function usePlatformUsersQuery(
-  lens: UserLens,
   query: PeopleQuery,
   initialData: ListPlatformUsersResult | null,
   initialKey: string,
 ) {
   const key = serializePlatformUsersQuery(query);
   return useQuery({
-    queryKey: ['platform-users', lens, key],
+    queryKey: ['platform-users', key],
     queryFn: () => orpc.platformUsers.list(query),
     initialData: key === initialKey ? (initialData ?? undefined) : undefined,
     placeholderData: keepPreviousData,

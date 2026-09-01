@@ -6,7 +6,7 @@ import { AUDIT_PAGE_SIZE } from '@cove/shared';
  *
  * Small enough to live here rather than in `@cove/shared`: unlike the people
  * directory, nothing on the server needs to re-serialize it, and the filters
- * are three optional ids.
+ * are a handful of optional ids.
  *
  * Anything unparseable falls back to a default. A query string is user-editable
  * text arriving from bookmarks and chat messages, so an invalid address is a
@@ -19,6 +19,17 @@ export function parseAuditQuery(
     Array.isArray(value) ? value[0] : value;
   const uuid = (value: string | undefined): string | undefined =>
     value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
+  // Repeated, because one record's history is written under several targets:
+  // suspending an account is keyed on the user, changing a role on the
+  // membership. The account page's Activity link sends both.
+  const targets = (Array.isArray(params.target)
+    ? params.target
+    : params.target === undefined
+      ? []
+      : [params.target]
+  )
+    .filter((value) => /^[0-9a-f-]{36}$/i.test(value))
+    .slice(0, 50);
 
   const page = Number.parseInt(first(params.page) ?? '', 10);
 
@@ -26,6 +37,7 @@ export function parseAuditQuery(
     academyId: uuid(first(params.academy)),
     actorUserId: uuid(first(params.actor)),
     supportGrantId: uuid(first(params.grant)),
+    targetIds: targets.length > 0 ? targets : undefined,
     action: first(params.action)?.trim().slice(0, 120) || undefined,
     page: Number.isFinite(page) && page > 0 ? page : 1,
     pageSize: AUDIT_PAGE_SIZE,
@@ -40,6 +52,7 @@ export function auditPath(
   if (query.academyId) params.set('academy', query.academyId);
   if (query.actorUserId) params.set('actor', query.actorUserId);
   if (query.supportGrantId) params.set('grant', query.supportGrantId);
+  for (const target of query.targetIds ?? []) params.append('target', target);
   if (query.action) params.set('action', query.action);
   if (query.page && query.page > 1) params.set('page', String(query.page));
   const search = params.toString();

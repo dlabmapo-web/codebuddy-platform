@@ -3,7 +3,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Command as CommandPrimitive } from 'cmdk';
-import { Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import * as React from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
 
@@ -202,6 +202,51 @@ function DropdownMenuItem({
   );
 }
 
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+
+/**
+ * A menu item that opens a nested panel of its own — a role picker inside a
+ * row's action menu, rather than a second dialog. Carries a trailing chevron
+ * so it reads as "more here" rather than as an ordinary item.
+ */
+function DropdownMenuSubTrigger({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger>) {
+  return (
+    <DropdownMenuPrimitive.SubTrigger
+      className={cn(
+        "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[14px] outline-none focus:bg-accent focus:text-ink data-[state=open]:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4",
+        className,
+      )}
+      data-slot="dropdown-menu-sub-trigger"
+      {...props}
+    >
+      {children}
+      <ChevronRight aria-hidden className="ml-auto size-3.5 text-sub" />
+    </DropdownMenuPrimitive.SubTrigger>
+  );
+}
+
+function DropdownMenuSubContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.SubContent
+        className={cn(
+          'cove-pop z-50 min-w-[9rem] overflow-hidden rounded-card border border-border bg-card p-1 shadow-lg',
+          className,
+        )}
+        data-slot="dropdown-menu-sub-content"
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+}
+
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
 /**
@@ -270,6 +315,9 @@ export {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Popover,
   PopoverContent,

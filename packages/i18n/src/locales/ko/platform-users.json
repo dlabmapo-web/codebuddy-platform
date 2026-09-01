@@ -1,39 +1,36 @@
 {
   "title": "사용자",
   "back": "사용자 목록으로",
-  "lens": {
-    "label": "사용자 범위",
-    "everyone": "전체",
-    "students": "학생",
-    "teachers": "선생님",
-    "staff": "팀 리드 · 매니저"
-  },
-  "lens_description": {
-    "everyone": "모든 아카데미의 Cove Studio 계정 전체입니다.",
-    "students": "Cove Studio에서 학습 중인 사용자입니다.",
-    "teachers": "반을 담당하는 선생님입니다.",
-    "staff": "아카데미와 커리큘럼을 운영하는 사용자입니다."
-  },
+  "subtitle": "모든 아카데미를 통틀어 Cove Studio의 전체 계정입니다.",
   "table": {
     "person": "사용자",
+    "role": "역할",
     "affiliation": "아카데미",
     "status": "계정",
     "joined": "가입일",
-    "actions": "작업",
-    "open": "열기",
     "search": "이름, 이메일, 번호로 검색",
     "empty": "조건에 맞는 계정이 없습니다.",
     "loading": "사용자를 불러오는 중",
     "no_academy": "소속 없음",
     "more_one": "외 1곳",
     "more_other": "외 {{count}}곳",
-    "operator": "플랫폼 운영자"
+    "operator": "운영자"
   },
   "facet": {
     "academy": "아카데미",
+    "no_academy": "소속 없음",
     "role": "역할",
     "account_status": "계정",
     "membership_status": "소속"
+  },
+  "composition": {
+    "label": "계정 구성",
+    "accounts_one": "개 계정",
+    "accounts_other": "개 계정",
+    "academies_one": "아카데미 {{count}}곳",
+    "academies_other": "아카데미 {{count}}곳",
+    "operators": "운영자",
+    "unaffiliated": "소속 없음"
   },
   "role": {
     "STUDENT": "학생",
@@ -42,16 +39,16 @@
     "MANAGER": "매니저"
   },
   "account_status": {
-    "ACTIVE": "정상",
+    "ACTIVE": "활성",
     "PENDING_PROFILE": "가입 진행 중",
     "SUSPENDED": "정지됨",
     "DELETED": "삭제됨"
   },
   "membership_status": {
     "INVITED": "초대됨",
-    "ACTIVE": "활동 중",
+    "ACTIVE": "활성",
     "SUSPENDED": "정지됨",
-    "LEFT": "탈퇴함"
+    "LEFT": "탈퇴"
   },
   "invitation_status": {
     "PENDING": "대기 중",
@@ -63,44 +60,136 @@
     "PENDING": "대기 중",
     "APPROVED": "승인됨",
     "REJECTED": "거절됨",
-    "CANCELLED": "취소됨"
+    "CANCELLED": "철회됨"
   },
   "delivery": {
-    "QUEUED": "대기 중",
+    "QUEUED": "대기열",
     "SENT": "발송됨",
     "DELIVERED": "전달됨",
     "BOUNCED": "반송됨",
     "FAILED": "발송 실패"
   },
+  "action": {
+    "menu": "계정 작업",
+    "manage": "관리",
+    "open": "계정 열기",
+    "change_role": "역할 변경",
+    "make_operator": "플랫폼 운영자로 지정",
+    "remove_operator": "플랫폼 접근 권한 해제",
+    "suspend": "계정 정지",
+    "restore": "계정 복구",
+    "delete": "계정 삭제",
+    "reason_label": "사유",
+    "reason_hint": "감사 기록에 남습니다. 나중에 동료가 읽고 이해할 수 있도록 적어 주세요."
+  },
+  "role_change": {
+    "title_single": "역할을 {{role}}(으)로 변경할까요?",
+    "body": "새 역할이 즉시 적용됩니다. 이전 역할로 얻었던 접근 권한에서는 로그아웃되며, 작업 기록은 그대로 남습니다.",
+    "cancel": "취소",
+    "confirm": "변경 저장",
+    "working": "저장하는 중…",
+    "body_multi_one": "이 아카데미에서의 역할을 고르세요. 변경한 경우에만 저장됩니다.",
+    "body_multi_other": "이 계정은 여러 아카데미에 속해 있습니다. 아카데미별로 역할을 고르세요. 변경한 항목만 저장됩니다.",
+    "title_academies_one": "{{name}}의 역할 변경",
+    "title_academies_other": "{{name}}의 역할 변경",
+    "open_for": "역할 변경, 현재 {{role}}",
+    "which_academy": "어느 아카데미"
+  },
+  "operator": {
+    "confirm_grant_title": "{{name}}을(를) 플랫폼 운영자로 지정할까요?",
+    "confirm_grant_body": "Cove Studio의 모든 권한을 갖게 됩니다. 모든 아카데미와 모든 계정을 보고, 정지하거나 삭제할 수 있습니다. 동료에게만 부여하고 고객에게는 부여하지 마세요.",
+    "confirm_revoke_title": "{{name}}의 플랫폼 접근 권한을 해제할까요?",
+    "confirm_revoke_body": "콘솔 접근이 즉시 사라집니다. 아카데미 소속과 역할은 그대로 유지됩니다."
+  },
+  "delete": {
+    "title": "{{name}}을(를) 삭제할까요?",
+    "body": "모든 곳에서 로그아웃되며, 운영자가 복구하기 전까지 다시 로그인할 수 없습니다.",
+    "stakes": "계정을 잠그는 작업이며 사람을 지우는 것이 아닙니다. 소속, 제출물, 기록은 모두 남고 운영자가 복구할 수 있습니다.",
+    "confirm_label": "확인하려면 {{handle}}을(를) 입력하세요",
+    "confirm": "계정 삭제",
+    "working": "삭제하는 중…"
+  },
   "detail": {
-    "subtitle": "이 사용자가 누구이고 어디에 속해 있는지 보여줍니다.",
-    "identity": "계정",
+    "subtitle": "이 사람이 누구이고, 어디에 속해 있으며, 그곳에서 무엇을 하는지.",
     "operator": "운영자",
     "username": "아이디",
     "joined": "가입일",
     "last_sign_in": "마지막 로그인",
+    "never": "없음",
     "academies": "아카데미",
     "no_email": "이메일 없음",
     "memberships": "아카데미",
     "memberships_empty": "소속 아카데미 없음",
-    "memberships_empty_body": "아직 어떤 아카데미에도 참여하지 않았습니다.",
+    "memberships_empty_body": "아직 아카데미에 가입하지 않은 계정입니다.",
     "invitations": "초대",
     "invitations_empty": "초대 없음",
     "invitations_empty_body": "이 주소로 발송된 초대가 없습니다.",
     "join_requests": "가입 신청",
     "join_requests_empty": "가입 신청 없음",
-    "join_requests_empty_body": "아카데미에 가입을 신청한 적이 없습니다.",
-    "suspend": "계정 정지",
-    "restore": "계정 복구",
-    "suspend_hint": "정지하면 모든 아카데미에서 로그아웃되고 다시 로그인할 수 없습니다.",
-    "restore_hint": "정지된 계정입니다. 복구하면 즉시 다시 로그인할 수 있습니다.",
-    "confirm_suspend_title": "{{name}} 계정을 정지할까요?",
-    "confirm_suspend_body": "모든 기기에서 로그아웃되며 복구할 때까지 로그인할 수 없습니다. 학습 기록과 소속은 그대로 유지됩니다.",
-    "confirm_restore_title": "{{name}} 계정을 복구할까요?",
-    "confirm_restore_body": "기존 아카데미와 역할 그대로 즉시 다시 로그인할 수 있습니다."
+    "join_requests_empty_body": "이 계정이 신청한 아카데미가 없습니다.",
+    "confirm_suspend_title": "{{name}}을(를) 정지할까요?",
+    "confirm_suspend_body": "모든 곳에서 로그아웃되며, 복구하기 전까지 로그인할 수 없습니다. 작업과 소속은 그대로 유지됩니다.",
+    "confirm_restore_title": "{{name}}을(를) 복구할까요?",
+    "confirm_restore_body": "기존 아카데미와 역할 그대로 즉시 다시 로그인할 수 있습니다.",
+    "working": "처리하는 중…",
+    "confirm": "확인"
+  },
+  "participation": {
+    "loading": "이 사람이 여기서 하는 일을 불러오는 중",
+    "forbidden": "아카데미 내부 활동을 보려면 참여 조회 권한이 필요합니다. 권한이 있는 운영자에게 요청하거나 지원 접근을 여세요.",
+    "retry": "다시 시도",
+    "open_academy": "콘솔에서 이 아카데미 열기",
+    "solved": "해결",
+    "of_total": "전체 {{total}}문제 중",
+    "no_exercises": "공개된 문제 없음",
+    "active_time": "학습 시간",
+    "active_days_one": "{{count}}일 동안",
+    "active_days_other": "{{count}}일 동안",
+    "streak": "연속 학습",
+    "days_one": "{{count}}일",
+    "days_other": "{{count}}일",
+    "last_active": "마지막 활동 {{date}}",
+    "never_active": "활동 기록 없음",
+    "points": "포인트",
+    "attempts_one": "시도 {{count}}회",
+    "attempts_other": "시도 {{count}}회",
+    "classes": "수업",
+    "no_class": "아직 수업이 없습니다",
+    "no_class_body": "아카데미의 수업 페이지에서 배정하세요. 그전까지는 열어 볼 수 있는 것이 없습니다.",
+    "courses": "코스",
+    "students": "학생",
+    "classes_taught": "담당 수업",
+    "no_taught": "담당 수업 없음",
+    "no_taught_body": "이 아카데미에서 이 계정을 담당 선생님으로 지정한 수업이 없습니다.",
+    "student_count_one": "학생 {{count}}명",
+    "student_count_other": "학생 {{count}}명",
+    "curriculum": "작성한 커리큘럼",
+    "no_courses": "아직 코스가 없습니다",
+    "no_courses_body": "이 계정이 이 아카데미에서 만든 코스가 없습니다.",
+    "taught_by_classes_one": "수업 {{count}}개",
+    "taught_by_classes_other": "수업 {{count}}개",
+    "visible": "공개",
+    "hidden": "비공개",
+    "members": "구성원",
+    "suspended_members_one": "정지 {{count}}명",
+    "suspended_members_other": "정지 {{count}}명",
+    "archived_classes_one": "보관 {{count}}개",
+    "archived_classes_other": "보관 {{count}}개",
+    "no_teacher": "담당 선생님 없음",
+    "since": "{{date}}부터",
+    "no_course": "배정된 코스 없음"
+  },
+  "activity": {
+    "title": "활동",
+    "open_trail": "전체 감사 기록",
+    "loading": "최근 활동을 불러오는 중",
+    "forbidden": "감사 기록을 보려면 감사 조회 권한이 필요합니다.",
+    "failed": "감사 기록을 불러오지 못했습니다. 잠시 후 다시 시도하세요.",
+    "empty": "아직 기록이 없습니다",
+    "empty_body": "이 계정이 하거나 이 계정에 대해 이루어진 작업이 아직 기록되지 않았습니다."
   },
   "unavailable": {
-    "title": "사용자 목록을 불러올 수 없습니다",
-    "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    "title": "사용자 정보를 불러올 수 없습니다",
+    "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도하세요."
   }
 }

@@ -1,9 +1,14 @@
 import type {
-  UserLens,
+  AcademyRole,
   PlatformUserMembership,
   PlatformUserSummary,
   UserStatus,
 } from '@cove/shared';
+
+import { roleIcons, roleTones } from '@/app/(studio)/academy/[academySlug]/(framed)/_lib/manager-view';
+import { toneStyles } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/overview-ui/panel';
+
+export { roleIcons, roleTones, toneStyles };
 
 /**
  * How the console reads a person, in one place.
@@ -100,18 +105,30 @@ export function userDisplayName(person: {
 /* ----------------------------------------------------------------- status */
 
 /**
- * How loudly a row's account status should read.
+ * The colour an account's state wears.
  *
- * `quiet` renders as a muted dot and a word; the rest render as a filled chip.
- * The distinction is the whole design of the column: a table that puts a green
- * ACTIVE pill on every row teaches the eye to skip the column, and then the one
- * suspended account in three hundred is the row nobody notices. Only trouble
- * gets colour, so colour keeps meaning trouble.
+ * A filled chip in every state, matching the membership status chips on the
+ * manager's own people table. The console showed a quiet grey dot for `ACTIVE`
+ * and reserved colour for trouble, on the reasoning that a green pill on three
+ * hundred rows teaches the eye to skip the column. That reasoning holds for a
+ * column nobody is looking at, and this is not one: an operator opens this
+ * table *because* somebody cannot sign in, so the state of the account is the
+ * first thing they read, and a grey dot is the slowest possible way to say
+ * "this one is fine".
+ *
+ * It also made the same fact look different in two places. A manager reading a
+ * green `Active` and an operator reading a grey dot were being shown one
+ * status by one product in two vocabularies.
+ *
+ * Colour still carries the difference between fine and not: green reads as
+ * settled, amber as unfinished, red as stopped, grey as gone. Nothing here
+ * colours a *person* — that rule is untouched, and it is why the role hues and
+ * these four never share a swatch.
  */
-export type StatusTone = 'quiet' | 'warning' | 'danger' | 'retired';
+export type StatusTone = 'settled' | 'warning' | 'danger' | 'retired';
 
 export const accountStatusTone: Record<UserStatus, StatusTone> = {
-  ACTIVE: 'quiet',
+  ACTIVE: 'settled',
   // Not an error — it is where every account starts — but it explains why
   // somebody says they cannot get in, so it has to be visible.
   PENDING_PROFILE: 'warning',
@@ -120,25 +137,32 @@ export const accountStatusTone: Record<UserStatus, StatusTone> = {
 };
 
 export const statusToneStyles: Record<StatusTone, string> = {
-  quiet: 'text-sub',
+  settled: 'bg-success/10 text-success',
   warning: 'bg-warning/10 text-warning',
   danger: 'bg-danger/10 text-danger',
   retired: 'bg-muted text-sub',
 };
 
 export const statusDotStyles: Record<StatusTone, string> = {
-  quiet: 'bg-success',
+  settled: 'bg-success',
   warning: 'bg-warning',
   danger: 'bg-danger',
   retired: 'bg-border',
 };
 
-/* ------------------------------------------------------------------ lenses */
+/* ------------------------------------------------------------------- role */
 
-/** Where each lens lives, so the switcher and the router agree. */
-export const lensHrefs: Record<UserLens, string> = {
-  everyone: '/admin/users',
-  students: '/admin/users/students',
-  teachers: '/admin/users/teachers',
-  staff: '/admin/users/staff',
-};
+/**
+ * The one solid chip in the table (§3.3).
+ *
+ * Platform authority reads as weight rather than hue: an operator is not a
+ * fifth academy role, so it never borrows `roleTones`. It is inverted against
+ * every other chip in the table, which is exactly right for the rarest and
+ * most consequential thing a row can be.
+ */
+export const operatorPlateStyles = 'bg-ink text-canvas';
+
+/** The role chip's icon and tone, from the shared academy-role palette. */
+export function roleChipStyles(role: AcademyRole) {
+  return { icon: roleIcons[role], className: toneStyles[roleTones[role]].chip };
+}

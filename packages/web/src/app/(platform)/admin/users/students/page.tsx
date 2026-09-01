@@ -1,9 +1,9 @@
-import { renderUsersPage } from '../_lib/render-users-page';
+import { redirectToDirectory } from '../_redirect';
 
 export default async function PlatformStudentsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  return renderUsersPage({ lens: 'students', searchParams });
+  redirectToDirectory(['STUDENT'], await searchParams);
 }

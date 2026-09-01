@@ -175,5 +175,30 @@
     "save": "Save changes",
     "saving": "Saving…",
     "archived": "An archived academy cannot be edited."
+  },
+  "vitals": {
+    "people": "Users",
+    "people_empty": "Nobody has joined yet",
+    "enrolments_one": "{{count}} class seat filled",
+    "enrolments_other": "{{count}} class seats filled",
+    "classes": "Running classes",
+    "classes_empty": "No class has been created",
+    "classes_detail": "{{active}} running · {{archived}} archived",
+    "courses": "Courses",
+    "courses_empty": "No curriculum yet",
+    "courses_detail": "{{published}} of {{total}} published",
+    "problems": "Problems",
+    "problems_empty": "No problems authored",
+    "lectures_one": "across {{count}} lecture",
+    "lectures_other": "across {{count}} lectures",
+    "roles": "Who is here",
+    "fault": {
+      "classes_without_teacher_one": "1 class has no teacher",
+      "classes_without_teacher_other": "{{count}} classes have no teacher",
+      "classes_without_course_one": "1 class teaches nothing",
+      "classes_without_course_other": "{{count}} classes teach nothing",
+      "problems_without_tests_one": "1 problem cannot grade",
+      "problems_without_tests_other": "{{count}} problems cannot grade"
+    }
   }
 }

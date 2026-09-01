@@ -3,6 +3,25 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PlatformAcademyService } from "./platform-academy.service.js";
 
+/**
+ * The counts `readAcademyStats` reads, stubbed at zero.
+ *
+ * This spec is about slug history, not about how many classes an academy
+ * runs — but the detail mapper now carries those figures, so the client has to
+ * answer for them.
+ */
+function statCounts() {
+  const count = () => vi.fn().mockResolvedValue(0);
+  return {
+    class: { count: count() },
+    course: { count: count() },
+    lecture: { count: count() },
+    material: { count: count() },
+    classEnrollment: { count: count() },
+    platformSupportGrant: { count: count() },
+  };
+}
+
 const academyId = "20000000-0000-4000-8000-000000000001";
 const identity = { authUserId: "auth-1" } as never;
 // The shape `academyDetailSelect` really returns, relations included — a bare
@@ -58,6 +77,7 @@ function createService(options: {
   };
   const service = new PlatformAcademyService(
     {
+      ...statCounts(),
       $transaction: vi.fn().mockImplementation((fn) => fn(transaction)),
       academy: { findUnique: vi.fn().mockResolvedValue(detail) },
       academySlugHistory: history,

@@ -53,6 +53,20 @@ export const platformPermissions = [
 
   "platform.audit.read",
   /**
+   * Reading any academy from the inside, without a support session.
+   *
+   * The console browses; a session is what allows a *change*. An operator
+   * asked to look at a broken class should not have to write a justification
+   * to look, and one who had to would learn to write "checking" — which costs
+   * the reason field the meaning the whole grant design rests on.
+   *
+   * It is a wide permission and worth naming as such: an academy's rosters,
+   * curriculum, and student work are all readable by anyone who holds it.
+   * Every write still needs a grant, so what an operator *did* stays
+   * attributable even though what they looked at is not.
+   */
+  "platform.academies.inspect",
+  /**
    * Browsing every academy's courses, classes, and problems.
    *
    * A read, and only a read. Editing curriculum is academy work reached

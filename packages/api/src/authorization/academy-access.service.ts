@@ -1,6 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   grantHasPermission,
+  platformRoleHasPermission,
+  readOnlyAcademyPermissions,
   roleHasPermission,
   type AcademyPermission,
   type AcademyRole,
@@ -23,7 +25,7 @@ export type AcademyAccess = {
    * whatever this request goes on to do, which is the entire accountability
    * story for support access.
    */
-  via: "membership" | "support";
+  via: "membership" | "support" | "platform";
   /** Present only when `via === "support"`. */
   supportGrantId?: string;
 };
@@ -47,10 +49,17 @@ export class AcademyAccessService {
    *    academy acts as that member. Letting a forgotten open grant silently
    *    upgrade somebody's real role would make "what could they do" depend on
    *    a row they were not thinking about.
-   * 3. **A live support grant last**, and only where a membership would have
+   * 3. **A live support grant**, and only where a membership would have
    *    refused for *absence*. A suspended membership stays a refusal: that
    *    academy made a decision about this person, and support access is not
    *    the tool for overruling it.
+   * 4. **A platform operator's standing read**, last, and reads only. An
+   *    operator holding `platform.academies.inspect` may look inside any
+   *    academy without opening a session, because requiring a written reason
+   *    to *look* teaches people to write "checking" — and the reason field is
+   *    the whole of what the grant design rests on. Every write still needs a
+   *    grant, so what was done stays attributable even though what was read
+   *    is not.
    *
    * Academy status is read differently on the two paths, deliberately. A
    * SUSPENDED academy accepts a grant — that is precisely when support is
@@ -131,14 +140,20 @@ export class AcademyAccessService {
     permission: AcademyPermission,
   ): Promise<AcademyAccess | null> {
     const grant = await this.supportGrants.findLive(userId, academyId);
-    if (!grant) return null;
 
     const academy = await this.prisma.academy.findUnique({
       where: { id: academyId },
       select: { status: true },
     });
     if (!academy) return null;
-    if (academy.status === "ARCHIVED" && !grant.readOnly) return null;
+
+    if (!grant) {
+      // No session. A platform operator may still read.
+      return this.platformRead(userId, academyId, permission);
+    }
+    if (academy.status === "ARCHIVED" && !grant.readOnly) {
+      return this.platformRead(userId, academyId, permission);
+    }
 
     if (grantHasPermission(grant, permission)) {
       // Attribution, not authority. Every audit record this request goes on to
@@ -168,6 +183,48 @@ export class AcademyAccessService {
     }
 
     return null;
+  }
+
+  /**
+   * A platform operator's standing read of any academy.
+   *
+   * Reads only, enforced by the same named set a read-only grant is bounded
+   * by — so "what an operator can see without a session" and "what a read-only
+   * session can see" are one list rather than two that drift.
+   *
+   * The role reported is `MANAGER`, because that is the shape of the reading:
+   * the academy-wide view rather than one teacher's classes. It authorizes
+   * nothing a Manager could not read, and every write falls through to the
+   * refusal below.
+   */
+  private async platformRead(
+    userId: string,
+    academyId: string,
+    permission: AcademyPermission,
+  ): Promise<AcademyAccess | null> {
+    if (
+      !(readOnlyAcademyPermissions as readonly AcademyPermission[]).includes(
+        permission,
+      )
+    ) {
+      return null;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { platformRole: true },
+    });
+    // `platformRole` is non-null in the schema, so an absent one means the
+    // row was not read — a caller that is not an operator, or a test double.
+    // Either way it is not authority.
+    if (
+      !user?.platformRole ||
+      !platformRoleHasPermission(user.platformRole, "platform.academies.inspect")
+    ) {
+      return null;
+    }
+
+    return { userId, academyId, role: "MANAGER", via: "platform" };
   }
 
   /**

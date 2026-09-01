@@ -19,7 +19,9 @@
     "remaining_one": "1분 남음",
     "remaining_other": "{{count}}분 남음",
     "ending": "곧 종료됩니다",
-    "manage": "관리"
+    "manage": "관리",
+    "viewing": "{{academy}}을(를) 플랫폼 운영자로 열람 중입니다",
+    "viewing_hint": "읽기 전용입니다. 변경하려면 지원 세션을 시작하세요."
   },
   "list": {
     "live_heading_one": "현재 1개 세션이 열려 있습니다",

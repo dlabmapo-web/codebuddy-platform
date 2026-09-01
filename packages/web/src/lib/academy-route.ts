@@ -51,16 +51,58 @@ export const resolveAcademyRoute = cache(
     }
 
     const grant = await activeSupportGrant(academySlug);
-    return grant
+    if (grant) {
+      return {
+        academyId: grant.academyId,
+        academySlug: grant.academySlug,
+        // The role the grant assumes. Every surface below branches on this
+        // exactly as it does for a member, which is the whole point of the
+        // grant carrying one.
+        role: grant.assumedRole,
+      };
+    }
+
+    // A platform operator reads any academy without a session. The API says
+    // the same — `AcademyAccessService` answers `via: "platform"` for reads —
+    // and this resolves the route the same way so the two cannot disagree
+    // about whether the page exists.
+    const inspected = await inspectAcademyRoute(academySlug);
+    return inspected
       ? {
-          academyId: grant.academyId,
-          academySlug: grant.academySlug,
-          // The role the grant assumes. Every surface below branches on this
-          // exactly as it does for a member, which is the whole point of the
-          // grant carrying one.
-          role: grant.assumedRole,
+          academyId: inspected.academyId,
+          academySlug: inspected.academySlug,
+          role: 'MANAGER' as const,
         }
       : null;
+  },
+);
+
+/**
+ * The academy an operator is looking at, resolved through their own seam.
+ *
+ * `platformAcademies.resolveSlug` answers for any signed-in caller, so it
+ * cannot be used to decide this. `platformAcademies.list` is gated on
+ * `platform.academies.read`, which is exactly the question being asked.
+ */
+export const inspectAcademyRoute = cache(
+  async (academySlug: string) => {
+    try {
+      const result = await createServerORPCClient().platformAcademies.list({
+        query: academySlug,
+        limit: 100,
+        offset: 0,
+      });
+      const academy = result.academies.find((row) => row.slug === academySlug);
+      return academy
+        ? {
+            academyId: academy.id,
+            academySlug: academy.slug,
+            academyName: academy.name,
+          }
+        : null;
+    } catch {
+      return null;
+    }
   },
 );
 

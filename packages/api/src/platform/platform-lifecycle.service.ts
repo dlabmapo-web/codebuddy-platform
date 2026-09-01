@@ -13,6 +13,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
+import { readAcademyStats } from "./academy-stats.js";
 import { toAcademyDetail } from "./platform-academy.mapper.js";
 import { academyDetailSelect } from "./platform-academy.select.js";
 
@@ -114,7 +115,7 @@ export class PlatformLifecycleService {
       );
     }
 
-    return toAcademyDetail(academy);
+    return toAcademyDetail(academy, await readAcademyStats(this.prisma, academy.id));
   }
 }
 

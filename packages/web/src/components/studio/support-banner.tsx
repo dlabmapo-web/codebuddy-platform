@@ -22,7 +22,13 @@ import { useTranslation } from 'react-i18next';
  * decision, so the operator has to be able to see how long they have without
  * going to look for it.
  */
-export function SupportBanner({ grant }: { grant: ActiveSupportGrant }) {
+export function SupportBanner({
+  academyName,
+  grant,
+}: {
+  academyName: string;
+  grant: ActiveSupportGrant;
+}) {
   const { t } = useTranslation('platform-support');
   const [remaining, setRemaining] = React.useState(() =>
     minutesLeft(grant?.expiresAt),
@@ -37,7 +43,24 @@ export function SupportBanner({ grant }: { grant: ActiveSupportGrant }) {
     return () => clearInterval(id);
   }, [grant]);
 
-  if (!grant) return null;
+  // No session: an operator reading an academy on their standing permission.
+  // Quieter than a session — nothing is being changed — but never absent,
+  // because the one thing that must not happen is an operator forgetting
+  // whose data is on screen.
+  if (!grant) {
+    return (
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-muted px-4 py-2 text-[13px] text-sub"
+        role="status"
+      >
+        <span className="inline-flex items-center gap-1.5 font-bold text-ink">
+          <Eye aria-hidden className="size-3.5 shrink-0" />
+          {t('banner.viewing', { academy: academyName })}
+        </span>
+        <span>{t('banner.viewing_hint')}</span>
+      </div>
+    );
+  }
 
   return (
     <div

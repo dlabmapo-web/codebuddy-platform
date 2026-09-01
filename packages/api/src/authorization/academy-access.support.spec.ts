@@ -30,9 +30,12 @@ function serviceWith(options: {
 }) {
   const prisma = {
     user: {
+      // An ordinary account: these cases are about membership and grants, so
+      // the standing platform read must not answer for them.
       findUnique: vi.fn().mockResolvedValue({
         id: userId,
         status: options.userStatus ?? "ACTIVE",
+        platformRole: "USER",
       }),
     },
     academyMembership: {
@@ -261,5 +264,98 @@ describe("AcademyAccessService support grants", () => {
     );
     expect(access.via).toBe("membership");
     expect(access.supportGrantId).toBeUndefined();
+  });
+});
+
+/**
+ * A platform operator's standing read.
+ *
+ * Looking does not need a written reason — an operator who had to justify a
+ * glance would learn to write "checking", and the reason field is the whole of
+ * what the grant design rests on. Changing anything still does.
+ */
+describe("AcademyAccessService platform read", () => {
+  function operator(options: {
+    platformRole?: "ADMIN" | "USER";
+    academyStatus?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  } = {}) {
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockImplementation(({ where }) =>
+          Promise.resolve(
+            where.authUserId
+              ? { id: userId, status: "ACTIVE" }
+              : { platformRole: options.platformRole ?? "ADMIN" },
+          ),
+        ),
+      },
+      academyMembership: { findUnique: vi.fn().mockResolvedValue(null) },
+      academy: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ status: options.academyStatus ?? "ACTIVE" }),
+      },
+    } as unknown as PrismaService;
+    const supportGrants = {
+      findLive: vi.fn().mockResolvedValue(null),
+    } as unknown as SupportGrantResolver;
+    return new AcademyAccessService(prisma, supportGrants);
+  }
+
+  it("lets an operator read an academy with no session at all", async () => {
+    await expect(
+      operator().requirePermission(authUserId, academyId, "academy.read"),
+    ).resolves.toMatchObject({ role: "MANAGER", via: "platform" });
+  });
+
+  it("refuses every write without one", async () => {
+    for (const permission of [
+      "academy.members.manage",
+      "curriculum.manage",
+      "academy.settings.manage",
+      "academy.applications.review",
+    ] as const) {
+      expect(
+        await codeOf(
+          operator().requirePermission(authUserId, academyId, permission),
+        ),
+      ).toBe("ACADEMY_MEMBERSHIP_REQUIRED");
+    }
+  });
+
+  it("never lets the standing read submit work", async () => {
+    expect(
+      await codeOf(
+        operator().requirePermission(
+          authUserId,
+          academyId,
+          "submissions.own.create",
+        ),
+      ),
+    ).toBe("ACADEMY_MEMBERSHIP_REQUIRED");
+  });
+
+  it("gives an ordinary account nothing", async () => {
+    expect(
+      await codeOf(
+        operator({ platformRole: "USER" }).requirePermission(
+          authUserId,
+          academyId,
+          "academy.read",
+        ),
+      ),
+    ).toBe("ACADEMY_MEMBERSHIP_REQUIRED");
+  });
+
+  it("still reads a suspended or archived academy", async () => {
+    for (const academyStatus of ["SUSPENDED", "ARCHIVED"] as const) {
+      await expect(
+        operator({ academyStatus }).requirePermission(
+          authUserId,
+          academyId,
+          "academy.read",
+        ),
+      ).resolves.toMatchObject({ via: "platform" });
+    }
   });
 });

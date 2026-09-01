@@ -19,7 +19,9 @@
     "remaining_one": "1 minute left",
     "remaining_other": "{{count}} minutes left",
     "ending": "Ending now",
-    "manage": "Manage"
+    "manage": "Manage",
+    "viewing": "Viewing {{academy}} as a platform operator",
+    "viewing_hint": "Read-only. Open a support session to change anything."
   },
   "list": {
     "live_heading_one": "1 session open now",

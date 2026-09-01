@@ -7,6 +7,27 @@ import type { PrismaService } from "../database/prisma.service.js";
 import type { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
 
+/**
+ * The counts `readAcademyStats` reads, stubbed at zero.
+ *
+ * These specs are about lifecycle and slug history, not about how many
+ * classes an academy runs — but the detail mapper now carries those figures,
+ * so the client has to answer for them. Zero everywhere keeps the assertions
+ * below about the thing they were written for.
+ */
+function statCounts() {
+  const count = () => vi.fn().mockResolvedValue(0);
+  return {
+    class: { count: count() },
+    course: { count: count() },
+    lecture: { count: count() },
+    material: { count: count() },
+    classEnrollment: { count: count() },
+    platformSupportGrant: { count: count() },
+  };
+}
+
+
 const academyId = "20000000-0000-4000-8000-000000000001";
 const actorUserId = "40000000-0000-4000-8000-000000000001";
 
@@ -55,6 +76,7 @@ function createService(current: "ACTIVE" | "SUSPENDED" | "ARCHIVED" | null) {
   };
 
   const prisma = {
+    ...statCounts(),
     $transaction: vi.fn().mockImplementation((fn: (t: unknown) => unknown) => fn(transaction)),
   } as unknown as PrismaService;
 

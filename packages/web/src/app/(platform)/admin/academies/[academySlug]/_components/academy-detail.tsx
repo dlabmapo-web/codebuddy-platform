@@ -28,6 +28,7 @@ import { useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
+import { AcademyVitals } from './academy-vitals';
 import { IdentityPanel } from './identity-panel';
 import { cn } from '@/lib/utils';
 
@@ -45,8 +46,15 @@ const body = 'px-4 py-4';
  * denominator — because this page answers the same kind of question the
  * manager's control tower does, one level up.
  *
- * Nothing here reaches inside: no course, class, or member appears, because a
- * platform admin's authority is over an academy and never within one.
+ * The vitals strip above them is this page's own addition: an operator opening
+ * an academy is usually asking whether it is working, and the member counts
+ * alone cannot tell a thriving campus from forty students with no class and no
+ * published course.
+ *
+ * Counts and links only — no course, class, or member is listed here. Reading
+ * one is a click into the console's own directories, or into the academy
+ * itself, where the operator's standing read applies and every change still
+ * needs a session.
  */
 export function AcademyDetail({
   academy: initial,
@@ -56,62 +64,28 @@ export function AcademyDetail({
   const [academy, setAcademy] = React.useState(initial);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <div className="grid gap-6">
+    <div className="grid gap-6">
+      {/* What the academy *is doing*, first. Everything below it is
+          administration, and an operator opening this page is almost always
+          asking the question these four numbers answer. */}
+      <AcademyVitals academy={academy} />
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="grid content-start gap-6">
         <FirstManagerPanel academy={academy} onChange={setAcademy} />
         <IdentityPanel academy={academy} onChange={setAcademy} />
-        <PeoplePanel academy={academy} />
-        <DetailsPanel academy={academy} />
       </div>
-      <div className="grid gap-6">
+      <div className="grid content-start gap-6">
         <EnterAcademyPanel academy={academy} />
         <LifecyclePanel academy={academy} onChange={setAcademy} />
+        <DetailsPanel academy={academy} />
+      </div>
       </div>
     </div>
   );
 }
 
 /* ----------------------------------------------------------------- people */
-
-function PeoplePanel({ academy }: { academy: PlatformAcademyDetail }) {
-  const { t } = useTranslation('platform');
-  const counts = [
-    { key: 'managers', count: academy.memberCounts.managers },
-    { key: 'team_leads', count: academy.memberCounts.teamLeads },
-    { key: 'teachers', count: academy.memberCounts.teachers },
-    { key: 'students', count: academy.memberCounts.students },
-  ] as const;
-
-  return (
-    <Panel
-      icon={Users}
-      meta={String(academy.memberCounts.total)}
-      title={t('detail.people')}
-      tone="brand"
-    >
-      {academy.memberCounts.total === 0 ? (
-        <EmptyState
-          body={t('detail.people_empty')}
-          icon={Users}
-          title={t('detail.people_empty_title')}
-        />
-      ) : (
-        <dl className={cn('grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4', body)}>
-          {counts.map((entry) => (
-            <div key={entry.key}>
-              <dd className="font-mono text-[22px] font-bold leading-none tabular-nums text-ink">
-                {entry.count}
-              </dd>
-              <dt className="mt-1 text-[12.5px] text-sub">
-                {t(`role_label.${entry.key}` as 'role_label.students')}
-              </dt>
-            </div>
-          ))}
-        </dl>
-      )}
-    </Panel>
-  );
-}
 
 /* ---------------------------------------------------------------- details */
 

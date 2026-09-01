@@ -5,6 +5,7 @@ import {
 } from "@cove/shared";
 
 import type { AcademyRole, MembershipStatus } from "../generated/prisma/enums.js";
+import type { AcademyStats } from "./academy-stats.js";
 
 /**
  * The rows the platform surface reads, and how they become a summary.
@@ -91,10 +92,12 @@ export type AcademyDetailRecord = AcademyRecord & {
 
 export function toAcademyDetail(
   record: AcademyDetailRecord,
+  stats: AcademyStats,
   now: Date = new Date(),
 ): PlatformAcademyDetail {
   return {
     ...toAcademySummary(record, now),
+    ...stats,
     organization: record.organization,
     contactEmail: record.contactEmail,
     contactPhone: record.contactPhone,

@@ -36,6 +36,7 @@ import {
   academyDetailSelect,
   academySummarySelect,
 } from "./platform-academy.select.js";
+import { readAcademyStats } from "./academy-stats.js";
 import { resolvePlatformOrganization } from "./platform-organization.js";
 
 /**
@@ -121,7 +122,11 @@ export class PlatformAcademyService {
       identity.authUserId,
       "platform.academies.read",
     );
-    return toAcademyDetail(await this.requireAcademy(academyId));
+    const [record, stats] = await Promise.all([
+      this.requireAcademy(academyId),
+      readAcademyStats(this.prisma, academyId),
+    ]);
+    return toAcademyDetail(record, stats);
   }
 
   /**
@@ -189,7 +194,7 @@ export class PlatformAcademyService {
         where: { id: input.academyId },
         select: academyDetailSelect,
       });
-      return toAcademyDetail(detail);
+      return toAcademyDetail(detail, await readAcademyStats(this.prisma, detail.id));
     });
   }
 
@@ -356,7 +361,10 @@ export class PlatformAcademyService {
     });
 
     return {
-      academy: toAcademyDetail(created.academy),
+      academy: toAcademyDetail(
+        created.academy,
+        await readAcademyStats(this.prisma, created.academy.id),
+      ),
       invitation: toInvitationDetail(created.invitation),
       // Returned once, to the operator who created it. Delivery may be a local
       // sink or a provider that bounces; either way the person who just made

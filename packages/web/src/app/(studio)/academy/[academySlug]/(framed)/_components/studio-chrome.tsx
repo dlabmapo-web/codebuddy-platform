@@ -23,7 +23,7 @@ import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
-import { activeSupportGrant } from '@/lib/academy-route';
+import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
 
 /**
@@ -66,6 +66,7 @@ export async function StudioChrome({
 }) {
   let academies: StudioAcademy[] = [];
   let academyName = '';
+  let selectedMembershipFound = false;
   let role = null;
   let hasPoints = false;
   let viewer: {
@@ -88,6 +89,7 @@ export async function StudioChrome({
     const selectedMembership = active.find(
       (membership) => membership.academy.id === academyId,
     );
+    selectedMembershipFound = Boolean(selectedMembership);
     academyName = selectedMembership?.academy.name ?? '';
     role = selectedMembership?.role ?? routeRole;
     if (!selectedMembership) {
@@ -115,9 +117,30 @@ export async function StudioChrome({
   // Memoised per request: the route guard already asked, so this is a map
   // lookup rather than a second round trip.
   const support = await activeSupportGrant(academySlug);
+  if (!selectedMembershipFound) {
+    // No membership: the name has to come from the operator's own seam, since
+    // `auth.me` only knows the academies this account belongs to. Memoised per
+    // request, and the route guard has already asked, so this is a map lookup.
+    academyName =
+      support?.academyName ??
+      (await inspectAcademyRoute(academySlug))?.academyName ??
+      academySlug;
+  }
 
   // True for every member, and for a support session that took write access.
-  const writable = !support?.readOnly;
+  // False for an operator reading on their standing permission, who has no
+  // session at all.
+  // A member writes as their role. A session writes if it took write access.
+  // An operator on the standing read writes nothing — `!support?.readOnly` was
+  // true for them, because there is no session to be read-only, which put
+  // Applications and Classes back in a nav that could not open either.
+  const writable = selectedMembershipFound
+    ? true
+    : support
+      ? !support.readOnly
+      : false;
+  // Here without a membership and without a session: the standing read.
+  const visiting = !selectedMembershipFound && !support;
 
   const sidebarState = (await cookies()).get('cove_sidebar_state')?.value;
 
@@ -147,7 +170,9 @@ export async function StudioChrome({
         {/* Above the sticky header and inside the content column: as a sibling
             of the shell it rendered behind a full-height fixed layout, which
             is the one place a warning must never be. */}
-        {support ? <SupportGrantNotice grant={support} /> : null}
+        {support || visiting ? (
+          <SupportGrantNotice academyName={academyName} grant={support} />
+        ) : null}
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" />
           {/*
@@ -180,9 +205,11 @@ export async function StudioChrome({
  * renders only while a grant is live.
  */
 async function SupportGrantNotice({
+  academyName,
   grant,
 }: {
-  grant: NonNullable<Awaited<ReturnType<typeof activeSupportGrant>>>;
+  academyName: string;
+  grant: Awaited<ReturnType<typeof activeSupportGrant>>;
 }) {
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, supportNamespaces);
@@ -192,7 +219,7 @@ async function SupportGrantNotice({
       namespaces={supportNamespaces}
       resources={resources}
     >
-      <SupportBanner grant={grant} />
+      <SupportBanner academyName={academyName} grant={grant} />
     </PageTranslationsProvider>
   );
 }

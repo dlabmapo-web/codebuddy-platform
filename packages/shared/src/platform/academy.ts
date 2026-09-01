@@ -155,6 +155,42 @@ export const platformAcademyDetailSchema = platformAcademySummarySchema
         displayName: z.string().nullable(),
       })
       .nullable(),
+
+    /**
+     * What this academy actually runs, counted.
+     *
+     * The member counts on the summary say who belongs to it; these say
+     * whether it is working. An academy with forty students, no class, and no
+     * published course is not a healthy academy — and until now the console
+     * could not tell that apart from a thriving one, because it only ever
+     * counted people.
+     */
+    classes: z.object({
+      total: z.number().int().nonnegative(),
+      active: z.number().int().nonnegative(),
+      archived: z.number().int().nonnegative(),
+      /** Active classes with no usable teacher assignment. The condition a
+       *  manager is asked about most, and the one nobody chose. */
+      withoutTeacher: z.number().int().nonnegative(),
+      /** Active classes teaching nothing, so their students have no work. */
+      withoutCourse: z.number().int().nonnegative(),
+    }),
+    content: z.object({
+      courses: z.number().int().nonnegative(),
+      publishedCourses: z.number().int().nonnegative(),
+      lectures: z.number().int().nonnegative(),
+      problems: z.number().int().nonnegative(),
+      /** Problems with no test case: authored, and unable to grade anything. */
+      problemsWithoutTests: z.number().int().nonnegative(),
+    }),
+    /** Enrolments, not people: one student in two classes counts twice, which
+     *  is what "seats filled" means to whoever sizes a campus. */
+    enrolments: z.number().int().nonnegative(),
+    /** Support sessions opened against this academy, ever, and live now. */
+    support: z.object({
+      total: z.number().int().nonnegative(),
+      live: z.number().int().nonnegative(),
+    }),
   })
   .strict();
 export type PlatformAcademyDetail = z.infer<typeof platformAcademyDetailSchema>;

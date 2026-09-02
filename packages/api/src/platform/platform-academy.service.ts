@@ -336,11 +336,17 @@ export class PlatformAcademyService {
       "platform.academies.create",
     );
 
-    const managerEmail = normalizeEmail(input.managerEmail);
+    // Absent means the academy is created open: it appears on the sign-up page
+    // at once, and whoever signs up choosing it waits in the queue an operator
+    // reviews. The two paths end in the same place — an academy with an active
+    // manager — and neither excludes the other afterwards.
+    const managerEmail = input.managerEmail
+      ? normalizeEmail(input.managerEmail)
+      : null;
     // The one moment the plaintext token exists. It is generated here, hashed
     // for storage, and handed to delivery after the commit — never read back,
     // because only the hash is kept.
-    const token = randomBytes(32).toString("base64url");
+    const token = managerEmail ? randomBytes(32).toString("base64url") : null;
 
     const created = await this.prisma.$transaction(async (transaction) => {
       const organization = await resolvePlatformOrganization(
@@ -395,17 +401,20 @@ export class PlatformAcademyService {
         skipDuplicates: true,
       });
 
-      const invitation = await transaction.academyInvitation.create({
-        data: {
-          academyId: academy.id,
-          email: managerEmail,
-          role: "MANAGER",
-          tokenHash: hashInvitationToken(token),
-          status: "PENDING",
-          expiresAt: new Date(Date.now() + invitationLifetimeMs),
-          invitedByUserId: actor.userId,
-        },
-      });
+      const invitation =
+        managerEmail && token
+          ? await transaction.academyInvitation.create({
+              data: {
+                academyId: academy.id,
+                email: managerEmail,
+                role: "MANAGER",
+                tokenHash: hashInvitationToken(token),
+                status: "PENDING",
+                expiresAt: new Date(Date.now() + invitationLifetimeMs),
+                invitedByUserId: actor.userId,
+              },
+            })
+          : null;
 
       await this.audit.write(transaction, {
         actorUserId: actor.userId,
@@ -417,16 +426,24 @@ export class PlatformAcademyService {
           name: academy.name,
           slug: academy.slug,
           timeZone: academy.timeZone,
+          // Which way in was chosen, recorded because it is the question asked
+          // afterwards: an academy that sat empty for a week is either an
+          // invitation nobody opened or an open academy nobody applied to, and
+          // those have different fixes. Without this the trail cannot tell
+          // them apart.
+          onboarding: invitation ? "invitation" : "open",
         },
       });
-      await this.audit.write(transaction, {
-        actorUserId: actor.userId,
-        academyId: academy.id,
-        action: "platform.academy.first_manager_invited",
-        targetType: "AcademyInvitation",
-        targetId: invitation.id,
-        after: { email: managerEmail, role: "MANAGER" },
-      });
+      if (invitation) {
+        await this.audit.write(transaction, {
+          actorUserId: actor.userId,
+          academyId: academy.id,
+          action: "platform.academy.first_manager_invited",
+          targetType: "AcademyInvitation",
+          targetId: invitation.id,
+          after: { email: managerEmail, role: "MANAGER" },
+        });
+      }
 
       // `peopleRevision` stays at 0. There is no roster yet, so no selection or
       // import preview can have been built against one.
@@ -435,19 +452,23 @@ export class PlatformAcademyService {
 
     // After the commit, never inside it: an email carrying a token that then
     // rolled back would be an invitation to an academy that does not exist.
-    await this.delivery.queueForInvitation({
-      invitationId: created.invitation.id,
-      academyId: created.academy.id,
-      email: managerEmail,
-      token,
-    });
+    if (created.invitation && managerEmail && token) {
+      await this.delivery.queueForInvitation({
+        invitationId: created.invitation.id,
+        academyId: created.academy.id,
+        email: managerEmail,
+        token,
+      });
+    }
 
     return {
       academy: toAcademyDetail(
         created.academy,
         await readAcademyStats(this.prisma, created.academy.id),
       ),
-      invitation: toInvitationDetail(created.invitation),
+      invitation: created.invitation
+        ? toInvitationDetail(created.invitation)
+        : null,
       // Returned once, to the operator who created it. Delivery may be a local
       // sink or a provider that bounces; either way the person who just made
       // this academy is the one who can still reach its manager by hand.
@@ -517,7 +538,12 @@ export class PlatformAcademyService {
       await this.audit.write(transaction, {
         actorUserId: actor.userId,
         academyId: input.academyId,
-        action: "platform.academy.first_manager_invitation_resent",
+        // An academy created open has never had a manager invitation, so this
+        // is the first one and calling it a resend would make the trail read
+        // as though an earlier attempt had been made and missed.
+        action: previous
+          ? "platform.academy.first_manager_invitation_resent"
+          : "platform.academy.first_manager_invited",
         targetType: "AcademyInvitation",
         targetId: created.id,
         before: previous ? { email: previous.email } : undefined,

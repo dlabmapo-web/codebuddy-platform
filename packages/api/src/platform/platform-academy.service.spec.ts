@@ -113,15 +113,16 @@ function createService(options: {
     }),
   } as unknown as PlatformAccessService;
 
+  const auditWrite = vi.fn().mockResolvedValue({});
   const service = new PlatformAcademyService(
     prisma,
     access,
-    { write: vi.fn().mockResolvedValue({}) } as unknown as AuditService,
+    { write: auditWrite } as unknown as AuditService,
     { queueForInvitation } as unknown as InvitationDeliveryService,
     { get: vi.fn().mockReturnValue("cove") } as never,
   );
 
-  return { service, queueForInvitation, transaction, access };
+  return { service, auditWrite, queueForInvitation, transaction, access };
 }
 
 async function codeOf(promise: Promise<unknown>): Promise<string> {
@@ -195,6 +196,52 @@ describe("PlatformAcademyService.create", () => {
     });
     await codeOf(service.create(identity, input));
     expect(queueForInvitation).not.toHaveBeenCalled();
+  });
+
+  /*
+   * The second way into an academy. An operator who does not yet know who will
+   * run one should not have to invent an address to make it — and the address
+   * they invent is the address the invitation goes to.
+   */
+  it("invites nobody when no manager address is given", async () => {
+    const { service, queueForInvitation, transaction } = createService();
+    const { managerEmail: _omitted, ...open } = input;
+
+    const result = await service.create(identity, open);
+
+    expect(transaction.academyInvitation.create).not.toHaveBeenCalled();
+    expect(queueForInvitation).not.toHaveBeenCalled();
+    // Null rather than absent, so one result shape covers both ways in and a
+    // caller branches on a value instead of on whether a key exists.
+    expect(result.invitation).toBeNull();
+    expect(result.token).toBeNull();
+  });
+
+  it("records which way in was chosen", async () => {
+    // An academy that sat empty for a week is either an invitation nobody
+    // opened or an open academy nobody applied to, and those have different
+    // fixes. Without this the trail cannot tell them apart.
+    const { service, auditWrite } = createService();
+    const { managerEmail: _omitted, ...open } = input;
+
+    await service.create(identity, open);
+    expect(auditWrite).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "platform.academy.created",
+        after: expect.objectContaining({ onboarding: "open" }),
+      }),
+    );
+
+    const invited = createService();
+    await invited.service.create(identity, input);
+    expect(invited.auditWrite).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "platform.academy.created",
+        after: expect.objectContaining({ onboarding: "invitation" }),
+      }),
+    );
   });
 
   it("normalizes the manager address before storing or sending it", async () => {

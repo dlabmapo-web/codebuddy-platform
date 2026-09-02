@@ -261,8 +261,17 @@ export const createPlatformAcademyInputSchema = z
     timeZone: z.string().min(1).max(64).refine(isSupportedTimeZone, {
       message: "unsupported_time_zone",
     }),
-    /** Where the first manager invitation is sent. */
-    managerEmail: z.email().max(200),
+    /**
+     * Where the first manager invitation is sent, when there is one.
+     *
+     * Optional, and its absence is a *decision* rather than a missing field:
+     * the academy is created open, appears on the sign-up page at once, and
+     * whoever signs up choosing it waits in the queue an operator reviews. An
+     * operator who does not yet know who will run an academy should not have
+     * to invent an address to make one — and the address they invent is the
+     * address the invitation goes to.
+     */
+    managerEmail: z.email().max(200).optional(),
     contactEmail: z
       .email()
       .max(200)
@@ -278,7 +287,8 @@ export type CreatePlatformAcademyInput = z.infer<
 export const createPlatformAcademyResultSchema = z
   .object({
     academy: platformAcademyDetailSchema,
-    invitation: academyInvitationDetailSchema,
+    /** Null when the academy was created open, with nobody invited. */
+    invitation: academyInvitationDetailSchema.nullable(),
     /**
      * The plaintext invitation token, returned to its creator and never again.
      *
@@ -286,8 +296,12 @@ export const createPlatformAcademyResultSchema = z
      * shown. The manager's own invitation flow does the same thing for the same
      * reason — and it is what makes the console usable at all wherever email is
      * not configured, which includes every development machine.
+     *
+     * Nullable alongside `invitation`, and always the same nullness: one shape
+     * covers both ways into an academy, so a caller branches on a value rather
+     * than on whether a key is present.
      */
-    token: z.string().min(32),
+    token: z.string().min(32).nullable(),
   })
   .strict();
 

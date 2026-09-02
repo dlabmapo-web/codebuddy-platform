@@ -101,6 +101,20 @@ export const platformPermissions = [
    * keeping a second implementation of content mutations.
    */
   "platform.content.read",
+  /**
+   * Every academy's pending applications, in one queue.
+   *
+   * A read, and only a read: approving one calls the academy's own review
+   * procedure, which already answers yes to an operator through the platform
+   * branch of `AcademyAccessService`. This permission exists for the reason
+   * `platform.content.read` does — the console's question is "across all of
+   * them", and no academy-scoped endpoint can answer it.
+   *
+   * It carries an applicant's name, email and the note they wrote, which is
+   * identity rather than learning data. It authorizes no submission, no grade
+   * and no profile field; those stay behind a support grant.
+   */
+  "platform.applications.read",
   "platform.features.manage",
   "platform.analytics.read",
   "platform.health.read",

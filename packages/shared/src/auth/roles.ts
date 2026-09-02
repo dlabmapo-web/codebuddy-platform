@@ -115,6 +115,22 @@ export const platformPermissions = [
    * and no profile field; those stay behind a support grant.
    */
   "platform.applications.read",
+
+  /**
+   * Every academy's invitations, in one queue, with the delivery evidence
+   * beside them.
+   *
+   * A read, and only a read: sending, revoking and resending call the academy's
+   * own procedures, which already answer yes to an operator through the
+   * platform branch of `AcademyAccessService`. This permission exists for the
+   * reason `platform.applications.read` does — the console's question is
+   * "across all of them", and no academy-scoped endpoint can answer it.
+   *
+   * It carries an invited address and a role, which is identity rather than
+   * learning data, and never a token: only the hash is stored, and the one
+   * moment a token is readable is the response that minted it.
+   */
+  "platform.invitations.read",
   "platform.features.manage",
   "platform.analytics.read",
   "platform.health.read",

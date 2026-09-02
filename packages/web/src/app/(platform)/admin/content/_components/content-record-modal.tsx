@@ -1,31 +1,20 @@
 'use client';
 
 import type { ContentLens } from '@cove/shared';
-import { Building2, Check, ChevronsUpDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/studio/overlays';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
+import {
+  AcademyField,
+  type ConsoleAcademyOption,
+} from '../../_components/academy-field';
 import { contentDetailHref } from '../../_lib/content-view';
-
-/** An academy a record can be created in — the facet's own list. */
-export type ContentAcademyOption = { id: string; name: string; slug: string };
 
 /**
  * What the modal is about to write.
@@ -93,7 +82,7 @@ export function ContentRecordModal({
   onClose,
   onSaved,
 }: {
-  academies: ContentAcademyOption[];
+  academies: ConsoleAcademyOption[];
   draft: ContentRecordDraft | null;
   /** This table's address, so the new record's editor can find its way back. */
   from: string;
@@ -103,7 +92,7 @@ export function ContentRecordModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation('platform-content');
+  const { t } = useTranslation('platform');
   const { t: copy } = useLayoutTranslation(['courses', 'classes', 'common']);
   const errorText = useErrorText();
   const router = useRouter();
@@ -236,22 +225,12 @@ export function ContentRecordModal({
                 {t('academy_field.label')}
                 {locked ? null : <span className="ml-1 text-danger">*</span>}
               </span>
-              {locked ? (
-                <p className="flex h-11 items-center gap-2 rounded-lg border border-border bg-canvas px-3 text-[15px] font-semibold text-ink">
-                  <Building2
-                    aria-hidden
-                    className="size-4 shrink-0 text-sub"
-                    strokeWidth={2.25}
-                  />
-                  <span className="truncate">{chosen?.name}</span>
-                </p>
-              ) : (
-                <AcademyField
-                  academies={academies}
-                  onChange={setAcademyId}
-                  selected={chosen}
-                />
-              )}
+              <AcademyField
+                academies={academies}
+                locked={locked}
+                onChange={setAcademyId}
+                selected={chosen}
+              />
               {locked && !editing ? (
                 <span className="text-[12.5px] text-sub">
                   {t('academy_field.locked')}
@@ -327,87 +306,5 @@ export function ContentRecordModal({
         </form>
       </ModalContent>
     </Modal>
-  );
-}
-
-/**
- * Which academy a new record lands in.
- *
- * A searchable list rather than a plain select: the console's own facet is fed
- * by every academy on the platform, and a list an operator has to scroll is a
- * list they pick the wrong neighbour from.
- */
-function AcademyField({
-  academies,
-  onChange,
-  selected,
-}: {
-  academies: ContentAcademyOption[];
-  onChange: (academyId: string) => void;
-  selected: ContentAcademyOption | null;
-}) {
-  const { t } = useTranslation('platform-content');
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverTrigger asChild>
-        <button
-          className="flex h-11 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 text-left text-[15px] outline-none transition-colors hover:bg-canvas focus:border-brand focus:ring-2 focus:ring-brand/20"
-          type="button"
-        >
-          <Building2
-            aria-hidden
-            className="size-4 shrink-0 text-sub"
-            strokeWidth={2.25}
-          />
-          <span
-            className={
-              selected
-                ? 'min-w-0 flex-1 truncate font-semibold text-ink'
-                : 'min-w-0 flex-1 truncate text-sub'
-            }
-          >
-            {selected?.name ?? t('academy_field.placeholder')}
-          </span>
-          <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-sub" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-[var(--radix-popover-trigger-width)] p-0"
-      >
-        <Command>
-          <CommandInput placeholder={t('academy_field.search')} />
-          <CommandList>
-            <CommandEmpty>{t('academy_field.empty')}</CommandEmpty>
-            <CommandGroup>
-              {academies.map((academy) => (
-                <CommandItem
-                  key={academy.id}
-                  onSelect={() => {
-                    onChange(academy.id);
-                    setOpen(false);
-                  }}
-                  value={`${academy.name} ${academy.slug}`}
-                >
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-semibold">
-                      {academy.name}
-                    </span>
-                    <span className="truncate font-mono text-[12px] text-sub">
-                      /{academy.slug}
-                    </span>
-                  </span>
-                  {academy.id === selected?.id ? (
-                    <Check className="size-4" />
-                  ) : null}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }

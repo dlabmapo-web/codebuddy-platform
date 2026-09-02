@@ -28,6 +28,7 @@ import type platform from '@cove/i18n/locales/en/platform.json';
 import type platformAudit from '@cove/i18n/locales/en/platform-audit.json';
 import type platformApplications from '@cove/i18n/locales/en/platform-applications.json';
 import type platformContent from '@cove/i18n/locales/en/platform-content.json';
+import type platformInvitations from '@cove/i18n/locales/en/platform-invitations.json';
 import type platformUsers from '@cove/i18n/locales/en/platform-users.json';
 import type platformSupport from '@cove/i18n/locales/en/platform-support.json';
 import type points from '@cove/i18n/locales/en/points.json';
@@ -66,6 +67,7 @@ declare module 'i18next' {
       'platform-audit': typeof platformAudit;
       'platform-applications': typeof platformApplications;
       'platform-content': typeof platformContent;
+      'platform-invitations': typeof platformInvitations;
       'platform-users': typeof platformUsers;
       'platform-support': typeof platformSupport;
       points: typeof points;

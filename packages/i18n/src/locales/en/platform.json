@@ -180,6 +180,7 @@
     "access": "Support access",
     "audit": "Audit trail",
     "applications": "Applications",
+    "invitations": "Invitations",
     "applications_waiting_one": "{{count}} application needs you",
     "applications_waiting_other": "{{count}} applications need you"
   },
@@ -269,5 +270,13 @@
     "course_body": "This removes the course and every module, lecture and problem in it. Refused if any student has submitted through it — hide it instead.",
     "class_body": "This removes the class, its roster and its schedule. Refused if any student has submitted through it — archive it instead.",
     "confirm_label": "Type {{name}} to confirm"
+  },
+  "academy_field": {
+    "label": "Academy",
+    "placeholder": "Choose an academy",
+    "search": "Search academies",
+    "empty": "No academy matches that name.",
+    "locked": "The academy you filtered to.",
+    "unknown": "Unknown academy"
   }
 }

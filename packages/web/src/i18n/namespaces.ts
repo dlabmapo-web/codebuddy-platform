@@ -141,6 +141,7 @@ export const platformNamespaces = [
   'platform-audit',
   'platform-applications',
   'platform-content',
+  'platform-invitations',
   'platform-users',
   'platform-support',
   'errors',

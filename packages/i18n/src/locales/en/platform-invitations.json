@@ -1,0 +1,67 @@
+{
+  "title": "Invitations",
+  "subtitle": "Every invitation on Cove Studio, and whether it arrived.",
+  "summary": {
+    "label": "Invitation summary",
+    "scope_one": "across {{count}} academy",
+    "scope_other": "across {{count}} academies",
+    "total": "Invitations",
+    "total_hint_one": "{{count}} accepted",
+    "total_hint_other": "{{count}} accepted",
+    "pending": "Pending",
+    "expiring_hint_zero": "None expiring this week",
+    "expiring_hint_one": "{{count}} expires this week",
+    "expiring_hint_other": "{{count}} expire this week",
+    "bounced": "Bounced",
+    "bounced_hint_one": "{{count}} in an academy with no manager",
+    "bounced_hint_other": "{{count}} in academies with no manager",
+    "bounced_clear": "Every one has a manager who can resend"
+  },
+  "table": {
+    "email": "Invited",
+    "academy": "Academy",
+    "role": "Role",
+    "status": "Status",
+    "delivery": "Delivery",
+    "expires": "Expires",
+    "actions": "Invitation actions",
+    "resend": "Resend the email",
+    "revoke": "Revoke invitation",
+    "open_academy": "Open academy",
+    "no_manager": "No manager",
+    "sent_by": "Sent by {{name}}",
+    "sent_by_us": "Sent by {{name}} (Cove)",
+    "search": "Search by email address",
+    "loading": "Loading invitations…",
+    "empty": "Nobody has been invited yet.",
+    "empty_filtered": "No invitation matches these filters.",
+    "action_failed": "That could not be done. Reload the page and try again."
+  },
+  "facet": {
+    "academy": "Academy",
+    "status": "Status",
+    "delivery": "Delivery",
+    "needs_you": "Needs you",
+    "needs_you_on": "No manager to act"
+  },
+  "composer": {
+    "open": "Invite someone",
+    "heading": "Invite someone to an academy",
+    "body": "Choose the academy first: a role means something different in each one.",
+    "notice": "They get a link that only works for this address, for 7 days.",
+    "submit": "Send invitation",
+    "sending": "Sending…",
+    "sent": "Invitation sent to {{email}}.",
+    "failed": "The invitation could not be sent. Check the address and try again."
+  },
+  "revoke": {
+    "heading": "Revoke the invitation to {{email}}?",
+    "body": "The link stops working immediately.",
+    "detail": "Anyone holding it — including {{academy}} — will find a dead page. You can invite the same address again afterwards.",
+    "confirm": "Revoke invitation"
+  },
+  "unavailable": {
+    "title": "Invitations are unavailable",
+    "body": "The queue could not be read. Reload the page, and if it keeps failing the API is not answering."
+  }
+}

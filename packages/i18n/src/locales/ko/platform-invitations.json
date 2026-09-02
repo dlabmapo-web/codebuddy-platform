@@ -1,0 +1,67 @@
+{
+  "title": "초대",
+  "subtitle": "Cove Studio의 모든 초대와 전달 여부입니다.",
+  "summary": {
+    "label": "초대 요약",
+    "scope_one": "{{count}}개 아카데미 기준",
+    "scope_other": "{{count}}개 아카데미 기준",
+    "total": "초대",
+    "total_hint_one": "{{count}}건 수락됨",
+    "total_hint_other": "{{count}}건 수락됨",
+    "pending": "대기 중",
+    "expiring_hint_zero": "이번 주 만료 예정 없음",
+    "expiring_hint_one": "이번 주 {{count}}건 만료",
+    "expiring_hint_other": "이번 주 {{count}}건 만료",
+    "bounced": "반송",
+    "bounced_hint_one": "관리자가 없는 아카데미 {{count}}건",
+    "bounced_hint_other": "관리자가 없는 아카데미 {{count}}건",
+    "bounced_clear": "모두 재발송할 관리자가 있습니다"
+  },
+  "table": {
+    "email": "초대 대상",
+    "academy": "아카데미",
+    "role": "역할",
+    "status": "상태",
+    "delivery": "전달",
+    "expires": "만료",
+    "actions": "초대 작업",
+    "resend": "이메일 재발송",
+    "revoke": "초대 취소",
+    "open_academy": "아카데미 열기",
+    "no_manager": "관리자 없음",
+    "sent_by": "{{name}} 발송",
+    "sent_by_us": "{{name}} 발송 (Cove)",
+    "search": "이메일 주소로 검색",
+    "loading": "초대를 불러오는 중…",
+    "empty": "아직 초대한 사람이 없습니다.",
+    "empty_filtered": "조건에 맞는 초대가 없습니다.",
+    "action_failed": "처리하지 못했습니다. 새로 불러온 뒤 다시 시도하세요."
+  },
+  "facet": {
+    "academy": "아카데미",
+    "status": "상태",
+    "delivery": "전달",
+    "needs_you": "직접 처리 필요",
+    "needs_you_on": "처리할 관리자 없음"
+  },
+  "composer": {
+    "open": "초대 보내기",
+    "heading": "아카데미에 초대하기",
+    "body": "아카데미를 먼저 선택하세요. 역할의 의미는 아카데미마다 다릅니다.",
+    "notice": "이 주소에서만 사용할 수 있는 링크가 7일간 유효합니다.",
+    "submit": "초대 보내기",
+    "sending": "보내는 중…",
+    "sent": "{{email}}에게 초대를 보냈습니다.",
+    "failed": "초대를 보내지 못했습니다. 주소를 확인한 뒤 다시 시도하세요."
+  },
+  "revoke": {
+    "heading": "{{email}}에게 보낸 초대를 취소할까요?",
+    "body": "링크가 즉시 사용할 수 없게 됩니다.",
+    "detail": "{{academy}}를 포함해 링크를 가진 사람은 만료된 페이지를 보게 됩니다. 같은 주소로 다시 초대할 수 있습니다.",
+    "confirm": "초대 취소"
+  },
+  "unavailable": {
+    "title": "초대를 불러올 수 없습니다",
+    "body": "목록을 읽지 못했습니다. 새로 불러오고, 계속 실패하면 API가 응답하지 않는 상태입니다."
+  }
+}

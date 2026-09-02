@@ -30,6 +30,15 @@ import { PlatformSidebar } from './platform-sidebar';
  *
  * It owns the translation provider rather than leaving it to each page: the
  * sidebar needs the same namespace the pages do, and it renders outside them.
+ *
+ * A page that needs a namespace of its own asks for it here through
+ * `namespaces` rather than nesting a second `PageTranslationsProvider` inside.
+ * `useTranslation` resolves to the *nearest* i18next instance, and a nested one
+ * is a fresh instance holding only what it was given — so every console
+ * namespace beneath it stops resolving and falls back to that instance's own
+ * `defaultNS`, which renders another page's copy under this page's keys. One
+ * merged instance, with `platform` still first so the default namespace does
+ * not move.
  */
 export async function PlatformShell({
   title,
@@ -37,6 +46,7 @@ export async function PlatformShell({
   actions,
   back,
   bleed = false,
+  namespaces,
   showPageHeading = true,
   children,
 }: {
@@ -47,13 +57,26 @@ export async function PlatformShell({
   back?: React.ReactNode;
   /** Skip the white content card so a page can lay out its own panels. */
   bleed?: boolean;
+  /**
+   * Namespaces this one route needs on top of the console's own.
+   *
+   * For copy too large or too specific to ride in every console page's RSC
+   * payload — the delivery vocabulary, for instance, which one page reads and
+   * which would otherwise put an explanation of what a bounce is into every
+   * operator's Academies page.
+   */
+  namespaces?: readonly string[];
   /** Hide the body heading when an interactive editor owns it. */
   showPageHeading?: boolean;
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
+  // `platform` stays first: `initTranslations` takes the head of this list as
+  // both `defaultNS` and `fallbackNS`, so a page's extra namespace must never
+  // lead it.
+  const pageNamespaces = [...platformNamespaces, ...(namespaces ?? [])];
   const [{ resources }, viewer, sidebarState] = await Promise.all([
-    initTranslations(locale, platformNamespaces),
+    initTranslations(locale, pageNamespaces),
     readViewer(),
     cookies().then((store) => store.get('cove_sidebar_state')?.value),
   ]);
@@ -61,7 +84,7 @@ export async function PlatformShell({
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={platformNamespaces}
+      namespaces={pageNamespaces}
       resources={resources}
     >
       <SidebarProvider defaultOpen={sidebarState !== 'false'}>

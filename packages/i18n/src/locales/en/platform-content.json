@@ -62,12 +62,5 @@
   "unavailable": {
     "title": "Content is unavailable",
     "body": "The platform could not be reached. Try again shortly."
-  },
-  "academy_field": {
-    "label": "Academy",
-    "placeholder": "Choose an academy",
-    "search": "Search academies",
-    "empty": "No academy matches that name.",
-    "locked": "The academy you filtered to."
   }
 }

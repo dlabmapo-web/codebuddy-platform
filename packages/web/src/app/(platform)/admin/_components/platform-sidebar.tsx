@@ -4,6 +4,7 @@ import {
   Inbox,
   KeyRound,
   LogOut,
+  Mail,
   School,
   type LucideIcon,
   ScrollText,
@@ -93,6 +94,13 @@ export function PlatformSidebar() {
           label: t('nav.applications'),
           icon: Inbox,
           badge: needsReview,
+        },
+        // Beside Applications, because the two are the ways into an academy —
+        // one pull, one push — and a manager's own rail puts them together.
+        {
+          href: '/admin/invitations',
+          label: t('nav.invitations'),
+          icon: Mail,
         },
       ],
     },

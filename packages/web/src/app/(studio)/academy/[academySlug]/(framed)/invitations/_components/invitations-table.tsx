@@ -55,7 +55,16 @@ const deliveryTone: Record<InvitationDelivery['state'], string> = {
   FAILED: 'bg-warning/10 text-warning',
 };
 
-function DeliveryBadge({ delivery }: { delivery: InvitationDelivery | null }) {
+/**
+ * Exported for the console's cross-academy queue, which asks the same question
+ * of the same attempt row. Two components for one ladder of evidence is how a
+ * bounce ends up green on one page and red on another.
+ */
+export function DeliveryBadge({
+  delivery,
+}: {
+  delivery: InvitationDelivery | null;
+}) {
   const { t } = useTranslation('people-ops');
   if (!delivery) {
     return (

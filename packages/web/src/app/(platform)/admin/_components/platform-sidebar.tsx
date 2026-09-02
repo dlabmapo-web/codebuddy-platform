@@ -10,7 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
 import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
@@ -47,6 +47,7 @@ export function PlatformSidebar() {
   const { t } = useTranslation('platform');
   const { t: common } = useLayoutTranslation('common');
   const pathname = usePathname();
+  const from = useSearchParams().get('from');
 
   const items = [
     { href: '/admin', label: t('nav.academies'), icon: School },
@@ -55,10 +56,29 @@ export function PlatformSidebar() {
     { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
     { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
   ];
-  const activeHref = activeNavHref(
-    pathname,
-    items.map((item) => item.href),
-  );
+
+  /**
+   * Which section the operator is *working in*, which is not always what the
+   * address says.
+   *
+   * One editor is mounted under several routes. A course opened from the
+   * content browser lives at `/admin/academies/…`, so a path-only rule lights
+   * **Academies** while the page's own Back link says **Content** — the rail
+   * and the page disagreeing about where the reader is, on every content row
+   * they open.
+   *
+   * `from` is already the record of where they came from (§2.6.1 of the content
+   * browser design). Reusing it here keeps one answer on screen. It only ever
+   * overrides the section, never the destination: the sidebar links are
+   * unchanged, so Content still goes to the content browser.
+   */
+  const workingIn = from?.startsWith('/admin/content') ? '/admin/content' : null;
+  const activeHref =
+    workingIn ??
+    activeNavHref(
+      pathname,
+      items.map((item) => item.href),
+    );
 
   return (
     <Sidebar collapsible="icon">

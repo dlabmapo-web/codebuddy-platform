@@ -6,7 +6,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { useContentBasePath } from '@/components/studio/content-base-path-provider';
+import {
+  useContentBasePath,
+  useContentSurface,
+} from '@/components/studio/content-base-path-provider';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
@@ -22,18 +25,25 @@ export function BuilderHeader({
   courseId: string;
 }) {
   const contentPaths = useContentBasePath();
+  // The console shell renders its own `BackLink` above the page heading, and it
+  // knows something this one cannot: which list the operator actually arrived
+  // from. Two back arrows forty pixels apart, pointing at different places, is
+  // a choice nobody asked to make — so under the console the shell's wins.
+  const shellOwnsBack = useContentSurface() === 'console';
   const { t } = useLayoutTranslation('content');
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <Link
-        className="inline-flex items-center gap-1.5 text-[14.5px] font-semibold text-sub transition-colors hover:text-ink"
-        href={contentPaths.courses()}
-      >
-        <ArrowLeft className="size-3.5" />
-        {t('builder.all_courses')}
-      </Link>
-      <div className="flex items-center gap-3">
+      {shellOwnsBack ? null : (
+        <Link
+          className="inline-flex items-center gap-1.5 text-[14.5px] font-semibold text-sub transition-colors hover:text-ink"
+          href={contentPaths.courses()}
+        >
+          <ArrowLeft className="size-3.5" />
+          {t('builder.all_courses')}
+        </Link>
+      )}
+      <div className="ml-auto flex items-center gap-3">
         <p className="text-[14px] font-semibold text-sub">
           {t('builder.summary', {
             modules: builder.tree.modules.length,

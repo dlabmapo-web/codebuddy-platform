@@ -1,6 +1,9 @@
 'use client';
 
-import { useContentBasePath } from '@/components/studio/content-base-path-provider';
+import {
+  useContentBasePath,
+  useContentSurface,
+} from '@/components/studio/content-base-path-provider';
 
 import { Archive, ArrowLeft, Pencil, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -17,19 +20,24 @@ export function ClassHeader({
   manager: ClassDetailManagerState;
 }) {
   const contentPaths = useContentBasePath();
+  // See `builder-header.tsx`: under the console the shell's own back link is
+  // the one that knows where the operator came from, so this one stands down.
+  const shellOwnsBack = useContentSurface() === 'console';
   const { t } = useLayoutTranslation('classes');
   const { detail } = manager;
   const archived = detail.status === 'ARCHIVED';
 
   return (
     <header className="space-y-4">
-      <Link
-        className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-sub transition-colors hover:text-brand"
-        href={contentPaths.classes()}
-      >
-        <ArrowLeft className="size-3.5" />
-        {t('detail.back')}
-      </Link>
+      {shellOwnsBack ? null : (
+        <Link
+          className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-sub transition-colors hover:text-brand"
+          href={contentPaths.classes()}
+        >
+          <ArrowLeft className="size-3.5" />
+          {t('detail.back')}
+        </Link>
+      )}
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">

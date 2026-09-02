@@ -10,13 +10,17 @@ import { isAccessDeniedError } from '@/lib/api-errors';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 
 import { PlatformShell } from '../../../../_components/platform-shell';
+import { consoleBackTarget } from '../../../../_lib/back-target';
 
 export default async function PlatformCourseBuilderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ academySlug: string; courseId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academySlug, courseId } = await params;
+  const { from } = await searchParams;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const client = createPlatformServerORPCClient();
   const academy = await client.platformAcademies
@@ -24,7 +28,7 @@ export default async function PlatformCourseBuilderPage({
     .catch(() => null);
   if (!academy) notFound();
 
-  const { t } = await getServerTranslation(['content']);
+  const { t } = await getServerTranslation(['content', 'platform-content']);
   const contentPaths = createContentPaths(academySlug, 'console');
   let initialTree = null;
   let loadFailed = false;
@@ -34,11 +38,14 @@ export default async function PlatformCourseBuilderPage({
     loadFailed = !isAccessDeniedError(error);
   }
 
+  const back = consoleBackTarget(from, t('platform-content:title'), {
+    href: contentPaths.courses(),
+    label: academy.name,
+  });
+
   return (
     <PlatformShell
-      back={
-        <BackLink href={contentPaths.courses()} label={academy.name} />
-      }
+      back={<BackLink href={back.href} label={back.label} />}
       bleed
       description={initialTree ? t('builder.description') : undefined}
       title={initialTree?.course.title ?? t('builder.fallback_title')}

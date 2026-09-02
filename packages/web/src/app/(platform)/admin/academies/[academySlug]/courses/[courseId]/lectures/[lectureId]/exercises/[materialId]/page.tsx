@@ -3,13 +3,16 @@ import { notFound } from 'next/navigation';
 
 import { PlatformShell } from '@/app/(platform)/admin/_components/platform-shell';
 import { ExerciseWorkspace } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/exercise-workspace';
+import { consoleBackTarget } from '@/app/(platform)/admin/_lib/back-target';
 import { BackLink } from '@/components/studio/back-link';
 import { createContentPaths } from '@/components/studio/content-paths';
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { requirePlatformAcademyRoute } from '@/lib/academy-route';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 
 export default async function PlatformExercisePage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     academySlug: string;
@@ -17,8 +20,10 @@ export default async function PlatformExercisePage({
     lectureId: string;
     materialId: string;
   }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academySlug, courseId, lectureId, materialId } = await params;
+  const { from } = await searchParams;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const client = createPlatformServerORPCClient();
   const academy = await client.platformAcademies
@@ -56,15 +61,15 @@ export default async function PlatformExercisePage({
   }
 
   const contentPaths = createContentPaths(academySlug, 'console');
+  const { t } = await getServerTranslation(['platform-content']);
+  const back = consoleBackTarget(from, t('platform-content:title'), {
+    href: contentPaths.course(courseId),
+    label: academy.name,
+  });
 
   return (
     <PlatformShell
-      back={
-        <BackLink
-          href={contentPaths.course(courseId)}
-          label={academy.name}
-        />
-      }
+      back={<BackLink href={back.href} label={back.label} />}
       bleed
       title={context.course.title}
     >

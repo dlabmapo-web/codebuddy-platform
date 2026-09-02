@@ -46,7 +46,9 @@ import { PlatformLifecycleService } from "../platform/platform-lifecycle.service
 import { PlatformUsersService } from "../platform/platform-users.service.js";
 import { PlatformAuditService } from "../platform/platform-audit.service.js";
 import { createPlatformAuditRouters } from "../platform/platform-audit.router.js";
+import { PlatformApplicationsService } from "../platform/platform-applications.service.js";
 import { PlatformContentService } from "../platform/platform-content.service.js";
+import { createPlatformApplicationsRouters } from "../platform/platform-applications.router.js";
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
 import { createPlatformUsersRouters } from "../platform/platform-users.router.js";
 import { PlatformSupportService } from "../platform/platform-support.service.js";
@@ -122,6 +124,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     }),
     platformAcademyService: app.get(PlatformAcademyService, { strict: false }),
     platformAuditService: app.get(PlatformAuditService, { strict: false }),
+    platformApplicationsService: app.get(PlatformApplicationsService, {
+      strict: false,
+    }),
     platformContentService: app.get(PlatformContentService, {
       strict: false,
     }),
@@ -168,6 +173,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const platformRouters = createPlatformRouters(os, deps);
   const platformUsersRouters = createPlatformUsersRouters(os, deps);
   const platformAuditRouters = createPlatformAuditRouters(os, deps);
+  const platformApplicationsRouters = createPlatformApplicationsRouters(os, deps);
   const platformContentRouters = createPlatformContentRouters(os, deps);
   const platformSupportRouters = createPlatformSupportRouters(os, deps);
   return os.router({
@@ -182,6 +188,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformRouters,
     ...platformUsersRouters,
     ...platformAuditRouters,
+    ...platformApplicationsRouters,
     ...platformContentRouters,
     ...platformSupportRouters,
     learn: createLearnRouter(os, deps),

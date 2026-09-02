@@ -4,8 +4,10 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { ManageModule } from "../manage/manage.module.js";
+import { MediaModule } from "../profile/media.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { PlatformAcademyService } from "./platform-academy.service.js";
+import { PlatformApplicationsService } from "./platform-applications.service.js";
 import { PlatformAuditService } from "./platform-audit.service.js";
 import { PlatformContentService } from "./platform-content.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
@@ -37,11 +39,16 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     AuthModule,
     AuthorizationModule,
     ManageModule,
+    // `ProfileMediaService`, for the applications queue: it shows an
+    // applicant's own photo, and signing one URL per row is what every other
+    // people surface already does through this module.
+    MediaModule,
     MonitoringRevocationModule,
   ],
   controllers: [PlatformUsersController],
   providers: [
     PlatformAcademyService,
+    PlatformApplicationsService,
     PlatformLifecycleService,
     PlatformUsersService,
     PlatformParticipationRepository,
@@ -51,6 +58,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
   ],
   exports: [
     PlatformAcademyService,
+    PlatformApplicationsService,
     PlatformLifecycleService,
     PlatformUsersService,
     PlatformSupportService,

@@ -22,15 +22,18 @@ import { SignupNotice } from './signup-notice';
 const initialState: AuthFormState = {};
 
 export function SignupForm({
+  invitedAcademy,
   invitedAcademyId,
   socialError,
 }: {
+  /** As the invitation names it, whatever state the academy is in. */
+  invitedAcademy?: { id: string; name: string } | null;
   invitedAcademyId?: string;
   socialError?: string;
 }) {
   const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(signupAction, initialState);
-  const academies = useSignupAcademies(invitedAcademyId);
+  const academies = useSignupAcademies(invitedAcademyId, invitedAcademy);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [challengeKey, setChallengeKey] = useState(0);
   // Signup ends two ways. With email confirmation off it redirects, and the

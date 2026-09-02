@@ -25,11 +25,6 @@ export function createPlatformContentRouters(
         .handler(({ context, input }) =>
           deps.platformContentService.classes(context.identity, input),
         ),
-      problems: os.platformContent.problems
-        .use(access.authenticated)
-        .handler(({ context, input }) =>
-          deps.platformContentService.problems(context.identity, input),
-        ),
     },
   };
 }

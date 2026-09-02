@@ -41,3 +41,63 @@ describe('PlatformContentService.summary', () => {
     expect(summary.classes.withoutTeacher).toBe(3);
   });
 });
+
+describe('PlatformContentService.courses', () => {
+  it('counts the problems under a course that cannot grade', async () => {
+    // The console has no list of problems any more — one is reached by opening
+    // its course. So the fault a problem carries has to arrive on the course
+    // row, or the summary strip's `cannot grade` number has nowhere to go.
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: 'course-1',
+        title: 'Python Foundations',
+        description: '',
+        isVisible: true,
+        updatedAt: new Date('2026-09-01T00:00:00.000Z'),
+        academy: { id: academyId, name: 'D.Lab Mapo', slug: 'mapo' },
+        _count: { modules: 2, classAssignments: 1 },
+        modules: [
+          {
+            _count: { lectures: 2 },
+            lectures: [
+              { _count: { materials: 3 }, materials: [{ id: 'm1' }] },
+              { _count: { materials: 4 }, materials: [] },
+            ],
+          },
+          {
+            _count: { lectures: 1 },
+            lectures: [
+              {
+                _count: { materials: 2 },
+                materials: [{ id: 'm2' }, { id: 'm3' }],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const prisma = {
+      academy: { findMany: vi.fn().mockResolvedValue([]) },
+      course: { count: vi.fn().mockResolvedValue(1), findMany },
+    } as never;
+    const service = new PlatformContentService(prisma, {
+      requirePermission: vi.fn().mockResolvedValue({}),
+    } as never);
+
+    const result = await service.courses(identity, {
+      sort: 'updatedAt',
+      direction: 'desc',
+      page: 1,
+      pageSize: 25,
+    });
+
+    expect(result.rows[0].exerciseCount).toBe(9);
+    expect(result.rows[0].problemsWithoutTests).toBe(3);
+    // Only the broken ones are selected, and inside the tree already loaded —
+    // a second round trip per page is what this nesting exists to avoid.
+    const materials =
+      findMany.mock.calls[0][0].select.modules.select.lectures.select.materials;
+    expect(materials.where.type).toBe('PROGRAMMING_EXERCISE');
+    expect(materials.where.OR).toHaveLength(2);
+  });
+});

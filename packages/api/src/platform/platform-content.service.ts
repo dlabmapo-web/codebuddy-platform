@@ -2,7 +2,6 @@ import { Injectable } from "@nestjs/common";
 import type {
   ListPlatformClassesResult,
   ListPlatformCoursesResult,
-  ListPlatformProblemsResult,
   PlatformContentSummary,
   PlatformContentSummaryInput,
   ResolvedListPlatformContentInput,
@@ -15,18 +14,29 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { contentStatPredicates } from "./content-stat-predicates.js";
 
 /**
+ * A problem that cannot grade, unscoped by academy.
+ *
+ * The same predicate the summary counts with, reused inside the course tree
+ * where the academy is already established by the outer `where`. One
+ * definition, so the number on a course row and the number in the summary
+ * strip can never disagree about what "cannot grade" means.
+ */
+const untestedProblem = contentStatPredicates().problemWithoutTests;
+
+/**
  * What every academy teaches, read across all of them at once.
  *
  * The question no academy-scoped service can answer: "which academy has the
  * course the customer is describing", "who has a class with no teacher",
- * "where is that problem". Each of those is a support call that used to end in
- * a SQL client.
+ * "which curriculum cannot grade". Each of those is a support call that used to
+ * end in a SQL client.
  *
  * The service reads only, and the counts are the point. A course row says how
- * much is in it and whether anybody teaches it; a problem row says whether it
- * has test cases. Those two numbers answer most of what an operator is actually
- * being asked, without opening a single one. Opening mounts that academy's
- * existing editor under a console route.
+ * much is in it, whether anybody teaches it, and how many of its problems have
+ * no test cases; a class row says who runs it and who is in it. Those numbers
+ * answer most of what an operator is actually being asked, without opening a
+ * single row. Opening mounts that academy's existing editor under a console
+ * route.
  */
 @Injectable()
 export class PlatformContentService {
@@ -111,7 +121,17 @@ export class PlatformContentService {
             select: {
               _count: { select: { lectures: true } },
               lectures: {
-                select: { _count: { select: { materials: true } } },
+                select: {
+                  _count: { select: { materials: true } },
+                  // Only the broken ones, and only their ids. Nested in the
+                  // tree already being loaded rather than asked for in a
+                  // second round trip, and on a healthy academy it selects
+                  // nothing at all.
+                  materials: {
+                    where: untestedProblem,
+                    select: { id: true },
+                  },
+                },
               },
             },
           },
@@ -142,6 +162,15 @@ export class PlatformContentService {
             sum +
             module.lectures.reduce(
               (inner, lecture) => inner + lecture._count.materials,
+              0,
+            ),
+          0,
+        ),
+        problemsWithoutTests: record.modules.reduce(
+          (sum, module) =>
+            sum +
+            module.lectures.reduce(
+              (inner, lecture) => inner + lecture.materials.length,
               0,
             ),
           0,
@@ -247,97 +276,6 @@ export class PlatformContentService {
     };
   }
 
-  async problems(
-    identity: SupabaseIdentity,
-    input: ResolvedListPlatformContentInput,
-  ): Promise<ListPlatformProblemsResult> {
-    await this.authorize(identity);
-
-    // Addressed by the material, because that is what the academy's own URLs
-    // address: an operator following an Edit link has to land on a page that
-    // exists.
-    const where: Prisma.MaterialWhereInput = {
-      type: "PROGRAMMING_EXERCISE",
-      lecture: {
-        courseModule: {
-          course: {
-            ...academyFilter(input),
-          },
-        },
-      },
-      ...(input.query
-        ? { title: { contains: input.query, mode: "insensitive" } }
-        : {}),
-    };
-
-    const [total, records, academyOptions] = await Promise.all([
-      this.prisma.material.count({ where }),
-      this.prisma.material.findMany({
-        where,
-        select: {
-          id: true,
-          title: true,
-          isVisible: true,
-          updatedAt: true,
-          programmingExercise: {
-            select: {
-              difficulty: true,
-              // Counted, never listed. The number tells an operator whether a
-              // problem is finished; the cases themselves are the academy's.
-              _count: { select: { testCases: true } },
-            },
-          },
-          lecture: {
-            select: {
-              id: true,
-              title: true,
-              courseModule: {
-                select: {
-                  course: {
-                    select: {
-                      id: true,
-                      title: true,
-                      academy: { select: { id: true, name: true, slug: true } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: problemOrder(input),
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
-      }),
-      this.academyOptions(),
-    ]);
-
-    return {
-      rows: records.map((record) => {
-        const course = record.lecture.courseModule.course;
-        return {
-          materialId: record.id,
-          title: record.title,
-          isVisible: record.isVisible,
-          difficulty: record.programmingExercise?.difficulty ?? null,
-          testCaseCount: record.programmingExercise?._count.testCases ?? 0,
-          courseId: course.id,
-          courseTitle: course.title,
-          lectureId: record.lecture.id,
-          lectureTitle: record.lecture.title,
-          academyId: course.academy.id,
-          academyName: course.academy.name,
-          academySlug: course.academy.slug,
-          updatedAt: record.updatedAt.toISOString(),
-        };
-      }),
-      total,
-      page: input.page,
-      pageSize: input.pageSize,
-      academyOptions,
-    };
-  }
-
   private async authorize(identity: SupabaseIdentity): Promise<void> {
     await this.access.requirePermission(
       identity.authUserId,
@@ -362,8 +300,8 @@ export class PlatformContentService {
  * never. It is the paging equivalent of a coin flip per request.
  *
  * A key a lens does not have falls back to that lens's default rather than
- * throwing. The sort travels across a lens switch in the URL, and an address
- * that 500s because it names `difficulty` while showing classes would be a
+ * throwing. The sort travels between the two pages in the URL, and an address
+ * that 500s because it names `students` while showing courses would be a
  * shareable link that breaks on arrival.
  */
 type ContentOrderInput = Pick<
@@ -396,20 +334,6 @@ function classOrder(
       return [{ name: dir }, { id: "asc" }];
     case "students":
       return [{ enrollments: { _count: dir } }, { id: "asc" }];
-    default:
-      return [{ updatedAt: dir }, { id: "asc" }];
-  }
-}
-
-function problemOrder(
-  input: ContentOrderInput,
-): Prisma.MaterialOrderByWithRelationInput[] {
-  const dir = input.direction;
-  switch (input.sort) {
-    case "title":
-      return [{ title: dir }, { id: "asc" }];
-    case "difficulty":
-      return [{ programmingExercise: { difficulty: dir } }, { id: "asc" }];
     default:
       return [{ updatedAt: dir }, { id: "asc" }];
   }

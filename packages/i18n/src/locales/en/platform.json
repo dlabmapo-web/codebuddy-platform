@@ -167,10 +167,16 @@
     "archived": "Archived"
   },
   "nav": {
-    "group": "Platform",
+    "group": {
+      "platform": "Platform",
+      "people": "People",
+      "content": "Curriculum",
+      "operations": "Operations"
+    },
     "academies": "Academies",
     "users": "Users",
-    "content": "Content",
+    "courses": "Courses",
+    "classes": "Classes",
     "access": "Support access",
     "audit": "Audit trail",
     "applications": "Applications",

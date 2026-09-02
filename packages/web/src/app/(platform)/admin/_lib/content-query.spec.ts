@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   contentPath,
   parseContentQuery,
-  queryForContentLens,
   serializeContentQuery,
 } from './content-query';
 
@@ -17,12 +16,10 @@ describe('content query', () => {
     );
   });
 
-  it('keeps academy scope but clears search, sort and page for a lens switch', () => {
-    const query = parseContentQuery(
-      `academy=${academyId}&q=python&page=3&sort=modules&dir=asc`,
-    );
-    expect(contentPath('problems', queryForContentLens(query))).toBe(
-      `/admin/content/problems?academy=${academyId}`,
+  it('addresses each curriculum page with the state it is showing', () => {
+    const query = parseContentQuery(`academy=${academyId}&q=level&page=2`);
+    expect(contentPath('classes', query)).toBe(
+      `/admin/content/classes?q=level&academy=${academyId}&page=2`,
     );
   });
 

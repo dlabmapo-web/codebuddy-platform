@@ -4,7 +4,6 @@ import type {
   ContentLens,
   ListPlatformClassesResult,
   ListPlatformCoursesResult,
-  ListPlatformProblemsResult,
   PlatformContentSummary,
 } from '@cove/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -21,11 +20,8 @@ import {
   type ContentQuery,
 } from '../_lib/content-query';
 
-/** One page of any lens. Every field the table reads is common to all three. */
-export type ContentPage =
-  | ListPlatformCoursesResult
-  | ListPlatformClassesResult
-  | ListPlatformProblemsResult;
+/** One page of either list. Every field the table reads is common to both. */
+export type ContentPage = ListPlatformCoursesResult | ListPlatformClassesResult;
 
 export function useContentSummaryQuery(
   academyIds: string[] | undefined,
@@ -82,11 +78,11 @@ export function useContentState(lens: ContentLens) {
 }
 
 /**
- * One page of one lens.
+ * One page of one list.
  *
- * The three lenses are three endpoints returning three row shapes. The union
- * is widened at the boundary rather than threaded through the table, because
- * the table already narrows on `lens` to choose its columns — carrying a
+ * The two lists are two endpoints returning two row shapes. The union is
+ * widened at the boundary rather than threaded through the table, because the
+ * table already narrows on `lens` to choose its columns — carrying a
  * discriminant in the payload as well would be the same decision made twice.
  */
 export function useContentQuery(
@@ -101,9 +97,7 @@ export function useContentQuery(
     queryFn: async () =>
       lens === 'courses'
         ? await orpc.platformContent.courses(query)
-        : lens === 'classes'
-          ? await orpc.platformContent.classes(query)
-          : await orpc.platformContent.problems(query),
+        : await orpc.platformContent.classes(query),
     initialData: key === initialKey ? (initialData ?? undefined) : undefined,
     placeholderData: keepPreviousData,
     staleTime: 15_000,

@@ -167,10 +167,16 @@
     "archived": "보관됨"
   },
   "nav": {
-    "group": "플랫폼",
+    "group": {
+      "platform": "플랫폼",
+      "people": "구성원",
+      "content": "커리큘럼",
+      "operations": "운영"
+    },
     "academies": "아카데미",
     "users": "사용자",
-    "content": "콘텐츠",
+    "courses": "코스",
+    "classes": "반",
     "access": "지원 접근",
     "audit": "감사 기록",
     "applications": "가입 신청",

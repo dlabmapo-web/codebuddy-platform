@@ -44,10 +44,17 @@ export default async function PlatformClassDetailPage({
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, pointsNamespaces);
 
-  const back = consoleBackTarget(from, t('platform-content:title'), {
+  const back = consoleBackTarget(
+    from,
+    {
+      courses: t('platform-content:lens.courses'),
+      classes: t('platform-content:lens.classes'),
+    },
+    {
     href: contentPaths.classes(),
     label: academy.name,
-  });
+    },
+  );
 
   return (
     <PlatformShell

@@ -14,11 +14,15 @@ import type { ContentPage } from '../../_hooks/use-platform-content';
 import { ContentTable } from '../_components/content-table';
 
 /**
- * The content browser, rendered for one lens.
+ * A curriculum page — Courses or Classes — across every academy.
  *
- * One function behind three routes, as the users directory is behind four. The
+ * One function behind two routes, as the users directory is behind four. The
  * first page is fetched on the server so an operator sees rows rather than a
  * spinner, and only a filter change costs a round trip.
+ *
+ * The heading is the kind, not the tool. Both routes were titled "Content"
+ * while a chip inside the toolbar decided which of them you were on, which is
+ * the whole reason an operator could not tell the two pages apart.
  */
 export async function renderContentPage({
   lens,
@@ -48,9 +52,7 @@ export async function renderContentPage({
   const [rows, summary] = await Promise.allSettled([
     lens === 'courses'
       ? client.platformContent.courses(query)
-      : lens === 'classes'
-        ? client.platformContent.classes(query)
-        : client.platformContent.problems(query),
+      : client.platformContent.classes(query),
     client.platformContent.summary({ academyIds: query.academyIds }),
   ]);
 
@@ -68,7 +70,7 @@ export async function renderContentPage({
     <PlatformShell
       bleed
       description={t(`platform-content:lens_description.${lens}`)}
-      title={t('platform-content:title')}
+      title={t(`platform-content:lens.${lens}`)}
     >
       <div className="grid gap-5">
         {initialData ? (

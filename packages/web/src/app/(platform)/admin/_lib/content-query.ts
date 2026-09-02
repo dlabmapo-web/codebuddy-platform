@@ -69,24 +69,6 @@ export function contentPath(lens: ContentLens, query: ContentQuery): string {
   return search ? `${base}?${search}` : base;
 }
 
-/**
- * Academy scope follows a lens switch; search, sort and paging do not.
- *
- * The sort is dropped for the same reason the search text is: `students` means
- * nothing on the courses lens, and a key the new lens cannot honour silently
- * becomes newest-first — an ordering the operator did not ask for and cannot
- * see they are being given.
- */
-export function queryForContentLens(query: ContentQuery): ContentQuery {
-  return {
-    ...query,
-    query: undefined,
-    sort: 'updatedAt',
-    direction: 'desc',
-    page: 1,
-  };
-}
-
 export function contentSummaryKey(academyIds?: string[]) {
   return [...(academyIds ?? [])].sort().join(',');
 }

@@ -1,11 +1,11 @@
 'use client';
 
 import {
-  BookOpen,
   Inbox,
   KeyRound,
   LogOut,
   School,
+  type LucideIcon,
   ScrollText,
   Shield,
   Users,
@@ -30,7 +30,21 @@ import {
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation } from '@/i18n';
 import { activeNavHref } from '@/lib/nav-active';
+import {
+  contentLensFromReferrer,
+  contentLensHrefs,
+  lensIcons,
+} from '../_lib/content-view';
 import { usePendingApplicationsCount } from '../_hooks/use-platform-applications';
+
+type NavLink = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Set only on the row that carries the review queue's count. */
+  badge?: number;
+};
+type NavGroup = { id: string; label: string; items: NavLink[] };
 
 /**
  * The operator's navigation, built from the same parts as the academy one.
@@ -41,9 +55,10 @@ import { usePendingApplicationsCount } from '../_hooks/use-platform-applications
  * below is the studio's own furniture, including the footer's sign-out, so the
  * console does not become the one page in Cove where a person cannot leave.
  *
- * The group was written as a list for exactly this: the account directory has
- * arrived as the second item and needed no rework. The audit log and the
- * feature switchboard land beside it the same way.
+ * The rows were written as a list for exactly this: the account directory
+ * arrived as a second item and needed no rework, and the list has since grown
+ * headings of its own — the same grouped shape the studio rail uses, so an
+ * operator who works in both is not reading two different kinds of navigation.
  */
 export function PlatformSidebar() {
   const { t } = useTranslation('platform');
@@ -56,36 +71,78 @@ export function PlatformSidebar() {
   // badge that is always lit is a badge nobody reads.
   const needsReview = usePendingApplicationsCount();
 
-  const items = [
-    { href: '/admin', label: t('nav.academies'), icon: School },
-    { href: '/admin/users', label: t('nav.users'), icon: Users },
+  // Grouped the way the studio's rail is, because an operator reads the two
+  // side by side: the console is where a support call about an academy ends
+  // up, and a flat list of six meant scanning all six to find which of them
+  // was about people. The headings say what a row acts on — the tenants
+  // themselves, the people in them, the curriculum they share, and the
+  // operator's own trail through it.
+  const groups: NavGroup[] = [
     {
-      href: '/admin/applications',
-      label: t('nav.applications'),
-      icon: Inbox,
-      badge: needsReview,
+      id: 'platform',
+      label: t('nav.group.platform'),
+      items: [{ href: '/admin', label: t('nav.academies'), icon: School }],
     },
-    { href: '/admin/content', label: t('nav.content'), icon: BookOpen },
-    { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
-    { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
+    {
+      id: 'people',
+      label: t('nav.group.people'),
+      items: [
+        { href: '/admin/users', label: t('nav.users'), icon: Users },
+        {
+          href: '/admin/applications',
+          label: t('nav.applications'),
+          icon: Inbox,
+          badge: needsReview,
+        },
+      ],
+    },
+    {
+      id: 'content',
+      label: t('nav.group.content'),
+      // Two rows, named after the things they hold, taking the icons the pages
+      // and their summary tiles already wear. They were one row called
+      // "Content" leading to a browser whose second list was reachable only
+      // through a chip in its own toolbar — the name of a tool, hiding half of
+      // what it did.
+      items: [
+        {
+          href: contentLensHrefs.courses,
+          label: t('nav.courses'),
+          icon: lensIcons.courses,
+        },
+        {
+          href: contentLensHrefs.classes,
+          label: t('nav.classes'),
+          icon: lensIcons.classes,
+        },
+      ],
+    },
+    {
+      id: 'operations',
+      label: t('nav.group.operations'),
+      items: [
+        { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
+        { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
+      ],
+    },
   ];
+  const items = groups.flatMap((group) => group.items);
 
   /**
-   * Which section the operator is *working in*, which is not always what the
+   * Which row the operator is *working in*, which is not always what the
    * address says.
    *
    * One editor is mounted under several routes. A course opened from the
-   * content browser lives at `/admin/academies/…`, so a path-only rule lights
-   * **Academies** while the page's own Back link says **Content** — the rail
-   * and the page disagreeing about where the reader is, on every content row
-   * they open.
+   * Courses page lives at `/admin/academies/…`, so a path-only rule lights
+   * **Academies** while the page's own Back link says **Courses** — the rail
+   * and the page disagreeing about where the reader is, on every row they open.
    *
    * `from` is already the record of where they came from (§2.6.1 of the content
-   * browser design). Reusing it here keeps one answer on screen. It only ever
-   * overrides the section, never the destination: the sidebar links are
-   * unchanged, so Content still goes to the content browser.
+   * browser design). `contentLensFromReferrer` reads it back, and states the
+   * rules it follows. It only ever overrides which row is lit, never where a
+   * link goes.
    */
-  const workingIn = from?.startsWith('/admin/content') ? '/admin/content' : null;
+  const workingIn = contentLensFromReferrer(from);
   const activeHref =
     workingIn ??
     activeNavHref(
@@ -115,35 +172,37 @@ export function PlatformSidebar() {
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{t('nav.group')}</SidebarGroupLabel>
-          <SidebarMenu>
-            {items.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeHref === item.href}
-                  tooltip={item.label}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="size-[1.05rem] shrink-0" />
-                    <span>{item.label}</span>
-                    {item.badge ? (
-                      <span
-                        aria-label={t('nav.applications_waiting', {
-                          count: item.badge,
-                        })}
-                        className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1.5 font-mono text-[11px] font-bold tabular-nums text-on-danger group-data-[collapsible=icon]:hidden"
-                      >
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        {groups.map((group) => (
+          <SidebarGroup key={group.id}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarMenu>
+              {group.items.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={activeHref === item.href}
+                    tooltip={item.label}
+                  >
+                    <Link href={item.href}>
+                      <item.icon className="size-[1.05rem] shrink-0" />
+                      <span>{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          aria-label={t('nav.applications_waiting', {
+                            count: item.badge,
+                          })}
+                          className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1.5 font-mono text-[11px] font-bold tabular-nums text-on-danger group-data-[collapsible=icon]:hidden"
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <SidebarSeparator className="mx-0" />

@@ -3,16 +3,20 @@ import { describe, expect, it } from 'vitest';
 import { consoleBackTarget } from './back-target';
 
 const fallback = { href: '/admin/academies/mapo/courses', label: 'D.Lab Mapo' };
+const labels = { courses: 'Courses', classes: 'Classes' };
 
 describe('consoleBackTarget', () => {
-  it('returns to the content browser the operator came from', () => {
+  it('returns to the page the operator came from, under its own name', () => {
     expect(
-      consoleBackTarget('/admin/content/courses?academy=abc', 'Content', fallback),
-    ).toEqual({ href: '/admin/content/courses?academy=abc', label: 'Content' });
+      consoleBackTarget('/admin/content/courses?academy=abc', labels, fallback),
+    ).toEqual({ href: '/admin/content/courses?academy=abc', label: 'Courses' });
+    expect(consoleBackTarget('/admin/content/classes', labels, fallback)).toEqual(
+      { href: '/admin/content/classes', label: 'Classes' },
+    );
   });
 
   it('falls back to the academy when no origin was carried', () => {
-    expect(consoleBackTarget(undefined, 'Content', fallback)).toEqual(fallback);
+    expect(consoleBackTarget(undefined, labels, fallback)).toEqual(fallback);
   });
 
   it('refuses anything that is not the content browser', () => {
@@ -25,21 +29,23 @@ describe('consoleBackTarget', () => {
       '/admin/access/new?academy=abc',
       'javascript:alert(1)',
       '/admin/content/unknown',
+      // The retired problems page. Its address only redirects now, so a Back
+      // link aimed at it would land on Courses under a label promising
+      // problems.
+      '/admin/content/problems',
     ];
     for (const from of hostile) {
-      expect(consoleBackTarget(from, 'Content', fallback), from).toEqual(
-        fallback,
-      );
+      expect(consoleBackTarget(from, labels, fallback), from).toEqual(fallback);
     }
   });
 
   it('takes the first value when a param repeats', () => {
     expect(
       consoleBackTarget(
-        ['/admin/content/problems', 'https://evil.example'],
-        'Content',
+        ['/admin/content/classes', 'https://evil.example'],
+        labels,
         fallback,
       ).href,
-    ).toBe('/admin/content/problems');
+    ).toBe('/admin/content/classes');
   });
 });

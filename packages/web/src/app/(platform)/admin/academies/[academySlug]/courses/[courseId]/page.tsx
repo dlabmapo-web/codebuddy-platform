@@ -38,10 +38,17 @@ export default async function PlatformCourseBuilderPage({
     loadFailed = !isAccessDeniedError(error);
   }
 
-  const back = consoleBackTarget(from, t('platform-content:title'), {
+  const back = consoleBackTarget(
+    from,
+    {
+      courses: t('platform-content:lens.courses'),
+      classes: t('platform-content:lens.classes'),
+    },
+    {
     href: contentPaths.courses(),
     label: academy.name,
-  });
+    },
+  );
 
   return (
     <PlatformShell

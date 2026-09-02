@@ -62,10 +62,17 @@ export default async function PlatformExercisePage({
 
   const contentPaths = createContentPaths(academySlug, 'console');
   const { t } = await getServerTranslation(['platform-content']);
-  const back = consoleBackTarget(from, t('platform-content:title'), {
+  const back = consoleBackTarget(
+    from,
+    {
+      courses: t('platform-content:lens.courses'),
+      classes: t('platform-content:lens.classes'),
+    },
+    {
     href: contentPaths.course(courseId),
     label: academy.name,
-  });
+    },
+  );
 
   return (
     <PlatformShell

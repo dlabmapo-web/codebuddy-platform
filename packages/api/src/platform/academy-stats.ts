@@ -1,6 +1,7 @@
 import type { PlatformAcademyDetail } from "@cove/shared";
 
 import type { PrismaService } from "../database/prisma.service.js";
+import { contentStatPredicates } from "./content-stat-predicates.js";
 
 export type AcademyStats = Pick<
   PlatformAcademyDetail,
@@ -25,10 +26,7 @@ export async function readAcademyStats(
   academyId: string,
   now: Date = new Date(),
 ): Promise<AcademyStats> {
-  const activeClass = { academyId, status: "ACTIVE" } as const;
-  const inAcademy = {
-    lecture: { courseModule: { course: { academyId } } },
-  } as const;
+  const stats = contentStatPredicates([academyId]);
 
   const [
     totalClasses,
@@ -46,52 +44,28 @@ export async function readAcademyStats(
     supportLive,
   ] = await Promise.all([
     prisma.class.count({ where: { academyId } }),
-    prisma.class.count({ where: activeClass }),
+    prisma.class.count({ where: stats.activeClass }),
     prisma.class.count({ where: { academyId, status: "ARCHIVED" } }),
+    // An assignment left behind by a teacher who was suspended or demoted is
+    // not coverage. Shared with the platform summary so the surfaces agree.
+    prisma.class.count({ where: stats.classWithoutTeacher }),
     prisma.class.count({
       where: {
-        ...activeClass,
-        // The same rule the manager's control tower applies: an assignment
-        // left behind by a teacher who was suspended or demoted is not a
-        // teacher. Written out rather than as a `NOT`, so the two surfaces
-        // cannot drift into disagreeing about whether a class is covered.
-        OR: [
-          { teacherMembershipId: null },
-          {
-            assignedTeacher: {
-              OR: [{ role: { not: "TEACHER" } }, { status: { not: "ACTIVE" } }],
-            },
-          },
-        ],
-      },
-    }),
-    prisma.class.count({
-      where: {
-        ...activeClass,
+        ...stats.activeClass,
         // Visible courses only. A class assigned nothing but a hidden draft
         // has students with no work, which is the state this counts.
         courseAssignments: { none: { course: { isVisible: true } } },
       },
     }),
     prisma.course.count({ where: { academyId } }),
-    prisma.course.count({ where: { academyId, isVisible: true } }),
+    prisma.course.count({ where: stats.publishedCourse }),
     prisma.lecture.count({ where: { courseModule: { course: { academyId } } } }),
     prisma.material.count({
-      where: { type: "PROGRAMMING_EXERCISE", ...inAcademy },
+      where: stats.problem,
     }),
-    prisma.material.count({
-      where: {
-        type: "PROGRAMMING_EXERCISE",
-        ...inAcademy,
-        // A problem that cannot grade. Either the exercise row was never
-        // written, or it has no case to run — both land a student on a
-        // Submit button that can only ever say nothing.
-        OR: [
-          { programmingExercise: { is: null } },
-          { programmingExercise: { testCases: { none: {} } } },
-        ],
-      },
-    }),
+    // Missing exercise metadata or no cases both mean the problem cannot
+    // grade. Shared with the platform summary for the same reason.
+    prisma.material.count({ where: stats.problemWithoutTests }),
     // Enrolments, not people: one student in two classes is two seats, which
     // is what the number means to whoever sizes a campus.
     prisma.classEnrollment.count({ where: { class: { academyId } } }),

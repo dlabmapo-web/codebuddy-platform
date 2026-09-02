@@ -10,6 +10,11 @@ export function createPlatformContentRouters(
 
   return {
     platformContent: {
+      summary: os.platformContent.summary
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformContentService.summary(context.identity, input),
+        ),
       courses: os.platformContent.courses
         .use(access.authenticated)
         .handler(({ context, input }) =>

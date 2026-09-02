@@ -3,6 +3,8 @@ import type {
   ListPlatformClassesResult,
   ListPlatformCoursesResult,
   ListPlatformProblemsResult,
+  PlatformContentSummary,
+  PlatformContentSummaryInput,
   ResolvedListPlatformContentInput,
 } from "@cove/shared";
 
@@ -10,6 +12,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PlatformAccessService } from "../authorization/platform-access.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { contentStatPredicates } from "./content-stat-predicates.js";
 
 /**
  * What every academy teaches, read across all of them at once.
@@ -19,11 +22,11 @@ import type { Prisma } from "../generated/prisma/client.js";
  * "where is that problem". Each of those is a support call that used to end in
  * a SQL client.
  *
- * Reads only, and the counts are the point. A course row says how much is in
- * it and whether anybody teaches it; a problem row says whether it has test
- * cases. Those two numbers answer most of what an operator is actually being
- * asked, without opening a single one — and opening one means a support
- * session, in the academy's own editor.
+ * The service reads only, and the counts are the point. A course row says how
+ * much is in it and whether anybody teaches it; a problem row says whether it
+ * has test cases. Those two numbers answer most of what an operator is actually
+ * being asked, without opening a single one. Opening mounts that academy's
+ * existing editor under a console route.
  */
 @Injectable()
 export class PlatformContentService {
@@ -31,6 +34,50 @@ export class PlatformContentService {
     private readonly prisma: PrismaService,
     private readonly access: PlatformAccessService,
   ) {}
+
+  async summary(
+    identity: SupabaseIdentity,
+    input: PlatformContentSummaryInput,
+  ): Promise<PlatformContentSummary> {
+    await this.authorize(identity);
+
+    const academyIds = input.academyIds?.length ? input.academyIds : undefined;
+    const stats = contentStatPredicates(academyIds);
+    const academyWhere: Prisma.AcademyWhereInput = academyIds
+      ? { id: { in: academyIds } }
+      : {};
+
+    const [
+      academies,
+      courses,
+      publishedCourses,
+      classes,
+      runningClasses,
+      classesWithoutTeacher,
+      problems,
+      problemsWithoutTests,
+    ] = await Promise.all([
+      this.prisma.academy.count({ where: academyWhere }),
+      this.prisma.course.count({ where: stats.course }),
+      this.prisma.course.count({ where: stats.publishedCourse }),
+      this.prisma.class.count({ where: stats.class }),
+      this.prisma.class.count({ where: stats.activeClass }),
+      this.prisma.class.count({ where: stats.classWithoutTeacher }),
+      this.prisma.material.count({ where: stats.problem }),
+      this.prisma.material.count({ where: stats.problemWithoutTests }),
+    ]);
+
+    return {
+      academies,
+      courses: { total: courses, published: publishedCourses },
+      classes: {
+        total: classes,
+        running: runningClasses,
+        withoutTeacher: classesWithoutTeacher,
+      },
+      problems: { total: problems, withoutTests: problemsWithoutTests },
+    };
+  }
 
   async courses(
     identity: SupabaseIdentity,
@@ -69,7 +116,7 @@ export class PlatformContentService {
             },
           },
         },
-        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        orderBy: courseOrder(input),
         skip: (input.page - 1) * input.pageSize,
         take: input.pageSize,
       }),
@@ -154,7 +201,7 @@ export class PlatformContentService {
           },
           _count: { select: { enrollments: true, courseAssignments: true } },
         },
-        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        orderBy: classOrder(input),
         skip: (input.page - 1) * input.pageSize,
         take: input.pageSize,
       }),
@@ -230,6 +277,7 @@ export class PlatformContentService {
         select: {
           id: true,
           title: true,
+          isVisible: true,
           updatedAt: true,
           programmingExercise: {
             select: {
@@ -257,7 +305,7 @@ export class PlatformContentService {
             },
           },
         },
-        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        orderBy: problemOrder(input),
         skip: (input.page - 1) * input.pageSize,
         take: input.pageSize,
       }),
@@ -270,6 +318,7 @@ export class PlatformContentService {
         return {
           materialId: record.id,
           title: record.title,
+          isVisible: record.isVisible,
           difficulty: record.programmingExercise?.difficulty ?? null,
           testCaseCount: record.programmingExercise?._count.testCases ?? 0,
           courseId: course.id,
@@ -301,6 +350,68 @@ export class PlatformContentService {
       select: { id: true, name: true, slug: true },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
+  }
+}
+
+/**
+ * How each lens turns a sort key into an `orderBy`.
+ *
+ * Every list ends on `id: "asc"`. Without a unique tiebreaker a page boundary
+ * is undefined for rows that tie — twenty courses updated in the same import
+ * minute — and an operator paging through them sees one row twice and another
+ * never. It is the paging equivalent of a coin flip per request.
+ *
+ * A key a lens does not have falls back to that lens's default rather than
+ * throwing. The sort travels across a lens switch in the URL, and an address
+ * that 500s because it names `difficulty` while showing classes would be a
+ * shareable link that breaks on arrival.
+ */
+type ContentOrderInput = Pick<
+  ResolvedListPlatformContentInput,
+  "sort" | "direction"
+>;
+
+function courseOrder(
+  input: ContentOrderInput,
+): Prisma.CourseOrderByWithRelationInput[] {
+  const dir = input.direction;
+  switch (input.sort) {
+    case "title":
+      return [{ title: dir }, { id: "asc" }];
+    case "classes":
+      return [{ classAssignments: { _count: dir } }, { id: "asc" }];
+    case "modules":
+      return [{ modules: { _count: dir } }, { id: "asc" }];
+    default:
+      return [{ updatedAt: dir }, { id: "asc" }];
+  }
+}
+
+function classOrder(
+  input: ContentOrderInput,
+): Prisma.ClassOrderByWithRelationInput[] {
+  const dir = input.direction;
+  switch (input.sort) {
+    case "title":
+      return [{ name: dir }, { id: "asc" }];
+    case "students":
+      return [{ enrollments: { _count: dir } }, { id: "asc" }];
+    default:
+      return [{ updatedAt: dir }, { id: "asc" }];
+  }
+}
+
+function problemOrder(
+  input: ContentOrderInput,
+): Prisma.MaterialOrderByWithRelationInput[] {
+  const dir = input.direction;
+  switch (input.sort) {
+    case "title":
+      return [{ title: dir }, { id: "asc" }];
+    case "difficulty":
+      return [{ programmingExercise: { difficulty: dir } }, { id: "asc" }];
+    default:
+      return [{ updatedAt: dir }, { id: "asc" }];
   }
 }
 

@@ -405,11 +405,19 @@ export function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => {
                   const sortable = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
+                  const meta = header.column.columnDef.meta;
+                  const alignRight = meta?.align === 'right';
                   return (
                     <th
                       className={cn(
                         'whitespace-nowrap px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-sub',
                         layout === 'fixed' && 'overflow-hidden',
+                        // A measurement column's header sits over its digits.
+                        // Left-aligned above right-aligned figures, the label
+                        // and the number it names are at opposite ends of the
+                        // cell, and the reader has to pair them by counting.
+                        alignRight && 'text-right',
+                        meta?.className,
                       )}
                       key={header.id}
                       style={{ width: header.getSize() === 150 ? undefined : header.getSize() }}
@@ -420,7 +428,13 @@ export function DataTable<TData, TValue>({
                             {/* Preflight resets text-transform on buttons, so
                                 headers restate it to match the rest. */}
                             <button
-                              className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 uppercase tracking-wider transition-colors hover:bg-card hover:text-ink data-[state=open]:bg-card data-[state=open]:text-ink"
+                              className={cn(
+                                'inline-flex h-8 items-center gap-1.5 rounded-md px-2 uppercase tracking-wider transition-colors hover:bg-card hover:text-ink data-[state=open]:bg-card data-[state=open]:text-ink',
+                                // The negative margin pulls the label back to
+                                // the cell edge it is aligned to, so a sortable
+                                // header lines up with the plain ones beside it.
+                                alignRight ? '-mr-2' : '-ml-2',
+                              )}
                               type="button"
                             >
                               {flexRender(
@@ -516,6 +530,9 @@ export function DataTable<TData, TValue>({
                         // would ellipsise nothing and the column would overlap
                         // the next one.
                         layout === 'fixed' && 'overflow-hidden',
+                        cell.column.columnDef.meta?.align === 'right' &&
+                          'text-right',
+                        cell.column.columnDef.meta?.className,
                       )}
                       key={cell.id}
                     >

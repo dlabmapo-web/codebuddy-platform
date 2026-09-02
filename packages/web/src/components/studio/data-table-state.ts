@@ -35,6 +35,17 @@ declare module '@tanstack/react-table' {
      * to line up for it to be one glance rather than ten readings.
      */
     align?: 'right';
+    /**
+     * Extra classes for this column's header and every one of its cells.
+     *
+     * For a column that answers a secondary question and can be dropped when
+     * the table runs out of room — `max-xl:hidden` on Updated, so the columns
+     * the operator came for keep their width on a narrow screen. Declared on
+     * the column rather than applied by position from outside, because a
+     * `nth-child` rule hides whichever column happens to be seventh today and
+     * says nothing when one is inserted before it.
+     */
+    className?: string;
   }
 }
 

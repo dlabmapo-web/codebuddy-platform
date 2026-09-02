@@ -1,16 +1,20 @@
 import { z } from "zod";
 
 import { classStatusSchema } from "../classes/class.js";
-import { exerciseDifficultySchema } from "../content/course.js";
 
 /**
  * The platform's view of what every academy teaches.
  *
- * The browser finds a course, class, or problem across the whole platform —
- * the question no academy-scoped surface can answer. Its Open links mount the
- * academy editors under console routes, and its row actions call the same
- * academy endpoints a customer's Team Lead uses. The console owns discovery
- * and chrome, not a second implementation of curriculum mutations.
+ * Two lists, courses and classes, across every academy at once — the question
+ * no academy-scoped surface can answer. There is deliberately no third list of
+ * problems: a problem is reached by opening the course that holds it, which is
+ * how a manager reaches one and how the console's own editors are mounted. The
+ * fault a problem can carry is reported on its course instead
+ * (`problemsWithoutTests`).
+ *
+ * Open links mount the academy editors under console routes, and row actions
+ * call the same academy endpoints a customer's Team Lead uses. The console owns
+ * discovery and chrome, not a second implementation of curriculum mutations.
  */
 
 /* ------------------------------------------------------------- the shapes */
@@ -32,6 +36,16 @@ export const platformCourseSchema = contentAcademySchema.extend({
   moduleCount: z.number().int().nonnegative(),
   lectureCount: z.number().int().nonnegative(),
   exerciseCount: z.number().int().nonnegative(),
+  /**
+   * Problems under this course that cannot grade — no test cases at all.
+   *
+   * The console has no flat list of problems: a problem is reached by opening
+   * the course that holds it, exactly as a manager reaches one. So the fault a
+   * problem can carry has to be readable one level up, or an operator reads
+   * "37 cannot grade" in the summary strip and has nowhere to go. Zero is the
+   * ordinary case and is drawn quiet.
+   */
+  problemsWithoutTests: z.number().int().nonnegative(),
   /** Classes currently taught this course. Zero means it is authored and not
    *  yet delivered, which is a real and common state. */
   classCount: z.number().int().nonnegative(),
@@ -63,40 +77,25 @@ export const platformClassSchema = contentAcademySchema.extend({
 });
 export type PlatformClass = z.infer<typeof platformClassSchema>;
 
-export const platformProblemSchema = contentAcademySchema.extend({
-  /** The material id, which is what the academy's own URLs address. */
-  materialId: z.uuid(),
-  title: z.string().min(1),
-  isVisible: z.boolean(),
-  difficulty: exerciseDifficultySchema.nullable(),
-  testCaseCount: z.number().int().nonnegative(),
-  courseId: z.uuid(),
-  courseTitle: z.string().min(1),
-  lectureId: z.uuid(),
-  lectureTitle: z.string().min(1),
-  updatedAt: z.iso.datetime(),
-});
-export type PlatformProblem = z.infer<typeof platformProblemSchema>;
-
 /* ---------------------------------------------------------------- reading */
 
 export const PLATFORM_CONTENT_PAGE_SIZE = 25;
 
 /**
- * What the three lists can be ordered by.
+ * What both lists can be ordered by.
  *
- * One union across all three lenses rather than three, for the reason the input
- * below is shared: the operator's question — "the biggest", "the newest" — is
- * the same wherever they ask it, and the service maps a key its lens does not
- * have onto that lens's default. An allowlist and not a free column name,
- * because this reaches an `orderBy`.
+ * One union across both lenses rather than two, for the reason the input below
+ * is shared: the operator's question — "the biggest", "the newest" — is the
+ * same wherever they ask it, and the service maps a key its lens does not have
+ * onto that lens's default. An allowlist and not a free column name, because
+ * this reaches an `orderBy`.
  *
- * **Only what the database can order.** `lectures`, `problems` and `tests` are
- * summed from nested counts after the rows are loaded, so a page of twenty-five
- * sorted by them would be twenty-five rows sorted among themselves — an order
- * that changes on every page and is a lie about the whole set. Those columns
- * stay unsortable in the table rather than appearing to work; see §8.1 of the
- * content browser design.
+ * **Only what the database can order.** `lectures`, `problems` and the
+ * untested-problem count are summed from nested counts after the rows are
+ * loaded, so a page of twenty-five sorted by them would be twenty-five rows
+ * sorted among themselves — an order that changes on every page and is a lie
+ * about the whole set. Those columns stay unsortable in the table rather than
+ * appearing to work; see §8.1 of the content browser design.
  *
  * `updatedAt` leads because it is the only key every lens shares and the one an
  * operator reaches for without being asked to think.
@@ -107,7 +106,6 @@ export const contentSortKeys = [
   "classes",
   "modules",
   "students",
-  "difficulty",
 ] as const;
 export const contentSortKeySchema = z.enum(contentSortKeys);
 export type ContentSortKey = (typeof contentSortKeys)[number];
@@ -117,11 +115,11 @@ export const contentSortDirectionSchema = z.enum(contentSortDirections);
 export type ContentSortDirection = (typeof contentSortDirections)[number];
 
 /**
- * One input for all three lists.
+ * One input for both lists.
  *
- * The three differ in what they return, not in how they are asked for: an
- * operator narrows by academy and types a name, whichever tab they are on.
- * Separate inputs would have drifted the moment one of them grew a filter.
+ * They differ in what they return, not in how they are asked for: an operator
+ * narrows by academy and types a name on either page. Separate inputs would
+ * have drifted the moment one of them grew a filter.
  */
 export const listPlatformContentInputSchema = z.object({
   query: z.string().trim().max(120).optional(),
@@ -140,7 +138,7 @@ export type ResolvedListPlatformContentInput = z.infer<
 
 /**
  * The summary follows the academy facet only. Search is deliberately absent:
- * a course-title query has no coherent meaning for the problem or class totals
+ * a course-title query has no coherent meaning for the class or problem totals
  * shown beside it.
  */
 export const platformContentSummaryInputSchema = z.object({
@@ -188,7 +186,6 @@ const listResult = <T extends z.ZodTypeAny>(row: T) =>
 
 export const listPlatformCoursesResultSchema = listResult(platformCourseSchema);
 export const listPlatformClassesResultSchema = listResult(platformClassSchema);
-export const listPlatformProblemsResultSchema = listResult(platformProblemSchema);
 
 export type ListPlatformCoursesResult = z.infer<
   typeof listPlatformCoursesResultSchema
@@ -196,12 +193,9 @@ export type ListPlatformCoursesResult = z.infer<
 export type ListPlatformClassesResult = z.infer<
   typeof listPlatformClassesResultSchema
 >;
-export type ListPlatformProblemsResult = z.infer<
-  typeof listPlatformProblemsResultSchema
->;
 
 /* ----------------------------------------------------------------- lenses */
 
-export const contentLenses = ["courses", "classes", "problems"] as const;
+export const contentLenses = ["courses", "classes"] as const;
 export const contentLensSchema = z.enum(contentLenses);
 export type ContentLens = (typeof contentLenses)[number];

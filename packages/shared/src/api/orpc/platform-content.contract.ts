@@ -4,7 +4,6 @@ import {
   listPlatformClassesResultSchema,
   listPlatformContentInputSchema,
   listPlatformCoursesResultSchema,
-  listPlatformProblemsResultSchema,
   platformContentSummaryInputSchema,
   platformContentSummarySchema,
 } from "../../platform/content.js";
@@ -17,8 +16,10 @@ import {
  * curriculum operation exists rather than a platform-specific copy.
  *
  * Nothing here returns a submission, a grade, or a student. A problem's hidden
- * test cases are counted, never listed: the count is what tells an operator
- * whether a problem is finished, and the cases themselves are the academy's.
+ * test cases are counted, never listed — and counted only in the aggregate, as
+ * "how many problems under this course cannot grade": the number is what tells
+ * an operator whether curriculum is finished, and the cases themselves are the
+ * academy's.
  */
 export const platformContentContract = {
   summary: oc
@@ -30,7 +31,4 @@ export const platformContentContract = {
   classes: oc
     .input(listPlatformContentInputSchema)
     .output(listPlatformClassesResultSchema),
-  problems: oc
-    .input(listPlatformContentInputSchema)
-    .output(listPlatformProblemsResultSchema),
 };

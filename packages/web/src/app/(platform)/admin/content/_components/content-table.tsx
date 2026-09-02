@@ -6,16 +6,16 @@ import type {
   PlatformClass,
   PlatformContentSummary,
   PlatformCourse,
-  PlatformProblem,
 } from '@cove/shared';
 import { formatShortDate } from '@cove/i18n/format';
 import type { ColumnDef, ColumnFiltersState } from '@tanstack/react-table';
-import { Archive, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Archive, Eye, EyeOff, Plus, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Panel } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/overview-ui/panel';
+import { Button } from '@/components/studio/button';
 import { ArchiveClassDialog } from '@/app/(studio)/academy/[academySlug]/(framed)/classes/_components/archive-class-dialog';
 import { VisibilityConfirmModal } from '@/app/(studio)/academy/[academySlug]/(framed)/content/_components/visibility-confirm-modal';
 import { DataTable } from '@/components/studio/data-table';
@@ -41,30 +41,49 @@ import {
   useContentSummaryQuery,
   type ContentPage,
 } from '../../_hooks/use-platform-content';
-import { contentDetailHref, lensIcons, lensTones } from '../../_lib/content-view';
+import {
+  contentDetailHref,
+  lensIcons,
+  lensTones,
+} from '../../_lib/content-view';
 import { ContentSummary } from './content-summary';
-import { ContentTypeChip } from './content-type-chip';
+import {
+  ContentRecordModal,
+  type ContentRecordDraft,
+} from './content-record-modal';
 
 /**
- * Every academy's teaching, in the table the rest of the product uses.
+ * Every academy's curriculum, in the table the rest of the product uses.
  *
- * One component for all three lenses, because they differ only in their
- * columns: the same search, the same academy facet, the same paging, the same
- * row actions. The alternative — three tables — would give the academy column
- * three places to drift, and the rule that every Open link stays inside the
- * console is the thing that must never differ.
+ * One component for both pages, because they differ only in their columns: the
+ * same search, the same academy facet, the same paging, the same row actions,
+ * the same create dialog. The alternative — two tables — would give the academy
+ * column two places to drift, and the rule that every Open link stays inside
+ * the console is the thing that must never differ.
+ *
+ * ## What it can do
+ *
+ * Everything a manager can do to a course or a class, across every academy at
+ * once: create, rename, hide or archive, delete, and open. Every write calls
+ * the same `academyCourses.*` / `academyClasses.*` endpoint the customer's own
+ * Team Lead calls — the console owns discovery and chrome, never a second
+ * implementation of a curriculum mutation.
+ *
+ * Problems are deliberately absent. One is reached by opening the course that
+ * holds it, exactly as a manager reaches one; the fault a problem can carry
+ * arrives here as `problemsWithoutTests` on its course instead.
  *
  * ## Colour
  *
  * The users directory's rule, one level up (§2.1 of the browser redesign):
  * **hue says what a thing is, loudness says whether it is in trouble.** One
- * lens is on screen at a time, so the hue is a page property rather than a
- * per-row decoration — the summary tile, the type chip and this panel's rail
- * all take `lensTones[lens]`, and switching to problems turns the page violet.
+ * kind is on screen at a time, so the hue is a page property rather than a
+ * per-row decoration — the rail row, the summary tile and this panel's rail all
+ * take `lensTones[lens]`, and moving to Classes turns the page teal.
  *
  * Loudness stays per row and stays rare: a class with nobody teaching it, a
- * problem with no test cases. Those two are what an operator opens this page
- * to find.
+ * course whose problems cannot grade. Those two are what an operator opens
+ * these pages to find.
  *
  * ## Where the counts live
  *
@@ -131,6 +150,7 @@ export function ContentTable({
     academyId: string;
     target: ContentDeleteTarget;
   } | null>(null);
+  const [draft, setDraft] = React.useState<ContentRecordDraft | null>(null);
   const [courseToHide, setCourseToHide] = React.useState<PlatformCourse | null>(
     null,
   );
@@ -199,36 +219,6 @@ export function ContentTable({
     [refresh],
   );
 
-  /**
-   * Applied immediately, with no dialog.
-   *
-   * Hiding a course or archiving a class confirms because both cascade — a
-   * course carries its modules, lectures and problems out of every student's
-   * view with it. A problem is a leaf and takes nothing with it, so a
-   * confirmation would be a click charged for nothing.
-   */
-  const setProblemVisibility = React.useCallback(
-    async (problem: PlatformProblem, isVisible: boolean) => {
-      setStatusPending(`problem:${problem.materialId}`);
-      setStatusError(null);
-      try {
-        await orpc.academyCourses.setExerciseVisibility({
-          academyId: problem.academyId,
-          courseId: problem.courseId,
-          lectureId: problem.lectureId,
-          materialId: problem.materialId,
-          isVisible,
-        });
-        refresh();
-      } catch (error) {
-        setStatusError({ kind: 'problem', error });
-      } finally {
-        setStatusPending(null);
-      }
-    },
-    [refresh],
-  );
-
   const columns = React.useMemo(() => {
     const updatedColumn = <T extends { updatedAt: string }>(
       size: number,
@@ -290,7 +280,7 @@ export function ContentTable({
           'classes',
           t('table.classes'),
           (row) => row.classCount,
-          false,
+          'none',
           78,
           true,
         ),
@@ -298,7 +288,7 @@ export function ContentTable({
           'modules',
           t('table.modules'),
           (row) => row.moduleCount,
-          false,
+          'none',
           78,
           true,
         ),
@@ -306,15 +296,26 @@ export function ContentTable({
           'lectures',
           t('table.lectures'),
           (row) => row.lectureCount,
-          false,
+          'none',
           78,
         ),
         countColumn<PlatformCourse>(
           'problems',
           t('table.problems'),
           (row) => row.exerciseCount,
-          false,
+          'none',
           78,
+        ),
+        // Beside the count it qualifies, so the pair reads as one sentence:
+        // "31 problems, 4 of which cannot grade". This is where the console
+        // acts on the summary strip's `cannot grade` number now that there is
+        // no page of problems to open.
+        countColumn<PlatformCourse>(
+          'untested',
+          t('table.cannot_grade'),
+          (row) => row.problemsWithoutTests,
+          'above-zero',
+          92,
         ),
         updatedColumn<PlatformCourse>(88),
         {
@@ -328,6 +329,16 @@ export function ContentTable({
               deleteLabel={platform('content_panel.delete_course')}
               href={contentDetailHref.course(row.original, path)}
               label={row.original.title}
+              onRename={() =>
+                setDraft({
+                  mode: 'edit',
+                  academyId: row.original.academyId,
+                  id: row.original.id,
+                  title: row.original.title,
+                  description: row.original.description,
+                  updatedAt: row.original.updatedAt,
+                })
+              }
               onDelete={() =>
                 setDeleteState({
                   academyId: row.original.academyId,
@@ -361,183 +372,62 @@ export function ContentTable({
       ] as ColumnDef<PlatformCourse>[];
     }
 
-    if (lens === 'classes') {
-      return [
-        {
-          id: 'name',
-          header: t('table.class'),
-          enableHiding: false,
-          cell: ({ row }) => (
-            <TitleCell
-              subtitle={row.original.description}
-              title={row.original.name}
-            />
-          ),
-        },
-        academyColumn<PlatformClass>(t('table.academy')),
-        {
-          id: 'status',
-          header: t('table.status'),
-          enableSorting: false,
-          size: 104,
-          meta: { hideable: true },
-          cell: ({ row }) => (
-            <StateBadge
-              label={t(`table.class_status.${row.original.status}`)}
-              on={row.original.status === 'ACTIVE'}
-            />
-          ),
-        },
-        {
-          id: 'courses',
-          header: t('table.assigned_courses'),
-          enableSorting: false,
-          size: 176,
-          meta: { hideable: true },
-          cell: ({ row }) => <CoursesCell courses={row.original.courses} />,
-        },
-        {
-          id: 'teacher',
-          header: t('table.teacher'),
-          enableSorting: false,
-          size: 164,
-          meta: { hideable: true },
-          cell: ({ row }) => (
-            <TeacherCell
-              avatarUrl={row.original.teacherAvatarUrl}
-              name={row.original.teacherName}
-            />
-          ),
-        },
-        countColumn<PlatformClass>(
-          'students',
-          t('table.students'),
-          (row) => row.studentCount,
-          false,
-          80,
-          true,
-        ),
-        updatedColumn<PlatformClass>(88),
-        {
-          id: 'actions',
-          header: '',
-          enableHiding: false,
-          enableSorting: false,
-          size: 96,
-          cell: ({ row }) => (
-            <ContentRowActions
-              deleteLabel={platform('content_panel.delete_class')}
-              href={contentDetailHref.class(row.original, path)}
-              label={row.original.name}
-              onDelete={() =>
-                setDeleteState({
-                  academyId: row.original.academyId,
-                  target: {
-                    kind: 'class',
-                    id: row.original.id,
-                    label: row.original.name,
-                  },
-                })
-              }
-              statusAction={{
-                disabled: Boolean(statusPending),
-                icon: row.original.status === 'ARCHIVED' ? RotateCcw : Archive,
-                label:
-                  row.original.status === 'ARCHIVED'
-                    ? classesT('restore')
-                    : classesT('archive'),
-                onSelect: () => {
-                  if (row.original.status === 'ARCHIVED') {
-                    void setClassStatus(row.original, 'ACTIVE');
-                    return;
-                  }
-                  setStatusError(null);
-                  setClassToArchive(row.original);
-                },
-              }}
-            />
-          ),
-        },
-      ] as ColumnDef<PlatformClass>[];
-    }
-
     return [
       {
-        id: 'title',
-        header: t('table.problem'),
+        id: 'name',
+        header: t('table.class'),
         enableHiding: false,
-        cell: ({ row }) => <TitleCell title={row.original.title} />,
+        cell: ({ row }) => (
+          <TitleCell
+            subtitle={row.original.description}
+            title={row.original.name}
+          />
+        ),
       },
-      academyColumn<PlatformProblem>(t('table.academy')),
+      academyColumn<PlatformClass>(t('table.academy')),
       {
-        id: 'visibility',
-        header: t('table.visibility'),
+        id: 'status',
+        header: t('table.status'),
         enableSorting: false,
         size: 104,
         meta: { hideable: true },
         cell: ({ row }) => (
           <StateBadge
-            label={
-              row.original.isVisible
-                ? t('table.published')
-                : t('table.hidden_problem')
-            }
-            on={row.original.isVisible}
+            label={t(`table.class_status.${row.original.status}`)}
+            on={row.original.status === 'ACTIVE'}
           />
         ),
       },
       {
-        // Its own column rather than a subtitle under the title. A problem
-        // title does not identify one — every academy has an "Exercise 3" —
-        // and where it sits was previously set in the smallest type on the row.
-        id: 'course',
-        header: t('table.course_column'),
+        id: 'courses',
+        header: t('table.assigned_courses'),
         enableSorting: false,
-        size: 180,
+        size: 176,
         meta: { hideable: true },
-        cell: ({ row }) => (
-          <div className="min-w-0">
-            <span className="block truncate text-[13.5px] font-semibold text-ink">
-              {row.original.courseTitle}
-            </span>
-            <span className="block truncate text-[12px] text-sub">
-              {row.original.lectureTitle}
-            </span>
-          </div>
-        ),
+        cell: ({ row }) => <CoursesCell courses={row.original.courses} />,
       },
       {
-        // A pill rather than grey text. Difficulty is a measurement of a
-        // problem, and the codebase's rule forbids colouring a *child*, not a
-        // measurement — the same reason rank markers carry tone.
-        id: 'difficulty',
-        header: t('table.difficulty'),
-        size: 108,
+        id: 'teacher',
+        header: t('table.teacher'),
+        enableSorting: false,
+        size: 164,
         meta: { hideable: true },
-        cell: ({ row }) =>
-          row.original.difficulty ? (
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${
-                difficultyStyles[row.original.difficulty]
-              }`}
-            >
-              {t(`table.difficulty_value.${row.original.difficulty}`)}
-            </span>
-          ) : (
-            <span className="text-sub">—</span>
-          ),
+        cell: ({ row }) => (
+          <TeacherCell
+            avatarUrl={row.original.teacherAvatarUrl}
+            name={row.original.teacherName}
+          />
+        ),
       },
-      // Zero test cases means the problem cannot grade anything, which is the
-      // single most common "this problem is broken" report — so this is the
-      // one count on the page that flags its zero.
-      countColumn<PlatformProblem>(
-        'tests',
-        t('table.tests'),
-        (row) => row.testCaseCount,
-        true,
+      countColumn<PlatformClass>(
+        'students',
+        t('table.students'),
+        (row) => row.studentCount,
+        'none',
         80,
+        true,
       ),
-      updatedColumn<PlatformProblem>(88),
+      updatedColumn<PlatformClass>(88),
       {
         id: 'actions',
         header: '',
@@ -546,34 +436,49 @@ export function ContentTable({
         size: 96,
         cell: ({ row }) => (
           <ContentRowActions
-            deleteLabel={t('table.delete_problem')}
-            href={contentDetailHref.problem(row.original, path)}
-            label={row.original.title}
+            deleteLabel={platform('content_panel.delete_class')}
+            href={contentDetailHref.class(row.original, path)}
+            label={row.original.name}
+            onRename={() =>
+              setDraft({
+                mode: 'edit',
+                academyId: row.original.academyId,
+                id: row.original.id,
+                title: row.original.name,
+                description: row.original.description,
+                updatedAt: row.original.updatedAt,
+              })
+            }
             onDelete={() =>
               setDeleteState({
                 academyId: row.original.academyId,
                 target: {
-                  kind: 'problem',
-                  id: row.original.materialId,
-                  label: row.original.title,
-                  courseId: row.original.courseId,
-                  lectureId: row.original.lectureId,
+                  kind: 'class',
+                  id: row.original.id,
+                  label: row.original.name,
                 },
               })
             }
             statusAction={{
               disabled: Boolean(statusPending),
-              icon: row.original.isVisible ? EyeOff : Eye,
-              label: row.original.isVisible
-                ? coursesT('hide')
-                : coursesT('show'),
-              onSelect: () =>
-                void setProblemVisibility(row.original, !row.original.isVisible),
+              icon: row.original.status === 'ARCHIVED' ? RotateCcw : Archive,
+              label:
+                row.original.status === 'ARCHIVED'
+                  ? classesT('restore')
+                  : classesT('archive'),
+              onSelect: () => {
+                if (row.original.status === 'ARCHIVED') {
+                  void setClassStatus(row.original, 'ACTIVE');
+                  return;
+                }
+                setStatusError(null);
+                setClassToArchive(row.original);
+              },
             }}
           />
         ),
       },
-    ] as ColumnDef<PlatformProblem>[];
+    ] as ColumnDef<PlatformClass>[];
   }, [
     classesT,
     coursesT,
@@ -583,7 +488,6 @@ export function ContentTable({
     platform,
     setClassStatus,
     setCourseVisibility,
-    setProblemVisibility,
     statusPending,
     t,
   ]);
@@ -612,6 +516,21 @@ export function ContentTable({
 
   const rowCount = page?.total ?? 0;
 
+  /**
+   * The single academy the facet is narrowed to, if it is narrowed to one.
+   *
+   * Read from the same `academyOptions` the facet is built from, so the chip
+   * and the summary strip can never name the academy differently. Two or more
+   * selected leaves it null: the strip then counts the academies rather than
+   * listing them, which is what "across 3 academies" is for.
+   */
+  const scopedAcademy =
+    query.academyIds?.length === 1
+      ? (page?.academyOptions.find(
+          (option) => option.id === query.academyIds?.[0],
+        ) ?? null)
+      : null;
+
   const sortColumnId = sortColumnIdOf(query.sort, lens);
 
   /**
@@ -622,13 +541,11 @@ export function ContentTable({
    * the shortcut for the mouse, not the only way in.
    */
   const openRow = React.useCallback(
-    (row: PlatformCourse | PlatformClass | PlatformProblem) => {
+    (row: PlatformCourse | PlatformClass) => {
       router.push(
         lens === 'courses'
           ? contentDetailHref.course(row as PlatformCourse, path)
-          : lens === 'classes'
-            ? contentDetailHref.class(row as PlatformClass, path)
-            : contentDetailHref.problem(row as PlatformProblem, path),
+          : contentDetailHref.class(row as PlatformClass, path),
       );
     },
     [lens, path, router],
@@ -650,7 +567,11 @@ export function ContentTable({
   return (
     <div className="grid gap-5">
       {summaryResult.data ? (
-        <ContentSummary active={lens} summary={summaryResult.data} />
+        <ContentSummary
+          academy={scopedAcademy}
+          active={lens}
+          summary={summaryResult.data}
+        />
       ) : null}
 
       <Panel
@@ -716,9 +637,39 @@ export function ContentTable({
           // offers eight, and which four matter depends on whether they are
           // auditing curriculum size or chasing a delivery question.
           showColumnVisibility
-          toolbarFilters={<ContentTypeChip lens={lens} query={query} />}
+          // Where the studio puts it, so a manager and an operator reach for
+          // the same corner. The lens chip that used to sit in this toolbar is
+          // gone: Courses and Classes are rail rows now, and a second control
+          // for the same move dressed as a filter was the thing that made this
+          // page read as one screen with a hidden switch.
+          toolbarActions={
+            <Button onClick={() => setDraft({ mode: 'create' })}>
+              <Plus />
+              {lens === 'courses'
+                ? coursesT('new_course')
+                : classesT('new_class')}
+            </Button>
+          }
         />
       </Panel>
+
+      <ContentRecordModal
+        academies={page?.academyOptions ?? []}
+        draft={draft}
+        from={path}
+        kind={lens}
+        // The facet has already answered "which academy" when it holds exactly
+        // one. Asking again is the form charging the operator for the filter
+        // they set.
+        lockedAcademyId={
+          query.academyIds?.length === 1 ? query.academyIds[0] : null
+        }
+        onClose={() => setDraft(null)}
+        onSaved={() => {
+          setDraft(null);
+          refresh();
+        }}
+      />
 
       <ContentDeleteDialog
         academyId={deleteState?.academyId ?? null}
@@ -751,10 +702,7 @@ export function ContentTable({
         }
         error={
           statusError?.kind === 'course'
-            ? errorText(
-                statusError.error,
-                coursesT('visibility_change_failed'),
-              )
+            ? errorText(statusError.error, coursesT('visibility_change_failed'))
             : null
         }
         itemTitle={courseToHide?.title ?? ''}
@@ -776,10 +724,7 @@ export function ContentTable({
           courseCount={classToArchive.courseCount}
           error={
             statusError?.kind === 'class'
-              ? errorText(
-                  statusError.error,
-                  classesT('archive_dialog.failed'),
-                )
+              ? errorText(statusError.error, classesT('archive_dialog.failed'))
               : null
           }
           name={classToArchive.name}
@@ -812,7 +757,6 @@ const sortKeyByColumnId: Record<string, ContentSortKey> = {
   classes: 'classes',
   modules: 'modules',
   students: 'students',
-  difficulty: 'difficulty',
 };
 
 /**
@@ -860,12 +804,6 @@ function academyColumn<T extends AcademyRow>(header: string): ColumnDef<T> {
     ),
   };
 }
-
-const difficultyStyles = {
-  EASY: 'bg-success/10 text-success',
-  MEDIUM: 'bg-warning/10 text-warning',
-  HARD: 'bg-danger/10 text-danger',
-} as const;
 
 /**
  * A row's name, over whatever one line best identifies it.

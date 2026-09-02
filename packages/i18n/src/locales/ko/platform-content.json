@@ -1,20 +1,15 @@
 {
-  "title": "콘텐츠",
   "lens": {
     "label": "콘텐츠 범위",
     "courses": "코스",
-    "classes": "반",
-    "problems": "문제"
+    "classes": "반"
   },
   "lens_description": {
     "courses": "모든 아카데미의 코스 전체입니다.",
-    "classes": "모든 반과 담당 선생님, 학생 수입니다.",
-    "problems": "모든 프로그래밍 문제와 채점 가능 여부입니다."
-  },
-  "type": {
-    "label": "콘텐츠 유형"
+    "classes": "모든 반과 담당 선생님, 학생 수입니다."
   },
   "summary": {
+    "heading": "플랫폼 전체 커리큘럼",
     "label": "콘텐츠 요약",
     "scope_one": "{{count}}개 아카데미 전체",
     "scope_other": "{{count}}개 아카데미 전체",
@@ -22,44 +17,29 @@
     "draft": "{{count}}개 초안",
     "running": "{{count}}개 운영 중",
     "no_teacher": "{{count}}개 담당 선생님 없음",
-    "no_tests": "{{count}}개 채점 불가"
-  },
-  "delete_problem": {
-    "title": "{{name}} 문제를 삭제할까요?",
-    "body": "문제와 테스트 케이스가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+    "no_tests": "{{count}}개 채점 불가",
+    "problems": "문제"
   },
   "table": {
     "course": "코스",
     "class": "반",
-    "problem": "문제",
     "academy": "아카데미",
     "teacher": "선생님",
     "students": "학생",
-    "difficulty": "난이도",
-    "tests": "테스트",
     "updated": "수정일",
     "actions": "작업",
     "open": "열기",
     "classes": "반",
-    "course_column": "코스",
-    "hidden_problem": "비공개",
-    "delete_problem": "문제 삭제",
     "published": "공개됨",
     "draft": "초안",
     "no_teacher": "담당 없음",
     "search_courses": "코스 제목으로 검색",
     "search_classes": "반 이름으로 검색",
-    "search_problems": "문제 제목으로 검색",
     "empty": "조건에 맞는 항목이 없습니다.",
     "loading": "콘텐츠를 불러오는 중",
     "class_status": {
       "ACTIVE": "운영 중",
       "ARCHIVED": "보관됨"
-    },
-    "difficulty_value": {
-      "EASY": "쉬움",
-      "MEDIUM": "보통",
-      "HARD": "어려움"
     },
     "visibility": "공개 여부",
     "status": "상태",
@@ -75,10 +55,19 @@
     "no_courses": "배정된 코스 없음",
     "courses_more": "+{{count}}",
     "courses_aria": "{{count}}개 배정: {{titles}}",
-    "teacher_role": "선생님"
+    "teacher_role": "선생님",
+    "rename": "이름 수정",
+    "cannot_grade": "테스트 없음"
   },
   "unavailable": {
     "title": "콘텐츠를 불러올 수 없습니다",
     "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+  },
+  "academy_field": {
+    "label": "아카데미",
+    "placeholder": "아카데미를 선택하세요",
+    "search": "아카데미 검색",
+    "empty": "이름이 일치하는 아카데미가 없습니다.",
+    "locked": "필터로 선택한 아카데미입니다."
   }
 }

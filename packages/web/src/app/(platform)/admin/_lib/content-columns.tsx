@@ -117,22 +117,30 @@ export function TeacherCell({
 }
 
 /**
+ * Which value of a count, if any, is a fault.
+ *
+ * Most counts measure size, and size is never wrong: a course with no class is
+ * authored and not yet delivered. Two of them measure a defect instead, and
+ * they point in opposite directions — a problem with no test cases cannot
+ * grade, and a course with problems that cannot grade has a number that should
+ * be zero. Naming the three cases keeps the loudness rule readable at the call
+ * site: hue says what a thing is, loudness says whether it is in trouble.
+ */
+export type CountFault = 'none' | 'zero' | 'above-zero';
+
+/**
  * A measurement column: right-aligned, tabular, and grey at zero.
  *
  * The alignment is `meta.align` rather than a class on the value, so the
  * header moves with the digits. Right-aligned figures under a left-aligned
  * label put the two at opposite ends of the cell, and four such columns beside
  * each other stop reading as a row of measurements at all.
- *
- * `flagZero` is for the counts where nothing is a fault rather than a stage: a
- * problem with no test cases cannot grade, while a course with no class is
- * simply authored and not yet delivered.
  */
 export function countColumn<T>(
   id: string,
   header: string,
   read: (row: T) => number,
-  flagZero = false,
+  fault: CountFault = 'none',
   size = 110,
   /** Off where the number is summed after loading and cannot be ordered by. */
   sortable = false,
@@ -146,14 +154,16 @@ export function countColumn<T>(
     meta: { align: 'right', hideable: true },
     cell: ({ row }) => {
       const value = read(row.original);
+      const wrong =
+        fault === 'zero' ? value === 0 : fault === 'above-zero' && value > 0;
       return (
         <span
           className={`font-mono text-[15px] tabular-nums ${
-            value === 0
-              ? flagZero
-                ? 'font-bold text-danger'
-                : 'text-sub/50'
-              : 'font-bold text-ink'
+            wrong
+              ? 'font-bold text-danger'
+              : value === 0
+                ? 'text-sub/50'
+                : 'font-bold text-ink'
           }`}
         >
           {value}

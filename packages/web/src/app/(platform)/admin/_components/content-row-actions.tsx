@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +19,7 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
 /**
- * Everything an operator does to one course, class or problem.
+ * Everything an operator does to one course or class.
  *
  * Lifted out of the academy detail page so the cross-academy browser and the
  * per-academy panel offer one menu rather than two that must never disagree.
@@ -38,6 +38,12 @@ import { orpc } from '@/lib/orpc';
  * tries both learns the menu is not telling them the truth about what it does.
  * The destination *is* the editor; `Open` is the honest word for going there.
  *
+ * `Rename` is not that item returning under another name. It opens a dialog and
+ * changes two fields in place, without leaving the table — which is the whole
+ * reason it exists: fixing a customer's typo used to cost a round trip into
+ * their academy. It is optional, because the academy detail page offers the
+ * same menu without a dialog to open.
+ *
  * Refusals are shown, never predicted. The server declines to delete a course
  * or class with student work behind it; that answer arrives in the dialog. An
  * item disabled by a rule the browser guessed at is wrong the moment another
@@ -45,25 +51,21 @@ import { orpc } from '@/lib/orpc';
  */
 export type ContentDeleteTarget =
   | { kind: 'course'; id: string; label: string }
-  | { kind: 'class'; id: string; label: string }
-  | {
-      kind: 'problem';
-      id: string;
-      label: string;
-      courseId: string;
-      lectureId: string;
-    };
+  | { kind: 'class'; id: string; label: string };
 
 export function ContentRowActions({
   deleteLabel,
   label,
   onDelete,
+  onRename,
   href,
   statusAction,
 }: {
   deleteLabel: string;
   label: string;
   onDelete: () => void;
+  /** Omitted where the surface has no rename dialog to open. */
+  onRename?: () => void;
   href: string;
   statusAction?: {
     disabled?: boolean;
@@ -101,6 +103,12 @@ export function ContentRowActions({
         <DropdownMenuContent align="end" className="w-[13rem] text-[14.5px]">
           <DropdownMenuLabel className="truncate text-[12.5px]">{label}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {onRename ? (
+            <DropdownMenuItem onSelect={onRename}>
+              <Pencil className="text-sub" />
+              {content('table.rename')}
+            </DropdownMenuItem>
+          ) : null}
           {statusAction && StatusIcon ? (
             <DropdownMenuItem
               disabled={statusAction.disabled}
@@ -122,16 +130,13 @@ export function ContentRowActions({
 }
 
 /**
- * One dialog for all three kinds.
+ * One dialog for both kinds.
  *
- * A course and a class ask for their name typed back, as academy deletion
- * does — the destructive acts in this product should ask the same thing of the
- * person doing them. A problem does not, because
- * `deleteProgrammingExerciseSchema` asks for no token, and inventing one the
- * contract does not check would be a ceremony rather than a guarantee.
+ * Each asks for its name typed back, as academy deletion does — the destructive
+ * acts in this product should ask the same thing of the person doing them.
  *
- * The server refuses either outright once a student has submitted, which is
- * the guarantee that matters and the one this form cannot make.
+ * The server refuses either outright once a student has submitted, which is the
+ * guarantee that matters and the one this form cannot make.
  */
 export function ContentDeleteDialog({
   academyId,
@@ -145,7 +150,6 @@ export function ContentDeleteDialog({
   target: ContentDeleteTarget | null;
 }) {
   const { t } = useTranslation('platform');
-  const { t: content } = useTranslation('platform-content');
   const errorText = useErrorText();
   const [typed, setTyped] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -158,28 +162,18 @@ export function ContentDeleteDialog({
     onClose();
   };
 
-  const confirmed = Boolean(target) &&
-    (target?.kind === 'problem' || typed.trim() === target?.label.trim());
-
-  const problem = target?.kind === 'problem';
+  const confirmed =
+    Boolean(target) && typed.trim() === target?.label.trim();
 
   return (
     <Modal onOpenChange={(next) => (next ? null : close())} open={Boolean(target)}>
       <ModalContent
-        description={
-          problem
-            ? content('delete_problem.body')
-            : t(
-                target?.kind === 'class'
-                  ? 'content_delete.class_body'
-                  : 'content_delete.course_body',
-              )
-        }
-        title={
-          problem
-            ? content('delete_problem.title', { name: target?.label ?? '' })
-            : t('content_delete.title', { name: target?.label ?? '' })
-        }
+        description={t(
+          target?.kind === 'class'
+            ? 'content_delete.class_body'
+            : 'content_delete.course_body',
+        )}
+        title={t('content_delete.title', { name: target?.label ?? '' })}
       >
         <form
           onSubmit={async (event) => {
@@ -194,18 +188,11 @@ export function ContentDeleteDialog({
                   courseId: target.id,
                   confirmTitle: typed.trim(),
                 });
-              } else if (target.kind === 'class') {
+              } else {
                 await orpc.academyClasses.delete({
                   academyId,
                   classId: target.id,
                   confirmName: typed.trim(),
-                });
-              } else {
-                await orpc.academyCourses.deleteExercise({
-                  academyId,
-                  courseId: target.courseId,
-                  lectureId: target.lectureId,
-                  materialId: target.id,
                 });
               }
               setTyped('');
@@ -219,26 +206,20 @@ export function ContentDeleteDialog({
           }}
         >
           <div className="grid gap-1.5 px-6 py-5">
-            {problem ? (
-              <p className="text-[14px] font-semibold text-ink">{target?.label}</p>
-            ) : (
-              <>
-                <label
-                  className="text-[13.5px] font-bold text-ink"
-                  htmlFor="content-delete-confirm"
-                >
-                  {t('content_delete.confirm_label', { name: target?.label ?? '' })}
-                  <span className="ml-1 text-danger">*</span>
-                </label>
-                <input
-                  autoComplete="off"
-                  className="h-10 w-full rounded-lg border border-border bg-card px-3 text-[14px] text-ink outline-none focus-visible:border-danger focus-visible:ring-2 focus-visible:ring-danger/30"
-                  id="content-delete-confirm"
-                  onChange={(event) => setTyped(event.target.value)}
-                  value={typed}
-                />
-              </>
-            )}
+            <label
+              className="text-[13.5px] font-bold text-ink"
+              htmlFor="content-delete-confirm"
+            >
+              {t('content_delete.confirm_label', { name: target?.label ?? '' })}
+              <span className="ml-1 text-danger">*</span>
+            </label>
+            <input
+              autoComplete="off"
+              className="h-10 w-full rounded-lg border border-border bg-card px-3 text-[14px] text-ink outline-none focus-visible:border-danger focus-visible:ring-2 focus-visible:ring-danger/30"
+              id="content-delete-confirm"
+              onChange={(event) => setTyped(event.target.value)}
+              value={typed}
+            />
             {error ? (
               <p className="mt-1 text-[13px] text-danger" role="alert">{errorText(error)}</p>
             ) : null}

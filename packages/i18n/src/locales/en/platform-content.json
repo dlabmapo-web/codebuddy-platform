@@ -1,20 +1,15 @@
 {
-  "title": "Content",
   "lens": {
     "label": "Which content",
     "courses": "Courses",
-    "classes": "Classes",
-    "problems": "Problems"
+    "classes": "Classes"
   },
   "lens_description": {
     "courses": "Every course on Cove Studio, across every academy.",
-    "classes": "Every class, who teaches it and who is in it.",
-    "problems": "Every programming problem, and whether it can grade."
-  },
-  "type": {
-    "label": "Content type"
+    "classes": "Every class, who teaches it and who is in it."
   },
   "summary": {
+    "heading": "Curriculum across the platform",
     "label": "Content summary",
     "scope_one": "across {{count}} academy",
     "scope_other": "across {{count}} academies",
@@ -22,44 +17,29 @@
     "draft": "{{count}} draft",
     "running": "{{count}} running",
     "no_teacher": "{{count}} with no teacher",
-    "no_tests": "{{count}} cannot grade"
-  },
-  "delete_problem": {
-    "title": "Delete {{name}}?",
-    "body": "This permanently removes the problem and its test cases. This cannot be undone."
+    "no_tests": "{{count}} cannot grade",
+    "problems": "Problems"
   },
   "table": {
     "course": "Course",
     "class": "Class",
-    "problem": "Problem",
     "academy": "Academy",
     "teacher": "Teacher",
     "students": "Students",
-    "difficulty": "Difficulty",
-    "tests": "Tests",
     "updated": "Updated",
     "actions": "Actions",
     "open": "Open",
     "classes": "Classes",
-    "course_column": "Course",
-    "hidden_problem": "Hidden",
-    "delete_problem": "Delete problem",
     "published": "Published",
     "draft": "Draft",
     "no_teacher": "No teacher",
     "search_courses": "Search courses by title",
     "search_classes": "Search classes by name",
-    "search_problems": "Search problems by title",
     "empty": "Nothing matches these filters.",
     "loading": "Loading content",
     "class_status": {
       "ACTIVE": "Running",
       "ARCHIVED": "Archived"
-    },
-    "difficulty_value": {
-      "EASY": "Easy",
-      "MEDIUM": "Medium",
-      "HARD": "Hard"
     },
     "visibility": "Visibility",
     "status": "Status",
@@ -75,10 +55,19 @@
     "no_courses": "No courses assigned",
     "courses_more": "+{{count}}",
     "courses_aria": "{{count}} assigned: {{titles}}",
-    "teacher_role": "Teacher"
+    "teacher_role": "Teacher",
+    "rename": "Rename",
+    "cannot_grade": "No tests"
   },
   "unavailable": {
     "title": "Content is unavailable",
     "body": "The platform could not be reached. Try again shortly."
+  },
+  "academy_field": {
+    "label": "Academy",
+    "placeholder": "Choose an academy",
+    "search": "Search academies",
+    "empty": "No academy matches that name.",
+    "locked": "The academy you filtered to."
   }
 }

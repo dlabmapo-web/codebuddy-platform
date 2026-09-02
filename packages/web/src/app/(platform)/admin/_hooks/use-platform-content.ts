@@ -5,6 +5,7 @@ import type {
   ListPlatformClassesResult,
   ListPlatformCoursesResult,
   ListPlatformProblemsResult,
+  PlatformContentSummary,
 } from '@cove/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
@@ -14,6 +15,7 @@ import { orpc } from '@/lib/orpc';
 
 import {
   contentPath,
+  contentSummaryKey,
   parseContentQuery,
   serializeContentQuery,
   type ContentQuery,
@@ -24,6 +26,22 @@ export type ContentPage =
   | ListPlatformCoursesResult
   | ListPlatformClassesResult
   | ListPlatformProblemsResult;
+
+export function useContentSummaryQuery(
+  academyIds: string[] | undefined,
+  initialData: PlatformContentSummary | null | undefined,
+  initialKey: string,
+) {
+  const key = contentSummaryKey(academyIds);
+  return useQuery<PlatformContentSummary>({
+    queryKey: ['platform-content-summary', key],
+    queryFn: () => orpc.platformContent.summary({ academyIds }),
+    initialData: key === initialKey ? (initialData ?? undefined) : undefined,
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
 
 /** The address owns the filter, as it does on the users directory. */
 export function useContentState(lens: ContentLens) {

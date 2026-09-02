@@ -1,4 +1,4 @@
-import type { ContentLens } from '@cove/shared';
+import type { ContentLens, PlatformContentSummary } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isAccessDeniedError } from '@/lib/api-errors';
@@ -6,11 +6,11 @@ import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { PlatformShell } from '../../_components/platform-shell';
 import {
+  contentSummaryKey,
   parseContentQuery,
   serializeContentQuery,
 } from '../../_lib/content-query';
 import type { ContentPage } from '../../_hooks/use-platform-content';
-import { ContentLensTabs } from '../_components/content-lens';
 import { ContentTable } from '../_components/content-table';
 
 /**
@@ -40,16 +40,29 @@ export async function renderContentPage({
   const client = createServerORPCClient();
   let initialData: ContentPage | null = null;
   let denied = false;
-  try {
-    initialData =
-      lens === 'courses'
-        ? await client.platformContent.courses(query)
-        : lens === 'classes'
-          ? await client.platformContent.classes(query)
-          : await client.platformContent.problems(query);
-  } catch (error) {
-    denied = isAccessDeniedError(error);
+
+  // Fetched together, but they fail apart. The summary is eight counts across
+  // every academy and is the likeliest call on this page to time out; the rows
+  // are what the operator came for. Folding both into one `Promise.all` made a
+  // slow count answer "Content is unavailable" over a table that had loaded.
+  const [rows, summary] = await Promise.allSettled([
+    lens === 'courses'
+      ? client.platformContent.courses(query)
+      : lens === 'classes'
+        ? client.platformContent.classes(query)
+        : client.platformContent.problems(query),
+    client.platformContent.summary({ academyIds: query.academyIds }),
+  ]);
+
+  if (rows.status === 'fulfilled') {
+    initialData = rows.value;
+  } else {
+    denied = isAccessDeniedError(rows.reason);
   }
+  // No strip rather than no page. The client refetches it on mount, so a
+  // summary that failed here is usually on screen a moment later.
+  const initialSummary: PlatformContentSummary | null =
+    summary.status === 'fulfilled' ? summary.value : null;
 
   return (
     <PlatformShell
@@ -58,11 +71,12 @@ export async function renderContentPage({
       title={t('platform-content:title')}
     >
       <div className="grid gap-5">
-        <ContentLensTabs active={lens} />
         {initialData ? (
           <ContentTable
             initialData={initialData}
             initialKey={serializeContentQuery(query)}
+            initialSummary={initialSummary}
+            initialSummaryKey={contentSummaryKey(query.academyIds)}
             lens={lens}
           />
         ) : (

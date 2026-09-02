@@ -139,6 +139,7 @@ export const peopleOpsNamespaces = [
 export const platformNamespaces = [
   'platform',
   'platform-audit',
+  'platform-applications',
   'platform-content',
   'platform-users',
   'platform-support',

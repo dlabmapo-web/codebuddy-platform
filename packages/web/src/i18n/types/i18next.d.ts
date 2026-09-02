@@ -26,6 +26,7 @@ import type nav from '@cove/i18n/locales/en/nav.json';
 import type peopleOps from '@cove/i18n/locales/en/people-ops.json';
 import type platform from '@cove/i18n/locales/en/platform.json';
 import type platformAudit from '@cove/i18n/locales/en/platform-audit.json';
+import type platformApplications from '@cove/i18n/locales/en/platform-applications.json';
 import type platformContent from '@cove/i18n/locales/en/platform-content.json';
 import type platformUsers from '@cove/i18n/locales/en/platform-users.json';
 import type platformSupport from '@cove/i18n/locales/en/platform-support.json';
@@ -63,6 +64,7 @@ declare module 'i18next' {
       'people-ops': typeof peopleOps;
       platform: typeof platform;
       'platform-audit': typeof platformAudit;
+      'platform-applications': typeof platformApplications;
       'platform-content': typeof platformContent;
       'platform-users': typeof platformUsers;
       'platform-support': typeof platformSupport;

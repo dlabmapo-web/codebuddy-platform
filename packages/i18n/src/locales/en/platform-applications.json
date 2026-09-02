@@ -1,0 +1,55 @@
+{
+  "title": "Applications",
+  "subtitle": "Everyone waiting to be let into an academy, across every academy.",
+  "summary": {
+    "label": "Applications summary",
+    "scope_one": "across {{count}} academy",
+    "scope_other": "across {{count}} academies",
+    "waiting": "Waiting",
+    "waiting_hint_one": "{{count}} person has applied and not been answered",
+    "waiting_hint_other": "{{count}} people have applied and not been answered",
+    "leaderless": "Only you",
+    "leaderless_hint_zero": "Every waiting applicant has a manager who can seat them",
+    "leaderless_hint_one": "{{count}} is in an academy with no manager yet",
+    "leaderless_hint_other": "{{count}} are in academies with no manager yet"
+  },
+  "table": {
+    "applicant": "Applicant",
+    "academy": "Academy",
+    "message": "Message",
+    "waiting": "Waiting",
+    "status": "Status",
+    "no_message": "No message",
+    "no_manager": "No manager",
+    "search": "Search by name or email",
+    "empty": "Nobody is waiting.",
+    "empty_filtered": "No applications match these filters.",
+    "loading": "Loading applications",
+    "review": "Review",
+    "open_academy": "Open academy"
+  },
+  "facet": {
+    "academy": "Academy",
+    "status": "Status",
+    "needs_you": "Needs you",
+    "needs_you_on": "Only ones with no manager"
+  },
+  "age": {
+    "just_now": "Just now",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
+  },
+  "review": {
+    "first_manager_title": "This academy has no manager",
+    "first_manager_body": "Approving as manager hands over the whole academy: its curriculum, its roster, and the power to appoint everyone else. Cove cannot check that this person is who they say they are, so say here how you confirmed it.",
+    "first_manager_reason_required": "Say how you confirmed this person before approving them as manager."
+  },
+  "unavailable": {
+    "title": "Applications are unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

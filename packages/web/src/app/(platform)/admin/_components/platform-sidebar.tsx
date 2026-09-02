@@ -2,6 +2,7 @@
 
 import {
   BookOpen,
+  Inbox,
   KeyRound,
   LogOut,
   School,
@@ -29,6 +30,7 @@ import {
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation } from '@/i18n';
 import { activeNavHref } from '@/lib/nav-active';
+import { usePendingApplicationsCount } from '../_hooks/use-platform-applications';
 
 /**
  * The operator's navigation, built from the same parts as the academy one.
@@ -49,9 +51,20 @@ export function PlatformSidebar() {
   const pathname = usePathname();
   const from = useSearchParams().get('from');
 
+  // Only the applications nobody else can review. A badge counting every
+  // pending application would sit permanently at a manager's workload, and a
+  // badge that is always lit is a badge nobody reads.
+  const needsReview = usePendingApplicationsCount();
+
   const items = [
     { href: '/admin', label: t('nav.academies'), icon: School },
     { href: '/admin/users', label: t('nav.users'), icon: Users },
+    {
+      href: '/admin/applications',
+      label: t('nav.applications'),
+      icon: Inbox,
+      badge: needsReview,
+    },
     { href: '/admin/content', label: t('nav.content'), icon: BookOpen },
     { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
     { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
@@ -115,6 +128,16 @@ export function PlatformSidebar() {
                   <Link href={item.href}>
                     <item.icon className="size-[1.05rem] shrink-0" />
                     <span>{item.label}</span>
+                    {item.badge ? (
+                      <span
+                        aria-label={t('nav.applications_waiting', {
+                          count: item.badge,
+                        })}
+                        className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1.5 font-mono text-[11px] font-bold tabular-nums text-on-danger group-data-[collapsible=icon]:hidden"
+                      >
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

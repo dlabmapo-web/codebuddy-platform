@@ -6,17 +6,11 @@ import { exerciseDifficultySchema } from "../content/course.js";
 /**
  * The platform's view of what every academy teaches.
  *
- * Read-only, and that is the design rather than an unfinished state. The
- * console browses so an operator can *find* a course, a class, or a problem
- * across the whole platform — the question no academy-scoped surface can
- * answer. Changing one is still academy work, so every row's Edit action opens
- * a support session and lands the operator in that academy's own editor, where
- * the change is made by the same code the customer's Team Lead uses and lands
- * on their audit trail with a stated reason.
- *
- * The alternative — editing curriculum from the console — would mean a second
- * implementation of every content mutation, running under different
- * authorization, whose bugs the academy's own screens would never show.
+ * The browser finds a course, class, or problem across the whole platform —
+ * the question no academy-scoped surface can answer. Its Open links mount the
+ * academy editors under console routes, and its row actions call the same
+ * academy endpoints a customer's Team Lead uses. The console owns discovery
+ * and chrome, not a second implementation of curriculum mutations.
  */
 
 /* ------------------------------------------------------------- the shapes */
@@ -73,6 +67,7 @@ export const platformProblemSchema = contentAcademySchema.extend({
   /** The material id, which is what the academy's own URLs address. */
   materialId: z.uuid(),
   title: z.string().min(1),
+  isVisible: z.boolean(),
   difficulty: exerciseDifficultySchema.nullable(),
   testCaseCount: z.number().int().nonnegative(),
   courseId: z.uuid(),
@@ -88,6 +83,40 @@ export type PlatformProblem = z.infer<typeof platformProblemSchema>;
 export const PLATFORM_CONTENT_PAGE_SIZE = 25;
 
 /**
+ * What the three lists can be ordered by.
+ *
+ * One union across all three lenses rather than three, for the reason the input
+ * below is shared: the operator's question — "the biggest", "the newest" — is
+ * the same wherever they ask it, and the service maps a key its lens does not
+ * have onto that lens's default. An allowlist and not a free column name,
+ * because this reaches an `orderBy`.
+ *
+ * **Only what the database can order.** `lectures`, `problems` and `tests` are
+ * summed from nested counts after the rows are loaded, so a page of twenty-five
+ * sorted by them would be twenty-five rows sorted among themselves — an order
+ * that changes on every page and is a lie about the whole set. Those columns
+ * stay unsortable in the table rather than appearing to work; see §8.1 of the
+ * content browser design.
+ *
+ * `updatedAt` leads because it is the only key every lens shares and the one an
+ * operator reaches for without being asked to think.
+ */
+export const contentSortKeys = [
+  "updatedAt",
+  "title",
+  "classes",
+  "modules",
+  "students",
+  "difficulty",
+] as const;
+export const contentSortKeySchema = z.enum(contentSortKeys);
+export type ContentSortKey = (typeof contentSortKeys)[number];
+
+export const contentSortDirections = ["asc", "desc"] as const;
+export const contentSortDirectionSchema = z.enum(contentSortDirections);
+export type ContentSortDirection = (typeof contentSortDirections)[number];
+
+/**
  * One input for all three lists.
  *
  * The three differ in what they return, not in how they are asked for: an
@@ -97,6 +126,8 @@ export const PLATFORM_CONTENT_PAGE_SIZE = 25;
 export const listPlatformContentInputSchema = z.object({
   query: z.string().trim().max(120).optional(),
   academyIds: z.array(z.uuid()).max(50).optional(),
+  sort: contentSortKeySchema.default("updatedAt"),
+  direction: contentSortDirectionSchema.default("desc"),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(PLATFORM_CONTENT_PAGE_SIZE),
 });
@@ -105,6 +136,41 @@ export type ListPlatformContentInput = z.input<
 >;
 export type ResolvedListPlatformContentInput = z.infer<
   typeof listPlatformContentInputSchema
+>;
+
+/**
+ * The summary follows the academy facet only. Search is deliberately absent:
+ * a course-title query has no coherent meaning for the problem or class totals
+ * shown beside it.
+ */
+export const platformContentSummaryInputSchema = z.object({
+  academyIds: z.array(z.uuid()).max(50).optional(),
+});
+export type PlatformContentSummaryInput = z.infer<
+  typeof platformContentSummaryInputSchema
+>;
+
+const summaryCountSchema = z.number().int().nonnegative();
+
+export const platformContentSummarySchema = z.object({
+  /** Academies in scope: the denominator for the three content totals. */
+  academies: summaryCountSchema,
+  courses: z.object({
+    total: summaryCountSchema,
+    published: summaryCountSchema,
+  }),
+  classes: z.object({
+    total: summaryCountSchema,
+    running: summaryCountSchema,
+    withoutTeacher: summaryCountSchema,
+  }),
+  problems: z.object({
+    total: summaryCountSchema,
+    withoutTests: summaryCountSchema,
+  }),
+});
+export type PlatformContentSummary = z.infer<
+  typeof platformContentSummarySchema
 >;
 
 const listResult = <T extends z.ZodTypeAny>(row: T) =>

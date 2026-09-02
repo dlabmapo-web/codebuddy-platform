@@ -18,9 +18,7 @@ export default async function NewAcademyPage() {
       description={t('create.subtitle')}
       title={t('create.title')}
     >
-      <div className="max-w-2xl">
-        <CreateAcademyForm />
-      </div>
+      <CreateAcademyForm />
     </PlatformShell>
   );
 }

@@ -75,9 +75,9 @@
     "subtitle": "Create the academy, then hand it to its manager.",
     "name_label": "Academy name",
     "name_hint": "What its members will call it.",
-    "slug_label": "Address",
+    "slug_label": "Web address",
     "slug_hint": "Used in links. Lowercase letters, numbers, and hyphens.",
-    "slug_preview": "cove.studio/{{slug}}",
+    "slug_preview": "cs.coveedu.com/academy/{{slug}}",
     "slug_edit": "Edit",
     "time_zone_label": "Time zone",
     "time_zone_hint": "Sets the academy's day boundary. Every report and deadline is measured against it.",
@@ -92,7 +92,25 @@
     "created_title": "{{name}} is ready",
     "created_body": "The invitation is on its way to {{email}}. The academy opens when they accept.",
     "created_open": "Open academy",
-    "created_another": "Create another"
+    "created_another": "Create another",
+    "onboarding_legend": "How will this academy get its first manager?",
+    "onboarding_open_label": "Let them sign up",
+    "onboarding_open_body": "The academy appears on the sign-up page straight away. Whoever signs up choosing it waits for you in Applications, and you decide their role.",
+    "onboarding_invite_label": "Invite one by email",
+    "onboarding_invite_body": "They get a link that makes them a manager. You can copy the link here if the email does not arrive.",
+    "created_open_body": "Nothing was sent. This academy is now on the sign-up page.",
+    "created_open_next": "Whoever signs up choosing it waits in Applications. Approve one of them as manager to hand the academy over — or invite a manager by email from the academy page.",
+    "created_open_applications": "Go to Applications",
+    "section_identity": "The academy",
+    "section_handover": "Its first manager",
+    "preview_label": "What you are creating",
+    "preview_name_empty": "Unnamed academy",
+    "preview_address": "Address",
+    "preview_address_empty": "Set a name to see the link",
+    "preview_now": "Local time there now",
+    "preview_handover": "First manager",
+    "preview_handover_open": "Whoever signs up, once you approve them",
+    "preview_handover_empty": "No address yet"
   },
   "detail": {
     "organization": "Organization",
@@ -130,7 +148,9 @@
     "confirm": "Confirm",
     "working": "Working…",
     "details": "Details",
-    "people_empty_title": "Nobody has joined yet"
+    "people_empty_title": "Nobody has joined yet",
+    "invite_body": "Sends a link that makes this person a manager. You can copy the link here if the email does not arrive.",
+    "invite_submit": "Invite a manager"
   },
   "never": "Never",
   "invite_link": {
@@ -152,7 +172,10 @@
     "users": "Users",
     "content": "Content",
     "access": "Support access",
-    "audit": "Audit trail"
+    "audit": "Audit trail",
+    "applications": "Applications",
+    "applications_waiting_one": "{{count}} application needs you",
+    "applications_waiting_other": "{{count}} applications need you"
   },
   "unavailable": {
     "title": "Academies are unavailable",

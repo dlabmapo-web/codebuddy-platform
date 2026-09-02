@@ -171,9 +171,16 @@ function FirstManagerPanel({
 
   const invitation = academy.pendingManagerInvitation;
 
+  // An academy created open has never had a manager invitation, so calling
+  // this a resend would describe an earlier attempt that was never made. The
+  // endpoint is the same either way; only the words change.
+  const isFirstSend = !invitation;
+
   return (
     <Panel
-      description={t('detail.resend_body')}
+      description={t(
+        isFirstSend ? 'detail.invite_body' : 'detail.resend_body',
+      )}
       icon={UserRoundPlus}
       title={t('detail.manager_invitation')}
       tone={academy.managerState === 'no_active_manager' ? 'danger' : 'primary'}
@@ -246,7 +253,11 @@ function FirstManagerPanel({
           </label>
           <Button disabled={pending} type="submit">
             <Send aria-hidden className="size-4" />
-            {pending ? t('detail.resend_sending') : t('detail.resend_submit')}
+            {pending
+              ? t('detail.resend_sending')
+              : t(
+                  isFirstSend ? 'detail.invite_submit' : 'detail.resend_submit',
+                )}
           </Button>
         </form>
 

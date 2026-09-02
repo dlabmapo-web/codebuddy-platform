@@ -50,6 +50,8 @@ import { PlatformApplicationsService } from "../platform/platform-applications.s
 import { PlatformContentService } from "../platform/platform-content.service.js";
 import { createPlatformApplicationsRouters } from "../platform/platform-applications.router.js";
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
+import { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
+import { createPlatformInvitationsRouters } from "../platform/platform-invitations.router.js";
 import { createPlatformUsersRouters } from "../platform/platform-users.router.js";
 import { PlatformSupportService } from "../platform/platform-support.service.js";
 import { createPlatformSupportRouters } from "../platform/platform-support.router.js";
@@ -130,6 +132,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformContentService: app.get(PlatformContentService, {
       strict: false,
     }),
+    platformInvitationsService: app.get(PlatformInvitationsService, {
+      strict: false,
+    }),
     platformUsersService: app.get(PlatformUsersService, { strict: false }),
     platformSupportService: app.get(PlatformSupportService, {
       strict: false,
@@ -175,6 +180,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const platformAuditRouters = createPlatformAuditRouters(os, deps);
   const platformApplicationsRouters = createPlatformApplicationsRouters(os, deps);
   const platformContentRouters = createPlatformContentRouters(os, deps);
+  const platformInvitationsRouters = createPlatformInvitationsRouters(os, deps);
   const platformSupportRouters = createPlatformSupportRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
@@ -190,6 +196,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformAuditRouters,
     ...platformApplicationsRouters,
     ...platformContentRouters,
+    ...platformInvitationsRouters,
     ...platformSupportRouters,
     learn: createLearnRouter(os, deps),
     points: createPointsRouter(os, deps),

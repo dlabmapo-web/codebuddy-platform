@@ -10,6 +10,7 @@ import { PlatformAcademyService } from "./platform-academy.service.js";
 import { PlatformApplicationsService } from "./platform-applications.service.js";
 import { PlatformAuditService } from "./platform-audit.service.js";
 import { PlatformContentService } from "./platform-content.service.js";
+import { PlatformInvitationsService } from "./platform-invitations.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
 import { PlatformUsersController } from "./platform-users.controller.js";
 import { PlatformUsersService } from "./platform-users.service.js";
@@ -55,6 +56,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformSupportService,
     PlatformAuditService,
     PlatformContentService,
+    PlatformInvitationsService,
   ],
   exports: [
     PlatformAcademyService,
@@ -64,6 +66,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformSupportService,
     PlatformAuditService,
     PlatformContentService,
+    PlatformInvitationsService,
   ],
 })
 export class PlatformModule {}

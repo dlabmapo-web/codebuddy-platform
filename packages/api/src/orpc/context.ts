@@ -36,6 +36,7 @@ import type { PlatformAcademyService } from "../platform/platform-academy.servic
 import type { PlatformAuditService } from "../platform/platform-audit.service.js";
 import type { PlatformApplicationsService } from "../platform/platform-applications.service.js";
 import type { PlatformContentService } from "../platform/platform-content.service.js";
+import type { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
 import type { PlatformUsersService } from "../platform/platform-users.service.js";
 import type { PlatformSupportService } from "../platform/platform-support.service.js";
 import type { PointsService } from "../points/points.service.js";
@@ -91,6 +92,7 @@ export type ORPCDeps = {
   platformAuditService: PlatformAuditService;
   platformApplicationsService: PlatformApplicationsService;
   platformContentService: PlatformContentService;
+  platformInvitationsService: PlatformInvitationsService;
   platformUsersService: PlatformUsersService;
   platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;

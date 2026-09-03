@@ -28,6 +28,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 
+import {
+  ProvenanceChips,
+  ProvenanceLine,
+} from '../../library/_components/provenance-chips';
 import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 import { useContentDate } from '../../_components/content-date';
 import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
@@ -98,6 +102,18 @@ export function CoursesTable({
               <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
                 {course.description || t('no_description')}
               </p>
+              {/*
+                Under the title rather than in a column of its own. Most
+                academies have no copied courses at all, and an empty column on
+                every row of every academy is a worse trade than two chips on
+                the few rows that have something to say.
+              */}
+              {course.provenance ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <ProvenanceLine provenance={course.provenance} />
+                  <ProvenanceChips provenance={course.provenance} />
+                </div>
+              ) : null}
             </div>
           );
         },

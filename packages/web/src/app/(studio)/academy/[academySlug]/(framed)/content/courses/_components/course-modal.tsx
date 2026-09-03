@@ -1,5 +1,6 @@
 'use client';
 
+import { CoursePathPreview } from '@/components/studio/course-path-preview';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -69,9 +70,15 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
             </label>
 
             {editing ? null : (
-              <p className="rounded-lg bg-canvas px-3.5 py-2.5 text-[13.5px] leading-5 text-sub">
-                {t('create.next_step')}
-              </p>
+              <CoursePathPreview
+                labels={[
+                  t('path.course'),
+                  t('path.module'),
+                  t('path.lecture'),
+                  t('path.problem'),
+                ]}
+                title={t('create.next_step')}
+              />
             )}
 
             {manager.submitError ? (

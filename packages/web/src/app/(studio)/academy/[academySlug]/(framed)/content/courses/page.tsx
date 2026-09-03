@@ -2,7 +2,10 @@ import { requireAcademyRoute } from '@/lib/academy-route';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
-import { destructiveNamespaces } from '@/i18n/namespaces';
+import {
+  academyLibraryNamespaces,
+  destructiveNamespaces,
+} from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -35,15 +38,22 @@ export default async function CoursesPage({
   }
 
   const locale = await getLocale();
+  // The library's vocabulary rides with this page because its rows carry the
+  // provenance chips — not with every page, which is why it is not in
+  // `courses`.
+  const pageNamespaces = [
+    ...destructiveNamespaces,
+    ...academyLibraryNamespaces,
+  ] as const;
   const { resources: destructiveResources } = await initTranslations(
     locale,
-    destructiveNamespaces,
+    pageNamespaces,
   );
 
   return (
     <PageTranslationsProvider
       locale={locale}
-      namespaces={destructiveNamespaces}
+      namespaces={pageNamespaces}
       resources={destructiveResources}
     >
     <StudioPage

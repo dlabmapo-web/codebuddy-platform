@@ -17,7 +17,7 @@
     "submit": "Create and open",
     "submitting": "Creating…",
     "title_conflict": "Another course already uses this title. Pick a different one.",
-    "next_step": "You go straight to the curriculum, where you add modules and lectures."
+    "next_step": "What you build next"
   },
   "column": {
     "course": "Course",
@@ -44,5 +44,11 @@
     "heading": "Edit course details",
     "body": "Change the name and description. The curriculum stays as it is.",
     "submit": "Save"
+  },
+  "path": {
+    "course": "Course",
+    "module": "Module",
+    "lecture": "Lecture",
+    "problem": "Problem"
   }
 }

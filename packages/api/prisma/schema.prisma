@@ -32,6 +32,17 @@ enum AcademyStatus {
   ARCHIVED
 }
 
+/// What an academy is for.
+///
+/// A `LIBRARY` is platform-owned curriculum: it holds courses and nothing
+/// else — no members, no classes, no students, no invitations. Its authority
+/// comes from the platform permission axis rather than from memberships, and
+/// every listing that means "the platform's customers" filters it out.
+enum AcademyKind {
+  ACADEMY
+  LIBRARY
+}
+
 enum AcademyRole {
   STUDENT
   TEACHER
@@ -461,6 +472,9 @@ model Academy {
   name           String
   slug           String
   status         AcademyStatus @default(ACTIVE)
+  /// Defaulted, so every academy that existed before the content library is
+  /// correct without a backfill.
+  kind           AcademyKind   @default(ACADEMY)
 
   /// Where the academy is, as a manager would write it on a letter. Every
   /// part is nullable because an academy exists before anyone fills its
@@ -1005,12 +1019,39 @@ model Course {
   /// captures this number, the browser round-trips it, and the commit compares
   /// it again while holding the course lock.
   contentRevision Int      @default(1) @map("content_revision")
+
+  /// The library course this was copied from, or null for a course the academy
+  /// authored itself.
+  ///
+  /// `Restrict`, not `SetNull`: the database refuses to delete a library course
+  /// while copies of it exist, and head office is pointed at retiring it
+  /// instead. Losing this pointer would lose the only record of where a
+  /// branch's curriculum came from.
+  sourceCourseId        String?   @map("source_course_id") @db.Uuid
+  /// The master's `contentRevision` at the instant of copying. Compared
+  /// against the master's current revision to decide whether head office has
+  /// moved on since.
+  sourceContentRevision Int?      @map("source_content_revision")
+  /// This course's *own* `contentRevision` immediately after the copy
+  /// transaction. Anything above it is the branch's own editing.
+  ///
+  /// Stored rather than assumed to be 1, so a later change to the copy path —
+  /// one that bumps the revision while building the tree — cannot silently
+  /// make every copy in the product read as customized.
+  baselineRevision      Int?      @map("baseline_revision")
+  /// Set only on a library course: withdrawn from the library, so no new
+  /// copies may be taken and existing ones are marked. Null is the ordinary
+  /// state for every course in the product.
+  retiredAt             DateTime? @map("retired_at") @db.Timestamptz(6)
+
   createdByUserId String   @map("created_by_user_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   academy           Academy                         @relation(fields: [academyId], references: [id], onDelete: Restrict)
   createdBy         User                            @relation("CourseCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  sourceCourse      Course?                         @relation("CourseSource", fields: [sourceCourseId], references: [id], onDelete: Restrict)
+  copies            Course[]                        @relation("CourseSource")
   modules           CourseModule[]
   exerciseDrafts    ExerciseDraft[]
   submissions       Submission[]
@@ -1020,6 +1061,8 @@ model Course {
   importSessions    ContentImportSession[]
 
   @@index([academyId, isVisible, updatedAt])
+  /// The library fan-out: every academy's copy of one master.
+  @@index([sourceCourseId])
   @@map("courses")
 }
 

@@ -24,6 +24,7 @@ import { platformApplicationsContract } from "./orpc/platform-applications.contr
 import { platformAuditContract } from "./orpc/platform-audit.contract.js";
 import { platformInvitationsContract } from "./orpc/platform-invitations.contract.js";
 import { platformContentContract } from "./orpc/platform-content.contract.js";
+import { platformRankingContract } from "./orpc/platform-ranking.contract.js";
 import { platformUsersContract } from "./orpc/platform-users.contract.js";
 import { platformSupportContract } from "./orpc/platform-support.contract.js";
 import { platformAcademiesContract } from "./orpc/platform.contract.js";
@@ -62,6 +63,7 @@ export const appContract = {
   platformAudit: platformAuditContract,
   platformContent: platformContentContract,
   platformInvitations: platformInvitationsContract,
+  platformRanking: platformRankingContract,
   platformUsers: platformUsersContract,
   platformSupport: platformSupportContract,
   points: pointsContract,

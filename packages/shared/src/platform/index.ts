@@ -4,6 +4,7 @@ export * from "./participation.js";
 export * from "./user-export.js";
 export * from "./support.js";
 export * from "./audit.js";
+export * from "./class-ranking.js";
 export * from "./content.js";
 export * from "./applications.js";
 export * from "./invitations.js";

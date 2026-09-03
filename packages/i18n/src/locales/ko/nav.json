@@ -37,5 +37,8 @@
   "badge": {
     "pending_applications": "{{pending}}명 승인 대기 중",
     "pending_applications_tooltip": "{{link}} · {{pending}}명 대기"
+  },
+  "role_switcher": {
+    "label": "역할 전환"
   }
 }

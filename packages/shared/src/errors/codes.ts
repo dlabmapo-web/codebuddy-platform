@@ -117,6 +117,12 @@ export const appErrorCodes = [
   "SUPPORT_GRANT_READ_ONLY",
   "LIBRARY_COURSE_NOT_FOUND",
   "LIBRARY_ADOPTION_CONFLICT",
+  /** Deleting a library course some academy has already adopted. The database
+   *  refuses it; head office is pointed at Retire instead. */
+  "LIBRARY_COURSE_HAS_COPIES",
+  /** A class, membership, invitation or enrollment was attempted inside a
+   *  `LIBRARY` academy, which holds courses and nothing else. */
+  "LIBRARY_ACADEMY_IMMUTABLE",
   "PLATFORM_USER_NOT_FOUND",
   "ACADEMY_DELETE_NOT_CONFIRMED",
   /** The typed handle in a `DELETED` status change did not match the
@@ -322,6 +328,9 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   LIBRARY_COURSE_NOT_FOUND: "That library course is not available.",
   LIBRARY_ADOPTION_CONFLICT:
     "This academy already has a course with that title.",
+  LIBRARY_COURSE_HAS_COPIES:
+    "Academies are already using this course. Retire it instead of deleting it.",
+  LIBRARY_ACADEMY_IMMUTABLE: "The content library holds courses only.",
   PLATFORM_USER_NOT_FOUND: "That account was not found.",
   ACADEMY_DELETE_NOT_CONFIRMED:
     "Type the academy's address exactly to confirm deletion.",

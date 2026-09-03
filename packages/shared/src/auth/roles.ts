@@ -147,6 +147,14 @@ export const platformPermissions = [
   "platform.support.grant",
   "platform.support.revoke",
 
+  /**
+   * Reading the library: its courses, and which academies adopted them.
+   *
+   * Apart from `manage` so a support or billing operator can see which course
+   * a branch is asking about without being able to rewrite the master
+   * curriculum every academy on the platform teaches from.
+   */
+  "platform.library.read",
   /** Authoring in the library academy. */
   "platform.library.manage",
   /** Pushing a library course into a customer's academy. Apart from `manage`
@@ -181,6 +189,56 @@ export function platformRoleHasPermission(
   return (
     platformRolePermissions[role] as readonly PlatformPermission[]
   ).includes(permission);
+}
+
+/* ------------------------------------------------- the content library */
+
+/**
+ * What platform authority in a `LIBRARY` academy resolves to.
+ *
+ * A library academy has no members, so `AcademyAccessService` cannot answer
+ * "what may this person do here" from a membership. It answers from the
+ * platform axis instead, and these two lists are the translation.
+ *
+ * Both are deliberately narrower than `teamLeadPermissions`: a library holds
+ * courses and nothing else, so every class, member, application and analytics
+ * permission is absent. `content.import` is present because authoring a
+ * hundred problems by hand is the thing the workbook exists to avoid, and head
+ * office has more of them to write than anyone.
+ */
+const libraryAuthorPermissions = [
+  "academy.read",
+  "curriculum.read",
+  "curriculum.review",
+  "curriculum.draft",
+  "curriculum.manage",
+  "curriculum.publish",
+  "exercises.manage",
+  "content.import",
+] as const satisfies readonly AcademyPermission[];
+
+const libraryReaderPermissions = [
+  "academy.read",
+  "curriculum.read",
+  "curriculum.review",
+] as const satisfies readonly AcademyPermission[];
+
+/**
+ * The academy permissions a platform role holds inside a library academy.
+ *
+ * Returns an empty list for a role holding neither library permission, so an
+ * omitted check still fails in the safe direction.
+ */
+export function libraryAcademyPermissions(
+  role: PlatformRole,
+): readonly AcademyPermission[] {
+  if (platformRoleHasPermission(role, "platform.library.manage")) {
+    return libraryAuthorPermissions;
+  }
+  if (platformRoleHasPermission(role, "platform.library.read")) {
+    return libraryReaderPermissions;
+  }
+  return [];
 }
 
 export const academyRoles = [

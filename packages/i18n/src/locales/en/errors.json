@@ -109,6 +109,8 @@
   "SUPPORT_GRANT_READ_ONLY": "This support session is read-only. Open a new one to make changes.",
   "LIBRARY_COURSE_NOT_FOUND": "That library course is not available.",
   "LIBRARY_ADOPTION_CONFLICT": "This academy already has a course with that title.",
+  "LIBRARY_COURSE_HAS_COPIES": "Academies are already using this course. Retire it instead of deleting it.",
+  "LIBRARY_ACADEMY_IMMUTABLE": "The content library holds courses only.",
   "PLATFORM_USER_NOT_FOUND": "That account was not found.",
   "ACADEMY_DELETE_NOT_CONFIRMED": "Type the academy's address exactly to confirm deletion.",
   "CONFIRMATION_MISMATCH": "Type the account's email or username exactly to confirm.",

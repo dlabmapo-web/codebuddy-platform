@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { courseProvenanceSchema } from "../platform/library.js";
+
 export const materialTypes = ["PROGRAMMING_EXERCISE"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
@@ -40,6 +42,15 @@ export const courseSummarySchema = z.object({
   description: descriptionSchema,
   isVisible: z.boolean(),
   content: courseContentCountsSchema,
+  /**
+   * Where this course came from, when it came from the content library.
+   *
+   * Null for a course the academy authored itself, which is most of them. It
+   * rides on the summary rather than arriving from a second endpoint because
+   * the branch's course list draws the sync chip on every row, and a list that
+   * had to fetch provenance separately would render the chips a beat late.
+   */
+  provenance: courseProvenanceSchema.nullable().default(null),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

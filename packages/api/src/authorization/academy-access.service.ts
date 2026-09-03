@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
-  roleHasPermission,
+  effectiveAcademyRoles,
+  rolesHavePermission,
   type AcademyPermission,
   type AcademyRole,
 } from "@cove/shared";
@@ -11,7 +12,19 @@ import { PrismaService } from "../database/prisma.service.js";
 export type AcademyAccess = {
   userId: string;
   academyId: string;
+  /**
+   * The member's highest role. Kept for the callers that legitimately ask for
+   * exactly one — the surfaces that are *about* a role rather than gated by
+   * one, such as which academy overview to render.
+   */
   role: AcademyRole;
+  /**
+   * Every role held here. What authorization is actually decided on: a Manager
+   * who also teaches holds both sets at once, and asking only about the
+   * highest would take away the teaching surfaces that are the whole point of
+   * granting the second role.
+   */
+  roles: readonly AcademyRole[];
 };
 
 @Injectable()
@@ -39,7 +52,10 @@ export class AcademyAccessService {
 
     const membership = await this.prisma.academyMembership.findUnique({
       where: { academyId_userId: { academyId, userId: user.id } },
-      include: { academy: { select: { status: true } } },
+      include: {
+        academy: { select: { status: true } },
+        extraRoles: { select: { role: true } },
+      },
     });
     if (!membership) {
       throw new AppException(
@@ -53,11 +69,15 @@ export class AcademyAccessService {
         HttpStatus.FORBIDDEN,
       );
     }
-    if (!roleHasPermission(membership.role, permission)) {
+    const roles = effectiveAcademyRoles(
+      membership.role,
+      membership.extraRoles.map((extra) => extra.role),
+    );
+    if (!rolesHavePermission(roles, permission)) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     }
 
-    return { userId: user.id, academyId, role: membership.role };
+    return { userId: user.id, academyId, role: membership.role, roles };
   }
 
   /**
@@ -80,6 +100,11 @@ export class AcademyAccessService {
    * is one bit and this runs on every request to the learning surfaces.
    */
   async isStudentAnywhere(authUserId: string): Promise<boolean> {
+    // Still `role`, not the role set, and correctly so: `STUDENT` is exclusive
+    // (`canCombineAcademyRoles`), so a membership is a student membership
+    // exactly when its primary role says it is. No extra-role join is needed
+    // to answer this, and adding one would cost a request that runs on every
+    // learning page.
     const count = await this.prisma.academyMembership.count({
       where: {
         role: "STUDENT",

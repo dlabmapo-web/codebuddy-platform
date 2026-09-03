@@ -284,6 +284,16 @@ model User {
   /// An IANA zone name. Null means "follow the browser", which is the right
   /// default for a student who has never thought about it.
   timezone           String?
+  /// Whether `email` is a generated `no-email.cove.invalid` address rather
+  /// than one the account holder can read.
+  ///
+  /// Supabase Auth requires an address for every identity and an elementary
+  /// student has none, so one is generated. It authenticates and does nothing
+  /// else: it is never displayed, never mailed, and never matched against an
+  /// invitation. Kept beside `email` rather than in a second column so every
+  /// existing unique index and identity-conflict check keeps working, and so
+  /// each downstream decision has to ask the question explicitly.
+  emailIsPlaceholder Boolean      @default(false) @map("email_is_placeholder")
   platformRole       PlatformRole @default(USER) @map("platform_role")
   status             UserStatus   @default(PENDING_PROFILE)
   legacyUserId       String?      @unique @map("legacy_user_id")
@@ -294,28 +304,31 @@ model User {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships           AcademyMembership[]
-  invitationsCreated    AcademyInvitation[]       @relation("InvitationCreator")
-  invitationsAccepted   AcademyInvitation[]       @relation("InvitationAcceptor")
-  joinRequests          AcademyJoinRequest[]      @relation("JoinRequester")
-  joinRequestsReviewed  AcademyJoinRequest[]      @relation("JoinReviewer")
-  membershipInvitations AcademyMembership[]       @relation("MembershipInviter")
-  membershipApprovals   AcademyMembership[]       @relation("MembershipApprover")
-  auditLogs             AuditLog[]                @relation("AuditActor")
-  coursesCreated        Course[]                  @relation("CourseCreator")
-  classesCreated        Class[]                   @relation("ClassCreator")
-  classCoursesAssigned  ClassCourse[]             @relation("ClassCourseAssigner")
-  classEnrollmentsMade  ClassEnrollment[]         @relation("ClassEnroller")
-  exerciseDrafts        ExerciseDraft[]
-  submissions           Submission[]
-  exerciseProgress      StudentExerciseProgress[]
-  solveSessions         ExerciseSolveSession[]
-  avatarAsset           MediaAsset?               @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
-  mediaUploaded         MediaAsset[]              @relation("MediaUploader")
-  peopleImports         PeopleImportSession[]     @relation("PeopleImportActor")
-  contentImports        ContentImportSession[]    @relation("ContentImportActor")
-  peopleBulkOperations  PeopleBulkOperation[]     @relation("PeopleBulkActor")
-  academiesCreated      Academy[]                 @relation("AcademyCreator")
+  memberships            AcademyMembership[]
+  issuedCredential       StudentIssuedCredential?  @relation("IssuedCredentialHolder")
+  credentialsIssued      StudentIssuedCredential[] @relation("IssuedCredentialIssuer")
+  membershipRolesGranted AcademyMembershipRole[]   @relation("MembershipRoleGranter")
+  invitationsCreated     AcademyInvitation[]       @relation("InvitationCreator")
+  invitationsAccepted    AcademyInvitation[]       @relation("InvitationAcceptor")
+  joinRequests           AcademyJoinRequest[]      @relation("JoinRequester")
+  joinRequestsReviewed   AcademyJoinRequest[]      @relation("JoinReviewer")
+  membershipInvitations  AcademyMembership[]       @relation("MembershipInviter")
+  membershipApprovals    AcademyMembership[]       @relation("MembershipApprover")
+  auditLogs              AuditLog[]                @relation("AuditActor")
+  coursesCreated         Course[]                  @relation("CourseCreator")
+  classesCreated         Class[]                   @relation("ClassCreator")
+  classCoursesAssigned   ClassCourse[]             @relation("ClassCourseAssigner")
+  classEnrollmentsMade   ClassEnrollment[]         @relation("ClassEnroller")
+  exerciseDrafts         ExerciseDraft[]
+  submissions            Submission[]
+  exerciseProgress       StudentExerciseProgress[]
+  solveSessions          ExerciseSolveSession[]
+  avatarAsset            MediaAsset?               @relation("UserAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  mediaUploaded          MediaAsset[]              @relation("MediaUploader")
+  peopleImports          PeopleImportSession[]     @relation("PeopleImportActor")
+  contentImports         ContentImportSession[]    @relation("ContentImportActor")
+  peopleBulkOperations   PeopleBulkOperation[]     @relation("PeopleBulkActor")
+  academiesCreated       Academy[]                 @relation("AcademyCreator")
 
   @@index([status])
   @@map("users")
@@ -537,6 +550,7 @@ model Academy {
   bulkOperations         PeopleBulkOperation[]
   pointAwards            PointAward[]
   pointPolicy            AcademyPointPolicy?
+  issuedCredentials      StudentIssuedCredential[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -615,12 +629,13 @@ model AcademyMembership {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  academy          Academy           @relation(fields: [academyId], references: [id], onDelete: Cascade)
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invitedBy        User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
-  approvedBy       User?             @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  academy          Academy                 @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extraRoles       AcademyMembershipRole[]
+  invitedBy        User?                   @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  approvedBy       User?                   @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   classEnrollments ClassEnrollment[]
-  assignedClasses  Class[]           @relation("ClassTeacher")
+  assignedClasses  Class[]                 @relation("ClassTeacher")
 
   monitoringVisitsAsTeacher TeacherMonitoringVisit[]        @relation("MonitoringVisitTeacher")
   monitoringVisitsAsStudent TeacherMonitoringVisit[]        @relation("MonitoringVisitStudent")
@@ -642,6 +657,87 @@ model AcademyMembership {
   /// Student growth, bucketed by the local day a membership became active.
   @@index([academyId, role, status, joinedAt], map: "academy_memberships_academy_joined_idx")
   @@map("academy_memberships")
+}
+
+/// An additional role this member holds in this academy, beyond
+/// `AcademyMembership.role`.
+///
+/// A small academy staffs one person as several things — the director who also
+/// teaches a class and also writes the curriculum. Before this they had to be
+/// given the widest role and lost the surfaces of the others, because
+/// `AcademyMembership` is unique on `[academyId, userId]` and a second
+/// membership is a second person as far as every foreign key is concerned.
+///
+/// Rows beside the primary role rather than an array column, so each grant
+/// carries who made it and when — which is what an audit of "why can this
+/// person see the whole academy" needs — and so the membership id that
+/// `ClassEnrollment`, `TeacherFeedback`, `PointAward` and the learning-day
+/// tables all point at stays one row per person per academy.
+///
+/// `STUDENT` never appears here, and never coexists with one of these on a
+/// membership whose primary role is `STUDENT`. A student's rows are *about*
+/// them while every staff role reads *across* students, and a membership that
+/// was both would make "whose work is this page showing" a question with two
+/// answers.
+model AcademyMembershipRole {
+  id              String      @id @default(uuid()) @db.Uuid
+  membershipId    String      @map("membership_id") @db.Uuid
+  role            AcademyRole
+  grantedByUserId String?     @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime    @default(now()) @map("granted_at") @db.Timestamptz(6)
+
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  grantedBy  User?             @relation("MembershipRoleGranter", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([membershipId, role])
+  @@index([membershipId])
+  @@map("academy_membership_roles")
+}
+
+/// The password a manager issued to a student, retained only while it is still
+/// the student's password.
+///
+/// This exists because a student has no email and therefore no self-service
+/// recovery: the manager who issued the credential *is* the recovery
+/// mechanism, and one they cannot read back is one they must reissue every
+/// time a child forgets.
+///
+/// Cove never stores a password a person chose. The row is destroyed the
+/// moment the student sets their own, so nothing here is a secret its owner
+/// believes is private. Because a student has no email, Cove's own My Page is
+/// the only route by which they can change it, so there is no path that
+/// invalidates the stored value without Cove noticing.
+///
+/// AES-256-GCM under `STUDENT_CREDENTIAL_KEY`. `keyVersion` exists so that key
+/// can be rotated without a migration that decrypts everything at once.
+model StudentIssuedCredential {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @unique @map("user_id") @db.Uuid
+  academyId      String    @map("academy_id") @db.Uuid
+  ciphertext     Bytes
+  iv             Bytes
+  authTag        Bytes     @map("auth_tag")
+  keyVersion     Int       @default(1) @map("key_version")
+  /// The leading characters, stored in the clear because they are shown in the
+  /// clear: the manager's screen renders `hae•••••••` so a credential can be
+  /// recognised without being revealed, and building that must not require
+  /// decrypting anything.
+  visiblePrefix  String    @map("visible_prefix")
+  length         Int
+  issuedByUserId String    @map("issued_by_user_id") @db.Uuid
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  /// How many times somebody has read this password back. Shown to the manager
+  /// beside the reveal button: being told that reads are counted and
+  /// attributed is what keeps a convenience from becoming a habit.
+  revealCount    Int       @default(0) @map("reveal_count")
+  lastRevealedAt DateTime? @map("last_revealed_at") @db.Timestamptz(6)
+
+  user     User    @relation("IssuedCredentialHolder", fields: [userId], references: [id], onDelete: Cascade)
+  academy  Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  issuedBy User    @relation("IssuedCredentialIssuer", fields: [issuedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([academyId])
+  @@map("student_issued_credentials")
 }
 
 model AcademyInvitation {

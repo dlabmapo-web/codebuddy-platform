@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import {
-  academyRoleFor,
+  academyRolesFor,
   canManageExercises,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
@@ -38,7 +38,7 @@ export default async function ExercisePage({
   } catch {
     notFound();
   }
-  const canEdit = canManageExercises(academyRoleFor(account, academyId));
+  const canEdit = canManageExercises(academyRolesFor(account, academyId));
   if (canEdit) {
     // Its own request, and its own failure. The model solution is the one
     // field this page can open without: legacy problems have none, and the

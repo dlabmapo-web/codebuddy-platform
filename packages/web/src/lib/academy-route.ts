@@ -78,6 +78,7 @@ export const resolvePlatformAcademyRoute = cache(
             // returns null without a membership, so an operator does not
             // reach a course page from here.
             role: 'MANAGER' as const,
+            roles: ['MANAGER'] as const,
           }
         : null;
     } catch {

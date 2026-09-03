@@ -1,8 +1,10 @@
+import type { AcademyRole } from '@cove/shared';
+
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { notFound } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { canManageClasses } from '@/lib/academy-access-state';
+import { academyRolesFor, canManageClasses } from '@/lib/academy-access-state';
 import { getAccount } from '@/lib/orpc-server';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
@@ -35,18 +37,13 @@ export default async function ClassRankingPage({
   const { academyId } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['points']);
 
-  let role = null;
+  let roles: readonly AcademyRole[] = [];
   try {
-    const account = await getAccount();
-    role =
-      account.user.memberships.find(
-        (membership) =>
-          membership.academy.id === academyId && membership.status === 'ACTIVE',
-      )?.role ?? null;
+    roles = academyRolesFor(await getAccount(), academyId);
   } catch {
     notFound();
   }
-  if (!canManageClasses(role)) notFound();
+  if (!canManageClasses(roles)) notFound();
 
   return (
     <StudioPage

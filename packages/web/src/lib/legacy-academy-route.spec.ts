@@ -24,6 +24,7 @@ function account(
       displayName: 'Student',
       avatarUrl: null,
       imageUrl: null,
+      emailIsPlaceholder: false,
       platformRole: 'USER',
       status: 'ACTIVE',
       memberships,
@@ -35,11 +36,11 @@ function account(
 describe('legacy academy routing', () => {
   it('resolves an academy UUID only from an active membership', () => {
     expect(legacyAcademySlug(account([
-      { academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null },
+      { academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null },
     ]), academy.id)).toBe(academy.slug);
 
     expect(legacyAcademySlug(account([
-      { academy, role: 'STUDENT', status: 'SUSPENDED', imageUrl: null },
+      { academy, role: 'STUDENT', roles: ['STUDENT'], status: 'SUSPENDED', imageUrl: null },
     ]), academy.id)).toBeNull();
     expect(legacyAcademySlug(account([]), academy.id)).toBeNull();
   });

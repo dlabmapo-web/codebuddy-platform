@@ -6,7 +6,7 @@ import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_compo
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import {
-  academyRoleFor,
+  academyRolesFor,
   canImportContent,
   canManageContent,
   canManageExercises,
@@ -38,10 +38,10 @@ export default async function CourseBuilderPage({
       getAccount(),
     ]);
     initialTree = tree;
-    const role = academyRoleFor(account, academyId);
-    canEditCurriculum = canManageContent(role);
-    canEditExercises = canManageExercises(role);
-    canImport = canImportContent(role);
+    const roles = academyRolesFor(account, academyId);
+    canEditCurriculum = canManageContent(roles);
+    canEditExercises = canManageExercises(roles);
+    canImport = canImportContent(roles);
   } catch (error) {
     // Only access denial gets the not-found state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.

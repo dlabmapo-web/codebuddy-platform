@@ -3,7 +3,7 @@ import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_compo
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import {
-  academyRoleFor,
+  academyRolesFor,
   canManageContent,
 } from '@/lib/academy-access-state';
 import { CoursesManager } from './_components/courses-manager';
@@ -26,7 +26,7 @@ export default async function CoursesPage({
       getAccount(),
     ]);
     courses = result.courses;
-    canEdit = canManageContent(academyRoleFor(account, academyId));
+    canEdit = canManageContent(academyRolesFor(account, academyId));
   } catch {
     // The permission-aware state is rendered below.
   }

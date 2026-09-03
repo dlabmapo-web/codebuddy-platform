@@ -9,7 +9,7 @@ import { contentImportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
-import { academyRoleFor, canImportContent } from '@/lib/academy-access-state';
+import { academyRolesFor, canImportContent } from '@/lib/academy-access-state';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { CourseImportWizard } from '../_components/course-import-wizard';
 
@@ -64,7 +64,7 @@ export default async function NewCourseImportPage({
         ),
       0,
     );
-    allowed = canImportContent(academyRoleFor(account, academyId));
+    allowed = canImportContent(academyRolesFor(account, academyId));
   } catch (error) {
     // Only access denial gets the unavailable state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.

@@ -1,4 +1,7 @@
+import { cookies } from 'next/headers';
+
 import { requireAcademyRoute } from '@/lib/academy-route';
+import { resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { getAccount } from '@/lib/orpc-server';
 
@@ -59,7 +62,19 @@ export default async function AcademyPage({
       (entry) =>
         entry.status === 'ACTIVE' && entry.academy.id === academyId,
     );
-    role = membership?.role ?? null;
+    // The role they are *working as*, which for anybody holding one role is
+    // simply that role. A Manager who also teaches gets the teaching overview
+    // while the switcher says 교사 — the four overviews below are each about
+    // one job, and showing a manager the control tower when they came here to
+    // teach is the case this resolves.
+    role = membership
+      ? resolveViewRole({
+          academyId,
+          held: membership.roles,
+          primary: membership.role,
+          cookie: (await cookies()).get(viewRoleCookieName)?.value,
+        }).role
+      : null;
     const features = new Set(membership?.features ?? []);
     hasLeaderboard =
       features.has('STUDENT_POINTS') &&

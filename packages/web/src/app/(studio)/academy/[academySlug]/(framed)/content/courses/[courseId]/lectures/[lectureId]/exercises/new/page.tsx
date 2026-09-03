@@ -5,7 +5,7 @@ import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import {
-  academyRoleFor,
+  academyRolesFor,
   canManageExercises,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
@@ -39,7 +39,7 @@ export default async function NewExercisePage({
     lecture: { id: lecture.id, title: lecture.title },
     material: null,
   };
-  const canEdit = canManageExercises(academyRoleFor(account, academyId));
+  const canEdit = canManageExercises(academyRolesFor(account, academyId));
   if (!canEdit) notFound();
 
   return (

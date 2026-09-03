@@ -12,8 +12,8 @@ export default async function ApplicationsPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId, role } = await requireAcademyRoute(academySlug);
-  if (!canReviewApplications(role)) notFound();
+  const { academyId, role, roles } = await requireAcademyRoute(academySlug);
+  if (!canReviewApplications(roles)) notFound();
   const { t } = await getServerTranslation(['applications']);
   return (
     <StudioPage title={t('title')}>

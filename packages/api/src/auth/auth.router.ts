@@ -1,6 +1,8 @@
 import type { ORPCDeps, ORPCImplementer } from "../orpc/context.js";
 import { createAccess } from "../orpc/access.js";
 import { requestAddress } from "../orpc/context.js";
+import { HttpStatus } from "@nestjs/common";
+
 import { AppException } from "../common/app-exception.js";
 import { PasswordRecoveryService } from "./password-recovery.service.js";
 
@@ -79,6 +81,44 @@ export function createAuthRouter(os: ORPCImplementer, deps: ORPCDeps) {
           // Recorded inside the service, without the username.
         }
         return accepted;
+      }),
+    /**
+     * Public, like the password signup it sits beside, and limited the same
+     * way. Ten per address per ten minutes rather than the thirty a username
+     * check allows: this one creates a Supabase identity, so a loop against it
+     * costs more than a lookup does.
+     */
+    signUpStudent: os.auth.signUpStudent
+      .handler(async ({ context, input }) => {
+        deps.rateLimitService.assert(
+          `auth:signup:student:${requestAddress(context.req)}`,
+          10,
+          10 * 60_000,
+        );
+        const solved = await deps.turnstileService.verify(
+          input.captchaToken,
+          requestAddress(context.req),
+        );
+        if (!solved) {
+          throw new AppException("CAPTCHA_FAILED", HttpStatus.BAD_REQUEST);
+        }
+        return deps.authService.signUpStudent({
+          username: input.username,
+          displayName: input.displayName,
+          password: input.password,
+          academyId: input.academyId,
+        });
+      }),
+    forgetIssuedPassword: os.auth.forgetIssuedPassword
+      .use(access.authenticated)
+      .handler(async ({ context }) => {
+        // Keyed on the caller's own identity and taking no target: this is
+        // somebody discarding a password that was issued to them, never one
+        // account reaching another's.
+        await deps.studentCredentialService.forgetForAuthUser(
+          context.identity.authUserId,
+        );
+        return { forgotten: true };
       }),
     setUsername: os.auth.setUsername
       .use(access.authenticated)

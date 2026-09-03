@@ -3,9 +3,18 @@ import type { AcademyRole, AuthMeResponse } from '@cove/shared';
 export type AcademyRouteIdentity = {
   academyId: string;
   academySlug: string;
-  /** The actor's role in this academy. Routes that differ for staff and
-   *  students branch on this rather than re-reading the membership. */
+  /** The actor's highest role in this academy. Routes that are *about* one
+   *  role — which overview to render — branch on this. */
   role: AcademyRole;
+  /**
+   * Every role the actor holds here.
+   *
+   * What the `can*` gates take, because a Manager who also teaches holds both
+   * sets and asking only about the highest would hide the teaching surfaces
+   * that are the reason for the second role. Carried on the identity so a page
+   * gets it from the same read that already resolved the academy.
+   */
+  roles: readonly AcademyRole[];
 };
 
 export function academyIdentityFromAccount(
@@ -21,6 +30,7 @@ export function academyIdentityFromAccount(
         academyId: membership.academy.id,
         academySlug: membership.academy.slug,
         role: membership.role,
+        roles: membership.roles,
       }
     : null;
 }

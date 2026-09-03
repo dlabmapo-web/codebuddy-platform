@@ -15,7 +15,15 @@ export type DevelopmentUser = {
   username: string;
   displayName: string;
   platformRole: PlatformRole;
+  /** The member's highest role, stored on the membership row. */
   academyRole: AcademyRole | null;
+  /**
+   * Roles held beside `academyRole`, for exercising the role switcher.
+   *
+   * Never `STUDENT`: a student's rows are about them while every staff role
+   * reads across students, and the schema refuses the combination.
+   */
+  extraAcademyRoles?: readonly AcademyRole[];
 };
 
 export const developmentUsers = [
@@ -66,6 +74,20 @@ export const developmentUsers = [
     displayName: "Cove Second Teacher",
     platformRole: "USER",
     academyRole: "TEACHER",
+  },
+  {
+    // Holds three roles at one academy, which is the only way to see the role
+    // switcher without granting one by hand. A small campus really does staff
+    // one person as director, teacher, and curriculum lead, and before this
+    // account existed that arrangement could not be tested at all.
+    id: "30000000-0000-4000-8000-000000000007",
+    membershipId: "40000000-0000-4000-8000-000000000007",
+    email: "multi@cove.test",
+    username: "cove-multi",
+    displayName: "Cove Multi-Role Staff",
+    platformRole: "USER",
+    academyRole: "MANAGER",
+    extraAcademyRoles: ["TEACHER", "TEAM_LEAD"],
   },
   {
     id: "30000000-0000-4000-8000-000000000005",

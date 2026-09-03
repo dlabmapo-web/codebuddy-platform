@@ -10,6 +10,7 @@ import {
   EmptyState,
   Panel,
 } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/overview-ui/panel';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
 import { useClassBoardQuery } from '../../_hooks/use-platform-ranking';
@@ -159,7 +160,13 @@ export function RankingBoard({
                     name: row.displayName,
                   })}
                   className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
-                  href={`/admin/academies/${academySlug}/points/students/${row.membershipId}?from=${encodeURIComponent(from)}`}
+                  href={routes.withQuery(
+                    routes.adminAcademyStudentPoints(
+                      academySlug,
+                      row.membershipId,
+                    ),
+                    { from },
+                  )}
                 >
                   {points('staff.open_points')}
                   <ArrowRight aria-hidden className="size-3.5" />

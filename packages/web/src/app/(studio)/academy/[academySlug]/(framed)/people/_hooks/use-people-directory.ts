@@ -164,6 +164,19 @@ export function usePeopleMutations(academyId: string) {
       orpc.academyMembers.changeRole({ academyId, ...input }),
     onSuccess: invalidate,
   });
+
+  const grantRole = useMutation({
+    mutationFn: (input: { membershipId: string; role: AcademyRole }) =>
+      orpc.academyMembers.grantRole({ academyId, ...input }),
+    onSuccess: invalidate,
+  });
+
+  const revokeRole = useMutation({
+    mutationFn: (input: { membershipId: string; role: AcademyRole }) =>
+      orpc.academyMembers.revokeRole({ academyId, ...input }),
+    onSuccess: invalidate,
+  });
+
   const suspend = useMutation({
     mutationFn: (membershipId: string) =>
       orpc.academyMembers.suspend({ academyId, membershipId }),
@@ -177,10 +190,16 @@ export function usePeopleMutations(academyId: string) {
 
   return {
     changeRole,
+    grantRole,
+    revokeRole,
     suspend,
     restore,
     pending:
-      changeRole.isPending || suspend.isPending || restore.isPending,
+      changeRole.isPending ||
+      grantRole.isPending ||
+      revokeRole.isPending ||
+      suspend.isPending ||
+      restore.isPending,
     error: changeRole.error ?? suspend.error ?? restore.error,
   };
 }

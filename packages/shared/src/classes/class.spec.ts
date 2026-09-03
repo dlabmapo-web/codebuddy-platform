@@ -4,6 +4,7 @@ import {
   addClassStudentsSchema,
   assignedTeacherDetailSchema,
   assignmentGrantsAccess,
+  CLASS_MAX_TEACHERS,
   classDetailSchema,
   classSummarySchema,
   createClassSchema,
@@ -197,6 +198,7 @@ describe("assigned teacher output", () => {
     createdAt: "2026-08-04T09:00:00.000Z",
     updatedAt: "2026-08-04T09:00:00.000Z",
     archivedAt: null,
+    teachers: [],
   };
 
   it("lets a class report no teacher at all", () => {
@@ -218,9 +220,74 @@ describe("assigned teacher output", () => {
         // able to carry a state that no longer grants access.
         membershipStatus: "SUSPENDED",
         role: "TEACHER",
+        roles: ["TEACHER"],
       },
     });
     expect(parsed.assignedTeacher?.membershipStatus).toBe("SUSPENDED");
+  });
+
+  it("carries the homeroom teacher and the assistants in one list", () => {
+    const parsed = classSummarySchema.parse({
+      ...base,
+      assignedTeacher: null,
+      teachers: [
+        {
+          membershipId,
+          userId: "55555555-5555-4555-8555-555555555555",
+          displayName: "Ada",
+          userStatus: "ACTIVE",
+          membershipStatus: "ACTIVE",
+          role: "MANAGER",
+          roles: ["MANAGER", "TEACHER"],
+          isHomeroom: true,
+        },
+        {
+          membershipId: "66666666-6666-4666-8666-666666666666",
+          userId: "77777777-7777-4777-8777-777777777777",
+          displayName: "Grace",
+          userStatus: "ACTIVE",
+          membershipStatus: "ACTIVE",
+          role: "TEACHER",
+          roles: ["TEACHER"],
+          isHomeroom: false,
+        },
+      ],
+    });
+    expect(parsed.teachers.map((teacher) => teacher.isHomeroom)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  it("refuses more teachers than a class may carry", () => {
+    const teacher = (index: number) => ({
+      membershipId: `8888888${index}-8888-4888-8888-888888888888`,
+      userId: `9999999${index}-9999-4999-8999-999999999999`,
+      displayName: `Teacher ${index}`,
+      userStatus: "ACTIVE" as const,
+      membershipStatus: "ACTIVE" as const,
+      role: "TEACHER" as const,
+      roles: ["TEACHER" as const],
+      isHomeroom: index === 0,
+    });
+    expect(
+      classSummarySchema.safeParse({
+        ...base,
+        assignedTeacher: null,
+        teachers: Array.from({ length: CLASS_MAX_TEACHERS }, (_, i) =>
+          teacher(i),
+        ),
+      }).success,
+    ).toBe(true);
+    expect(
+      classSummarySchema.safeParse({
+        ...base,
+        assignedTeacher: null,
+        teachers: Array.from({ length: CLASS_MAX_TEACHERS + 1 }, (_, i) =>
+          teacher(i),
+        ),
+      }).success,
+    ).toBe(false);
   });
 
   it("adds the email only on the detail shape", () => {
@@ -230,8 +297,9 @@ describe("assigned teacher output", () => {
         userId: "55555555-5555-4555-8555-555555555555",
         displayName: null,
         userStatus: "ACTIVE",
-        membershipStatus: "ACTIVE",
         role: "TEACHER",
+        membershipStatus: "ACTIVE",
+        roles: ["TEACHER"],
         email: "ada@example.com",
       }).email,
     ).toBe("ada@example.com");
@@ -246,6 +314,7 @@ describe("assigned teacher output", () => {
           userStatus: "ACTIVE",
           membershipStatus: "ACTIVE",
           role: "TEACHER",
+          roles: ["TEACHER"],
         },
       }).success,
     ).toBe(false);
@@ -269,12 +338,27 @@ describe("assigned teacher output", () => {
 });
 
 describe("assignmentGrantsAccess", () => {
+  /*
+   * A director who also teaches stores `role = MANAGER` with TEACHER beside
+   * it. Reading the primary role alone marked their working assignment "no
+   * longer a teacher" the moment they were granted the second role.
+   */
+  it("grants for a multi-role member who still holds TEACHER", () => {
+    expect(
+      assignmentGrantsAccess({
+        userStatus: "ACTIVE",
+        membershipStatus: "ACTIVE",
+        roles: ["TEACHER", "TEAM_LEAD", "MANAGER"],
+      }),
+    ).toBe(true);
+  });
+
   it("grants only for an active teacher membership", () => {
     expect(
       assignmentGrantsAccess({
         userStatus: "ACTIVE",
         membershipStatus: "ACTIVE",
-        role: "TEACHER",
+        roles: ["TEACHER"],
       }),
     ).toBe(true);
   });
@@ -284,14 +368,14 @@ describe("assignmentGrantsAccess", () => {
       assignmentGrantsAccess({
         userStatus: "ACTIVE",
         membershipStatus: "SUSPENDED",
-        role: "TEACHER",
+        roles: ["TEACHER"],
       }),
     ).toBe(false);
     expect(
       assignmentGrantsAccess({
         userStatus: "ACTIVE",
         membershipStatus: "ACTIVE",
-        role: "TEAM_LEAD",
+        roles: ["TEAM_LEAD"],
       }),
     ).toBe(false);
   });
@@ -301,7 +385,7 @@ describe("assignmentGrantsAccess", () => {
       assignmentGrantsAccess({
         userStatus: "SUSPENDED",
         membershipStatus: "ACTIVE",
-        role: "TEACHER",
+        roles: ["TEACHER"],
       }),
     ).toBe(false);
   });

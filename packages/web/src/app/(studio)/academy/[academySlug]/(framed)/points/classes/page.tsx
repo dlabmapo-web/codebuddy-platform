@@ -35,10 +35,10 @@ export default async function ClassRankingPage({
   // a platform operator's chosen view. Re-deriving it from `auth.me` here sent
   // an operator standing as Team Lead to the not-found page, on a link their
   // own sidebar had just offered them.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['points']);
 
-  if (!canManageClasses(role)) notFound();
+  if (!canManageClasses(roles)) notFound();
 
   return (
     <StudioPage

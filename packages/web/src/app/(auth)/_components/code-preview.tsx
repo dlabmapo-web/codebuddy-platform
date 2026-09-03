@@ -10,7 +10,7 @@ export function CodePreview() {
         <span className="h-3 w-3 rounded-full bg-[#28C840]" />
         <span className="ml-2 font-mono text-[12px] text-white/40">solution.py</span>
       </div>
-      <pre className="overflow-x-auto px-5 py-4 font-mono text-[13px] leading-7">
+      <pre className="overflow-x-auto px-5 py-5 font-mono text-[14px] leading-[1.9]">
         <code>
           <span className="text-[#569CD6]">def</span> <span className="text-[#DCDCAA]">two_sum</span>
           <span className="text-[#D4D4D4]">(nums, target):</span>

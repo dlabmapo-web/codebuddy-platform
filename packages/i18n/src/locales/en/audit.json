@@ -29,6 +29,7 @@
     "class.teacher.assigned": "Assigned a teacher",
     "class.teacher.replaced": "Replaced the teacher",
     "class.teacher.removed": "Removed the teacher",
+    "class.assistants.updated": "Changed a class's assistant teachers",
     "platform.academy.first_manager_invited": "Cove invited the first manager",
     "platform.academy.first_manager_invitation_resent": "Cove resent the first manager invitation",
     "fallback": "{{action}}"

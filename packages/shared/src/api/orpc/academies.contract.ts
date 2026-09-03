@@ -20,6 +20,12 @@ import {
   createAcademyJoinRequestSchema,
   reviewAcademyJoinRequestSchema,
 } from "../../memberships/join-request.js";
+import {
+  issueStudentPasswordInputSchema,
+  revealStudentPasswordInputSchema,
+  studentCredentialStateSchema,
+  studentPasswordRevealSchema,
+} from "../../memberships/student-credentials.js";
 import { successResponseSchema } from "./common.contract.js";
 
 const academyInputSchema = z.object({ academyId: z.uuid() });
@@ -97,7 +103,30 @@ export const academyMembersContract = {
   list: oc
     .input(academyInputSchema)
     .output(z.object({ members: z.array(academyMemberSchema) })),
+  /**
+   * Replaces the member's primary role. Any additional roles they hold are
+   * untouched — this is the existing single-role action, kept for the surfaces
+   * that change one person's standing outright.
+   */
   changeRole: oc
+    .input(membershipInputSchema.extend({ role: academyRoleSchema }))
+    .output(academyMemberSchema),
+  /**
+   * Adds a role beside the ones this member already holds.
+   *
+   * Refused when it would put `STUDENT` alongside a staff role in either
+   * direction: a membership id names one subject, and every points,
+   * monitoring, and analytics query depends on that staying true.
+   */
+  grantRole: oc
+    .input(membershipInputSchema.extend({ role: academyRoleSchema }))
+    .output(academyMemberSchema),
+  /**
+   * Takes a role away. Removing the last one is refused — a member with no
+   * role is not a member, and the action for that is removing the membership.
+   * Removing the primary role promotes the highest of the rest.
+   */
+  revokeRole: oc
     .input(membershipInputSchema.extend({ role: academyRoleSchema }))
     .output(academyMemberSchema),
   suspend: oc
@@ -106,4 +135,43 @@ export const academyMembersContract = {
   restore: oc
     .input(membershipInputSchema)
     .output(academyMemberSchema),
+};
+
+/**
+ * A student's password, for the manager who is their only way back in.
+ *
+ * A student has no email and therefore no self-service recovery. These three
+ * procedures are that recovery, and each one is separately authorized by
+ * `academy.members.credentials.manage` and separately audited — deliberately
+ * apart from `academyMembers`, whose actions change what a person may do
+ * rather than reading a secret.
+ *
+ * Every one of them refuses a target that is not a student, including the
+ * caller's own membership: a manager must not be able to mint themselves a
+ * password for a colleague's account.
+ */
+export const academyStudentCredentialsContract = {
+  /** The panel's state. Never the password — see `reveal`. */
+  get: oc
+    .input(revealStudentPasswordInputSchema)
+    .output(studentCredentialStateSchema),
+  /**
+   * Generates a new password, sets it in Supabase, and shows it once.
+   *
+   * Does not revoke the student's existing sessions: a child mid-lesson should
+   * not be thrown out of their work because an office computer clicked a
+   * button.
+   */
+  issue: oc
+    .input(issueStudentPasswordInputSchema)
+    .output(studentPasswordRevealSchema),
+  /**
+   * Reads back the password this academy issued, if it is still the student's.
+   *
+   * Fetched on demand and never in a list response, so a plaintext password is
+   * never in a page's initial payload or a query cache that outlives the click.
+   */
+  reveal: oc
+    .input(revealStudentPasswordInputSchema)
+    .output(studentPasswordRevealSchema),
 };

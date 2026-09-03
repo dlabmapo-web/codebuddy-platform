@@ -38,11 +38,15 @@
   },
   "teacher_cell": {
     "none": "Not assigned",
-    "role": "Teacher",
+    "role": "Homeroom teacher",
     "unavailable": "Unavailable",
     "aria_assigned": "Assigned teacher: {{name}}",
     "aria_unavailable": "{{name}} is assigned but the assignment grants no access",
-    "aria_none": "No teacher assigned"
+    "aria_none": "No teacher assigned",
+    "with_assistants_one": "Homeroom teacher · {{count}} assistant",
+    "with_assistants_other": "Homeroom teacher · {{count}} assistants",
+    "assistants_only_one": "No homeroom teacher · {{count}} assistant",
+    "assistants_only_other": "No homeroom teacher · {{count}} assistants"
   },
   "create": {
     "heading": "Name the class",
@@ -141,12 +145,12 @@
       "duration_minutes": "{{minutes}}m"
     },
     "teacher_panel": {
-      "heading": "Assigned teacher",
-      "body": "One teacher is responsible for this class. The same teacher can run any number of classes.",
+      "heading": "Teachers",
+      "body": "One homeroom teacher is answerable for this class, with up to two assistants beside them. Assistants teach it on the same terms.",
       "assign": "Assign teacher",
       "replace": "Replace teacher",
       "remove": "Remove assignment",
-      "empty": "No teacher is assigned yet. Assign the teacher responsible for this class.",
+      "empty": "No teacher is assigned yet. Assign the homeroom teacher answerable for this class.",
       "empty_readonly": "No teacher is assigned yet.",
       "archived_readonly": "This class is archived. Restore it before changing who teaches it.",
       "no_name": "Name not set",
@@ -156,7 +160,11 @@
       "unavailable": "Unavailable",
       "unavailable_account": "This user account is inactive, so the assignment grants no access. Replace it or remove it.",
       "unavailable_suspended": "This membership is suspended, so the assignment grants no access. Replace it or remove it.",
-      "unavailable_role": "This member is no longer a teacher, so the assignment grants no access. Replace it or remove it."
+      "unavailable_role": "This member is no longer a teacher, so the assignment grants no access. Replace it or remove it.",
+      "manage_assistants": "Assistants",
+      "homeroom": "Homeroom",
+      "assistant": "Assistant",
+      "active_assistant": "Active membership, assisting"
     },
     "students_panel": {
       "heading": "Students",
@@ -227,10 +235,30 @@
     "submitting": "Saving…",
     "failed": "Could not save the teacher. Reload the class and try again."
   },
+  "assistants_dialog": {
+    "heading": "Manage assistant teachers",
+    "body": "Assistants teach this class on the same terms as its homeroom teacher. Up to {{count}} of them, and the homeroom teacher is not one.",
+    "trigger_label": "Select assistants",
+    "search": "Search by name or email",
+    "empty": "No teacher matches that search.",
+    "none_eligible": "This academy has no other active teachers to assist. Invite one, or change a member's role to Teacher.",
+    "selected": "{{count}} of {{max}} selected.",
+    "over_cap": "Pick at most {{count}} assistants.",
+    "submit": "Save assistants",
+    "submitting": "Saving…",
+    "failed": "Could not save the assistants. Reload the class and try again."
+  },
   "remove_teacher": {
     "heading": "Remove this teacher?",
     "body": "{{name}} loses class-monitoring access to this class right away. The class stays active with its courses and students, and runs unassigned until you pick someone else.",
     "confirm": "Remove assignment",
+    "submitting": "Removing…"
+  },
+  "remove_assistant": {
+    "heading": "Remove this assistant?",
+    "body": "{{name}} loses access to this class right away. The class keeps its homeroom teacher, its courses, and its students.",
+    "reassurance": "The class stays staffed. Only this assistant's access ends.",
+    "confirm": "Remove assistant",
     "submitting": "Removing…"
   },
   "remove_course": {

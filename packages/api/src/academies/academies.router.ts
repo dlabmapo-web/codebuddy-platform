@@ -137,6 +137,16 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.academyMembershipService.changeRole(context.identity, input)
         ),
+      grantRole: os.academyMembers.grantRole
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.academyMembershipService.grantRole(context.identity, input)
+        ),
+      revokeRole: os.academyMembers.revokeRole
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.academyMembershipService.revokeRole(context.identity, input)
+        ),
       suspend: os.academyMembers.suspend
         .use(access.authenticated)
         .handler(({ context, input }) =>
@@ -147,6 +157,72 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.academyMembershipService.restore(context.identity, input)
         ),
+    },
+    /**
+     * A student's password, for the manager who is their only way back in.
+     *
+     * Each of these authorizes separately against
+     * `academy.members.credentials.manage` before the service runs, and the
+     * service refuses any target that is not a student of this academy — so a
+     * caller who reaches here still cannot address a colleague's account.
+     *
+     * `reveal` is limited far more tightly than it is authorized. A manager
+     * legitimately reads a handful of passwords in a session; a script walking
+     * the roster to harvest them would need hundreds, and the limit is what
+     * makes the difference visible.
+     */
+    academyStudentCredentials: {
+      get: os.academyStudentCredentials.get
+        .use(access.authenticated)
+        .handler(async ({ context, input }) => {
+          await deps.academyAccessService.requirePermission(
+            context.identity.authUserId,
+            input.academyId,
+            "academy.members.credentials.manage",
+          );
+          return deps.studentCredentialService.state(
+            input.academyId,
+            input.membershipId,
+          );
+        }),
+      issue: os.academyStudentCredentials.issue
+        .use(access.authenticated)
+        .handler(async ({ context, input }) => {
+          const actor = await deps.academyAccessService.requirePermission(
+            context.identity.authUserId,
+            input.academyId,
+            "academy.members.credentials.manage",
+          );
+          deps.rateLimitService.assert(
+            `academy:credentials:issue:${actor.userId}`,
+            60,
+            60 * 60_000,
+          );
+          return deps.studentCredentialService.issue(
+            actor.userId,
+            input.academyId,
+            input.membershipId,
+          );
+        }),
+      reveal: os.academyStudentCredentials.reveal
+        .use(access.authenticated)
+        .handler(async ({ context, input }) => {
+          const actor = await deps.academyAccessService.requirePermission(
+            context.identity.authUserId,
+            input.academyId,
+            "academy.members.credentials.manage",
+          );
+          deps.rateLimitService.assert(
+            `academy:credentials:reveal:${actor.userId}`,
+            60,
+            60 * 60_000,
+          );
+          return deps.studentCredentialService.reveal(
+            actor.userId,
+            input.academyId,
+            input.membershipId,
+          );
+        }),
     },
   };
 }

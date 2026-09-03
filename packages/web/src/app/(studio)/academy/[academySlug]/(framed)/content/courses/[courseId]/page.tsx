@@ -23,10 +23,10 @@ export default async function CourseBuilderPage({
 }) {
   const { academySlug, courseId } = await params;
   const contentPaths = createContentPaths(academySlug, 'academy');
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['content']);
   let initialTree = null;
   let canEditCurriculum = false;
@@ -37,9 +37,9 @@ export default async function CourseBuilderPage({
   try {
     const client = createServerORPCClient();
     initialTree = await client.academyCourses.getTree({ academyId, courseId });
-    canEditCurriculum = canManageContent(role);
-    canEditExercises = canManageExercises(role);
-    canImport = canImportContent(role);
+    canEditCurriculum = canManageContent(roles);
+    canEditExercises = canManageExercises(roles);
+    canImport = canImportContent(roles);
   } catch (error) {
     // Only access denial gets the not-found state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.

@@ -99,7 +99,7 @@ test.describe('the content library', () => {
 
     // Lands in the branch's own builder, on its own course.
     await expect(page).toHaveURL(
-      new RegExp(`/academy/${ACADEMY_SLUG}/content/courses/[0-9a-f-]+$`),
+      new RegExp(`${routes.academyCourses(ACADEMY_SLUG)}/[0-9a-f-]+$`),
     );
     await expect(page.getByRole('heading', { name: copyTitle })).toBeVisible();
 

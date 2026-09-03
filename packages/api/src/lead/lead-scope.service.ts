@@ -1,3 +1,4 @@
+import type { AcademyRole } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ACADEMY_TIME_ZONE, type AcademyPermission } from "@cove/shared";
 
@@ -52,7 +53,7 @@ export class LeadScopeService {
     academyId: string,
     permission: AcademyPermission,
   ): Promise<TeamLeadActor> {
-    let actor: { userId: string; role: string };
+    let actor: { userId: string; role: string; roles: readonly AcademyRole[] };
     try {
       actor = await this.access.requirePermission(
         identity.authUserId,
@@ -65,7 +66,9 @@ export class LeadScopeService {
         HttpStatus.FORBIDDEN,
       );
     }
-    if (actor.role !== "TEAM_LEAD") {
+    // The role set, not the primary role: a Manager granted TEAM_LEAD holds
+    // `role = MANAGER` and was refused the curriculum overview.
+    if (!actor.roles.includes("TEAM_LEAD")) {
       throw new AppException(
         "CURRICULUM_OVERVIEW_ACCESS_DENIED",
         HttpStatus.FORBIDDEN,

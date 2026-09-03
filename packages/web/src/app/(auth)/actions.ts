@@ -2,9 +2,11 @@
 
 import { redirect, RedirectType } from 'next/navigation';
 import { cookies } from 'next/headers';
+import type { TFunction } from 'i18next';
 import { z } from 'zod';
 import type { Provider } from '@supabase/supabase-js';
 import {
+  signupKindSchema,
   socialAuthProviderSchema,
   usernameSchema,
   type SocialAuthProvider,
@@ -20,6 +22,16 @@ import { isSocialProviderAvailable } from './_components/social-providers';
 import { clientAddress } from './_lib/client-address';
 
 export type AuthFormState = { message?: string; success?: boolean };
+
+/**
+ * The translator the signup helpers take.
+ *
+ * Named rather than written inline: `getServerTranslation` returns a `TFunction`
+ * typed over the namespaces it loaded, so the keys are checked at every call
+ * site. A loose `(key: string) => string` would accept it structurally in
+ * neither direction, and would give up that checking if it did.
+ */
+type SignupTranslate = TFunction<readonly ['auth', 'validation']>;
 
 type CaptchaInput =
   | { valid: true; token?: string }
@@ -51,12 +63,32 @@ const credentialsSchema = z.object({
   password: z.string().min(8),
 });
 
-const signupSchema = z.object({
+/**
+ * The fields both kinds of signup share.
+ *
+ * `passwordConfirm` is checked here as well as in the browser, and not only
+ * because a browser check is bypassable. A student cannot recover a password
+ * by email — there is no address to send to — so a mistyped one is an account
+ * lost until a manager issues a new one. That is worth a second check on the
+ * server even though the first one almost always catches it.
+ */
+const signupBaseSchema = z.object({
   username: usernameSchema,
-  email: z.email(),
   password: z.string().min(8),
+  passwordConfirm: z.string().min(8),
   displayName: z.string().trim().min(2).max(100),
   academyId: z.uuid(),
+}).refine((value) => value.password === value.passwordConfirm, {
+  path: ['passwordConfirm'],
+});
+
+const staffSignupSchema = z.object({
+  kind: z.literal('STAFF'),
+  email: z.email(),
+});
+
+const studentSignupSchema = z.object({
+  kind: z.literal('STUDENT'),
 });
 
 const socialAuthSchema = z.object({
@@ -167,27 +199,32 @@ export async function signupAction(
   _state: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const input = signupSchema.safeParse({
+  const { t } = await getServerTranslation(['auth', 'validation']);
+  const kind = signupKindSchema.safeParse(formData.get('kind'));
+  const input = signupBaseSchema.safeParse({
     displayName: formData.get('displayName'),
     username: formData.get('username'),
-    email: formData.get('email'),
     password: formData.get('password'),
+    passwordConfirm: formData.get('passwordConfirm'),
     academyId: formData.get('academyId'),
   });
-  const { t } = await getServerTranslation(['auth', 'validation']);
-  if (!input.success) {
-    const usernameFailed = input.error.issues.some(
-      (issue) => issue.path[0] === 'username',
-    );
-    return {
-      message: usernameFailed
-        ? t('validation:username_invalid')
-        : t('validation:signup_invalid'),
-    };
+  if (!kind.success || !input.success) {
+    return { message: signupInvalidMessage(input, t) };
   }
 
   const captcha = captchaInput(formData);
   if (!captcha.valid) return { message: t('error.captcha_failed') };
+
+  // Split here rather than inside one procedure, because the two halves share
+  // almost nothing: a student's identity is created by the API through the
+  // service-role client and a staff member's by their own browser session, and
+  // only one of the two has an address to verify or to collide with.
+  if (kind.data === 'STUDENT') {
+    return signUpStudent(input.data, captcha.token, t);
+  }
+
+  const email = staffSignupSchema.shape.email.safeParse(formData.get('email'));
+  if (!email.success) return { message: t('validation:signup_invalid') };
 
   // Advisory only — the unique index decides. Checking here is what keeps a
   // taken name from being discovered after the Supabase account already exists.
@@ -214,7 +251,7 @@ export async function signupAction(
   const supabase = await createClient();
   const hasInvitation = (await cookies()).has('cove_invitation');
   const { data, error } = await supabase.auth.signUp({
-    email: input.data.email,
+    email: email.data,
     password: input.data.password,
     options: {
       data: {
@@ -269,6 +306,95 @@ export async function signupAction(
     success: true,
     message: t('error.signup_verify_email'),
   };
+}
+
+/**
+ * Which of the three things went wrong, for a form that shows one message.
+ *
+ * The username and the password confirmation each get their own sentence
+ * because each has an obvious fix the person can make; everything else shares
+ * the general one. Ordered with the confirmation first: a mismatch is the most
+ * likely rejection by far, and a person who mistyped it should not be sent to
+ * look at their username.
+ */
+function signupInvalidMessage(
+  input: z.ZodSafeParseResult<{ username: string }>,
+  t: SignupTranslate,
+): string {
+  if (input.success) return t('validation:signup_invalid');
+  const failed = (field: string) =>
+    input.error.issues.some((issue) => issue.path[0] === field);
+  if (failed('passwordConfirm')) return t('validation:password_mismatch');
+  if (failed('username')) return t('validation:username_invalid');
+  return t('validation:signup_invalid');
+}
+
+/**
+ * Creates a student account, which has no email address.
+ *
+ * The account is made by the API rather than by this session's Supabase
+ * client, because Supabase requires an address and the one Cove generates must
+ * not be something the browser chooses. What comes back is that generated
+ * address, used here for one thing only: signing the student in immediately,
+ * so a child never sees a form that succeeded and left them on it.
+ *
+ * There is no "check your email" branch. There is no email.
+ */
+async function signUpStudent(
+  input: {
+    username: string;
+    displayName: string;
+    password: string;
+    academyId: string;
+  },
+  captchaToken: string | undefined,
+  t: SignupTranslate,
+): Promise<AuthFormState> {
+  let email: string;
+  try {
+    ({ email } = await createServerORPCClient(
+      undefined,
+      await clientAddress(),
+    ).auth.signUpStudent({
+      username: input.username,
+      displayName: input.displayName,
+      password: input.password,
+      academyId: input.academyId,
+      ...(captchaToken ? { captchaToken } : {}),
+    }));
+  } catch (error) {
+    const { code } = toApiError(error);
+    return {
+      message: t(
+        code === 'USERNAME_TAKEN'
+          ? 'error.username_taken'
+          : code === 'RATE_LIMITED'
+            ? 'error.too_many_attempts'
+            : code === 'CAPTCHA_FAILED'
+              ? 'error.captcha_failed'
+              : 'error.signup_failed',
+      ),
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: input.password,
+  });
+  // The account exists either way. Sending them to the login page to type the
+  // name and password they just chose is a worse outcome than a failed
+  // redirect, and far better than reporting a failure for something that
+  // worked — which would have them try again and be told the name is taken.
+  if (error || !data.session) {
+    return { success: true, message: t('error.signup_student_sign_in') };
+  }
+
+  await beginStudentSession(data.session.access_token);
+  redirect(
+    (await cookies()).has('cove_invitation') ? '/invite' : '/welcome',
+    RedirectType.replace,
+  );
 }
 
 /**

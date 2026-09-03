@@ -47,6 +47,7 @@
   "CLASS_VALIDATION_FAILED": "Fix the class details and try again.",
   "CLASS_MEMBERSHIP_INELIGIBLE": "Only active students of this academy can be enrolled.",
   "CLASS_TEACHER_INELIGIBLE": "Only an active teacher of this academy can be assigned to a class.",
+  "CLASS_TEACHER_ALREADY_ASSIGNED": "That teacher already runs this class as its homeroom teacher.",
   "COURSE_NOT_ASSIGNED": "This course is not available to you.",
   "DRAFT_TOO_LARGE": "Your code is too large to save. Shorten it and try again.",
   "SUBMISSION_IN_FLIGHT": "This problem is already being graded. Wait for the result.",
@@ -116,5 +117,14 @@
   "CONFIRMATION_MISMATCH": "Type the account's email or username exactly to confirm.",
   "LAST_ADMIN_REQUIRED": "The platform must keep at least one operator.",
   "PLATFORM_EXPORT_TOO_LARGE": "Too many accounts to download at once. Narrow the filter and try again.",
+  "MEMBERSHIP_ROLE_CONFLICT": "A student account cannot hold a staff role.",
+  "MEMBERSHIP_ROLE_ALREADY_HELD": "This member already has that role.",
+  "MEMBERSHIP_ROLE_NOT_HELD": "This member does not have that role.",
+  "MEMBERSHIP_ROLE_LAST": "A member must keep at least one role.",
+  "STUDENT_CREDENTIAL_TARGET_INVALID": "Only students in your academy can be issued one.",
+  "STUDENT_CREDENTIAL_NOT_STORED": "The student changed it, so Cove cannot show it. Issue a new one.",
+  "STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE": "Saved passwords are unavailable here. Issue a new one.",
+  "SIGNUP_STUDENT_FAILED": "The student account could not be created.",
+  "CAPTCHA_FAILED": "The security check failed. Refresh and try again.",
   "UNKNOWN": "Something went wrong. Try again."
 }

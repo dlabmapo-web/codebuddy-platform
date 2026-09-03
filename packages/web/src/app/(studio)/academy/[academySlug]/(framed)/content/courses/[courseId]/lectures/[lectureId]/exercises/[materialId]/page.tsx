@@ -5,7 +5,7 @@ import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_compo
 import {
   canManageExercises,
 } from '@/lib/academy-access-state';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
+import { createServerORPCClient } from '@/lib/orpc-server';
 import { ExerciseWorkspace } from '../_components/exercise-workspace';
 
 export default async function ExercisePage({
@@ -19,28 +19,24 @@ export default async function ExercisePage({
   }>;
 }) {
   const { academySlug, courseId, lectureId, materialId } = await params;
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
   let context;
-  let account;
   let solutionCode = '';
   try {
-    [context, account] = await Promise.all([
-      client.academyCourses.getExercise({
-        academyId,
-        courseId,
-        lectureId,
-        materialId,
-      }),
-      getAccount(),
-    ]);
+    context = await client.academyCourses.getExercise({
+      academyId,
+      courseId,
+      lectureId,
+      materialId,
+    });
   } catch {
     notFound();
   }
-  const canEdit = canManageExercises(role);
+  const canEdit = canManageExercises(roles);
   if (canEdit) {
     // Its own request, and its own failure. The model solution is the one
     // field this page can open without: legacy problems have none, and the

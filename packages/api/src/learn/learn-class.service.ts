@@ -1,3 +1,4 @@
+import { membershipHoldsRole } from "../authorization/membership-roles.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type {
   LearnClassDetail,
@@ -60,6 +61,7 @@ function studentClassSelect(academyId: string) {
         academyId: true,
         status: true,
         role: true,
+        extraRoles: { select: { role: true } },
         // The same fragment the roster and the six other member surfaces use,
         // so a teacher's photo cannot resolve differently here than it does
         // anywhere else in the academy.
@@ -290,6 +292,10 @@ function tellableTeacher(
   // The stored key cannot prove same-academy on its own, so the academy is
   // checked here as well as on the class.
   if (assigned.academyId !== academyId) return false;
-  if (assigned.status !== "ACTIVE" || assigned.role !== "TEACHER") return false;
+  // Holds TEACHER, rather than has it as their highest role — see
+  // `membershipHoldsRole`.
+  if (assigned.status !== "ACTIVE" || !membershipHoldsRole(assigned, "TEACHER")) {
+    return false;
+  }
   return assigned.user.status === "ACTIVE";
 }

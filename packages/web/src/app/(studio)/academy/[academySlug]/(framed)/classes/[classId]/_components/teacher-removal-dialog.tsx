@@ -9,12 +9,16 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager';
 
 /**
- * Confirms clearing the assignment.
+ * Confirms dropping one of the class's teachers.
  *
  * Separate from the course and student removals because the promise is
  * different: nothing is archived and no work is at stake. The class keeps its
- * courses, its roster, and its active status, and simply runs unassigned —
- * which is a legitimate state, not a broken one.
+ * courses, its roster, and its active status.
+ *
+ * The two kinds share the dialog and differ only in what is being promised.
+ * Clearing the homeroom teacher leaves the class running unassigned — a
+ * legitimate state, not a broken one — while dropping an assistant leaves it
+ * staffed exactly as it was, minus one pair of hands.
  */
 export function TeacherRemovalDialog({
   manager,
@@ -24,7 +28,10 @@ export function TeacherRemovalDialog({
   const { t } = useLayoutTranslation(['classes', 'common']);
   const errorText = useErrorText();
   const removing = manager.removing;
-  if (removing?.kind !== 'teacher') return null;
+  if (removing?.kind !== 'teacher' && removing?.kind !== 'assistant') {
+    return null;
+  }
+  const assistant = removing.kind === 'assistant';
 
   return (
     <Modal
@@ -34,8 +41,13 @@ export function TeacherRemovalDialog({
       open
     >
       <ModalContent
-        description={t('remove_teacher.body', { name: removing.name })}
-        title={t('remove_teacher.heading')}
+        description={t(
+          assistant ? 'remove_assistant.body' : 'remove_teacher.body',
+          { name: removing.name },
+        )}
+        title={t(
+          assistant ? 'remove_assistant.heading' : 'remove_teacher.heading',
+        )}
       >
         <div className="px-6 py-5">
           <div className="flex items-start gap-3.5">
@@ -49,7 +61,13 @@ export function TeacherRemovalDialog({
 
           <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-success/5 px-3.5 py-3 text-[13.5px] leading-5 text-sub">
             <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
-            <p>{t('detail.teacher_panel.body')}</p>
+            <p>
+              {t(
+                assistant
+                  ? 'remove_assistant.reassurance'
+                  : 'detail.teacher_panel.body',
+              )}
+            </p>
           </div>
 
           {manager.removalError ? (
@@ -75,7 +93,11 @@ export function TeacherRemovalDialog({
           >
             {manager.removalPending
               ? t('remove_teacher.submitting')
-              : t('remove_teacher.confirm')}
+              : t(
+                  assistant
+                    ? 'remove_assistant.confirm'
+                    : 'remove_teacher.confirm',
+                )}
           </button>
         </div>
       </ModalContent>

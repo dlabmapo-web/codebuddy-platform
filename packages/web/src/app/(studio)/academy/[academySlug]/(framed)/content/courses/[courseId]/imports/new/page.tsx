@@ -9,7 +9,7 @@ import { contentImportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
-import { academyRoleFor, canImportContent } from '@/lib/academy-access-state';
+import { canImportContent } from '@/lib/academy-access-state';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { CourseImportWizard } from '../_components/course-import-wizard';
 
@@ -30,10 +30,10 @@ export default async function NewCourseImportPage({
   params: Promise<{ academySlug: string; courseId: string }>;
 }) {
   const { academySlug, courseId } = await params;
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const locale = await getLocale();
   const [{ t }, { resources }] = await Promise.all([
     getServerTranslation(['content-import']),
@@ -64,7 +64,7 @@ export default async function NewCourseImportPage({
         ),
       0,
     );
-    allowed = canImportContent(role);
+    allowed = canImportContent(roles);
   } catch (error) {
     // Only access denial gets the unavailable state; anything else is a real
     // fault and would otherwise masquerade as a permissions problem.

@@ -12,6 +12,7 @@ import type { SubmissionService } from "./submission.service.js";
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "student@example.com",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: "Student",

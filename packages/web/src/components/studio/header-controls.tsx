@@ -1,21 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { Moon, Sun } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
+import { Moon, Sun, UserRound } from 'lucide-react';
 import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
+import type { AcademyRole } from '@cove/shared';
 
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { RoleBadge, roleDotClass } from '@/components/studio/role-badge';
 import { LocaleFlag } from '@/components/studio/locale-flag';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { setBrowserLocale } from '@/i18n/client/set-locale';
 import { routes } from '@/lib/routes';
+import { setViewRoleAction } from '@/lib/view-role-action';
 import { useTheme } from '@/lib/theme/theme-provider';
 import { themes, type Theme } from '@/lib/theme/settings';
 import { cn } from '@/lib/utils';
@@ -121,21 +129,33 @@ export function LanguageControl({ className }: { className?: string }) {
 }
 
 /**
- * The way into My Page, from anywhere in Studio.
+ * The reader's own menu: who they are here, which of their roles they are
+ * working as, and the way into My Page.
  *
- * A face rather than a gear: the destination is the person's own account, and
- * an avatar is the one control on this bar whose meaning nobody has to be
- * taught. It sits beside theme and language because all three are about the
- * reader rather than about the page they are on.
+ * A face rather than a gear, and a menu rather than a link. The destination is
+ * the person's own account, and an avatar is the one control on this bar whose
+ * meaning nobody has to be taught — so it is also the right place for the one
+ * other control that is about them rather than about the page: the role they
+ * are viewing as.
+ *
+ * The role switcher lived beside the academy name in the bar, where it read as
+ * a property of the academy. It is a property of the reader.
  */
 export function ProfileControl({
   className,
+  academyId,
+  academySlug,
   academyImageUrl,
   imageUrl,
   avatarUrl,
   name,
+  role,
+  roles,
 }: {
   className?: string;
+  academyId?: string;
+  /** Where a role switch lands — the academy's overview. */
+  academySlug?: string;
   /** The current membership's academy override. */
   academyImageUrl?: string | null;
   /** The Cove image, when the account has uploaded one. */
@@ -143,16 +163,67 @@ export function ProfileControl({
   /** The external OAuth photo, as the fallback beneath it. */
   avatarUrl?: string | null;
   name?: string | null;
+  /** The role being viewed as, when inside an academy. */
+  role?: AcademyRole | null;
+  /** Every role held here. One or none renders no switcher. */
+  roles?: readonly AcademyRole[];
 }) {
-  const { t } = useLayoutTranslation('nav');
+  const { t } = useLayoutTranslation(['nav', 'common']);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const held = roles ?? [];
+  const canSwitch = Boolean(academyId && role && held.length > 1);
+
+  function selectRole(next: AcademyRole) {
+    if (!academyId || next === role) return;
+    /*
+     * Close before navigating, and this is not cosmetic.
+     *
+     * While the menu is open Radix marks everything behind it
+     * `aria-hidden="true"` so screen readers see only the overlay. Navigating
+     * from under an open menu renders a new tree into content still carrying
+     * those attributes, and React reports a hydration mismatch listing every
+     * background node — plus whatever text differs beneath them.
+     *
+     * Closing first lets Radix remove them, which it does on close, so the
+     * incoming page is rendered into clean markup.
+     */
+    setOpen(false);
+    startTransition(async () => {
+      await setViewRoleAction(academyId, next);
+      // Back to the academy's front door, not wherever they happened to be.
+      //
+      // The roles do not share a navigation. Switching from Manager to Teacher
+      // while standing on Members left the reader on a page their new role has
+      // no link to and, on some pages, no permission for — a dead end reached
+      // by a control that was supposed to help. The overview is the one page
+      // every role answers, so it is where every switch lands.
+      if (academySlug) {
+        router.push(routes.academy(academySlug));
+      }
+      // The sidebar lives in a layout above the page and is built from the
+      // role that just changed, so the tree is refreshed either way.
+      router.refresh();
+    });
+  }
 
   return (
-    <Link
-      aria-label={t('my_page')}
-      className={cn(trigger, 'w-9 px-0', className)}
-      href={routes.account}
-      title={t('my_page')}
-    >
+    <DropdownMenu onOpenChange={setOpen} open={open}>
+      {/*
+        `rounded-full`, unlike every other control on this bar.
+        A focus ring follows the trigger's shape, and a rounded *square* ring
+        around a circular avatar reads as a stray border rather than as focus —
+        which is how it looked after closing the menu, when Radix returns focus
+        to the trigger and the browser treats that as keyboard focus. Made
+        concentric with the avatar, the same ring reads as the control being
+        focused, which is what it means.
+      */}
+      <DropdownMenuTrigger
+        aria-label={t('my_page')}
+        className={cn(trigger, 'w-9 rounded-full px-0', className)}
+        title={t('my_page')}
+      >
       {/*
         * The ring is the whole reason this is not a bare `ProfileAvatar`.
         *
@@ -176,7 +247,61 @@ export function ProfileControl({
         name={name}
         size="sm"
       />
-    </Link>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[13rem] p-1.5">
+        {/* Who this is, before what they can do. The name alone is ambiguous
+            in an academy where somebody wears three hats. */}
+        {name ? (
+          <div className="px-2 pb-1.5 pt-1">
+            <p className="truncate text-[13px] font-bold text-ink">{name}</p>
+            {held.length > 0 ? (
+              <span className="mt-1 flex flex-wrap gap-1">
+                {held.map((held_role) => (
+                  <RoleBadge key={held_role} role={held_role} />
+                ))}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {name ? <DropdownMenuSeparator /> : null}
+
+        <DropdownMenuItem asChild>
+          <Link href={routes.account}>
+            <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
+            {t('my_page')}
+          </Link>
+        </DropdownMenuItem>
+
+        {/* Only when there is a choice. A switcher offering one role is
+            furniture, and most members hold exactly one. */}
+        {canSwitch ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{t('role_switcher.label')}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              onValueChange={(next) => {
+                selectRole(next as AcademyRole);
+              }}
+              value={role ?? undefined}
+            >
+              {held.map((option) => (
+                <DropdownMenuRadioItem
+                  className="gap-2"
+                  key={option}
+                  value={option}
+                >
+                  <span
+                    aria-hidden
+                    className={cn('size-2 rounded-full', roleDotClass(option))}
+                  />
+                  {t(`common:role.${option}`)}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -188,10 +313,14 @@ export function HeaderControls({
   className?: string;
   /** Absent on surfaces that have no session to describe. */
   account?: {
+    academyId?: string;
+    academySlug?: string;
     academyImageUrl?: string | null;
     imageUrl: string | null;
     avatarUrl: string | null;
     name: string | null;
+    role?: AcademyRole | null;
+    roles?: readonly AcademyRole[];
   };
 }) {
   return (
@@ -200,10 +329,14 @@ export function HeaderControls({
       <ThemeControl />
       {account ? (
         <ProfileControl
+          academyId={account.academyId}
+          academySlug={account.academySlug}
           academyImageUrl={account.academyImageUrl}
           avatarUrl={account.avatarUrl}
           imageUrl={account.imageUrl}
           name={account.name}
+          role={account.role}
+          roles={account.roles}
         />
       ) : null}
     </div>

@@ -2,5 +2,6 @@
   "credentials_invalid": "Enter your username and password.",
   "signup_invalid": "Use a valid email, name, and password of 8+ characters.",
   "username_invalid": "Use 5–30 characters: letters, numbers, dot, dash, or underscore.",
-  "social_request_invalid": "Choose a valid academy and social provider."
+  "social_request_invalid": "Choose a valid academy and social provider.",
+  "password_mismatch": "The two passwords are different. Enter them again."
 }

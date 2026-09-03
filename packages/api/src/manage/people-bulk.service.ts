@@ -364,9 +364,15 @@ export class PeopleBulkService {
         status: true,
         user: { select: { displayName: true, username: true, email: true } },
         memberProfile: { select: { academyDisplayName: true } },
+        extraRoles: { select: { role: true } },
         assignedClasses: {
           where: { status: "ACTIVE" },
           select: { id: true },
+        },
+        // Assisting a class is teaching it, so it strands the same way.
+        assistedClasses: {
+          where: { class: { status: "ACTIVE" } },
+          select: { classId: true },
         },
         classEnrollments: {
           where: { class: { status: "ACTIVE" } },
@@ -392,7 +398,11 @@ export class PeopleBulkService {
       role: member.role,
       status: member.status,
       displayName: memberDisplayName(member),
-      teachesClassIds: member.assignedClasses.map((entry) => entry.id),
+      extraRoles: member.extraRoles.map((entry) => entry.role),
+      teachesClassIds: [
+        ...member.assignedClasses.map((entry) => entry.id),
+        ...member.assistedClasses.map((entry) => entry.classId),
+      ],
       enrolledClassIds: member.classEnrollments.map((entry) => entry.classId),
     }));
   }
@@ -485,7 +495,7 @@ export class PeopleBulkService {
       );
       add(
         "monitoring_revoked",
-        decided.eligible.filter((member) => member.role === "TEACHER"),
+        decided.eligible.filter(holdsTeacher),
       );
     }
 
@@ -502,12 +512,16 @@ export class PeopleBulkService {
             member.enrolledClassIds.length > 0,
         ),
       );
+      // Stranded only if the change actually takes TEACHER away. A bulk role
+      // change rewrites the primary role and leaves extra grants alone, so a
+      // member moved to MANAGER who still holds TEACHER keeps their classes
+      // and must not be warned about losing them.
       add(
         "teacher_assignments_stranded",
         decided.eligible.filter(
           (member) =>
-            member.role === "TEACHER" &&
-            options.role !== "TEACHER" &&
+            holdsTeacher(member) &&
+            !holdsTeacherAfterRoleChange(member, options.role) &&
             member.teachesClassIds.length > 0,
         ),
       );
@@ -593,13 +607,30 @@ export class PeopleBulkService {
         }
         // Likewise a class whose teacher is no longer a Teacher is unassigned
         // rather than left pointing at somebody who cannot teach it.
+        //
+        // Scoped to members who no longer hold TEACHER *at all*: this writes
+        // the primary role only, so somebody moved to MANAGER who still holds
+        // a TEACHER grant beside it keeps every class they run.
         if (options.role !== "TEACHER") {
+          const lostTeacher = {
+            extraRoles: { none: { role: "TEACHER" } },
+          } satisfies Prisma.AcademyMembershipWhereInput;
           await transaction.class.updateMany({
             where: {
               academyId: input.academyId,
               teacherMembershipId: { in: ids },
+              assignedTeacher: lostTeacher,
             },
             data: { teacherMembershipId: null },
+          });
+          // An assistant has no "unassigned" state to fall back to, so the
+          // row goes rather than being emptied.
+          await transaction.classAssistantTeacher.deleteMany({
+            where: {
+              membershipId: { in: ids },
+              class: { academyId: input.academyId },
+              teacher: lostTeacher,
+            },
           });
         }
         break;
@@ -671,12 +702,38 @@ type TargetMember = {
   role: string;
   status: string;
   displayName: string;
+  /**
+   * Roles granted beside the primary one. A bulk role change rewrites only
+   * the primary, so these survive it — which is why the primary role alone is
+   * the wrong thing to ask about a director who also teaches.
+   */
+  extraRoles: string[];
+  /** Classes they teach, as homeroom teacher or as an assistant. */
   teachesClassIds: string[];
   enrolledClassIds: string[];
 };
 
 type BlockedMember = { member: TargetMember; code: string };
 type Decided = { eligible: TargetMember[]; blocked: BlockedMember[] };
+
+/** Whether this member holds TEACHER now, primary or granted beside it. */
+function holdsTeacher(member: TargetMember): boolean {
+  return member.role === "TEACHER" || member.extraRoles.includes("TEACHER");
+}
+
+/**
+ * Whether a bulk role change leaves this member still holding TEACHER.
+ *
+ * The change writes the primary role and nothing else, so a grant sitting in
+ * `extraRoles` survives it — which is exactly why the primary role alone is
+ * the wrong thing to ask.
+ */
+function holdsTeacherAfterRoleChange(
+  member: TargetMember,
+  role: string,
+): boolean {
+  return role === "TEACHER" || member.extraRoles.includes("TEACHER");
+}
 
 /** Which kinds end a member's ability to hold a live monitoring session. */
 function needsRevocation(options: BulkOptions): boolean {

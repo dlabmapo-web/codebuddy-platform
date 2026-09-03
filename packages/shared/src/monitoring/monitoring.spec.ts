@@ -25,6 +25,7 @@ import {
 
 const academyId = "11111111-1111-4111-8111-111111111111";
 const otherAcademyId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const otherMembershipId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const classId = "22222222-2222-4222-8222-222222222222";
 const membershipId = "33333333-3333-4333-8333-333333333333";
 const userId = "44444444-4444-4444-8444-444444444444";
@@ -34,13 +35,14 @@ const activeClass: MonitoringClassFacts = {
   academyId,
   status: "ACTIVE",
   teacherMembershipId: membershipId,
+  assistantMembershipIds: [],
 };
 
 const assignedTeacher: MonitoringTeacherFacts = {
   membershipId,
   academyId,
   userId,
-  role: "TEACHER",
+  roles: ["TEACHER"],
   membershipStatus: "ACTIVE",
   userStatus: "ACTIVE",
 };
@@ -136,10 +138,56 @@ describe("grantsLiveMonitoring", () => {
   });
 
   it("denies a member moved off the teacher role while still assigned", () => {
-    expect(grantsLiveMonitoring(accessInput({ teacher: { role: "TEAM_LEAD" } })))
-      .toBe(false);
-    expect(grantsLiveMonitoring(accessInput({ teacher: { role: "MANAGER" } })))
-      .toBe(false);
+    expect(
+      grantsLiveMonitoring(accessInput({ teacher: { roles: ["TEAM_LEAD"] } })),
+    ).toBe(false);
+    expect(
+      grantsLiveMonitoring(accessInput({ teacher: { roles: ["MANAGER"] } })),
+    ).toBe(false);
+  });
+
+  /*
+   * A director who also teaches. Their membership stores `role = MANAGER`
+   * with TEACHER beside it, so reading the primary role alone denied them the
+   * monitoring the second grant exists to give.
+   */
+  it("grants to a multi-role member who still holds TEACHER", () => {
+    expect(
+      grantsLiveMonitoring(
+        accessInput({ teacher: { roles: ["MANAGER", "TEACHER"] } }),
+      ),
+    ).toBe(true);
+  });
+
+  /*
+   * An assistant teaches the class on identical terms; what they lack is
+   * being the one named as answerable for it, which is a different question
+   * from who may watch a lesson.
+   */
+  it("grants to an assistant teacher of the class", () => {
+    expect(
+      grantsLiveMonitoring(
+        accessInput({
+          class: {
+            teacherMembershipId: otherMembershipId,
+            assistantMembershipIds: [membershipId],
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("denies a teacher who neither runs nor assists the class", () => {
+    expect(
+      grantsLiveMonitoring(
+        accessInput({
+          class: {
+            teacherMembershipId: otherMembershipId,
+            assistantMembershipIds: [],
+          },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("denies a deleted assignment", () => {

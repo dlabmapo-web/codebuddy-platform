@@ -54,6 +54,10 @@ function serviceWith(options: {
               role: options.membership.role,
               status: options.membership.status,
               academy: { status: options.membership.academyStatus },
+              // The service reads the role set, so the double carries what the
+              // query's `include` asks for. None of these cases is about a
+              // second role.
+              extraRoles: [],
             }
           : null,
       ),

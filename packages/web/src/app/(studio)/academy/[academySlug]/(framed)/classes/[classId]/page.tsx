@@ -22,10 +22,10 @@ export default async function ClassDetailPage({
 }) {
   const { academySlug, classId } = await params;
   const contentPaths = createContentPaths(academySlug, 'academy');
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['classes']);
   let detail = null;
   let canAssignCourses = false;
@@ -39,10 +39,10 @@ export default async function ClassDetailPage({
     const result = await client.academyClasses.get({ academyId, classId });
     detail = result;
     // Only a usability layer — every mutation is authorized again in the API.
-    canAssignCourses = canManageClasses(role);
-    canEnroll = canManageEnrollment(role);
-    canAssignTeacher = canManageClassTeachers(role);
-    canSetSchedule = canManageClassSchedule(role);
+    canAssignCourses = canManageClasses(roles);
+    canEnroll = canManageEnrollment(roles);
+    canAssignTeacher = canManageClassTeachers(roles);
+    canSetSchedule = canManageClassSchedule(roles);
   } catch (error) {
     // A missing class and a server fault get different copy: only the first is
     // something the reader can act on by going back to the list.

@@ -95,6 +95,12 @@ export class PasswordRecoveryService {
    * with no `email` password identity in Supabase has nothing to reset, so an
    * OAuth-only user is told to sign in with their provider by the login page,
    * not handed a password by this flow.
+   *
+   * A student is not one either. Their address is generated and resolves
+   * nowhere, so mail sent to it burns provider quota to reach nobody; their
+   * recovery is a manager issuing a password. This returns null for them and
+   * the router still answers `{ accepted: true }`, so the endpoint stays unable
+   * to say which kind of account a username names.
    */
   private async recoveryTarget(username: string): Promise<{
     email: string | null;
@@ -102,7 +108,12 @@ export class PasswordRecoveryService {
   }> {
     const user = await this.prisma.user.findUnique({
       where: { username },
-      select: { authUserId: true, email: true, status: true },
+      select: {
+        authUserId: true,
+        email: true,
+        emailIsPlaceholder: true,
+        status: true,
+      },
     });
     // Every well-formed username pays for one Supabase identity lookup. Without
     // the synthetic id, a known active account has one more network round trip
@@ -120,6 +131,7 @@ export class PasswordRecoveryService {
       email:
         user?.authUserId &&
         user.email &&
+        !user.emailIsPlaceholder &&
         usableStatus &&
         identity === "present"
           ? user.email

@@ -1,5 +1,9 @@
 import { HttpStatus } from "@nestjs/common";
-import type { AcademyRole } from "@cove/shared";
+import {
+  displayableEmail,
+  effectiveAcademyRoles,
+  type AcademyRole,
+} from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
@@ -8,8 +12,14 @@ import type { AuditService } from "./audit.service.js";
 
 export const membershipInclude = {
   user: {
-    select: { id: true, email: true, displayName: true },
+    select: {
+      id: true,
+      email: true,
+      emailIsPlaceholder: true,
+      displayName: true,
+    },
   },
+  extraRoles: { select: { role: true } },
 } as const;
 
 type MembershipWithUser = Prisma.AcademyMembershipGetPayload<{
@@ -139,16 +149,37 @@ export function hasAnotherActiveManager(
 
 export function toAcademyMember(membership: {
   id: string;
-  role: "STUDENT" | "TEACHER" | "TEAM_LEAD" | "MANAGER";
+  role: AcademyRole;
   status: "INVITED" | "ACTIVE" | "SUSPENDED" | "LEFT";
   joinedAt: Date | null;
   suspendedAt: Date | null;
-  user: { id: string; email: string | null; displayName: string | null };
+  user: {
+    id: string;
+    email: string | null;
+    emailIsPlaceholder?: boolean;
+    displayName: string | null;
+  };
+  extraRoles?: { role: AcademyRole }[];
 }) {
   return {
     id: membership.id,
-    user: membership.user,
+    user: {
+      id: membership.user.id,
+      // A student's generated address is not an address anybody can read, and
+      // the roster is one of the places it would otherwise be rendered as
+      // though it were.
+      email: membership.user.emailIsPlaceholder
+        ? null
+        : displayableEmail(membership.user.email),
+      displayName: membership.user.displayName,
+    },
     role: membership.role,
+    roles: [
+      ...effectiveAcademyRoles(
+        membership.role,
+        (membership.extraRoles ?? []).map((extra) => extra.role),
+      ),
+    ],
     status: membership.status,
     joinedAt: membership.joinedAt?.toISOString() ?? null,
     suspendedAt: membership.suspendedAt?.toISOString() ?? null,

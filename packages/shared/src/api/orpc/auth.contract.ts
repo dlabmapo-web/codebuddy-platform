@@ -34,6 +34,43 @@ export const authContract = {
       captchaToken: z.string().min(1).max(4096).optional(),
     }))
     .output(z.object({ accepted: z.literal(true) })),
+  /**
+   * Creates a student account, which has no email address.
+   *
+   * Separate from the browser's own `supabase.auth.signUp` for two reasons a
+   * form cannot work around. Supabase requires an address, and any address the
+   * browser invented would be one the browser could choose; and an account
+   * created by `signUp` has an unconfirmed email, which makes
+   * `ensureSignupRequest` skip the academy join request and strands the student
+   * on `/welcome` with no way forward. The API creates the identity with the
+   * service-role client, confirmed, against a generated placeholder.
+   *
+   * Answers with that placeholder so the browser can sign in with it. It is
+   * not a secret — it authenticates nothing without the password — and
+   * returning it saves a round trip.
+   */
+  signUpStudent: oc
+    .input(z.object({
+      username: usernameSchema,
+      displayName: z.string().trim().min(2).max(100),
+      password: z.string().min(8).max(72),
+      academyId: z.uuid(),
+      captchaToken: z.string().min(1).max(4096).optional(),
+    }))
+    .output(z.object({ email: z.string() })),
+  /**
+   * Forgets the password a manager issued to this account, because the account
+   * holder has just replaced it.
+   *
+   * The invariant `StudentIssuedCredential` rests on: Cove keeps only a
+   * password it generated, and only while that is still the password. The
+   * change itself happens in the browser against Supabase — Cove never sees
+   * the new value — so this is the call that tells the API the old one is
+   * dead. Idempotent, and harmless for an account that never had one.
+   */
+  forgetIssuedPassword: oc
+    .input(emptyInputSchema)
+    .output(z.object({ forgotten: z.boolean() })),
   setUsername: oc
     .input(z.object({ username: usernameSchema }))
     .output(authMeResponseSchema),

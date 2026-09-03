@@ -82,12 +82,26 @@ describe("learningScopeFor", () => {
     expect(klass?.status).toBe("ACTIVE");
     // A demoted or suspended teacher stops reaching the class through the
     // stale assignment, so the role and status are part of the join.
-    expect(klass?.assignedTeacher).toEqual({
+    //
+    // The role is matched as a *set* membership: a manager who also teaches
+    // stores `role = MANAGER` with TEACHER beside it, and an equality test
+    // here would have cut them off from the classes they run.
+    //
+    // Homeroom or assistant: both teach the class, and the same membership
+    // predicate applies to either seat.
+    const teacher = {
       academyId,
       userId,
       status: "ACTIVE",
-      role: "TEACHER",
-    });
+      OR: [
+        { role: "TEACHER" },
+        { extraRoles: { some: { role: "TEACHER" } } },
+      ],
+    };
+    expect(klass?.OR).toEqual([
+      { assignedTeacher: teacher },
+      { assistantTeachers: { some: { teacher } } },
+    ]);
   });
 
   it("leaves curriculum owners on visibility rules alone", () => {

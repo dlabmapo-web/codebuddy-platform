@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import {
+  displayableEmail,
   academyRoles,
   clampPage,
+  effectiveAcademyRoles,
   membershipStatuses,
   type ListPeopleInput,
   type PeoplePage,
@@ -103,6 +105,7 @@ export class PeopleDirectoryService {
         id: true,
         userId: true,
         role: true,
+        extraRoles: { select: { role: true } },
         status: true,
         joinedAt: true,
         suspendedAt: true,
@@ -146,10 +149,16 @@ export class PeopleDirectoryService {
         membership.memberProfile?.academyDisplayName?.trim() ||
         membership.user.displayName?.trim() ||
         membership.user.username?.trim() ||
-        membership.user.email ||
+        displayableEmail(membership.user.email) ||
         "—",
-      email: membership.user.email,
+      email: displayableEmail(membership.user.email),
       role: membership.role,
+      roles: [
+        ...effectiveAcademyRoles(
+          membership.role,
+          membership.extraRoles.map((extra) => extra.role),
+        ),
+      ],
       status: membership.status,
       joinedAt: membership.joinedAt?.toISOString() ?? null,
       suspendedAt: membership.suspendedAt?.toISOString() ?? null,

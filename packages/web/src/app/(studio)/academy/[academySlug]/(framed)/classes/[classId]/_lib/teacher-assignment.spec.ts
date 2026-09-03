@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assistantCandidates,
+  assistantSlotsLeft,
   canEditAssignment,
+  canSubmitAssistants,
   canSubmitTeacherSelection,
+  currentAssistantIds,
   isReplacement,
   teacherAssignmentState,
   teacherDisplayName,
@@ -11,6 +15,7 @@ import {
 
 const membershipA = '60000000-0000-4000-8000-00000000000a';
 const membershipB = '60000000-0000-4000-8000-00000000000b';
+const membershipC = '60000000-0000-4000-8000-00000000000c';
 
 describe('teacherAssignmentState', () => {
   it('reports an unassigned class', () => {
@@ -22,7 +27,7 @@ describe('teacherAssignmentState', () => {
       teacherAssignmentState({
         userStatus: 'ACTIVE',
         membershipStatus: 'ACTIVE',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('active');
   });
@@ -34,9 +39,25 @@ describe('teacherAssignmentState', () => {
       teacherAssignmentState({
         userStatus: 'ACTIVE',
         membershipStatus: 'SUSPENDED',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('unavailable');
+  });
+
+  /*
+   * A director who also teaches. Their membership stores `role = MANAGER`
+   * with TEACHER beside it, and reading the primary role alone marked a
+   * working assignment "no longer a teacher" the moment they were granted a
+   * second role.
+   */
+  it('keeps a multi-role member assigned while they still hold TEACHER', () => {
+    expect(
+      teacherAssignmentState({
+        userStatus: 'ACTIVE',
+        membershipStatus: 'ACTIVE',
+        roles: ['TEACHER', 'TEAM_LEAD', 'MANAGER'],
+      }),
+    ).toBe('active');
   });
 
   it('reports a membership moved off the teacher role as unavailable', () => {
@@ -44,14 +65,14 @@ describe('teacherAssignmentState', () => {
       teacherAssignmentState({
         userStatus: 'ACTIVE',
         membershipStatus: 'ACTIVE',
-        role: 'TEAM_LEAD',
+        roles: ['TEAM_LEAD'],
       }),
     ).toBe('unavailable');
     expect(
       teacherAssignmentState({
         userStatus: 'ACTIVE',
         membershipStatus: 'ACTIVE',
-        role: 'STUDENT',
+        roles: ['STUDENT'],
       }),
     ).toBe('unavailable');
   });
@@ -61,7 +82,7 @@ describe('teacherAssignmentState', () => {
       teacherAssignmentState({
         userStatus: 'ACTIVE',
         membershipStatus: 'INVITED',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('unavailable');
   });
@@ -71,7 +92,7 @@ describe('teacherAssignmentState', () => {
       teacherAssignmentState({
         userStatus: 'SUSPENDED',
         membershipStatus: 'ACTIVE',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('unavailable');
   });
@@ -83,7 +104,7 @@ describe('unavailableReason', () => {
       unavailableReason({
         userStatus: 'ACTIVE',
         membershipStatus: 'ACTIVE',
-        role: 'TEAM_LEAD',
+        roles: ['TEAM_LEAD'],
       }),
     ).toBe('role');
   });
@@ -93,14 +114,14 @@ describe('unavailableReason', () => {
       unavailableReason({
         userStatus: 'ACTIVE',
         membershipStatus: 'SUSPENDED',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('suspended');
     expect(
       unavailableReason({
         userStatus: 'ACTIVE',
         membershipStatus: 'LEFT',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('suspended');
   });
@@ -110,7 +131,7 @@ describe('unavailableReason', () => {
       unavailableReason({
         userStatus: 'SUSPENDED',
         membershipStatus: 'ACTIVE',
-        role: 'TEACHER',
+        roles: ['TEACHER'],
       }),
     ).toBe('account');
   });
@@ -233,5 +254,103 @@ describe('teacherDisplayName', () => {
       teacherDisplayName({ displayName: null, email: null }, 'Name not set'),
     ).toBe('Name not set');
     expect(teacherDisplayName(null, 'Name not set')).toBe('Name not set');
+  });
+});
+
+
+describe('assistant teachers', () => {
+  const seat = (membershipId: string, isHomeroom: boolean) => ({
+    membershipId,
+    isHomeroom,
+  });
+
+  it('reads the assistants off the class teacher list', () => {
+    expect(
+      currentAssistantIds([
+        seat(membershipA, true),
+        seat(membershipB, false),
+        seat(membershipC, false),
+      ]),
+    ).toEqual([membershipB, membershipC]);
+  });
+
+  it('reports no assistants for a class with only a homeroom teacher', () => {
+    expect(currentAssistantIds([seat(membershipA, true)])).toEqual([]);
+  });
+
+  /*
+   * Filtered out rather than shown and refused: offering the homeroom teacher
+   * would let a manager submit the one change the API exists to reject.
+   */
+  it('never offers the homeroom teacher as their own assistant', () => {
+    expect(
+      assistantCandidates(
+        [{ membershipId: membershipA }, { membershipId: membershipB }],
+        membershipA,
+      ),
+    ).toEqual([{ membershipId: membershipB }]);
+  });
+
+  it('offers everybody while the class is unassigned', () => {
+    expect(
+      assistantCandidates([{ membershipId: membershipA }], null),
+    ).toHaveLength(1);
+  });
+
+  it('counts the seats left from the assistant cap', () => {
+    expect(assistantSlotsLeft(0)).toBe(2);
+    expect(assistantSlotsLeft(2)).toBe(0);
+    // A class already over the cap reports no room rather than a negative.
+    expect(assistantSlotsLeft(3)).toBe(0);
+  });
+
+  it('refuses to submit the set already stored', () => {
+    expect(
+      canSubmitAssistants({
+        selectedIds: [membershipB],
+        currentIds: [membershipB],
+        pending: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('submits a swap that keeps the same number of assistants', () => {
+    expect(
+      canSubmitAssistants({
+        selectedIds: [membershipC],
+        currentIds: [membershipB],
+        pending: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('submits an emptied set, which is how the last assistant goes', () => {
+    expect(
+      canSubmitAssistants({
+        selectedIds: [],
+        currentIds: [membershipB],
+        pending: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('refuses more assistants than the class may carry', () => {
+    expect(
+      canSubmitAssistants({
+        selectedIds: [membershipA, membershipB, membershipC],
+        currentIds: [],
+        pending: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('refuses while a save is in flight, so one click cannot send twice', () => {
+    expect(
+      canSubmitAssistants({
+        selectedIds: [membershipB],
+        currentIds: [],
+        pending: true,
+      }),
+    ).toBe(false);
   });
 });

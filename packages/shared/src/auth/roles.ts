@@ -256,6 +256,14 @@ export const academyPermissions = [
   "academy.members.read",
   "academy.members.manage",
   /**
+   * Issuing a student's password, and reading back one already issued.
+   *
+   * Separate from `academy.members.manage`, which covers role, suspension, and
+   * profile. Changing how a child signs in is a different authority from
+   * changing what they may do, and only one of the two reads a secret.
+   */
+  "academy.members.credentials.manage",
+  /**
    * Read and review pending academy applications. This does not authorize
    * changing an existing member's role, suspending one, or sending an
    * invitation; those remain separate membership-management capabilities.
@@ -344,6 +352,11 @@ const teamLeadPermissions = [
 const managerOnlyPermissions = [
   "academy.settings.manage",
   "academy.members.manage",
+  /*
+   * Manager-only, and deliberately not in `teamLeadPermissions`. A Team Lead
+   * runs what the academy teaches; how a child signs in is not curriculum.
+   */
+  "academy.members.credentials.manage",
   "class-enrollments.manage",
   "class-schedule.manage",
 ] as const satisfies readonly AcademyPermission[];
@@ -552,3 +565,93 @@ export function grantHasPermission(
 ): boolean {
   return grantEffectivePermissions(grant).includes(permission);
 }
+
+/**
+ * How much authority each academy role carries, for the one question that
+ * needs an order: which of several held roles is the primary one.
+ *
+ * Written out rather than taken from the position of a member in
+ * `academyRoles`, for the reason §5.3 of the authorization design gives — a
+ * reordering of that array must never silently promote somebody. Permissions
+ * are still never decided by comparing these numbers; that is what
+ * `rolesHavePermission` is for.
+ */
+const academyRoleRank: Record<AcademyRole, number> = {
+  STUDENT: 0,
+  TEACHER: 1,
+  TEAM_LEAD: 2,
+  MANAGER: 3,
+};
+
+/**
+ * Every role a member holds in one academy: the primary one stored on the
+ * membership, plus any granted beside it.
+ *
+ * Deduplicated and ordered by `academyRoles`, so the switcher lists them the
+ * same way on every screen and two equal sets are equal arrays.
+ */
+export function effectiveAcademyRoles(
+  primary: AcademyRole,
+  extras: readonly AcademyRole[] = [],
+): readonly AcademyRole[] {
+  const held = new Set<AcademyRole>([primary, ...extras]);
+  return academyRoles.filter((role) => held.has(role));
+}
+
+/**
+ * Whether a member holding this set may do something.
+ *
+ * The union, never the primary role alone. A Manager who also teaches holds
+ * both sets at once; asking only about the highest would take away the
+ * teaching surfaces that are the whole point of granting the second role.
+ */
+export function rolesHavePermission(
+  roles: readonly AcademyRole[],
+  permission: AcademyPermission,
+): boolean {
+  return roles.some((role) => roleHasPermission(role, permission));
+}
+
+/** The highest role in a set — what `AcademyMembership.role` must hold. */
+export function primaryAcademyRole(
+  roles: readonly AcademyRole[],
+): AcademyRole | null {
+  return roles.reduce<AcademyRole | null>(
+    (highest, role) =>
+      highest === null || academyRoleRank[role] > academyRoleRank[highest]
+        ? role
+        : highest,
+    null,
+  );
+}
+
+/**
+ * Whether these roles may be held by one membership.
+ *
+ * `STUDENT` combines with nothing. Not squeamishness about hierarchy: a
+ * student's rows are *about* them — their submissions, their points, their
+ * class standing, the feedback their teacher wrote them — while every staff
+ * role reads *across* students. A membership that was both would make "whose
+ * work is this page showing" a question with two answers, and every
+ * monitoring, points, and analytics query would need a new opinion about which
+ * one it meant. A person who is genuinely both keeps two academy accounts,
+ * which is rare and honest.
+ */
+export function canCombineAcademyRoles(
+  roles: readonly AcademyRole[],
+): boolean {
+  if (roles.length === 0) return false;
+  return !roles.includes("STUDENT") || roles.length === 1;
+}
+
+/**
+ * Whether a member holding this set is a student.
+ *
+ * Exactly `{ STUDENT }`, by the rule above. Written as its own predicate
+ * because the credential endpoints refuse any target that is not one, and
+ * `roles.includes("STUDENT")` would be the wrong question to ask there.
+ */
+export function isStudentRoleSet(roles: readonly AcademyRole[]): boolean {
+  return roles.length === 1 && roles[0] === "STUDENT";
+}
+

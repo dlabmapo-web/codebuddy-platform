@@ -41,10 +41,11 @@ const account: AuthMeResponse = {
     displayName: 'Student',
     avatarUrl: null,
     imageUrl: null,
+    emailIsPlaceholder: false,
     platformRole: 'USER',
     status: 'ACTIVE',
     memberships: [
-      { academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null },
+      { academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null },
     ],
     applications: [],
   },

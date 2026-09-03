@@ -20,10 +20,10 @@ export default async function NewExercisePage({
   }>;
 }) {
   const { academySlug, courseId, lectureId } = await params;
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
   const tree = await client.academyCourses.getTree({ academyId, courseId });
   const courseModule = tree.modules.find((item) =>
@@ -38,7 +38,7 @@ export default async function NewExercisePage({
     lecture: { id: lecture.id, title: lecture.title },
     material: null,
   };
-  const canEdit = canManageExercises(role);
+  const canEdit = canManageExercises(roles);
   if (!canEdit) notFound();
 
   return (

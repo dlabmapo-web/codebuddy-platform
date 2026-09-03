@@ -22,8 +22,8 @@ export default async function AcademySettingsPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId, role } = await requireAcademyRoute(academySlug);
-  if (!canManageAcademySettings(role)) notFound();
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
+  if (!canManageAcademySettings(roles)) notFound();
 
   const { t } = await getServerTranslation(['content']);
 

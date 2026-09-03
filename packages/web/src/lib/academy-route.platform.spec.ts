@@ -48,6 +48,9 @@ describe('platform academy route', () => {
       academyId: 'academy-1',
       academySlug: 'mapo-dlab',
       role: 'MANAGER',
+      // An operator stands in one role and holds nothing beside it, so the
+      // set the `can*` gates read is that role alone.
+      roles: ['MANAGER'],
     });
     expect(mocks.cookies).not.toHaveBeenCalled();
   });

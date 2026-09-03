@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { ProfileMediaService } from "../profile/profile-media.service.js";
+import type { SupabaseAuthService } from "./supabase-auth.service.js";
 import { AuthService } from "./auth.service.js";
 import type { SupabaseIdentity } from "./auth.types.js";
 
@@ -12,6 +13,19 @@ import type { SupabaseIdentity } from "./auth.types.js";
  */
 const media = {} as ProfileMediaService;
 
+/**
+ * Only `signUpStudent` reaches Supabase, and nothing in this file exercises it.
+ * A stub that would throw if it were touched is more useful than a permissive
+ * one: it keeps a future test from silently creating a real identity.
+ */
+const supabaseAuth = () =>
+  ({
+    createStudentUser: vi.fn(() => {
+      throw new Error("unexpected Supabase call");
+    }),
+    deleteUser: vi.fn(),
+  }) as unknown as SupabaseAuthService;
+
 const academyId = "20000000-0000-4000-8000-000000000001";
 const authUserId = "90000000-0000-4000-8000-000000000001";
 const userId = "91000000-0000-4000-8000-000000000001";
@@ -19,6 +33,7 @@ const userId = "91000000-0000-4000-8000-000000000001";
 const identity: SupabaseIdentity = {
   authUserId,
   email: "social@example.com",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: "Social User",
@@ -32,6 +47,7 @@ function userRecord() {
     id: userId,
     authUserId,
     email: identity.email,
+    emailIsPlaceholder: false,
     username: null,
     displayName: identity.displayName,
     avatarUrl: null,
@@ -90,7 +106,7 @@ function createCompletionService(provider = "google") {
   return {
     prisma,
     transaction,
-    service: new AuthService(prisma, onboarding, media),
+    service: new AuthService(prisma, onboarding, media, supabaseAuth()),
   };
 }
 
@@ -122,7 +138,7 @@ describe("AuthService.bootstrap username claim", () => {
     const onboarding = {
       ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
     } as unknown as AcademyOnboardingService;
-    return { create, update, service: new AuthService(prisma, onboarding, media) };
+    return { create, update, service: new AuthService(prisma, onboarding, media, supabaseAuth()) };
   }
 
   it("stores the signup username on the new profile", async () => {
@@ -187,7 +203,7 @@ describe("AuthService.bootstrap username claim", () => {
       ensureSignupRequest: vi.fn().mockResolvedValue(undefined),
     } as unknown as AcademyOnboardingService;
 
-    const result = await new AuthService(prisma, onboarding, media).bootstrap({
+    const result = await new AuthService(prisma, onboarding, media, supabaseAuth()).bootstrap({
       ...identity,
       username: "somebody-else",
     });
@@ -223,6 +239,7 @@ describe("AuthService.me profile images", () => {
           featureFlags: [],
         },
         role: "MANAGER",
+        extraRoles: [],
         status: "ACTIVE",
         memberProfile: {
           avatarAssetId: academyAsset.id,
@@ -241,6 +258,7 @@ describe("AuthService.me profile images", () => {
       prisma,
       {} as AcademyOnboardingService,
       { signMany } as unknown as ProfileMediaService,
+      supabaseAuth(),
     );
 
     const result = await service.me(identity);
@@ -259,7 +277,7 @@ describe("AuthService.resolveSignInEmail", () => {
     const prisma = { user: { findUnique } } as unknown as PrismaService;
     return {
       findUnique,
-      service: new AuthService(prisma, {} as AcademyOnboardingService, media),
+      service: new AuthService(prisma, {} as AcademyOnboardingService, media, supabaseAuth()),
     };
   }
 
@@ -315,7 +333,7 @@ describe("AuthService.setUsername", () => {
     } as unknown as PrismaService;
     return {
       update,
-      service: new AuthService(prisma, {} as AcademyOnboardingService, media),
+      service: new AuthService(prisma, {} as AcademyOnboardingService, media, supabaseAuth()),
     };
   }
 
@@ -363,7 +381,7 @@ describe("AuthService.completeOAuthOnboarding", () => {
     const prisma = {
       user: { findUnique: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaService;
-    const service = new AuthService(prisma, {} as AcademyOnboardingService, media);
+    const service = new AuthService(prisma, {} as AcademyOnboardingService, media, supabaseAuth());
 
     await expect(service.completeOAuthOnboarding(identity)).rejects.toMatchObject({
       code: "OAUTH_ONBOARDING_INTENT_REQUIRED",

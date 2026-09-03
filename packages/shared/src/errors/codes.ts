@@ -22,6 +22,15 @@ export const appErrorCodes = [
   "JOIN_REQUEST_ROLE_NOT_PERMITTED",
   "MEMBERSHIP_ALREADY_EXISTS",
   "MEMBERSHIP_STATE_CONFLICT",
+  "MEMBERSHIP_ROLE_CONFLICT",
+  "MEMBERSHIP_ROLE_ALREADY_HELD",
+  "MEMBERSHIP_ROLE_NOT_HELD",
+  "MEMBERSHIP_ROLE_LAST",
+  "STUDENT_CREDENTIAL_TARGET_INVALID",
+  "STUDENT_CREDENTIAL_NOT_STORED",
+  "STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE",
+  "SIGNUP_STUDENT_FAILED",
+  "CAPTCHA_FAILED",
   "RATE_LIMITED",
   "OAUTH_ONBOARDING_INTENT_REQUIRED",
   "OAUTH_ONBOARDING_INTENT_INVALID",
@@ -49,6 +58,7 @@ export const appErrorCodes = [
   "CLASS_VALIDATION_FAILED",
   "CLASS_MEMBERSHIP_INELIGIBLE",
   "CLASS_TEACHER_INELIGIBLE",
+  "CLASS_TEACHER_ALREADY_ASSIGNED",
   "COURSE_NOT_ASSIGNED",
   "DRAFT_TOO_LARGE",
   "SUBMISSION_IN_FLIGHT",
@@ -207,6 +217,9 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // Deliberately one message for every eligibility failure: a caller must not
   // be able to tell a suspended teacher from one in another academy.
   CLASS_TEACHER_INELIGIBLE: "Only an active teacher of this academy can be assigned to a class.",
+  // Names the person's existing place on the class rather than refusing
+  // vaguely: the fix is to change who is homeroom, not to try again.
+  CLASS_TEACHER_ALREADY_ASSIGNED: "That teacher already runs this class as its homeroom teacher.",
   COURSE_NOT_ASSIGNED: "This course is not available to you.",
   DRAFT_TOO_LARGE: "Your code is too large to save.",
   SUBMISSION_IN_FLIGHT: "This problem is already being graded. Wait for the result.",
@@ -338,4 +351,29 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   LAST_ADMIN_REQUIRED: "The platform must keep at least one operator.",
   PLATFORM_EXPORT_TOO_LARGE:
     "Too many accounts to download at once. Narrow the filter and try again.",
+  // One answer for every reason a role cannot be added, so the refusal never
+  // describes a membership the caller was not already looking at.
+  MEMBERSHIP_ROLE_CONFLICT:
+    "A student account cannot also hold a staff role. Use a separate account.",
+  MEMBERSHIP_ROLE_ALREADY_HELD: "This member already has that role.",
+  MEMBERSHIP_ROLE_NOT_HELD: "This member does not have that role.",
+  // Removing the last role would leave a membership that grants nothing. The
+  // action the caller wants is removing the member, which is a different button.
+  MEMBERSHIP_ROLE_LAST: "A member must keep at least one role.",
+  // Deliberately the same sentence for "not a student", "not in your academy",
+  // and "no such membership": a manager must not be able to learn who holds a
+  // staff role somewhere else by reading which refusal comes back.
+  STUDENT_CREDENTIAL_TARGET_INVALID:
+    "Passwords can only be issued to students in your academy.",
+  // The student has since chosen their own. Not a fault — Cove destroys what
+  // it issued the moment it stops being true.
+  STUDENT_CREDENTIAL_NOT_STORED:
+    "This student set their own password, so Cove cannot show it. Issue a new one.",
+  // No STUDENT_CREDENTIAL_KEY on this deployment. Issuing still works and
+  // shows the password once; there is simply nothing kept to read back.
+  STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE:
+    "Saved passwords are not available on this server. Issue a new one to see it once.",
+  SIGNUP_STUDENT_FAILED: "The student account could not be created.",
+  CAPTCHA_FAILED:
+    "The security check could not be completed. Refresh the page and try again.",
 };

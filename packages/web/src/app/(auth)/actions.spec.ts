@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signInWithOAuth: vi.fn(),
   signUp: vi.fn(),
+  signUpStudent: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -34,6 +35,7 @@ vi.mock('@/lib/orpc-server', () => ({
     auth: {
       checkUsernameAvailable: mocks.checkUsernameAvailable,
       resolveSignInEmail: mocks.resolveSignInEmail,
+      signUpStudent: mocks.signUpStudent,
     },
     studentSession: { begin: mocks.beginStudentSession },
   }),
@@ -76,11 +78,19 @@ const loginFields = {
   password: 'a-valid-password',
 };
 
+/**
+ * A staff signup, which is the path these tests exercise: it is the one that
+ * carries an email and goes through the browser's own Supabase client. The
+ * student path creates its identity through the API instead and is covered
+ * separately below.
+ */
 const signupFields = {
   academyId: '10000000-0000-4000-8000-000000000001',
+  kind: 'STAFF',
   displayName: 'Min Su',
   email: 'minsu@example.com',
   password: 'a-valid-password',
+  passwordConfirm: 'a-valid-password',
   username: 'minsu01',
 };
 
@@ -388,5 +398,105 @@ describe('social authentication history', () => {
       'https://accounts.example.test/authorize',
       'replace',
     );
+  });
+});
+
+/**
+ * The student half of signup: no email anywhere, and an identity the API
+ * creates rather than the browser.
+ */
+describe('signupAction for a student', () => {
+  const studentFields = {
+    academyId: '10000000-0000-4000-8000-000000000001',
+    kind: 'STUDENT',
+    displayName: 'Min Su',
+    password: 'a-valid-password',
+    passwordConfirm: 'a-valid-password',
+    username: 'minsu01',
+    captchaToken: 'turnstile-token',
+  };
+
+  it('never asks Supabase directly and never sends an email field', async () => {
+    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+
+    await signupAction({}, formData(studentFields));
+
+    // The browser's own client would demand an address; the whole point of
+    // the student path is that there is none to give it.
+    expect(mocks.signUp).not.toHaveBeenCalled();
+    expect(mocks.signUpStudent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'minsu01',
+        displayName: 'Min Su',
+        academyId: studentFields.academyId,
+        captchaToken: 'turnstile-token',
+      }),
+    );
+    expect(mocks.signUpStudent.mock.calls[0]![0]).not.toHaveProperty('email');
+  });
+
+  it('signs the student in with the address the API generated', async () => {
+    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+
+    await signupAction({}, formData(studentFields));
+
+    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
+      email: 's-abc@no-email.cove.invalid',
+      password: 'a-valid-password',
+    });
+    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
+  });
+
+  it('reports a taken username without creating anything', async () => {
+    mocks.signUpStudent.mockRejectedValue(
+      new ORPCError('CONFLICT', { data: { code: 'USERNAME_TAKEN' } }),
+    );
+
+    await expect(signupAction({}, formData(studentFields))).resolves.toEqual({
+      message: 'error.username_taken',
+    });
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('treats a failed sign-in as success, because the account exists', async () => {
+    // Reporting a failure here would send somebody to try again and be told
+    // the name is taken — by their own account.
+    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    await expect(signupAction({}, formData(studentFields))).resolves.toEqual({
+      success: true,
+      message: 'error.signup_student_sign_in',
+    });
+  });
+});
+
+describe('signupAction password confirmation', () => {
+  it('refuses a mismatch on the server, whatever the browser did', async () => {
+    // A student cannot recover a password by email, so a mistyped one is an
+    // account lost until a manager issues a new one.
+    await expect(
+      signupAction(
+        {},
+        formData({
+          ...signupFields,
+          passwordConfirm: 'a-different-password',
+          captchaToken: 'turnstile-token',
+        }),
+      ),
+    ).resolves.toEqual({ message: 'validation:password_mismatch' });
+    expect(mocks.signUp).not.toHaveBeenCalled();
+    expect(mocks.signUpStudent).not.toHaveBeenCalled();
   });
 });

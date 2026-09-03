@@ -20,6 +20,8 @@ const courseTwo = "40000000-0000-4000-8000-000000000002";
 
 function createService(overrides?: {
   role?: string;
+  /** Every role held, when it differs from `[role]`. */
+  roles?: string[];
   classes?: { id: string; name: string }[];
   memberships?: unknown[];
   assignments?: unknown[];
@@ -54,6 +56,7 @@ function createService(overrides?: {
     requirePermission: vi.fn().mockResolvedValue({
       userId: "teacher-user",
       role: overrides?.role ?? "TEACHER",
+      roles: overrides?.roles ?? [overrides?.role ?? "TEACHER"],
     }),
   } as unknown as AcademyAccessService;
 
@@ -73,6 +76,22 @@ describe("TeacherOverviewAccessService", () => {
     ).rejects.toMatchObject({ code: "TEACHER_OVERVIEW_ACCESS_DENIED" });
   });
 
+  /*
+   * The regression this guards: a Manager granted TEACHER holds
+   * `role = MANAGER`, so an exact comparison refused them the teaching
+   * overview the grant exists to give — the page rendered
+   * "This section could not load".
+   */
+  it("admits a manager who also holds teacher", async () => {
+    const { service } = createService({
+      role: "MANAGER",
+      roles: ["TEACHER", "MANAGER"],
+    });
+    await expect(
+      service.requireScope(identity, { academyId }),
+    ).resolves.toBeDefined();
+  });
+
   it("refuses an actor with no membership row in this academy", async () => {
     const { service } = createService({ membershipRow: null });
     await expect(
@@ -89,11 +108,31 @@ describe("TeacherOverviewAccessService", () => {
         where: expect.objectContaining({
           academyId,
           status: "ACTIVE",
-          teacherMembershipId: "teacher-membership",
-          assignedTeacher: expect.objectContaining({
-            role: "TEACHER",
-            status: "ACTIVE",
-          }),
+          // Homeroom or assistant, with the same membership predicate on
+          // either seat.
+          OR: [
+            {
+              assignedTeacher: expect.objectContaining({
+                id: "teacher-membership",
+                // Set membership, so a manager who also teaches still matches.
+                OR: [
+                  { role: "TEACHER" },
+                  { extraRoles: { some: { role: "TEACHER" } } },
+                ],
+                status: "ACTIVE",
+              }),
+            },
+            {
+              assistantTeachers: {
+                some: {
+                  teacher: expect.objectContaining({
+                    id: "teacher-membership",
+                    status: "ACTIVE",
+                  }),
+                },
+              },
+            },
+          ],
         }),
       }),
     );

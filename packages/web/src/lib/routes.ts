@@ -47,6 +47,8 @@ export const routes = {
     `/admin/academies/${segment(academySlug)}/classes`,
   adminAcademyClass: (academySlug: string, classId: string) =>
     `/admin/academies/${segment(academySlug)}/classes/${segment(classId)}`,
+  adminAcademyStudentPoints: (academySlug: string, membershipId: string) =>
+    `/admin/academies/${segment(academySlug)}/points/students/${segment(membershipId)}`,
   /** The content library. It has no academy slug in its addresses: head
    *  office never sees its own curriculum addressed as a customer's academy. */
   adminLibrary: '/admin/content/library',

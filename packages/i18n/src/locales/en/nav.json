@@ -37,5 +37,8 @@
   "badge": {
     "pending_applications": "{{pending}} waiting for approval",
     "pending_applications_tooltip": "{{link}} · {{pending}} waiting"
+  },
+  "role_switcher": {
+    "label": "View as"
   }
 }

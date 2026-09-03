@@ -18,13 +18,14 @@ import {
   canReviewContent,
   isStudent,
 } from '@/lib/academy-access-state';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import { SupportBanner } from '@/components/studio/support-banner';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
+import { heldRoles, resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
 
 /**
@@ -68,7 +69,9 @@ export async function StudioChrome({
   let academies: StudioAcademy[] = [];
   let academyName = '';
   let selectedMembershipFound = false;
-  let role = null;
+  let role: AcademyRole | null = null;
+  let held: readonly AcademyRole[] = [];
+  let primaryRole: AcademyRole | null = null;
   let hasPoints = false;
   let viewer: {
     academyImageUrl: string | null;
@@ -93,6 +96,8 @@ export async function StudioChrome({
     selectedMembershipFound = Boolean(selectedMembership);
     academyName = selectedMembership?.academy.name ?? '';
     role = selectedMembership?.role ?? routeRole;
+    held = heldRoles(account, academyId);
+    primaryRole = selectedMembership?.role ?? null;
     if (!selectedMembership) {
       // Visiting on a grant. The switcher still lists the operator's own
       // academies — none, usually — and this one is added so the header names
@@ -144,14 +149,50 @@ export async function StudioChrome({
   // Here without a membership and without a session: the standing read.
   const visiting = !selectedMembershipFound && !support;
 
-  const sidebarState = (await cookies()).get('cove_sidebar_state')?.value;
+  const cookieStore = await cookies();
+  const sidebarState = cookieStore.get('cove_sidebar_state')?.value;
 
+  /*
+   * Which of this member's roles the shell is built for.
+   *
+   * The union decides what they may do; this decides what they are shown. A
+   * member with one role — almost everybody — resolves to it and sees no
+   * switcher at all, so nothing about this is visible until somebody genuinely
+   * holds two.
+   *
+   * Note the sidebar gates below take `shown` and not `held`. Leaving every
+   * role's navigation on screen would make the switcher change the overview
+   * and nothing else, which is not a switcher. The API is unaffected either
+   * way: it authorizes against the full set and has never read this.
+   */
+  const viewRole = primaryRole
+    ? resolveViewRole({
+        academyId,
+        held,
+        primary: primaryRole,
+        cookie: cookieStore.get(viewRoleCookieName)?.value,
+      }).role
+    : null;
+  /*
+   * A visiting operator holds no membership, so there is no view role to
+   * resolve and `held` is empty. What they are standing in is the role the
+   * route resolved — a support grant's assumed role, or the platform view — so
+   * the shell is built from that instead. Building it from an empty set would
+   * hand them a sidebar with nothing in it, which is the fault `routeRole`
+   * exists to prevent.
+   */
+  const shown: readonly AcademyRole[] = viewRole
+    ? [viewRole]
+    : role
+      ? [role]
+      : [];
   return (
     <SidebarProvider defaultOpen={sidebarState !== 'false'}>
       <StudioSidebar
         academies={academies}
+        viewRole={viewRole}
         academyId={academyId}
-        canLearn={canLearn(role)}
+        canLearn={canLearn(shown)}
         /*
          * A read-only support session narrows the nav to what it can open.
          * Without this the sidebar offered a visiting operator Applications
@@ -160,10 +201,10 @@ export async function StudioChrome({
          * refusal. Membership access is unaffected: `writable` is true for
          * everyone who is actually a member.
          */
-        canManageAcademy={canManageAcademy(role) && writable}
-        canManageClasses={canManageClasses(role) && writable}
-        canManageContent={canReviewContent(role)}
-        canReviewApplications={canReviewApplications(role) && writable}
+        canManageAcademy={canManageAcademy(shown) && writable}
+        canManageClasses={canManageClasses(shown) && writable}
+        canManageContent={canReviewContent(shown)}
+        canReviewApplications={canReviewApplications(shown) && writable}
         /*
          * This gates the *classes* link, not the live watch. A platform
          * operator standing as Teacher covers the academy's classes, so the
@@ -171,10 +212,10 @@ export async function StudioChrome({
          * `MonitoringAccessService`, which needs a real membership.
          */
         canMonitor={
-          canMonitorClasses(role) && (support ? support.allowMonitoring : true)
+          canMonitorClasses(shown) && (support ? support.allowMonitoring : true)
         }
         hasPoints={hasPoints}
-        isStudent={isStudent(role)}
+        isStudent={isStudent(shown)}
       />
       <SidebarInset>
         {/* Above the sticky header and inside the content column: as a sibling
@@ -202,7 +243,23 @@ export async function StudioChrome({
           </span>
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
-          <HeaderControls account={viewer ?? undefined} className="ml-auto" />
+          {/* The role switcher rides in this menu rather than beside the
+              academy name: which role you are working as is a fact about the
+              reader, and the bar is about the academy. */}
+          <HeaderControls
+            account={
+              viewer
+                ? {
+                    ...viewer,
+                    academyId,
+                    academySlug: academySlug || undefined,
+                    role: viewRole,
+                    roles: held,
+                  }
+                : undefined
+            }
+            className="ml-auto"
+          />
         </header>
         {children}
       </SidebarInset>

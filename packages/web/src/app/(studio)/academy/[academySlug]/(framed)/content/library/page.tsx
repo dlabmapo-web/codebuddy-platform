@@ -29,7 +29,7 @@ export default async function AcademyLibraryPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['academy-library']);
 
   let courses = null;
@@ -37,7 +37,7 @@ export default async function AcademyLibraryPage({
     const result = await createServerORPCClient().academyLibrary.available({
       academyId,
     });
-    courses = canManageContent(role) ? result.courses : null;
+    courses = canManageContent(roles) ? result.courses : null;
   } catch {
     // The unavailable state below covers both a refusal and a fault: this page
     // offers nothing but a copy, so a reader who cannot copy has no partial

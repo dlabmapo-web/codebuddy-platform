@@ -9,6 +9,7 @@ import { MonitoringAccessService } from "./monitoring-access.service.js";
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "teacher@example.com",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: "Teacher",
@@ -35,6 +36,8 @@ const studentClaim = {
 
 function createService(options?: {
   role?: "TEACHER" | "TEAM_LEAD" | "MANAGER" | "STUDENT";
+  /** Every role held, when it differs from `[role]`. */
+  roles?: ("TEACHER" | "TEAM_LEAD" | "MANAGER" | "STUDENT")[];
   permissionError?: AppException;
   featureEnabled?: boolean | null;
   teacherMembership?: { id: string } | null;
@@ -83,6 +86,7 @@ function createService(options?: {
         userId: teacherUserId,
         academyId,
         role: options?.role ?? "TEACHER",
+        roles: options?.roles ?? [options?.role ?? "TEACHER"],
       });
     }),
   } as unknown as AcademyAccessService;
@@ -177,20 +181,30 @@ describe("requireAssignedClass", () => {
   it("queries every fact of the effective-assignment predicate", async () => {
     const { service, prisma } = createService();
     await service.requireAssignedClass(actor, classId);
+    // The same membership predicate on both sides: an assistant who has been
+    // suspended or moved off TEACHER loses the class exactly as the homeroom
+    // teacher does.
+    const teacher = {
+      id: teacherMembershipId,
+      academyId,
+      userId: teacherUserId,
+      OR: [
+        { role: "TEACHER" },
+        { extraRoles: { some: { role: "TEACHER" } } },
+      ],
+      status: "ACTIVE",
+      user: { status: "ACTIVE" },
+    };
     expect(prisma.class.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           id: classId,
           academyId,
           status: "ACTIVE",
-          teacherMembershipId,
-          assignedTeacher: {
-            academyId,
-            userId: teacherUserId,
-            role: "TEACHER",
-            status: "ACTIVE",
-            user: { status: "ACTIVE" },
-          },
+          OR: [
+            { assignedTeacher: teacher },
+            { assistantTeachers: { some: { teacher } } },
+          ],
         },
       }),
     );

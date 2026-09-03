@@ -15,6 +15,8 @@ import { AcademyAccessService } from "../authorization/academy-access.service.js
 import { AuthService } from "../auth/auth.service.js";
 import { OAuthOnboardingIntentService } from "../auth/oauth-onboarding-intent.service.js";
 import { PasswordRecoveryService } from "../auth/password-recovery.service.js";
+import { TurnstileService } from "../auth/turnstile.service.js";
+import { StudentCredentialService } from "../academies/student-credential.service.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { StudentSessionService } from "../auth/student-session.service.js";
 import { createStudentSessionRouter } from "../auth/student-session.router.js";
@@ -89,6 +91,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     supabaseAuthService: app.get(SupabaseAuthService, { strict: false }),
+    turnstileService: app.get(TurnstileService, { strict: false }),
     studentSessionService: app.get(StudentSessionService, { strict: false }),
     academyDiscoveryService: app.get(AcademyDiscoveryService, { strict: false }),
     academyInvitationService: app.get(AcademyInvitationService, {
@@ -98,6 +101,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     academyMembershipService: app.get(AcademyMembershipService, {
+      strict: false,
+    }),
+    studentCredentialService: app.get(StudentCredentialService, {
       strict: false,
     }),
     academyOnboardingService: app.get(AcademyOnboardingService, {

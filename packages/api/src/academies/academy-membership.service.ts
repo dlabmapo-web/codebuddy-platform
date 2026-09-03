@@ -1,5 +1,11 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import type { AcademyRole } from "@cove/shared";
+import {
+  canCombineAcademyRoles,
+  displayableEmail,
+  effectiveAcademyRoles,
+  primaryAcademyRole,
+  type AcademyRole,
+} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -76,6 +82,148 @@ export class AcademyMembershipService {
       include: membershipInclude,
     });
     return toAcademyMember(updated);
+  }
+
+  /**
+   * Adds a role beside the ones this member already holds.
+   *
+   * The primary role on the membership row is left alone unless the new role
+   * outranks it, in which case the two swap: `AcademyMembership.role` must
+   * stay the highest held role, because every existing roster, index, and
+   * analytic reads it as exactly that.
+   */
+  async grantRole(
+    identity: SupabaseIdentity,
+    input: { academyId: string; membershipId: string; role: AcademyRole },
+  ) {
+    const actor = await this.requireManager(identity, input.academyId);
+    return this.prisma.$transaction(async (transaction) => {
+      const membership = await lockMembershipForUpdate(
+        transaction,
+        input.academyId,
+        input.membershipId,
+      );
+      if (membership.status !== "ACTIVE") {
+        throw new AppException("MEMBERSHIP_STATE_CONFLICT", HttpStatus.CONFLICT);
+      }
+
+      const held = effectiveAcademyRoles(
+        membership.role,
+        membership.extraRoles.map((extra) => extra.role),
+      );
+      const { next, primary } = planRoleGrant(held, input.role);
+      // The role being displaced from the primary slot becomes an extra row,
+      // and the new highest takes its place. Written as a delete-then-create
+      // of the whole extra set rather than a diff: there are at most three
+      // rows, and a diff here would be more code than it saves.
+      await transaction.academyMembershipRole.deleteMany({
+        where: { membershipId: membership.id },
+      });
+      await transaction.academyMembershipRole.createMany({
+        data: next
+          .filter((role) => role !== primary)
+          .map((role) => ({
+            membershipId: membership.id,
+            role,
+            grantedByUserId: actor.userId,
+          })),
+      });
+      const updated = await transaction.academyMembership.update({
+        where: { id: membership.id },
+        data: { role: primary, approvedByUserId: actor.userId },
+        include: membershipInclude,
+      });
+
+      await this.audit.write(transaction, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "academy.membership.role_granted",
+        targetType: "AcademyMembership",
+        targetId: membership.id,
+        before: { roles: held },
+        after: { roles: next },
+      });
+      await bumpPeopleRevision(transaction, input.academyId);
+      return toAcademyMember(updated);
+    });
+  }
+
+  /**
+   * Takes one role away from a member who holds several.
+   *
+   * Removing the last one is refused: a membership that grants nothing is not
+   * a membership, and the action the caller actually wants is removing the
+   * member, which is a different button with different consequences.
+   */
+  async revokeRole(
+    identity: SupabaseIdentity,
+    input: { academyId: string; membershipId: string; role: AcademyRole },
+  ) {
+    const actor = await this.requireManager(identity, input.academyId);
+    const { member, changed } = await this.prisma.$transaction(
+      async (transaction) => {
+        const membership = await lockMembershipForUpdate(
+          transaction,
+          input.academyId,
+          input.membershipId,
+        );
+        const held = effectiveAcademyRoles(
+          membership.role,
+          membership.extraRoles.map((extra) => extra.role),
+        );
+        const { next, primary } = planRoleRevoke(held, input.role);
+        // The same guard `changeRole` applies: an academy must not be left
+        // without a manager because somebody removed the only one's manager
+        // role while leaving their teacher role in place.
+        if (input.role === "MANAGER") {
+          await assertAnotherActiveManager(
+            transaction,
+            input.academyId,
+            membership.id,
+          );
+        }
+
+        await transaction.academyMembershipRole.deleteMany({
+          where: { membershipId: membership.id },
+        });
+        await transaction.academyMembershipRole.createMany({
+          data: next
+            .filter((role) => role !== primary)
+            .map((role) => ({
+              membershipId: membership.id,
+              role,
+              grantedByUserId: actor.userId,
+            })),
+        });
+        const updated = await transaction.academyMembership.update({
+          where: { id: membership.id },
+          data: { role: primary, approvedByUserId: actor.userId },
+          include: membershipInclude,
+        });
+
+        await this.audit.write(transaction, {
+          actorUserId: actor.userId,
+          academyId: input.academyId,
+          action: "academy.membership.role_revoked",
+          targetType: "AcademyMembership",
+          targetId: membership.id,
+          before: { roles: held },
+          after: { roles: next },
+        });
+        await bumpPeopleRevision(transaction, input.academyId);
+        return {
+          member: toAcademyMember(updated),
+          // Losing a role narrows what this person may do, so any live
+          // monitoring stream they hold on the strength of it has to end —
+          // the same reason `changeRole` revokes.
+          changed: true,
+        };
+      },
+    );
+    if (changed) {
+      await this.revocation.revokeMembership(input.membershipId, "ROLE_CHANGED");
+    }
+    return member;
   }
 
   async suspend(
@@ -177,4 +325,50 @@ export class AcademyMembershipService {
       "academy.members.manage",
     );
   }
+}
+
+/**
+ * What a membership's roles become when one is added, or why they cannot.
+ *
+ * Pure, and exported for the same reason `hasAnotherActiveManager` is: the
+ * decision here is arithmetic over a role set, and testing it through a
+ * transaction would test the mock rather than the rule.
+ */
+export function planRoleGrant(
+  held: readonly AcademyRole[],
+  granted: AcademyRole,
+): { next: readonly AcademyRole[]; primary: AcademyRole } {
+  if (held.includes(granted)) {
+    throw new AppException("MEMBERSHIP_ROLE_ALREADY_HELD", HttpStatus.CONFLICT);
+  }
+  const next = effectiveAcademyRoles(granted, held);
+  // Refuses both directions at once: STUDENT onto staff, and staff onto a
+  // student. A membership id names one subject, and every points, monitoring,
+  // and analytics query depends on that staying true.
+  if (!canCombineAcademyRoles(next)) {
+    throw new AppException("MEMBERSHIP_ROLE_CONFLICT", HttpStatus.CONFLICT);
+  }
+  return { next, primary: primaryAcademyRole(next)! };
+}
+
+/**
+ * The same for a removal.
+ *
+ * Removing the last role is refused rather than allowed to empty the set: a
+ * membership that grants nothing is not a membership, and the action the
+ * caller actually wants is removing the member — a different button with
+ * different consequences.
+ */
+export function planRoleRevoke(
+  held: readonly AcademyRole[],
+  revoked: AcademyRole,
+): { next: readonly AcademyRole[]; primary: AcademyRole } {
+  if (!held.includes(revoked)) {
+    throw new AppException("MEMBERSHIP_ROLE_NOT_HELD", HttpStatus.CONFLICT);
+  }
+  if (held.length === 1) {
+    throw new AppException("MEMBERSHIP_ROLE_LAST", HttpStatus.CONFLICT);
+  }
+  const next = held.filter((role) => role !== revoked);
+  return { next, primary: primaryAcademyRole(next)! };
 }

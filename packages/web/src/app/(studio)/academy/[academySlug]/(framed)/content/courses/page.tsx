@@ -20,10 +20,10 @@ export default async function CoursesPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-    // The role comes from the guard, which resolves it from a membership or from
+  // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
   // write control from an operator the API would have allowed.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['courses']);
   let courses = null;
   let canEdit = false;
@@ -32,7 +32,7 @@ export default async function CoursesPage({
     const client = createServerORPCClient();
     const result = await client.academyCourses.list({ academyId });
     courses = result.courses;
-    canEdit = canManageContent(role);
+    canEdit = canManageContent(roles);
   } catch {
     // The permission-aware state is rendered below.
   }

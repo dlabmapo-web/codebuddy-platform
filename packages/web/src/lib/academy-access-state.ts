@@ -3,7 +3,7 @@ import type {
   AuthMeResponse,
   AuthUser,
 } from '@cove/shared';
-import { roleCanMonitor, roleHasPermission } from '@cove/shared';
+import { roleCanMonitor, rolesHavePermission } from '@cove/shared';
 
 import { routes } from '@/lib/routes';
 
@@ -163,16 +163,14 @@ export function pendingStateView(
   }
 }
 
-export function canManageAcademy(role: AcademyRole | null | undefined): boolean {
-  return role === 'MANAGER';
+export function canManageAcademy(roles: readonly AcademyRole[]): boolean {
+  return roles.includes('MANAGER');
 }
 
 export function canReviewApplications(
-  role: AcademyRole | null | undefined,
+  roles: readonly AcademyRole[],
 ): boolean {
-  return role
-    ? roleHasPermission(role, 'academy.applications.review')
-    : false;
+  return rolesHavePermission(roles, 'academy.applications.review');
 }
 
 /**
@@ -181,8 +179,8 @@ export function canReviewApplications(
  * Student holds nothing else, so the People and Content gates below already
  * hide those groups without any role check specific to students.
  */
-export function canLearn(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'curriculum.read') : false;
+export function canLearn(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'curriculum.read');
 }
 
 /**
@@ -194,8 +192,11 @@ export function canLearn(role: AcademyRole | null | undefined): boolean {
  * server refuses them either way; this keeps the nav from offering a page that
  * would only turn them away.
  */
-export function isStudent(role: AcademyRole | null | undefined): boolean {
-  return role === 'STUDENT';
+export function isStudent(roles: readonly AcademyRole[]): boolean {
+  // Exactly a student, never "holds STUDENT among others" — `STUDENT` does not
+  // combine with a staff role, so the two questions have the same answer, and
+  // this is the one that stays right if that ever changes.
+  return roles.length === 1 && roles[0] === 'STUDENT';
 }
 
 /**
@@ -205,17 +206,17 @@ export function isStudent(role: AcademyRole | null | undefined): boolean {
  * neither decides whether students can see where they rank against each other.
  */
 export function canManageAcademySettings(
-  role: AcademyRole | null | undefined,
+  roles: readonly AcademyRole[],
 ): boolean {
-  return role ? roleHasPermission(role, 'academy.settings.manage') : false;
+  return rolesHavePermission(roles, 'academy.settings.manage');
 }
 
-export function canManageContent(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'curriculum.manage') : false;
+export function canManageContent(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'curriculum.manage');
 }
 
-export function canReviewContent(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'curriculum.review') : false;
+export function canReviewContent(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'curriculum.review');
 }
 
 /**
@@ -227,8 +228,8 @@ export function canReviewContent(role: AcademyRole | null | undefined): boolean 
  * `canManageContent` because it grants something that one does not — the
  * current-course workbook contains hidden test inputs and expected outputs.
  */
-export function canImportContent(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'content.import') : false;
+export function canImportContent(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'content.import');
 }
 
 /**
@@ -236,14 +237,12 @@ export function canImportContent(role: AcademyRole | null | undefined): boolean 
  * arranges what a class learns, but only a Manager decides who sits in it,
  * because that changes a student's access.
  */
-export function canManageClasses(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'classes.manage') : false;
+export function canManageClasses(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'classes.manage');
 }
 
-export function canManageEnrollment(
-  role: AcademyRole | null | undefined,
-): boolean {
-  return role ? roleHasPermission(role, 'class-enrollments.manage') : false;
+export function canManageEnrollment(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'class-enrollments.manage');
 }
 
 /**
@@ -255,9 +254,9 @@ export function canManageEnrollment(
  * a class's hours.
  */
 export function canManageClassSchedule(
-  role: AcademyRole | null | undefined,
+  roles: readonly AcademyRole[],
 ): boolean {
-  return role ? roleHasPermission(role, 'class-schedule.manage') : false;
+  return rolesHavePermission(roles, 'class-schedule.manage');
 }
 
 /**
@@ -266,9 +265,9 @@ export function canManageClassSchedule(
  * with their own classes, never about choosing who runs one.
  */
 export function canManageClassTeachers(
-  role: AcademyRole | null | undefined,
+  roles: readonly AcademyRole[],
 ): boolean {
-  return role ? roleHasPermission(role, 'class-teachers.manage') : false;
+  return rolesHavePermission(roles, 'class-teachers.manage');
 }
 
 /**
@@ -280,18 +279,16 @@ export function canManageClassTeachers(
  * the link still proves nothing — every page and every socket event
  * re-checks the assignment itself.
  */
-export function canMonitorClasses(
-  role: AcademyRole | null | undefined,
-): boolean {
-  return role ? roleCanMonitor(role) : false;
+export function canMonitorClasses(roles: readonly AcademyRole[]): boolean {
+  return roles.some((role) => roleCanMonitor(role));
 }
 
-export function canManageExercises(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'exercises.manage') : false;
+export function canManageExercises(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'exercises.manage');
 }
 
-export function canPublishContent(role: AcademyRole | null | undefined): boolean {
-  return role ? roleHasPermission(role, 'curriculum.publish') : false;
+export function canPublishContent(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'curriculum.publish');
 }
 
 export function academyRoleFor(
@@ -302,4 +299,36 @@ export function academyRoleFor(
     (membership) =>
       membership.status === 'ACTIVE' && membership.academy.id === academyId,
   )?.role ?? null;
+}
+
+/**
+ * Every role this account holds in one academy — what the `can*` gates above
+ * take.
+ *
+ * Empty for a non-member, which makes every gate false without any call site
+ * needing a null check of its own.
+ */
+export function academyRolesFor(
+  account: AuthMeResponse,
+  academyId: string,
+): readonly AcademyRole[] {
+  return (
+    account.user.memberships.find(
+      (membership) =>
+        membership.status === 'ACTIVE' && membership.academy.id === academyId,
+    )?.roles ?? []
+  );
+}
+
+/**
+ * Who may issue and read back a student's password.
+ *
+ * Its own gate rather than a corner of `canManageAcademy`, because it grants
+ * something the rest of member management does not: sight of a secret. A Team
+ * Lead runs the curriculum and holds no part of this.
+ */
+export function canManageStudentCredentials(
+  roles: readonly AcademyRole[],
+): boolean {
+  return rolesHavePermission(roles, 'academy.members.credentials.manage');
 }

@@ -1,3 +1,4 @@
+import { displayableEmail } from "@cove/shared";
 import { Injectable } from "@nestjs/common";
 
 import { PrismaService } from "../database/prisma.service.js";
@@ -348,7 +349,7 @@ export class ManagerOverviewRepository {
         membership.memberProfile?.academyDisplayName?.trim() ||
           membership.user.displayName?.trim() ||
           membership.user.username?.trim() ||
-          membership.user.email ||
+          displayableEmail(membership.user.email) ||
           "—",
       );
     }
@@ -361,7 +362,7 @@ export class ManagerOverviewRepository {
         request.id,
         request.user.displayName?.trim() ||
           request.user.username?.trim() ||
-          request.user.email ||
+          displayableEmail(request.user.email) ||
           "—",
       );
     }

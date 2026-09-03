@@ -12,6 +12,7 @@ const classId = "20000000-0000-4000-8000-000000000002";
 const identity: SupabaseIdentity = {
   authUserId: "auth-user",
   email: null,
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: null,

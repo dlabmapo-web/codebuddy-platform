@@ -4,10 +4,16 @@ export function SignupNotice() {
   const { t } = useTranslation('auth');
 
   return (
-    <div className="mt-5 flex gap-3 rounded-xl border border-border bg-canvas px-4 py-3.5 text-[14px] leading-6 text-sub">
+    /*
+     * A line, not a card. It was a bordered panel carrying two sentences that
+     * the account-type hint said again further up; with the duplicate gone
+     * this is the only place the role rule appears, and one muted line at the
+     * foot of the form states it without spending eighty pixels on a box.
+     */
+    <div className="mt-4 flex gap-2.5 text-[13px] leading-5 text-sub">
       <svg
         aria-hidden
-        className="mt-0.5 h-5 w-5 shrink-0 text-brand"
+        className="mt-px h-4 w-4 shrink-0 text-brand"
         fill="none"
         viewBox="0 0 24 24"
         xmlns="http://www.w3.org/2000/svg"

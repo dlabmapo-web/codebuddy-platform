@@ -5,9 +5,9 @@ import { useId, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const baseInput =
-  'h-14 w-full rounded-xl border border-border bg-card text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
+  'h-12 w-full rounded-xl border border-border bg-card text-[16px] text-ink placeholder:text-sub/50 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
 
-const labelClass = 'mb-2 block text-[15px] font-semibold text-ink';
+const labelClass = 'mb-1.5 block text-[14px] font-semibold text-ink';
 const iconClass = 'pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sub';
 
 export function TextField({
@@ -54,7 +54,7 @@ export function TextField({
           type={type}
         />
       </div>
-      {hint ? <p className="mt-2 text-[14px] leading-5 text-sub">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub">{hint}</p> : null}
     </div>
   );
 }
@@ -119,7 +119,7 @@ export function PasswordField({
           {visible ? <EyeOff size={20} strokeWidth={1.75} /> : <Eye size={20} strokeWidth={1.75} />}
         </button>
       </div>
-      {hint ? <p className="mt-2 text-[14px] leading-5 text-sub">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub">{hint}</p> : null}
     </div>
   );
 }

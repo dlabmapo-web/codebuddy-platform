@@ -1,4 +1,7 @@
+import { cookies } from 'next/headers';
+
 import { requireAcademyRoute } from '@/lib/academy-route';
+import { resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { getAccount } from '@/lib/orpc-server';
 
@@ -52,7 +55,11 @@ export default async function AcademyPage({
   // from a live support grant. Re-deriving it here from `auth.me` was the
   // reason an operator holding a grant reached this page and was told they
   // had no access to it: the API had authorized them and this lookup had not.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, role: routeRole } = await requireAcademyRoute(academySlug);
+  // Defaults to what the guard resolved, so an operator on a grant or on the
+  // platform view keeps the role they are standing in. A member's own view
+  // role replaces it below, once their memberships have been read.
+  let role = routeRole;
   const { t } = await getServerTranslation(['academy']);
 
   let hasLeaderboard = false;
@@ -61,6 +68,23 @@ export default async function AcademyPage({
     const membership = account.user.memberships.find(
       (entry) => entry.status === 'ACTIVE' && entry.academy.id === academyId,
     );
+    // The role they are *working as*, which for anybody holding one role is
+    // simply that role. A Manager who also teaches gets the teaching overview
+    // while the switcher says 교사 — the four overviews below are each about
+    // one job, and showing a manager the control tower when they came here to
+    // teach is the case this resolves.
+    //
+    // Falls back to the guard's role rather than to null: an operator visiting
+    // on a grant holds no membership to resolve a view role from, and a null
+    // here would drop them through all four branches to a blank page.
+    role = membership
+      ? resolveViewRole({
+          academyId,
+          held: membership.roles,
+          primary: membership.role,
+          cookie: (await cookies()).get(viewRoleCookieName)?.value,
+        }).role
+      : routeRole;
     // Feature flags stay membership-derived. An operator on a grant holds no
     // membership and so sees no leaderboard, which is the right default: the
     // board is a student-facing feature of an academy they are visiting.

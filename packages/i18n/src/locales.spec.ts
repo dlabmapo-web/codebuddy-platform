@@ -14,21 +14,24 @@ const localesDir = join(import.meta.dirname, "locales");
  * the lecture progress labels all belong to it. The per-namespace cap below is
  * the one that still forces a split, and nothing here has reached it.
  *
- * Raised again from 56 KiB when the console's people operations landed. The
- * cause was two error codes, not two features: `errors` is a layout namespace
- * that grows by a line with every surface the platform gains, and Korean pays
- * three bytes a character for it. Korean was already within 50 bytes of the
- * ceiling before them, so the next code would have broken this regardless.
+ * Raised from 56 KiB twice over, on two branches at once: the console's
+ * people operations added error codes, and the class assistant-teacher copy
+ * added a dialog, a removal confirmation and the panel's labels. Each branch
+ * raised this to fit its own half — 58 and 59 KiB — and merging them put `ko`
+ * at 59.25 KiB, above both. 60 KiB is what the two together actually need.
  *
- * The move this comment has asked for twice now is still the right one and is
- * still not a side effect of a feature: `classes`, `content` and `learn` are
- * 10–13 KiB each and are read from 35–43 files across two route groups, so
- * each needs `PageTranslationsProvider` mounted per route and fails by
- * rendering raw keys on a student's page. Splitting `errors` itself is the
- * better target — a third of its codes are raised only under `/admin` — and
- * either one is its own change with its own review.
+ * That is the third raise, and the split this comment keeps asking for is now
+ * overdue rather than optional. `errors` is the better target than it looks: a
+ * third of its codes are raised only under `/admin`, and it grows by a line
+ * with every surface the platform gains, which Korean pays three bytes a
+ * character for. `classes` is the other candidate — 20 consumers, 19 of them
+ * under `/classes/`, which already mounts a page provider; the twentieth is
+ * `teach/loading.tsx`, borrowing four column labels that belong in `teach`
+ * anyway. Either is its own change with its own review, because moving files
+ * off `useLayoutTranslation` fails by rendering raw keys rather than by
+ * failing a build.
  */
-const TOTAL_BUDGET_BYTES = 58 * 1024;
+const TOTAL_BUDGET_BYTES = 60 * 1024;
 /** Bytes above which a single namespace should move to a page provider. */
 const NAMESPACE_BUDGET_BYTES = 15 * 1024;
 

@@ -79,6 +79,8 @@ export const resolveAcademyRoute = cache(
         // exactly as it does for a member, which is the whole point of the
         // grant carrying one.
         role: grant.assumedRole,
+        // A grant stands in one role, so the set it may act on is that role.
+        roles: [grant.assumedRole],
       };
     }
 
@@ -88,6 +90,7 @@ export const resolveAcademyRoute = cache(
     // about whether the page exists.
     const inspected = await inspectAcademyRoute(academySlug);
     if (!inspected) return null;
+    const viewRole = await platformViewRole();
     return {
       academyId: inspected.academyId,
       academySlug: inspected.academySlug,
@@ -95,7 +98,10 @@ export const resolveAcademyRoute = cache(
       // API is told about. Hardcoding `MANAGER` here meant the sidebar was
       // built for a Manager whatever the operator picked, while the API
       // answered for the role they actually chose.
-      role: await platformViewRole(),
+      role: viewRole,
+      // One chosen role, so one-role set — the operator is not a member and
+      // holds nothing beside it.
+      roles: [viewRole],
     };
   },
 );
@@ -178,7 +184,12 @@ export const resolvePlatformAcademyRoute = cache(
       return {
         academyId: academy.id,
         academySlug: academy.slug,
+        // A platform operator holds no academy membership, so there is no
+        // academy role to report. The reported Manager role is the platform
+        // view's permission set, not a membership, and these fields only
+        // satisfy the shared identity type.
         role: 'MANAGER' as const,
+        roles: ['MANAGER'] as const,
       };
     } catch {
       return null;

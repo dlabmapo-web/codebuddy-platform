@@ -35,6 +35,7 @@ function account(overrides: Partial<AuthMeResponse['user']> = {}): AuthMeRespons
       displayName: 'Cove User',
       avatarUrl: null,
       imageUrl: null,
+      emailIsPlaceholder: false,
       platformRole: 'USER',
       status: 'ACTIVE',
       memberships: [],
@@ -59,19 +60,19 @@ function application(status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') 
 describe('resolveAcademyAccessState', () => {
   it('prioritizes an active membership over historical applications', () => {
     const result = resolveAcademyAccessState(account({
-      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE', imageUrl: null }],
+      memberships: [{ academy, role: 'TEACHER', roles: ['TEACHER'], status: 'ACTIVE', imageUrl: null }],
       applications: [application('APPROVED')],
     }));
 
     expect(result.kind).toBe('active');
     expect(authDestination(account({
-      memberships: [{ academy, role: 'TEACHER', status: 'ACTIVE', imageUrl: null }],
+      memberships: [{ academy, role: 'TEACHER', roles: ['TEACHER'], status: 'ACTIVE', imageUrl: null }],
     }))).toBe(`/academy/${academy.slug}`);
   });
 
   it('routes a suspended membership to the pending access surface', () => {
     const input = account({
-      memberships: [{ academy, role: 'STUDENT', status: 'SUSPENDED', imageUrl: null }],
+      memberships: [{ academy, role: 'STUDENT', roles: ['STUDENT'], status: 'SUSPENDED', imageUrl: null }],
       applications: [application('APPROVED')],
     });
 
@@ -126,7 +127,7 @@ describe('resolveAcademyAccessState', () => {
         account({
           platformRole: 'ADMIN',
           memberships: [
-            { academy, role: 'MANAGER', status: 'ACTIVE', imageUrl: null },
+            { academy, role: 'MANAGER', roles: ['MANAGER'], status: 'ACTIVE', imageUrl: null },
           ],
         }),
       ),
@@ -134,96 +135,96 @@ describe('resolveAcademyAccessState', () => {
   });
 
   it('exposes academy management only to managers', () => {
-    expect(canManageAcademy('MANAGER')).toBe(true);
-    expect(canManageAcademy('TEAM_LEAD')).toBe(false);
-    expect(canManageAcademy('TEACHER')).toBe(false);
-    expect(canManageAcademy('STUDENT')).toBe(false);
-    expect(canManageAcademy(null)).toBe(false);
+    expect(canManageAcademy(['MANAGER'])).toBe(true);
+    expect(canManageAcademy(['TEAM_LEAD'])).toBe(false);
+    expect(canManageAcademy(['TEACHER'])).toBe(false);
+    expect(canManageAcademy(['STUDENT'])).toBe(false);
+    expect(canManageAcademy([])).toBe(false);
   });
 
   it('lets managers and team leads review applications', () => {
-    expect(canReviewApplications('MANAGER')).toBe(true);
-    expect(canReviewApplications('TEAM_LEAD')).toBe(true);
-    expect(canReviewApplications('TEACHER')).toBe(false);
-    expect(canReviewApplications('STUDENT')).toBe(false);
-    expect(canReviewApplications(null)).toBe(false);
+    expect(canReviewApplications(['MANAGER'])).toBe(true);
+    expect(canReviewApplications(['TEAM_LEAD'])).toBe(true);
+    expect(canReviewApplications(['TEACHER'])).toBe(false);
+    expect(canReviewApplications(['STUDENT'])).toBe(false);
+    expect(canReviewApplications([])).toBe(false);
   });
 
   it('gives managers the same authoring controls as team leads', () => {
-    expect(canReviewContent('MANAGER')).toBe(true);
-    expect(canManageContent('MANAGER')).toBe(true);
-    expect(canManageExercises('MANAGER')).toBe(true);
-    expect(canPublishContent('MANAGER')).toBe(true);
+    expect(canReviewContent(['MANAGER'])).toBe(true);
+    expect(canManageContent(['MANAGER'])).toBe(true);
+    expect(canManageExercises(['MANAGER'])).toBe(true);
+    expect(canPublishContent(['MANAGER'])).toBe(true);
   });
 
   // The line that does not move. A manager authors the curriculum now, but
   // monitoring is not a curriculum capability: it belongs to the teacher a
   // class is assigned to, and every page and socket re-checks that assignment.
   it('keeps live monitoring with the assigned teacher', () => {
-    expect(canMonitorClasses('TEACHER')).toBe(true);
-    expect(canMonitorClasses('MANAGER')).toBe(false);
-    expect(canMonitorClasses('TEAM_LEAD')).toBe(false);
+    expect(canMonitorClasses(['TEACHER'])).toBe(true);
+    expect(canMonitorClasses(['MANAGER'])).toBe(false);
+    expect(canMonitorClasses(['TEAM_LEAD'])).toBe(false);
   });
 
   it('exposes content authoring to team leads', () => {
-    expect(canManageContent('TEAM_LEAD')).toBe(true);
-    expect(canManageExercises('TEAM_LEAD')).toBe(true);
-    expect(canPublishContent('TEAM_LEAD')).toBe(true);
-    expect(canManageContent('TEACHER')).toBe(false);
-    expect(canManageContent('STUDENT')).toBe(false);
-    expect(canManageContent(null)).toBe(false);
+    expect(canManageContent(['TEAM_LEAD'])).toBe(true);
+    expect(canManageExercises(['TEAM_LEAD'])).toBe(true);
+    expect(canPublishContent(['TEAM_LEAD'])).toBe(true);
+    expect(canManageContent(['TEACHER'])).toBe(false);
+    expect(canManageContent(['STUDENT'])).toBe(false);
+    expect(canManageContent([])).toBe(false);
   });
 
   it('shows the Teaching group to team leads and managers only', () => {
-    expect(canManageClasses('TEAM_LEAD')).toBe(true);
-    expect(canManageClasses('MANAGER')).toBe(true);
-    expect(canManageClasses('TEACHER')).toBe(false);
-    expect(canManageClasses('STUDENT')).toBe(false);
-    expect(canManageClasses(null)).toBe(false);
+    expect(canManageClasses(['TEAM_LEAD'])).toBe(true);
+    expect(canManageClasses(['MANAGER'])).toBe(true);
+    expect(canManageClasses(['TEACHER'])).toBe(false);
+    expect(canManageClasses(['STUDENT'])).toBe(false);
+    expect(canManageClasses([])).toBe(false);
   });
 
   it('shows enrollment controls to managers alone', () => {
-    expect(canManageEnrollment('MANAGER')).toBe(true);
+    expect(canManageEnrollment(['MANAGER'])).toBe(true);
     // A Team Lead reaches the class page and reads the roster, but the add
     // and remove controls stay hidden.
-    expect(canManageClasses('TEAM_LEAD')).toBe(true);
-    expect(canManageEnrollment('TEAM_LEAD')).toBe(false);
-    expect(canManageEnrollment('TEACHER')).toBe(false);
-    expect(canManageEnrollment('STUDENT')).toBe(false);
-    expect(canManageEnrollment(null)).toBe(false);
+    expect(canManageClasses(['TEAM_LEAD'])).toBe(true);
+    expect(canManageEnrollment(['TEAM_LEAD'])).toBe(false);
+    expect(canManageEnrollment(['TEACHER'])).toBe(false);
+    expect(canManageEnrollment(['STUDENT'])).toBe(false);
+    expect(canManageEnrollment([])).toBe(false);
   });
 
   it('shows teacher assignment controls to team leads and managers', () => {
-    expect(canManageClassTeachers('TEAM_LEAD')).toBe(true);
-    expect(canManageClassTeachers('MANAGER')).toBe(true);
+    expect(canManageClassTeachers(['TEAM_LEAD'])).toBe(true);
+    expect(canManageClassTeachers(['MANAGER'])).toBe(true);
     // A Teacher never chooses who runs a class, not even their own.
-    expect(canManageClassTeachers('TEACHER')).toBe(false);
-    expect(canManageClassTeachers('STUDENT')).toBe(false);
-    expect(canManageClassTeachers(null)).toBe(false);
+    expect(canManageClassTeachers(['TEACHER'])).toBe(false);
+    expect(canManageClassTeachers(['STUDENT'])).toBe(false);
+    expect(canManageClassTeachers([])).toBe(false);
   });
 
   it('treats only a Student as a student', () => {
     // The gate behind the My Classes nav entry. Staff hold `curriculum.read`
     // so they can preview curriculum, and that must not read as enrollment.
-    expect(isStudent('STUDENT')).toBe(true);
-    expect(isStudent('TEACHER')).toBe(false);
-    expect(isStudent('TEAM_LEAD')).toBe(false);
-    expect(isStudent('MANAGER')).toBe(false);
-    expect(isStudent(null)).toBe(false);
+    expect(isStudent(['STUDENT'])).toBe(true);
+    expect(isStudent(['TEACHER'])).toBe(false);
+    expect(isStudent(['TEAM_LEAD'])).toBe(false);
+    expect(isStudent(['MANAGER'])).toBe(false);
+    expect(isStudent([])).toBe(false);
   });
 
   it('lands a student on the academy overview, not the catalog', () => {
     // The overview is the one surface that knows which problem they stopped
     // in the middle of. Sending them past it to My Courses would skip it.
     const destination = authDestination(account({
-      memberships: [{ academy, role: 'STUDENT', status: 'ACTIVE', imageUrl: null }],
+      memberships: [{ academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null }],
     }));
     expect(destination).toBe(`/academy/${academy.slug}`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {
     const input = account({
-      memberships: [{ academy, role: 'MANAGER', status: 'ACTIVE', imageUrl: null }],
+      memberships: [{ academy, role: 'MANAGER', roles: ['MANAGER'], status: 'ACTIVE', imageUrl: null }],
     });
     expect(academyRoleFor(input, academy.id)).toBe('MANAGER');
     expect(

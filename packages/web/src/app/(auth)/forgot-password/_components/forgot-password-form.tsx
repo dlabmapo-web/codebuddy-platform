@@ -173,6 +173,16 @@ export function ForgotPasswordForm({ linkExpired }: { linkExpired?: boolean }) {
               <p className="mt-4 border-t border-success/20 pt-4 text-[13px] leading-5 text-sub">
                 {t('forgot.accepted_hint')}
               </p>
+              {/*
+               * Named here rather than decided by the server, and that is the
+               * point. This endpoint answers identically for every username so
+               * it cannot be used to discover which ones exist — it must never
+               * learn to say "that one is a student". So the page tells a child
+               * what to do without anything having been looked up.
+               */}
+              <p className="mt-3 text-[13px] leading-5 text-sub">
+                {t('forgot.student_notice')}
+              </p>
             </div>
 
             <button

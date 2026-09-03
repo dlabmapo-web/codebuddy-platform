@@ -1,3 +1,6 @@
+import type { AcademyRole } from "@cove/shared";
+
+import { membershipHoldsRole } from "../authorization/membership-roles.js";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { resolveComparisonSurface, teacherOutlineNumber } from "@cove/shared";
 
@@ -246,6 +249,7 @@ export class StudentOverviewAccessService {
             academyId: true,
             status: true,
             role: true,
+            extraRoles: { select: { role: true } },
             user: { select: { status: true, displayName: true } },
           },
         },
@@ -279,14 +283,19 @@ function effectiveTeacherName(
   teacher: {
     academyId: string;
     status: string;
-    role: string;
+    role: AcademyRole;
+    extraRoles: { role: AcademyRole }[];
     user: { status: string; displayName: string | null };
   } | null,
   academyId: string,
 ): string | null {
   if (!teacher) return null;
   if (teacher.academyId !== academyId) return null;
-  if (teacher.status !== "ACTIVE" || teacher.role !== "TEACHER") return null;
+  // Holds TEACHER, rather than has it as their highest role: a manager who
+  // teaches this class is still the teacher a student should be told about.
+  if (teacher.status !== "ACTIVE" || !membershipHoldsRole(teacher, "TEACHER")) {
+    return null;
+  }
   if (teacher.user.status !== "ACTIVE") return null;
   // A blank name fails with the rest rather than falling back to an email or
   // an id: those identify an account, and "Teacher not assigned" is a better

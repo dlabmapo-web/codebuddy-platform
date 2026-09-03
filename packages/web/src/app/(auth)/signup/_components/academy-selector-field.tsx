@@ -23,7 +23,7 @@ const AcademyTrigger = forwardRef<HTMLButtonElement, TriggerProps<SelectorItem>>
       <button
         aria-controls={undefined}
         aria-expanded={false}
-        className={`flex h-14 w-full items-center gap-3 rounded-xl border border-border bg-card px-4 text-left text-[16px] text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ''}`}
+        className={`flex h-12 w-full items-center gap-3 rounded-xl border border-border bg-card px-4 text-left text-[16px] text-ink outline-none transition-colors hover:border-brand/50 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ''}`}
         ref={ref}
         role="combobox"
         type="button"

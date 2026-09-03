@@ -69,6 +69,10 @@ export class PointsAccessService {
       // read of the academy, not of themselves. `AcademyAccessService` is the
       // authority here, as it is everywhere else; this service resolving its
       // own reader from a membership row is why it had to be asked separately.
+      //
+      // `membershipId` is forwarded, unlike on the two board paths: here it
+      // names the *student being read*, not the reader, and dropping it
+      // answered an operator's ledger request with a page about nobody.
       return this.platformScope(identity, input);
     }
     if (reader.academy.status !== "ACTIVE") {
@@ -118,11 +122,21 @@ export class PointsAccessService {
   }
 
   /**
-   * A platform operator reading an academy's boards.
+   * A platform operator reading an academy's boards, or one of its students.
    *
-   * No subject: an operator is not on any ranking, so `membershipId` is empty
-   * and `isSelf` is false — which is what keeps `isYou` off every row rather
-   * than landing on whichever row happens to share the blank.
+   * **The operator is never the subject.** They hold no membership, sit on no
+   * ranking, and have no points — so `isSelf` is false unconditionally, which
+   * is what keeps `isYou` off every row rather than landing on whichever row
+   * happens to share a blank id.
+   *
+   * Who the subject *is* depends on the caller. The two board paths ask about
+   * a class and pass no `membershipId`, so the scope keeps an empty subject —
+   * correct, because a board is a read of the class rather than of anybody.
+   * `resolve` asks about one student and passes theirs, and dropping it there
+   * was a defect: `subjectName` came back empty, which fails `labelSchema`'s
+   * own `.min(1)`, and `listLedger` filtered on `membershipId: ""`, which
+   * matches nothing. An operator opening a child's ledger got a nameless page
+   * with no rows on it.
    *
    * Every class in the academy is in scope, matching the Teacher view's own
    * academy-wide reach. The feature flag still decides whether a board renders
@@ -131,7 +145,7 @@ export class PointsAccessService {
    */
   private async platformScope(
     identity: SupabaseIdentity,
-    input: { academyId: string; classId?: string },
+    input: { academyId: string; membershipId?: string; classId?: string },
   ): Promise<PointsScope> {
     let academy: { timeZone: string; status: string } | null = null;
     try {
@@ -168,15 +182,58 @@ export class PointsAccessService {
       throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
     }
 
+    // The student this read is about, when the caller named one. Scoped by
+    // academy, so an operator cannot reach a child through another tenant's
+    // route — and a membership that exists in a different academy answers
+    // exactly as one that does not exist, which is what stops the refusal
+    // being used to test ids.
+    const subject = input.membershipId
+      ? await this.requirePlatformSubject(input.academyId, input.membershipId)
+      : null;
+
     return {
       academyId: input.academyId,
       timeZone: academy.timeZone,
-      membershipId: "",
-      subjectName: "",
+      membershipId: subject?.id ?? "",
+      subjectName: subject?.name ?? "",
+      // Never true here, whatever the subject: the reader is an operator, and
+      // the subject is somebody else by construction.
       isSelf: false,
       classes: classes.map((entry) => ({ classId: entry.id, name: entry.name })),
       leaderboardEnabled: enabled.has("STUDENT_CLASS_LEADERBOARD"),
     };
+  }
+
+  /**
+   * The student an operator named, or the same refusal an absent one gets.
+   *
+   * `requireReadableStudent`'s counterpart for a reader with no membership. It
+   * carries no teacher-assignment narrowing — an operator's reach is the whole
+   * academy, which is what `platformScope` already grants for classes — but it
+   * keeps the two rules that matter: the membership must be an `ACTIVE`
+   * `STUDENT`, and it must belong to *this* academy.
+   */
+  private async requirePlatformSubject(
+    academyId: string,
+    membershipId: string,
+  ): Promise<{ id: string; name: string }> {
+    const subject = await this.prisma.academyMembership.findFirst({
+      where: {
+        id: membershipId,
+        academyId,
+        role: "STUDENT",
+        status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        user: { select: { displayName: true } },
+        memberProfile: { select: { academyDisplayName: true } },
+      },
+    });
+    if (!subject) {
+      throw new AppException("POINTS_ACCESS_DENIED", HttpStatus.NOT_FOUND);
+    }
+    return { id: subject.id, name: displayNameOf(subject) };
   }
 
   /**

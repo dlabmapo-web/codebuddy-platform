@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  displayableEmail,
   ACADEMY_TIME_ZONE,
   MANAGER_MAX_CLASS_ROWS,
   type AcademyPermission,
@@ -7,6 +8,7 @@ import {
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import { membershipHoldsRole } from "../authorization/membership-roles.js";
 import {
   classStudentWhere,
   classTaughtMaterialWhere,
@@ -147,6 +149,7 @@ export class ManagerScopeService {
           assignedTeacher: {
             select: {
               role: true,
+              extraRoles: { select: { role: true } },
               status: true,
               user: { select: { displayName: true, username: true } },
             },
@@ -171,7 +174,13 @@ export class ManagerScopeService {
       // assignment in place. §9.3 counts that class as having no teacher, which
       // is the truth a manager needs — hiding the stale row would hide the work.
       const teacher = record.assignedTeacher;
-      const usable = teacher?.role === "TEACHER" && teacher.status === "ACTIVE";
+      // The role set, not the primary role: a director who also teaches stores
+      // `role = MANAGER`, and reading the primary alone reported their class
+      // as having no teacher at all.
+      const usable =
+        teacher !== null &&
+        membershipHoldsRole(teacher, "TEACHER") &&
+        teacher.status === "ACTIVE";
       teacherNames.set(
         record.id,
         usable
@@ -420,7 +429,7 @@ export function memberDisplayName(membership: {
     membership.memberProfile?.academyDisplayName?.trim() ||
     membership.user.displayName?.trim() ||
     membership.user.username?.trim() ||
-    membership.user.email ||
+    displayableEmail(membership.user.email) ||
     "—"
   );
 }

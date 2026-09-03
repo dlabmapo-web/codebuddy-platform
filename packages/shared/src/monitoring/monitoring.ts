@@ -333,14 +333,22 @@ export function roleCanMonitor(role: AcademyRole): boolean {
 export type MonitoringClassFacts = {
   academyId: string;
   status: ClassStatus;
+  /** The homeroom teacher: the one membership answerable for the class. */
   teacherMembershipId: string | null;
+  /** Everyone else who teaches it, who monitor it on identical terms. */
+  assistantMembershipIds: readonly string[];
 };
 
 export type MonitoringTeacherFacts = {
   membershipId: string;
   academyId: string;
   userId: string;
-  role: AcademyRole;
+  /**
+   * Every role the membership holds, not only the highest. A director who also
+   * teaches stores `role = MANAGER`, and asking the primary role alone refused
+   * them the monitoring their `TEACHER` grant exists to give.
+   */
+  roles: readonly AcademyRole[];
   membershipStatus: MembershipStatus;
   userStatus: UserStatus;
 };
@@ -368,14 +376,34 @@ export function grantsLiveMonitoring(input: {
   if (!teacher) return false;
   return (
     classFacts.status === "ACTIVE" &&
-    classFacts.teacherMembershipId !== null &&
-    classFacts.teacherMembershipId === teacher.membershipId &&
+    teachesClass(classFacts, teacher.membershipId) &&
     teacher.academyId === classFacts.academyId &&
     teacher.membershipStatus === "ACTIVE" &&
     teacher.userStatus === "ACTIVE" &&
     session.academyId === classFacts.academyId &&
     session.userId === teacher.userId &&
-    roleCanMonitor(teacher.role)
+    teacher.roles.some(roleCanMonitor)
+  );
+}
+
+/**
+ * Whether this membership teaches the class at all — as its homeroom teacher
+ * or as one of its assistants.
+ *
+ * An assistant teaches on identical terms; what the homeroom teacher has and
+ * they do not is being the one named as answerable for the class, which is a
+ * different question from who may watch a lesson.
+ */
+export function teachesClass(
+  classFacts: Pick<
+    MonitoringClassFacts,
+    "teacherMembershipId" | "assistantMembershipIds"
+  >,
+  membershipId: string,
+): boolean {
+  return (
+    classFacts.teacherMembershipId === membershipId ||
+    classFacts.assistantMembershipIds.includes(membershipId)
   );
 }
 

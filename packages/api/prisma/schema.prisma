@@ -636,6 +636,7 @@ model AcademyMembership {
   approvedBy       User?                   @relation("MembershipApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   classEnrollments ClassEnrollment[]
   assignedClasses  Class[]                 @relation("ClassTeacher")
+  assistedClasses  ClassAssistantTeacher[] @relation("ClassAssistantTeacher")
 
   monitoringVisitsAsTeacher TeacherMonitoringVisit[]        @relation("MonitoringVisitTeacher")
   monitoringVisitsAsStudent TeacherMonitoringVisit[]        @relation("MonitoringVisitStudent")
@@ -1057,7 +1058,10 @@ model Class {
   description         String      @default("")
   status              ClassStatus @default(ACTIVE)
   createdByUserId     String      @map("created_by_user_id") @db.Uuid
-  /// The one teacher responsible for this class, or null while unassigned.
+  /// The homeroom teacher: the one person answerable for this class, or null
+  /// while unassigned. Assistants live in `assistantTeachers`; this column
+  /// stays singular because monitoring, points, and the student's "your
+  /// teacher" all mean exactly one person.
   /// Deliberately not unique: one teacher runs many classes. It stores the
   /// membership rather than the user so academy scope and academy role are
   /// both explicit — but the key alone cannot prove same-academy, so every
@@ -1075,6 +1079,7 @@ model Class {
   /// and merely unassigned. Suspension and role changes delete nothing, so a
   /// stale assignment stays visible to managers as unavailable.
   assignedTeacher   AcademyMembership?              @relation("ClassTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  assistantTeachers ClassAssistantTeacher[]
   courseAssignments ClassCourse[]
   enrollments       ClassEnrollment[]
   scheduleSlots     ClassScheduleSlot[]
@@ -1091,6 +1096,38 @@ model Class {
   /// query the later monitoring design starts from.
   @@index([teacherMembershipId, status])
   @@map("classes")
+}
+
+/// A teacher who helps run a class beside its homeroom teacher.
+///
+/// Its own table rather than more columns on `Class`, because "who else
+/// teaches here" is a set that grows and shrinks: fixed columns would make
+/// every read spell out which of them happened to be filled, and would cap
+/// the answer in the schema instead of where the rule belongs. The cap
+/// itself — `CLASS_MAX_TEACHERS`, homeroom included — is enforced in the
+/// service, which is the only place that can report which class is full.
+///
+/// An assistant teaches the class on exactly the same terms as the homeroom
+/// teacher; what the homeroom teacher has and they do not is being the one
+/// named as answerable for it.
+model ClassAssistantTeacher {
+  id           String   @id @default(uuid()) @db.Uuid
+  classId      String   @map("class_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  /// Cascade, unlike the homeroom column's SetNull: a class with no homeroom
+  /// teacher is a state a manager has to see and fix, while a deleted
+  /// membership's assistant row means nothing and should simply go.
+  teacher AcademyMembership @relation("ClassAssistantTeacher", fields: [membershipId], references: [id], onDelete: Cascade)
+
+  /// The same person cannot assist one class twice.
+  @@unique([classId, membershipId])
+  /// Answers "which classes does this teacher help run" — the assistant half
+  /// of the assigned-class predicate.
+  @@index([membershipId])
+  @@map("class_assistant_teachers")
 }
 
 /// One course taught to one class. Removing the row revokes access and never

@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  displayableEmail,
   monitoringLimits,
   toNavigatorContext,
   type MonitoringClassRoster,
@@ -159,7 +160,7 @@ export class MonitoringService {
         userId: enrollment.membership.user.id,
         displayName: enrollment.membership.user.displayName,
         username: enrollment.membership.user.username,
-        email: enrollment.membership.user.email,
+        email: displayableEmail(enrollment.membership.user.email),
         // Reported as they stand now: an enrollment row for a suspended member
         // stays on the roster, and the teacher sees why it grants nothing.
         membershipStatus: enrollment.membership.status,

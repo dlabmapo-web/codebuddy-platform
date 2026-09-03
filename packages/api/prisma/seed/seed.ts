@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { createClient } from "@supabase/supabase-js";
 
 import { validateEnvironment } from "../../src/config/env.schema.js";
+import type { AcademyRole } from "../../src/generated/prisma/enums.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
 import { developmentAcademy, developmentOrganization } from "./data/organizations.js";
 import {
@@ -128,6 +129,24 @@ async function main(): Promise<void> {
             update: { id: seedUser.membershipId, ...membershipData },
             create: { id: seedUser.membershipId, ...membershipData },
           });
+
+          // Replaced wholesale rather than merged, so re-running the seed
+          // after removing an extra role actually removes it.
+          await transaction.academyMembershipRole.deleteMany({
+            where: { membershipId: seedUser.membershipId },
+          });
+          const extras: readonly AcademyRole[] =
+            "extraAcademyRoles" in seedUser
+              ? seedUser.extraAcademyRoles ?? []
+              : [];
+          if (extras.length > 0) {
+            await transaction.academyMembershipRole.createMany({
+              data: extras.map((role) => ({
+                membershipId: seedUser.membershipId!,
+                role,
+              })),
+            });
+          }
         }
       }
     });

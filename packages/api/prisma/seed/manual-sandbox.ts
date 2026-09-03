@@ -159,7 +159,7 @@ async function main(): Promise<void> {
   });
 
   // The sandbox course is unreachable until a class assigns it to a student.
-  const { enrolled } = await seedClassFixture(prisma, {
+  const { enrolled, assistantsAssigned } = await seedClassFixture(prisma, {
     classId: sandbox.classId,
     academyId: academy.id,
     name: sandbox.className,
@@ -174,6 +174,14 @@ async function main(): Promise<void> {
     teacherEmail: developmentUsers.find(
       (user) => user.academyRole === "TEACHER",
     )?.email,
+    // A fully staffed class, so the teacher panel shows all three seats rather
+    // than only the homeroom one. The multi-role account is deliberately one
+    // of them: a member whose primary role is MANAGER must read as a working
+    // assistant, which is the case that kept regressing.
+    assistantTeacherEmails: [
+      "teacher2@cove.test",
+      "multi@cove.test",
+    ],
   });
 
   // Points are opt-in per academy, so the sandbox opens the economy for
@@ -215,7 +223,9 @@ async function main(): Promise<void> {
 
   console.log(`🌱 "${sandbox.exerciseTitle}" ready in ${academy.name}`);
   console.log(`   course:   ${sandbox.courseTitle}`);
-  console.log(`   class:    ${sandbox.className} (${enrolled} enrolled)`);
+  console.log(
+    `   class:    ${sandbox.className} (${enrolled} enrolled, ${assistantsAssigned} assisting)`,
+  );
   console.log(`   material: ${sandbox.materialId}`);
   console.log(`   cases:    2 sample, 3 hidden`);
   console.log(`   points:   on (${slots} attendance windows)`);

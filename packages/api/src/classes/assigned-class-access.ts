@@ -1,3 +1,6 @@
+import type { AcademyRole } from "@cove/shared";
+
+import { holdsRoleWhere } from "../authorization/membership-roles.js";
 import { HttpStatus } from "@nestjs/common";
 import type { AppErrorCode } from "@cove/shared";
 
@@ -47,11 +50,15 @@ export async function requireAssignedTeacherActor(input: {
       }) => Promise<{ id: string } | null>;
     };
   };
-  resolveActor: () => Promise<{ userId: string; role: string }>;
+  resolveActor: () => Promise<{
+    userId: string;
+    role: string;
+    roles: readonly AcademyRole[];
+  }>;
   academyId: string;
   deniedCode: AppErrorCode;
 }): Promise<AssignedClassActor> {
-  let actor: { userId: string; role: string };
+  let actor: { userId: string; role: string; roles: readonly AcademyRole[] };
   try {
     actor = await input.resolveActor();
   } catch (error) {
@@ -60,7 +67,10 @@ export async function requireAssignedTeacherActor(input: {
     }
     throw error;
   }
-  if (actor.role !== "TEACHER") {
+  // The role set, not the primary role. A Manager who also teaches holds
+  // `role = MANAGER`, and comparing the primary role refused them the very
+  // surface the second grant exists to give.
+  if (!actor.roles.includes("TEACHER")) {
     throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
   }
   const membership = await input.prisma.academyMembership.findUnique({
@@ -79,20 +89,45 @@ export async function requireAssignedTeacherActor(input: {
   };
 }
 
+/**
+ * "A class taught by a membership matching this predicate" — homeroom teacher
+ * or assistant.
+ *
+ * Who teaches a class is two rows in two tables: the homeroom column names the
+ * one person answerable for it, and `assistantTeachers` holds everyone else
+ * who teaches it on identical terms. Composed rather than spelled out at each
+ * call site, because a caller that remembered only the homeroom column would
+ * go on refusing assistants long after this one was fixed.
+ *
+ * The membership predicate is applied to both sides, so an assistant who has
+ * been suspended or moved off `TEACHER` loses the class exactly as the
+ * homeroom teacher does.
+ */
+export function taughtByWhere(
+  teacher: Prisma.AcademyMembershipWhereInput,
+): Prisma.ClassWhereInput {
+  return {
+    OR: [{ assignedTeacher: teacher }, { assistantTeachers: { some: { teacher } } }],
+  };
+}
+
 export function assignedClassWhere(
   actor: AssignedClassActor,
 ): Prisma.ClassWhereInput {
   return {
     academyId: actor.academyId,
     status: "ACTIVE",
-    teacherMembershipId: actor.membershipId,
-    assignedTeacher: {
+    // Pinned by membership id inside the join rather than by the class's
+    // teacher column, so the one predicate covers both places a teacher can
+    // sit on a class.
+    ...taughtByWhere({
+      id: actor.membershipId,
       academyId: actor.academyId,
       userId: actor.userId,
-      role: "TEACHER",
+      ...holdsRoleWhere("TEACHER"),
       status: "ACTIVE",
       user: { status: "ACTIVE" },
-    },
+    }),
   };
 }
 

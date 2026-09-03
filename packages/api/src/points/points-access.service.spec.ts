@@ -10,6 +10,7 @@ const membershipId = "30000000-0000-4000-8000-000000000003";
 const identity: SupabaseIdentity = {
   authUserId: "auth-user",
   email: null,
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: null,
@@ -70,7 +71,12 @@ describe("PointsAccessService.resolveOverviewBoard", () => {
         where: {
           academyId,
           status: "ACTIVE",
-          teacherMembershipId: membershipId,
+          // Homeroom or assistant: both teach the class, so both may read
+          // its board.
+          OR: [
+            { assignedTeacher: { id: membershipId } },
+            { assistantTeachers: { some: { teacher: { id: membershipId } } } },
+          ],
         },
       }),
     );

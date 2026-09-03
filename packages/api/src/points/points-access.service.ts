@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import { taughtByWhere } from "../classes/assigned-class-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 
@@ -161,9 +162,9 @@ export class PointsAccessService {
       where: {
         academyId: input.academyId,
         status: "ACTIVE",
-        ...(reader.role === "TEACHER"
-          ? { teacherMembershipId: reader.id }
-          : {}),
+        // Homeroom or assistant: both teach the class, so both may read its
+        // board.
+        ...(reader.role === "TEACHER" ? taughtByWhere({ id: reader.id }) : {}),
       },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -241,7 +242,7 @@ export class PointsAccessService {
                 academyId: input.academyId,
                 status: "ACTIVE",
                 ...(reader.role === "TEACHER"
-                  ? { teacherMembershipId: reader.id }
+                  ? taughtByWhere({ id: reader.id })
                   : {}),
               },
               orderBy: { name: "asc" },
@@ -302,7 +303,7 @@ export class PointsAccessService {
         ...(reader.role === "TEACHER"
           ? {
               classEnrollments: {
-                some: { class: { teacherMembershipId: reader.id } },
+                some: { class: taughtByWhere({ id: reader.id }) },
               },
             }
           : {}),

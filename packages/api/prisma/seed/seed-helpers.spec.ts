@@ -2,7 +2,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { usernameSchema } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
-import { developmentUsers } from "./data/users.js";
+import { developmentUsers, type DevelopmentUser } from "./data/users.js";
 import {
   assertDevelopmentSeedAllowed,
   assertNoCoveUserConflicts,
@@ -16,18 +16,52 @@ type SupabaseAdmin = SupabaseClient["auth"]["admin"];
 describe("development seed manifest", () => {
   it("contains unique accounts for every platform and academy role", () => {
     expect(() => validateSeedUsers(developmentUsers)).not.toThrow();
+    // Derived rather than a fixed count: what this asserts is that no two
+    // accounts share an address, which stays true as accounts are added.
     expect(new Set(developmentUsers.map((user) => normalizeEmail(user.email))).size)
-      .toBe(6);
+      .toBe(developmentUsers.length);
     expect(developmentUsers.filter((user) => user.platformRole === "ADMIN"))
       .toHaveLength(1);
     expect(developmentUsers.map((user) => user.academyRole).filter(Boolean).sort())
-      .toEqual(["MANAGER", "STUDENT", "TEACHER", "TEACHER", "TEAM_LEAD"]);
+      .toEqual([
+        "MANAGER",
+        "MANAGER",
+        "STUDENT",
+        "TEACHER",
+        "TEACHER",
+        "TEAM_LEAD",
+      ]);
   });
 
   it("gives every seed account a distinct, signable-in username", () => {
-    expect(new Set(developmentUsers.map((user) => user.username)).size).toBe(6);
+    expect(new Set(developmentUsers.map((user) => user.username)).size)
+      .toBe(developmentUsers.length);
     for (const user of developmentUsers) {
       expect(usernameSchema.safeParse(user.username).success).toBe(true);
+    }
+  });
+
+  it("keeps one account holding several roles, so the switcher is reachable", () => {
+    // Without it there is no way to see the role switcher locally short of
+    // granting a second role by hand before every test of it.
+    // Read through the declared type rather than the `as const` literal: the
+    // manifest narrows to a union in which only some members carry the
+    // optional field, and the assertion is about the manifest as a whole.
+    const users: readonly DevelopmentUser[] = developmentUsers;
+    const multi = users.filter(
+      (user) => (user.extraAcademyRoles?.length ?? 0) > 0,
+    );
+    expect(multi).toHaveLength(1);
+    expect(multi[0]!.username).toBe("cove-multi");
+    expect([multi[0]!.academyRole, ...multi[0]!.extraAcademyRoles!].sort())
+      .toEqual(["MANAGER", "TEACHER", "TEAM_LEAD"]);
+    // STUDENT never combines with a staff role: a student's rows are about
+    // them, while every staff role reads across students.
+    for (const user of users) {
+      if ((user.extraAcademyRoles?.length ?? 0) > 0) {
+        expect(user.academyRole).not.toBe("STUDENT");
+        expect(user.extraAcademyRoles).not.toContain("STUDENT");
+      }
     }
   });
 

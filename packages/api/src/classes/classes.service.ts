@@ -1,12 +1,20 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import { displayableEmail, effectiveAcademyRoles } from "@cove/shared";
+
+import { holdsRoleWhere } from "../authorization/membership-roles.js";
 import type {
   AcademyAuditAction,
+  AcademyRole,
+  AssignedTeacherSummary,
   ClassDetail,
   ClassStatus,
   ClassSummary,
+  ClassTeacherSummary,
   EligibleStudentSummary,
   EligibleTeacherSummary,
+  MembershipStatus,
   SetClassScheduleInput,
+  UserStatus,
 } from "@cove/shared";
 
 import { AuditService } from "../academies/audit.service.js";
@@ -36,6 +44,9 @@ const assignedTeacherSelect = {
   select: {
     id: true,
     role: true,
+    // The assignment is effective while the member *holds* TEACHER, which for
+    // somebody who also manages is an extra role rather than their primary.
+    extraRoles: { select: { role: true } },
     status: true,
     user: { select: { id: true, displayName: true, status: true } },
   },
@@ -46,10 +57,40 @@ const assignedTeacherDetailSelect = {
   select: {
     id: true,
     role: true,
+    extraRoles: { select: { role: true } },
     status: true,
-    user: { select: { id: true, displayName: true, email: true, status: true } },
+    user: {
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        status: true,
+        ...memberAvatarSelect.user.select,
+      },
+    },
+    memberProfile: memberAvatarSelect.memberProfile,
   },
 } as const;
+
+/**
+ * The assistants, ordered the way the panel lists them: by name, so the set
+ * reads the same on every load rather than in insertion order.
+ */
+const assistantTeachersSelect = {
+  select: { teacher: assignedTeacherSelect },
+  orderBy: [
+    { teacher: { user: { displayName: "asc" } } },
+    { membershipId: "asc" },
+  ],
+} satisfies Prisma.Class$assistantTeachersArgs;
+
+const assistantTeachersDetailSelect = {
+  select: { teacher: assignedTeacherDetailSelect },
+  orderBy: [
+    { teacher: { user: { displayName: "asc" } } },
+    { membershipId: "asc" },
+  ],
+} satisfies Prisma.Class$assistantTeachersArgs;
 
 /** The list intentionally avoids loading roster PII just to calculate a count. */
 const classListInclude = {
@@ -58,6 +99,7 @@ const classListInclude = {
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
   assignedTeacher: assignedTeacherSelect,
+  assistantTeachers: assistantTeachersSelect,
   _count: { select: { enrollments: true } },
 } as const satisfies Prisma.ClassInclude;
 
@@ -67,6 +109,7 @@ const classDetailInclude = {
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
   assignedTeacher: assignedTeacherDetailSelect,
+  assistantTeachers: assistantTeachersDetailSelect,
   scheduleSlots: {
     // The timetable reads down the week and across the day, which is the order
     // a manager types it in and the order they check it back.
@@ -427,13 +470,18 @@ export class ClassesService {
    * return a faceless roster while the rest showed photos.
    */
   private async presentDetail(record: ClassRecord): Promise<ClassDetail> {
-    const avatars = await resolveMemberAvatars(
-      this.profileMedia,
-      record.enrollments.map((enrollment) => ({
+    // Everybody on the page in one signing round trip — the roster and the
+    // teachers together, rather than a batch each.
+    const avatars = await resolveMemberAvatars(this.profileMedia, [
+      ...record.enrollments.map((enrollment) => ({
         ...enrollment.membership,
         key: enrollment.membershipId,
       })),
-    );
+      ...teacherMemberships(record).map((membership) => ({
+        ...membership,
+        key: membership.id,
+      })),
+    ]);
     return toClassDetail(record, avatars);
   }
 
@@ -477,7 +525,7 @@ export class ClassesService {
         membershipId: membership.id,
         userId: membership.user.id,
         displayName: membership.user.displayName,
-        email: membership.user.email,
+        email: displayableEmail(membership.user.email),
         ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),
     };
@@ -650,7 +698,7 @@ export class ClassesService {
         membershipId: membership.id,
         userId: membership.user.id,
         displayName: membership.user.displayName,
-        email: membership.user.email,
+        email: displayableEmail(membership.user.email),
         ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),
     };
@@ -742,6 +790,139 @@ export class ClassesService {
     return this.presentDetail(updated);
   }
 
+  /**
+   * Replaces the class's assistant teachers with the submitted set.
+   *
+   * A set, not add and remove: the concurrency claim, the eligibility check,
+   * and the audit entry would otherwise be written twice for two shapes of one
+   * decision — who else teaches this class.
+   *
+   * The homeroom teacher is deliberately not settable here. Naming who is
+   * answerable for a class is `setTeacher`'s decision, and folding the two
+   * together would let a single call quietly demote somebody with no audit
+   * entry saying so.
+   */
+  async setAssistantTeachers(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      teacherMembershipIds: string[];
+      expectedUpdatedAt: string;
+    },
+    context: ClassRequestContext = {},
+  ): Promise<ClassDetail> {
+    const actor = await this.requireTeacherManager(identity, input.academyId);
+    const desired = [...new Set(input.teacherMembershipIds)];
+
+    const { record: updated, removed } = await this.prisma.$transaction(
+      async (tx) => {
+        const current = await requireClass(tx, input.academyId, input.classId);
+        assertActive(current);
+        const assigned = current.assistantTeachers.map(
+          (assistant) => assistant.teacher.id,
+        );
+        const added = desired.filter(
+          (membershipId) => !assigned.includes(membershipId),
+        );
+        const removed = assigned.filter(
+          (membershipId) => !desired.includes(membershipId),
+        );
+        // Nothing to decide, so nothing to move the revision or to audit.
+        if (added.length === 0 && removed.length === 0) {
+          return { record: current, removed };
+        }
+
+        // One person cannot hold both places on one class. Refused rather than
+        // silently ignored, because the manager who submitted it believes they
+        // just added a teacher.
+        if (
+          current.teacherMembershipId !== null &&
+          desired.includes(current.teacherMembershipId)
+        ) {
+          throw new AppException(
+            "CLASS_TEACHER_ALREADY_ASSIGNED",
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (added.length > 0) {
+          // Every submitted membership is validated before anything is
+          // written: one cross-academy id must fail the whole call, not half
+          // of it. One code for every failure — cross-academy, suspended,
+          // inactive user, wrong role — so a caller cannot probe memberships
+          // they cannot otherwise see.
+          const eligible = await tx.academyMembership.findMany({
+            where: { id: { in: added }, ...eligibleTeacherWhere(input.academyId) },
+            select: { id: true },
+          });
+          if (eligible.length !== added.length) {
+            throw new AppException(
+              "CLASS_TEACHER_INELIGIBLE",
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+        }
+
+        const claimed = await tx.class.updateMany({
+          where: {
+            id: current.id,
+            academyId: input.academyId,
+            status: "ACTIVE",
+            updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
+          },
+          data: { updatedAt: new Date() },
+        });
+        if (claimed.count !== 1) {
+          throwClassWriteConflict(current, input.expectedUpdatedAt);
+        }
+
+        if (removed.length > 0) {
+          await tx.classAssistantTeacher.deleteMany({
+            where: { classId: current.id, membershipId: { in: removed } },
+          });
+        }
+        if (added.length > 0) {
+          await tx.classAssistantTeacher.createMany({
+            data: added.map((membershipId) => ({
+              classId: current.id,
+              membershipId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        const record = await requireClass(tx, input.academyId, input.classId);
+        await this.audit.write(tx, {
+          actorUserId: actor.userId,
+          academyId: input.academyId,
+          action: "class.assistants.updated",
+          targetType: "Class",
+          targetId: current.id,
+          requestId: context.requestId,
+          // Membership ids only: the audit trail answers who was responsible,
+          // and needs no name, email, or student work to do it.
+          before: { assistantMembershipIds: assigned },
+          after: {
+            assistantMembershipIds: record.assistantTeachers.map(
+              (assistant) => assistant.teacher.id,
+            ),
+          },
+        });
+        return { record, removed };
+      },
+    );
+    // An assistant who just lost the class stops monitoring it now, not when
+    // their claim next expires — the same rule the homeroom teacher gets.
+    for (const membershipId of removed) {
+      await this.revocation.revokeScope(
+        { classId: input.classId, teacherMembershipRef: membershipId },
+        "ASSIGNMENT_CHANGED",
+      );
+    }
+    return this.presentDetail(updated);
+  }
+
   private requireClassManager(identity: SupabaseIdentity, academyId: string) {
     return this.access.requirePermission(
       identity.authUserId,
@@ -807,13 +988,19 @@ export class ClassesService {
  * The academy is a parameter rather than a fixed field so no caller can
  * accidentally leave it out and match a membership in another tenant.
  */
-function eligibleTeacherWhere(academyId: string) {
+function eligibleTeacherWhere(
+  academyId: string,
+): Prisma.AcademyMembershipWhereInput {
   return {
     academyId,
-    role: "TEACHER",
+    // Anybody holding TEACHER, not only those whose highest role it is. A
+    // manager who also teaches is a legitimate choice to run a class, and
+    // matching on the primary role alone kept them out of this list while the
+    // teaching pages were being handed to them elsewhere.
+    ...holdsRoleWhere("TEACHER"),
     status: "ACTIVE",
     user: { status: "ACTIVE" },
-  } as const satisfies Prisma.AcademyMembershipWhereInput;
+  };
 }
 
 /**
@@ -901,6 +1088,73 @@ function normalizeSchedule(
   );
 }
 
+/**
+ * One teacher membership, reported as it stands now rather than as it stood
+ * when the assignment was made: a suspended teacher must read as unavailable,
+ * not as in charge.
+ *
+ * `roles` carries the whole set, not just the primary, because that is what
+ * decides whether the assignment still grants anything — a director who also
+ * teaches stores `role = MANAGER` and would otherwise read as no teacher at
+ * all.
+ */
+function toTeacherSummary(membership: {
+  id: string;
+  role: AcademyRole;
+  status: MembershipStatus;
+  extraRoles: { role: AcademyRole }[];
+  user: { id: string; displayName: string | null; status: UserStatus };
+}): AssignedTeacherSummary {
+  return {
+    membershipId: membership.id,
+    userId: membership.user.id,
+    displayName: membership.user.displayName,
+    userStatus: membership.user.status,
+    membershipStatus: membership.status,
+    role: membership.role,
+    roles: [
+      ...effectiveAcademyRoles(
+        membership.role,
+        membership.extraRoles.map((extra) => extra.role),
+      ),
+    ],
+  };
+}
+
+/**
+ * Everyone who teaches this class: the homeroom teacher first, then the
+ * assistants the query already ordered by name.
+ *
+ * One list rather than two fields to read, so a surface showing "who teaches
+ * here" cannot show one group and quietly drop the other.
+ */
+function classTeachers(
+  record: Pick<ClassListRecord | ClassRecord, "assignedTeacher"> & {
+    assistantTeachers: { teacher: Parameters<typeof toTeacherSummary>[0] }[];
+  },
+): ClassTeacherSummary[] {
+  return [
+    ...(record.assignedTeacher
+      ? [{ ...toTeacherSummary(record.assignedTeacher), isHomeroom: true }]
+      : []),
+    ...record.assistantTeachers.map((assistant) => ({
+      ...toTeacherSummary(assistant.teacher),
+      isHomeroom: false,
+    })),
+  ];
+}
+
+/** The membership rows behind `classTeachers`, homeroom first. */
+function teacherMemberships<T>(record: {
+  assignedTeacher: T | null;
+  assistantTeachers: { teacher: T }[];
+}): T[] {
+  return [
+    ...(record.assignedTeacher ? [record.assignedTeacher] : []),
+    ...record.assistantTeachers.map((assistant) => assistant.teacher),
+  ];
+}
+
 function classSummaryFields(
   record: ClassListRecord | ClassRecord,
   studentCount: number,
@@ -918,17 +1172,9 @@ function classSummaryFields(
     })),
     studentCount,
     assignedTeacher: record.assignedTeacher
-      ? {
-          membershipId: record.assignedTeacher.id,
-          userId: record.assignedTeacher.user.id,
-          displayName: record.assignedTeacher.user.displayName,
-          userStatus: record.assignedTeacher.user.status,
-          // Reported as they stand now, not as they stood when assigned: a
-          // suspended teacher must read as unavailable, not as in charge.
-          membershipStatus: record.assignedTeacher.status,
-          role: record.assignedTeacher.role,
-        }
+      ? toTeacherSummary(record.assignedTeacher)
       : null,
+    teachers: classTeachers(record),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     archivedAt: record.archivedAt?.toISOString() ?? null,
@@ -948,15 +1194,27 @@ function toClassDetail(
   avatars: Map<string, typeof noMemberAvatar>,
 ): ClassDetail {
   const summary = toClassSummary(record);
+  // The detail page names each teacher exactly; the list gets by on a name.
+  const emails = new Map<string, string | null>(
+    teacherMemberships(record).map((membership) => [
+      membership.id,
+      membership.user.email,
+    ]),
+  );
   return {
     ...summary,
     assignedTeacher:
       summary.assignedTeacher && record.assignedTeacher
         ? {
             ...summary.assignedTeacher,
-            email: record.assignedTeacher.user.email,
+            email: displayableEmail(record.assignedTeacher.user.email),
           }
         : null,
+    teachers: summary.teachers.map((teacher) => ({
+      ...teacher,
+      email: displayableEmail(emails.get(teacher.membershipId) ?? null),
+      ...(avatars.get(teacher.membershipId) ?? noMemberAvatar),
+    })),
     schedule: record.scheduleSlots.map((slot) => ({
       id: slot.id,
       weekday: slot.weekday,
@@ -967,7 +1225,7 @@ function toClassDetail(
       membershipId: enrollment.membershipId,
       userId: enrollment.membership.user.id,
       displayName: enrollment.membership.user.displayName,
-      email: enrollment.membership.user.email,
+      email: displayableEmail(enrollment.membership.user.email),
       membershipStatus: enrollment.membership.status,
       role: enrollment.membership.role,
       enrolledAt: enrollment.enrolledAt.toISOString(),

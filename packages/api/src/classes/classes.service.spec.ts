@@ -12,6 +12,7 @@ import { ClassesService } from "./classes.service.js";
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "lead@example.com",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: "Lead",
@@ -42,11 +43,18 @@ const claiming = {
 
 function teacherMembership(
   id: string,
-  overrides: Partial<{ status: string; role: string; userStatus: string }> = {},
+  overrides: Partial<{
+    status: string;
+    role: string;
+    /** Roles held beside the primary, for a member who wears several hats. */
+    extraRoles: string[];
+    userStatus: string;
+  }> = {},
 ) {
   return {
     id,
     role: overrides.role ?? "TEACHER",
+    extraRoles: (overrides.extraRoles ?? []).map((role) => ({ role })),
     status: overrides.status ?? "ACTIVE",
     user: {
       id: `user-${id}`,
@@ -65,6 +73,8 @@ function classRecord(
     updatedAt: Date;
     /** The stored assignment, valid or not. */
     teacher: ReturnType<typeof teacherMembership> | null;
+    /** Everyone else who teaches the class, beside the homeroom teacher. */
+    assistants: ReturnType<typeof teacherMembership>[];
     /** When the class meets. Empty is the ordinary case. */
     schedule: {
       id: string;
@@ -84,6 +94,9 @@ function classRecord(
     createdByUserId: actorUserId,
     teacherMembershipId: teacher?.id ?? null,
     assignedTeacher: teacher,
+    assistantTeachers: (overrides.assistants ?? []).map((assistant) => ({
+      teacher: assistant,
+    })),
     archivedAt: null,
     createdAt: updatedAt,
     updatedAt: overrides.updatedAt ?? updatedAt,
@@ -159,6 +172,10 @@ function createService(options?: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    classAssistantTeacher: {
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     classScheduleSlot: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -204,13 +221,18 @@ function createService(options?: {
       }),
     },
     academyMembership: {
+      // Enrollment and assistant-teacher eligibility both land here. The role
+      // clause is what tells them apart, so the double answers each from its
+      // own list rather than offering students as teachers.
       findMany: vi.fn().mockImplementation(({ where }: {
-        where: { id: { in: string[] } };
+        where: { id: { in: string[] }; OR?: unknown };
       }) => {
-        const eligible = options?.eligibleMembershipIds ?? [
-          membershipId,
-          otherMembershipId,
-        ];
+        const eligible = where.OR
+          ? (options?.eligibleTeacherIds ?? [teacherA, teacherB])
+          : (options?.eligibleMembershipIds ?? [
+              membershipId,
+              otherMembershipId,
+            ]);
         return Promise.resolve(
           where.id.in
             .filter((id) => eligible.includes(id))
@@ -686,7 +708,12 @@ describe("ClassesService teacher assignment", () => {
       expect.objectContaining({
         where: {
           academyId,
-          role: "TEACHER",
+          // Anybody holding TEACHER, so a manager who also teaches is offered
+          // as a candidate to run a class.
+          OR: [
+            { role: "TEACHER" },
+            { extraRoles: { some: { role: "TEACHER" } } },
+          ],
           status: "ACTIVE",
           user: { status: "ACTIVE" },
         },
@@ -817,7 +844,12 @@ describe("ClassesService teacher assignment", () => {
         where: {
           id: teacherA,
           academyId,
-          role: "TEACHER",
+          // Set membership, not equality: a manager who also teaches stores
+          // `role = MANAGER` and would fail an exact match.
+          OR: [
+            { role: "TEACHER" },
+            { extraRoles: { some: { role: "TEACHER" } } },
+          ],
           status: "ACTIVE",
           user: { status: "ACTIVE" },
         },
@@ -1027,6 +1059,232 @@ describe("ClassesService teacher assignment", () => {
       // @ts-expect-error narrowing the generated include type is not the point
       include?.assignedTeacher?.select?.user?.select,
     ).toEqual({ id: true, displayName: true, status: true });
+  });
+});
+
+describe("ClassesService assistant teachers", () => {
+  const revision = updatedAt.toISOString();
+  const teacherC = "70000000-0000-4000-8000-00000000000c";
+
+  it("gates the assistants on the same class-teachers.manage", async () => {
+    const { service, access } = createService();
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [teacherB],
+      expectedUpdatedAt: revision,
+    });
+
+    expect(access.requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "class-teachers.manage",
+    );
+  });
+
+  it("derives additions and removals from the submitted set", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA),
+        assistants: [teacherMembership(teacherB)],
+      }),
+      eligibleTeacherIds: [teacherA, teacherB, teacherC],
+    });
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [teacherC],
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.classAssistantTeacher.deleteMany).toHaveBeenCalledWith({
+      where: { classId, membershipId: { in: [teacherB] } },
+    });
+    expect(transaction.classAssistantTeacher.createMany).toHaveBeenCalledWith({
+      data: [{ classId, membershipId: teacherC }],
+      skipDuplicates: true,
+    });
+  });
+
+  it("moves the class revision so the list reports the change", async () => {
+    const { service, transaction } = createService({
+      eligibleTeacherIds: [teacherB],
+    });
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [teacherB],
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: classId,
+        academyId,
+        status: "ACTIVE",
+        updatedAt: claiming,
+      },
+      data: { updatedAt: expect.any(Date) },
+    });
+  });
+
+  it("does not touch or audit a set that changes nothing", async () => {
+    const { service, transaction, audit } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA),
+        assistants: [teacherMembership(teacherB)],
+      }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [teacherB],
+      expectedUpdatedAt: revision,
+    });
+
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+    expect(transaction.classAssistantTeacher.createMany).not.toHaveBeenCalled();
+    expect(transaction.classAssistantTeacher.deleteMany).not.toHaveBeenCalled();
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("refuses one ineligible id without writing any of them", async () => {
+    const { service, transaction } = createService({
+      eligibleTeacherIds: [teacherB],
+    });
+
+    await expect(
+      service.setAssistantTeachers(identity, {
+        academyId,
+        classId,
+        teacherMembershipIds: [teacherB, teacherC],
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_TEACHER_INELIGIBLE" });
+    expect(transaction.classAssistantTeacher.createMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses to seat the homeroom teacher as their own assistant", async () => {
+    // Refused rather than silently dropped: the manager who submitted it
+    // believes they just added a teacher to the class.
+    const { service } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA) }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+
+    await expect(
+      service.setAssistantTeachers(identity, {
+        academyId,
+        classId,
+        teacherMembershipIds: [teacherA],
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toMatchObject({ code: "CLASS_TEACHER_ALREADY_ASSIGNED" });
+  });
+
+  it("refuses to write to an archived class", async () => {
+    const { service } = createService({
+      record: classRecord({ status: "ARCHIVED" }),
+      eligibleTeacherIds: [teacherB],
+    });
+
+    await expect(
+      service.setAssistantTeachers(identity, {
+        academyId,
+        classId,
+        teacherMembershipIds: [teacherB],
+        expectedUpdatedAt: revision,
+      }),
+    ).rejects.toBeInstanceOf(AppException);
+  });
+
+  it("stops a dropped assistant monitoring the class straight away", async () => {
+    const { service, revocation } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA),
+        assistants: [teacherMembership(teacherB)],
+      }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [],
+      expectedUpdatedAt: revision,
+    });
+
+    expect(revocation.revokeScope).toHaveBeenCalledWith(
+      { classId, teacherMembershipRef: teacherB },
+      "ASSIGNMENT_CHANGED",
+    );
+  });
+
+  it("names only membership ids in the audit entry", async () => {
+    const { service, audit } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA),
+        assistants: [teacherMembership(teacherB)],
+      }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+
+    await service.setAssistantTeachers(identity, {
+      academyId,
+      classId,
+      teacherMembershipIds: [],
+      expectedUpdatedAt: revision,
+    });
+
+    const entry = vi.mocked(audit.write).mock.calls[0]?.[1];
+    expect(entry).toMatchObject({
+      action: "class.assistants.updated",
+      before: { assistantMembershipIds: [teacherB] },
+    });
+    expect(JSON.stringify(entry)).not.toContain("teacher@example.com");
+  });
+
+  it("reports the homeroom teacher and the assistants as one list", async () => {
+    const { service } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA),
+        assistants: [teacherMembership(teacherB)],
+      }),
+    });
+
+    const detail = await service.get(identity, { academyId, classId });
+
+    expect(detail.teachers).toMatchObject([
+      { membershipId: teacherA, isHomeroom: true },
+      { membershipId: teacherB, isHomeroom: false },
+    ]);
+  });
+
+  /*
+   * A director who also teaches. Their membership stores `role = MANAGER`
+   * with TEACHER beside it, so a reader asking the primary role alone would
+   * report a working assignment as no teacher at all.
+   */
+  it("carries the whole role set of a multi-role teacher", async () => {
+    const { service } = createService({
+      record: classRecord({
+        teacher: teacherMembership(teacherA, {
+          role: "MANAGER",
+          extraRoles: ["TEACHER"],
+        }),
+      }),
+    });
+
+    const detail = await service.get(identity, { academyId, classId });
+
+    expect(detail.teachers[0]?.roles).toEqual(
+      expect.arrayContaining(["MANAGER", "TEACHER"]),
+    );
   });
 });
 

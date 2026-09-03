@@ -1,5 +1,10 @@
-import type { AssignedTeacherDetail, AssignedTeacherSummary } from '@cove/shared';
-import { assignmentGrantsAccess } from '@cove/shared';
+import type {
+  AssignedTeacherDetail,
+  AssignedTeacherSummary,
+  ClassTeacherDetail,
+  EligibleTeacherSummary,
+} from '@cove/shared';
+import { assignmentGrantsAccess, CLASS_MAX_ASSISTANT_TEACHERS } from '@cove/shared';
 
 /**
  * The decisions the teacher panel, list cell, and dialog all branch on, kept
@@ -24,7 +29,7 @@ export type UnavailableReason = 'account' | 'suspended' | 'role';
 export function teacherAssignmentState(
   teacher: Pick<
     AssignedTeacherSummary,
-    'membershipStatus' | 'role' | 'userStatus'
+    'membershipStatus' | 'roles' | 'userStatus'
   > | null,
 ): TeacherAssignmentState {
   if (!teacher) return 'none';
@@ -38,7 +43,7 @@ export function teacherAssignmentState(
 export function unavailableReason(
   teacher: Pick<
     AssignedTeacherSummary,
-    'membershipStatus' | 'role' | 'userStatus'
+    'membershipStatus' | 'roles' | 'userStatus'
   >,
 ): UnavailableReason {
   if (teacher.userStatus !== 'ACTIVE') return 'account';
@@ -104,4 +109,78 @@ export function teacherDisplayName(
   fallback: string,
 ): string {
   return teacher?.displayName ?? teacher?.email ?? fallback;
+}
+
+
+/* ------------------------------------------------------- assistant teachers */
+
+/**
+ * Who the assistants dialog may offer.
+ *
+ * The homeroom teacher is filtered out rather than shown and refused: they
+ * already teach this class, and offering them would let a manager submit a
+ * change the API exists to reject.
+ */
+export function assistantCandidates<T extends { membershipId: string }>(
+  eligible: T[],
+  homeroomMembershipId: string | null,
+): T[] {
+  return eligible.filter(
+    (teacher) => teacher.membershipId !== homeroomMembershipId,
+  );
+}
+
+/** The assistants currently on the class, in the order the server sent them. */
+export function currentAssistantIds(
+  teachers: Pick<ClassTeacherDetail, 'membershipId' | 'isHomeroom'>[],
+): string[] {
+  return teachers
+    .filter((teacher) => !teacher.isHomeroom)
+    .map((teacher) => teacher.membershipId);
+}
+
+/**
+ * How many more assistants this class can take.
+ *
+ * Counted from the cap on assistants rather than from the total, so an
+ * unassigned class does not silently offer the homeroom teacher's seat to an
+ * assistant who could not then be promoted into it.
+ */
+export function assistantSlotsLeft(assistantCount: number): number {
+  return Math.max(0, CLASS_MAX_ASSISTANT_TEACHERS - assistantCount);
+}
+
+/**
+ * Whether saving the assistants would change anything.
+ *
+ * Submitting the set already stored is refused here rather than sent as a
+ * no-op: the API would accept it, but the button would have promised a change
+ * it did not make.
+ */
+export function canSubmitAssistants({
+  selectedIds,
+  currentIds,
+  pending,
+}: {
+  selectedIds: string[];
+  currentIds: string[];
+  pending: boolean;
+}): boolean {
+  if (pending) return false;
+  if (selectedIds.length > CLASS_MAX_ASSISTANT_TEACHERS) return false;
+  const current = new Set(currentIds);
+  return (
+    selectedIds.length !== currentIds.length ||
+    selectedIds.some((id) => !current.has(id))
+  );
+}
+
+/** Search text for a teacher row, matching on either half of their identity. */
+export function teacherSearchLabel(
+  teacher: Pick<EligibleTeacherSummary, 'displayName' | 'email'>,
+  fallback: string,
+): string {
+  return (
+    [teacher.displayName, teacher.email].filter(Boolean).join(' · ') || fallback
+  );
 }

@@ -89,7 +89,7 @@ export class MonitoringAccessService {
       academyId,
       "classes.assigned.manage",
     );
-    if (!roleCanMonitor(actor.role)) {
+    if (!actor.roles.some(roleCanMonitor)) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     }
     const membership = await this.prisma.academyMembership.findUnique({

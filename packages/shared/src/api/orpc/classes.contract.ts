@@ -11,6 +11,7 @@ import {
   eligibleTeacherSummarySchema,
   listClassesSchema,
   removeClassStudentSchema,
+  setClassAssistantTeachersSchema,
   setClassCoursesSchema,
   setClassStatusSchema,
   setClassScheduleSchema,
@@ -46,4 +47,13 @@ export const academyClassesContract = {
     .input(classIdInputSchema)
     .output(z.object({ teachers: z.array(eligibleTeacherSummarySchema) })),
   setTeacher: oc.input(setClassTeacherSchema).output(classDetailSchema),
+  /**
+   * The assistants, as a complete set. Separate from `setTeacher` because
+   * naming who is answerable for a class and listing who else teaches it are
+   * two decisions, and an auditor reading one must not have to infer the
+   * other.
+   */
+  setAssistantTeachers: oc
+    .input(setClassAssistantTeachersSchema)
+    .output(classDetailSchema),
 };

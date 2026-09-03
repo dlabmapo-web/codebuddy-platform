@@ -89,11 +89,33 @@ function CoursesCell({ courses }: { courses: AssignedCourseSummary[] }) {
  * were staffed is the failure this cell exists to prevent, so an unavailable
  * assignment keeps the name and says plainly that it grants nothing.
  */
-function TeacherCell({ teacher }: { teacher: AssignedTeacherSummary | null }) {
+/**
+ * Who teaches this class, in one column's worth of space.
+ *
+ * The homeroom teacher is named and the assistants are counted rather than
+ * listed: the list answers "is this class staffed, and by whom", and three
+ * names in a table cell answers it worse than one name and a tally does.
+ */
+/** How many teachers assist this class, beside its homeroom teacher. */
+function assistantCount(record: ClassSummary): number {
+  return record.teachers.filter((teacher) => !teacher.isHomeroom).length;
+}
+
+function TeacherCell({
+  teacher,
+  assistantCount,
+}: {
+  teacher: AssignedTeacherSummary | null;
+  assistantCount: number;
+}) {
   const { t } = useLayoutTranslation('classes');
   if (!teacher) {
     return (
-      <span className="text-[13.5px] text-sub/60">{t('teacher_cell.none')}</span>
+      <span className="text-[13.5px] text-sub/60">
+        {assistantCount > 0
+          ? t('teacher_cell.assistants_only', { count: assistantCount })
+          : t('teacher_cell.none')}
+      </span>
     );
   }
 
@@ -121,7 +143,9 @@ function TeacherCell({ teacher }: { teacher: AssignedTeacherSummary | null }) {
         <span className="block truncate text-[14px] font-semibold">{name}</span>
         {effective ? (
           <span className="block truncate text-[12.5px] text-sub">
-            {t('teacher_cell.role')}
+            {assistantCount > 0
+              ? t('teacher_cell.with_assistants', { count: assistantCount })
+              : t('teacher_cell.role')}
           </span>
         ) : (
           <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-draft-soft px-1.5 py-0.5 text-[11.5px] font-bold text-draft">
@@ -174,6 +198,12 @@ export function ClassesTable({
                         teacherAssignmentState(teacher) === 'active'
                           ? ''
                           : ` · ${t('teacher_cell.unavailable')}`
+                      }${
+                        assistantCount(row.original) > 0
+                          ? ` · ${t('teacher_cell.with_assistants', {
+                              count: assistantCount(row.original),
+                            })}`
+                          : ''
                       }`
                     : t('teacher_cell.aria_none')}
                 </p>
@@ -219,7 +249,12 @@ export function ClassesTable({
         // sorts with the other blanks rather than under a literal label.
         accessorFn: (record) => record.assignedTeacher?.displayName ?? '',
         header: t('column.teacher'),
-        cell: ({ row }) => <TeacherCell teacher={row.original.assignedTeacher} />,
+        cell: ({ row }) => (
+          <TeacherCell
+            assistantCount={assistantCount(row.original)}
+            teacher={row.original.assignedTeacher}
+          />
+        ),
       },
       {
         id: 'updated',

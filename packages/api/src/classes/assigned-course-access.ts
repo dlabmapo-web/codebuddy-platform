@@ -1,3 +1,5 @@
+import { holdsRoleWhere } from "../authorization/membership-roles.js";
+import { taughtByWhere } from "./assigned-class-access.js";
 import type { AcademyRole } from "@cove/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
@@ -69,7 +71,8 @@ export function assignedMaterialWhere(
 }
 
 /**
- * A class this teacher currently runs.
+ * A class this teacher currently runs, as its homeroom teacher or as one of
+ * its assistants.
  *
  * The mirror of `enrolledClassWhere` for the other side of delivery. The
  * assignment stores a membership rather than a user, so the academy and the
@@ -83,7 +86,12 @@ export function taughtClassWhere(
   return {
     academyId,
     status: "ACTIVE",
-    assignedTeacher: { academyId, userId, status: "ACTIVE", role: "TEACHER" },
+    ...taughtByWhere({
+      academyId,
+      userId,
+      status: "ACTIVE",
+      ...holdsRoleWhere("TEACHER"),
+    }),
   };
 }
 

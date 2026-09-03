@@ -10,6 +10,7 @@ import { TeacherProgressAccessService } from "./teacher-progress-access.service.
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "teacher@example.com",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: null,
   displayName: "Teacher",
@@ -50,6 +51,8 @@ function materialRow(overrides: Record<string, unknown> = {}) {
 
 function createService(options?: {
   role?: AcademyRole;
+  /** Every role held, when it differs from `[role]`. */
+  roles?: AcademyRole[];
   classRecord?: { id: string; name: string } | null;
   memberships?: unknown[];
   materials?: unknown[];
@@ -96,6 +99,7 @@ function createService(options?: {
     requirePermission: vi.fn(async () => ({
       userId: teacherUserId,
       role: options?.role ?? ("TEACHER" as AcademyRole),
+      roles: options?.roles ?? [options?.role ?? ("TEACHER" as AcademyRole)],
     })),
   } as unknown as AcademyAccessService;
 
@@ -166,7 +170,16 @@ describe("TeacherProgressAccessService", () => {
           id: classId,
           academyId,
           status: "ACTIVE",
-          teacherMembershipId: membershipId,
+          OR: [
+            { assignedTeacher: expect.objectContaining({ id: membershipId }) },
+            {
+              assistantTeachers: {
+                some: {
+                  teacher: expect.objectContaining({ id: membershipId }),
+                },
+              },
+            },
+          ],
         }),
       }),
     );

@@ -11,11 +11,14 @@ import { useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
 
+import { currentAssistantIds } from '../_lib/teacher-assignment';
+
 /** What the confirmation dialog is currently asking about. */
 export type PendingRemoval =
   | { kind: 'course'; id: string; title: string }
   | { kind: 'student'; id: string; name: string }
-  | { kind: 'teacher'; id: string; name: string };
+  | { kind: 'teacher'; id: string; name: string }
+  | { kind: 'assistant'; id: string; name: string };
 
 /**
  * Owns every mutation on the class page.
@@ -49,6 +52,7 @@ export function useClassDetailManager({
   const [assignOpen, setAssignOpen] = useState(false);
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [teacherOpen, setTeacherOpen] = useState(false);
+  const [assistantsOpen, setAssistantsOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [removing, setRemoving] = useState<PendingRemoval | null>(null);
   // The dialogs' draft selections live here rather than inside them: opening
@@ -60,6 +64,9 @@ export function useClassDetailManager({
   );
   // One id, never an array: a class has one teacher, and a draft that could
   // hold two would let the UI offer a state the API has no way to store.
+  const [selectedAssistantIds, setSelectedAssistantIds] = useState<string[]>(
+    [],
+  );
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(
     null,
   );
@@ -88,7 +95,10 @@ export function useClassDetailManager({
   const eligibleTeachersQuery = useQuery({
     queryKey: ['academy', academyId, 'class', classId, 'eligible-teachers'],
     queryFn: () => orpc.academyClasses.listEligibleTeachers({ academyId, classId }),
-    enabled: canAssignTeacher && teacherOpen,
+    // Both dialogs pick from this one list, so it has to be fetched for
+    // either. Gated on the homeroom dialog alone, opening "Assistants" found
+    // an empty list and told the manager the academy had no teachers in it.
+    enabled: canAssignTeacher && (teacherOpen || assistantsOpen),
   });
 
   const applyDetail = async (next: ClassDetail) => {
@@ -187,6 +197,25 @@ export function useClassDetailManager({
     },
   });
 
+  /**
+   * The assistants as a whole set, so adding one and dropping another is one
+   * revision claim rather than two that could interleave.
+   */
+  const assistantsMutation = useMutation({
+    mutationFn: (teacherMembershipIds: string[]) =>
+      orpc.academyClasses.setAssistantTeachers({
+        academyId,
+        classId,
+        teacherMembershipIds,
+        expectedUpdatedAt: detail.updatedAt,
+      }),
+    onSuccess: async (next) => {
+      setAssistantsOpen(false);
+      setRemoving(null);
+      await applyDetail(next);
+    },
+  });
+
   const removeStudentMutation = useMutation({
     mutationFn: (membershipId: string) =>
       orpc.academyClasses.removeStudent({ academyId, classId, membershipId }),
@@ -273,6 +302,21 @@ export function useClassDetailManager({
     teacherPending: teacherMutation.isPending,
     teacherError: teacherMutation.error,
 
+    assistantsOpen,
+    openAssistants: () => {
+      assistantsMutation.reset();
+      // Seeded from the stored set, so the dialog opens on the truth and a
+      // manager adding a third teacher does not have to re-pick the other two.
+      setSelectedAssistantIds(currentAssistantIds(detail.teachers));
+      setAssistantsOpen(true);
+    },
+    closeAssistants: () => setAssistantsOpen(false),
+    selectedAssistantIds,
+    setSelectedAssistantIds,
+    saveAssistants: () => assistantsMutation.mutate(selectedAssistantIds),
+    assistantsPending: assistantsMutation.isPending,
+    assistantsError: assistantsMutation.error,
+
     saveSchedule: (slots: ClassScheduleSlotInput[]) =>
       scheduleMutation.mutate(slots),
     resetSchedule: () => scheduleMutation.reset(),
@@ -293,6 +337,10 @@ export function useClassDetailManager({
       teacherMutation.reset();
       setRemoving({ kind: 'teacher', id: teacher.membershipId, name });
     },
+    askRemoveAssistant: (teacher: { membershipId: string }, name: string) => {
+      assistantsMutation.reset();
+      setRemoving({ kind: 'assistant', id: teacher.membershipId, name });
+    },
     cancelRemoval: () => setRemoving(null),
     confirmRemoval: () => {
       if (!removing) return;
@@ -308,12 +356,23 @@ export function useClassDetailManager({
         teacherMutation.mutate(null);
         return;
       }
+      if (removing.kind === 'assistant') {
+        // The whole remaining set, not a delete: the mutation is a replace, so
+        // dropping one assistant is submitting the others.
+        assistantsMutation.mutate(
+          currentAssistantIds(detail.teachers).filter(
+            (id) => id !== removing.id,
+          ),
+        );
+        return;
+      }
       removeStudentMutation.mutate(removing.id);
     },
     removalPending:
       removeStudentMutation.isPending ||
       (coursesMutation.isPending && removing?.kind === 'course') ||
-      (teacherMutation.isPending && removing?.kind === 'teacher'),
+      (teacherMutation.isPending && removing?.kind === 'teacher') ||
+      (assistantsMutation.isPending && removing?.kind === 'assistant'),
     removalError:
       removing?.kind === 'student'
         ? removeStudentMutation.error
@@ -321,7 +380,9 @@ export function useClassDetailManager({
           ? coursesMutation.error
           : removing?.kind === 'teacher'
             ? teacherMutation.error
-            : null,
+            : removing?.kind === 'assistant'
+              ? assistantsMutation.error
+              : null,
   };
 }
 

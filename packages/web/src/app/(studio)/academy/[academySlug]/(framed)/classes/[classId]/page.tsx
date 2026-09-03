@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import {
-  academyRoleFor,
+  academyRolesFor,
   canManageClasses,
   canManageClassSchedule,
   canManageClassTeachers,
@@ -39,11 +39,11 @@ export default async function ClassDetailPage({
     ]);
     detail = result;
     // Only a usability layer — every mutation is authorized again in the API.
-    const role = academyRoleFor(account, academyId);
-    canAssignCourses = canManageClasses(role);
-    canEnroll = canManageEnrollment(role);
-    canAssignTeacher = canManageClassTeachers(role);
-    canSetSchedule = canManageClassSchedule(role);
+    const roles = academyRolesFor(account, academyId);
+    canAssignCourses = canManageClasses(roles);
+    canEnroll = canManageEnrollment(roles);
+    canAssignTeacher = canManageClassTeachers(roles);
+    canSetSchedule = canManageClassSchedule(roles);
   } catch (error) {
     // A missing class and a server fault get different copy: only the first is
     // something the reader can act on by going back to the list.

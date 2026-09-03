@@ -3,7 +3,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { Command as CommandPrimitive } from 'cmdk';
-import { Search } from 'lucide-react';
+import { Check, Search } from 'lucide-react';
 import * as React from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
 
@@ -229,6 +229,40 @@ function DropdownMenuRadioItem({
   );
 }
 
+/**
+ * A menu row that toggles rather than selects.
+ *
+ * Beside `RadioItem` rather than replacing it: a radio group answers "which
+ * one of these", and there are still menus that mean that. This answers "which
+ * of these", which is what a membership's roles are.
+ *
+ * The tick is rendered by the caller in the row's own content, as `RadioItem`
+ * does, so a menu can put it wherever its layout wants.
+ */
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      className={cn(
+        'relative flex cursor-pointer select-none items-center rounded-md px-2.5 py-1.5 text-[14px] font-medium text-sub outline-none transition-colors',
+        'focus:bg-accent focus:text-ink data-[state=checked]:font-semibold data-[state=checked]:text-ink',
+        'data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
+        className,
+      )}
+      data-slot="dropdown-menu-checkbox-item"
+      {...props}
+    >
+      {children}
+      <DropdownMenuPrimitive.ItemIndicator className="ml-auto">
+        <Check aria-hidden className="size-3.5 text-brand" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 function DropdownMenuLabel({
   className,
   ...props
@@ -265,6 +299,7 @@ export {
   DrawerTrigger,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,

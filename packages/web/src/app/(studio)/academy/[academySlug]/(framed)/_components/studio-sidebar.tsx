@@ -49,6 +49,7 @@ import { NavPendingHint } from './nav-pending-hint';
 import { NavCountBadge, NavCountDot } from './nav-count-badge';
 import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
+import { RoleBadge } from '@/components/studio/role-badge';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
@@ -89,9 +90,19 @@ export function StudioSidebar({
   canMonitor,
   hasPoints,
   isStudent,
+  viewRole,
 }: {
   academies: StudioAcademy[];
   academyId: string;
+  /**
+   * The role this reader is working as, which is what the chip under the
+   * academy name shows.
+   *
+   * Not the membership's primary role: somebody holding three roles who
+   * switches to Teacher is a Teacher here until they switch back, and a badge
+   * still reading "Manager" contradicts the nav beside it.
+   */
+  viewRole?: AcademyRole | null;
   canLearn: boolean;
   canManageAcademy: boolean;
   canManageClasses: boolean;
@@ -133,7 +144,11 @@ export function StudioSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <AcademySwitcher academies={academies} academyId={academyId} />
+        <AcademySwitcher
+          academies={academies}
+          academyId={academyId}
+          viewRole={viewRole}
+        />
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
@@ -264,10 +279,18 @@ const AcademyTrigger = React.forwardRef<
             <span className="block truncate text-[14px] font-bold leading-tight">
               {selectedItem?.name ?? t('academy_switcher.select')}
             </span>
-            <span className="block truncate text-[12px] leading-tight text-sub">
-              {selectedItem
-                ? t(`common:role.${selectedItem.role}`)
-                : t('academy_switcher.no_membership')}
+            {/* The role, in the colour it wears everywhere else in Studio.
+                As grey caption text it read as metadata about the academy;
+                as a chip it reads as what the person is here, which is what
+                the line is for. */}
+            <span className="mt-0.5 block truncate leading-tight">
+              {selectedItem ? (
+                <RoleBadge role={selectedItem.role} />
+              ) : (
+                <span className="text-[12px] text-sub">
+                  {t('academy_switcher.no_membership')}
+                </span>
+              )}
             </span>
           </span>
           <ChevronsUpDown className="size-4 shrink-0 text-sub" />
@@ -280,31 +303,39 @@ const AcademyTrigger = React.forwardRef<
 function AcademySwitcher({
   academies,
   academyId,
+  viewRole,
 }: {
   academies: StudioAcademy[];
   academyId: string;
+  viewRole?: AcademyRole | null;
 }) {
   const { t } = useLayoutTranslation(['nav', 'common']);
   const router = useRouter();
 
-  if (academies.length <= 1) {
-    return <AcademyTrigger disabled selectedItem={academies[0]} />;
+  // The chip shows the role being worked as, so the selected academy carries
+  // the view role rather than the membership's highest one. Every *other*
+  // academy in the list keeps its own, which is the role the reader would
+  // arrive as over there.
+  const shown = academies.map((academy) =>
+    academy.id === academyId && viewRole ? { ...academy, role: viewRole } : academy,
+  );
+
+  if (shown.length <= 1) {
+    return <AcademyTrigger disabled selectedItem={shown[0]} />;
   }
 
   return (
     <ResponsiveSelector
       align="start"
       drawerTitle={t('academy_switcher.switch')}
-      list={academies}
+      list={shown}
       onSelect={(academy) => router.push(routes.academy(academy.slug))}
       placeholder={t('academy_switcher.search')}
       popoverClassName="w-60"
       renderItem={(academy) => (
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-semibold">{academy.name}</span>
-          <span className="truncate text-[12px] text-sub">
-            {t(`common:role.${academy.role}`)}
-          </span>
+          <RoleBadge className="mt-0.5 self-start" role={academy.role} />
         </span>
       )}
       selectedId={academyId}

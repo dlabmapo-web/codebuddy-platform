@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type { AcademyRole } from '@cove/shared';
 
 import { HeaderControls } from '@/components/studio/header-controls';
 import {
@@ -16,6 +17,7 @@ import {
   canReviewContent,
   isStudent,
 } from '@/lib/academy-access-state';
+import { heldRoles, resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
 import { getAccount } from '@/lib/orpc-server';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
 
@@ -47,7 +49,9 @@ export async function StudioChrome({
 }) {
   let academies: StudioAcademy[] = [];
   let academyName = '';
-  let role = null;
+  let academySlug = '';
+  let held: readonly AcademyRole[] = [];
+  let primaryRole: AcademyRole | null = null;
   let hasPoints = false;
   let viewer: {
     academyImageUrl: string | null;
@@ -70,7 +74,9 @@ export async function StudioChrome({
       (membership) => membership.academy.id === academyId,
     );
     academyName = selectedMembership?.academy.name ?? '';
-    role = selectedMembership?.role ?? null;
+    academySlug = selectedMembership?.academy.slug ?? '';
+    held = heldRoles(account, academyId);
+    primaryRole = selectedMembership?.role ?? null;
     hasPoints = (selectedMembership?.features ?? []).includes('STUDENT_POINTS');
     // Feeds the header's way into My Page. The name is only for the initials
     // fallback, so the global one is right even inside an academy.
@@ -84,21 +90,46 @@ export async function StudioChrome({
     redirect('/login');
   }
 
-  const sidebarState = (await cookies()).get('cove_sidebar_state')?.value;
+  const cookieStore = await cookies();
+  const sidebarState = cookieStore.get('cove_sidebar_state')?.value;
+
+  /*
+   * Which of this member's roles the shell is built for.
+   *
+   * The union decides what they may do; this decides what they are shown. A
+   * member with one role — almost everybody — resolves to it and sees no
+   * switcher at all, so nothing about this is visible until somebody genuinely
+   * holds two.
+   *
+   * Note the sidebar gates below take `[viewRole]` and not `held`. Leaving
+   * every role's navigation on screen would make the switcher change the
+   * overview and nothing else, which is not a switcher. The API is unaffected
+   * either way: it authorizes against the full set and has never read this.
+   */
+  const viewRole = primaryRole
+    ? resolveViewRole({
+        academyId,
+        held,
+        primary: primaryRole,
+        cookie: cookieStore.get(viewRoleCookieName)?.value,
+      }).role
+    : null;
+  const shown: readonly AcademyRole[] = viewRole ? [viewRole] : [];
 
   return (
     <SidebarProvider defaultOpen={sidebarState !== 'false'}>
       <StudioSidebar
         academies={academies}
+        viewRole={viewRole}
         academyId={academyId}
-        canLearn={canLearn(role)}
-        canManageAcademy={canManageAcademy(role)}
-        canManageClasses={canManageClasses(role)}
-        canManageContent={canReviewContent(role)}
-        canReviewApplications={canReviewApplications(role)}
-        canMonitor={canMonitorClasses(role)}
+        canLearn={canLearn(shown)}
+        canManageAcademy={canManageAcademy(shown)}
+        canManageClasses={canManageClasses(shown)}
+        canManageContent={canReviewContent(shown)}
+        canReviewApplications={canReviewApplications(shown)}
+        canMonitor={canMonitorClasses(shown)}
         hasPoints={hasPoints}
-        isStudent={isStudent(role)}
+        isStudent={isStudent(shown)}
       />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">
@@ -116,7 +147,23 @@ export async function StudioChrome({
           </span>
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
-          <HeaderControls account={viewer ?? undefined} className="ml-auto" />
+          {/* The role switcher rides in this menu rather than beside the
+              academy name: which role you are working as is a fact about the
+              reader, and the bar is about the academy. */}
+          <HeaderControls
+            account={
+              viewer
+                ? {
+                    ...viewer,
+                    academyId,
+                    academySlug: academySlug || undefined,
+                    role: viewRole,
+                    roles: held,
+                  }
+                : undefined
+            }
+            className="ml-auto"
+          />
         </header>
         {children}
       </SidebarInset>

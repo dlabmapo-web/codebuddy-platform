@@ -282,7 +282,7 @@ async function upsertClassmate(
  * that exceeds what the server would have paid teaches a developer the wrong
  * number.
  */
-async function seedClassmateAwards(
+export async function seedClassmateAwards(
   prisma: PrismaClient,
   input: {
     academyId: string;
@@ -292,10 +292,31 @@ async function seedClassmateAwards(
     days: number;
     membershipIds: string[];
     timeZone: string;
+    /**
+     * Shifts every student's rhythm, so two classes seeded from one run do not
+     * come out as the same board twice.
+     *
+     * The console's ranking compares classes against each other, which the
+     * per-student spread alone cannot serve: nine students spread identically
+     * in twelve classes ranks twelve equal classes and shows nothing. Offsetting
+     * the index moves the whole class along the same pace curve — one class
+     * works most days, another turns up twice a week — which is what puts a
+     * real distance between the rows of a cross-academy table.
+     *
+     * Defaults to 0, which is exactly the behaviour every existing caller had.
+     */
+    paceOffset?: number;
   },
 ): Promise<number> {
+  // Scoped to the class, not just to the students. A student enrolled in two
+  // classes has a separate history in each — points are class-scoped, which is
+  // the whole of the 2026-08-24 attribution design — so an unscoped delete
+  // wipes the history this fixture wrote for their *other* class on the very
+  // next call. It showed up as a cross-academy ranking where every second
+  // seeded class reported zero.
   await prisma.pointAward.deleteMany({
     where: {
+      classId: input.classId,
       membershipId: { in: input.membershipIds },
       dedupeKey: { startsWith: seedAwardPrefix },
     },
@@ -309,8 +330,11 @@ async function seedClassmateAwards(
   for (const [index, membershipId] of input.membershipIds.entries()) {
     // 0 = works nearly every day, 8 = turns up now and then. Spread across the
     // class rather than assigned, so the board is never nine of the same
-    // student.
-    const attendanceOdds = 9 - index;
+    // student. `paceOffset` slides the whole class along that curve, so a
+    // cross-academy table has busy classes and quiet ones rather than twelve
+    // identical ones. Floored at 1: a class nobody attends writes no awards at
+    // all, and the caller asks for that by not seeding it.
+    const attendanceOdds = Math.max(1, 9 - index - (input.paceOffset ?? 0));
 
     for (let back = 0; back < input.days; back += 1) {
       const localDate = addLocalDays(today, -back);
@@ -336,9 +360,12 @@ async function seedClassmateAwards(
           membershipId,
           reason,
           amount,
-          // Namespaced, and unique by construction: one student, one day, one
-          // position in that day's run.
-          dedupeKey: `${seedAwardPrefix}${membershipId}:${localDate}:${sequence}`,
+          // Namespaced, and unique by construction: one class, one student,
+          // one day, one position in that day's run. The class is part of the
+          // key because a student in two classes earns in both, and a key
+          // without it makes the second class's rows collide with the first's
+          // — which `skipDuplicates` then drops in silence.
+          dedupeKey: `${seedAwardPrefix}${input.classId}:${membershipId}:${localDate}:${sequence}`,
           classId: input.classId,
           localDate: localDateValue,
           subjectLabel,

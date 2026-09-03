@@ -1,0 +1,54 @@
+{
+  "title": "Class ranking",
+  "subtitle": "Every class on Cove Studio, and what its students earned.",
+  "summary": {
+    "label": "What the platform earned",
+    "heading": "Across the platform",
+    "scope_one": "{{count}} academy",
+    "scope_other": "{{count}} academies",
+    "points": "Points earned",
+    "classes": "Classes earning",
+    "quiet_classes_one": "{{count}} earned nothing",
+    "quiet_classes_other": "{{count}} earned nothing",
+    "students": "Students earning",
+    "students_hint": "of those enrolled",
+    "points_off": "Points switched off",
+    "points_off_hint": "no ranking in these classes"
+  },
+  "table": {
+    "title": "Classes",
+    "class": "Class",
+    "academy": "Academy",
+    "students": "Students",
+    "earning": "Earning",
+    "points": "Points",
+    "solved": "Solved",
+    "state": "Ranking",
+    "no_teacher": "No teacher assigned",
+    "not_counted": "Not counted",
+    "search": "Search a class or academy",
+    "empty": "No classes match this filter.",
+    "loading": "Loading classes",
+    "truncated": "Showing the first 2,000 classes. Narrow by academy to rank the rest."
+  },
+  "state": {
+    "ranked": "Ranked",
+    "ranked_hint": "Points and the class ranking are both switched on.",
+    "board_off": "Board off",
+    "board_off_hint": "Students earn points, but this academy hides the class ranking from them.",
+    "points_off": "Points off",
+    "points_off_hint": "This academy has switched student points off, so there is nothing to rank.",
+    "points_off_body": "This academy has switched student points off. Its manager can turn them back on in the academy's settings."
+  },
+  "board": {
+    "title": "Class ranking",
+    "description": "The same ranking this class's own students and teacher see. Open a student to see how they earned it.",
+    "unavailable": "The ranking could not be loaded",
+    "unavailable_body": "The ranking did not answer. Choose the class again, or try another period.",
+    "close": "Close"
+  },
+  "unavailable": {
+    "title": "Class ranking is unavailable",
+    "body": "The ranking did not answer. Reload the page to try again."
+  }
+}

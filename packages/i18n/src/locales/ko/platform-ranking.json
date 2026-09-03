@@ -1,0 +1,54 @@
+{
+  "title": "반 랭킹",
+  "subtitle": "Cove Studio의 모든 반과 학생들이 획득한 포인트입니다.",
+  "summary": {
+    "label": "플랫폼 획득 현황",
+    "heading": "플랫폼 전체",
+    "scope_one": "아카데미 {{count}}곳",
+    "scope_other": "아카데미 {{count}}곳",
+    "points": "획득 포인트",
+    "classes": "활동한 반",
+    "quiet_classes_one": "{{count}}개 반은 획득 없음",
+    "quiet_classes_other": "{{count}}개 반은 획득 없음",
+    "students": "획득한 학생",
+    "students_hint": "등록 학생 중",
+    "points_off": "포인트 사용 안 함",
+    "points_off_hint": "해당 반은 랭킹이 없습니다"
+  },
+  "table": {
+    "title": "반",
+    "class": "반",
+    "academy": "아카데미",
+    "students": "학생",
+    "earning": "획득",
+    "points": "포인트",
+    "solved": "해결",
+    "state": "랭킹",
+    "no_teacher": "담당 선생님 없음",
+    "not_counted": "집계 안 함",
+    "search": "반 또는 아카데미 검색",
+    "empty": "조건에 맞는 반이 없습니다.",
+    "loading": "반 불러오는 중",
+    "truncated": "상위 2,000개 반만 표시합니다. 아카데미로 좁혀서 나머지를 확인하세요."
+  },
+  "state": {
+    "ranked": "랭킹 있음",
+    "ranked_hint": "포인트와 반 랭킹이 모두 켜져 있습니다.",
+    "board_off": "랭킹 숨김",
+    "board_off_hint": "학생은 포인트를 획득하지만, 이 아카데미는 반 랭킹을 학생에게 보여주지 않습니다.",
+    "points_off": "포인트 끔",
+    "points_off_hint": "이 아카데미는 학생 포인트를 사용하지 않아 랭킹을 만들 수 없습니다.",
+    "points_off_body": "이 아카데미는 학생 포인트를 사용하지 않습니다. 매니저가 아카데미 설정에서 다시 켤 수 있습니다."
+  },
+  "board": {
+    "title": "반 랭킹",
+    "description": "이 반의 학생과 선생님이 보는 것과 같은 랭킹입니다. 학생을 열면 포인트를 어떻게 얻었는지 볼 수 있습니다.",
+    "unavailable": "랭킹을 불러오지 못했습니다",
+    "unavailable_body": "랭킹이 응답하지 않았습니다. 반을 다시 선택하거나 다른 기간을 확인해 주세요.",
+    "close": "닫기"
+  },
+  "unavailable": {
+    "title": "반 랭킹을 사용할 수 없습니다",
+    "body": "랭킹이 응답하지 않았습니다. 페이지를 새로고침해 주세요."
+  }
+}

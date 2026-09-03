@@ -142,6 +142,7 @@ export const platformNamespaces = [
   'platform-applications',
   'platform-content',
   'platform-invitations',
+  'platform-ranking',
   'platform-users',
   'platform-support',
   'errors',

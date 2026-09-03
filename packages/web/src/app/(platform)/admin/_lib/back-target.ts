@@ -29,21 +29,41 @@ import type { ContentLens } from '@cove/shared';
  * `/admin/content/problems` is deliberately *not* on the list any more. That
  * page is gone and its address only redirects, so a Back link pointing at it
  * would bounce the reader to Courses under a label promising problems.
+ *
+ * `/admin/ranking` joined it deliberately, which is what the paragraph above
+ * asks the next surface to do: the class ranking opens a student's ledger, and
+ * without an entry here that reader presses Back and lands on the academy index
+ * with their period, sort and academy filter gone.
  */
-const CURRICULUM_PAGE = /^\/admin\/content\/(courses|classes)(\?[^#]*)?$/;
+const CONSOLE_PAGE = /^\/admin\/(content\/(?:courses|classes)|ranking)(\?[^#]*)?$/;
+
+/** The console pages a detail view may be returned to. */
+export type ConsoleBackPage = ContentLens | 'ranking';
 
 export type BackTarget = { href: string; label: string };
 
 export function consoleBackTarget(
   from: string | string[] | undefined,
-  /** What to call each page, so Back names the one it returns to. */
-  labels: Record<ContentLens, string>,
+  /**
+   * What to call each page, so Back names the one it returns to.
+   *
+   * Partial, because a caller names only the pages it can actually be opened
+   * from — the curriculum editors are unreachable from the ranking, and making
+   * them carry its label would mean loading a namespace for a string nothing
+   * can render. A `from` naming a page this caller did not label falls back,
+   * which is the same answer an unrecognised one gets.
+   */
+  labels: Partial<Record<ConsoleBackPage, string>>,
   fallback: BackTarget,
 ): BackTarget {
   const value = Array.isArray(from) ? from[0] : from;
-  const match = value?.match(CURRICULUM_PAGE);
+  const match = value?.match(CONSOLE_PAGE);
   if (value && match) {
-    return { href: value, label: labels[match[1] as ContentLens] };
+    // The captured group is the path, which is `content/courses` for the two
+    // curriculum pages and `ranking` for the third. Keyed by its last segment,
+    // so one label map serves all three.
+    const label = labels[match[1].split('/').pop() as ConsoleBackPage];
+    if (label) return { href: value, label };
   }
   return fallback;
 }

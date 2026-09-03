@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   ScrollText,
   Shield,
+  Trophy,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -123,6 +124,12 @@ export function PlatformSidebar() {
           label: t('nav.classes'),
           icon: lensIcons.classes,
         },
+        // Under Classes, because a ranking is a read of what a class produced.
+        // It is not a third content lens and deliberately carries no
+        // `contentLensHrefs` entry: that machinery describes two lists sharing
+        // one input schema and one table, and a member sharing neither would
+        // make the abstraction a coincidence.
+        { href: '/admin/ranking', label: t('nav.ranking'), icon: Trophy },
       ],
     },
     {

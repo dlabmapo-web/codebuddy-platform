@@ -10,7 +10,7 @@ import { useMinuteClock } from '@/hooks/use-minute-clock';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { routes } from '@/lib/routes';
 
-import { courseAccent, courseAccentClasses } from '../../_lib/course-accent';
+import { courseAccent, courseAccentClasses } from '@/lib/course-accent';
 import { byMostRecent, elapsedSince } from '../../_lib/elapsed';
 
 /**

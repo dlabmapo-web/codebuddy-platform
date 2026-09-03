@@ -3,6 +3,7 @@
 import {
   Inbox,
   KeyRound,
+  Library,
   LogOut,
   Mail,
   School,
@@ -108,12 +109,25 @@ export function PlatformSidebar() {
     {
       id: 'content',
       label: t('nav.group.content'),
-      // Two rows, named after the things they hold, taking the icons the pages
-      // and their summary tiles already wear. They were one row called
-      // "Content" leading to a browser whose second list was reachable only
-      // through a chip in its own toolbar — the name of a tool, hiding half of
-      // what it did.
+      // Rows named after the things they hold, taking the icons the pages and
+      // their summary tiles already wear. They were one row called "Content"
+      // leading to a browser whose second list was reachable only through a
+      // chip in its own toolbar — the name of a tool, hiding half of what it
+      // did.
+      //
+      // "Courses" became "Academy courses" when the library arrived beside it.
+      // The two answer different questions — what head office publishes, and
+      // what one customer is running right now — and with both present the
+      // bare word named neither.
       items: [
+        // First, because it is the only row here about the platform's own
+        // work: the other two answer support questions about somebody else's
+        // academy, and this one is what head office opens the console to do.
+        {
+          href: '/admin/content/library',
+          label: t('nav.library'),
+          icon: Library,
+        },
         {
           href: contentLensHrefs.courses,
           label: t('nav.courses'),

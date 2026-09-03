@@ -1,6 +1,10 @@
 /**
  * Which of the four identity hues a course wears.
  *
+ * Shared rather than owned by the learning surface, because a course keeps one
+ * identity wherever it is drawn: on a student's card, on a team lead's list,
+ * and on the master in the content library that a branch's copy came from.
+ *
  * A course's colour has to be the same one every time a student sees it —
  * across sessions, on My Courses and on a class page, in either language — or
  * it teaches them nothing and becomes noise. So it is derived from the course

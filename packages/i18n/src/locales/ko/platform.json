@@ -175,7 +175,7 @@
     },
     "academies": "아카데미",
     "users": "사용자",
-    "courses": "코스",
+    "courses": "학원 과목",
     "classes": "반",
     "ranking": "랭킹",
     "access": "지원 접근",
@@ -183,7 +183,8 @@
     "applications": "가입 신청",
     "invitations": "초대",
     "applications_waiting_one": "{{count}}건의 신청에 답변이 필요합니다",
-    "applications_waiting_other": "{{count}}건의 신청에 답변이 필요합니다"
+    "applications_waiting_other": "{{count}}건의 신청에 답변이 필요합니다",
+    "library": "라이브러리"
   },
   "unavailable": {
     "title": "아카데미를 불러올 수 없습니다",

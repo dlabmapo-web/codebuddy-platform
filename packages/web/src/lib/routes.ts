@@ -47,6 +47,17 @@ export const routes = {
     `/admin/academies/${segment(academySlug)}/classes`,
   adminAcademyClass: (academySlug: string, classId: string) =>
     `/admin/academies/${segment(academySlug)}/classes/${segment(classId)}`,
+  /** The content library. It has no academy slug in its addresses: head
+   *  office never sees its own curriculum addressed as a customer's academy. */
+  adminLibrary: '/admin/content/library',
+  adminLibraryCourse: (courseId: string) =>
+    `/admin/content/library/${segment(courseId)}`,
+  adminLibraryExercise: (
+    courseId: string,
+    lectureId: string,
+    materialId: string,
+  ) =>
+    `/admin/content/library/${segment(courseId)}/lectures/${segment(lectureId)}/exercises/${segment(materialId)}`,
   adminAcademyExercise: (
     academySlug: string,
     courseId: string,
@@ -63,6 +74,8 @@ export const routes = {
     `${academyRoot(academySlug)}/content/courses`,
   academyCourse: (academySlug: string, courseId: string) =>
     `${academyRoot(academySlug)}/content/courses/${segment(courseId)}`,
+  academyLibrary: (academySlug: string) =>
+    `${academyRoot(academySlug)}/content/library`,
   academyCourseImport: (academySlug: string, courseId: string) =>
     `${academyRoot(academySlug)}/content/courses/${segment(courseId)}/imports/new`,
   academyLearnCourses: (academySlug: string) =>

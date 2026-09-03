@@ -142,6 +142,7 @@ export const platformNamespaces = [
   'platform-applications',
   'platform-content',
   'platform-invitations',
+  'platform-library',
   'platform-ranking',
   'platform-users',
   'platform-support',
@@ -207,6 +208,17 @@ export const profileNamespaces = ["profile", "errors"] as const;
  */
 export const pointsNamespaces = ["points", "errors"] as const;
 
+/**
+ * The academy's view of the content library.
+ *
+ * Its own list rather than a slice of `courses`: this copy is read on one
+ * route by curriculum staff, and `courses` is a layout namespace — putting it
+ * there sent the library's whole vocabulary in the RSC payload of every page a
+ * student loads, which is exactly what the Korean payload budget in
+ * `@cove/i18n` refused.
+ */
+export const academyLibraryNamespaces = ["academy-library", "errors"] as const;
+
 export type PageNamespace =
   | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]
@@ -223,7 +235,8 @@ export type PageNamespace =
   | (typeof contentImportNamespaces)[number]
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number]
-  | (typeof pointsNamespaces)[number];
+  | (typeof pointsNamespaces)[number]
+  | (typeof academyLibraryNamespaces)[number];
 
 /**
  * The confirmation copy for deleting a course or a class.

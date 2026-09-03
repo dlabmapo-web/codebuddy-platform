@@ -8,7 +8,7 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { useLayoutTranslation } from '@/i18n';
 import { routes } from '@/lib/routes';
 
-import { courseAccent, courseAccentClasses } from '../_lib/course-accent';
+import { courseAccent, courseAccentClasses } from '@/lib/course-accent';
 
 /**
  * One course, wherever a student meets it.

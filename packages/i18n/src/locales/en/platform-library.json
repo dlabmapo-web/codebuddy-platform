@@ -1,0 +1,83 @@
+{
+  "title": "Content library",
+  "subtitle": "Courses head office publishes. Any academy can take a copy and make it their own.",
+  "open": "Open",
+  "search": {
+    "label": "Search library courses",
+    "placeholder": "Search courses"
+  },
+  "state": {
+    "draft": "Draft",
+    "published": "Published",
+    "retired": "Retired"
+  },
+  "shape": {
+    "modules": "{{count}} modules",
+    "modules_one": "1 module",
+    "lectures": "{{count}} lectures",
+    "lectures_one": "1 lecture",
+    "problems": "{{count}} problems",
+    "problems_one": "1 problem",
+    "cannot_grade": "{{count}} cannot grade",
+    "cannot_grade_one": "1 cannot grade"
+  },
+  "create": {
+    "action": "New course",
+    "heading": "Name the master course",
+    "body": "It starts as a draft. Publish it when it is ready for academies to copy.",
+    "title_label": "Course title",
+    "title_placeholder": "Python Level 1",
+    "description_label": "What academies get",
+    "description_placeholder": "Variables, loops and functions across 12 modules",
+    "submit": "Create and open",
+    "submitting": "Creating…",
+    "cancel": "Cancel"
+  },
+  "actions": {
+    "publish": "Publish to academies",
+    "unpublish": "Unpublish",
+    "retire": "Retire from library",
+    "restore": "Return to library",
+    "edit": "Rename"
+  },
+  "copies": {
+    "count": "{{count}} academies",
+    "count_one": "1 academy",
+    "count_zero": "No copies",
+    "behind": "{{count}} behind",
+    "heading": "Who is teaching {{title}}",
+    "body": "Which academies took a copy, at which revision, and whether they have edited it since.",
+    "loading": "Reading copies…",
+    "customized": "Customized",
+    "at_revision_behind": "Copied at revision {{revision}}",
+    "at_revision_current": "Current"
+  },
+  "empty": {
+    "heading": "No master courses yet",
+    "body": "Create the first one. Once you publish it, every academy in the organization can take a copy.",
+    "search_heading": "No courses match",
+    "search_body": "Try a different word, or clear the search to see the whole library."
+  },
+  "unavailable": {
+    "title": "The library could not be read",
+    "body": "Reload the page. If it keeps failing, the platform API is not answering."
+  },
+  "no_description": "No description",
+  "row_menu_aria": "Actions for {{title}}",
+  "column": {
+    "course": "Course",
+    "state": "State",
+    "modules": "Modules",
+    "lectures": "Lectures",
+    "problems": "Problems",
+    "copies": "Academies",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "edit": {
+    "heading": "Rename the master course",
+    "body": "Academies that already copied it keep the name they chose.",
+    "submit": "Save changes",
+    "submitting": "Saving…"
+  }
+}

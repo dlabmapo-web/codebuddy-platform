@@ -175,7 +175,7 @@
     },
     "academies": "Academies",
     "users": "Users",
-    "courses": "Courses",
+    "courses": "Academy courses",
     "classes": "Classes",
     "ranking": "Ranking",
     "access": "Support access",
@@ -183,7 +183,8 @@
     "applications": "Applications",
     "invitations": "Invitations",
     "applications_waiting_one": "{{count}} application needs you",
-    "applications_waiting_other": "{{count}} applications need you"
+    "applications_waiting_other": "{{count}} applications need you",
+    "library": "Library"
   },
   "unavailable": {
     "title": "Academies are unavailable",

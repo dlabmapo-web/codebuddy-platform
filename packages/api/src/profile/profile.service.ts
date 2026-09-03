@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  displayableEmail,
   profileLocaleSchema,
   type MyProfileResponse,
   type ProfileLocale,
@@ -219,7 +220,10 @@ export class ProfileService {
       profile: {
         userId: user.id,
         username: user.username,
-        email: user.email,
+        // A student's generated `no-email.cove.invalid` address is not an
+        // address anybody can read, and My Page is exactly where rendering one
+        // would look like corrupted data. Null is the truth: they have none.
+        email: displayableEmail(user.email),
         displayName: user.displayName,
         contactPhone: user.contactPhone,
         image,

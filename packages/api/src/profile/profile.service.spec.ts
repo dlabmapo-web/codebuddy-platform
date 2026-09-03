@@ -5,6 +5,7 @@ import { ProfileService } from "./profile.service.js";
 
 const identity = {
   authUserId: "auth-user",
+  emailIsPlaceholder: false,
   emailVerified: true,
 } as SupabaseIdentity;
 

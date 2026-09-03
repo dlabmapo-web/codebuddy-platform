@@ -19,14 +19,18 @@ const academyId = "20000000-0000-4000-8000-000000000001";
 
 function createService(overrides?: {
   role?: string;
+  /** Every role held, when it differs from `[role]` — a multi-role member. */
+  roles?: string[];
   denied?: boolean;
   timeZone?: string | null;
 }) {
+  const role = overrides?.role ?? "TEAM_LEAD";
   const requirePermission = overrides?.denied
     ? vi.fn().mockRejectedValue(new AppException("ACADEMY_MEMBERSHIP_REQUIRED", 403))
     : vi.fn().mockResolvedValue({
         userId: "lead-user",
-        role: overrides?.role ?? "TEAM_LEAD",
+        role,
+        roles: overrides?.roles ?? [role],
       });
 
   const prisma = {
@@ -46,8 +50,11 @@ function createService(overrides?: {
   };
 }
 
-async function denialCodeFor(role: string): Promise<string> {
-  const { service } = createService({ role });
+async function denialCodeFor(
+  role: string,
+  roles?: string[],
+): Promise<string> {
+  const { service } = createService({ role, roles });
   try {
     await service.requireTeamLead(identity, academyId, "curriculum.manage");
     return "NOT_DENIED";
@@ -57,6 +64,29 @@ async function denialCodeFor(role: string): Promise<string> {
 }
 
 describe("LeadScopeService", () => {
+  /*
+   * The regression this guards: a Manager granted TEAM_LEAD holds
+   * `role = MANAGER`, because the membership row stores only the highest role.
+   * Comparing that primary role refused them the curriculum overview the second
+   * grant exists to give, and the page rendered "The control tower could not
+   * load" with no way forward.
+   */
+  it("admits a manager who also holds team lead", async () => {
+    const { service } = createService({
+      role: "MANAGER",
+      roles: ["TEACHER", "TEAM_LEAD", "MANAGER"],
+    });
+    await expect(
+      service.requireTeamLead(identity, academyId, "curriculum.manage"),
+    ).resolves.toMatchObject({ userId: "lead-user" });
+  });
+
+  it("still refuses a manager who does not hold team lead", async () => {
+    expect(await denialCodeFor("MANAGER", ["MANAGER"])).toBe(
+      "CURRICULUM_OVERVIEW_ACCESS_DENIED",
+    );
+  });
+
   it("admits an active team lead and carries the academy's own zone", async () => {
     const { service, requirePermission } = createService();
     const actor = await service.requireTeamLead(

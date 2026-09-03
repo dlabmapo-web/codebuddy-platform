@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  displayableEmail,
   isStaffRole,
   type AcademyProfileResponse,
   type AcademyProfileSection,
@@ -647,7 +648,7 @@ export class AcademyProfileService {
         academyName: membership.academy.name,
         userId: membership.userId,
         globalDisplayName: membership.user.displayName,
-        email: membership.user.email,
+        email: displayableEmail(membership.user.email),
         username: membership.user.username,
         role: membership.role,
         status: membership.status,

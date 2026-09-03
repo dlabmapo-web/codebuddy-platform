@@ -129,7 +129,16 @@ export const peopleRowSchema = z
     /** The academy-scoped override if one exists, else the account name. */
     displayName: z.string().min(1).max(200),
     email: z.email().nullable(),
+    /** The member's highest role — what the column sorts and filters on. */
     role: academyRoleSchema,
+    /**
+     * Every role this member holds, `role` included.
+     *
+     * Carried on the row so the roster can grant and revoke in place, instead
+     * of sending a manager to the member page to learn that somebody is both a
+     * manager and a teacher.
+     */
+    roles: z.array(academyRoleSchema).min(1),
     status: membershipStatusSchema,
     joinedAt: z.iso.datetime().nullable(),
     suspendedAt: z.iso.datetime().nullable(),

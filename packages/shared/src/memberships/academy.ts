@@ -45,10 +45,14 @@ export const academyMemberSchema = z.object({
   id: z.uuid(),
   user: z.object({
     id: z.uuid(),
+    /** Null for a student, who has no address of their own. */
     email: z.email().nullable(),
     displayName: z.string().nullable(),
   }),
+  /** The member's highest role — what the roster sorts and filters on. */
   role: academyRoleSchema,
+  /** Every role they hold here, `role` included. */
+  roles: z.array(academyRoleSchema).min(1),
   status: membershipStatusSchema,
   joinedAt: z.iso.datetime().nullable(),
   suspendedAt: z.iso.datetime().nullable(),

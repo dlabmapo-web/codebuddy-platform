@@ -133,6 +133,30 @@ export function TurnstileChallenge({
     return () => clearTimeout(timer);
   }, [attempt, fail, status]);
 
+  /**
+   * Render whenever this component is mounted and Turnstile is already on the
+   * page, rather than only when `next/script` announces a load.
+   *
+   * `onReady` fires at most once per `<Script>` instance — after the load
+   * event the first time, or on mount if the script is already in Next's load
+   * cache — and is deliberately skipped when React re-runs effects on the same
+   * instance. This component removes its widget in its own cleanup, so the two
+   * together could leave a mounted form with no widget on it and no way back:
+   * `onReady` had already been spent, and nothing else was watching.
+   *
+   * That is why a reload worked and a link did not. Loading `/signup` fresh
+   * leaves the script uncached, so the widget is created by the load event,
+   * after the effects have settled. Arriving from `/login` the script is
+   * already cached, `onReady` fires on the first effect pass, the remount
+   * removes that widget, and no second announcement was ever coming.
+   *
+   * Safe to run on every pass: `renderWidget` returns early when a widget
+   * already exists, and no-ops until the script has actually arrived.
+   */
+  useEffect(() => {
+    renderWidget();
+  }, [renderWidget]);
+
   useEffect(() => () => {
     const widgetId = widgetIdRef.current;
     if (widgetId && window.turnstile) {
@@ -181,6 +205,10 @@ export function TurnstileChallenge({
   return (
     <div aria-label={t('captcha.label')} role="group">
       <div className="min-h-[65px]" ref={containerRef} />
+      {/* `onReady` covers the one case the mount effect above cannot: the
+          first load on a cold page, where the script is still in flight when
+          the effects run. Both call the same guarded render, so whichever
+          arrives second does nothing. */}
       <Script
         id="cloudflare-turnstile"
         onError={() => fail('script_blocked')}

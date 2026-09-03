@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { parseUsername } from "@cove/shared";
+import { isPlaceholderAddress, parseUsername } from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
@@ -46,6 +46,9 @@ export class SupabaseAuthService {
       authUserId: claims.sub,
       sessionId: firstUuid(claims.session_id),
       email,
+      // Decided here, from the address itself, so no caller has to know what a
+      // generated address looks like in order to avoid displaying one.
+      emailIsPlaceholder: isPlaceholderAddress(email),
       emailVerified: email !== null && emailVerified,
       // User metadata is client-writable, so this is untrusted input and is
       // revalidated here rather than trusted as a stored value.
@@ -55,6 +58,73 @@ export class SupabaseAuthService {
       provider: firstString(appMetadata.provider),
       requestedAcademyId: firstUuid(metadata.requested_academy_id),
     };
+  }
+
+  /**
+   * Creates a confirmed password identity for an account with no email.
+   *
+   * `email_confirm: true` is not a trick. There is nothing to confirm — the
+   * address is generated and resolves nowhere — and an unconfirmed identity
+   * would make `emailVerified` false in every token, which makes
+   * `ensureSignupRequest` skip the academy join request and strands the
+   * student on `/welcome` with no way forward.
+   *
+   * Metadata carries the same three keys the browser signup writes, so
+   * `bootstrap` claims the username and creates the join request through
+   * exactly the path it already uses.
+   */
+  async createStudentUser(input: {
+    email: string;
+    password: string;
+    username: string;
+    displayName: string;
+    requestedAcademyId: string;
+  }): Promise<{ authUserId: string }> {
+    const { data, error } = await this.client.auth.admin.createUser({
+      email: input.email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: {
+        username: input.username,
+        full_name: input.displayName,
+        requested_academy_id: input.requestedAcademyId,
+      },
+    });
+    if (error || !data?.user) {
+      throw new AppException("SIGNUP_STUDENT_FAILED", HttpStatus.BAD_GATEWAY);
+    }
+    return { authUserId: data.user.id };
+  }
+
+  /**
+   * Removes an auth identity.
+   *
+   * Only ever called to undo a `createStudentUser` whose Cove-side transaction
+   * failed. A Supabase identity with no Cove row is the orphan state that
+   * leaves somebody authenticated with nowhere to land and unable to sign up
+   * again, and this is the one moment it can still be avoided.
+   */
+  async deleteUser(authUserId: string): Promise<void> {
+    await this.client.auth.admin.deleteUser(authUserId);
+  }
+
+  /**
+   * Sets a new password on an account, as a manager issuing one to a student.
+   *
+   * Deliberately does not revoke the account's existing sessions. A child
+   * working through a problem should not be thrown out of it because an office
+   * computer clicked a button; the new password is for the next sign-in.
+   */
+  async setPassword(authUserId: string, password: string): Promise<void> {
+    const { error } = await this.client.auth.admin.updateUserById(authUserId, {
+      password,
+    });
+    if (error) {
+      throw new AppException(
+        "STUDENT_CREDENTIAL_TARGET_INVALID",
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
   }
 
   /**

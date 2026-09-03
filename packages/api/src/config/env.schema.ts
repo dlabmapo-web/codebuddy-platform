@@ -39,6 +39,38 @@ export const apiEnvironmentSchema = z.object({
   SUPABASE_URL: httpsUrlSchema,
   SUPABASE_SECRET_KEY: z.string().min(1),
   BFF_SHARED_SECRET: z.string().min(32).optional(),
+  /**
+   * The AES-256-GCM key protecting manager-issued student passwords, as 32
+   * bytes of base64.
+   *
+   * Optional on purpose. A student has no email and therefore no self-service
+   * recovery, so issuing a password must work on every deployment; without
+   * this key it works and shows the password once, and nothing is stored to
+   * read back later. Refusing to start would make a development environment
+   * unable to reset a password at all, and refusing the operation would make
+   * an unconfigured production one unable to recover a locked-out child.
+   */
+  /**
+   * The Turnstile secret, for the one signup path Supabase cannot check.
+   *
+   * Optional so a development machine with no Turnstile keys still works. In
+   * production its absence means the student signup endpoint has nothing in
+   * front of it, which `superRefine` below refuses.
+   */
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  STUDENT_CREDENTIAL_KEY: z
+    .string()
+    .refine(
+      (value) => {
+        try {
+          return Buffer.from(value, "base64").length === 32;
+        } catch {
+          return false;
+        }
+      },
+      { message: "must be 32 bytes of base64" },
+    )
+    .optional(),
   DATABASE_URL: postgresUrlSchema,
   DIRECT_URL: postgresUrlSchema,
   /**
@@ -124,6 +156,16 @@ export const apiEnvironmentSchema = z.object({
       code: "custom",
       path: ["BFF_SHARED_SECRET"],
       message: "is required in production",
+    });
+  }
+  if (
+    environment.NODE_ENV === "production" && !environment.TURNSTILE_SECRET_KEY
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["TURNSTILE_SECRET_KEY"],
+      message:
+        "is required in production: student signup creates accounts through the service-role admin API, which bypasses Supabase's own captcha",
     });
   }
   if (environment.NODE_ENV === "production") {

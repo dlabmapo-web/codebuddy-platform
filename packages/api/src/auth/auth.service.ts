@@ -1,5 +1,13 @@
+import { randomUUID } from "node:crypto";
+
 import { HttpStatus, Injectable } from "@nestjs/common";
-import { authMeResponseSchema, type AuthMeResponse } from "@cove/shared";
+import {
+  authMeResponseSchema,
+  buildPlaceholderEmail,
+  displayableEmail,
+  effectiveAcademyRoles,
+  type AuthMeResponse,
+} from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -8,6 +16,7 @@ import type { SupabaseIdentity } from "./auth.types.js";
 import { AcademyOnboardingService } from "../academies/academy-onboarding.service.js";
 import { hashOAuthOnboardingToken } from "./oauth-onboarding-intent.service.js";
 import { ProfileMediaService } from "../profile/profile-media.service.js";
+import { SupabaseAuthService } from "./supabase-auth.service.js";
 
 /**
  * Returned for a username nobody holds. `.invalid` is reserved by RFC 2606 and
@@ -24,6 +33,7 @@ const userInclude = {
     include: {
       academy: { include: { featureFlags: { where: { isEnabled: true } } } },
       memberProfile: { include: { avatarAsset: true } },
+      extraRoles: true,
     },
     orderBy: { createdAt: "asc" as const },
   },
@@ -39,6 +49,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly onboarding: AcademyOnboardingService,
     private readonly media: ProfileMediaService,
+    private readonly supabaseAuth: SupabaseAuthService,
   ) {}
 
   async bootstrap(identity: SupabaseIdentity): Promise<AuthMeResponse> {
@@ -55,6 +66,13 @@ export class AuthService {
         where: { id: existing.id },
         data: {
           email: identity.email ?? existing.email,
+          // Only when an address came with the token. Without the guard, a
+          // token that carried no address at all would reset a real account's
+          // flag to false and a student's to the same, describing whichever
+          // address was already stored rather than the one in hand.
+          ...(identity.email
+            ? { emailIsPlaceholder: identity.emailIsPlaceholder }
+            : {}),
           displayName: identity.displayName ?? existing.displayName,
           avatarUrl: identity.avatarUrl ?? existing.avatarUrl,
           status: identity.emailVerified && existing.status === "PENDING_PROFILE"
@@ -91,6 +109,84 @@ export class AuthService {
       identity.emailVerified,
     );
     return this.present(await this.requireUser(created.id));
+  }
+
+  /**
+   * Creates a student account, which has no email address anywhere in it.
+   *
+   * The order matters and is the whole of the design. The Supabase identity is
+   * created first, because it is the only step that can fail for a reason Cove
+   * cannot see; if anything after it fails, that identity is deleted again.
+   * A Supabase user with no Cove row is the orphan state that leaves somebody
+   * authenticated with nowhere to land and unable to sign up a second time,
+   * and this method is the only place it can still be undone.
+   *
+   * The username is checked before the identity is made and decided by the
+   * unique index after it, exactly as `createWithUsername` does. Unlike that
+   * path, a lost race here does *not* give up the name and keep the account:
+   * the person has typed a password and nothing else, has no email to sign in
+   * with, and an account under a name they did not choose would be one they
+   * could never find again. The whole thing is rolled back and the form says
+   * the name is taken.
+   */
+  async signUpStudent(input: {
+    username: string;
+    displayName: string;
+    password: string;
+    academyId: string;
+  }): Promise<{ email: string }> {
+    const academy = await this.prisma.academy.findFirst({
+      where: { id: input.academyId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!academy) {
+      throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
+    }
+
+    if (!(await this.isUsernameAvailable(input.username))) {
+      throw new AppException("USERNAME_TAKEN", HttpStatus.CONFLICT);
+    }
+
+    const email = buildPlaceholderEmail(randomUUID());
+    const { authUserId } = await this.supabaseAuth.createStudentUser({
+      email,
+      password: input.password,
+      username: input.username,
+      displayName: input.displayName,
+      requestedAcademyId: input.academyId,
+    });
+
+    try {
+      await this.prisma.$transaction(async (transaction) => {
+        const user = await transaction.user.create({
+          data: {
+            authUserId,
+            email,
+            emailIsPlaceholder: true,
+            username: input.username,
+            displayName: input.displayName,
+            // Confirmed at creation, because there is nothing to confirm.
+            status: "ACTIVE",
+          },
+          select: { id: true },
+        });
+        await transaction.academyJoinRequest.create({
+          data: { academyId: input.academyId, userId: user.id },
+        });
+      });
+    } catch (error) {
+      // Best effort, and deliberately not awaited into the failure path's
+      // result: if the deletion itself fails there is nothing further this
+      // request can do, and reporting *that* would replace a message the
+      // person can act on with one they cannot.
+      await this.supabaseAuth.deleteUser(authUserId).catch(() => undefined);
+      if (isUsernameConflict(error)) {
+        throw new AppException("USERNAME_TAKEN", HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
+
+    return { email };
   }
 
   async completeOAuthOnboarding(
@@ -181,6 +277,7 @@ export class AuthService {
           where: { id: user.id },
           data: {
             email: identity.email,
+            emailIsPlaceholder: identity.emailIsPlaceholder,
             displayName: identity.displayName,
             avatarUrl: identity.avatarUrl,
             status: identity.emailVerified && user.status === "PENDING_PROFILE"
@@ -207,6 +304,7 @@ export class AuthService {
           data: {
             authUserId: identity.authUserId,
             email: identity.email,
+            emailIsPlaceholder: identity.emailIsPlaceholder,
             displayName: identity.displayName,
             avatarUrl: identity.avatarUrl,
             status: identity.emailVerified ? "ACTIVE" : "PENDING_PROFILE",
@@ -263,6 +361,7 @@ export class AuthService {
     const data = {
       authUserId: identity.authUserId,
       email: identity.email,
+      emailIsPlaceholder: identity.emailIsPlaceholder,
       displayName: identity.displayName,
       avatarUrl: identity.avatarUrl,
       status: identity.emailVerified
@@ -460,7 +559,10 @@ function toAuthMe(
     user: {
       id: user.id,
       authUserId: user.authUserId,
-      email: user.email,
+      // A generated address never leaves the API. Every client would otherwise
+      // have to learn what one looks like in order to avoid showing it.
+      email: displayableEmail(user.email),
+      emailIsPlaceholder: user.emailIsPlaceholder,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
@@ -474,6 +576,12 @@ function toAuthMe(
           slug: membership.academy.slug,
         },
         role: membership.role,
+        roles: [
+          ...effectiveAcademyRoles(
+            membership.role,
+            membership.extraRoles.map((extra) => extra.role),
+          ),
+        ],
         status: membership.status,
         imageUrl: membership.memberProfile?.avatarAssetId
           ? imageUrls.get(membership.memberProfile.avatarAssetId) ?? null

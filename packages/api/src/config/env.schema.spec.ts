@@ -55,6 +55,7 @@ describe("validateEnvironment", () => {
       ...validEnvironment,
       NODE_ENV: "production",
       BFF_SHARED_SECRET: "a-production-secret-with-at-least-32-bytes",
+      TURNSTILE_SECRET_KEY: "0x-turnstile-secret",
       EMAIL_API_KEY: "re_test",
       EMAIL_FROM: "Cove <hello@example.com>",
       EMAIL_WEBHOOK_SECRET: "whsec_test-secret-value",

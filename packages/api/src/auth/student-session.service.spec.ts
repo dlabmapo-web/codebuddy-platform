@@ -8,6 +8,7 @@ const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   sessionId: "20000000-0000-4000-8000-000000000001",
   email: "student@cove.test",
+  emailIsPlaceholder: false,
   emailVerified: true,
   username: "student",
   displayName: "Student",

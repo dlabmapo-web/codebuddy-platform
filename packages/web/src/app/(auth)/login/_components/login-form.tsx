@@ -67,6 +67,15 @@ export function LoginForm({
       ) : null}
 
       <SocialLoginButtons />
+      {/*
+       * Before anybody presses one, not after. Signing in with a provider
+       * without having signed up leaves the visitor authenticated by Google
+       * and unknown to Cove, and a sentence here is cheaper than the panel on
+       * `/signup` that has to explain it afterwards.
+       */}
+      <p className="mt-3 text-center text-[13px] leading-5 text-sub">
+        {t('social.first_time_hint')}
+      </p>
 
       <AuthDivider label={t('divider.or_with_username')} />
 
@@ -90,6 +99,15 @@ export function LoginForm({
             </Link>
           </div>
           <PasswordField label="" minLength={8} />
+          {/*
+           * Where a child goes instead. `/forgot-password` needs an email and
+           * a student has none, so sending them there would be a round trip to
+           * a page that cannot help them. No lookup happens for this to be
+           * shown, so it reveals nothing about any account.
+           */}
+          <p className="mt-2 text-[13px] leading-5 text-sub">
+            {t('login.student_forgot_hint')}
+          </p>
         </div>
 
         {publicConfig.turnstileSiteKey ? (

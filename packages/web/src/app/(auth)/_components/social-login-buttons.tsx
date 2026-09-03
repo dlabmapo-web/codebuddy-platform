@@ -74,7 +74,7 @@ export function SocialLoginButtons({
                   : t('social.continue_with', { provider: label })
               }
               className={[
-                'flex h-14 items-center justify-center gap-2.5 rounded-xl border bg-card text-[15px] font-semibold text-ink transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed',
+                'flex h-12 items-center justify-center gap-2.5 rounded-xl border bg-card text-[15px] font-semibold text-ink transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed',
                 isPending
                   ? 'border-brand/40 ring-2 ring-brand/15'
                   : 'border-border hover:border-ink/25 hover:bg-surface',

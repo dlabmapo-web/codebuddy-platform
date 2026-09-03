@@ -14,6 +14,7 @@ import type {
 } from '@cove/shared';
 import {
   academyRoles,
+  canCombineAcademyRoles,
   membershipStatuses,
   peoplePageSizes,
   peopleSortFields,
@@ -41,8 +42,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
@@ -270,13 +270,20 @@ export function PeopleDirectory({
         cell: ({ row }) => (
           <RoleCell
             disabled={mutations.pending}
-            onChange={(role) =>
-              mutations.changeRole.mutate({
+            onGrant={(role) =>
+              mutations.grantRole.mutate({
+                membershipId: row.original.membershipId,
+                role,
+              })
+            }
+            onRevoke={(role) =>
+              mutations.revokeRole.mutate({
                 membershipId: row.original.membershipId,
                 role,
               })
             }
             role={row.original.role}
+            roles={row.original.roles}
             status={row.original.status}
           />
         ),
@@ -613,7 +620,7 @@ function SelectAllOnPage({
 }
 
 /**
- * A member's role: a badge that opens a menu, rather than a select box.
+ * A member's roles: a badge that opens a menu, rather than a select box.
  *
  * The select this replaces was wrong in three ways that only show up in use.
  *
@@ -632,21 +639,33 @@ function SelectAllOnPage({
  *
  * What replaces it reads as the value: the same coloured badge the role wears
  * in the control tower's composition band and everywhere else in the product.
- * It happens to be a button, so changing the role is two deliberate clicks, and
- * the menu is a radio group because one membership holds exactly one role.
+ * It happens to be a button, so changing a role is two deliberate clicks.
+ *
+ * The menu is a set of checkboxes, not a radio group. A membership can hold
+ * several roles — the director who also teaches and also writes the curriculum
+ * — so ticking a role grants it and unticking revokes it, in place. The badge
+ * carries the highest role and a `+n` for the rest, which is the compact form
+ * of the same fact.
  */
 function RoleCell({
   disabled,
-  onChange,
+  onGrant,
+  onRevoke,
   role,
+  roles,
   status,
 }: {
   disabled: boolean;
-  onChange: (role: AcademyRole) => void;
+  onGrant: (role: AcademyRole) => void;
+  onRevoke: (role: AcademyRole) => void;
+  /** The highest role held, which the badge shows. */
   role: AcademyRole;
+  /** Every role held, which the menu ticks. */
+  roles: readonly AcademyRole[];
   status: MembershipStatus;
 }) {
   const { t } = useTranslation('manager');
+  const extras = roles.length - 1;
 
   const badge = (
     <span
@@ -656,6 +675,7 @@ function RoleCell({
       )}
     >
       {t(`role.${role}`)}
+      {extras > 0 ? <span className="opacity-70">+{extras}</span> : null}
     </span>
   );
 
@@ -679,6 +699,7 @@ function RoleCell({
           type="button"
         >
           {t(`role.${role}`)}
+          {extras > 0 ? <span className="opacity-70">+{extras}</span> : null}
           {/* The only affordance the badge carries. Faint until hover, so a
               column of roles reads as values rather than as a row of buttons. */}
           <ChevronDown
@@ -691,18 +712,30 @@ function RoleCell({
       <DropdownMenuContent align="start" className="w-44">
         <DropdownMenuLabel>{t('people.column.role')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          onValueChange={(next) => {
-            if (next !== role) onChange(next as AcademyRole);
-          }}
-          value={role}
-        >
-          {academyRoles.map((option) => (
-            <DropdownMenuRadioItem
-              // `RadioItem` carries no gap of its own, unlike `MenuItem`.
+        {academyRoles.map((option) => {
+          const held = roles.includes(option);
+          // Offered only when the result would be a legal set. STUDENT
+          // combines with no staff role in either direction, and unticking the
+          // last role would leave a membership that grants nothing — the
+          // action for that is removing the member, which lives in the row
+          // menu with its own confirmation.
+          const allowed = held
+            ? roles.length > 1
+            : canCombineAcademyRoles([...roles, option]);
+          return (
+            <DropdownMenuCheckboxItem
+              checked={held}
               className="gap-2"
+              disabled={disabled || !allowed}
               key={option}
-              value={option}
+              onCheckedChange={(next) =>
+                next ? onGrant(option) : onRevoke(option)
+              }
+              onSelect={(event) => {
+                // Keep the menu open: granting two roles is one errand, and a
+                // menu that closed after each tick would make it three.
+                event.preventDefault();
+              }}
             >
               <span
                 aria-hidden
@@ -712,12 +745,9 @@ function RoleCell({
                 )}
               />
               {t(`role.${option}`)}
-              {option === role ? (
-                <Check aria-hidden className="ml-auto size-3.5 text-brand" />
-              ) : null}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+            </DropdownMenuCheckboxItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -501,6 +501,21 @@ function PasswordControl() {
       return;
     }
 
+    /*
+     * The password Cove was holding for this account, if any, is now wrong.
+     *
+     * A student's manager can read back the password they issued, and the one
+     * thing that makes that defensible is that Cove destroys it the moment its
+     * owner replaces it — which is here, because a student has no email and so
+     * no recovery link can change a password behind Cove's back.
+     *
+     * Deliberately not blocking and deliberately silent. The password has
+     * already changed; reporting a failure here would tell somebody their
+     * change did not work when it did. A stale row is caught anyway, because
+     * revealing it hands the manager a password that no longer signs anybody in.
+     */
+    void orpc.auth.forgetIssuedPassword({}).catch(() => undefined);
+
     setOpen(false);
     setCurrentPassword('');
     setNewPassword('');

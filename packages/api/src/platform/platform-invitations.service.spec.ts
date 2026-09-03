@@ -155,12 +155,18 @@ describe('PlatformInvitationsService.list', () => {
     // The facet could stop at academies with something in it; this response
     // also feeds the form that sends the first invitation, and an academy with
     // none is exactly the one an operator is asked to help.
+    //
+    // Every live academy means every live *customer*. The content library is
+    // an academy row too, and this is the list where excluding it matters
+    // most: without the filter the composer would offer to invite somebody
+    // into head office's own curriculum.
     const academyFindMany = vi.fn().mockResolvedValue([]);
     const { service } = build({
       academy: { count: vi.fn().mockResolvedValue(0), findMany: academyFindMany },
     });
     await service.list(identity, { ...input });
     expect(academyFindMany.mock.calls[0][0].where).toEqual({
+      kind: 'ACADEMY',
       status: { not: 'ARCHIVED' },
     });
   });

@@ -12,16 +12,11 @@ import { PlatformAccessService } from "../authorization/platform-access.service.
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { contentStatPredicates } from "./content-stat-predicates.js";
-
-/**
- * A problem that cannot grade, unscoped by academy.
- *
- * The same predicate the summary counts with, reused inside the course tree
- * where the academy is already established by the outer `where`. One
- * definition, so the number on a course row and the number in the summary
- * strip can never disagree about what "cannot grade" means.
- */
-const untestedProblem = contentStatPredicates().problemWithoutTests;
+import {
+  courseTreeCountSelect,
+  courseTreeCounts,
+} from "./course-tree-counts.js";
+import { tenantAcademies } from "./library-academy.js";
 
 /**
  * What every academy teaches, read across all of them at once.
@@ -53,9 +48,10 @@ export class PlatformContentService {
 
     const academyIds = input.academyIds?.length ? input.academyIds : undefined;
     const stats = contentStatPredicates(academyIds);
-    const academyWhere: Prisma.AcademyWhereInput = academyIds
-      ? { id: { in: academyIds } }
-      : {};
+    const academyWhere: Prisma.AcademyWhereInput = {
+      ...tenantAcademies,
+      ...(academyIds ? { id: { in: academyIds } } : {}),
+    };
 
     const [
       academies,
@@ -96,6 +92,7 @@ export class PlatformContentService {
     await this.authorize(identity);
 
     const where: Prisma.CourseWhereInput = {
+      academy: tenantAcademies,
       ...academyFilter(input),
       ...(input.query
         ? { title: { contains: input.query, mode: "insensitive" } }
@@ -116,25 +113,8 @@ export class PlatformContentService {
           // Counted by the database rather than by loading the tree: a course
           // with forty lectures would otherwise cost forty rows to answer one
           // number, on a page showing twenty-five courses.
-          _count: { select: { modules: true, classAssignments: true } },
-          modules: {
-            select: {
-              _count: { select: { lectures: true } },
-              lectures: {
-                select: {
-                  _count: { select: { materials: true } },
-                  // Only the broken ones, and only their ids. Nested in the
-                  // tree already being loaded rather than asked for in a
-                  // second round trip, and on a healthy academy it selects
-                  // nothing at all.
-                  materials: {
-                    where: untestedProblem,
-                    select: { id: true },
-                  },
-                },
-              },
-            },
-          },
+          _count: { select: { classAssignments: true } },
+          ...courseTreeCountSelect,
         },
         orderBy: courseOrder(input),
         skip: (input.page - 1) * input.pageSize,
@@ -152,29 +132,7 @@ export class PlatformContentService {
         academyId: record.academy.id,
         academyName: record.academy.name,
         academySlug: record.academy.slug,
-        moduleCount: record._count.modules,
-        lectureCount: record.modules.reduce(
-          (sum, module) => sum + module._count.lectures,
-          0,
-        ),
-        exerciseCount: record.modules.reduce(
-          (sum, module) =>
-            sum +
-            module.lectures.reduce(
-              (inner, lecture) => inner + lecture._count.materials,
-              0,
-            ),
-          0,
-        ),
-        problemsWithoutTests: record.modules.reduce(
-          (sum, module) =>
-            sum +
-            module.lectures.reduce(
-              (inner, lecture) => inner + lecture.materials.length,
-              0,
-            ),
-          0,
-        ),
+        ...courseTreeCounts(record),
         classCount: record._count.classAssignments,
         updatedAt: record.updatedAt.toISOString(),
       })),
@@ -192,6 +150,7 @@ export class PlatformContentService {
     await this.authorize(identity);
 
     const where: Prisma.ClassWhereInput = {
+      academy: tenantAcademies,
       ...academyFilter(input),
       ...(input.query
         ? { name: { contains: input.query, mode: "insensitive" } }
@@ -285,6 +244,7 @@ export class PlatformContentService {
 
   private academyOptions() {
     return this.prisma.academy.findMany({
+      where: tenantAcademies,
       select: { id: true, name: true, slug: true },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });

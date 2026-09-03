@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
+import { AcademyLibraryService } from "./library/academy-library.service.js";
 import { CourseService } from "./course.service.js";
 import { ContentImportController } from "./import/content-import.controller.js";
 import { ContentImportService } from "./import/content-import.service.js";
@@ -28,7 +29,7 @@ import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.
     MonitoringRevocationModule,
   ],
   controllers: [ContentImportController],
-  providers: [CourseService, ContentImportService],
-  exports: [CourseService, ContentImportService],
+  providers: [AcademyLibraryService, CourseService, ContentImportService],
+  exports: [AcademyLibraryService, CourseService, ContentImportService],
 })
 export class ContentModule {}

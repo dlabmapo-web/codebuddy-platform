@@ -1,6 +1,11 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { stableKeyFromUuid } from "@cove/shared";
+import {
+  isCourseCustomized,
+  librarySyncState,
+  stableKeyFromUuid,
+  type CourseProvenance,
+} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -23,6 +28,19 @@ import { MonitoringRevocationService } from "../monitoring/monitoring-revocation
 
 type ContentRequestContext = { requestId?: string };
 
+/**
+ * The master this course was copied from, when it was.
+ *
+ * Four scalars and nothing else — never the master's tree. A branch reading
+ * its own course list is reading one row out of the library academy, and this
+ * narrow select is the whole of that boundary.
+ */
+const sourceCourseInclude = {
+  sourceCourse: {
+    select: { id: true, title: true, contentRevision: true, retiredAt: true },
+  },
+} as const;
+
 const courseSummaryInclude = {
   modules: {
     select: {
@@ -32,6 +50,7 @@ const courseSummaryInclude = {
       },
     },
   },
+  ...sourceCourseInclude,
 } as const satisfies Prisma.CourseInclude;
 
 const treeInclude = {
@@ -60,6 +79,7 @@ const treeInclude = {
       },
     },
   },
+  ...sourceCourseInclude,
 } as const satisfies Prisma.CourseInclude;
 
 const exerciseAuthoringInclude = {
@@ -379,6 +399,17 @@ export class CourseService {
     });
     if (submissions > 0) {
       throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
+    }
+
+    // A master some academy has already adopted is not the platform's to
+    // destroy. `courses_source_course_id_fkey` is RESTRICT, so the database
+    // refuses this anyway — but it refuses with a foreign-key violation, and
+    // this turns that into the answer that names the remedy: retire it.
+    const copies = await this.prisma.course.count({
+      where: { sourceCourseId: course.id },
+    });
+    if (copies > 0) {
+      throw new AppException("LIBRARY_COURSE_HAS_COPIES", HttpStatus.CONFLICT);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1186,6 +1217,48 @@ function exerciseRecordAudit(record: ExerciseRecord) {
   };
 }
 
+/**
+ * Where a course came from, when it came from the content library.
+ *
+ * Null for a course the academy authored itself, which is most of them — and
+ * null too when the caller's select did not ask for the master, so a summary
+ * built from a narrower read says "no provenance" rather than inventing one.
+ *
+ * Both halves of the status are computed here from revisions that already
+ * exist, by the same two functions the branch's chips and head office's
+ * fan-out use. One definition, so the two surfaces cannot disagree about what
+ * "up to date" means.
+ */
+function courseProvenance(course: {
+  contentRevision?: number;
+  baselineRevision?: number | null;
+  sourceContentRevision?: number | null;
+  createdAt: Date;
+  sourceCourse?: {
+    id: string;
+    title: string;
+    contentRevision: number;
+    retiredAt: Date | null;
+  } | null;
+}): CourseProvenance | null {
+  const source = course.sourceCourse;
+  if (!source) return null;
+  return {
+    sourceCourseId: source.id,
+    sourceTitle: source.title,
+    syncState: librarySyncState({
+      sourceContentRevision: source.contentRevision,
+      copiedAtRevision: course.sourceContentRevision ?? 0,
+      sourceRetiredAt: source.retiredAt,
+    }),
+    isCustomized: isCourseCustomized({
+      contentRevision: course.contentRevision ?? 0,
+      baselineRevision: course.baselineRevision ?? null,
+    }),
+    copiedAt: course.createdAt.toISOString(),
+  };
+}
+
 export function toCourseSummary(course: {
   id: string;
   academyId: string;
@@ -1194,6 +1267,15 @@ export function toCourseSummary(course: {
   isVisible: boolean;
   createdAt: Date;
   updatedAt: Date;
+  contentRevision?: number;
+  baselineRevision?: number | null;
+  sourceContentRevision?: number | null;
+  sourceCourse?: {
+    id: string;
+    title: string;
+    contentRevision: number;
+    retiredAt: Date | null;
+  } | null;
   modules: Array<{
     lectures: Array<{
       _count?: { materials: number };
@@ -1216,6 +1298,7 @@ export function toCourseSummary(course: {
     description: course.description,
     isVisible: course.isVisible,
     content: { modules: course.modules.length, lectures, exercises },
+    provenance: courseProvenance(course),
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };

@@ -124,10 +124,20 @@ export class PlatformSupportService {
     const grantId = await this.prisma.$transaction(async (transaction) => {
       const academy = await transaction.academy.findUnique({
         where: { id: input.academyId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, kind: true },
       });
       if (!academy) {
         throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
+      }
+      // A grant is authority inside *a customer's* academy, assumed as one of
+      // its roles. The library has no roles to assume, and its authority is
+      // the platform axis — so a grant over it would be a second, weaker way
+      // to reach what `platform.library.manage` already governs.
+      if (academy.kind === "LIBRARY") {
+        throw new AppException(
+          "LIBRARY_ACADEMY_IMMUTABLE",
+          HttpStatus.CONFLICT,
+        );
       }
       // Archived is terminal. Reading its history is support; writing to it is
       // editing something the platform has already declared over.

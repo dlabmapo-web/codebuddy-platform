@@ -11,6 +11,7 @@ import { PlatformApplicationsService } from "./platform-applications.service.js"
 import { PlatformAuditService } from "./platform-audit.service.js";
 import { PlatformContentService } from "./platform-content.service.js";
 import { PlatformInvitationsService } from "./platform-invitations.service.js";
+import { PlatformLibraryService } from "./platform-library.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
 import { PlatformRankingService } from "./platform-ranking.service.js";
 import { PlatformUsersController } from "./platform-users.controller.js";
@@ -58,6 +59,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformAuditService,
     PlatformContentService,
     PlatformInvitationsService,
+    PlatformLibraryService,
     PlatformRankingService,
   ],
   exports: [
@@ -69,6 +71,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformAuditService,
     PlatformContentService,
     PlatformInvitationsService,
+    PlatformLibraryService,
     PlatformRankingService,
   ],
 })

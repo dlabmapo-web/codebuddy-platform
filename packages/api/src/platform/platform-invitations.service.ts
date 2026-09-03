@@ -13,6 +13,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 // The same mapper the manager's own delivery list uses. Two shapes for one
 // attempt row is how a bounce ends up rendered differently on two pages.
 import { toDelivery } from "../manage/invitation-delivery.service.js";
+import { tenantAcademies } from "./library-academy.js";
 
 /**
  * Every invitation on the platform, read across all of them at once.
@@ -234,7 +235,10 @@ export class PlatformInvitationsService {
    */
   private academyOptions() {
     return this.prisma.academy.findMany({
-      where: { status: { not: "ARCHIVED" } },
+      // The library is excluded, and this list is why it matters: it feeds the
+      // composer's academy field, so without the filter an operator could send
+      // somebody an invitation into head office's own curriculum.
+      where: { ...tenantAcademies, status: { not: "ARCHIVED" } },
       select: { id: true, name: true, slug: true },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });

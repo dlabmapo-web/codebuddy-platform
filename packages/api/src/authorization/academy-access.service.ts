@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   grantHasPermission,
   isPlatformViewRole,
+  libraryAcademyPermissions,
   platformRoleHasPermission,
   platformViewPermissions,
   roleHasPermission,
@@ -16,6 +17,7 @@ import {
   setRequestSupportGrant,
 } from "../common/request-context.js";
 import { PrismaService } from "../database/prisma.service.js";
+import type { AcademyStatus } from "../generated/prisma/client.js";
 import { SupportGrantResolver } from "./support-grant.resolver.js";
 
 export type AcademyAccess = {
@@ -97,10 +99,32 @@ export class AcademyAccessService {
       include: { academy: { select: { status: true } } },
     });
     if (!membership) {
+      // Read once, here, rather than inside each path below: the support
+      // resolver needs the status and the library branch needs the kind, and
+      // the two used to be one query anyway.
+      const academy = await this.prisma.academy.findUnique({
+        where: { id: academyId },
+        select: { status: true, kind: true },
+      });
+      if (!academy) {
+        throw new AppException(
+          "ACADEMY_MEMBERSHIP_REQUIRED",
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      // A library academy has no members, so there is no membership to fall
+      // back from and no support grant to consider. Its authority is the
+      // platform axis and nothing else.
+      if (academy.kind === "LIBRARY") {
+        return this.requireLibraryAccess(user.id, academyId, permission);
+      }
+
       const viaSupport = await this.requireSupportGrant(
         user.id,
         academyId,
         permission,
+        academy.status,
       );
       if (viaSupport) return viaSupport;
       throw new AppException(
@@ -143,20 +167,15 @@ export class AcademyAccessService {
     userId: string,
     academyId: string,
     permission: AcademyPermission,
+    academyStatus: AcademyStatus,
   ): Promise<AcademyAccess | null> {
     const grant = await this.supportGrants.findLive(userId, academyId);
-
-    const academy = await this.prisma.academy.findUnique({
-      where: { id: academyId },
-      select: { status: true },
-    });
-    if (!academy) return null;
 
     if (!grant) {
       // No session. A platform operator may still read.
       return this.platformRead(userId, academyId, permission);
     }
-    if (academy.status === "ARCHIVED" && !grant.readOnly) {
+    if (academyStatus === "ARCHIVED" && !grant.readOnly) {
       return this.platformRead(userId, academyId, permission);
     }
 
@@ -188,6 +207,51 @@ export class AcademyAccessService {
     }
 
     return null;
+  }
+
+  /**
+   * Authority inside a `LIBRARY` academy, which comes from the platform axis
+   * and from nowhere else.
+   *
+   * The "every write needs a support grant" rule this class enforces protects
+   * *a customer's* data: writing into somebody else's academy must be
+   * justified and attributable, which is what a time-limited grant with a
+   * written reason is for. A library academy is not a customer's academy — it
+   * is platform-owned curriculum — so routing head office's routine authoring
+   * through that machinery would fill the grant log with "authoring" and cost
+   * the reason field the meaning the whole design rests on.
+   *
+   * `libraryAcademyPermissions` is the translation from platform authority to
+   * academy permissions, and it is narrower than any academy role: a library
+   * holds courses and nothing else, so nothing about members, classes,
+   * enrollment or analytics is in it.
+   *
+   * The reported role is `TEAM_LEAD`, the academy's curriculum owner, because
+   * that is honestly what the operator is acting as here — and because every
+   * editor mounted over a library course reads `role` to decide what to draw.
+   */
+  private async requireLibraryAccess(
+    userId: string,
+    academyId: string,
+    permission: AcademyPermission,
+  ): Promise<AcademyAccess> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { platformRole: true },
+    });
+    if (!user?.platformRole) {
+      throw new AppException("PLATFORM_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+
+    const permitted = libraryAcademyPermissions(user.platformRole);
+    if (permitted.length === 0) {
+      throw new AppException("PLATFORM_ACCESS_DENIED", HttpStatus.FORBIDDEN);
+    }
+    if (!permitted.includes(permission)) {
+      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    }
+
+    return { userId, academyId, role: "TEAM_LEAD", via: "platform" };
   }
 
   /**

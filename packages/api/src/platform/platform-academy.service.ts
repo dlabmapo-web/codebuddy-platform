@@ -41,6 +41,7 @@ import {
 import { purgeAcademy } from "./academy-purge.js";
 import { readAcademyStats } from "./academy-stats.js";
 import { resolvePlatformOrganization } from "./platform-organization.js";
+import { tenantAcademies } from "./library-academy.js";
 
 /**
  * Onboarding an academy, and reading the platform's roster of them.
@@ -91,7 +92,9 @@ export class PlatformAcademyService {
     // an ORDER BY. Bounded by the size of the platform's own academy list —
     // tens, not millions — and revisited when that stops being true.
     const records = await this.prisma.academy.findMany({
-      where,
+      // The content library is not a customer and never appears here. It is
+      // reachable at exactly one address in the console: /admin/content/library.
+      where: { ...where, ...tenantAcademies },
       select: academySummarySelect,
       orderBy: { createdAt: "desc" },
     });

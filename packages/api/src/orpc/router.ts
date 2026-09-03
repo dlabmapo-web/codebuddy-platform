@@ -48,6 +48,8 @@ import { PlatformAuditService } from "../platform/platform-audit.service.js";
 import { createPlatformAuditRouters } from "../platform/platform-audit.router.js";
 import { PlatformApplicationsService } from "../platform/platform-applications.service.js";
 import { PlatformContentService } from "../platform/platform-content.service.js";
+import { PlatformLibraryService } from "../platform/platform-library.service.js";
+import { AcademyLibraryService } from "../content/library/academy-library.service.js";
 import { createPlatformApplicationsRouters } from "../platform/platform-applications.router.js";
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
 import { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
@@ -58,6 +60,8 @@ import { createPlatformUsersRouters } from "../platform/platform-users.router.js
 import { PlatformSupportService } from "../platform/platform-support.service.js";
 import { createPlatformSupportRouters } from "../platform/platform-support.router.js";
 import { createPlatformRouters } from "../platform/platform.router.js";
+import { createPlatformLibraryRouters } from "../platform/platform-library.router.js";
+import { createAcademyLibraryRouters } from "../content/library/academy-library.router.js";
 import { PointsService } from "../points/points.service.js";
 import { createPointsRouter } from "../points/points.router.js";
 import { AcademyProfileService } from "../profile/academy-profile.service.js";
@@ -131,6 +135,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformApplicationsService: app.get(PlatformApplicationsService, {
       strict: false,
     }),
+    platformLibraryService: app.get(PlatformLibraryService, { strict: false }),
+    academyLibraryService: app.get(AcademyLibraryService, { strict: false }),
     platformContentService: app.get(PlatformContentService, {
       strict: false,
     }),
@@ -185,6 +191,8 @@ function createORPCRouter(deps: ORPCDeps) {
   const platformAuditRouters = createPlatformAuditRouters(os, deps);
   const platformApplicationsRouters = createPlatformApplicationsRouters(os, deps);
   const platformContentRouters = createPlatformContentRouters(os, deps);
+  const platformLibraryRouters = createPlatformLibraryRouters(os, deps);
+  const academyLibraryRouters = createAcademyLibraryRouters(os, deps);
   const platformInvitationsRouters = createPlatformInvitationsRouters(os, deps);
   const platformRankingRouters = createPlatformRankingRouters(os, deps);
   const platformSupportRouters = createPlatformSupportRouters(os, deps);
@@ -202,6 +210,8 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformAuditRouters,
     ...platformApplicationsRouters,
     ...platformContentRouters,
+    ...platformLibraryRouters,
+    ...academyLibraryRouters,
     ...platformInvitationsRouters,
     ...platformRankingRouters,
     ...platformSupportRouters,

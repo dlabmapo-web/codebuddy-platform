@@ -12,6 +12,7 @@ import {
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PlatformAccessService } from "../authorization/platform-access.service.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { tenantAcademies } from "./library-academy.js";
 
 /**
  * Every academy's classes, ordered by what their students earned.
@@ -65,6 +66,7 @@ export class PlatformRankingService {
     // row whose board cannot open.
     const academies = await this.prisma.academy.findMany({
       where: {
+        ...tenantAcademies,
         status: "ACTIVE",
         ...(input.academyIds?.length ? { id: { in: input.academyIds } } : {}),
       },
@@ -300,6 +302,7 @@ export class PlatformRankingService {
    *  offer, so the surfaces filter by the same names. */
   private academyOptions() {
     return this.prisma.academy.findMany({
+      where: tenantAcademies,
       select: { id: true, name: true, slug: true },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });

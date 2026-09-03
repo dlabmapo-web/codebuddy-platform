@@ -1,4 +1,21 @@
 import type { Prisma } from "../generated/prisma/client.js";
+import { tenantAcademies } from "./library-academy.js";
+
+/**
+ * A problem that cannot grade, with no academy scope of its own.
+ *
+ * The definition, in one place. Used bare inside a course tree that is already
+ * scoped to one academy — where adding a scope would be wrong, because the
+ * library's own courses would then count zero — and used scoped below, where
+ * the question is "across the platform's customers".
+ */
+export const problemWithoutTests: Prisma.MaterialWhereInput = {
+  type: "PROGRAMMING_EXERCISE",
+  OR: [
+    { programmingExercise: { is: null } },
+    { programmingExercise: { testCases: { none: {} } } },
+  ],
+};
 
 /**
  * The predicates shared by academy health and the cross-academy content
@@ -9,22 +26,36 @@ export function contentStatPredicates(academyIds?: readonly string[]) {
   const academyId: Prisma.StringFilter | string | undefined = academyIds
     ? { in: [...academyIds] }
     : undefined;
-  const academyScope: Prisma.CourseWhereInput = academyId ? { academyId } : {};
-  const classScope: Prisma.ClassWhereInput = academyId ? { academyId } : {};
-  const problemScope: Prisma.MaterialWhereInput = academyId
-    ? {
-        lecture: {
-          courseModule: { course: { academyId } },
+  // Every scope here carries the tenant filter, named or not. These counts are
+  // the console's claim about *the platform's customers*, and the content
+  // library is not one: a master course counted among them would inflate every
+  // tile on the summary strip and put head office's own curriculum into an
+  // answer about how much academies teach.
+  const academyScope: Prisma.CourseWhereInput = {
+    academy: tenantAcademies,
+    ...(academyId ? { academyId } : {}),
+  };
+  const classScope: Prisma.ClassWhereInput = {
+    academy: tenantAcademies,
+    ...(academyId ? { academyId } : {}),
+  };
+  const problemScope: Prisma.MaterialWhereInput = {
+    lecture: {
+      courseModule: {
+        course: {
+          academy: tenantAcademies,
+          ...(academyId ? { academyId } : {}),
         },
-      }
-    : {};
+      },
+    },
+  };
 
   const activeClass: Prisma.ClassWhereInput = {
     ...classScope,
     status: "ACTIVE",
   };
   const problem: Prisma.MaterialWhereInput = {
-    type: "PROGRAMMING_EXERCISE",
+    type: problemWithoutTests.type,
     ...problemScope,
   };
 
@@ -53,10 +84,7 @@ export function contentStatPredicates(academyIds?: readonly string[]) {
     problem,
     problemWithoutTests: {
       ...problem,
-      OR: [
-        { programmingExercise: { is: null } },
-        { programmingExercise: { testCases: { none: {} } } },
-      ],
+      OR: problemWithoutTests.OR,
     } satisfies Prisma.MaterialWhereInput,
   };
 }

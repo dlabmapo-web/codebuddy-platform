@@ -29,6 +29,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { writeWorkbook } from "../common/workbook-writer.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
+import { tenantAcademies } from "./library-academy.js";
 import {
   toUserDetail,
   toUserInvitation,
@@ -93,6 +94,7 @@ export class PlatformUsersService {
       // so clearing a narrow filter does not require the operator to reload
       // the page to get their options back.
       this.prisma.academy.findMany({
+        where: tenantAcademies,
         select: { id: true, name: true, slug: true },
         orderBy: [{ name: "asc" }, { id: "asc" }],
       }),

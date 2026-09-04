@@ -108,7 +108,14 @@ function classRecord(
       courseId,
       assignedByUserId: actorUserId,
       assignedAt: updatedAt,
-      course: { id: courseId, title: `Course ${courseId.slice(-1)}`, isVisible: true },
+      course: {
+        id: courseId,
+        title: `Course ${courseId.slice(-1)}`,
+        isVisible: true,
+        // The include filters every level, so what survives is what a student
+        // in this class could open: one module, one lecture, two problems.
+        modules: [{ lectures: [{ _count: { materials: 2 } }] }],
+      },
     })),
     enrollments: (overrides.membershipIds ?? []).map((id) => ({
       classId,

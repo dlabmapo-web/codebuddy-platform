@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import { BookOpen, EyeOff, Plus, Unlink } from 'lucide-react';
+import { AlertTriangle, BookOpen, EyeOff, Plus, Unlink } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/studio/button';
@@ -72,6 +72,15 @@ export function ClassCoursesPanel({
                     {t('detail.courses_panel.hidden_note')}
                   </p>
                 )}
+                {/* Worse than hidden, and quieter: a visible course with
+                    nothing visible inside it is not shown to these students as
+                    an empty course — it is not shown at all. */}
+                {course.isVisible && course.visibleExercises === 0 ? (
+                  <p className="mt-1 flex items-start gap-1.5 text-[13px] leading-5 text-warning">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                    {t('detail.courses_panel.no_content_note')}
+                  </p>
+                ) : null}
               </div>
               {editable ? (
                 // Unlink, not a trash can: the course itself survives, only

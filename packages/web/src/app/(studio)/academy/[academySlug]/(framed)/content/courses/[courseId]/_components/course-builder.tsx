@@ -10,6 +10,7 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { useCourseBuilder } from '../_hooks/use-course-builder';
 import { BuilderHeader } from './builder-header';
+import { ContentReadinessNotice } from './content-readiness';
 import { ModuleCard } from './module-card';
 
 export function CourseBuilder({
@@ -46,6 +47,8 @@ export function CourseBuilder({
         canImport={canImport}
         courseId={courseId}
       />
+
+      <ContentReadinessNotice builder={builder} />
 
       <div>
         <section className="space-y-3">

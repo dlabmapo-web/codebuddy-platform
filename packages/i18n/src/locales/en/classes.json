@@ -101,7 +101,8 @@
       "empty_readonly": "No courses assigned yet.",
       "hidden_note": "Assigned, but hidden. Students cannot open it until the course is visible.",
       "row_menu_aria": "Actions for “{{title}}”",
-      "remove": "Remove from class"
+      "remove": "Remove from class",
+      "no_content_note": "Assigned and visible, but no problems inside it are visible to students."
     },
     "schedule_panel": {
       "heading": "Class times",

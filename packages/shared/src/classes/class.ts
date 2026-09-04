@@ -25,6 +25,15 @@ export const assignedCourseSummarySchema = z.object({
   title: z.string().min(1),
   /** Assigning a hidden course is allowed; students still cannot open it. */
   isVisible: z.boolean(),
+  /**
+   * Problems in it a student could actually reach.
+   *
+   * Zero on a *visible* course is the quiet failure this panel exists to end:
+   * the class is assigned a published course, and the students in it see no
+   * course at all, because a course with nothing visible inside it is dropped
+   * from their list rather than shown empty.
+   */
+  visibleExercises: z.number().int().nonnegative(),
 });
 export type AssignedCourseSummary = z.infer<typeof assignedCourseSummarySchema>;
 

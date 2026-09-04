@@ -14,6 +14,7 @@ import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import { VisibilityIndicator } from './builder-controls';
+import { ContentVisibilityControl } from './content-readiness';
 
 export function BuilderHeader({
   builder,
@@ -69,6 +70,9 @@ export function BuilderHeader({
           effectivelyVisible={builder.tree.course.isVisible}
           isVisible={builder.tree.course.isVisible}
         />
+        {builder.editable && builder.tree.course.content.exercises > 0 ? (
+          <ContentVisibilityControl builder={builder} />
+        ) : null}
         {builder.tree.modules.length > 0 ? (
           <button
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"

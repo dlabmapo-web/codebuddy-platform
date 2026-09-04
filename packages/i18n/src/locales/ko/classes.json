@@ -93,7 +93,8 @@
       "empty_readonly": "아직 지정된 코스가 없습니다.",
       "hidden_note": "지정되었지만 숨김 상태입니다. 코스를 공개해야 학생이 열 수 있습니다.",
       "row_menu_aria": "‘{{title}}’ 작업 메뉴",
-      "remove": "반에서 제외"
+      "remove": "반에서 제외",
+      "no_content_note": "학생에게 공개된 문제가 없습니다."
     },
     "schedule_panel": {
       "heading": "수업 시간",

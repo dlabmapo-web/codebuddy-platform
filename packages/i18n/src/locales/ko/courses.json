@@ -49,5 +49,7 @@
     "module": "모듈",
     "lecture": "강의",
     "problem": "문제"
-  }
+  },
+  "no_visible_content": "공개된 콘텐츠 없음",
+  "no_visible_content_hint": "문제가 모두 비공개라 학생에게 보이지 않습니다."
 }

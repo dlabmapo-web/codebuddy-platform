@@ -10,7 +10,13 @@
     "load_failed_body": "This is not a permissions problem. Something went wrong on the server — try again, and check the server logs if it persists.",
     "summary": "{{modules}} modules · {{lectures}} lectures",
     "structural_error": "Could not save that change. Try again.",
-    "import_excel": "Import from Excel"
+    "import_excel": "Import from Excel",
+    "show_all_content": "Show all content",
+    "hide_all_content": "Hide all content",
+    "all_content_kind": "all content in this course",
+    "not_teachable_title": "Students cannot see this course",
+    "not_teachable_body": "The course is visible, but no problems inside it are. Choose “Show all content” to make it teachable.",
+    "not_teachable_body_readonly": "The course is visible, but no problems inside it are. Ask a Team Lead to show its content."
   },
   "empty": {
     "heading": "Start with a module",
@@ -90,15 +96,14 @@
     },
     "test": {
       "add": "Add answer",
-      "help": "Choose per answer whether students see it as a sample or it stays hidden for grading. At least one sample is required.",
+      "help": "Choose per answer whether students see it as a sample or it stays hidden for grading. A problem with no answers can be saved, but nobody can attempt it.",
       "label": "Answer {{number}}",
       "input": "Input",
       "expected": "Expected output",
       "remove": "Remove answer {{number}}",
       "sample_badge": "Shown to students",
       "hidden_badge": "Hidden",
-      "toggle_visibility": "Toggle visibility",
-      "last_sample_locked": "The last sample answer cannot be hidden or removed."
+      "toggle_visibility": "Toggle visibility"
     },
     "hint": {
       "add": "Add hint",
@@ -136,7 +141,8 @@
     "preview_example_n": "Example {{number}}",
     "preview_stdin": "Input",
     "preview_stdout": "Expected output",
-    "preview_starter": "Starter code"
+    "preview_starter": "Starter code",
+    "no_tests_note": "No answers yet, so no student can attempt this problem. You can save it now and add answers later."
   },
   "rename": {
     "module_title": "Edit module name",

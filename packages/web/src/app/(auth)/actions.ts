@@ -259,7 +259,20 @@ export async function signupAction(
         username: input.data.username,
         ...(hasInvitation
           ? {}
-          : { requested_academy_id: input.data.academyId }),
+          : {
+              requested_academy_id: input.data.academyId,
+              /*
+               * The Student/Staff control's answer, carried onto the join
+               * request this signup creates so the lobby can show the right
+               * empty navigation while the person waits.
+               *
+               * Client-writable metadata, and it authorizes nothing — the
+               * academy role still comes only from the manager who approves.
+               * Somebody forging it would see five empty pages instead of
+               * four.
+               */
+              requested_kind: 'STAFF',
+            }),
       },
       emailRedirectTo: `${publicConfig.siteUrl}/auth/callback`,
       ...(captcha.token ? { captchaToken: captcha.token } : {}),

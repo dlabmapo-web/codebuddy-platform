@@ -1,7 +1,11 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isPlaceholderAddress, parseUsername } from "@cove/shared";
+import {
+  isPlaceholderAddress,
+  parseUsername,
+  type JoinRequestKind,
+} from "@cove/shared";
 
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
@@ -57,6 +61,7 @@ export class SupabaseAuthService {
       avatarUrl: firstUrl(metadata.avatar_url, metadata.picture),
       provider: firstString(appMetadata.provider),
       requestedAcademyId: firstUuid(metadata.requested_academy_id),
+      requestedKind: parseRequestedKind(metadata.requested_kind),
     };
   }
 
@@ -88,6 +93,9 @@ export class SupabaseAuthService {
         username: input.username,
         full_name: input.displayName,
         requested_academy_id: input.requestedAcademyId,
+        // A student account is created by the API rather than by the browser,
+        // so the kind is stated here rather than read from a form.
+        requested_kind: "STUDENT",
       },
     });
     if (error || !data?.user) {
@@ -215,6 +223,18 @@ export class SupabaseAuthService {
       return { delivered: false };
     }
   }
+}
+
+/**
+ * The Student/Staff choice, from client-writable metadata.
+ *
+ * Anything that is not one of the two answers becomes null, which the caller
+ * reads as STUDENT — the narrower shape. Nothing downstream is authorized by
+ * this, so an unrecognised value costs an applicant nothing but the wrong
+ * empty navigation.
+ */
+function parseRequestedKind(value: unknown): JoinRequestKind | null {
+  return value === "STUDENT" || value === "STAFF" ? value : null;
 }
 
 function firstUuid(value: unknown): string | null {

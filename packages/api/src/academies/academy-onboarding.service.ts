@@ -1,5 +1,9 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import type { CreateAcademyJoinRequest, MemberAvatarUrls } from "@cove/shared";
+import type {
+  CreateAcademyJoinRequest,
+  JoinRequestKind,
+  MemberAvatarUrls,
+} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
@@ -31,10 +35,21 @@ export const requestInclude = {
 export class AcademyOnboardingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * `requestedKind` is what the signup form's Student/Staff control chose. It
+   * travels onto the request so the lobby can show the right empty navigation
+   * while the applicant waits, and it decides nothing else — the academy role
+   * still comes only from the manager who approves.
+   *
+   * Defaulted rather than required so an identity that predates the column, or
+   * one arriving through OAuth with no such choice recorded, still produces a
+   * request.
+   */
   async ensureSignupRequest(
     userId: string,
     requestedAcademyId: string | null,
     emailVerified: boolean,
+    requestedKind: JoinRequestKind = "STUDENT",
   ): Promise<void> {
     if (!requestedAcademyId || !emailVerified) return;
 
@@ -62,11 +77,29 @@ export class AcademyOnboardingService {
 
     try {
       await this.prisma.academyJoinRequest.create({
-        data: { academyId: requestedAcademyId, userId },
+        data: { academyId: requestedAcademyId, userId, requestedKind },
       });
     } catch (error) {
       if (!hasPrismaCode(error, "P2002")) throw error;
     }
+  }
+
+  /**
+   * What this person last asked to be at this academy.
+   *
+   * Read only when a reapplication carries no kind of its own. Falls back to
+   * STUDENT, which is the narrower shape and the common case.
+   */
+  private async previousKind(
+    academyId: string,
+    userId: string,
+  ): Promise<JoinRequestKind> {
+    const previous = await this.prisma.academyJoinRequest.findFirst({
+      where: { academyId, userId },
+      select: { requestedKind: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return previous?.requestedKind ?? "STUDENT";
   }
 
   async create(identity: SupabaseIdentity, input: CreateAcademyJoinRequest) {
@@ -116,6 +149,13 @@ export class AcademyOnboardingService {
           academyId: input.academyId,
           userId: user.id,
           message: input.message,
+          // Reapplying from the pending screen sends no kind, and the kind of
+          // the request being replaced is the right answer: somebody rejected
+          // as staff is still applying as staff.
+          requestedKind: input.kind ?? (await this.previousKind(
+            input.academyId,
+            user.id,
+          )),
         },
         include: requestInclude,
       });

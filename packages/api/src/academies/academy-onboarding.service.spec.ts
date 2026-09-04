@@ -43,7 +43,23 @@ describe("AcademyOnboardingService.ensureSignupRequest", () => {
       data: {
         academyId: "20000000-0000-4000-8000-000000000001",
         userId: "30000000-0000-4000-8000-000000000009",
+        // Absent from the caller, so the narrower shape. A hint for the lobby
+        // only; nothing downstream is authorized by it.
+        requestedKind: "STUDENT",
       },
+    });
+  });
+
+  it("carries the signup form's Staff choice onto the request", async () => {
+    const { prisma, service } = createService();
+    await service.ensureSignupRequest(
+      "30000000-0000-4000-8000-000000000009",
+      "20000000-0000-4000-8000-000000000001",
+      true,
+      "STAFF",
+    );
+    expect(prisma.academyJoinRequest.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ requestedKind: "STAFF" }),
     });
   });
 

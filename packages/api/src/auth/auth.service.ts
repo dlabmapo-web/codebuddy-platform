@@ -87,6 +87,7 @@ export class AuthService {
         updated.id,
         identity.requestedAcademyId,
         identity.emailVerified,
+        identity.requestedKind ?? "STUDENT",
       );
       return this.present(await this.requireUser(updated.id));
     }
@@ -107,6 +108,7 @@ export class AuthService {
       created.id,
       identity.requestedAcademyId,
       identity.emailVerified,
+      identity.requestedKind ?? "STUDENT",
     );
     return this.present(await this.requireUser(created.id));
   }

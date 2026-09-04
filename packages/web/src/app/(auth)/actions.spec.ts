@@ -172,6 +172,9 @@ describe('signupAction CAPTCHA', () => {
         data: {
           full_name: signupFields.displayName,
           requested_academy_id: signupFields.academyId,
+          // The Student/Staff answer, carried onto the join request so the
+          // lobby shows the right empty navigation while this person waits.
+          requested_kind: 'STAFF',
           username: signupFields.username,
         },
         emailRedirectTo: 'http://localhost:3000/auth/callback',

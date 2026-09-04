@@ -23,6 +23,7 @@ describe('academy route identity', () => {
     expect(academyIdentityFromAccount(account, 'cove-seoul')).toEqual({
       academyId: 'academy-1',
       academySlug: 'cove-seoul',
+      via: 'membership',
     });
   });
 

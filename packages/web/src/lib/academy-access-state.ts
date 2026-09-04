@@ -41,6 +41,23 @@ export type PendingStateView = {
   canReapply: boolean;
 };
 
+/**
+ * The one pending application, when there is one.
+ *
+ * Deliberately not `applications[0]`. Once a pending application decides where
+ * somebody is *sent* rather than only what a status card says, first-wins is a
+ * bug: a person rejected by one academy who then applies to another holds two
+ * rows, and the older rejection would keep them out of the lobby they are
+ * entitled to. The newest wins among several, which is the one they just made.
+ */
+function pendingApplication(
+  account: AuthMeResponse,
+): Application | undefined {
+  return account.user.applications
+    .filter((application) => application.status === 'PENDING')
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+}
+
 export function resolveAcademyAccessState(
   account: AuthMeResponse,
 ): AcademyAccessState {
@@ -56,6 +73,13 @@ export function resolveAcademyAccessState(
   );
   if (suspendedMembership) {
     return { kind: 'suspended', membership: suspendedMembership };
+  }
+
+  // Ahead of any other application, for the reason `pendingApplication`
+  // gives — this is the state that now decides a destination.
+  const pending = pendingApplication(account);
+  if (pending) {
+    return { kind: 'application', application: pending };
   }
 
   const application = account.user.applications[0];
@@ -89,6 +113,19 @@ export function authDestination(account: AuthMeResponse): string {
   }
   if (state.kind === 'welcome') {
     return routes.welcome;
+  }
+  /*
+   * A pending applicant waits inside the academy rather than on a card outside
+   * it. The lobby is the academy's own frame with every page empty, so the
+   * first minute of Cove is the product rather than a waiting room whose only
+   * control reloads itself.
+   *
+   * Only PENDING. Rejected, cancelled, suspended and "no academy at all" are
+   * not people waiting — they are people whose answer has arrived, or who have
+   * nowhere to be — and `/pending` already reads correctly for each of them.
+   */
+  if (state.kind === 'application' && state.application.status === 'PENDING') {
+    return routes.academy(state.application.academy.slug);
   }
   return routes.pending;
 }

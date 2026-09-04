@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type * as React from 'react';
 import { useState, useTransition } from 'react';
 import { Moon, Sun, UserRound } from 'lucide-react';
 import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
@@ -309,8 +310,19 @@ export function ProfileControl({
 export function HeaderControls({
   className,
   account,
+  notifications,
 }: {
   className?: string;
+  /**
+   * The bell, rendered by whichever shell mounted this.
+   *
+   * A slot rather than a component imported here, because the bell needs its
+   * own translation namespace loaded on the server and this file is a client
+   * module. It sits between the theme control and the avatar: language and
+   * theme are about how the interface presents itself, and the bell and the
+   * face are both about the reader.
+   */
+  notifications?: React.ReactNode;
   /** Absent on surfaces that have no session to describe. */
   account?: {
     academyId?: string;
@@ -327,6 +339,7 @@ export function HeaderControls({
     <div className={cn('flex items-center gap-0.5', className)}>
       <LanguageControl />
       <ThemeControl />
+      {notifications}
       {account ? (
         <ProfileControl
           academyId={account.academyId}

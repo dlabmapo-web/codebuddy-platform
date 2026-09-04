@@ -191,6 +191,29 @@ export const contentImportNamespaces = [
 export const sessionNamespaces = ["session"] as const;
 
 /**
+ * The applicant's lobby: the status plate, the tracker and the seven empty
+ * states.
+ *
+ * Its own list rather than a layout namespace, for the reason `learning` and
+ * `lead` have one — but with a sharper edge here. This copy is read once, by
+ * somebody who is not yet a member, and every signed-in member of every
+ * academy would otherwise carry the vocabulary of waiting for approval in
+ * their RSC payload forever.
+ */
+export const lobbyNamespaces = ["lobby", "errors"] as const;
+
+/**
+ * The bell, mounted by both shells.
+ *
+ * A page namespace loaded by the two chromes rather than a layout one, even
+ * though it appears on every studio page: `layoutNamespaces` is capped by the
+ * Korean root-payload budget in `@cove/i18n`'s `locales.spec.ts`, and that
+ * budget's note asks the next feature to split rather than raise it. Eleven
+ * keys mounted where they are drawn is the split.
+ */
+export const notificationNamespaces = ["notifications"] as const;
+
+/**
  * My Page and the manager's member-profile route.
  *
  * Its own list rather than a layout namespace: the copy covers six form
@@ -236,7 +259,9 @@ export type PageNamespace =
   | (typeof sessionNamespaces)[number]
   | (typeof profileNamespaces)[number]
   | (typeof pointsNamespaces)[number]
-  | (typeof academyLibraryNamespaces)[number];
+  | (typeof academyLibraryNamespaces)[number]
+  | (typeof lobbyNamespaces)[number]
+  | (typeof notificationNamespaces)[number];
 
 /**
  * The confirmation copy for deleting a course or a class.

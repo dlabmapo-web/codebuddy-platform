@@ -75,6 +75,7 @@ export const resolveAcademyRoute = cache(
       return {
         academyId: grant.academyId,
         academySlug: grant.academySlug,
+        via: 'grant',
         // The role the grant assumes. Every surface below branches on this
         // exactly as it does for a member, which is the whole point of the
         // grant carrying one.
@@ -94,6 +95,7 @@ export const resolveAcademyRoute = cache(
     return {
       academyId: inspected.academyId,
       academySlug: inspected.academySlug,
+      via: 'platform',
       // The role the operator chose to stand in, read from the same cookie the
       // API is told about. Hardcoding `MANAGER` here meant the sidebar was
       // built for a Manager whatever the operator picked, while the API
@@ -105,6 +107,82 @@ export const resolveAcademyRoute = cache(
     };
   },
 );
+
+/**
+ * Member, grant or platform — **or** an applicant waiting on this academy.
+ *
+ * Deliberately a second function rather than a branch inside
+ * `resolveAcademyRoute`. Admitting applicants there would admit them to every
+ * caller of it at once, including the two full-viewport workspaces that sit
+ * outside the frame: the exercise editor and live monitoring. Those must keep
+ * answering 404, so the wider answer is opt-in and exactly two layouts opt in.
+ *
+ * The applicant is resolved last, so nobody who is already somebody here can
+ * be resolved as one instead.
+ */
+export const resolveAcademyOrLobbyRoute = cache(
+  async (academySlug: string): Promise<AcademyRouteIdentity | null> => {
+    return (await resolveAcademyRoute(academySlug)) ??
+      (await applicantRoute(academySlug));
+  },
+);
+
+/**
+ * The framed entry point: admit a member, a visiting operator or an applicant,
+ * and otherwise behave exactly as `requireAcademyRoute` does — a retired slug
+ * still redirects, an unknown one still 404s.
+ */
+export async function requireAcademyOrLobbyRoute(
+  academySlug: string,
+): Promise<AcademyRouteIdentity> {
+  const identity = await resolveAcademyOrLobbyRoute(academySlug);
+  if (identity) return identity;
+  return requireAcademyRoute(academySlug);
+}
+
+/**
+ * The lobby identity, for somebody waiting on an application to this academy.
+ *
+ * Resolved through the applicant's own seam rather than from `auth.me`'s
+ * applications, because the lobby has to agree with the API about two things
+ * `auth.me` does not report: that the academy is still ACTIVE — an academy
+ * archived after somebody applied must not keep serving them a branded lobby —
+ * and its display name, image and points flag, which the shell draws. One
+ * request answers all of it, and it is the only academy request the lobby
+ * makes.
+ */
+export const applicantRoute = cache(
+  async (academySlug: string): Promise<AcademyRouteIdentity | null> => {
+    const lobby = await lobbyAcademy(academySlug);
+    if (!lobby) return null;
+    return {
+      academyId: lobby.id,
+      academySlug: lobby.slug,
+      via: 'application',
+      // An applicant holds no role. `role` exists only to satisfy the shared
+      // identity type; nothing branches on it for this `via`, and `roles`
+      // being empty is what makes every permission gate refuse.
+      role: 'STUDENT' as const,
+      roles: [] as const,
+    };
+  },
+);
+
+/**
+ * Everything the lobby shell draws, and the single source both it and the
+ * route guard read.
+ *
+ * `applicantRoute` resolves through this rather than calling the endpoint
+ * itself, so the guard and the shell share one memoised request instead of
+ * making the same one twice per render.
+ */
+export const lobbyAcademy = cache(async (academySlug: string) => {
+  try {
+    return await createServerORPCClient().lobby.academy({ academySlug });
+  } catch {
+    return null;
+  }
+});
 
 /**
  * The academy an operator is looking at, resolved through their own seam.
@@ -184,6 +262,7 @@ export const resolvePlatformAcademyRoute = cache(
       return {
         academyId: academy.id,
         academySlug: academy.slug,
+        via: 'platform',
         // A platform operator holds no academy membership, so there is no
         // academy role to report. The reported Manager role is the platform
         // view's permission set, not a membership, and these fields only

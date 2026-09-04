@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { HeaderControls } from '@/components/studio/header-controls';
+import { NotificationsMount } from '@/components/studio/notifications/notifications-mount';
 import {
   SidebarInset,
   SidebarProvider,
@@ -259,6 +260,10 @@ export async function StudioChrome({
                 : undefined
             }
             className="ml-auto"
+            /* The same bell in the same place a member had it while they were
+               an applicant, so it does not appear to have been part of the
+               waiting experience. */
+            notifications={<NotificationsMount />}
           />
         </header>
         {children}

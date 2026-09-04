@@ -56,7 +56,16 @@ export type PanelTone =
   | 'success'
   | 'teal'
   | 'warning'
-  | 'danger';
+  | 'danger'
+  /**
+   * Waiting to be reviewed.
+   *
+   * The same amber the PENDING chip wears in the applications table and the
+   * count wears on the manager's nav. One state, one colour, on both sides of
+   * the review: an applicant should not meet a different colour for the fact a
+   * manager already reads as amber.
+   */
+  | 'draft';
 
 /**
  * Each tone as complete class strings rather than composed ones.
@@ -141,6 +150,15 @@ export const toneStyles: Record<
     meter: 'bg-danger',
     wash: 'bg-danger/[0.06]',
     solid: 'bg-danger text-on-danger',
+  },
+  draft: {
+    rail: 'bg-draft',
+    chip: 'bg-draft/10 text-draft',
+    pill: 'bg-draft/10 text-draft',
+    text: 'text-draft',
+    meter: 'bg-draft',
+    wash: 'bg-draft/[0.06]',
+    solid: 'bg-draft text-on-draft',
   },
 };
 

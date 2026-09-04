@@ -96,9 +96,6 @@ describe('resolveAcademyAccessState', () => {
       const state = resolveAcademyAccessState(account({
         applications: [application(status)],
       }));
-      expect(authDestination(account({
-        applications: [application(status)],
-      }))).toBe('/pending');
       expect(pendingStateView(state)).toMatchObject({
         state: expectedState,
         canCancel,
@@ -106,6 +103,62 @@ describe('resolveAcademyAccessState', () => {
       });
     },
   );
+
+  it('sends a pending applicant into the academy lobby, not the waiting card', () => {
+    // The lobby is the academy's own frame with every page empty. Waiting
+    // inside it is the whole point of the feature: the first minute of Cove
+    // should be the product, not a card whose only control reloads itself.
+    expect(
+      authDestination(account({ applications: [application('PENDING')] })),
+    ).toBe(`/academy/${academy.slug}`);
+  });
+
+  it.each(['APPROVED', 'REJECTED', 'CANCELLED'] as const)(
+    'keeps a %s application on the terminal pending screen',
+    (status) => {
+      // Only PENDING is somebody waiting. The rest have their answer, and
+      // `/pending` already reads correctly for each of them.
+      expect(
+        authDestination(account({ applications: [application(status)] })),
+      ).toBe('/pending');
+    },
+  );
+
+  it('prefers the pending application over an older decided one', () => {
+    /*
+     * The bug this exists to prevent: somebody rejected by one academy who
+     * then applies to another holds two rows, and `applications[0]` would send
+     * them to the waiting card instead of the lobby they are entitled to.
+     */
+    const rejectedElsewhere = {
+      ...application('REJECTED'),
+      id: '50000000-0000-4000-8000-000000000002',
+      academy: { ...academy, slug: 'other-academy' },
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const input = account({
+      applications: [rejectedElsewhere, application('PENDING')],
+    });
+
+    expect(resolveAcademyAccessState(input)).toMatchObject({
+      kind: 'application',
+      application: { status: 'PENDING' },
+    });
+    expect(authDestination(input)).toBe(`/academy/${academy.slug}`);
+  });
+
+  it('takes the newest of several pending applications', () => {
+    const older = {
+      ...application('PENDING'),
+      id: '50000000-0000-4000-8000-000000000003',
+      academy: { ...academy, slug: 'older-academy' },
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+
+    expect(
+      authDestination(account({ applications: [older, application('PENDING')] })),
+    ).toBe(`/academy/${academy.slug}`);
+  });
 
   it('keeps an unrelated account on the welcome page', () => {
     const input = account();

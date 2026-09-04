@@ -47,6 +47,7 @@ describe('platform academy route', () => {
     await expect(resolvePlatformAcademyRoute('mapo-dlab')).resolves.toEqual({
       academyId: 'academy-1',
       academySlug: 'mapo-dlab',
+      via: 'platform',
       role: 'MANAGER',
       // An operator stands in one role and holds nothing beside it, so the
       // set the `can*` gates read is that role alone.

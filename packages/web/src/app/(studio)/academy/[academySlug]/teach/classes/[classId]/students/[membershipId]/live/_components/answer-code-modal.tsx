@@ -128,8 +128,12 @@ export function AnswerCodeModal({
               {t('answer.failed')}
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-xl border border-[#34343f] bg-[#1e1e1e]">
+            <div
+              // theme-lint-ignore — the answer pane is the code surface, dark in both themes
+              className="relative overflow-hidden rounded-xl border border-[#34343f] bg-[#1e1e1e]"
+            >
               <button
+                // theme-lint-ignore — copy button chrome sits on that dark pane
                 className="absolute right-3 top-3 z-10 inline-flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-[#2d2d2d] px-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#3a3a3a]"
                 onClick={() => void copyAnswer()}
                 type="button"

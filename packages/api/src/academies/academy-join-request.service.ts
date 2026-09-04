@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   canApproveAs,
+  type AcademyRole,
   type ReviewAcademyJoinRequest,
 } from "@cove/shared";
 
@@ -9,6 +10,7 @@ import { AcademyAccessService } from "../authorization/academy-access.service.js
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { bumpPeopleRevision } from "../manage/people-revision.js";
+import { NotificationBroadcaster } from "../notifications/notification-broadcaster.js";
 import {
   noMemberAvatar,
   resolveMemberAvatars,
@@ -28,6 +30,11 @@ export class AcademyJoinRequestService {
     private readonly audit: AuditService,
     /** The applications table shows faces, like every other people surface. */
     private readonly profileMedia: ProfileMediaService,
+    /**
+     * Tells the applicant, on whatever screen they are already looking at.
+     * Called after the transaction below commits, never inside it.
+     */
+    private readonly notifications: NotificationBroadcaster,
   ) {}
 
   async list(identity: SupabaseIdentity, academyId: string) {
@@ -92,6 +99,25 @@ export class AcademyJoinRequestService {
       );
     }
 
+    const reviewed = await this.reviewInTransaction(actor, input);
+
+    /*
+     * The applicant is told here, after the decision is durable.
+     *
+     * Inside the transaction this would announce an approval that a rollback
+     * would unmake, and the applicant would be looking at a membership that
+     * does not exist. Awaited rather than left floating so a test can observe
+     * it, and internally best-effort so it can never fail the review a manager
+     * has already made.
+     */
+    await this.notifications.decisionMade(reviewed.userId, reviewed.detail.id);
+    return reviewed.detail;
+  }
+
+  private async reviewInTransaction(
+    actor: { userId: string; role: AcademyRole },
+    input: ReviewAcademyJoinRequest,
+  ) {
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
         SELECT id
@@ -113,7 +139,12 @@ export class AcademyJoinRequestService {
           request.approvedRole === input.role;
         const sameRejection = input.decision === "REJECT" &&
           request.status === "REJECTED";
-        if (sameApproval || sameRejection) return toJoinRequestDetail(request);
+        if (sameApproval || sameRejection) {
+          return {
+            detail: toJoinRequestDetail(request),
+            userId: request.userId,
+          };
+        }
         throw new AppException(
           "JOIN_REQUEST_STATE_CONFLICT",
           HttpStatus.CONFLICT,
@@ -141,7 +172,10 @@ export class AcademyJoinRequestService {
           after: { status: rejected.status },
           reason: input.reason,
         });
-        return toJoinRequestDetail(rejected);
+        return {
+          detail: toJoinRequestDetail(rejected),
+          userId: rejected.userId,
+        };
       }
 
       const membership = await transaction.academyMembership.findUnique({
@@ -200,7 +234,10 @@ export class AcademyJoinRequestService {
       // §8.1 — an approved application is a new member, so the revision
       // moves with it.
       await bumpPeopleRevision(transaction, request.academyId);
-      return toJoinRequestDetail(approved);
+      return {
+        detail: toJoinRequestDetail(approved),
+        userId: approved.userId,
+      };
     });
   }
 }

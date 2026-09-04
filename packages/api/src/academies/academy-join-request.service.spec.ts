@@ -5,6 +5,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AppException } from "../common/app-exception.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import type { NotificationBroadcaster } from "../notifications/notification-broadcaster.js";
 import type { ProfileMediaService } from "../profile/profile-media.service.js";
 import type { AuditService } from "./audit.service.js";
 import { AcademyJoinRequestService } from "./academy-join-request.service.js";
@@ -100,12 +101,25 @@ function createService(options: {
   const media = {
     signMany: vi.fn().mockResolvedValue([]),
   } as unknown as ProfileMediaService;
+  // The applicant is told after the transaction commits, and the broadcaster
+  // is best-effort by design — so the review must behave identically whether
+  // it succeeds, and the spec asserts it is reached with the right applicant.
+  const notifications = {
+    decisionMade: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NotificationBroadcaster;
 
   return {
     access,
     audit,
+    notifications,
     prisma,
-    service: new AcademyJoinRequestService(prisma, access, audit, media),
+    service: new AcademyJoinRequestService(
+      prisma,
+      access,
+      audit,
+      media,
+      notifications,
+    ),
     transaction,
   };
 }
@@ -154,6 +168,60 @@ describe("AcademyJoinRequestService", () => {
       );
     },
   );
+
+  it("tells the applicant once the decision is durable, never inside it", async () => {
+    const { notifications, prisma, service } = createService();
+
+    await service.review(identity, {
+      academyId,
+      requestId,
+      decision: "APPROVE",
+      role: "STUDENT",
+    });
+
+    // The applicant, resolved from the row the transaction wrote — not from
+    // anything the reviewing manager sent.
+    expect(notifications.decisionMade).toHaveBeenCalledWith(
+      applicantUserId,
+      requestId,
+    );
+    // A socket emit inside the transaction would announce an approval a
+    // rollback could unmake, so the order is asserted rather than assumed.
+    const emitted = vi.mocked(notifications.decisionMade).mock
+      .invocationCallOrder[0]!;
+    const committed = vi.mocked(prisma.$transaction).mock
+      .invocationCallOrder[0]!;
+    expect(emitted).toBeGreaterThan(committed);
+  });
+
+  it("tells a rejected applicant too", async () => {
+    const { notifications, service } = createService();
+
+    await service.review(identity, {
+      academyId,
+      requestId,
+      decision: "REJECT",
+      reason: "The application is incomplete.",
+    });
+
+    expect(notifications.decisionMade).toHaveBeenCalledWith(
+      applicantUserId,
+      requestId,
+    );
+  });
+
+  it("says nothing when the review was refused", async () => {
+    const { notifications, service } = createService();
+
+    await expect(service.review(identity, {
+      academyId,
+      requestId,
+      decision: "APPROVE",
+      role: "MANAGER",
+    })).rejects.toMatchObject({ code: "JOIN_REQUEST_ROLE_NOT_PERMITTED" });
+
+    expect(notifications.decisionMade).not.toHaveBeenCalled();
+  });
 
   it.each(["TEAM_LEAD", "MANAGER"] as const)(
     "refuses a team lead approving an applicant as %s before opening a transaction",

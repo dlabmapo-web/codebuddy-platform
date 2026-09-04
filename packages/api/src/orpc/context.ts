@@ -22,6 +22,8 @@ import type { ClassesService } from "../classes/classes.service.js";
 import type { ContentImportService } from "../content/import/content-import.service.js";
 import type { CourseService } from "../content/course.service.js";
 import type { AnswerRecordsService } from "../learn/answer-records.service.js";
+import type { LobbyService } from "../lobby/lobby.service.js";
+import type { NotificationsService } from "../notifications/notifications.service.js";
 import type { LearnClassService } from "../learn/learn-class.service.js";
 import type { LearnService } from "../learn/learn.service.js";
 import type { StudentOverviewService } from "../learn/student-overview.service.js";
@@ -81,6 +83,8 @@ export type ORPCDeps = {
   learnService: LearnService;
   studentOverviewService: StudentOverviewService;
   submissionService: SubmissionService;
+  lobbyService: LobbyService;
+  notificationsService: NotificationsService;
   monitoringService: MonitoringService;
   profileService: ProfileService;
   academyProfileService: AcademyProfileService;

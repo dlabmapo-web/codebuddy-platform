@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { SupabaseAuthModule } from "../auth/supabase-auth.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
+import { NotificationsModule } from "../notifications/notifications.module.js";
 import { MediaModule } from "../profile/media.module.js";
 import { AcademyDiscoveryService } from "./academy-discovery.service.js";
 import { AcademyInvitationService } from "./academy-invitation.service.js";
@@ -19,6 +20,7 @@ import { RateLimitService } from "./rate-limit.service.js";
     AuthorizationModule,
     MediaModule,
     MonitoringRevocationModule,
+    NotificationsModule,
     SupabaseAuthModule,
   ],
   providers: [

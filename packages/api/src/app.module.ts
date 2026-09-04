@@ -11,7 +11,9 @@ import { DatabaseModule } from "./database/database.module.js";
 import { ContentModule } from "./content/content.module.js";
 import { LeadModule } from "./lead/lead.module.js";
 import { LearnModule } from "./learn/learn.module.js";
+import { LobbyModule } from "./lobby/lobby.module.js";
 import { MonitoringModule } from "./monitoring/monitoring.module.js";
+import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ProfileModule } from "./profile/profile.module.js";
 import { ManageModule } from "./manage/manage.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
@@ -34,7 +36,9 @@ import { TeachModule } from "./teach/teach.module.js";
     ContentModule,
     LeadModule,
     LearnModule,
+    LobbyModule,
     MonitoringModule,
+    NotificationsModule,
     ProfileModule,
     TeachModule,
     ManageModule,

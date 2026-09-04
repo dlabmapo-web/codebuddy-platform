@@ -55,6 +55,23 @@ export function useCourseBuilder({
     onSuccess: (course) => applyTree({ ...tree, course }),
   });
 
+  /**
+   * Every module, lecture and problem at once.
+   *
+   * The action that makes a course arriving complete — copied from the library,
+   * or filled by the workbook importer — teachable. Doing it a row at a time is
+   * several hundred requests, which is how courses end up published and empty.
+   */
+  const setContentVisibilityMutation = useMutation({
+    mutationFn: (isVisible: boolean) =>
+      orpc.academyCourses.setContentVisibility({
+        academyId,
+        courseId,
+        isVisible,
+      }),
+    onSuccess: applyTree,
+  });
+
   const createModuleMutation = useMutation({
     mutationFn: () =>
       orpc.academyCourses.createModule({
@@ -158,6 +175,7 @@ export function useCourseBuilder({
     reorderExercisesMutation,
     setExerciseVisibilityMutation,
     setCourseVisibilityMutation,
+    setContentVisibilityMutation,
   ].find((mutation) => mutation.isError)?.error;
 
   return {
@@ -195,6 +213,9 @@ export function useCourseBuilder({
       updateModuleMutation.mutate({ moduleId, title }),
     setCourseVisible: (isVisible: boolean) =>
       setCourseVisibilityMutation.mutate(isVisible),
+    setContentVisible: (isVisible: boolean) =>
+      setContentVisibilityMutation.mutate(isVisible),
+    setContentVisiblePending: setContentVisibilityMutation.isPending,
     setModuleVisible: (moduleId: string, isVisible: boolean) =>
       updateModuleMutation.mutate({ moduleId, isVisible }),
     deleteModule: (moduleId: string) => deleteModuleMutation.mutate(moduleId),

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useLayoutTranslation } from '@/i18n';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -65,6 +66,8 @@ function ExerciseRow({
   siblings: readonly CourseMaterial[];
 }) {
   const { t } = useLayoutTranslation('content');
+  // See `ModuleCard`: the flag is inert in a library academy.
+  const visibilityIsReal = useContentSurface() !== 'library';
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -85,10 +88,12 @@ function ExerciseRow({
         {material.title}
       </Link>
       <div className="flex shrink-0 items-center gap-1">
-        <VisibilityIndicator
-          effectivelyVisible={effectivelyVisible}
-          isVisible={material.isVisible}
-        />
+        {visibilityIsReal ? (
+          <VisibilityIndicator
+            effectivelyVisible={effectivelyVisible}
+            isVisible={material.isVisible}
+          />
+        ) : null}
         {exercise?.aiFeedbackEnabled ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11.5px] font-bold text-brand">
             <Sparkles className="size-2.5" />
@@ -115,8 +120,11 @@ function ExerciseRow({
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() => router.push(href)}
-          onToggleVisible={(next) =>
-            builder.setExerciseVisible(lectureId, material.id, next)
+          onToggleVisible={
+            visibilityIsReal
+              ? (next) =>
+                  builder.setExerciseVisible(lectureId, material.id, next)
+              : undefined
           }
         />
       ) : null}
@@ -165,6 +173,7 @@ export function LectureRow({
   parentEffectivelyVisible: boolean;
 }) {
   const { t } = useLayoutTranslation('content');
+  const visibilityIsReal = useContentSurface() !== 'library';
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -219,10 +228,12 @@ export function LectureRow({
                 : t('lecture.no_exercises')}
             </span>
           </div>
-          <VisibilityIndicator
-            effectivelyVisible={effectivelyVisible}
-            isVisible={lecture.isVisible}
-          />
+          {visibilityIsReal ? (
+            <VisibilityIndicator
+              effectivelyVisible={effectivelyVisible}
+              isVisible={lecture.isVisible}
+            />
+          ) : null}
           {builder.editable ? (
             <RowMenu
               isVisible={lecture.isVisible}
@@ -231,13 +242,17 @@ export function LectureRow({
               onDelete={() => setDeleting(true)}
               onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
               onRename={() => setRenaming(true)}
-              onToggleVisible={(next) => {
-                if (!next) {
-                  setHiding(true);
-                  return;
-                }
-                builder.setLectureVisible(lecture.id, next);
-              }}
+              onToggleVisible={
+                visibilityIsReal
+                  ? (next) => {
+                      if (!next) {
+                        setHiding(true);
+                        return;
+                      }
+                      builder.setLectureVisible(lecture.id, next);
+                    }
+                  : undefined
+              }
             />
           ) : null}
         </div>

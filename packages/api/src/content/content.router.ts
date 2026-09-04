@@ -36,6 +36,13 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      setContentVisibility: os.academyCourses.setContentVisibility
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.setContentVisibility(context.identity, input, {
+            requestId: requestId(context.req),
+          })
+        ),
       getTree: os.academyCourses.getTree
         .use(access.authenticated)
         .handler(({ context, input }) =>

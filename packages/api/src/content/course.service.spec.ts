@@ -34,10 +34,14 @@ function courseRecord() {
     modules: [
       {
         id: "50000000-0000-4000-8000-000000000001",
+        isVisible: true,
         lectures: [
           {
             id: "60000000-0000-4000-8000-000000000001",
-            _count: { materials: 2 },
+            isVisible: true,
+            // One of the two is hidden, so the two counts differ and the test
+            // below cannot pass by reading the same number twice.
+            materials: [{ isVisible: true }, { isVisible: false }],
           },
         ],
       },
@@ -158,7 +162,17 @@ describe("CourseService", () => {
   it("summarizes the one live curriculum tree", () => {
     expect(toCourseSummary(courseRecord())).toMatchObject({
       isVisible: false,
-      content: { modules: 1, lectures: 1, exercises: 2 },
+      content: { modules: 1, lectures: 1, exercises: 2, visibleExercises: 1 },
+    });
+  });
+
+  it("counts no problem as reachable once an ancestor is hidden", () => {
+    const record = courseRecord();
+    record.modules[0]!.isVisible = false;
+
+    expect(toCourseSummary(record).content).toMatchObject({
+      exercises: 2,
+      visibleExercises: 0,
     });
   });
 });
@@ -255,6 +269,32 @@ describe("CourseService hierarchy revisions", () => {
         data: { contentRevision: { increment: 1 } },
       }),
     );
+  });
+
+  /**
+   * `contentRevision` answers *the content changed*, and two callers depend on
+   * that meaning: the import session's staleness check, and the library's
+   * "customized" axis. Showing or hiding a row changes who may read the course,
+   * never what it says — and bumping here made every adopted course read as
+   * customized the moment its Team Lead switched a module on.
+   */
+  it("leaves the revision alone when only visibility moves", async () => {
+    const { service, transaction } = createHierarchyService();
+
+    await service.updateModule(identity, {
+      academyId,
+      courseId,
+      moduleId,
+      isVisible: true,
+    });
+    await service.updateLecture(identity, {
+      academyId,
+      courseId,
+      lectureId,
+      isVisible: true,
+    });
+
+    expect(transaction.course.update).not.toHaveBeenCalled();
   });
 });
 
@@ -540,5 +580,145 @@ describe("CourseService direct problem editing", () => {
       service.deleteLecture(identity, { academyId, courseId, lectureId }),
     ).rejects.toMatchObject({ code: "CONTENT_HAS_SUBMISSIONS" });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The one write that makes a complete course teachable.
+ *
+ * Its shape is the point: three `updateMany` calls scoped by the course, not a
+ * walk. A course adopted from the library or filled by the workbook importer is
+ * several hundred rows, and the per-row toggles are why those courses sat
+ * published and empty.
+ */
+function createBulkVisibilityService() {
+  const revocation = { revokeClass: vi.fn().mockResolvedValue(undefined) };
+  const audit = { write: vi.fn().mockResolvedValue({ id: "audit-id" }) };
+  const transaction = {
+    courseModule: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
+    lecture: { updateMany: vi.fn().mockResolvedValue({ count: 11 }) },
+    material: { updateMany: vi.fn().mockResolvedValue({ count: 96 }) },
+    course: { update: vi.fn().mockResolvedValue({ contentRevision: 2 }) },
+  };
+  const requirePermission = vi.fn().mockResolvedValue({
+    userId: actorUserId,
+    academyId,
+    role: "TEAM_LEAD",
+  });
+  const prisma = {
+    course: { findFirst: vi.fn().mockResolvedValue({ id: courseId, title: "C" }) },
+    classCourse: { findMany: vi.fn().mockResolvedValue([{ classId: "class-1" }]) },
+    $transaction: vi.fn(
+      async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+    ),
+  } as unknown as PrismaService;
+  const service = new CourseService(
+    prisma,
+    { requirePermission } as unknown as AcademyAccessService,
+    audit as unknown as AuditService,
+    revocation as never,
+  );
+  Object.defineProperty(service, "currentTree", {
+    value: vi.fn().mockResolvedValue({}),
+  });
+  return { service, transaction, audit, revocation, requirePermission };
+}
+
+describe("CourseService.setContentVisibility", () => {
+  it("shows every level under the course in one transaction", async () => {
+    const { service, transaction } = createBulkVisibilityService();
+
+    await service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: true,
+    });
+
+    expect(transaction.courseModule.updateMany).toHaveBeenCalledWith({
+      where: { courseId },
+      data: { isVisible: true },
+    });
+    expect(transaction.lecture.updateMany).toHaveBeenCalledWith({
+      where: { courseModule: { courseId } },
+      data: { isVisible: true },
+    });
+    expect(transaction.material.updateMany).toHaveBeenCalledWith({
+      where: { lecture: { courseModule: { courseId } } },
+      data: { isVisible: true },
+    });
+  });
+
+  it("takes the same permission every other visibility write takes", async () => {
+    const { service, requirePermission } = createBulkVisibilityService();
+
+    await service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: true,
+    });
+
+    expect(requirePermission).toHaveBeenCalledWith(
+      identity.authUserId,
+      academyId,
+      "curriculum.manage",
+    );
+  });
+
+  it("records how much of the curriculum moved, not merely that it did", async () => {
+    const { service, audit } = createBulkVisibilityService();
+
+    await service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: false,
+    });
+
+    expect(audit.write).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "content.course.content_visibility_changed",
+        after: {
+          isVisible: false,
+          modules: 3,
+          lectures: 11,
+          materials: 96,
+        },
+      }),
+    );
+  });
+
+  /** Hiding can pull a problem out from under a lesson in progress. */
+  it("revokes monitoring when hiding, and not when showing", async () => {
+    const hiding = createBulkVisibilityService();
+    await hiding.service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: false,
+    });
+    expect(hiding.revocation.revokeClass).toHaveBeenCalledWith(
+      "class-1",
+      "MATERIAL_UNAVAILABLE",
+    );
+
+    const showing = createBulkVisibilityService();
+    await showing.service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: true,
+    });
+    expect(showing.revocation.revokeClass).not.toHaveBeenCalled();
+  });
+
+  it("does not move the content revision", async () => {
+    const { service, transaction } = createBulkVisibilityService();
+
+    await service.setContentVisibility(identity, {
+      academyId,
+      courseId,
+      isVisible: true,
+    });
+
+    expect(transaction.course.update).not.toHaveBeenCalled();
   });
 });

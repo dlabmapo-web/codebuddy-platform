@@ -20,6 +20,7 @@ import {
   reorderLecturesSchema,
   reorderProgrammingExercisesSchema,
   setExerciseVisibilitySchema,
+  setCourseContentVisibilitySchema,
   setCourseVisibilitySchema,
   updateCourseModuleSchema,
   updateCourseSchema,
@@ -44,6 +45,17 @@ export const academyCoursesContract = {
   setVisibility: oc
     .input(setCourseVisibilitySchema)
     .output(courseSummarySchema),
+  /**
+   * Show or hide every module, lecture and problem under one course.
+   *
+   * The action a course adopted from the library never needed, and the one an
+   * imported course always did: making a complete curriculum teachable one row
+   * at a time is several hundred requests, which is how courses end up
+   * published and empty. Returns the tree, like every other builder write.
+   */
+  setContentVisibility: oc
+    .input(setCourseContentVisibilitySchema)
+    .output(courseTreeSchema),
   getTree: oc.input(courseIdInputSchema).output(courseTreeSchema),
   createModule: oc
     .input(createCourseModuleSchema)

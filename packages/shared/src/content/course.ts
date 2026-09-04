@@ -32,6 +32,16 @@ export const courseContentCountsSchema = z.object({
   modules: z.number().int().nonnegative(),
   lectures: z.number().int().nonnegative(),
   exercises: z.number().int().nonnegative(),
+  /**
+   * Problems a student could actually reach, were the course visible.
+   *
+   * A problem counts only when it, its lecture and its module are all visible,
+   * which is the same ancestor chain `effectivelyVisibleMaterialWhere` walks on
+   * the server. `exercises` counts every problem regardless — a course can hold
+   * a hundred and deliver none, and the two numbers side by side are what makes
+   * that legible instead of baffling.
+   */
+  visibleExercises: z.number().int().nonnegative(),
 });
 export type CourseContentCounts = z.infer<typeof courseContentCountsSchema>;
 
@@ -143,6 +153,33 @@ export const setCourseVisibilitySchema = z.object({
   courseId: z.uuid(),
   isVisible: z.boolean(),
 });
+
+/**
+ * Every module, lecture and problem under one course, in one write.
+ *
+ * The course's own visibility is deliberately not part of this: publishing a
+ * course and stocking it are two decisions, and collapsing them would take away
+ * the only way to prepare a course before students can reach it.
+ */
+export const setCourseContentVisibilitySchema = z.object({
+  academyId: z.uuid(),
+  courseId: z.uuid(),
+  isVisible: z.boolean(),
+});
+
+/**
+ * A course students cannot learn anything from, that nobody has been told about.
+ *
+ * True only for a *published* course with nothing visible inside it. A hidden
+ * course with hidden content is an ordinary draft, and warning about those would
+ * teach people to ignore the warning that matters.
+ */
+export function courseHasNoVisibleContent(course: {
+  isVisible: boolean;
+  content: { visibleExercises: number };
+}): boolean {
+  return course.isVisible && course.content.visibleExercises === 0;
+}
 
 export const courseIdInputSchema = z.object({
   academyId: z.uuid(),

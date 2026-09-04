@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  courseHasNoVisibleContent,
   createCourseSchema,
   createProgrammingExerciseSchema,
   programmingExerciseDescriptionMaxLength,
@@ -133,5 +134,34 @@ describe("manual programming exercise schemas", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+/**
+ * The one predicate three surfaces read — the builder strip, the courses table
+ * chip and the class panel note. If they ever disagreed about what "not
+ * teachable" means, the warning would appear in one place and not another,
+ * which is worse than no warning at all.
+ */
+describe("courseHasNoVisibleContent", () => {
+  const course = (isVisible: boolean, visibleExercises: number) => ({
+    isVisible,
+    content: { visibleExercises },
+  });
+
+  it("stays quiet about a hidden course with hidden content", () => {
+    expect(courseHasNoVisibleContent(course(false, 0))).toBe(false);
+  });
+
+  it("warns about a published course that can deliver nothing", () => {
+    expect(courseHasNoVisibleContent(course(true, 0))).toBe(true);
+  });
+
+  it("stops warning once one problem is reachable", () => {
+    expect(courseHasNoVisibleContent(course(true, 1))).toBe(false);
+  });
+
+  it("stays quiet about a hidden course that is fully stocked", () => {
+    expect(courseHasNoVisibleContent(course(false, 12))).toBe(false);
   });
 });

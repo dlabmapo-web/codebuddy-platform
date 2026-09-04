@@ -41,12 +41,26 @@ const sourceCourseInclude = {
   },
 } as const;
 
+/**
+ * The counts a course row prints, including the one that says whether it can
+ * teach anything.
+ *
+ * Flags rather than `_count`: Prisma cannot alias two counts of the same
+ * relation, and the row needs both *how many problems this course holds* and
+ * *how many a student could reach*. One boolean per material is what buys the
+ * second number without a second query.
+ */
 const courseSummaryInclude = {
   modules: {
     select: {
       id: true,
+      isVisible: true,
       lectures: {
-        select: { id: true, _count: { select: { materials: true } } },
+        select: {
+          id: true,
+          isVisible: true,
+          materials: { select: { isVisible: true } },
+        },
       },
     },
   },
@@ -255,13 +269,74 @@ export class CourseService {
         before: { isVisible: current.isVisible },
         after: { isVisible: updated.isVisible },
       });
-      // §9.2 — the course's content moved, so any import preview taken
-      // against the old revision is now stale and will be refused.
-      await bumpContentRevision(tx, input.courseId);
+      // Deliberately no `bumpContentRevision`. Publishing changes who may read
+      // the course, never what it says, and `contentRevision` answers the
+      // second question for two callers that must not hear the first: the
+      // import session's staleness check, and the library's "customized" axis.
+      // Bumping here made every adopted course read as customized the moment
+      // its Team Lead published it, before anyone had edited a word.
       return updated;
     });
     if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return toCourseSummary(course);
+  }
+
+  /**
+   * Show or hide every module, lecture and problem under one course.
+   *
+   * The action the per-row toggles could not be: a course arriving complete —
+   * copied from the library, or filled by the workbook importer — is several
+   * hundred rows, and making it teachable one request at a time is why courses
+   * end up published and empty.
+   *
+   * Three `updateMany` writes rather than a walk, because the course is the
+   * scope and every row under it is going to the same value. The course's own
+   * visibility is untouched: publishing and stocking are two decisions, and
+   * merging them would remove the only way to prepare a course out of sight.
+   */
+  async setContentVisibility(
+    identity: SupabaseIdentity,
+    input: { academyId: string; courseId: string; isVisible: boolean },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    const course = await this.requireCourse(input.academyId, input.courseId);
+    await this.prisma.$transaction(async (tx) => {
+      const modules = await tx.courseModule.updateMany({
+        where: { courseId: course.id },
+        data: { isVisible: input.isVisible },
+      });
+      const lectures = await tx.lecture.updateMany({
+        where: { courseModule: { courseId: course.id } },
+        data: { isVisible: input.isVisible },
+      });
+      const materials = await tx.material.updateMany({
+        where: { lecture: { courseModule: { courseId: course.id } } },
+        data: { isVisible: input.isVisible },
+      });
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.course.content_visibility_changed",
+        targetType: "Course",
+        targetId: course.id,
+        requestId: context.requestId,
+        // The counts, not merely the fact: the log has to say how much of the
+        // curriculum moved, or an operator reading it later cannot tell a
+        // published course from a published typo.
+        after: {
+          isVisible: input.isVisible,
+          modules: modules.count,
+          lectures: lectures.count,
+          materials: materials.count,
+        },
+      });
+      // No revision bump, for the reason `setVisibility` records.
+    });
+    // Hiding can pull content out from under a lesson in progress, exactly as
+    // a single-row hide can.
+    if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
+    return this.currentTree(input);
   }
 
   async getTree(
@@ -357,7 +432,12 @@ export class CourseService {
         before: moduleAudit(current),
         after: moduleAudit(updated),
       });
-      await bumpContentRevision(tx, input.courseId);
+      // Title and description are content; visibility is delivery. A call
+      // carrying only `isVisible` leaves the revision where it was, so a
+      // library copy is not reported as customized for being switched on.
+      if (input.title !== undefined || input.description !== undefined) {
+        await bumpContentRevision(tx, input.courseId);
+      }
     });
     if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -586,7 +666,12 @@ export class CourseService {
         before: lectureAudit(current),
         after: lectureAudit(updated),
       });
-      await bumpContentRevision(tx, input.courseId);
+      // Title and description are content; visibility is delivery. A call
+      // carrying only `isVisible` leaves the revision where it was, so a
+      // library copy is not reported as customized for being switched on.
+      if (input.title !== undefined || input.description !== undefined) {
+        await bumpContentRevision(tx, input.courseId);
+      }
     });
     if (input.isVisible === false) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -880,9 +965,7 @@ export class CourseService {
         before: { isVisible: current.isVisible },
         after: { isVisible: input.isVisible },
       });
-      // §9.2 — the course's content moved, so any import preview taken
-      // against the old revision is now stale and will be refused.
-      await bumpContentRevision(tx, input.courseId);
+      // No revision bump: showing or hiding a problem is delivery, not content.
     });
     if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
@@ -1276,19 +1359,37 @@ export function toCourseSummary(course: {
     contentRevision: number;
     retiredAt: Date | null;
   } | null;
+  /**
+   * Flags, not counts, all the way down.
+   *
+   * A caller that selected `_count` could produce `exercises` but never
+   * `visibleExercises`, and would have to report zero — which reads as "this
+   * course teaches nothing" on three surfaces. Requiring the flags here turns
+   * that into a compile error at the include instead of a wrong badge in
+   * production.
+   */
   modules: Array<{
+    isVisible: boolean;
     lectures: Array<{
-      _count?: { materials: number };
-      materials?: unknown[];
+      isVisible: boolean;
+      materials: Array<{ isVisible: boolean }>;
     }>;
   }>;
 }) {
   let lectures = 0;
   let exercises = 0;
+  let visibleExercises = 0;
   for (const courseModule of course.modules) {
     lectures += courseModule.lectures.length;
     for (const lecture of courseModule.lectures) {
-      exercises += lecture._count?.materials ?? lecture.materials?.length ?? 0;
+      exercises += lecture.materials.length;
+      // The same ancestor chain `effectivelyVisibleMaterialWhere` walks on the
+      // student's side, so the number a Manager reads and the number a student
+      // can reach are the one number.
+      if (!courseModule.isVisible || !lecture.isVisible) continue;
+      for (const material of lecture.materials) {
+        if (material.isVisible) visibleExercises += 1;
+      }
     }
   }
   return {
@@ -1297,7 +1398,12 @@ export function toCourseSummary(course: {
     title: course.title,
     description: course.description,
     isVisible: course.isVisible,
-    content: { modules: course.modules.length, lectures, exercises },
+    content: {
+      modules: course.modules.length,
+      lectures,
+      exercises,
+      visibleExercises,
+    },
     provenance: courseProvenance(course),
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),

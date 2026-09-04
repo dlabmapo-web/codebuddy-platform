@@ -304,6 +304,7 @@ export const curriculumAuditActions = [
   "content.course.created",
   "content.course.updated",
   "content.course.visibility_changed",
+  "content.course.content_visibility_changed",
   "content.course.deleted",
   "content.course_module.created",
   "content.course_module.updated",

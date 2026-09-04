@@ -32,6 +32,16 @@ export const courseContentCountsSchema = z.object({
   modules: z.number().int().nonnegative(),
   lectures: z.number().int().nonnegative(),
   exercises: z.number().int().nonnegative(),
+  /**
+   * Problems a student could actually reach, were the course visible.
+   *
+   * A problem counts only when it, its lecture and its module are all visible,
+   * which is the same ancestor chain `effectivelyVisibleMaterialWhere` walks on
+   * the server. `exercises` counts every problem regardless — a course can hold
+   * a hundred and deliver none, and the two numbers side by side are what makes
+   * that legible instead of baffling.
+   */
+  visibleExercises: z.number().int().nonnegative(),
 });
 export type CourseContentCounts = z.infer<typeof courseContentCountsSchema>;
 
@@ -144,6 +154,33 @@ export const setCourseVisibilitySchema = z.object({
   isVisible: z.boolean(),
 });
 
+/**
+ * Every module, lecture and problem under one course, in one write.
+ *
+ * The course's own visibility is deliberately not part of this: publishing a
+ * course and stocking it are two decisions, and collapsing them would take away
+ * the only way to prepare a course before students can reach it.
+ */
+export const setCourseContentVisibilitySchema = z.object({
+  academyId: z.uuid(),
+  courseId: z.uuid(),
+  isVisible: z.boolean(),
+});
+
+/**
+ * A course students cannot learn anything from, that nobody has been told about.
+ *
+ * True only for a *published* course with nothing visible inside it. A hidden
+ * course with hidden content is an ordinary draft, and warning about those would
+ * teach people to ignore the warning that matters.
+ */
+export function courseHasNoVisibleContent(course: {
+  isVisible: boolean;
+  content: { visibleExercises: number };
+}): boolean {
+  return course.isVisible && course.content.visibleExercises === 0;
+}
+
 export const courseIdInputSchema = z.object({
   academyId: z.uuid(),
   courseId: z.uuid(),
@@ -220,14 +257,27 @@ export const exerciseDraftFieldsSchema = z.object({
     }),
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
-  testCases: z.array(exerciseTestCaseDraftSchema).min(1).max(50),
+  /**
+   * Optional. A problem with no answers yet is an ordinary half-written
+   * problem, and the product already knows what to do with one: a student can
+   * never submit to it (`SubmissionService` refuses with
+   * `EXERCISE_NOT_AVAILABLE` inside the transaction that owns the grading
+   * snapshot) and the console counts it as `problemsWithoutTests` on the
+   * library, the content table and an academy's vitals. Refusing to *save* one
+   * only meant an author had to invent an answer before they could write down
+   * the question.
+   */
+  testCases: z.array(exerciseTestCaseDraftSchema).max(50),
   hints: z.array(exerciseHintDraftSchema),
 });
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
 
 /**
- * Students need at least one worked example, so a saveable exercise always
- * keeps one SAMPLE case. Authors choose which cases those are per case.
+ * Whether a student would be shown a worked example.
+ *
+ * No longer a condition of saving — a problem may be written before it can be
+ * graded — but still what the authoring form reports, so an author can see at a
+ * glance that this problem cannot yet be attempted.
  */
 export function hasSampleTestCase(
   testCases: Array<{ visibility: TestCaseVisibility; expectedOutput: string }>,
@@ -239,19 +289,13 @@ export function hasSampleTestCase(
   );
 }
 
-const sampleTestCaseRefinement = {
-  error: "At least one visible sample test case is required.",
-  path: ["testCases"],
-};
-
 export const exerciseParentInputSchema = courseIdInputSchema.extend({
   lectureId: z.uuid(),
 });
 
 export const createProgrammingExerciseSchema = exerciseParentInputSchema
   .extend(exerciseDraftFieldsSchema.shape)
-  .strict()
-  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
+  .strict();
 
 export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
   materialId: z.uuid(),
@@ -275,8 +319,7 @@ export const updateProgrammingExerciseSchema = exerciseMaterialInputSchema
     ...exerciseDraftFieldsSchema.shape,
     expectedUpdatedAt: z.iso.datetime(),
   })
-  .strict()
-  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
+  .strict();
 
 export const deleteProgrammingExerciseSchema = exerciseMaterialInputSchema;
 

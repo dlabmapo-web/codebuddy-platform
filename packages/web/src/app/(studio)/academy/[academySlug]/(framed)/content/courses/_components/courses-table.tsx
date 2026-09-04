@@ -1,8 +1,9 @@
 'use client';
 
-import type { CourseSummary } from '@cove/shared';
+import { courseHasNoVisibleContent, type CourseSummary } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
+  AlertTriangle,
   ArrowRight,
   Eye,
   EyeOff,
@@ -53,6 +54,27 @@ function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
         }`}
       />
       {isVisible ? t('visible') : t('hidden')}
+    </span>
+  );
+}
+
+/**
+ * A published course that can deliver nothing.
+ *
+ * Students never see such a course at all — one with no visible problems is
+ * dropped from their catalogue and from every class it is assigned to, rather
+ * than shown empty — so this row is the only place the mistake is visible to
+ * somebody who can fix it.
+ */
+function NoContentChip() {
+  const { t } = useLayoutTranslation('courses');
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 text-[12.5px] font-bold text-warning"
+      title={t('no_visible_content_hint')}
+    >
+      <AlertTriangle className="size-3" />
+      {t('no_visible_content')}
     </span>
   );
 }
@@ -124,7 +146,10 @@ export function CoursesTable({
         header: t('column.visibility'),
         filterFn: 'arrIncludesSome',
         cell: ({ row }) => (
-          <VisibilityIndicator isVisible={row.original.isVisible} />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <VisibilityIndicator isVisible={row.original.isVisible} />
+            {courseHasNoVisibleContent(row.original) ? <NoContentChip /> : null}
+          </div>
         ),
       },
       {

@@ -259,7 +259,13 @@ describe("LearnClassService list", () => {
     expect(classes[0]!.availableCourseCount).toBe(0);
   });
 
-  it("excludes an assigned course whose curriculum holds no visible exercise", async () => {
+  /**
+   * Counted, not hidden. A course whose curriculum is entirely hidden is the
+   * academy's mistake to fix, and a student who was told they have it must be
+   * able to find it — reading "no problems yet" rather than finding nothing and
+   * no explanation anywhere.
+   */
+  it("counts an assigned course whose curriculum holds no visible exercise", async () => {
     const { service } = createService({
       classes: [
         studentClass({
@@ -273,7 +279,7 @@ describe("LearnClassService list", () => {
 
     const { classes } = await service.listClasses(identity, academyId);
 
-    expect(classes[0]!.availableCourseCount).toBe(1);
+    expect(classes[0]!.availableCourseCount).toBe(2);
   });
 
   it("refuses a staff member previewing the curriculum", async () => {
@@ -409,7 +415,7 @@ describe("LearnClassService detail", () => {
     expect(detail.teacher).toBeNull();
   });
 
-  it("omits an empty course from both the cards and the count", async () => {
+  it("lists an empty course with zero counts rather than dropping it", async () => {
     const { service } = createService({
       detail: studentClass({
         courseAssignments: [
@@ -421,8 +427,18 @@ describe("LearnClassService detail", () => {
 
     const detail = await service.getClass(identity, { academyId, classId });
 
-    expect(detail.courses.map((course) => course.courseId)).toEqual([courseId]);
+    expect(detail.courses.map((course) => course.courseId)).toEqual([
+      courseId,
+      "40000000-0000-4000-8000-000000000009",
+    ]);
     expect(detail.availableCourseCount).toBe(detail.courses.length);
+    // Zero is what the card reads as "not ready yet", and what the outline
+    // behind it already explains.
+    expect(detail.courses[1]!.counts).toMatchObject({
+      modules: 0,
+      lectures: 0,
+      exercises: 0,
+    });
   });
 
   it("stays useful when the class has no available courses", async () => {

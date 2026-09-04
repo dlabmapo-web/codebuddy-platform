@@ -9,6 +9,8 @@ import { useCallback, useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
 
+import { academyCoursesQueryKey } from '../_lib/courses-query';
+
 export function useCoursesManager({
   academyId,
   initialCourses,
@@ -23,7 +25,7 @@ export function useCoursesManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const queryKey = ['academy', academyId, 'courses'];
+  const queryKey = academyCoursesQueryKey(academyId);
 
   const coursesQuery = useQuery({
     queryKey,

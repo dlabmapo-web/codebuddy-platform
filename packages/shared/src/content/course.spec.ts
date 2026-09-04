@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  courseHasNoVisibleContent,
   createCourseSchema,
+  hasSampleTestCase,
   createProgrammingExerciseSchema,
   programmingExerciseDescriptionMaxLength,
   programmingExerciseSchema,
@@ -100,7 +102,24 @@ describe("manual programming exercise schemas", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects an exercise whose cases are all hidden from students", () => {
+  /**
+   * Answers are what make a problem *gradeable*, not what make it *writable*.
+   * Requiring one to save meant an author with the question but not yet the
+   * answer could not put the question down at all. The half-written state is
+   * already a first-class one everywhere else: a submission to such a problem
+   * is refused with `EXERCISE_NOT_AVAILABLE`, and the console counts them as
+   * `problemsWithoutTests`.
+   */
+  it("accepts an exercise with no answers yet", () => {
+    const result = createProgrammingExerciseSchema.safeParse({
+      ...validExercise,
+      testCases: [],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an exercise whose cases are all hidden from students", () => {
     const result = createProgrammingExerciseSchema.safeParse({
       ...validExercise,
       testCases: [
@@ -108,18 +127,27 @@ describe("manual programming exercise schemas", () => {
       ],
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it("rejects a sample case with no expected output to show", () => {
-    const result = createProgrammingExerciseSchema.safeParse({
-      ...validExercise,
-      testCases: [
-        { input: "1 2", expectedOutput: "  ", visibility: "SAMPLE" as const },
-      ],
-    });
-
-    expect(result.success).toBe(false);
+  /** Still reported to the author — it is just no longer a refusal. */
+  it("reports whether a student would be shown a worked example", () => {
+    expect(
+      hasSampleTestCase([
+        { expectedOutput: "3", visibility: "SAMPLE" as const },
+      ]),
+    ).toBe(true);
+    expect(
+      hasSampleTestCase([
+        { expectedOutput: "  ", visibility: "SAMPLE" as const },
+      ]),
+    ).toBe(false);
+    expect(
+      hasSampleTestCase([
+        { expectedOutput: "3", visibility: "HIDDEN" as const },
+      ]),
+    ).toBe(false);
+    expect(hasSampleTestCase([])).toBe(false);
   });
 
   it("rejects more than fifty test cases", () => {
@@ -133,5 +161,34 @@ describe("manual programming exercise schemas", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+/**
+ * The one predicate three surfaces read — the builder strip, the courses table
+ * chip and the class panel note. If they ever disagreed about what "not
+ * teachable" means, the warning would appear in one place and not another,
+ * which is worse than no warning at all.
+ */
+describe("courseHasNoVisibleContent", () => {
+  const course = (isVisible: boolean, visibleExercises: number) => ({
+    isVisible,
+    content: { visibleExercises },
+  });
+
+  it("stays quiet about a hidden course with hidden content", () => {
+    expect(courseHasNoVisibleContent(course(false, 0))).toBe(false);
+  });
+
+  it("warns about a published course that can deliver nothing", () => {
+    expect(courseHasNoVisibleContent(course(true, 0))).toBe(true);
+  });
+
+  it("stops warning once one problem is reachable", () => {
+    expect(courseHasNoVisibleContent(course(true, 1))).toBe(false);
+  });
+
+  it("stays quiet about a hidden course that is fully stocked", () => {
+    expect(courseHasNoVisibleContent(course(false, 12))).toBe(false);
   });
 });

@@ -20,7 +20,8 @@
     "start": "시작하기",
     "resume": "이어서 풀기",
     "complete": "완료",
-    "solved_of": "{{total}}문제 중 {{solved}}문제 해결"
+    "solved_of": "{{total}}문제 중 {{solved}}문제 해결",
+    "not_ready": "준비 중"
   },
   "classes": {
     "title": "내 반",
@@ -55,8 +56,8 @@
     "search_placeholder": "문제 검색",
     "search_clear": "검색어 지우기",
     "no_results": "검색 결과가 없습니다.",
-    "empty_title": "아직 문제가 없습니다",
-    "empty_body": "공개된 버전에 표시할 문제가 없습니다.",
+    "empty_title": "아직 열 수 있는 내용이 없습니다",
+    "empty_body": "강의와 문제가 아직 비공개입니다. 선생님께 문의해 주세요.",
     "module_label": "모듈 {{position}}",
     "lecture_label": "강의 {{position}}",
     "lecture_empty": "이 강의에는 아직 문제가 없습니다.",

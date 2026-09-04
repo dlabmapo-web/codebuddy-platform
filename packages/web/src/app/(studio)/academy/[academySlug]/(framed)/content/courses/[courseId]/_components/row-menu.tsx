@@ -38,7 +38,13 @@ export function RowMenu({
    */
   onMove?: () => void;
   onRename: () => void;
-  onToggleVisible: (next: boolean) => void;
+  /**
+   * Absent on the library surface, where the flag is inert: a `LIBRARY` academy
+   * has no students for a row to be hidden from, and `adopt` lands every copied
+   * row visible regardless. Offering the control there would let head office
+   * believe they had excluded a module from every future copy.
+   */
+  onToggleVisible?: (next: boolean) => void;
   /** `strong` marks the group-level menu so it reads apart from child rows. */
   tone?: 'default' | 'strong';
 }) {
@@ -75,14 +81,16 @@ export function RowMenu({
             {t('row.move')}
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem onSelect={() => onToggleVisible(!isVisible)}>
-          {isVisible ? (
-            <EyeOff className="text-sub" />
-          ) : (
-            <Eye className="text-sub" />
-          )}
-          {isVisible ? t('row.hide') : t('row.show')}
-        </DropdownMenuItem>
+        {onToggleVisible ? (
+          <DropdownMenuItem onSelect={() => onToggleVisible(!isVisible)}>
+            {isVisible ? (
+              <EyeOff className="text-sub" />
+            ) : (
+              <Eye className="text-sub" />
+            )}
+            {isVisible ? t('row.hide') : t('row.show')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-danger focus:bg-danger/10 focus:text-danger"

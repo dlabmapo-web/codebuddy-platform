@@ -2,6 +2,7 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 
+import { useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useLayoutTranslation } from '@/i18n';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -24,6 +25,11 @@ export function ModuleCard({
   exercisePath: (lectureId: string, materialId: string) => string;
 }) {
   const { t } = useLayoutTranslation(['content', 'common']);
+  // A `LIBRARY` academy has no students, so nothing in it is hidden *from*
+  // anyone, and `adopt` lands every copied row visible whatever these flags
+  // say. Showing the control there would promise head office an exclusion it
+  // would not get.
+  const visibilityIsReal = useContentSurface() !== 'library';
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -86,10 +92,12 @@ export function ModuleCard({
             ) : null}
           </p>
         </div>
-        <VisibilityIndicator
-          effectivelyVisible={effectivelyVisible}
-          isVisible={courseModule.isVisible}
-        />
+        {visibilityIsReal ? (
+          <VisibilityIndicator
+            effectivelyVisible={effectivelyVisible}
+            isVisible={courseModule.isVisible}
+          />
+        ) : null}
         {builder.editable ? (
           <RowMenu
             isVisible={courseModule.isVisible}
@@ -98,13 +106,17 @@ export function ModuleCard({
             onDelete={() => setDeleting(true)}
             onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
             onRename={() => setRenaming(true)}
-            onToggleVisible={(next) => {
-              if (!next) {
-                setHiding(true);
-                return;
-              }
-              builder.setModuleVisible(courseModule.id, next);
-            }}
+            onToggleVisible={
+              visibilityIsReal
+                ? (next) => {
+                    if (!next) {
+                      setHiding(true);
+                      return;
+                    }
+                    builder.setModuleVisible(courseModule.id, next);
+                  }
+                : undefined
+            }
             tone="strong"
           />
         ) : null}

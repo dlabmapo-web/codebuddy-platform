@@ -67,11 +67,6 @@ export function AnswersEditor({
       <div className="space-y-3">
         {testCases.map((testCase, index) => {
           const isSample = testCase.visibility === 'SAMPLE';
-          // Guard the last visible sample so the exercise stays saveable.
-          const isOnlySample =
-            isSample &&
-            testCases.filter((item) => item.visibility === 'SAMPLE').length ===
-              1;
           return (
           <article
             className={`rounded-xl border p-4 ${
@@ -93,11 +88,9 @@ export function AnswersEditor({
                       ? 'bg-brand-soft text-brand'
                       : 'bg-retired-soft text-retired'
                   } ${
-                    editable && !isOnlySample
-                      ? 'cursor-pointer hover:opacity-80'
-                      : 'cursor-default'
+                    editable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
                   }`}
-                  disabled={!editable || isOnlySample}
+                  disabled={!editable}
                   onClick={() =>
                     update(
                       replaceAt(testCases, index, {
@@ -106,11 +99,7 @@ export function AnswersEditor({
                       }),
                     )
                   }
-                  title={
-                    isOnlySample
-                      ? t('exercise.test.last_sample_locked')
-                      : t('exercise.test.toggle_visibility')
-                  }
+                  title={t('exercise.test.toggle_visibility')}
                   type="button"
                 >
                   {isSample ? (
@@ -123,7 +112,7 @@ export function AnswersEditor({
                     : t('exercise.test.hidden_badge')}
                 </button>
               </div>
-              {editable && testCases.length > 1 && !isOnlySample ? (
+              {editable ? (
                 <button
                   aria-label={t('exercise.test.remove', {
                     number: index + 1,

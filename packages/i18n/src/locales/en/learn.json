@@ -23,7 +23,8 @@
     "start": "Start",
     "resume": "Resume",
     "complete": "Complete",
-    "solved_of": "{{solved}} of {{total}} solved"
+    "solved_of": "{{solved}} of {{total}} solved",
+    "not_ready": "Not ready yet"
   },
   "classes": {
     "title": "My classes",
@@ -62,8 +63,8 @@
     "search_placeholder": "Search problems",
     "search_clear": "Clear search",
     "no_results": "No problem matches that search.",
-    "empty_title": "This course has no problems yet",
-    "empty_body": "The published version contains no visible problems.",
+    "empty_title": "Nothing to open in this course yet",
+    "empty_body": "Your academy has this course open, but its lectures and problems are still hidden. Ask your teacher when they will be available.",
     "module_label": "Module {{position}}",
     "lecture_label": "Lecture {{position}}",
     "lecture_empty": "No problems in this lecture yet.",

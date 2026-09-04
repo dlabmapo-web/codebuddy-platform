@@ -50,5 +50,7 @@
     "module": "Module",
     "lecture": "Lecture",
     "problem": "Problem"
-  }
+  },
+  "no_visible_content": "Nothing visible",
+  "no_visible_content_hint": "This course is visible, but no problems inside it are. Students do not see it at all."
 }

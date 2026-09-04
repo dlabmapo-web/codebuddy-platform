@@ -19,21 +19,21 @@ const master = {
       title: 'Variables',
       description: 'names and values',
       position: 1,
-      isVisible: true,
+      isVisible: false,
       lectures: [
         {
           externalKey: 'l1',
           title: 'Assignment',
           description: '',
           position: 1,
-          isVisible: true,
+          isVisible: false,
           materials: [
             {
               type: 'PROGRAMMING_EXERCISE',
               title: 'Sum 1..N',
               position: 1,
               isRequired: true,
-              isVisible: true,
+              isVisible: false,
               programmingExercise: {
                 externalKey: 'p1',
                 legacyProblemNo: 412,
@@ -217,6 +217,26 @@ describe('AcademyLibraryService.adopt', () => {
     });
     expect(created.programmingExercise[0]).not.toHaveProperty('legacyProblemNo');
     expect(created.programmingExercise[0]).not.toHaveProperty('gradingRevision');
+  });
+
+  /**
+   * The bug this rule exists to prevent: head office never toggles a row in the
+   * library — nothing there is read by a student — so a copy that inherited
+   * those flags arrived complete and able to teach nothing, and its Team Lead
+   * had several hundred toggles between them and a working course.
+   */
+  it('lands the whole tree visible, whatever the master says', async () => {
+    const { service, created } = build();
+
+    await service.adopt(identity, {
+      academyId: branchId,
+      libraryCourseId: masterId,
+      title: 'Python Level 1',
+    });
+
+    expect(created.courseModule[0]).toMatchObject({ isVisible: true });
+    expect(created.lecture[0]).toMatchObject({ isVisible: true });
+    expect(created.material[0]).toMatchObject({ isVisible: true });
   });
 
   it('lands hidden, stamped with the revision it was taken at', async () => {

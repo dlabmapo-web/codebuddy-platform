@@ -54,6 +54,10 @@ export function CourseCard({
       : 0;
   const done = progress.total > 0 && progress.solved === progress.total;
   const underway = !done && (progress.solved > 0 || progress.started > 0);
+  // The course is published but nothing inside it is visible yet. The card is
+  // still here — a student told they have this course should find it — but
+  // "Start →" would be a promise the outline behind it cannot keep.
+  const notReady = counts.exercises === 0;
 
   return (
     <Link
@@ -135,6 +139,10 @@ export function CourseCard({
               solved: progress.solved,
               total: progress.total,
             })}
+          </span>
+        ) : notReady ? (
+          <span className="shrink-0 rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-sub">
+            {t('catalog.not_ready')}
           </span>
         ) : (
           <span className="shrink-0 text-[12.5px] font-bold text-brand transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none">

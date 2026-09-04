@@ -67,10 +67,20 @@ export function useExerciseAuthoring({
   const editable = canEdit;
   const completeness = exerciseCompleteness(draft);
   const completeCount = completeness.filter((item) => item.complete).length;
-  const saveReady = completeCount === completeness.length;
-  const missing = completeness
+  const required = completeness.filter((item) => !item.optional);
+  const saveReady = required.every((item) => item.complete);
+  const missing = required
     .filter((item) => !item.complete)
     .map((item) => item.id);
+  /**
+   * Saveable, but a student could not attempt it.
+   *
+   * Said rather than enforced: the console already counts these across every
+   * academy as `problemsWithoutTests`, and a submission to one is refused, so
+   * the author needs the fact — not a locked button.
+   */
+  const notGradeable = !completeness.find((item) => item.id === 'test')!
+    .complete;
 
   const builderPath = contentPaths.course(target.courseId);
 
@@ -129,7 +139,12 @@ export function useExerciseAuthoring({
     if (!editable) return null;
     const key = field === 'test' ? 'testCases' : field === 'solution' ? 'solutionCode' : field;
     if (!touched.has(key)) return null;
-    return missing.includes(field) ? t(`exercise.error.${field}`) : null;
+    // `missing` no longer includes `test` — answers are optional — so the
+    // comparison is widened here rather than widening `missing` itself, which
+    // the typed translation keys above depend on staying narrow.
+    return (missing as readonly string[]).includes(field)
+      ? t(`exercise.error.${field}`)
+      : null;
   }
 
   function leave() {
@@ -145,6 +160,7 @@ export function useExerciseAuthoring({
     completeness,
     completeCount,
     saveReady,
+    notGradeable,
     missing,
     errorFor,
     isNew: !initialContext.material,

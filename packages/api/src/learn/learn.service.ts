@@ -90,9 +90,7 @@ export class LearnService {
     const statuses = await this.curriculum.statusByMaterial(userId, materialIds);
 
     return {
-      courses: courses.flatMap(
-        (course) => courseSummaryFor(course, statuses) ?? [],
-      ),
+      courses: courses.map((course) => courseSummaryFor(course, statuses)),
     };
   }
 

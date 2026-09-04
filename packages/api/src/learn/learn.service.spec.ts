@@ -244,6 +244,31 @@ describe("LearnService visible curriculum", () => {
     );
   });
 
+  /**
+   * The course a student was told they have, and could not find.
+   *
+   * `visibleCurriculumInclude` filters every hidden level out, so a published
+   * course whose whole tree is hidden arrives here with no modules at all. It
+   * used to be dropped from this list, which meant a student assigned that
+   * course saw no row for it anywhere and had nothing to ask about. It is
+   * listed now, with zero counts, and the outline behind it says why.
+   */
+  it("lists a visible course whose content is all hidden, with zero counts", async () => {
+    const { service } = createService({
+      course: { ...visibleCourse(), modules: [] },
+    });
+
+    const result = await service.listCourses(identity, academyId);
+
+    expect(result.courses).toHaveLength(1);
+    expect(result.courses[0]).toMatchObject({
+      courseId,
+      title: "Python Foundations",
+      counts: { modules: 0, lectures: 0, exercises: 0 },
+      progress: { total: 0, solved: 0 },
+    });
+  });
+
   it("does not expose a hidden course outline", async () => {
     const { service } = createService({ course: null });
 

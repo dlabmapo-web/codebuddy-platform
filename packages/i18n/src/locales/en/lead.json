@@ -99,6 +99,7 @@
       "content.course.created": "created",
       "content.course.updated": "edited",
       "content.course.visibility_changed": "shown or hidden",
+      "content.course.content_visibility_changed": "all content shown or hidden",
       "content.course.deleted": "Deleted a course",
       "content.course_module.created": "module added",
       "content.course_module.updated": "module edited",

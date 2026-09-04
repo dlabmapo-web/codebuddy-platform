@@ -95,7 +95,26 @@ const assistantTeachersDetailSelect = {
 /** The list intentionally avoids loading roster PII just to calculate a count. */
 const classListInclude = {
   courseAssignments: {
-    include: { course: { select: { id: true, title: true, isVisible: true } } },
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          isVisible: true,
+          // The ancestor chain a student walks, so the panel can say that an
+          // assigned, published course still delivers nothing.
+          modules: {
+            where: { isVisible: true },
+            select: {
+              lectures: {
+                where: { isVisible: true },
+                select: { _count: { select: { materials: { where: { isVisible: true } } } } },
+              },
+            },
+          },
+        },
+      },
+    },
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
   assignedTeacher: assignedTeacherSelect,
@@ -105,7 +124,26 @@ const classListInclude = {
 
 const classDetailInclude = {
   courseAssignments: {
-    include: { course: { select: { id: true, title: true, isVisible: true } } },
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          isVisible: true,
+          // The ancestor chain a student walks, so the panel can say that an
+          // assigned, published course still delivers nothing.
+          modules: {
+            where: { isVisible: true },
+            select: {
+              lectures: {
+                where: { isVisible: true },
+                select: { _count: { select: { materials: { where: { isVisible: true } } } } },
+              },
+            },
+          },
+        },
+      },
+    },
     orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
   },
   assignedTeacher: assignedTeacherDetailSelect,
@@ -1225,6 +1263,26 @@ function teacherMemberships<T>(record: {
   ];
 }
 
+/**
+ * Problems in an assigned course a student in the class could actually open.
+ *
+ * The include has already filtered every level, so this is the sum of what
+ * survived rather than a second pass over the flags.
+ */
+function visibleExerciseCount(course: {
+  modules: Array<{ lectures: Array<{ _count: { materials: number } }> }>;
+}): number {
+  return course.modules.reduce(
+    (total, courseModule) =>
+      total +
+      courseModule.lectures.reduce(
+        (inner, lecture) => inner + lecture._count.materials,
+        0,
+      ),
+    0,
+  );
+}
+
 function classSummaryFields(
   record: ClassListRecord | ClassRecord,
   studentCount: number,
@@ -1239,6 +1297,7 @@ function classSummaryFields(
       id: assignment.course.id,
       title: assignment.course.title,
       isVisible: assignment.course.isVisible,
+      visibleExercises: visibleExerciseCount(assignment.course),
     })),
     studentCount,
     assignedTeacher: record.assignedTeacher

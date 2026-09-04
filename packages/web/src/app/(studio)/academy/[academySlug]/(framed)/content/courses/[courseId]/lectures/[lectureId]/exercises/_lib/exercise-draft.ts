@@ -121,18 +121,33 @@ export function draftToPayload(draft: ExerciseDraft) {
   };
 }
 
+/**
+ * What the problem still needs, and which of it actually blocks saving.
+ *
+ * `optional` is the whole distinction: an answer is what makes the problem
+ * *gradeable*, not what makes it *writable*. An author who has the question but
+ * not yet the answer used to be unable to save at all, so the work lived in a
+ * browser tab until they invented a test case. The row is still listed, still
+ * unchecked, and now simply does not hold the button shut.
+ */
 export function exerciseCompleteness(draft: ExerciseDraft) {
   return [
-    { id: 'title', complete: draft.title.trim().length > 0 },
-    { id: 'difficulty', complete: Boolean(draft.difficulty) },
+    { id: 'title', complete: draft.title.trim().length > 0, optional: false },
+    { id: 'difficulty', complete: Boolean(draft.difficulty), optional: false },
     {
       id: 'description',
       complete: richTextToPlainText(draft.description).length > 0,
+      optional: false,
     },
-    { id: 'solution', complete: draft.solutionCode.trim().length > 0 },
+    {
+      id: 'solution',
+      complete: draft.solutionCode.trim().length > 0,
+      optional: false,
+    },
     {
       id: 'test',
       complete: hasSampleTestCase(draft.testCases),
+      optional: true,
     },
   ] as const;
 }

@@ -230,7 +230,14 @@ export class AcademyLibraryService {
         title: courseModule.title,
         description: courseModule.description,
         position: courseModule.position,
-        isVisible: courseModule.isVisible,
+        // Visible, whatever the master says. A hidden row in the library means
+        // "head office has not finished this" — there is no student in a
+        // library academy for it to be hidden *from* — and head office's real
+        // signal for not-ready is the course's DRAFT state, which
+        // `requireAdoptableMaster` refuses outright. Carrying a flag that means
+        // nothing at the source into a place where it means everything is what
+        // handed branches complete courses that could teach nothing.
+        isVisible: true,
       });
 
       for (const lecture of courseModule.lectures) {
@@ -242,7 +249,7 @@ export class AcademyLibraryService {
           title: lecture.title,
           description: lecture.description,
           position: lecture.position,
-          isVisible: lecture.isVisible,
+          isVisible: true,
         });
 
         for (const material of lecture.materials) {
@@ -254,7 +261,7 @@ export class AcademyLibraryService {
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
-            isVisible: material.isVisible,
+            isVisible: true,
           });
 
           const exercise = material.programmingExercise;
@@ -306,8 +313,10 @@ export class AcademyLibraryService {
           academyId: input.academyId,
           title,
           description: source.description,
-          // A copy nobody has reviewed must not be teachable. The branch
-          // publishes it deliberately, from the editor it is already in.
+          // The one gate, and the only one the branch needs: while this is
+          // false no descendant flag can reach a student, whatever it says. The
+          // branch publishes deliberately, from the editor it is already in,
+          // and that single switch is now the whole of the decision.
           isVisible: false,
           contentRevision: 1,
           baselineRevision: 1,
@@ -405,7 +414,14 @@ const summaryInclude = {
   modules: {
     select: {
       id: true,
-      lectures: { select: { id: true, _count: { select: { materials: true } } } },
+      isVisible: true,
+      lectures: {
+        select: {
+          id: true,
+          isVisible: true,
+          materials: { select: { isVisible: true } },
+        },
+      },
     },
   },
   sourceCourse: {

@@ -107,7 +107,24 @@ test.describe('the content library', () => {
     // module head office wrote.
     await expect(page.getByText('Variables and input')).toBeVisible();
 
-    await page.goto(routes.academyCourses(ACADEMY_SLUG));
+    // The copy arrives ready to teach. Head office never switched a row on in
+    // the library — nothing there is read by a student — and if the copy had
+    // inherited those flags, the Team Lead would be looking at a complete
+    // course that can deliver nothing, with no warning and several hundred
+    // toggles between them and a working one.
+    const copiedModule = page
+      .getByRole('article')
+      .filter({ hasText: 'Variables and input' });
+    await expect(copiedModule.getByText('Visible').first()).toBeVisible();
+    await expect(copiedModule.getByText('Hidden')).toHaveCount(0);
+
+    // Back the way a Team Lead actually goes — the builder's own "All courses"
+    // link, not a fresh page load. One query client spans both routes, and the
+    // courses table served its pre-adopt cache here until the copy invalidated
+    // it: the course was missing until the page was reloaded by hand.
+    await page.getByRole('link', { name: 'All courses' }).click();
+    await expect(page).toHaveURL(routes.academyCourses(ACADEMY_SLUG));
+
     const row = page.getByRole('row').filter({ hasText: copyTitle });
     await expect(row).toBeVisible();
     await expect(row.getByText('Hidden')).toBeVisible();
@@ -115,6 +132,16 @@ test.describe('the content library', () => {
     // Untouched, so exactly one chip and no `Customized` beside it.
     await expect(row.getByText('Up to date')).toBeVisible();
     await expect(row.getByText('Customized')).toHaveCount(0);
+
+    // Publishing is the one switch, and it is only that: a course whose
+    // delivery changed has not had its content edited, so the copy must not
+    // start reporting itself as customized for having been switched on.
+    await row.getByRole('button', { name: /Actions|More/i }).first().click();
+    await page.getByRole('menuitem', { name: 'Show' }).click();
+    await expect(row.getByText('Visible')).toBeVisible();
+    await expect(row.getByText('Customized')).toHaveCount(0);
+    // And nothing warns, because the course can actually teach something.
+    await expect(row.getByText('Nothing visible')).toHaveCount(0);
   });
 
   test('the library never appears among the platform’s customers', async ({

@@ -257,14 +257,27 @@ export const exerciseDraftFieldsSchema = z.object({
     }),
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
-  testCases: z.array(exerciseTestCaseDraftSchema).min(1).max(50),
+  /**
+   * Optional. A problem with no answers yet is an ordinary half-written
+   * problem, and the product already knows what to do with one: a student can
+   * never submit to it (`SubmissionService` refuses with
+   * `EXERCISE_NOT_AVAILABLE` inside the transaction that owns the grading
+   * snapshot) and the console counts it as `problemsWithoutTests` on the
+   * library, the content table and an academy's vitals. Refusing to *save* one
+   * only meant an author had to invent an answer before they could write down
+   * the question.
+   */
+  testCases: z.array(exerciseTestCaseDraftSchema).max(50),
   hints: z.array(exerciseHintDraftSchema),
 });
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
 
 /**
- * Students need at least one worked example, so a saveable exercise always
- * keeps one SAMPLE case. Authors choose which cases those are per case.
+ * Whether a student would be shown a worked example.
+ *
+ * No longer a condition of saving — a problem may be written before it can be
+ * graded — but still what the authoring form reports, so an author can see at a
+ * glance that this problem cannot yet be attempted.
  */
 export function hasSampleTestCase(
   testCases: Array<{ visibility: TestCaseVisibility; expectedOutput: string }>,
@@ -276,19 +289,13 @@ export function hasSampleTestCase(
   );
 }
 
-const sampleTestCaseRefinement = {
-  error: "At least one visible sample test case is required.",
-  path: ["testCases"],
-};
-
 export const exerciseParentInputSchema = courseIdInputSchema.extend({
   lectureId: z.uuid(),
 });
 
 export const createProgrammingExerciseSchema = exerciseParentInputSchema
   .extend(exerciseDraftFieldsSchema.shape)
-  .strict()
-  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
+  .strict();
 
 export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
   materialId: z.uuid(),
@@ -312,8 +319,7 @@ export const updateProgrammingExerciseSchema = exerciseMaterialInputSchema
     ...exerciseDraftFieldsSchema.shape,
     expectedUpdatedAt: z.iso.datetime(),
   })
-  .strict()
-  .refine((input) => hasSampleTestCase(input.testCases), sampleTestCaseRefinement);
+  .strict();
 
 export const deleteProgrammingExerciseSchema = exerciseMaterialInputSchema;
 

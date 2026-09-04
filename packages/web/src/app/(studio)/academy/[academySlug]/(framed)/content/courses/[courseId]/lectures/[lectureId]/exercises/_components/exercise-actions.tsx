@@ -1,4 +1,4 @@
-import { Eye, Save } from 'lucide-react';
+import { AlertTriangle, Eye, Save } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -22,6 +22,7 @@ export function ExerciseActions({
     isNew,
     leave,
     missing,
+    notGradeable,
     openPreview,
     save,
     saveError,
@@ -46,6 +47,15 @@ export function ExerciseActions({
               .map((field) => t(`exercise.required.${field}`))
               .join(', '),
           })}
+        </p>
+      ) : null}
+
+      {/* Saveable without answers, but say what that costs. The problem can be
+          written now and graded later; until then no student can attempt it. */}
+      {editable && !blocked && notGradeable ? (
+        <p className="mb-4 flex items-start gap-2 text-[14px] leading-6 text-sub">
+          <AlertTriangle className="mt-1 size-4 shrink-0 text-warning" />
+          {t('exercise.no_tests_note')}
         </p>
       ) : null}
 

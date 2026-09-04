@@ -91,9 +91,12 @@ export async function seedLibraryFixture(prisma: PrismaClient) {
       externalKey: "library-m1",
       title: libraryFixture.moduleTitle,
       position: 1,
-      isVisible: true,
+      // Hidden, as head office actually leaves it: a `LIBRARY` academy has no
+      // students, so nobody there ever switches a row on. `adopt` lands the
+      // copy visible regardless, and this fixture is what proves it.
+      isVisible: false,
     },
-    update: { title: libraryFixture.moduleTitle },
+    update: { title: libraryFixture.moduleTitle, isVisible: false },
   });
 
   await prisma.lecture.upsert({
@@ -104,9 +107,9 @@ export async function seedLibraryFixture(prisma: PrismaClient) {
       externalKey: "library-l1",
       title: libraryFixture.lectureTitle,
       position: 1,
-      isVisible: true,
+      isVisible: false,
     },
-    update: { title: libraryFixture.lectureTitle },
+    update: { title: libraryFixture.lectureTitle, isVisible: false },
   });
 
   await prisma.material.upsert({
@@ -117,9 +120,9 @@ export async function seedLibraryFixture(prisma: PrismaClient) {
       type: "PROGRAMMING_EXERCISE",
       title: libraryFixture.problemTitle,
       position: 1,
-      isVisible: true,
+      isVisible: false,
     },
-    update: { title: libraryFixture.problemTitle },
+    update: { title: libraryFixture.problemTitle, isVisible: false },
   });
 
   // A problem that can actually grade, so an adopted copy is teachable rather

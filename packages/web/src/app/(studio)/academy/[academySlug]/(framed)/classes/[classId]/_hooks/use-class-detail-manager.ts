@@ -11,6 +11,7 @@ import { useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
 
+import { academyCoursesQueryKey } from '../../../content/courses/_lib/courses-query';
 import { currentAssistantIds } from '../_lib/teacher-assignment';
 
 /** What the confirmation dialog is currently asking about. */
@@ -81,7 +82,7 @@ export function useClassDetailManager({
 
   /** Only fetched while a dialog needs it, and only for who may open it. */
   const coursesQuery = useQuery({
-    queryKey: ['academy', academyId, 'courses'],
+    queryKey: academyCoursesQueryKey(academyId),
     queryFn: () => orpc.academyCourses.list({ academyId }),
     enabled: canAssignCourses && assignOpen,
   });

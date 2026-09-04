@@ -10,6 +10,7 @@ import {
   Library,
   Presentation,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,8 @@ import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { courseAccent, courseAccentClasses } from '@/lib/course-accent';
 import { orpc } from '@/lib/orpc';
+
+import { academyCoursesQueryKey } from '../../courses/_lib/courses-query';
 
 /**
  * What head office publishes, and the one button that makes it yours.
@@ -48,6 +51,7 @@ export function LibraryBrowser({
   const { t: courses } = useTranslation('courses');
   const errorText = useErrorText();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const contentPaths = useContentBasePath();
 
   const [available, setAvailable] = React.useState(initialCourses);
@@ -100,6 +104,15 @@ export function LibraryBrowser({
           .available({ academyId })
           .then((result) => result.courses),
       );
+      // The copy is a new course in this academy, and two surfaces cache that
+      // list behind one query client that outlives this navigation: the courses
+      // table and a class's course picker. Without this the Team Lead walks
+      // back from the builder to a table that does not list the course they
+      // just took, and only a full page reload — which builds a new query
+      // client — shows it.
+      await queryClient.invalidateQueries({
+        queryKey: academyCoursesQueryKey(academyId),
+      });
       router.push(contentPaths.course(course.id));
     } catch (caught) {
       setError(caught);

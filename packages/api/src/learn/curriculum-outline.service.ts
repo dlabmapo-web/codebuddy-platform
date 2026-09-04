@@ -157,11 +157,13 @@ export type ProgressByMaterial = Map<
 /**
  * One course as a catalog card, or nothing.
  *
- * `null` means the course is visible but unopenable — every module, lecture,
- * or exercise beneath it is hidden — and a card for it would send a student to
- * an empty outline. Returning the absence rather than a zero-count summary is
- * what lets the caller drop the course from a list and from its own count in
- * the same step.
+ * A course with nothing visible inside it still gets a summary, with zero
+ * counts. It was dropped once, and the silence was worse than the empty course:
+ * a student assigned a published course simply had no row for it anywhere, and
+ * nothing on any surface said why. The outline behind it already renders "this
+ * course has no problems yet" — that state existed and was unreachable. A
+ * zero-count card is a course that is not ready; no card at all is a course
+ * that appears not to exist.
  *
  * The single projection behind both **My Courses** and a class detail page.
  * Two copies would be two ideas of what "12 problems" or "3 started" means,
@@ -171,10 +173,9 @@ export type ProgressByMaterial = Map<
 export function courseSummaryFor(
   course: VisibleCourse,
   statuses: ProgressByMaterial,
-): LearnCourseSummary | null {
+): LearnCourseSummary {
   const modules = nonemptyModules(course);
   const exercises = exerciseMaterialIds({ modules });
-  if (exercises.length === 0) return null;
 
   return {
     courseId: course.id,

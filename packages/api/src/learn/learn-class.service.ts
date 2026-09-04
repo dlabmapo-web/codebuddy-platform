@@ -242,15 +242,17 @@ async function teacherPhotos(
  *
  * One function for the list's count and the detail's cards, so the two cannot
  * drift into counting assignments on one page and openable courses on the
- * other. A visible course whose whole curriculum is hidden produces no summary
- * and is therefore never counted, exactly as **My Courses** drops it.
+ * other. A visible course whose whole curriculum is hidden is listed with zero
+ * counts rather than dropped, exactly as **My Courses** now lists it: a student
+ * assigned a course their academy has published should find it where they were
+ * told it would be, reading "no problems yet" — not find nothing at all.
  */
 function availableCourses(
   record: StudentClass,
   statuses: ProgressByMaterial,
 ): LearnCourseSummary[] {
-  return record.courseAssignments.flatMap(
-    (assignment) => courseSummaryFor(assignment.course, statuses) ?? [],
+  return record.courseAssignments.map((assignment) =>
+    courseSummaryFor(assignment.course, statuses),
   );
 }
 

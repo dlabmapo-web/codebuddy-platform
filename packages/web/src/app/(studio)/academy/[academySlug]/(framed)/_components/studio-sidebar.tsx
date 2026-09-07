@@ -6,6 +6,7 @@ import {
   BookOpen,
   ChevronsUpDown,
   ClipboardList,
+  Coins,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -609,13 +610,19 @@ export function studioNavGroups({
   if (canManageAcademy) {
     // Its own group: the features here decide what every other group shows,
     // so it does not belong filed under People.
-    groups.push({
-      id: 'settings',
-      labelKey: 'group.settings',
-      items: [
-        { href: `${base}/settings`, labelKey: 'link.settings', icon: Settings },
-      ],
-    });
+    const settings: NavLink[] = [
+      { href: `${base}/settings`, labelKey: 'link.settings', icon: Settings },
+    ];
+    // What each kind of work pays. Only where the academy runs points at all —
+    // a page configuring an economy nobody has is worse than no page.
+    if (hasPoints) {
+      settings.push({
+        href: `${base}/settings/points`,
+        labelKey: 'link.point_policy',
+        icon: Coins,
+      });
+    }
+    groups.push({ id: 'settings', labelKey: 'group.settings', items: settings });
   }
 
   return groups;

@@ -167,5 +167,92 @@
     "no_classes": "No classes yet",
     "no_classes_hint": "Create a class and enroll students, and its ranking opens here.",
     "class_label": "Class"
+  },
+  "policy": {
+    "title": "Points and rewards",
+    "description": "What each kind of work is worth in this academy.",
+    "following_defaults": "This academy has not set its own values yet, so it follows the platform defaults shown below.",
+    "group": {
+      "solve": "Solving problems",
+      "finish": "Finishing lessons",
+      "attendance": "Turning up",
+      "learning_time": "Time spent studying",
+      "cap": "The daily limit"
+    },
+    "field": {
+      "solve_easy": "Easy problem solved",
+      "solve_medium": "Medium problem solved",
+      "solve_hard": "Hard problem solved",
+      "lecture": "Lecture completed",
+      "module": "Module completed",
+      "course": "Course completed",
+      "attendance": "Present for class",
+      "attendance_late": "Present, but late",
+      "min_minutes": "Counted minutes to be present",
+      "grace_minutes": "Minutes after the start still on time",
+      "tier_minutes": "Step {{tier}}: minutes studied",
+      "tier_points": "Step {{tier}}: points paid",
+      "cap": "Most one student can earn in one class in one day"
+    },
+    "hint": {
+      "solve": "Paid once per problem, the first time a student solves it. A hard problem should be worth more than an easy one, or the numbers tell a student to avoid hard problems.",
+      "finish": "Paid once, when the last piece is done — every material in a lecture, every lecture in a module, every module in a course.",
+      "attendance": "Paid once a day, per class, and proved by working rather than by opening a tab. A student gets one of these two, never both.",
+      "min_minutes": "Minutes, not points.",
+      "grace_minutes": "Minutes, not points. After this, the day counts as late.",
+      "learning_time": "Counted minutes, in one class, in one day. Each step pays when it is reached, so a student who studies through all three is paid all three.",
+      "cap": "The most one student can earn in one class in one day. Without it the ranking measures how long a student sat there, not what they learned."
+    },
+    "amount": {
+      "solveEasy": "an easy problem",
+      "solveMedium": "a medium problem",
+      "solveHard": "a hard problem",
+      "lectureCompleted": "a lecture",
+      "moduleCompleted": "a module",
+      "courseCompleted": "a course",
+      "attendance": "attendance",
+      "attendanceLate": "a late arrival",
+      "learningTimeTier1Points": "the first time step",
+      "learningTimeTier2Points": "the second time step",
+      "learningTimeTier3Points": "the third time step"
+    },
+    "list_separator": ", ",
+    "capped_warning": "{{names}} pays more than the daily limit of {{cap}}P, so a student receives the limit instead of the full amount.",
+    "forward_only": "Changes apply from now on. Points already earned keep the value they were given.",
+    "preview": {
+      "title": "What students will see",
+      "description": "The panel on the student's own points page, built from the values above."
+    },
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Restore the defaults",
+    "reset_confirm": "The values you set will be discarded and this academy will follow the platform defaults again.",
+    "error": {
+      "SOLVE_ORDER": "A hard problem cannot be worth less than an easy one.",
+      "TIER_MINUTES_ORDER": "Each step must be longer than the one before it.",
+      "TIER_POINTS_ORDER": "A longer step cannot pay less than a shorter one.",
+      "LATE_ORDER": "Arriving late cannot pay more than arriving on time.",
+      "REQUIRED": "Enter a number.",
+      "TOO_SMALL": "That is below the smallest value allowed here.",
+      "TOO_BIG": "That is above the largest value allowed here.",
+      "INVALID": "That is not a value this field accepts."
+    },
+    "example": {
+      "title": "An ordinary day",
+      "attend": "Turning up",
+      "solve": "{{problems}} easy problems",
+      "lecture": "Finishing a lecture",
+      "time": "{{minutes}} minutes of study",
+      "total": "That day earns",
+      "capped": "The day comes to {{total}}P, so the {{cap}}P limit trims it."
+    },
+    "unit": {
+      "points": "points",
+      "minutes": "minutes"
+    },
+    "step": "Step {{tier}}",
+    "unsaved_note": "Not saved yet. Students see the values you last saved.",
+    "after": "After",
+    "pays": "Pays"
   }
 }

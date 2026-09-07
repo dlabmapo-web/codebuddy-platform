@@ -12,6 +12,7 @@ import {
 } from "../memberships/status.js";
 import { classStatusSchema, type ClassStatus } from "../classes/class.js";
 import { learnExerciseSchema } from "../content/learn.js";
+import { memberAvatarUrlsShape } from "../profile/avatar.js";
 
 /**
  * Live teacher monitoring: the domain a class-scoped monitoring session is
@@ -668,9 +669,31 @@ export const monitoringRosterStudentSchema = z.object({
   enrolledAt: z.iso.datetime(),
   /** History for an offline label. Presence is decided by the registry. */
   lastLearningSeenAt: z.iso.datetime().nullable(),
+  // A face, resolved the same way every other list of people resolves one.
+  // A roster a teacher scans for somebody to help is read by recognition
+  // before it is read by name.
+  ...memberAvatarUrlsShape,
 });
 export type MonitoringRosterStudent = z.infer<
   typeof monitoringRosterStudentSchema
+>;
+
+/**
+ * One exercise on this class's courses, as the roster needs to name it.
+ *
+ * The number is the course-relative one the student sees in their own
+ * navigator, produced by the same traversal — `flattenOutlineExercises` — so
+ * "problem 14" means the same thing on both screens. Presence carries a
+ * material id and nothing else; this is what turns that into a name.
+ */
+export const monitoringRosterExerciseSchema = z.object({
+  materialId: z.uuid(),
+  /** Course-relative and 1-based, matching the student's navigator. */
+  number: z.number().int().positive(),
+  title: z.string().min(1),
+});
+export type MonitoringRosterExercise = z.infer<
+  typeof monitoringRosterExerciseSchema
 >;
 
 export const monitoringClassRosterSchema = z.object({
@@ -678,6 +701,12 @@ export const monitoringClassRosterSchema = z.object({
   courses: z.array(
     z.object({ id: z.uuid(), title: z.string().min(1), isVisible: z.boolean() }),
   ),
+  /**
+   * Every exercise a student on this roster could be sitting in. Presence is
+   * filtered to the class's own courses, so a material id that reaches the
+   * roster is always one of these.
+   */
+  exercises: z.array(monitoringRosterExerciseSchema),
   students: z
     .array(monitoringRosterStudentSchema)
     .max(monitoringLimits.rosterMaxEnrollments),

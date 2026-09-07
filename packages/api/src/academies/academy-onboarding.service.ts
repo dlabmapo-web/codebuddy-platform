@@ -215,6 +215,7 @@ export function toJoinRequestDetail(request: {
   academyId: string;
   message: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  requestedKind: JoinRequestKind;
   approvedRole: "STUDENT" | "TEACHER" | "TEAM_LEAD" | "MANAGER" | null;
   reviewReason: string | null;
   createdAt: Date;
@@ -230,6 +231,11 @@ export function toJoinRequestDetail(request: {
     user: { ...request.user, ...avatar },
     message: request.message,
     status: request.status,
+    // The reviewer's copy of the signup answer. Recorded since the lobby
+    // needed it; it was simply never carried out to the queue that has to act
+    // on it, which is how a Staff applicant reached a manager looking like
+    // every other row.
+    requestedKind: request.requestedKind,
     approvedRole: request.approvedRole,
     reviewReason: request.reviewReason,
     createdAt: request.createdAt.toISOString(),

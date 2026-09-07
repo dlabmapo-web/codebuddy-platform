@@ -8,11 +8,17 @@ test.describe.configure({ mode: 'serial' });
 const PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const STUDENT = process.env.E2E_STUDENT_USERNAME ?? 'cove-student';
 const MANAGER = process.env.E2E_MANAGER_EMAIL ?? 'manager@cove.test';
-const SECOND_ACADEMY_ID = 'e1000000-0000-4000-8000-000000000001';
+const SECOND_ACADEMY_SLUG = 'e2e-profile-academy';
 
+/*
+ * My Page is read inside the academy's own frame now, so its address carries
+ * the slug rather than a query value. `/account` is still there, and still
+ * global — it is what an applicant, an operator, or an account between
+ * academies gets — but it no longer expands anybody's academy profile.
+ */
 async function openMyPage(page: Page, identifier = STUDENT) {
   const academySlug = await signInAs({ page, identifier, password: PASSWORD });
-  await page.goto(`/account?academy=${academySlug}`);
+  await page.goto(routes.academyMe(academySlug));
   await expect(page.getByRole('heading', { name: /Cove Student|Cove Academy Manager/ }))
     .toBeVisible();
   return academySlug;
@@ -50,15 +56,18 @@ test('academy switching asks before discarding an unsaved draft', async ({ page 
   const academySlug = await openMyPage(page);
   await page.getByLabel('Name in this academy').fill(`Unsaved ${Date.now()}`);
 
+  // Moving to another academy is a navigation now rather than a swap in place,
+  // which is exactly why the question still has to be asked: `beforeunload`
+  // covers a reload and sees nothing of a client-side push.
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Unsaved changes' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page).toHaveURL(new RegExp(`academy=${academySlug}`));
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
 
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   await dialog.getByRole('button', { name: 'Discard and switch' }).click();
-  await expect(page).toHaveURL(new RegExp(`academy=${SECOND_ACADEMY_ID}`));
+  await expect(page).toHaveURL(new RegExp(`${SECOND_ACADEMY_SLUG}/me$`));
   await expect(page.getByText('E2E Profile Academy', { exact: true }).first()).toBeVisible();
 });
 

@@ -30,7 +30,7 @@ import {
   changePassword,
   validatePasswordChange,
   type PasswordChangeIssue,
-} from '../_lib/change-password';
+} from './change-password';
 
 /**
  * The account zone: everything that belongs to the person rather than to an

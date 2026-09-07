@@ -18,8 +18,8 @@ import { Skeleton } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { toApiError } from '@/lib/api-errors';
-import { ImagePicker } from '@/app/(studio)/account/_components/image-picker';
-import { uploadProfileImage } from '@/app/(studio)/account/_lib/upload-image';
+import { ImagePicker } from '@/components/studio/profile/my-page/image-picker';
+import { uploadProfileImage } from '@/components/studio/profile/my-page/upload-image';
 
 import { accentStyle } from '@/components/studio/profile/accent';
 import {

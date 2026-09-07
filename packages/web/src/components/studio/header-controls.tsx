@@ -270,8 +270,17 @@ export function ProfileControl({
         ) : null}
         {name ? <DropdownMenuSeparator /> : null}
 
+        {/*
+          Inside an academy this goes to that academy's My Page, which is where
+          the reader's profile *for this academy* is edited and where the rail
+          stays on screen. The bare `/account` is the answer only where there is
+          no academy to scope to — the console, and an applicant's lobby — and
+          it is still the page an account with no membership gets.
+        */}
         <DropdownMenuItem asChild>
-          <Link href={routes.account}>
+          <Link
+            href={academySlug ? routes.academyMe(academySlug) : routes.account}
+          >
             <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
             {t('my_page')}
           </Link>

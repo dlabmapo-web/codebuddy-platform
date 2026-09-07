@@ -1,63 +1,71 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { Modal, ModalContent, Skeleton } from '@/components/studio/primitives';
 import { Button } from '@/components/studio/button';
 import { useTranslation } from 'react-i18next';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
-import { useMyPage } from '../_hooks/use-my-page';
-import { myPagePath } from '../_lib/academy-selection';
-import {
-  rememberAcademy,
-  useRememberedAcademy,
-} from '../_lib/remembered-academy';
+import { useMyPage } from './use-my-page';
 import { accentStyle } from '@/components/studio/profile/accent';
+import { routes } from '@/lib/routes';
 import { AcademySections } from './academy-sections';
 import { AccountSections } from './account-sections';
 import { IdentityCard } from './identity-card';
 
 /**
- * One narrow reading column, in role order.
+ * One narrow reading column, in role order, at both of My Page's entrances.
  *
  * A student's academy profile comes before their account settings because
  * correcting a school name is what they came for; staff see their teaching
  * profile and assignments first for the same reason. Nothing is behind a tab —
  * someone looking for "where do I change my phone number" should find it by
  * scrolling.
+ *
+ * ## The two entrances
+ *
+ * `academyId` is the whole difference. Inside an academy — `/academy/{slug}/me`
+ * — it names that academy, its profile sections render, and the strip of
+ * academies at the foot of the identity card is a way across to the others.
+ * At `/account` it is null: the reader is not standing in an academy, so no
+ * academy profile is fetched and none is shown, and that same strip becomes
+ * the way in.
+ *
+ * There is no third state where the page picks an academy for itself. It used
+ * to — query, then local storage, then the first membership — and the cost was
+ * a profile that opened on whichever academy the browser last remembered,
+ * with no address to link to and nothing in the URL to say which one you were
+ * editing.
  */
-export function MyPageWorkspace() {
+export function MyPageWorkspace({
+  academy: scope,
+}: {
+  /**
+   * The academy this page is for, or null at `/account`.
+   *
+   * The slug travels beside the id rather than being looked up from the
+   * memberships list: the framed route has it from the URL segment before any
+   * query resolves, and `AcademyProfileContext` does not carry one — which is
+   * how the old workspace ended up reading it out of the selection it also
+   * used to decide which academy to show.
+   */
+  academy: { id: string; slug: string } | null;
+}) {
   const { t } = useTranslation('profile');
   const errorText = useErrorText();
   const router = useRouter();
-  const requested = useSearchParams().get('academy');
 
-  // A convenience, never a correctness input: the server still authorizes
-  // whichever academy this resolves to.
-  const remembered = useRememberedAcademy();
-
-  const page = useMyPage({ requested, remembered });
-  const { academyId, profile, academy, selection } = page;
-  // The academy zone links into that academy's studio routes, and My Page is
-  // not one of them, so the slug travels with the selection rather than being
-  // read from a route the page never entered.
-  const selectedAcademySlug = selection.selected?.academySlug ?? null;
+  const academyId = scope?.id ?? null;
+  const page = useMyPage({ academyId });
+  const { profile, academy } = page;
+  // Its own memo so the callback below has a stable dependency: a fresh `[]`
+  // on every render made `goToAcademy` a new function on every render, which
+  // is the whole thing `useCallback` is there to prevent.
+  const memberships = useMemo(() => profile?.memberships ?? [], [profile]);
   const [academyDirty, setAcademyDirty] = useState(false);
-  const [pendingAcademyId, setPendingAcademyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (academyId) rememberAcademy(academyId);
-  }, [academyId]);
-
-  useEffect(() => {
-    // Design §6.1: an academy the caller may not select is removed with replace
-    // navigation, so the back button does not walk into it again.
-    if (profile && selection.shouldReplaceUrl) {
-      router.replace(myPagePath(academyId));
-    }
-  }, [academyId, profile, router, selection.shouldReplaceUrl]);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
     if (!academyDirty) return;
@@ -66,21 +74,28 @@ export function MyPageWorkspace() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [academyDirty]);
 
-  const navigateToAcademy = useCallback(
-    (nextAcademyId: string) => router.replace(myPagePath(nextAcademyId)),
-    [router],
-  );
-
-  const select = useCallback(
+  /**
+   * Moving to another academy is a navigation now, not a swap in place.
+   *
+   * Which is why the unsaved-changes question still has to be asked here. The
+   * `beforeunload` guard above covers a reload or a closed tab; a client-side
+   * push is invisible to it, and this used to be the one control that could
+   * throw away a half-written academy profile without a word.
+   */
+  const goToAcademy = useCallback(
     (nextAcademyId: string) => {
-      if (nextAcademyId === academyId) return;
+      const membership = memberships.find(
+        (candidate) => candidate.academyId === nextAcademyId,
+      );
+      if (!membership || nextAcademyId === academyId) return;
+      const href = routes.academyMe(membership.academySlug);
       if (academyDirty) {
-        setPendingAcademyId(nextAcademyId);
+        setPendingHref(href);
         return;
       }
-      navigateToAcademy(nextAcademyId);
+      router.push(href);
     },
-    [academyDirty, academyId, navigateToAcademy],
+    [academyDirty, academyId, memberships, router],
   );
 
   if (!profile) {
@@ -129,24 +144,28 @@ export function MyPageWorkspace() {
               .catch(() => undefined);
           },
         }}
-        memberships={selection.options}
-        onSelectAcademy={select}
+        memberships={memberships}
+        onSelectAcademy={goToAcademy}
         profile={profile}
         selectedAcademyId={academyId}
       />
 
-      {academy && selectedAcademySlug ? (
-        // The accent lives on this wrapper and nowhere else, so every academy
-        // section inherits one hue and the account zone below inherits none.
-        <div className="space-y-5" style={accentStyle(academy.context.role)}>
-          <AcademySections
-            academy={academy}
-            academySlug={selectedAcademySlug}
-            onDirtyChange={setAcademyDirty}
-            onSaved={page.applyAcademy}
-          />
-        </div>
-      ) : selection.options.length === 0 ? (
+      {academyId ? (
+        academy ? (
+          // The accent lives on this wrapper and nowhere else, so every academy
+          // section inherits one hue and the account zone below inherits none.
+          <div className="space-y-5" style={accentStyle(academy.context.role)}>
+            <AcademySections
+              academy={academy}
+              academySlug={scope!.slug}
+              onDirtyChange={setAcademyDirty}
+              onSaved={page.applyAcademy}
+            />
+          </div>
+        ) : (
+          <Skeleton className="h-64 w-full rounded-card" />
+        )
+      ) : memberships.length === 0 ? (
         <section className="rounded-card border border-dashed border-border bg-card px-6 py-6">
           <h2 className="text-[17px] font-extrabold tracking-[-0.02em]">
             {t('identity.no_academy_title')}
@@ -155,9 +174,7 @@ export function MyPageWorkspace() {
             {t('identity.no_academy_body')}
           </p>
         </section>
-      ) : (
-        <Skeleton className="h-64 w-full rounded-card" />
-      )}
+      ) : null}
 
       <AccountSections
         globalImage={academyId ? {
@@ -176,9 +193,9 @@ export function MyPageWorkspace() {
 
       <Modal
         onOpenChange={(open) => {
-          if (!open) setPendingAcademyId(null);
+          if (!open) setPendingHref(null);
         }}
-        open={pendingAcademyId !== null}
+        open={pendingHref !== null}
       >
         <ModalContent
           description={t('identity.unsaved_body', {
@@ -188,7 +205,7 @@ export function MyPageWorkspace() {
         >
           <div className="flex flex-col-reverse gap-2 px-6 py-5 sm:flex-row sm:justify-end">
             <Button
-              onClick={() => setPendingAcademyId(null)}
+              onClick={() => setPendingHref(null)}
               type="button"
               variant="outline"
             >
@@ -196,10 +213,10 @@ export function MyPageWorkspace() {
             </Button>
             <Button
               onClick={() => {
-                const next = pendingAcademyId;
-                setPendingAcademyId(null);
+                const next = pendingHref;
+                setPendingHref(null);
                 setAcademyDirty(false);
-                if (next) navigateToAcademy(next);
+                if (next) router.push(next);
               }}
               type="button"
               variant="danger"

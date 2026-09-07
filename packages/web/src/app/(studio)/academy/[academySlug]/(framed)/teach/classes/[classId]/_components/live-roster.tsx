@@ -59,8 +59,8 @@ export function LiveRoster({
   const { entries, state, denied } = useClassPresence({ academyId, classId });
 
   const rows = React.useMemo(
-    () => sortRoster(mergeRoster(roster.students, entries)),
-    [entries, roster.students],
+    () => sortRoster(mergeRoster(roster.students, entries, roster.exercises)),
+    [entries, roster.exercises, roster.students],
   );
   const counts = React.useMemo(() => countRoster(rows), [rows]);
   // The pills decide which rows the table receives; the table owns text

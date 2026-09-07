@@ -51,7 +51,7 @@ export function ProblemStatement({
    */
   onRevealHint?: () => void;
 }) {
-  const { t } = useLayoutTranslation(['learn', 'content']);
+  const { t } = useLayoutTranslation(['learn']);
 
   const constraintLines = exercise.constraints
     .split('\n')

@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
@@ -38,7 +39,7 @@ export function useExerciseAuthoring({
   initialSolutionCode: string;
 }) {
   const contentPaths = useContentBasePath();
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const router = useRouter();
   const queryClient = useQueryClient();
   const initialDraft = React.useMemo(

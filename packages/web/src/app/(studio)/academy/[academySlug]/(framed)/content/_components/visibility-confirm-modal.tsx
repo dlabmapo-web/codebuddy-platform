@@ -4,6 +4,7 @@ import { EyeOff, RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 type AffectedContent = {
@@ -35,7 +36,7 @@ export function VisibilityConfirmModal({
   open: boolean;
   pending?: boolean;
 }) {
-  const { t } = useLayoutTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common']);
   const visibleAffected = affected.filter(({ value }) => value > 0);
 
   return (

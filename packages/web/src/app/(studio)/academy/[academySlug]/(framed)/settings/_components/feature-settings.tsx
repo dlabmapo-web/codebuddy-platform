@@ -40,7 +40,7 @@ export function FeatureSettings({
   academyId: string;
   initialFeatures: AcademyFeatureList | null;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useLayoutTranslation('academy');
   const errorText = useErrorText();
   const queryClient = useQueryClient();
 

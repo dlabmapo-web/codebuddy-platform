@@ -59,7 +59,7 @@ export function LiveHeader({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
-  const { t: tc } = useLayoutTranslation('content');
+  const { t: tc } = useLayoutTranslation('courses');
   const student =
     context.student.displayName ??
     context.student.email ??

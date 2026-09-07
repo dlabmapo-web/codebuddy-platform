@@ -82,7 +82,7 @@ export function WorkspaceHeader({
   backToRecords?: boolean;
   submitting: boolean;
 }) {
-  const { t } = useLayoutTranslation(['learn', 'content']);
+  const { t } = useLayoutTranslation(['learn', 'courses']);
   const locale = useLocale();
   const { exercise, neighbors } = workspace;
 
@@ -114,7 +114,7 @@ export function WorkspaceHeader({
               difficultyStyles[exercise.difficulty]
             }`}
           >
-            {t(`content:exercise.difficulty.${exercise.difficulty}`)}
+            {t(`courses:exercise.difficulty.${exercise.difficulty}`)}
           </span>
           {/* Compact and factual: which attempt is on screen. Nothing here
               disables anything — the workspace stays fully editable. */}

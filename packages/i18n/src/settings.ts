@@ -59,6 +59,14 @@ export function isLocale(value: string | undefined | null): value is Locale {
  * signed-out screens and by nobody afterwards, so a student in the middle of
  * an exercise was carrying the copy for a password they were not resetting.
  * The `(v2-auth)` layout mounts it instead.
+ *
+ * `content` followed it. Eleven kilobytes of curriculum-authoring copy that
+ * only a Team Lead ever reads was the largest thing a student carried on every
+ * page, and the Korean payload had run out of budget. The `(framed)/content`
+ * layout mounts it, and so do the two platform-console surfaces that render
+ * the same builder. The three keys shared with pages outside those routes —
+ * an exercise's difficulty, and one settings sentence — moved to `courses` and
+ * `academy` rather than dragging the whole namespace back.
  */
 export const layoutNamespaces = [
   "common",
@@ -69,7 +77,6 @@ export const layoutNamespaces = [
   "invitations",
   "courses",
   "classes",
-  "content",
   "learn",
   "errors",
   "validation",

@@ -2,6 +2,7 @@ import type { ExerciseDifficulty } from '@cove/shared';
 import { BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { ExerciseAuthoring } from '../_hooks/use-exercise-authoring';
@@ -37,7 +38,7 @@ export function BasicInformation({
   editable: boolean;
   update: ExerciseDraftUpdate;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const titleError = authoring.errorFor('title');
   const descriptionError = authoring.errorFor('description');
 

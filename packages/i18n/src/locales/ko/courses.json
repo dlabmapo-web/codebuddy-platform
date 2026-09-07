@@ -51,5 +51,12 @@
     "problem": "문제"
   },
   "no_visible_content": "공개된 콘텐츠 없음",
-  "no_visible_content_hint": "문제가 모두 비공개라 학생에게 보이지 않습니다."
+  "no_visible_content_hint": "문제가 모두 비공개라 학생에게 보이지 않습니다.",
+  "exercise": {
+    "difficulty": {
+      "EASY": "쉬움",
+      "MEDIUM": "보통",
+      "HARD": "어려움"
+    }
+  }
 }

@@ -40,7 +40,7 @@ export function ExerciseRow({
   label: string;
 }) {
   const academySlug = useAcademySlug();
-  const { t } = useLayoutTranslation(['learn', 'content']);
+  const { t } = useLayoutTranslation(['learn', 'courses']);
   const status = statusStyles[exercise.status];
 
   return (
@@ -62,7 +62,7 @@ export function ExerciseRow({
             difficultyStyles[exercise.difficulty]
           }`}
         >
-          {t(`content:exercise.difficulty.${exercise.difficulty}`)}
+          {t(`courses:exercise.difficulty.${exercise.difficulty}`)}
         </span>
         {exercise.bestScore > 0 ? (
           <span className="shrink-0 font-mono text-[11.5px] font-bold text-sub">

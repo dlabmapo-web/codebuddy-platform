@@ -5,6 +5,7 @@ import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 
 import { useContentSurface } from '@/components/studio/content-base-path-provider';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
@@ -25,7 +26,7 @@ export function ContentVisibilityControl({
 }: {
   builder: CourseBuilderState;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const [hiding, setHiding] = useState(false);
   const { course } = builder.tree;
   const everythingVisible =
@@ -92,7 +93,7 @@ export function ContentReadinessNotice({
 }: {
   builder: CourseBuilderState;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   // A library master has no students to be unreachable to, and its course-level
   // state means "adoptable", not "live".
   const isLibrary = useContentSurface() === 'library';

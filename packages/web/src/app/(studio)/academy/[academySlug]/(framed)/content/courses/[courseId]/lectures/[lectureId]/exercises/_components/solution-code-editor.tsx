@@ -1,6 +1,7 @@
 import { BadgeCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 
@@ -19,7 +20,7 @@ export function SolutionCodeEditor({
   onChange: (value: string) => void;
   error: string | null;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
 
   return (
     <SectionCard

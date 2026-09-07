@@ -3,6 +3,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useContentSurface } from '@/components/studio/content-base-path-provider';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -24,7 +25,7 @@ export function ModuleCard({
   courseModule: CourseModule;
   exercisePath: (lectureId: string, materialId: string) => string;
 }) {
-  const { t } = useLayoutTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common']);
   // A `LIBRARY` academy has no students, so nothing in it is hidden *from*
   // anyone, and `adopt` lands every copied row visible whatever these flags
   // say. Showing the control there would promise head office an exclusion it

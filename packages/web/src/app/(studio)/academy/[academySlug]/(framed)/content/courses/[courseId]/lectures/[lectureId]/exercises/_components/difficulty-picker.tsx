@@ -1,5 +1,6 @@
 import type { ExerciseDifficulty } from '@cove/shared';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +26,7 @@ export function DifficultyPicker({
   onChange: (value: ExerciseDifficulty) => void;
   disabled?: boolean;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation(['content', 'courses']);
 
   return (
     <div
@@ -56,7 +57,7 @@ export function DifficultyPicker({
                 active ? 'opacity-100' : 'opacity-40',
               )}
             />
-            {t(`exercise.difficulty.${difficulty}`)}
+            {t(`courses:exercise.difficulty.${difficulty}`)}
           </button>
         );
       })}

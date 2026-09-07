@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 /** Shows an item's own flag while the tooltip explains inherited visibility. */
@@ -10,7 +11,7 @@ export function VisibilityIndicator({
   isVisible: boolean;
   effectivelyVisible: boolean;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const label = isVisible
     ? effectivelyVisible
       ? t('row.visible_tooltip')

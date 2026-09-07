@@ -25,7 +25,7 @@ export default async function AcademySettingsPage({
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   if (!canManageAcademySettings(roles)) notFound();
 
-  const { t } = await getServerTranslation(['content']);
+  const { t } = await getServerTranslation(['academy']);
 
   let features: AcademyFeatureList | null = null;
   try {

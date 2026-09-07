@@ -3,6 +3,7 @@
 import { Check, EyeOff } from 'lucide-react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 export type MoveTarget = {
@@ -36,7 +37,7 @@ export function MoveModal({
   open: boolean;
   siblings: readonly MoveTarget[];
 }) {
-  const { t } = useLayoutTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common']);
 
   return (
     <Modal

@@ -5,6 +5,7 @@ import { useContentBasePath } from '@/components/studio/content-base-path-provid
 import type { CourseTree } from '@cove/shared';
 import { Plus } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
@@ -29,7 +30,7 @@ export function CourseBuilder({
   initialTree: CourseTree;
 }) {
   const contentPaths = useContentBasePath();
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const errorText = useErrorText();
   const builder = useCourseBuilder({
     target: { academyId, courseId },

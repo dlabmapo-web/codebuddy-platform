@@ -1,5 +1,6 @@
 import { Lightbulb, Plus, Trash2 } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import {
@@ -22,7 +23,7 @@ export function HintsEditor({
   hints: HintDraft[];
   update: (hints: HintDraft[]) => void;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
 
   return (
     <SectionCard

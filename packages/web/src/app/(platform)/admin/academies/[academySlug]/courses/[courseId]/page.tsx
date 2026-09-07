@@ -11,6 +11,7 @@ import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 
 import { PlatformShell } from '../../../../_components/platform-shell';
 import { consoleBackTarget } from '../../../../_lib/back-target';
+import { contentNamespaces } from '@/i18n/namespaces';
 
 export default async function PlatformCourseBuilderPage({
   params,
@@ -54,6 +55,9 @@ export default async function PlatformCourseBuilderPage({
     <PlatformShell
       back={<BackLink href={back.href} label={back.label} />}
       bleed
+      // The course builder is the academy's own, rendered here against the
+      // library. Its copy left the layout payload, so this surface mounts it.
+      namespaces={contentNamespaces}
       description={initialTree ? t('builder.description') : undefined}
       title={initialTree?.course.title ?? t('builder.fallback_title')}
     >

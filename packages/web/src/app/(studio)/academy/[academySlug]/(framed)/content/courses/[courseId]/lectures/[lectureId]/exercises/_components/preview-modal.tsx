@@ -3,6 +3,7 @@
 import { EyeOff, Info, X } from 'lucide-react';
 import * as React from 'react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import { type ExerciseDraft } from '../_lib/exercise-draft';
@@ -54,7 +55,7 @@ export function PreviewModal({
   draft: ExerciseDraft;
   onClose: () => void;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation(['content', 'courses']);
   const sampleCases = draft.testCases.filter(
     (testCase) => testCase.visibility === 'SAMPLE',
   );
@@ -101,7 +102,7 @@ export function PreviewModal({
                   difficultyStyles[draft.difficulty]
                 }`}
               >
-                {t(`exercise.difficulty.${draft.difficulty}`)}
+                {t(`courses:exercise.difficulty.${draft.difficulty}`)}
               </span>
               <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-sub">
                 {t('exercise.language_python')}

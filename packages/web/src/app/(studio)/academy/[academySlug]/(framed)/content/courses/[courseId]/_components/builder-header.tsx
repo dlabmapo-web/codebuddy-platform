@@ -10,6 +10,7 @@ import {
   useContentBasePath,
   useContentSurface,
 } from '@/components/studio/content-base-path-provider';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
@@ -31,7 +32,7 @@ export function BuilderHeader({
   // from. Two back arrows forty pixels apart, pointing at different places, is
   // a choice nobody asked to make — so under the console the shell's wins.
   const shellOwnsBack = useContentSurface() === 'console';
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">

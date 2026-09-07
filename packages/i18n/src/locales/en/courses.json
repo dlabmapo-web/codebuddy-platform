@@ -52,5 +52,12 @@
     "problem": "Problem"
   },
   "no_visible_content": "Nothing visible",
-  "no_visible_content_hint": "This course is visible, but no problems inside it are. Students do not see it at all."
+  "no_visible_content_hint": "This course is visible, but no problems inside it are. Students do not see it at all.",
+  "exercise": {
+    "difficulty": {
+      "EASY": "Easy",
+      "MEDIUM": "Medium",
+      "HARD": "Hard"
+    }
+  }
 }

@@ -1,5 +1,6 @@
 import { AlertTriangle, Eye, Save } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
@@ -14,7 +15,7 @@ export function ExerciseActions({
 }: {
   authoring: ExerciseAuthoring;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const errorText = useErrorText();
   const {
     editable,

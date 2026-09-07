@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useId } from 'react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 export const inputClass =
@@ -70,7 +71,7 @@ export function Field({
   children: ReactNode;
   as?: 'label' | 'group';
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const labelId = useId();
   const caption = (
     <span className="text-[14px] font-bold" id={as === 'group' ? labelId : undefined}>

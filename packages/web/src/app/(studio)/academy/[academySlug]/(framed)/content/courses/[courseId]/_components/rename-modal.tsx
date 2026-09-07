@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 export function RenameModal({
@@ -18,7 +19,7 @@ export function RenameModal({
   open: boolean;
   value: string;
 }) {
-  const { t } = useLayoutTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common']);
   const [title, setTitle] = useState(value);
   const trimmed = title.trim();
   const unchanged = trimmed === value.trim();

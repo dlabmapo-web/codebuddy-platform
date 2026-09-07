@@ -13,5 +13,28 @@
   "learning_overview_title": "Overview",
   "control_tower_title": "Control tower",
   "control_tower_description": "One picture of the academy: what needs a decision, and whether the classes are alive.",
-  "curriculum_overview_title": "Curriculum overview"
+  "curriculum_overview_title": "Curriculum overview",
+  "settings": {
+    "title": "Academy settings",
+    "description": "What this academy has switched on.",
+    "requires": "Needs {{title}}. Turning this on turns that on too.",
+    "feature": {
+      "TEACHER_LIVE_MONITORING": {
+        "title": "Live monitoring",
+        "body": "Teachers can watch their students work in real time — the editor, the terminal, as it is typed."
+      },
+      "STUDENT_CLASS_STANDING": {
+        "title": "Class standing",
+        "body": "Students see where they sit in their class. This is the one place a student is told anything about another student."
+      },
+      "STUDENT_POINTS": {
+        "title": "Points",
+        "body": "Students earn points for solved problems. With this off no point is ever recorded."
+      },
+      "STUDENT_CLASS_LEADERBOARD": {
+        "title": "Class leaderboard",
+        "body": "A named ranking of the class, by points. Replaces class standing where both are on."
+      }
+    }
+  }
 }

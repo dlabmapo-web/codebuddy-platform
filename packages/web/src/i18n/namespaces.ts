@@ -23,6 +23,25 @@ export const monitoringNamespaces = ["monitoring", "errors"] as const;
 export const authNamespaces = ["auth"] as const;
 
 /**
+ * Curriculum authoring: the course builder and the exercise editor.
+ *
+ * Eleven kilobytes of copy a Team Lead reads and nobody else, which is what
+ * made it the largest thing every student carried on every page. It left
+ * `layoutNamespaces` when the Korean root payload ran out of budget — the same
+ * answer `auth` gave, and the one that budget's note asks for.
+ *
+ * `common` rides along because several of these components translate a
+ * confirm-or-cancel pair in the same `t` call as their own copy, and one hook
+ * cannot span two i18next instances. `courses` for the same reason: an
+ * exercise's difficulty is named on student screens too, so it stayed in the
+ * layout payload while the rest of this namespace left.
+ *
+ * Mounted by the `(framed)/content` layout, and by the two platform-console
+ * surfaces that render the same builder against the shared library.
+ */
+export const contentNamespaces = ["content", "common", "courses"] as const;
+
+/**
  * The student exercise workspace.
  *
  * `monitoring` because a teacher may join at any moment and the indicator's

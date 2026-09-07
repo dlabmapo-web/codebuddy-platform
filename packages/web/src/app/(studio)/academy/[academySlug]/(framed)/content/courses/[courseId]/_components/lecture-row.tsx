@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useContentSurface } from '@/components/studio/content-base-path-provider';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -65,7 +66,7 @@ function ExerciseRow({
   parentEffectivelyVisible: boolean;
   siblings: readonly CourseMaterial[];
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation(['content', 'courses']);
   // See `ModuleCard`: the flag is inert in a library academy.
   const visibilityIsReal = useContentSurface() !== 'library';
   const router = useRouter();
@@ -106,7 +107,7 @@ function ExerciseRow({
               difficultyStyles[exercise.difficulty]
             }`}
           >
-            {t(`exercise.difficulty.${exercise.difficulty}`)}
+            {t(`courses:exercise.difficulty.${exercise.difficulty}`)}
           </span>
         ) : null}
       </div>
@@ -172,7 +173,7 @@ export function LectureRow({
   moduleNumber: number;
   parentEffectivelyVisible: boolean;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation(['content', 'courses']);
   const visibilityIsReal = useContentSurface() !== 'library';
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);

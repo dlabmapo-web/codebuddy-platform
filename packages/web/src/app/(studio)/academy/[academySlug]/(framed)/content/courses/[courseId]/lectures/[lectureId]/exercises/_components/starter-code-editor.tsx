@@ -1,6 +1,7 @@
 import { Code2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 import { registerPaircodeTheme } from '@/lib/monaco/theme';
 
@@ -19,7 +20,7 @@ export function StarterCodeEditor({
   onChange: (value: string) => void;
   editable: boolean;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
 
   return (
     <SectionCard

@@ -3,6 +3,7 @@
 import { TriangleAlert } from 'lucide-react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 /**
@@ -26,7 +27,7 @@ export function DeleteModal({
   onConfirm: () => void;
   open: boolean;
 }) {
-  const { t } = useLayoutTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common']);
   const lectures = cascade?.lectures ?? 0;
   const exercises = cascade?.exercises ?? 0;
   const losesChildren = lectures > 0 || exercises > 0;

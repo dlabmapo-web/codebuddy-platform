@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 /**
@@ -48,7 +49,7 @@ export function RowMenu({
   /** `strong` marks the group-level menu so it reads apart from child rows. */
   tone?: 'default' | 'strong';
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
 
   return (
     <DropdownMenu>

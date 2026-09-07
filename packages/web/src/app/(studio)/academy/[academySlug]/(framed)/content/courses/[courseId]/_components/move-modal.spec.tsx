@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/i18n', () => ({
-  useLayoutTranslation: () => ({
+// The authoring copy is page-scoped since `content` left the layout payload,
+// so this component reads react-i18next's own hook rather than the layout one.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
     t: (key: string, values?: Record<string, string>) =>
       values?.title ? `${key}:${values.title}` : key,
   }),

@@ -1,6 +1,7 @@
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { ExerciseAuthoring } from '../_hooks/use-exercise-authoring';
@@ -12,7 +13,7 @@ export function ExerciseHeader({
   context: ExerciseAuthoringContext;
   authoring: ExerciseAuthoring;
 }) {
-  const { t } = useLayoutTranslation('content');
+  const { t } = useTranslation('content');
   const { editable, dirty, isNew, leave, savePending, saveError, saveConflict } =
     authoring;
   const title = authoring.draft.title.trim();

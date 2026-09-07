@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
+import { joinRequestKindSchema } from "./join-request.js";
 import {
   invitationStatusSchema,
   joinRequestStatusSchema,
@@ -35,6 +36,20 @@ export const academyJoinRequestDetailSchema = z.object({
   }),
   message: z.string().nullable(),
   status: joinRequestStatusSchema,
+  /**
+   * What the applicant said they were applying as, at signup.
+   *
+   * Carried to the reviewer because they are the one person who has to answer
+   * it: the queue showed a name, a message and a date, and somebody who chose
+   * Staff on the signup form arrived looking exactly like somebody who chose
+   * Student. The dialog then opened on `STUDENT`, so the ordinary path — read
+   * the row, press Approve — seated a would-be teacher as a student, and the
+   * only trace of what they had asked for was a column nothing rendered.
+   *
+   * It stays what it is elsewhere: a hint. It grants nothing, bounds nothing,
+   * and the role still comes from the manager's choice in the dialog.
+   */
+  requestedKind: joinRequestKindSchema,
   approvedRole: academyRoleSchema.nullable(),
   reviewReason: z.string().nullable(),
   createdAt: z.iso.datetime(),

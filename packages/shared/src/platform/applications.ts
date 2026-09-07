@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
+import { joinRequestKindSchema } from "../memberships/join-request.js";
 import { joinRequestStatusSchema } from "../memberships/status.js";
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
 
@@ -36,6 +37,8 @@ export const platformApplicationSchema = z.object({
   }),
   message: z.string().nullable(),
   status: joinRequestStatusSchema,
+  /** What the signup form's Student/Staff control chose. A hint, as ever. */
+  requestedKind: joinRequestKindSchema,
   approvedRole: academyRoleSchema.nullable(),
   reviewReason: z.string().nullable(),
   createdAt: z.iso.datetime(),

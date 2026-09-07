@@ -32,7 +32,12 @@ import { LearnService } from "../learn/learn.service.js";
 import { StudentOverviewService } from "../learn/student-overview.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
+import { LobbyService } from "../lobby/lobby.service.js";
+import { createLobbyRouter } from "../lobby/lobby.router.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
+import { createNotificationsRouter } from "../notifications/notifications.router.js";
 import { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import { PointPolicyService } from "../manage/point-policy.service.js";
 import { createAcademyFeaturesRouter } from "../manage/academy-features.router.js";
 import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
 import { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
@@ -118,6 +123,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     learnService: app.get(LearnService, { strict: false }),
     studentOverviewService: app.get(StudentOverviewService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
+    lobbyService: app.get(LobbyService, { strict: false }),
+    notificationsService: app.get(NotificationsService, { strict: false }),
     monitoringService: app.get(MonitoringService, { strict: false }),
     profileService: app.get(ProfileService, { strict: false }),
     academyProfileService: app.get(AcademyProfileService, { strict: false }),
@@ -127,6 +134,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
     managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
     academyFeaturesService: app.get(AcademyFeaturesService, { strict: false }),
+    pointPolicyService: app.get(PointPolicyService, { strict: false }),
     academyOperationsProfileService: app.get(AcademyOperationsProfileService, {
       strict: false,
     }),
@@ -206,6 +214,8 @@ function createORPCRouter(deps: ORPCDeps) {
     auth: createAuthRouter(os, deps),
     studentSession: createStudentSessionRouter(os, deps),
     academyFeatures: createAcademyFeaturesRouter(os, deps),
+    lobby: createLobbyRouter(os, deps),
+    notifications: createNotificationsRouter(os, deps),
     ...academyRouters,
     ...contentRouters,
     ...classesRouters,

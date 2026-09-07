@@ -68,7 +68,10 @@ function classRecord(overrides?: {
             username: "student01",
             email: "student@example.com",
             status: "ACTIVE",
+            avatarUrl: null,
+            avatarAsset: null,
           },
+          memberProfile: null,
         },
       },
     ],
@@ -198,6 +201,11 @@ function createService(options?: {
   studentSelfError?: AppException;
   materialError?: AppException;
   outline?: LearnCourseOutline | null;
+  rosterExercises?: {
+    id: string;
+    title: string;
+    lecture: { courseModule: { courseId: string } };
+  }[];
   visit?: { id: string; material: { programmingExercise: { solutionCode: string | null } | null } | null } | null;
 }) {
   const prisma = {
@@ -216,6 +224,9 @@ function createService(options?: {
       findFirst: vi.fn().mockResolvedValue(
         options?.material === undefined ? materialRecord() : options.material,
       ),
+      // The roster names the exercise a student is sitting in, so it walks the
+      // class's courses once per read.
+      findMany: vi.fn().mockResolvedValue(options?.rosterExercises ?? []),
     },
     exerciseDraft: {
       findUnique: vi.fn().mockResolvedValue(
@@ -312,6 +323,9 @@ function createService(options?: {
     ),
   } as unknown as CurriculumOutlineService;
   const audit = { write: vi.fn().mockResolvedValue(undefined) };
+  // Signing is best-effort by design: an avatar is the one thing on a roster
+  // that may degrade to initials without the page being wrong.
+  const profileMedia = { signMany: vi.fn().mockResolvedValue([]) };
 
   return {
     service: new MonitoringService(
@@ -320,6 +334,7 @@ function createService(options?: {
       broadcaster,
       curriculum,
       audit as never,
+      profileMedia as never,
     ),
     curriculum: curriculum as unknown as Record<
       string,
@@ -414,6 +429,10 @@ describe("getClassRoster", () => {
         userStatus: "ACTIVE",
         enrolledAt: updatedAt.toISOString(),
         lastLearningSeenAt: updatedAt.toISOString(),
+        // Resolved by the shared chain in the browser, so all three travel.
+        academyImageUrl: null,
+        globalImageUrl: null,
+        externalAvatarUrl: null,
       },
     ]);
     expect(roster.students[0]).not.toHaveProperty("state");

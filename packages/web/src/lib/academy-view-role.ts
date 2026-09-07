@@ -46,7 +46,7 @@ export function parseViewRole(
  * A cookie naming a role the member does not hold is not an error page. It is
  * the ordinary consequence of a role being revoked, of switching academies, or
  * of somebody editing the value by hand, and losing the whole screen over any
- * of those would be absurd — the same reasoning `selectAcademy` applies to a
+ * of those would be absurd — the same reasoning `redirectSlugFor` applies to a
  * stale `?academy=`. It falls back to the primary role, which every member has.
  */
 export function resolveViewRole(input: {

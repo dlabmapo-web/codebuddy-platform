@@ -4,6 +4,7 @@ import {
   monitoringLimits,
   toNavigatorContext,
   type MonitoringClassRoster,
+  type MonitoringRosterExercise,
   type MonitoringClassSummary,
   type MonitoringExercisePreview,
   type MonitoringFeedback,
@@ -17,6 +18,13 @@ import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
+import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
+import {
+  memberAvatarSelect,
+  noMemberAvatar,
+  resolveMemberAvatars,
+} from "../profile/member-avatars.js";
+import { ProfileMediaService } from "../profile/profile-media.service.js";
 import {
   MonitoringAccessService,
   type MonitoringClassClaim,
@@ -40,6 +48,8 @@ export class MonitoringService {
     private readonly broadcaster: MonitoringFeedbackBroadcaster,
     private readonly curriculum: CurriculumOutlineService,
     private readonly audit: AuditService,
+    /** Signs the roster's avatars, in one batch rather than one per student. */
+    private readonly profileMedia: ProfileMediaService,
   ) {}
 
   /**
@@ -132,8 +142,10 @@ export class MonitoringService {
                     username: true,
                     email: true,
                     status: true,
+                    ...memberAvatarSelect.user.select,
                   },
                 },
+                memberProfile: memberAvatarSelect.memberProfile,
               },
             },
           },
@@ -142,6 +154,18 @@ export class MonitoringService {
         },
       },
     });
+
+    const avatars = await resolveMemberAvatars(
+      this.profileMedia,
+      record.enrollments.map((enrollment) => ({
+        ...enrollment.membership,
+        key: enrollment.membership.id,
+      })),
+    );
+    const exercises = await this.rosterExercises(
+      record.academyId,
+      record.courseAssignments.map((assignment) => assignment.course.id),
+    );
 
     return {
       class: {
@@ -155,6 +179,7 @@ export class MonitoringService {
         updatedAt: record.updatedAt.toISOString(),
       },
       courses: record.courseAssignments.map((assignment) => assignment.course),
+      exercises,
       students: record.enrollments.map((enrollment) => ({
         membershipId: enrollment.membership.id,
         userId: enrollment.membership.user.id,
@@ -167,10 +192,62 @@ export class MonitoringService {
         userStatus: enrollment.membership.user.status,
         enrolledAt: enrollment.enrolledAt.toISOString(),
         lastLearningSeenAt: enrollment.lastLearningSeenAt?.toISOString() ?? null,
+        ...(avatars.get(enrollment.membership.id) ?? noMemberAvatar),
       })),
       truncated:
         record._count.enrollments > monitoringLimits.rosterMaxEnrollments,
     };
+  }
+
+  /**
+   * Every exercise on this class's courses, numbered as its students see it.
+   *
+   * Presence reports a material id, which reads as "In an exercise" and tells
+   * a teacher nothing they can act on. Resolving it needs the course walked in
+   * order, so it is done once per roster read rather than per heartbeat — the
+   * curriculum does not change between two beats, and the alternative was a
+   * count query on the hottest path in the gateway.
+   *
+   * The ordering is module, lecture, then material — position first and id as
+   * the tiebreak, which is `flattenOutlineExercises`' traversal. Numbering by
+   * a second rule that merely agreed today would eventually print a different
+   * number here than the one the student is looking at.
+   */
+  private async rosterExercises(
+    academyId: string,
+    courseIds: string[],
+  ): Promise<MonitoringRosterExercise[]> {
+    if (courseIds.length === 0) return [];
+    const materials = await this.prisma.material.findMany({
+      where: {
+        ...effectivelyVisibleMaterialWhere(academyId),
+        lecture: { courseModule: { courseId: { in: courseIds } } },
+      },
+      select: {
+        id: true,
+        title: true,
+        lecture: {
+          select: { courseModule: { select: { courseId: true } } },
+        },
+      },
+      orderBy: [
+        { lecture: { courseModule: { position: "asc" } } },
+        { lecture: { courseModule: { id: "asc" } } },
+        { lecture: { position: "asc" } },
+        { lecture: { id: "asc" } },
+        { position: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    // Course-relative, so a class assigned two courses numbers each from one.
+    const counted = new Map<string, number>();
+    return materials.map((material) => {
+      const courseId = material.lecture.courseModule.courseId;
+      const number = (counted.get(courseId) ?? 0) + 1;
+      counted.set(courseId, number);
+      return { materialId: material.id, number, title: material.title };
+    });
   }
 
   /**

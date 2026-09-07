@@ -25,7 +25,8 @@
     "solution_status": "풀이 현황",
     "student_analytics": "학생 분석",
     "class_ranking": "반 랭킹",
-    "settings": "학원 설정"
+    "settings": "학원 설정",
+    "point_policy": "포인트 지급 기준"
   },
   "academy_switcher": {
     "select": "학원 선택",

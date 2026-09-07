@@ -16,12 +16,14 @@ import { academyContentImportsContract } from "./orpc/content-imports.contract.j
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { academyLibraryContract } from "./orpc/library.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
+import { lobbyContract } from "./orpc/lobby.contract.js";
 import {
   academyOperationsOverviewContract,
   academyOperationsProfileContract,
   academyPeopleContract,
 } from "./orpc/manager-overview.contract.js";
 import { monitoringContract } from "./orpc/monitoring.contract.js";
+import { notificationsContract } from "./orpc/notifications.contract.js";
 import { platformApplicationsContract } from "./orpc/platform-applications.contract.js";
 import { platformAuditContract } from "./orpc/platform-audit.contract.js";
 import { platformInvitationsContract } from "./orpc/platform-invitations.contract.js";
@@ -62,7 +64,9 @@ export const appContract = {
   academyLibrary: academyLibraryContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
+  lobby: lobbyContract,
   monitoring: monitoringContract,
+  notifications: notificationsContract,
   platformAcademies: platformAcademiesContract,
   platformApplications: platformApplicationsContract,
   platformAudit: platformAuditContract,

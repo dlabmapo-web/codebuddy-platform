@@ -1,4 +1,4 @@
-import { requireAcademyRoute } from '@/lib/academy-route';
+import { requireAcademyOrLobbyRoute } from '@/lib/academy-route';
 import { AcademyRouteProvider } from '@/components/studio/academy-route-provider';
 import { ContentBasePathProvider } from '@/components/studio/content-base-path-provider';
 import { PageTranslationsProvider } from '@/i18n';
@@ -39,7 +39,14 @@ export default async function AcademyLayout({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  /*
+   * The wider guard, because this layout sits above the lobby as well as above
+   * the studio and a parent that refused would 404 an applicant before the
+   * framed layout could offer them anything. Everything below is
+   * students-only, and an applicant is a student nowhere, so nothing here runs
+   * for them.
+   */
+  const { academyId } = await requireAcademyOrLobbyRoute(academySlug);
 
   // Presence is about *this* academy: a roster shows the students of one
   // academy, so somebody is present here only if they are a student here.

@@ -1,5 +1,6 @@
-import { requireAcademyRoute } from '@/lib/academy-route';
+import { requireAcademyOrLobbyRoute } from '@/lib/academy-route';
 
+import { LobbyChrome } from './_components/lobby/lobby-chrome';
 import { StudioChrome } from './_components/studio-chrome';
 
 /**
@@ -31,7 +32,25 @@ export default async function FramedAcademyLayout({
   const { academySlug } = await params;
   // Memoised per request, and the parent layout has already resolved it, so
   // this costs a map lookup rather than a second round trip.
-  const { academyId, role } = await requireAcademyRoute(academySlug);
+  const { academyId, role, via } = await requireAcademyOrLobbyRoute(academySlug);
+
+  /*
+   * Somebody waiting on an application reads the academy's frame with every
+   * page empty, rather than a card outside it.
+   *
+   * `children` is deliberately not rendered, so an applicant is never shown a
+   * member page's contents. That alone is not enough to keep a member page
+   * from *deciding the response* — each one calls `requireAcademyRoute` and
+   * `notFound()` ends the whole segment — which is why the lobby keeps itself
+   * to this one route and drives its sections from a `section` query instead
+   * of linking at the member addresses.
+   *
+   * The failure mode of that arrangement is a 404 on a deep member URL, which
+   * is safe: it refuses, it does not leak.
+   */
+  if (via === 'application') {
+    return <LobbyChrome academySlug={academySlug} />;
+  }
 
   return (
     <StudioChrome academyId={academyId} academySlug={academySlug} routeRole={role}>

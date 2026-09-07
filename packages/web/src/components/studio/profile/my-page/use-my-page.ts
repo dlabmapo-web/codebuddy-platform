@@ -7,8 +7,7 @@ import type { AcademyProfileResponse, MyProfileResponse } from '@cove/shared';
 
 import { orpc } from '@/lib/orpc';
 
-import { selectAcademy } from '../_lib/academy-selection';
-import { uploadProfileImage } from '../_lib/upload-image';
+import { uploadProfileImage } from './upload-image';
 
 export const myProfileKey = ['profile', 'me'] as const;
 
@@ -17,20 +16,21 @@ export function academyProfileKey(academyId: string) {
 }
 
 /**
- * The two reads My Page is built from, plus the decision about which academy
- * the second one is for.
+ * The two reads My Page is built from.
  *
- * They are separate queries because they are separately owned and separately
+ * Separate queries because they are separately owned and separately
  * authorized: the account always loads, and the academy profile is whatever
- * the selected membership allows. Which academy that is depends on the account
- * response, so the choice lives here rather than in the component — otherwise
- * the component has to render once with no answer and once with one.
+ * the named membership allows.
+ *
+ * Which academy is no longer decided here. It used to be — from the query,
+ * then local storage, then the first membership — which meant the component
+ * rendered once with no answer and once with one. The address answers it now:
+ * inside an academy the slug names it, and at `/account` there is deliberately
+ * no academy at all.
  */
 export function useMyPage(input: {
-  /** The `academy` query value, which may name anything at all. */
-  requested: string | null;
-  /** The last academy this browser looked at, or null before hydration. */
-  remembered: string | null;
+  /** The academy whose profile to read, or null on the global page. */
+  academyId: string | null;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -41,12 +41,7 @@ export function useMyPage(input: {
     retry: false,
   });
 
-  const selection = selectAcademy(
-    profileQuery.data?.memberships ?? [],
-    input.requested,
-    input.remembered,
-  );
-  const academyId = selection.selected?.academyId ?? null;
+  const academyId = input.academyId;
 
   const academyQuery = useQuery<AcademyProfileResponse>({
     queryKey: academyProfileKey(academyId ?? 'none'),
@@ -109,7 +104,6 @@ export function useMyPage(input: {
   return {
     profile: profileQuery.data ?? null,
     academy: academyId ? academyQuery.data ?? null : null,
-    selection,
     academyId,
     loading:
       profileQuery.isPending || (Boolean(academyId) && academyQuery.isPending),

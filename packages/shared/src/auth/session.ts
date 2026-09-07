@@ -3,17 +3,11 @@ import { z } from "zod";
 import { academyRoleSchema, platformRoleSchema } from "./roles.js";
 import { academyApplicationSummarySchema } from "../memberships/academy.js";
 
-/**
- * What the signup form is being filled in for.
- *
- * Not a role, and never stored as one. It decides one thing — whether Cove
- * asks for an email address — because an elementary student does not have one.
- * The academy role still comes only from a manager approving the join request,
- * so a `STAFF` signup that a manager approves as a `STUDENT` is legal, if odd.
+/*
+ * `signupKinds` used to be declared here and now lives in `signup-kind.ts`,
+ * which explains why. It is still exported from `@cove/shared` under the same
+ * names, through `auth/index.ts`.
  */
-export const signupKinds = ["STUDENT", "STAFF"] as const;
-export const signupKindSchema = z.enum(signupKinds);
-export type SignupKind = z.infer<typeof signupKindSchema>;
 
 export const userStatuses = [
   "PENDING_PROFILE",

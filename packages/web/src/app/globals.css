@@ -545,6 +545,29 @@ h1, h2, h3, h4 {
 @keyframes cove-hint-pulse { 50% { opacity: 0.2; } }
 
 /*
+ * A strip that scrolls sideways rather than growing downward.
+ *
+ * The terminal header is one row tall and has to stay that way: the sample
+ * chips there can number ten, and letting them wrap moved Run onto a second
+ * line and changed the height of the pane underneath. A scrollbar is not an
+ * option either — the row is 28px and a horizontal bar would take a third of
+ * it — so the overflow is scrolled rather than shown.
+ *
+ * The content inside is pushed right with `margin-left: auto` rather than the
+ * parent's `justify-content: end`, which is what keeps the *start* of an
+ * overflowing strip reachable: an auto margin resolves to zero once there is
+ * nothing spare, where `justify-end` leaves the first chips clipped off the
+ * scrollable area entirely.
+ */
+.cove-scroll-x {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.cove-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * The page going quiet while a signed-out form submits.
  *
  * Same 120ms hesitation as everything else here: a sign-in answered inside it

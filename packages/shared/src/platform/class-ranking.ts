@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { DEFAULT_POINTS_PERIOD } from "../points/period.js";
 import { pointsPeriodKindSchema } from "../points/points.js";
 
 /**
@@ -153,7 +154,7 @@ export const listPlatformRankingInputSchema = z.object({
   academyIds: z.array(z.uuid()).max(50).optional(),
   /** Drives the table's aggregates *and* the board below it. Two period
    *  controls on one screen showing two different weeks is a bug report. */
-  period: pointsPeriodKindSchema.default("day"),
+  period: pointsPeriodKindSchema.default(DEFAULT_POINTS_PERIOD),
   sort: rankingSortKeySchema.default("points"),
   direction: rankingSortDirectionSchema.default("desc"),
   page: z.number().int().min(1).default(1),

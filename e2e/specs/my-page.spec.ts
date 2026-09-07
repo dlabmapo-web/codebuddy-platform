@@ -8,11 +8,17 @@ test.describe.configure({ mode: 'serial' });
 const PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const STUDENT = process.env.E2E_STUDENT_USERNAME ?? 'cove-student';
 const MANAGER = process.env.E2E_MANAGER_EMAIL ?? 'manager@cove.test';
-const SECOND_ACADEMY_ID = 'e1000000-0000-4000-8000-000000000001';
+const SECOND_ACADEMY_SLUG = 'e2e-profile-academy';
 
+/*
+ * My Page is read inside the academy's own frame now, so its address carries
+ * the slug rather than a query value. `/account` is still there, and still
+ * global — it is what an applicant, an operator, or an account between
+ * academies gets — but it no longer expands anybody's academy profile.
+ */
 async function openMyPage(page: Page, identifier = STUDENT) {
   const academySlug = await signInAs({ page, identifier, password: PASSWORD });
-  await page.goto(`/account?academy=${academySlug}`);
+  await page.goto(routes.academyMe(academySlug));
   await expect(page.getByRole('heading', { name: /Cove Student|Cove Academy Manager/ }))
     .toBeVisible();
   return academySlug;
@@ -50,16 +56,44 @@ test('academy switching asks before discarding an unsaved draft', async ({ page 
   const academySlug = await openMyPage(page);
   await page.getByLabel('Name in this academy').fill(`Unsaved ${Date.now()}`);
 
+  // Moving to another academy is a navigation now rather than a swap in place,
+  // which is exactly why the question still has to be asked: `beforeunload`
+  // covers a reload and sees nothing of a client-side push.
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Unsaved changes' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page).toHaveURL(new RegExp(`academy=${academySlug}`));
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
 
   await page.getByRole('button', { name: /E2E Profile Academy/ }).click();
   await dialog.getByRole('button', { name: 'Discard and switch' }).click();
-  await expect(page).toHaveURL(new RegExp(`academy=${SECOND_ACADEMY_ID}`));
+  await expect(page).toHaveURL(new RegExp(`${SECOND_ACADEMY_SLUG}/me$`));
   await expect(page.getByText('E2E Profile Academy', { exact: true }).first()).toBeVisible();
+});
+
+test('My Page is reachable from the rail and from the header, and the rail stays put', async ({
+  page,
+}) => {
+  const academySlug = await signInAs({ page, identifier: STUDENT, password: PASSWORD });
+  await page.goto(routes.academy(academySlug));
+
+  const rail = page.locator('[data-slot="sidebar"]').first();
+  await expect(rail).toBeVisible();
+
+  // The row in the navigation, which wears the reader's face where every other
+  // row wears a glyph.
+  await rail.getByRole('link', { name: /my page|마이 페이지/i }).click();
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
+  // The whole point of the move: the frame is a layout above this page, so it
+  // is never torn down and rebuilt on the way in.
+  await expect(rail).toBeVisible();
+
+  // And the header avatar, which is the other way in and lands in the same
+  // place rather than at the global account page.
+  await page.goto(routes.academy(academySlug));
+  await page.getByRole('button', { name: /my page|마이 페이지/i }).first().click();
+  await page.getByRole('menuitem', { name: /my page|마이 페이지/i }).click();
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
 });
 
 test('photo cropping stays bounded and is keyboard operable', async ({ page }) => {

@@ -1,0 +1,23 @@
+{
+  "label": "알림",
+  "title": "알림",
+  "empty": "새 알림이 없습니다.",
+  "unread": "읽지 않음 {{count}}건",
+  "loading": "불러오는 중…",
+  "failed": "알림을 불러오지 못했습니다.",
+  "approved": {
+    "title": "승인되었습니다",
+    "body": "{{academy}}에서 {{role}}(으)로 승인했습니다.",
+    "body_no_role": "{{academy}}에서 신청을 승인했습니다.",
+    "action": "학원 입장하기"
+  },
+  "rejected": {
+    "title": "신청이 거절되었습니다",
+    "body": "{{academy}}에서 신청을 받지 못했습니다.",
+    "reason": "사유: {{reason}}",
+    "action": "자세히 보기"
+  },
+  "unread_badge": "새 알림 {{count}}",
+  "just_now": "방금",
+  "action_hint": "입장하면 페이지가 바로 채워집니다."
+}

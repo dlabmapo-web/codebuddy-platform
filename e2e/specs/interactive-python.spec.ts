@@ -45,7 +45,7 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   test.setTimeout(120_000);
   const academySlug = await signIn(page);
 
-  const workerResponse = await page.request.get('/pyodide-worker.js?v=6');
+  const workerResponse = await page.request.get('/pyodide-worker.js?v=7');
   expect(workerResponse.headers()['cross-origin-resource-policy']).toBe('same-origin');
   expect(workerResponse.headers()['cache-control']).toContain('immutable');
 
@@ -121,4 +121,32 @@ test('a failing run opens the error coach', async ({ page }) => {
   await expect(coachTab).toHaveCount(0);
   await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.locator('.cove-error-line')).toHaveCount(0);
+});
+
+test('output without a trailing newline belongs to the run that wrote it', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const academySlug = await signIn(page);
+
+  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
+
+  const run = page.getByRole('button', { name: /^run$|^실행$/i });
+  const terminal = page.getByTestId('terminal');
+
+  // `print(x, end=' ')` in a loop is how a student prints a list on one line,
+  // and it leaves the last write with no newline behind it.
+  await replaceEditorCode(page, 'for x in [2, 5, 1]:\n    print(x, end=" ")');
+  await expect(run).toBeEnabled({ timeout: 90_000 });
+  await run.click();
+
+  // On the first run, not held back until a later one flushes it.
+  await expect(terminal).toContainText('2 5 1', { timeout: 30_000 });
+  await expect(run).toBeEnabled();
+
+  // And the next run starts clean rather than opening with the leftovers.
+  await replaceEditorCode(page, 'print("second")');
+  await run.click();
+  await expect(terminal).toContainText('second', { timeout: 30_000 });
+  await expect(terminal).not.toContainText('2 5 1');
 });

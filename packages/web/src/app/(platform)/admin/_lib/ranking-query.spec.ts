@@ -12,9 +12,9 @@ const classId = '30000000-0000-4000-8000-000000000003';
 const academyId = '10000000-0000-4000-8000-000000000001';
 
 describe('parseRankingQuery', () => {
-  it('opens on points, descending, today', () => {
+  it('opens on points, descending, all time', () => {
     expect(parseRankingQuery('')).toMatchObject({
-      period: 'day',
+      period: 'all',
       sort: 'points',
       direction: 'desc',
       page: 1,
@@ -33,7 +33,7 @@ describe('parseRankingQuery', () => {
     expect(query).toMatchObject({
       sort: 'points',
       direction: 'desc',
-      period: 'day',
+      period: 'all',
       page: 1,
       classId: null,
     });

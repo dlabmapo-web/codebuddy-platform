@@ -9,6 +9,7 @@
   "review_failed": "The application could not be reviewed.",
   "column": {
     "applicant": "Applicant",
+    "requested": "Applied as",
     "message": "Message",
     "status": "Status",
     "applied": "Applied",
@@ -17,6 +18,9 @@
   "search_placeholder": "Search by name or email",
   "no_message": "No message",
   "review": "Review",
+  "requested_label": "They applied as",
+  "requested_note_staff": "{{name}} asked to join as staff. Student is not a staff role — pick the one they should have.",
+  "requested_note_student": "{{name}} asked to join as a student. You are about to grant a staff role.",
   "role_label": "Role to grant",
   "reason_label": "Note",
   "reason_hint": "(required to reject)",

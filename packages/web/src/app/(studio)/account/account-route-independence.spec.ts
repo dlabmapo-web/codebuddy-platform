@@ -4,7 +4,19 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-const accountRoot = fileURLToPath(new URL('.', import.meta.url));
+/*
+ * Both halves of My Page: the global route, and the sections it shares with
+ * the academy-scoped one at `/academy/{slug}/me`. The shared half is the part
+ * that matters most — it renders under a provider on one route and under none
+ * on the other, so a hook reaching for the academy context would work in
+ * testing and blank the global page in production.
+ */
+const roots = [
+  fileURLToPath(new URL('.', import.meta.url)),
+  fileURLToPath(
+    new URL('../../../components/studio/profile/my-page/', import.meta.url),
+  ),
+];
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -24,10 +36,12 @@ function sourceFiles(directory: string): string[] {
  * it travels as a prop. This keeps the whole subtree honest about that.
  */
 describe('My Page does not depend on the academy route context', () => {
-  it('imports no academy route hook anywhere under /account', () => {
-    const offenders = sourceFiles(accountRoot).filter((path) =>
-      /useAcademySlug|academy-route-provider/.test(readFileSync(path, 'utf8')),
-    );
+  it('imports no academy route hook in the global route or the shared sections', () => {
+    const offenders = roots
+      .flatMap(sourceFiles)
+      .filter((path) =>
+        /useAcademySlug|academy-route-provider/.test(readFileSync(path, 'utf8')),
+      );
 
     expect(offenders).toEqual([]);
   });

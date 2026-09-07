@@ -3,6 +3,15 @@ import type { AcademyRole, AuthMeResponse } from '@cove/shared';
 export type AcademyRouteIdentity = {
   academyId: string;
   academySlug: string;
+  /**
+   * Which source of authority answered.
+   *
+   * Read in exactly one place — the framed layout, which builds a different
+   * shell for an applicant — and never to widen anything. Every other consumer
+   * reads `roles`, which is empty for `application`, so nothing that treats an
+   * identity as a member today can start treating an applicant as one.
+   */
+  via: 'membership' | 'grant' | 'platform' | 'application';
   /** The actor's highest role in this academy. Routes that are *about* one
    *  role — which overview to render — branch on this. */
   role: AcademyRole;
@@ -29,6 +38,7 @@ export function academyIdentityFromAccount(
     ? {
         academyId: membership.academy.id,
         academySlug: membership.academy.slug,
+        via: 'membership',
         role: membership.role,
         roles: membership.roles,
       }

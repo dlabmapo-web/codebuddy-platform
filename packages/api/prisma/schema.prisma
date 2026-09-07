@@ -71,6 +71,23 @@ enum JoinRequestStatus {
   CANCELLED
 }
 
+/// What a signup said it was asking to be, before anybody decided.
+///
+/// A presentation hint and nothing else: it chooses which empty navigation an
+/// applicant is shown while they wait in the lobby. It is never read by
+/// `AcademyAccessService`, never consulted when a request is reviewed, and
+/// grants nothing on its own. The academy role still comes only from the
+/// manager who approves, bounded by `canApproveAs`.
+///
+/// Deliberately not `AcademyRole`. A staff applicant does not yet know whether
+/// they will be a teacher, a team lead or a manager — that is the decision the
+/// request exists to ask for — and a column typed as a role would invite a
+/// later reader to treat it as one.
+enum JoinRequestKind {
+  STUDENT
+  STAFF
+}
+
 enum OAuthOnboardingIntentStatus {
   PENDING
   CONSUMED
@@ -995,7 +1012,19 @@ model AcademyJoinRequest {
   userId           String            @map("user_id") @db.Uuid
   message          String?
   status           JoinRequestStatus @default(PENDING)
+  /// See `JoinRequestKind`. Defaulted rather than nullable because every row
+  /// that predates the lobby still has to render one, and the student shape is
+  /// both the common case and the narrower of the two.
+  requestedKind    JoinRequestKind   @default(STUDENT) @map("requested_kind")
   approvedRole     AcademyRole?      @map("approved_role")
+  /// When the applicant dismissed the bell for this decision.
+  ///
+  /// Null while a decision is unread, which is what draws the dot. The bell is
+  /// this row projected rather than a notification written beside it, so it
+  /// cannot disagree with the membership the same review created, a retried
+  /// review cannot produce two of it, and applications that already exist
+  /// already have a correct one.
+  acknowledgedAt   DateTime?         @map("acknowledged_at") @db.Timestamptz(6)
   reviewedByUserId String?           @map("reviewed_by_user_id") @db.Uuid
   reviewedAt       DateTime?         @map("reviewed_at") @db.Timestamptz(6)
   reviewReason     String?           @map("review_reason")

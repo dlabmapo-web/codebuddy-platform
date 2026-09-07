@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type * as React from 'react';
 import { useState, useTransition } from 'react';
-import { Moon, Sun, UserRound } from 'lucide-react';
+import { Check, Moon, Sun, UserRound } from 'lucide-react';
 import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
 import type { AcademyRole } from '@cove/shared';
 
@@ -17,7 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
-import { RoleBadge, roleDotClass } from '@/components/studio/role-badge';
+import {
+  RoleBadge,
+  roleDotClass,
+  roleSelectedClass,
+} from '@/components/studio/role-badge';
 import { LocaleFlag } from '@/components/studio/locale-flag';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
@@ -265,8 +270,17 @@ export function ProfileControl({
         ) : null}
         {name ? <DropdownMenuSeparator /> : null}
 
+        {/*
+          Inside an academy this goes to that academy's My Page, which is where
+          the reader's profile *for this academy* is edited and where the rail
+          stays on screen. The bare `/account` is the answer only where there is
+          no academy to scope to — the console, and an applicant's lobby — and
+          it is still the page an account with no membership gets.
+        */}
         <DropdownMenuItem asChild>
-          <Link href={routes.account}>
+          <Link
+            href={academySlug ? routes.academyMe(academySlug) : routes.account}
+          >
             <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
             {t('my_page')}
           </Link>
@@ -285,8 +299,17 @@ export function ProfileControl({
               value={role ?? undefined}
             >
               {held.map((option) => (
+                /*
+                 * The role in play is coloured, not just bolder.
+                 *
+                 * This menu answers a question the reader asks in a glance —
+                 * "which hat am I wearing" — and weight alone made them read
+                 * all three labels to find it. Tinted in the role's own hue,
+                 * with the tick that hue too, the answer is the first thing
+                 * seen and it matches the badge beside their name above.
+                 */
                 <DropdownMenuRadioItem
-                  className="gap-2"
+                  className={cn('gap-2', roleSelectedClass(option))}
                   key={option}
                   value={option}
                 >
@@ -295,6 +318,13 @@ export function ProfileControl({
                     className={cn('size-2 rounded-full', roleDotClass(option))}
                   />
                   {t(`common:role.${option}`)}
+                  {option === role ? (
+                    <Check
+                      aria-hidden
+                      className="ml-auto size-3.5"
+                      strokeWidth={2.5}
+                    />
+                  ) : null}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -309,8 +339,19 @@ export function ProfileControl({
 export function HeaderControls({
   className,
   account,
+  notifications,
 }: {
   className?: string;
+  /**
+   * The bell, rendered by whichever shell mounted this.
+   *
+   * A slot rather than a component imported here, because the bell needs its
+   * own translation namespace loaded on the server and this file is a client
+   * module. It sits between the theme control and the avatar: language and
+   * theme are about how the interface presents itself, and the bell and the
+   * face are both about the reader.
+   */
+  notifications?: React.ReactNode;
   /** Absent on surfaces that have no session to describe. */
   account?: {
     academyId?: string;
@@ -327,6 +368,7 @@ export function HeaderControls({
     <div className={cn('flex items-center gap-0.5', className)}>
       <LanguageControl />
       <ThemeControl />
+      {notifications}
       {account ? (
         <ProfileControl
           academyId={account.academyId}

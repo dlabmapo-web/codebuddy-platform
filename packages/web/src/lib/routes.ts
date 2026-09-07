@@ -68,6 +68,15 @@ export const routes = {
   ) =>
     `/admin/academies/${segment(academySlug)}/courses/${segment(courseId)}/lectures/${segment(lectureId)}/exercises/${segment(materialId)}`,
   academy: (academySlug: string) => academyRoot(academySlug),
+  /**
+   * My Page, read inside the academy's own frame.
+   *
+   * Academy-scoped because the page is: it edits how this person appears in
+   * *this* academy, and the slug fixes which one instead of a query parameter
+   * and a value remembered in local storage. `routes.account` stays the
+   * global address for a reader who is not standing in an academy at all.
+   */
+  academyMe: (academySlug: string) => `${academyRoot(academySlug)}/me`,
   academyClasses: (academySlug: string) =>
     `${academyRoot(academySlug)}/classes`,
   academyClass: (academySlug: string, classId: string) =>

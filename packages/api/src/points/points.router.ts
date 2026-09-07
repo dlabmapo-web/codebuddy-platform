@@ -4,10 +4,13 @@ import type { ORPCDeps, ORPCImplementer } from "../orpc/context.js";
 /**
  * Points and the class ranking.
  *
- * Both operations are reads, and the namespace has no third. A point is
- * written only by the transaction that recorded the fact it describes, so
- * there is nothing here for a request to call. §5.2 of the student points
- * design.
+ * Every board here is a read. A point is written only by the transaction that
+ * recorded the fact it describes, so no request may award one — §5.2 of the
+ * student points design, and the reason there is no mutation on a student.
+ *
+ * `policy` is the one namespace that writes, and it writes an academy: what an
+ * action pays, for everybody, before anyone has done anything. It cannot name
+ * a student and it cannot reach an award already paid.
  */
 export function createPointsRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
@@ -33,5 +36,22 @@ export function createPointsRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.pointsService.getOverviewBoard(context.identity, input)
       ),
+    policy: {
+      get: os.points.policy.get
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.pointPolicyService.get(context.identity, input)
+        ),
+      update: os.points.policy.update
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.pointPolicyService.update(context.identity, input)
+        ),
+      reset: os.points.policy.reset
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.pointPolicyService.reset(context.identity, input)
+        ),
+    },
   };
 }

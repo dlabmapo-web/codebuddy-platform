@@ -7,7 +7,7 @@
  * docs/superpowers/specs/2026-08-11-light-dark-theme-design.md true a year
  * from now.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 const webDir = resolve(import.meta.dirname, '..');
@@ -20,21 +20,22 @@ const sourceDir = resolve(webDir, 'src');
  */
 const darkSurfaces = new Set(
   [
-    'app/(auth)/auth/_components/code-preview.tsx',
-    'app/(studio)/studio/academies/[academyId]/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/starter-code-editor.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/code-editor.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/editor-pane.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/error-coach-panel.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-hero.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-metrics.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/result-panel.tsx',
-    'app/(studio)/studio/academies/[academyId]/learn/exercises/[materialId]/_components/test-result-list.tsx',
-    'app/(studio)/studio/academies/[academyId]/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/authoring-fields.tsx',
-    'app/(studio)/studio/academies/[academyId]/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/preview-modal.tsx',
-    'app/(studio)/studio/academies/[academyId]/teach/classes/[classId]/students/[membershipId]/live/_components/live-editor.tsx',
-    'app/(studio)/studio/academies/[academyId]/teach/classes/[classId]/students/[membershipId]/live/_components/live-output.tsx',
-    'app/(studio)/studio/academies/[academyId]/teach/classes/[classId]/students/[membershipId]/live/_components/preview-editor.tsx',
-    'app/(studio)/studio/academies/[academyId]/teach/classes/[classId]/students/[membershipId]/live/_components/student-run-panel.tsx',
+    'app/(auth)/_components/code-preview.tsx',
+    'app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/starter-code-editor.tsx',
+    'app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/solution-code-editor.tsx',
+    'app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/authoring-fields.tsx',
+    'app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/preview-modal.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/editor-pane.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/error-coach-panel.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-hero.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-metrics.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-panel.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/test-result-list.tsx',
+    'app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-editor.tsx',
+    'app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-output.tsx',
+    'app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/preview-editor.tsx',
+    'app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/student-run-panel.tsx',
     'components/workspace/example-card.tsx',
     'components/workspace/font-size-controls.tsx',
     'components/workspace/run-controls.tsx',
@@ -108,6 +109,23 @@ function* sourceFiles(dir) {
       yield full;
     }
   }
+}
+
+/**
+ * An allowlist keyed on route paths goes stale the moment a route is renamed,
+ * and it fails silently: the entry stops matching, the dark pane it exempted
+ * starts reporting, and the report reads as new violations rather than as a
+ * stale list. The v2 routing cutover did exactly this. Fail on the real cause.
+ */
+const missingDarkSurfaces = [...darkSurfaces].filter(
+  (rel) => !existsSync(join(sourceDir, rel)),
+);
+if (missingDarkSurfaces.length > 0) {
+  console.error(
+    'darkSurfaces lists files that no longer exist. Update the paths rather than deleting the entries — the surfaces were probably moved:\n',
+  );
+  for (const rel of missingDarkSurfaces) console.error(`  ${rel}`);
+  process.exit(1);
 }
 
 const violations = [];

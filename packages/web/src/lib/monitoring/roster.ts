@@ -2,6 +2,7 @@ import {
   canOpenLiveWorkspace,
   enrollmentGrantsAccess,
   type MonitoringLiveState,
+  type MonitoringRosterExercise,
   type MonitoringRosterStudent,
   type PresenceEntry,
 } from '@cove/shared';
@@ -21,6 +22,12 @@ export type RosterFilter = 'all' | 'online' | 'solving' | 'idle' | 'offline';
 export type RosterRow = MonitoringRosterStudent & {
   state: MonitoringLiveState;
   materialId: string | null;
+  /**
+   * Which problem, by the number and name the student sees. Null when they are
+   * not in one — and also when presence names a material the roster's courses
+   * do not, which is a curriculum edit mid-lesson rather than a broken row.
+   */
+  exercise: MonitoringRosterExercise | null;
   run: PresenceEntry['run'];
   /** False while the enrollment row exists but grants nothing. */
   active: boolean;
@@ -30,9 +37,14 @@ export type RosterRow = MonitoringRosterStudent & {
 export function mergeRoster(
   students: readonly MonitoringRosterStudent[],
   presence: readonly PresenceEntry[],
+  /** This class's courses, so a material id can be named. */
+  exercises: readonly MonitoringRosterExercise[] = [],
 ): RosterRow[] {
   const byMembership = new Map(
     presence.map((entry) => [entry.studentMembershipId, entry]),
+  );
+  const byMaterial = new Map(
+    exercises.map((exercise) => [exercise.materialId, exercise]),
   );
   return students.map((student) => {
     const entry = byMembership.get(student.membershipId);
@@ -46,6 +58,7 @@ export function mergeRoster(
       ...student,
       state,
       materialId,
+      exercise: materialId ? byMaterial.get(materialId) ?? null : null,
       run: entry?.run ?? null,
       active,
       // A suspended member is on the roster so the teacher can see why they

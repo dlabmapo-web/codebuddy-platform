@@ -29,6 +29,9 @@ function student(
     userStatus: 'ACTIVE',
     enrolledAt: '2026-08-04T09:00:00.000Z',
     lastLearningSeenAt: null,
+    academyImageUrl: null,
+    globalImageUrl: null,
+    externalAvatarUrl: null,
     ...overrides,
   };
 }
@@ -93,6 +96,39 @@ describe('mergeRoster', () => {
     );
     expect(idle!.canOpenLive).toBe(false);
     expect(online!.canOpenLive).toBe(false);
+  });
+
+  it('names the problem a student is in, as the student sees it numbered', () => {
+    const [row] = mergeRoster(
+      [student({ membershipId: 'a' })],
+      [presence('a', { state: 'SOLVING', materialId })],
+      [{ materialId, number: 14, title: 'Deque' }],
+    );
+    expect(row!.exercise).toEqual({ materialId, number: 14, title: 'Deque' });
+  });
+
+  /**
+   * A problem hidden while the class was working on it. The row must still
+   * read as somebody in an exercise — "Not in an exercise" would send the
+   * teacher looking for a student who is sitting right there.
+   */
+  it('leaves the exercise unnamed when the courses no longer hold it', () => {
+    const [row] = mergeRoster(
+      [student({ membershipId: 'a' })],
+      [presence('a', { state: 'SOLVING', materialId })],
+      [{ materialId: 'another-material', number: 1, title: 'Elsewhere' }],
+    );
+    expect(row!.exercise).toBeNull();
+    expect(row!.materialId).toBe(materialId);
+  });
+
+  it('has no exercise for a student outside one', () => {
+    const [row] = mergeRoster(
+      [student({ membershipId: 'a' })],
+      [presence('a', { state: 'ONLINE', materialId: null })],
+      [{ materialId, number: 1, title: 'Deque' }],
+    );
+    expect(row!.exercise).toBeNull();
   });
 
   it('ignores presence for somebody who is not on the roster', () => {

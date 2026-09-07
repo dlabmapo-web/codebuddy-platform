@@ -10,6 +10,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DataTable } from '@/components/studio/data-table';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLocale } from '@/i18n';
 import {
   compareLiveState,
@@ -61,15 +62,26 @@ export function RosterTable({
         cell: ({ row }) => {
           const student = row.original;
           return (
-            <div className="min-w-0 max-w-xs">
-              <p className="truncate text-[14.5px] font-bold">
-                {student.displayName ?? student.email ?? student.membershipId}
-              </p>
-              <p className="truncate text-[13px] text-sub">
-                {student.active
-                  ? (student.username ? `@${student.username}` : student.email)
-                  : t('roster.membership_inactive')}
-              </p>
+            <div className="flex min-w-0 max-w-xs items-center gap-2.5">
+              {/* Empty `alt`: the name is written right beside it, and a
+                  reader should not hear the same person twice. */}
+              <ProfileAvatar
+                academyImageUrl={student.academyImageUrl}
+                externalAvatarUrl={student.externalAvatarUrl}
+                globalImageUrl={student.globalImageUrl}
+                name={student.displayName ?? student.email}
+                size="sm"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-[14.5px] font-bold">
+                  {student.displayName ?? student.email ?? student.membershipId}
+                </p>
+                <p className="truncate text-[13px] text-sub">
+                  {student.active
+                    ? (student.username ? `@${student.username}` : student.email)
+                    : t('roster.membership_inactive')}
+                </p>
+              </div>
             </div>
           );
         },
@@ -84,15 +96,34 @@ export function RosterTable({
       },
       {
         id: 'exercise',
-        accessorFn: (row) => (row.materialId ? 1 : 0),
+        // Sorts by the problem's own number, so the column groups a class
+        // working through the same course rather than listing them at random.
+        // Nobody in an exercise sorts after everybody who is.
+        accessorFn: (row) => row.exercise?.number ?? Number.MAX_SAFE_INTEGER,
         header: t('roster.column_exercise'),
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap text-[13px] text-sub">
-            {row.original.materialId
-              ? t('roster.in_exercise')
-              : t('roster.no_exercise')}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const { exercise, materialId } = row.original;
+          if (!exercise) {
+            return (
+              <span className="whitespace-nowrap text-[13px] text-sub">
+                {/* A material the roster's courses cannot name still says the
+                    student is working — silently reading as idle would be a
+                    lie a curriculum edit could tell. */}
+                {materialId ? t('roster.in_exercise') : t('roster.no_exercise')}
+              </span>
+            );
+          }
+          return (
+            <div className="flex min-w-0 max-w-[16rem] items-center gap-2">
+              <span className="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-[12px] font-bold tabular-nums text-sub">
+                {exercise.number}
+              </span>
+              <span className="truncate text-[13.5px] font-semibold text-ink" title={exercise.title}>
+                {exercise.title}
+              </span>
+            </div>
+          );
+        },
       },
       {
         id: 'activity',

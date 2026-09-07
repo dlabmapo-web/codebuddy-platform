@@ -1,0 +1,23 @@
+{
+  "label": "Notifications",
+  "title": "Notifications",
+  "empty": "Nothing new.",
+  "unread": "{{count}} unread",
+  "loading": "Loading…",
+  "failed": "Notifications could not be loaded.",
+  "approved": {
+    "title": "You were approved",
+    "body": "{{academy}} approved you as {{role}}.",
+    "body_no_role": "{{academy}} approved your request.",
+    "action": "Enter academy"
+  },
+  "rejected": {
+    "title": "Request declined",
+    "body": "{{academy}} could not accept your request.",
+    "reason": "Reason: {{reason}}",
+    "action": "See details"
+  },
+  "unread_badge": "{{count}} new",
+  "just_now": "Just now",
+  "action_hint": "Your pages fill in as soon as you enter."
+}

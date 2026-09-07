@@ -1,0 +1,66 @@
+{
+  "status": {
+    "heading": "Under review",
+    "body": "A manager at {{academy}} is reading your request. Look around while you wait — these pages fill in the moment you are approved.",
+    "applied": "Applied {{when}}",
+    "kind_student": "Applied as a student",
+    "kind_staff": "Applied as staff"
+  },
+  "steps": {
+    "label": "Where you are",
+    "account": "Account created",
+    "review": "Under review",
+    "join": "Join a class"
+  },
+  "profile": {
+    "heading": "Complete your profile",
+    "body": "Add a photo and check your name. It is the one thing you can finish now, and it is what a manager sees beside your request.",
+    "action": "Open My Page"
+  },
+  "actions": {
+    "withdraw": "Withdraw my request",
+    "elsewhere": "Apply to a different academy",
+    "working": "Working…",
+    "failed": "That did not go through. Try again."
+  },
+  "section": {
+    "overview": {
+      "heading": "Overview"
+    },
+    "my_courses": {
+      "heading": "Your courses",
+      "title": "Your courses appear here",
+      "body": "Once a manager approves you, everything this academy teaches opens from this page."
+    },
+    "my_classes": {
+      "heading": "Your class",
+      "title": "Your class appears here",
+      "body": "Your classmates, your teacher and your schedule show up here once you are approved."
+    },
+    "records": {
+      "heading": "Answer records",
+      "title": "Your answer records appear here",
+      "body": "Every problem you solve is kept here. Nothing yet — you have not started."
+    },
+    "my_points": {
+      "heading": "Your points",
+      "title": "Your points appear here",
+      "body": "Points you earn are counted here once you join a class."
+    },
+    "courses": {
+      "heading": "Courses",
+      "title": "The curriculum appears here",
+      "body": "This academy's courses open here once a manager approves you."
+    },
+    "classes": {
+      "heading": "Classes",
+      "title": "Classes appear here",
+      "body": "The classes you run are listed here once a manager approves you."
+    },
+    "ranking": {
+      "heading": "Class ranking",
+      "title": "Class standings appear here",
+      "body": "Standings are drawn once you have a class with students in it."
+    }
+  }
+}

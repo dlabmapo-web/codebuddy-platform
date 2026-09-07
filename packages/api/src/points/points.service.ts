@@ -1,11 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
   DEFAULT_POINTS_PERIOD,
-  MIN_STUDENTS_FOR_COMPARISON,
   OVERVIEW_RANKING_MAX_ROWS,
   POINTS_LEDGER_PAGE_SIZE,
-  learningTiers,
   parsePointsPeriodKind,
+  pointRulesFrom,
   rankEntries,
   rankGap,
   resolvePointsPeriod,
@@ -172,7 +171,13 @@ export class PointsService {
   }
 
   /**
-   * Today's first five rows, for every role overview.
+   * The first five rows, for every role overview.
+   *
+   * Built on `DEFAULT_POINTS_PERIOD` rather than a period of its own, which is
+   * how it follows the pages without a second decision to keep in step. It
+   * used to be today's; it is now all time, because a manager reading the
+   * overview and then opening the ranking page must not be shown two different
+   * orders for the same class with nothing on either page explaining why.
    *
    * The complete board is built once, through the same path as the points
    * pages, before it is trimmed. That preserves ties, eligibility, `isYou`,
@@ -221,10 +226,27 @@ export class PointsService {
   /**
    * One class board.
    *
-   * The floor is checked before the rows are built, not after: below it there
-   * is nothing to render and nothing worth computing. §10.4 — a position out
-   * of two is not information, and the first thing a child learns from this
-   * product must not be that they are last.
+   * ## There is no floor on class size
+   *
+   * There was: three enrolled students, and three of them active, or the
+   * section explained itself instead of ranking anybody. §10.4 of the student
+   * points design argued it well — "a position out of two is not information"
+   * — and that argument was written for a board that reset every night, which
+   * the same section says: the floor "does most of its work on the daily
+   * board, where it is reached and crossed every morning".
+   *
+   * The default period is now all time, and a board covering the life of the
+   * class is the record rather than a coincidence at any class size. So an
+   * academy opening its first class with two children in it is shown its
+   * ranking instead of a paragraph explaining why it cannot have one. What it
+   * costs is stated plainly in §6 of the all-time ranking design: a class of
+   * two now has a visible loser and no tomorrow makes it level again.
+   *
+   * What survives is the quiet board. A class where nobody has earned anything
+   * is still told so, because a table of five students all on zero, ordered by
+   * a tiebreak they cannot see, is not a ranking of anything — but that state
+   * is now reached only by a class that has never earned a point, rather than
+   * by every class before lunchtime.
    */
   private async buildLeaderboard(
     scope: PointsScope,
@@ -269,18 +291,10 @@ export class PointsService {
       return (total?.points ?? 0) > 0 || (days.get(member.membershipId) ?? 0) > 0;
     });
 
-    if (members.length < MIN_STUDENTS_FOR_COMPARISON) {
-      return {
-        eligible: false,
-        reason: "TOO_FEW_STUDENTS",
-        classes,
-        classId: selected.classId,
-        gap: { kind: "alone" },
-      };
-    }
-    if (active.length < MIN_STUDENTS_FOR_COMPARISON) {
-      // The board is quiet, not broken. On the daily view this is reached and
-      // crossed every morning, which is exactly what it is for.
+    if (active.length === 0) {
+      // Quiet, not broken, and not the same statement as "too small". One
+      // student who has earned something is a board; a roster of any size that
+      // has earned nothing is not.
       return {
         eligible: false,
         reason: "NO_ACTIVITY_YET",
@@ -307,8 +321,11 @@ export class PointsService {
     // 오늘 means yesterday. For a student whose class met yesterday and not
     // today, that comparison is noise dressed as a result, so the daily board
     // does not draw one.
+    //
+    // All time is excluded for a harder reason: there is no period before
+    // everything, and `previousPointsPeriod` refuses rather than inventing one.
     const improved =
-      period.kind === "day"
+      period.kind === "day" || period.kind === "all"
         ? new Set<string>()
         : await this.leaderboard.improvedSince(
             scope.academyId,
@@ -340,26 +357,15 @@ export class PointsService {
     };
   }
 
-  /** What each action pays, read from the academy's own policy. */
+  /**
+   * What each action pays, read from the academy's own policy.
+   *
+   * The projection itself lives in `@cove/shared` so the manager's editor can
+   * preview a policy it has not saved yet through the same function. Two
+   * callers, one mapping: a preview cannot promise what this would not.
+   */
   private async rulesFor(academyId: string): Promise<PointRules> {
-    const policy = await this.awards.policyFor(this.prisma, academyId);
-    return {
-      solve: {
-        easy: policy.solveEasy,
-        medium: policy.solveMedium,
-        hard: policy.solveHard,
-      },
-      lectureCompleted: policy.lectureCompleted,
-      moduleCompleted: policy.moduleCompleted,
-      courseCompleted: policy.courseCompleted,
-      attendance: policy.attendance,
-      attendanceLate: policy.attendanceLate,
-      learningTiers: learningTiers(policy).map((tier) => ({
-        minutes: tier.minutes,
-        points: tier.points,
-      })),
-      dailyCap: policy.studentDailyCap,
-    };
+    return pointRulesFrom(await this.awards.policyFor(this.prisma, academyId));
   }
 
   /**

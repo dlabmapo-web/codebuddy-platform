@@ -271,7 +271,7 @@ export function CoursesTable({
             ],
           },
         ]}
-        pageSize={10}
+        pageSize={15}
         searchPlaceholder={t('search_placeholder')}
         toolbarActions={toolbarActions}
       />

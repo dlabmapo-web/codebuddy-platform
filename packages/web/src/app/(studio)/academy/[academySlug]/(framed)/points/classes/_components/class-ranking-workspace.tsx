@@ -5,7 +5,7 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import type { ClassPointsBoard, PointsPeriodKind } from '@cove/shared';
-import { pointsPeriodKinds } from '@cove/shared';
+import { DEFAULT_POINTS_PERIOD, pointsPeriodKinds } from '@cove/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowRight, School, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -60,7 +60,7 @@ export function ClassRankingWorkspace({ academyId }: { academyId: string }) {
       classId: params.get('classId'),
       period: (pointsPeriodKinds as readonly string[]).includes(period ?? '')
         ? (period as PointsPeriodKind)
-        : ('day' as PointsPeriodKind),
+        : DEFAULT_POINTS_PERIOD,
     };
   }, [searchKey]);
 
@@ -78,7 +78,9 @@ export function ClassRankingWorkspace({ academyId }: { academyId: string }) {
       setQuery(merged);
       const params = new URLSearchParams();
       if (merged.classId) params.set('classId', merged.classId);
-      if (merged.period !== 'day') params.set('period', merged.period);
+      if (merged.period !== DEFAULT_POINTS_PERIOD) {
+        params.set('period', merged.period);
+      }
       const search = params.toString();
       setUrlKey(search);
       // `replaceState`, so switching period four times does not leave Back

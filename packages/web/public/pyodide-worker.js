@@ -78,6 +78,7 @@ self.onmessage = async (e) => {
       const errorJson = await pyodide.runPythonAsync(`
 import json as _paircode_json
 import linecache as _paircode_linecache
+import sys as _paircode_sys
 import traceback as _paircode_traceback
 
 _paircode_error = None
@@ -120,6 +121,18 @@ except BaseException as _paircode_exc:
         'offset': _paircode_offset,
         'display': _paircode_display,
     }, ensure_ascii=False)
+finally:
+    # Pyodide leaves sys.stdout line-buffered, so a program whose last write has
+    # no trailing newline ends with that write still in the buffer: this run is
+    # judged on output it never handed over, and the next run's first newline
+    # flushes the leftovers into a transcript they do not belong to. Running the
+    # same code twice would then pass the second time — the sample verdict has
+    # to be made on everything the program wrote, so it is all flushed here.
+    for _paircode_stream in (_paircode_sys.stdout, _paircode_sys.stderr):
+        try:
+            _paircode_stream.flush()
+        except Exception:
+            pass
 
 _paircode_error
 `);

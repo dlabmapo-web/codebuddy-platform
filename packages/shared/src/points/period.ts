@@ -1,5 +1,5 @@
 /**
- * The three periods a ranking can cover, as calendars rather than windows.
+ * The periods a ranking can cover, as calendars rather than windows.
  *
  * `7d` and `30d` are right for a report — they answer "how has this student
  * been doing lately" from any day you happen to ask. They are wrong for a
@@ -7,13 +7,20 @@
  * the bottom, a position changes overnight for something that happened a month
  * ago, and a season can never end because it never started.
  *
- * `day` is the default. The board is a race and a race wants a start gun:
- * tomorrow morning everyone is level again, so the worst a bad day can cost is
- * a day. §6.3 and §10.2 of the student points design.
+ * `all` is the default, and is a calendar period like the rest: a fixed end,
+ * an unbounded start, and nothing that ever expires out of the bottom — which
+ * is exactly what separates it from the rolling windows above. It answers the
+ * question the other three cannot, "how has this class done since it began",
+ * and it is the only one that says something on a quiet Monday morning.
+ *
+ * `day` was the default until then, on the argument that the board is a race
+ * and a race wants a start gun. That argument is a good one and the period is
+ * still one tap away; what changed is that a start gun every morning also
+ * means a board which forgets everything a student has ever done.
  *
  * Refresh and reset are different things. Every period here is recomputed on
  * every request and never cached — the period decides only when the board
- * returns to zero.
+ * returns to zero, and `all` is the one that never does.
  */
 
 import {
@@ -25,15 +32,33 @@ import {
   type LocalDate,
 } from "../content/academy-time.js";
 
-export type PointsPeriodKind = "day" | "week" | "month";
+export type PointsPeriodKind = "all" | "day" | "week" | "month";
 
+/**
+ * Widest first, and the order is load-bearing: every period selector in the
+ * product renders its buttons by mapping this array, so this is also the order
+ * a reader sees them in and the reason the default sits at the left end.
+ */
 export const pointsPeriodKinds: readonly PointsPeriodKind[] = [
+  "all",
   "day",
   "week",
   "month",
 ] as const;
 
-export const DEFAULT_POINTS_PERIOD: PointsPeriodKind = "day";
+export const DEFAULT_POINTS_PERIOD: PointsPeriodKind = "all";
+
+/**
+ * The floor an unbounded period starts at.
+ *
+ * Deliberately not the class's creation date. `resolvePointsPeriod` has no
+ * class in scope, and the console resolves one period across many classes at
+ * once — a period whose start depends on which class you are looking at is not
+ * one period. No award can predate the class that produced it, so this and
+ * `Class.createdAt` produce identical sums; the difference is only what a
+ * label could print, and no surface prints this one.
+ */
+export const POINTS_EPOCH_DATE: LocalDate = "1970-01-01";
 
 export type PointsPeriod = {
   kind: PointsPeriodKind;
@@ -84,7 +109,12 @@ export function resolvePointsPeriod(
   let startDate: LocalDate;
   let endDate: LocalDate;
 
-  if (kind === "day") {
+  if (kind === "all") {
+    // Everything up to and including today. The end still moves with the
+    // academy's own clock, so an evening class is not split across two dates.
+    startDate = POINTS_EPOCH_DATE;
+    endDate = today;
+  } else if (kind === "day") {
     startDate = today;
     endDate = today;
   } else if (kind === "week") {
@@ -110,8 +140,17 @@ export function resolvePointsPeriod(
  *
  * Used for the rising-position marker, which asks whether a student moved up
  * since the last comparable race. Never rendered as a board of its own.
+ *
+ * There is nothing before all time, and the honest answer to "what came before
+ * everything" is not a period — so this refuses rather than inventing one. The
+ * caller is expected to have decided already: `PointsService` skips the marker
+ * for `all` exactly as it skips it for `day`, and this throw is the guard that
+ * keeps a future caller from silently comparing a board against itself.
  */
 export function previousPointsPeriod(period: PointsPeriod): PointsPeriod {
+  if (period.kind === "all") {
+    throw new Error("All time has no previous period.");
+  }
   // One day before this period opened lands inside the previous one for all
   // three kinds: the day before, the Sunday that closed last week, and the
   // last day of last month.

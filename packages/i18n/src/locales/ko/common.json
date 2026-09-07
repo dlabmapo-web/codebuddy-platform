@@ -84,6 +84,10 @@
     "REJECTED": "거절됨",
     "CANCELLED": "취소됨"
   },
+  "join_request_kind": {
+    "STUDENT": "학생",
+    "STAFF": "교직원"
+  },
   "legal": {
     "terms": "이용약관",
     "privacy": "개인정보처리방침"

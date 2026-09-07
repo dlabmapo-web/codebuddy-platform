@@ -16,7 +16,7 @@ import {
   calculateSquareCrop,
   cropProfileImage,
   type CropPosition,
-} from '../_lib/crop-image';
+} from './crop-image';
 
 const cropViewportSize = 224;
 const initialCrop: CropPosition = { zoom: 1, x: 0, y: 0 };

@@ -78,7 +78,7 @@ export function LiveOutput({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-editor-bg">
-      <div className="flex shrink-0 items-center gap-1 border-b border-white/10 bg-[#2d2d2d] px-2">
+      <div className="@container flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-2">
         <div className="flex min-w-0" role="tablist">
           {tabs.map((name) => (
             <button
@@ -120,19 +120,17 @@ export function LiveOutput({
 
         {/* Running belongs to the teacher's tab: the control and its output sit
             in the same region, and neither one reaches the student. */}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 py-1">
-          {canRun ? (
-            <RunControls
-              activeSample={activeSample}
-              onRun={onRun}
-              onRunSample={onRunSample}
-              onStop={runner.stop}
-              ready={runner.ready}
-              running={runner.running}
-              sampleTestCases={sampleTestCases}
-            />
-          ) : null}
-        </div>
+        {canRun ? (
+          <RunControls
+            activeSample={activeSample}
+            onRun={onRun}
+            onRunSample={onRunSample}
+            onStop={runner.stop}
+            ready={runner.ready}
+            running={runner.running}
+            sampleTestCases={sampleTestCases}
+          />
+        ) : null}
       </div>
 
       <div

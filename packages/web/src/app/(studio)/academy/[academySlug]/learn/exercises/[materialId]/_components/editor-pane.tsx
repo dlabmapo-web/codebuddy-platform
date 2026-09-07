@@ -157,8 +157,8 @@ export function EditorPane({
         style={{ height: outputHeight }}
         {...surfaceProps('terminal')}
       >
-        <div className="flex shrink-0 items-center gap-1 border-b border-white/10 bg-[#2d2d2d] px-2">
-          <div className="flex" role="tablist">
+        <div className="@container flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-2">
+          <div className="flex shrink-0" role="tablist">
             {tabs.map((name) => {
               const Icon = tabIcon[name];
               return (
@@ -201,17 +201,15 @@ export function EditorPane({
             })}
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 py-1">
-            <RunControls
-              activeSample={activeSample}
-              onRun={onRun}
-              onRunSample={onRunSample}
-              onStop={runner.stop}
-              ready={runner.ready}
-              running={runner.running}
-              sampleTestCases={sampleTestCases}
-            />
-          </div>
+          <RunControls
+            activeSample={activeSample}
+            onRun={onRun}
+            onRunSample={onRunSample}
+            onStop={runner.stop}
+            ready={runner.ready}
+            running={runner.running}
+            sampleTestCases={sampleTestCases}
+          />
         </div>
 
         <div

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
-import { signupKindSchema, type SignupKind } from "../auth/session.js";
+import { signupKindSchema, type SignupKind } from "../auth/signup-kind.js";
 
 /**
  * What an application says it is asking to be.

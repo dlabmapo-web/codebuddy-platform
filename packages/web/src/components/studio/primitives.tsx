@@ -90,9 +90,26 @@ function TooltipContent({
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         className={cn(
-          // `text-canvas` inverts with `bg-ink`, so the tooltip stays readable
-          // in dark, where `ink` is the near-white end of the scale.
-          'z-50 w-fit rounded-md bg-ink px-2.5 py-1.5 text-[13px] font-medium text-canvas',
+          /*
+           * The academy's blue, not the web's default black bubble.
+           *
+           * A tooltip here is almost always naming a collapsed sidebar icon —
+           * the reader has hidden the labels and is asking for one back. Brand
+           * is what the product already uses to mean "this is the thing you
+           * are pointing at": the active sidebar item, the primary button, the
+           * links in the table. A near-black bubble belonged to no design in
+           * particular, and a plain card read as a second, quieter panel
+           * floating over the first.
+           *
+           * The pale end of the blue, not the solid one. A label is a hint,
+           * and a saturated chip carries the weight of a primary button — next
+           * to the sidebar's own active item it competed with the thing it was
+           * describing. `--brand-soft` behind `--brand` is the same pairing
+           * the product uses wherever blue has to be quiet, and it inverts on
+           * its own: soft is a near-white wash in light and a deep navy in
+           * dark, with `--brand` lightening to stay legible against it.
+           */
+          'cove-pop z-50 w-fit rounded-lg border border-brand/25 bg-brand-soft px-2.5 py-1.5 text-[13px] font-semibold text-brand shadow-[var(--shadow-card)]',
           className,
         )}
         data-slot="tooltip-content"

@@ -23,6 +23,7 @@ import { courseAccent, courseAccentClasses } from '@/lib/course-accent';
 import { orpc } from '@/lib/orpc';
 
 import { academyCoursesQueryKey } from '../../courses/_lib/courses-query';
+import { useLayoutTranslation } from '@/i18n';
 
 /**
  * What head office publishes, and the one button that makes it yours.
@@ -48,7 +49,10 @@ export function LibraryBrowser({
   initialCourses: AvailableLibraryCourse[];
 }) {
   const { t } = useTranslation('academy-library');
-  const { t: courses } = useTranslation('courses');
+  // The layout instance, not this page's: `courses` and `common` are layout
+  // namespaces, and the provider above this page carries neither. Reading them
+  // from the page instance printed `path.module` into the row tooltips.
+  const { t: courses } = useLayoutTranslation(['courses', 'common']);
   const errorText = useErrorText();
   const router = useRouter();
   const queryClient = useQueryClient();

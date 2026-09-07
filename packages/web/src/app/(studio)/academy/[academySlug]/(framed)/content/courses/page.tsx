@@ -4,6 +4,7 @@ import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import {
   academyLibraryNamespaces,
+  contentNamespaces,
   destructiveNamespaces,
 } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
@@ -41,7 +42,11 @@ export default async function CoursesPage({
   // The library's vocabulary rides with this page because its rows carry the
   // provenance chips — not with every page, which is why it is not in
   // `courses`.
+  // `contentNamespaces` too. This provider replaces the instance the content
+  // layout mounts rather than adding to it, and the table's rows open the
+  // visibility confirmation, whose copy lives in `content`.
   const pageNamespaces = [
+    ...contentNamespaces,
     ...destructiveNamespaces,
     ...academyLibraryNamespaces,
   ] as const;

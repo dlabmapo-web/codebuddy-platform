@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { LearnModule } from "../learn/learn.module.js";
+import { MediaModule } from "../profile/media.module.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
 import { MonitoringAccessService } from "./monitoring-access.service.js";
 import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
@@ -35,6 +36,8 @@ import { AcademiesModule } from "../academies/academies.module.js";
     // For the outline builder only: a teacher's copy of a student's curriculum
     // is the student's own outline, read through a teacher's claim.
     LearnModule,
+    // The roster renders people, and a person has a face.
+    MediaModule,
     MonitoringRevocationModule,
     // For the activity accumulator alone. The gateway produces heartbeats; the
     // teaching module owns what they durably become.

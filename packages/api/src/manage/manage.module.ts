@@ -18,6 +18,7 @@ import { ManagerOverviewRepository } from "./manager-overview.repository.js";
 import { ManagerOverviewService } from "./manager-overview.service.js";
 import { ManagerScopeService } from "./manager-scope.service.js";
 import { PeopleBulkService } from "./people-bulk.service.js";
+import { PointPolicyService } from "./point-policy.service.js";
 import { PeopleDirectoryService } from "./people-directory.service.js";
 import { PeopleImportController } from "./people-import.controller.js";
 import { PeopleImportService } from "./people-import.service.js";
@@ -55,6 +56,7 @@ import { PeopleImportService } from "./people-import.service.js";
     ManagerOverviewRepository,
     ManagerOverviewService,
     AcademyFeaturesService,
+    PointPolicyService,
     AcademyOperationsProfileService,
     AcademyMediaService,
     PeopleDirectoryService,
@@ -70,6 +72,7 @@ import { PeopleImportService } from "./people-import.service.js";
   exports: [
     ManagerOverviewService,
     AcademyFeaturesService,
+    PointPolicyService,
     AcademyOperationsProfileService,
     PeopleDirectoryService,
     PeopleImportService,

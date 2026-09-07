@@ -3,8 +3,8 @@ import {
   DEFAULT_POINTS_PERIOD,
   OVERVIEW_RANKING_MAX_ROWS,
   POINTS_LEDGER_PAGE_SIZE,
-  learningTiers,
   parsePointsPeriodKind,
+  pointRulesFrom,
   rankEntries,
   rankGap,
   resolvePointsPeriod,
@@ -357,26 +357,15 @@ export class PointsService {
     };
   }
 
-  /** What each action pays, read from the academy's own policy. */
+  /**
+   * What each action pays, read from the academy's own policy.
+   *
+   * The projection itself lives in `@cove/shared` so the manager's editor can
+   * preview a policy it has not saved yet through the same function. Two
+   * callers, one mapping: a preview cannot promise what this would not.
+   */
   private async rulesFor(academyId: string): Promise<PointRules> {
-    const policy = await this.awards.policyFor(this.prisma, academyId);
-    return {
-      solve: {
-        easy: policy.solveEasy,
-        medium: policy.solveMedium,
-        hard: policy.solveHard,
-      },
-      lectureCompleted: policy.lectureCompleted,
-      moduleCompleted: policy.moduleCompleted,
-      courseCompleted: policy.courseCompleted,
-      attendance: policy.attendance,
-      attendanceLate: policy.attendanceLate,
-      learningTiers: learningTiers(policy).map((tier) => ({
-        minutes: tier.minutes,
-        points: tier.points,
-      })),
-      dailyCap: policy.studentDailyCap,
-    };
+    return pointRulesFrom(await this.awards.policyFor(this.prisma, academyId));
   }
 
   /**

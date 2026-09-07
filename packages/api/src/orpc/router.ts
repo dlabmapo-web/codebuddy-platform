@@ -37,6 +37,7 @@ import { createLobbyRouter } from "../lobby/lobby.router.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { createNotificationsRouter } from "../notifications/notifications.router.js";
 import { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import { PointPolicyService } from "../manage/point-policy.service.js";
 import { createAcademyFeaturesRouter } from "../manage/academy-features.router.js";
 import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
 import { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
@@ -133,6 +134,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
     managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
     academyFeaturesService: app.get(AcademyFeaturesService, { strict: false }),
+    pointPolicyService: app.get(PointPolicyService, { strict: false }),
     academyOperationsProfileService: app.get(AcademyOperationsProfileService, {
       strict: false,
     }),

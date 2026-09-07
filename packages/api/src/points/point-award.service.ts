@@ -4,6 +4,7 @@ import {
   academyLocalDate,
   applyDailyCap,
   learningTiersReached,
+  pointPolicyFrom,
   pointsForSolve,
   type PointPolicy,
 } from "@cove/shared";
@@ -79,26 +80,7 @@ export class PointAwardService {
   /** An academy's economy, or the shared defaults when it has never set one. */
   async policyFor(tx: PointsTx, academyId: string): Promise<PointPolicy> {
     const row = await tx.academyPointPolicy.findUnique({ where: { academyId } });
-    if (!row) return DEFAULT_POINT_POLICY;
-    return {
-      solveEasy: row.solveEasy,
-      solveMedium: row.solveMedium,
-      solveHard: row.solveHard,
-      lectureCompleted: row.lectureCompleted,
-      moduleCompleted: row.moduleCompleted,
-      courseCompleted: row.courseCompleted,
-      attendance: row.attendance,
-      attendanceLate: row.attendanceLate,
-      attendanceMinMinutes: row.attendanceMinMinutes,
-      attendanceGraceMinutes: row.attendanceGraceMinutes,
-      learningTimeTier1Minutes: row.learningTimeTier1Minutes,
-      learningTimeTier1Points: row.learningTimeTier1Points,
-      learningTimeTier2Minutes: row.learningTimeTier2Minutes,
-      learningTimeTier2Points: row.learningTimeTier2Points,
-      learningTimeTier3Minutes: row.learningTimeTier3Minutes,
-      learningTimeTier3Points: row.learningTimeTier3Points,
-      studentDailyCap: row.studentDailyCap,
-    };
+    return row ? pointPolicyFrom(row) : DEFAULT_POINT_POLICY;
   }
 
   /**

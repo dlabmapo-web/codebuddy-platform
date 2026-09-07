@@ -29,6 +29,7 @@ import type { LearnService } from "../learn/learn.service.js";
 import type { StudentOverviewService } from "../learn/student-overview.service.js";
 import type { SubmissionService } from "../learn/submission.service.js";
 import type { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import type { PointPolicyService } from "../manage/point-policy.service.js";
 import type { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
 import type { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
 import type { PeopleBulkService } from "../manage/people-bulk.service.js";
@@ -94,6 +95,7 @@ export type ORPCDeps = {
   teacherStudentsService: TeacherStudentsService;
   managerOverviewService: ManagerOverviewService;
   academyFeaturesService: AcademyFeaturesService;
+  pointPolicyService: PointPolicyService;
   academyOperationsProfileService: AcademyOperationsProfileService;
   peopleDirectoryService: PeopleDirectoryService;
   peopleImportService: PeopleImportService;

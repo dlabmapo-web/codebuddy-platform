@@ -10,6 +10,11 @@ import {
   pointsPageInputSchema,
   pointsPageSchema,
 } from "../../points/points.js";
+import {
+  pointPolicyInputSchema,
+  pointPolicyStateSchema,
+  pointPolicyUpdateSchema,
+} from "../../points/policy.js";
 
 /**
  * Points and the class ranking.
@@ -31,6 +36,17 @@ import {
  * tier — is a manager-only void, which excludes a row from every sum without
  * ever subtracting from a student. It is deliberately not exposed here yet;
  * §7.6 and §20.
+ *
+ * ## `policy` is not an exception to any of that
+ *
+ * Nobody may grant a point to a person. What an *action* pays is a setting,
+ * and a setting is not a grant: it applies to every student equally, it is
+ * decided before anyone has done anything, and it cannot name a child. It also
+ * cannot reach backwards — `PointAward.amount` is frozen at earn time — so a
+ * manager can change what the next solve pays and nothing else.
+ *
+ * That is the whole of the widening, and it is the reason the mutation reads
+ * an academy id and never a membership id.
  */
 export const pointsContract = {
   /**
@@ -52,4 +68,24 @@ export const pointsContract = {
   getOverviewBoard: oc
     .input(overviewPointsBoardInputSchema)
     .output(overviewPointsBoardSchema),
+  /**
+   * This academy's economy, and the one role that may change it.
+   *
+   * Manager-only on both sides. Every member can already read what an action
+   * pays, through `rules` on `getPage`; what `get` adds is the two attendance
+   * thresholds, which are operational settings rather than a promise made to a
+   * student, and the editor is their only reader.
+   */
+  policy: {
+    get: oc.input(pointPolicyInputSchema).output(pointPolicyStateSchema),
+    /** A whole policy, never a patch. The refinements are between fields. */
+    update: oc.input(pointPolicyUpdateSchema).output(pointPolicyStateSchema),
+    /**
+     * Back to the platform defaults, by deleting the row rather than writing
+     * them into it. The absence of a row keeps meaning *this academy never
+     * chose*, so an academy that resets follows any later change to the
+     * defaults instead of being frozen at today's values.
+     */
+    reset: oc.input(pointPolicyInputSchema).output(pointPolicyStateSchema),
+  },
 };

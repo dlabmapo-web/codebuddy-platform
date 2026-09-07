@@ -109,8 +109,9 @@ export async function StudioChrome({
       ];
     }
     hasPoints = (selectedMembership?.features ?? []).includes('STUDENT_POINTS');
-    // Feeds the header's way into My Page. The name is only for the initials
-    // fallback, so the global one is right even inside an academy.
+    // Feeds both ways into My Page — the header avatar and the rail's own row.
+    // The name is only for the initials fallback, so the global one is right
+    // even inside an academy.
     viewer = {
       academyImageUrl: selectedMembership?.imageUrl ?? null,
       imageUrl: account.user.imageUrl,
@@ -193,6 +194,7 @@ export async function StudioChrome({
         academies={academies}
         viewRole={viewRole}
         academyId={academyId}
+        viewer={viewer}
         canLearn={canLearn(shown)}
         /*
          * A read-only support session narrows the nav to what it can open.

@@ -71,6 +71,31 @@ test('academy switching asks before discarding an unsaved draft', async ({ page 
   await expect(page.getByText('E2E Profile Academy', { exact: true }).first()).toBeVisible();
 });
 
+test('My Page is reachable from the rail and from the header, and the rail stays put', async ({
+  page,
+}) => {
+  const academySlug = await signInAs({ page, identifier: STUDENT, password: PASSWORD });
+  await page.goto(routes.academy(academySlug));
+
+  const rail = page.locator('[data-slot="sidebar"]').first();
+  await expect(rail).toBeVisible();
+
+  // The row in the navigation, which wears the reader's face where every other
+  // row wears a glyph.
+  await rail.getByRole('link', { name: /my page|마이 페이지/i }).click();
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
+  // The whole point of the move: the frame is a layout above this page, so it
+  // is never torn down and rebuilt on the way in.
+  await expect(rail).toBeVisible();
+
+  // And the header avatar, which is the other way in and lands in the same
+  // place rather than at the global account page.
+  await page.goto(routes.academy(academySlug));
+  await page.getByRole('button', { name: /my page|마이 페이지/i }).first().click();
+  await page.getByRole('menuitem', { name: /my page|마이 페이지/i }).click();
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/me$`));
+});
+
 test('photo cropping stays bounded and is keyboard operable', async ({ page }) => {
   await openMyPage(page);
   const identity = page.locator('main section').first();

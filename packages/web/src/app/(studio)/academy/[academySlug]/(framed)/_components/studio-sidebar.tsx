@@ -49,6 +49,7 @@ import { NavPendingHint } from './nav-pending-hint';
 import { NavCountBadge, NavCountDot } from './nav-count-badge';
 import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
+import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { RoleBadge } from '@/components/studio/role-badge';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,7 @@ type NavGroup = {
 export function StudioSidebar({
   academies,
   academyId,
+  viewer,
   canLearn,
   canManageAcademy,
   canManageClasses,
@@ -94,6 +96,20 @@ export function StudioSidebar({
 }: {
   academies: StudioAcademy[];
   academyId: string;
+  /**
+   * The reader's own photographs and name, for the My Page row.
+   *
+   * That row wears a face where every other row wears a glyph, because it is
+   * the only one that leads somewhere about the reader rather than about the
+   * academy — and a face is the one icon nobody has to be taught. Null when the
+   * account lookup failed; `ProfileAvatar` draws initials, then a stand-in.
+   */
+  viewer: {
+    academyImageUrl: string | null;
+    imageUrl: string | null;
+    avatarUrl: string | null;
+    name: string | null;
+  } | null;
   /**
    * The role this reader is working as, which is what the chip under the
    * academy name shows.
@@ -126,12 +142,15 @@ export function StudioSidebar({
     hasPoints,
     isStudent,
   });
+  const myPageHref = routes.academyMe(academySlug);
   // Decided across every group: the Overview link prefixes all the others, so
-  // only the most specific match can be the active one.
-  const activeHref = activeNavHref(
-    pathname,
-    groups.flatMap((group) => group.items.map((item) => item.href)),
-  );
+  // only the most specific match can be the active one. My Page is in the set
+  // although it is in no group — it is a page of this academy, and left out
+  // the overview's prefix would claim its path.
+  const activeHref = activeNavHref(pathname, [
+    ...groups.flatMap((group) => group.items.map((item) => item.href)),
+    myPageHref,
+  ]);
   // Asked once for the whole sidebar rather than by the badge itself: the
   // collapsed rail puts the same number in a tooltip the button owns, and two
   // components reading it separately is how a dot and its tooltip end up
@@ -160,6 +179,26 @@ export function StudioSidebar({
             pendingApplications={pendingApplications}
           />
         ))}
+        {/*
+         * Last, and outside every group.
+         *
+         * My Page belongs to none of them: it is not part of the academy, of
+         * the curriculum, or of the people — it is the reader. Filed under
+         * Learning it would sit beside "My courses" and read as a student's
+         * page, which it is not; filed under Academy it would read as a
+         * setting of the academy, which it also is not.
+         *
+         * At the end rather than the head because the rail is read top-down as
+         * the academy's own shape, and the reader is not part of that shape.
+         * It also lands in the same place for every role — a student's rail
+         * has three groups above it and a manager's has five, and this is the
+         * row both of them find without counting.
+         */}
+        <MyPageRow
+          href={myPageHref}
+          isActive={activeHref === myPageHref}
+          viewer={viewer}
+        />
       </SidebarContent>
       <SidebarFooter>
         {/* Theme and language moved to the header's top right; the footer keeps
@@ -179,6 +218,77 @@ export function StudioSidebar({
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+/**
+ * The one row in the rail that wears a face.
+ *
+ * `ProfileAvatar` rather than a `lucide` glyph, and that is the whole point of
+ * it: every other row names a part of the academy and takes the icon its
+ * subject deserves; this one leads to the reader, and their own photograph
+ * says so faster than any glyph could — especially on the collapsed rail,
+ * where a row is nothing but its icon.
+ *
+ * The avatar has to fight the collapsed rail's own rule to survive it.
+ * `SidebarMenuButton` hides every direct `<span>` child at icon width, so the
+ * label disappears — which is correct — and so would the avatar, which is a
+ * span too. The override is deliberate and marked important, because the
+ * alternative at that width is a row with nothing in it at all.
+ */
+function MyPageRow({
+  href,
+  isActive,
+  viewer,
+}: {
+  href: string;
+  isActive: boolean;
+  viewer: {
+    academyImageUrl: string | null;
+    imageUrl: string | null;
+    avatarUrl: string | null;
+    name: string | null;
+  } | null;
+}) {
+  const { t } = useLayoutTranslation(['nav', 'common']);
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const collapsed = state === 'collapsed' && !isMobile;
+  const label = t('my_page');
+
+  return (
+    <SidebarGroup>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            asChild
+            isActive={isActive}
+            tooltip={collapsed ? label : undefined}
+          >
+            <Link href={href} onClick={() => setOpenMobile(false)}>
+              {/*
+                `xs`, not the header's `sm`. `ProfileAvatar` sets its width and
+                height as inline styles, so a `size-*` class cannot shrink it —
+                the size has to come from the prop, and asking for the header's
+                size here gave the rail a 32px face standing among 17px glyphs
+                and matching the avatar two corners away pixel for pixel.
+              */}
+              <ProfileAvatar
+                academyImageUrl={viewer?.academyImageUrl}
+                className={cn(
+                  'ring-1 ring-sub/30',
+                  'group-data-[collapsible=icon]:!inline-flex',
+                )}
+                externalAvatarUrl={viewer?.avatarUrl}
+                globalImageUrl={viewer?.imageUrl}
+                name={viewer?.name ?? label}
+                size="xs"
+              />
+              <span>{label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }
 

@@ -16,7 +16,7 @@ export type ProfileAvatarProps = {
   globalImageUrl?: string | null;
   externalAvatarUrl?: string | null;
   name?: string | null;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   /**
    * Screen-reader text. Left empty when the name is already written beside the
    * image, so a reader does not hear it twice.
@@ -26,6 +26,16 @@ export type ProfileAvatarProps = {
 };
 
 const sizes = {
+  /*
+   * Icon-sized, for a navigation row that stands among glyphs.
+   *
+   * The rail draws its icons at `1.05rem`, and a circle reads smaller than a
+   * square bounding box at the same measure, so this is a couple of pixels
+   * over to sit level with them rather than under them. It is deliberately not
+   * `sm`: that is the header's size, and a face repeated at identical size in
+   * two corners of the same screen reads as the same control twice.
+   */
+  xs: { pixels: 20, text: 'text-[9px]' },
   sm: { pixels: 32, text: 'text-[12px]' },
   md: { pixels: 40, text: 'text-[14px]' },
   lg: { pixels: 64, text: 'text-[22px]' },

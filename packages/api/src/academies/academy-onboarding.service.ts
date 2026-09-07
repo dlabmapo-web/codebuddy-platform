@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import { displayableEmail } from "@cove/shared";
 import type {
   CreateAcademyJoinRequest,
   JoinRequestKind,
@@ -228,7 +229,18 @@ export function toJoinRequestDetail(request: {
     // An applicant is not a member yet, so there is no academy-scoped photo to
     // find — only whatever they set on their own account. The three fields
     // still travel, so the same avatar component renders here as everywhere.
-    user: { ...request.user, ...avatar },
+    //
+    // The address goes through `displayableEmail` for the reason that helper
+    // exists: a student signs up without one, Supabase requires one anyway, and
+    // the generated `s-<uuid>@no-email.cove.invalid` reached this queue intact
+    // — sixty characters of machine noise under the applicant's name, which a
+    // manager reads as Cove being broken. Null is the honest answer, and every
+    // other people surface already gives it.
+    user: {
+      ...request.user,
+      email: displayableEmail(request.user.email),
+      ...avatar,
+    },
     message: request.message,
     status: request.status,
     // The reviewer's copy of the signup answer. Recorded since the lobby

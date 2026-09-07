@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { displayableEmail } from "@cove/shared";
 import type {
   ListPlatformApplicationsResult,
   PlatformApplication,
@@ -73,7 +74,10 @@ export class PlatformApplicationsService {
           academySlug: record.academy.slug,
           user: {
             id: record.user.id,
-            email: record.user.email,
+            // A student account has no address of its own; the generated
+            // placeholder is not one an operator can read, write to, or search
+            // for, so it never leaves the server.
+            email: displayableEmail(record.user.email),
             displayName: record.user.displayName,
             ...(avatars.get(record.id) ?? noMemberAvatar),
           },

@@ -69,7 +69,13 @@ export function ApplicationsTable({
               />
               <div className="min-w-0">
                 <p className="truncate font-semibold">{name}</p>
-                <p className="truncate text-[13px] text-sub">{user.email}</p>
+                {/* A student signs up without an address, and the server sends
+                    null rather than the placeholder it stores. The line goes
+                    with it — an empty one under the name would read as an
+                    address that failed to load. */}
+                {user.email ? (
+                  <p className="truncate text-[13px] text-sub">{user.email}</p>
+                ) : null}
               </div>
             </div>
           );

@@ -84,6 +84,10 @@
     "REJECTED": "Rejected",
     "CANCELLED": "Cancelled"
   },
+  "join_request_kind": {
+    "STUDENT": "Student",
+    "STAFF": "Staff"
+  },
   "legal": {
     "terms": "Terms",
     "privacy": "Privacy"

@@ -19,6 +19,7 @@ import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
 import { facetSelection } from '@/components/studio/data-table-state';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
+import { RequestedKindBadge } from '@/components/studio/role-badge';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { routes } from '@/lib/routes';
@@ -105,8 +106,18 @@ export function ApplicationsTable({
                 size="sm"
               />
               <div className="min-w-0">
-                <span className="block truncate text-[14px] font-bold text-ink">
-                  {name}
+                {/* Beside the name rather than in a column of its own: this
+                    queue already carries six, and what somebody asked to be is
+                    part of who is asking. The operator reviewing them needs it
+                    for the same reason the academy's own manager does. */}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[14px] font-bold text-ink">
+                    {name}
+                  </span>
+                  <RequestedKindBadge
+                    className="shrink-0"
+                    kind={row.original.requestedKind}
+                  />
                 </span>
                 <span className="block truncate font-mono text-[12px] text-sub">
                   {user.email ?? '—'}

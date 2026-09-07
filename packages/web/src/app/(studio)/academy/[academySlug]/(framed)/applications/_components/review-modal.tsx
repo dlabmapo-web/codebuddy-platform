@@ -1,15 +1,16 @@
 'use client';
 
-import type { AcademyRole } from '@cove/shared';
+import type { AcademyRole, JoinRequestKind } from '@cove/shared';
 import { useState } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
+import { RequestedKindBadge } from '@/components/studio/role-badge';
 import { useLayoutTranslation } from '@/i18n';
 
 import { RoleSelector } from '../../_components/role-selector';
 
 /**
- * The three fields this dialog reads from an application.
+ * The four fields this dialog reads from an application.
  *
  * Structural rather than the manager hook's row type, because the console's
  * cross-academy queue renders the same dialog over its own payload. Naming the
@@ -19,6 +20,7 @@ import { RoleSelector } from '../../_components/role-selector';
  */
 export type ReviewableApplication = {
   message: string | null;
+  requestedKind: JoinRequestKind;
   user: { displayName: string | null; email: string | null };
 };
 
@@ -70,6 +72,21 @@ export function ReviewModal({
   const applicant =
     request.user.displayName ?? request.user.email ?? t('common:fallback.user');
   const blocked = approveBlockedReason?.(role, reason) ?? null;
+  /*
+   * Which way the grant and the request disagree, or null when they agree.
+   *
+   * A hint, exactly as the field is everywhere else: nothing here changes what
+   * may be granted, and `canApproveAs` on the server is still the only thing
+   * that bounds it. Staff covers three roles, so "asked as staff" is satisfied
+   * by any of them and only `STUDENT` contradicts it.
+   */
+  const grantsStaff = role !== 'STUDENT';
+  const mismatch: JoinRequestKind | null =
+    request.requestedKind === 'STAFF' && !grantsStaff
+      ? 'STAFF'
+      : request.requestedKind === 'STUDENT' && grantsStaff
+        ? 'STUDENT'
+        : null;
 
   return (
     <Modal
@@ -90,6 +107,23 @@ export function ReviewModal({
             </blockquote>
           ) : null}
 
+          {/*
+            What they asked for, above the field that answers it.
+
+            The dialog opens on Student regardless, so a staff applicant and a
+            student applicant presented the reviewer with an identical screen —
+            and the quickest path through it, press Approve, was right for one
+            of them and wrong for the other. Stating the request here does not
+            decide anything: the grant is still whatever the selector below
+            says. It just stops the decision being made without it.
+          */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas px-3.5 py-2.5">
+            <span className="text-[13px] font-bold text-sub">
+              {t('requested_label')}
+            </span>
+            <RequestedKindBadge kind={request.requestedKind} />
+          </div>
+
           <div className="grid gap-1.5">
             <span className="text-[14px] font-bold">{t('role_label')}</span>
             <RoleSelector
@@ -98,6 +132,22 @@ export function ReviewModal({
               roles={roles}
               value={role}
             />
+            {/*
+              Only when the two disagree. A note that is always on the screen is
+              furniture; this one appears exactly when the grant about to be
+              made is not the one that was asked for, which is the only moment
+              it carries information.
+            */}
+            {mismatch ? (
+              <p className="text-[12.5px] font-semibold leading-[1.5] text-draft">
+                {t(
+                  mismatch === 'STAFF'
+                    ? 'requested_note_staff'
+                    : 'requested_note_student',
+                  { name: applicant },
+                )}
+              </p>
+            ) : null}
           </div>
 
           <label className="grid gap-1.5">

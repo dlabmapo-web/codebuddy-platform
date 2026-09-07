@@ -2,7 +2,7 @@
 
 import { GraduationCap, ShieldCheck, UserCog, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { AcademyRole } from '@cove/shared';
+import type { AcademyRole, JoinRequestKind } from '@cove/shared';
 
 import { useLayoutTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
@@ -115,6 +115,59 @@ export function RoleBadge({
         <Icon aria-hidden className="size-3" strokeWidth={2.25} />
       ) : null}
       {t(`role.${role}`)}
+    </span>
+  );
+}
+
+/**
+ * What an applicant asked to be, which is not yet a role.
+ *
+ * ## Why staff is a gradient
+ *
+ * Every other chip in this file is one flat hue, and this one deliberately is
+ * not. "Staff" stands for three roles — teacher, team lead, manager — and
+ * which of them this person should be is the entire question the reviewer is
+ * about to answer. Painting the chip in any single staff hue would answer it
+ * in the queue, before anybody decided: a violet chip reads as "teacher" to a
+ * manager who has learned the palette from the roster.
+ *
+ * So it wears all three, left to right in the order the roles rank, over a
+ * violet hairline. It is unmistakably staff, unmistakably colourful, and
+ * unmistakably not any one of them — and it cannot be confused with a
+ * `RoleBadge`, because no role badge is ever a gradient.
+ *
+ * The student chip stays flat brand blue. That answer is already whole: there
+ * is one student role, and it is the academy's own colour.
+ */
+export function RequestedKindBadge({
+  className,
+  kind,
+}: {
+  className?: string;
+  kind: JoinRequestKind;
+}) {
+  const { t } = useLayoutTranslation('common');
+  const staff = kind === 'STAFF';
+  const Icon = staff ? ShieldCheck : GraduationCap;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-bold ring-1 ring-inset',
+        staff
+          ? 'bg-gradient-to-r from-peer/20 via-teal/20 to-primary/20 text-ink ring-peer/25'
+          : 'bg-brand/10 text-brand ring-brand/20',
+        className,
+      )}
+    >
+      {/* The icon takes the gradient's first stop rather than the label's ink,
+          so the chip has a point of real colour to lead with at chip size. */}
+      <Icon
+        aria-hidden
+        className={cn('size-3.5', staff && 'text-peer')}
+        strokeWidth={2.25}
+      />
+      {t(`join_request_kind.${kind}`)}
     </span>
   );
 }

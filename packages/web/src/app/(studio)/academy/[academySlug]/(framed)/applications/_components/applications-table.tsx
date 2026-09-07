@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/studio/button';
 import { DataTable } from '@/components/studio/data-table';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
+import { RequestedKindBadge } from '@/components/studio/role-badge';
 import { useLayoutTranslation, useLocale } from '@/i18n';
 
 import type {
@@ -73,6 +74,24 @@ export function ApplicationsTable({
             </div>
           );
         },
+      },
+      {
+        /*
+         * Next to the name, because it is part of who is asking.
+         *
+         * The queue used to show a name, a message and a date, which made
+         * somebody who chose Staff at signup indistinguishable from somebody
+         * who chose Student — and the review dialog opened on Student either
+         * way. A manager working down the list had nothing to read that would
+         * have stopped them.
+         */
+        id: 'requested',
+        accessorFn: (request) => request.requestedKind,
+        header: t('column.requested'),
+        filterFn: 'arrIncludesSome',
+        cell: ({ row }) => (
+          <RequestedKindBadge kind={row.original.requestedKind} />
+        ),
       },
       {
         id: 'message',

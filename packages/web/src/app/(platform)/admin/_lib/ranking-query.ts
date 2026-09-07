@@ -5,6 +5,7 @@ import type {
 } from '@cove/shared';
 import {
   PLATFORM_RANKING_PAGE_SIZE,
+  DEFAULT_POINTS_PERIOD,
   pointsPeriodKinds,
   rankingSortDirections,
   rankingSortKeys,
@@ -56,7 +57,7 @@ export function parseRankingQuery(search: string): RankingQuery {
       .slice(0, 50),
     period: (pointsPeriodKinds as readonly string[]).includes(period)
       ? (period as PointsPeriodKind)
-      : 'day',
+      : DEFAULT_POINTS_PERIOD,
     sort: (rankingSortKeys as readonly string[]).includes(sort)
       ? (sort as RankingSortKey)
       : 'points',
@@ -86,7 +87,7 @@ export function serializeRankingQuery(query: RankingQuery): string {
   const params = new URLSearchParams();
   if (query.query) params.set('q', query.query);
   for (const id of [...(query.academyIds ?? [])].sort()) params.append('in', id);
-  if (query.period !== 'day') params.set('period', query.period);
+  if (query.period !== DEFAULT_POINTS_PERIOD) params.set('period', query.period);
   if (query.sort !== 'points') params.set('sort', query.sort);
   if (query.direction !== 'desc') params.set('dir', query.direction);
   if (query.page > 1) params.set('page', String(query.page));

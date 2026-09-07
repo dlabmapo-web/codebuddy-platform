@@ -44,7 +44,6 @@ export function OverviewRankingCard({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('points');
-  const locale = useLocale();
   const preferred = preferredClassId ?? null;
   const [selection, setSelection] = React.useState({
     classId: preferred,
@@ -96,15 +95,18 @@ export function OverviewRankingCard({
     (entry) => entry.classId === selectedClassId,
   );
   const isStale = result.isFetching || result.isPlaceholderData;
-  const date = new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: period.timeZone,
-  }).format(new Date(period.startsAt));
+  /*
+   * The link carries the period the card is showing.
+   *
+   * It used to hardcode `period=day`, which was correct while the card was
+   * always today's. It is not any more: the card follows the shared default,
+   * and a "see full ranking" that quietly re-ranked the class on the way is the
+   * one thing this link must not do.
+   */
   const fullHref = selectedClassId
     ? `${routes.academy(academySlug)}/points${
         audience === 'staff' ? '/classes' : ''
-      }?period=day&classId=${selectedClassId}`
+      }?period=${period.kind}&classId=${selectedClassId}`
     : null;
 
   return (
@@ -132,7 +134,7 @@ export function OverviewRankingCard({
           ? t('preview.participants', { count: leaderboard.participants })
           : undefined
       }
-      scope={t('preview.scope', { date })}
+      scope={t('preview.scope')}
       title={t('preview.title')}
       tone="primary"
     >

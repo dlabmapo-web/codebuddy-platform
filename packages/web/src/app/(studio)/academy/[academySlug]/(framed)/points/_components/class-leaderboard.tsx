@@ -90,15 +90,29 @@ export function ClassLeaderboard({
   const { t } = useTranslation('points');
   const locale = useLocale();
 
+  /*
+   * A class of one is shown its points, not a position.
+   *
+   * "1st of 1" is not a fact about anybody, and it is the one part of the old
+   * three-student floor whose objection survives it: a board with a single row
+   * has nothing to rank. Two rows is a ranking — small, and honest — so the
+   * column returns as soon as there is somebody to be ahead of.
+   */
+  const ranked = (board?.eligible === true ? board.rows.length : 0) > 1;
+
   const columns = React.useMemo<ColumnDef<LeaderboardRow>[]>(
     () => [
-      {
-        id: 'position',
-        header: t('board.column.position'),
-        enableSorting: false,
-        size: 104,
-        cell: ({ row }) => <RankCell locale={locale} row={row.original} />,
-      },
+      ...(ranked
+        ? [
+            {
+              id: 'position',
+              header: t('board.column.position'),
+              enableSorting: false,
+              size: 104,
+              cell: ({ row }) => <RankCell locale={locale} row={row.original} />,
+            } satisfies ColumnDef<LeaderboardRow>,
+          ]
+        : []),
       {
         id: 'student',
         // The one column the search reads. Sorting stays off: position is the
@@ -291,7 +305,7 @@ export function ClassLeaderboard({
           ]
         : []),
     ],
-    [locale, rowAction, t],
+    [locale, ranked, rowAction, t],
   );
 
   const classes = board?.classes ?? [];
@@ -315,6 +329,7 @@ export function ClassLeaderboard({
       {board === null || board.eligible === false ? (
         <BoardUnavailable
           onSelectPeriod={onSelectPeriod}
+          period={periodKind}
           reason={board?.reason ?? null}
         />
       ) : (
@@ -557,15 +572,22 @@ function RankCell({ locale, row }: { locale: string; row: LeaderboardRow }) {
 /**
  * Why there is no board, and what to do instead.
  *
- * Never a blank panel and never a zero. On the daily view the quiet state is
- * reached and crossed every morning, which is exactly what it is for — so it
- * offers the week rather than leaving a child looking at nothing.
+ * Never a blank panel and never a zero. On a narrow period the quiet state is
+ * ordinary — nobody has worked *today* — so it offers the widest period, where
+ * anything the class has ever earned is counted.
+ *
+ * On all time it offers nothing, and that is the point: if the widest period
+ * is empty then every narrower one is too, and a button that moved the reader
+ * to another empty board would be a lie about where the points are.
  */
 function BoardUnavailable({
   onSelectPeriod,
+  period,
   reason,
 }: {
   onSelectPeriod: (period: PointsPeriodKind) => void;
+  /** The period being shown, which decides whether a wider one exists. */
+  period: PointsPeriodKind;
   reason: string | null;
 }) {
   const { t } = useTranslation('points');
@@ -574,16 +596,18 @@ function BoardUnavailable({
     return (
       <EmptyState
         action={
-          <button
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] font-bold text-brand transition-colors hover:border-brand hover:bg-brand-soft"
-            onClick={() => onSelectPeriod('week')}
-            type="button"
-          >
-            <CalendarRange aria-hidden className="size-4" />
-            {t('board.quiet_action')}
-          </button>
+          period === 'all' ? undefined : (
+            <button
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] font-bold text-brand transition-colors hover:border-brand hover:bg-brand-soft"
+              onClick={() => onSelectPeriod('all')}
+              type="button"
+            >
+              <CalendarRange aria-hidden className="size-4" />
+              {t('board.quiet_action')}
+            </button>
+          )
         }
-        body={t('board.quiet_hint')}
+        body={t(period === 'all' ? 'board.quiet_hint' : 'board.quiet_hint_period')}
         icon={Users}
         title={t('board.quiet')}
         tone="primary"

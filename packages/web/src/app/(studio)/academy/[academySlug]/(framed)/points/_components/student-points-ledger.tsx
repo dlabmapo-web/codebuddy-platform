@@ -39,13 +39,21 @@ export function StudentPointsLedger({
   const { t } = useTranslation('points');
   const locale = useLocale();
 
+  /*
+   * All time has a start but not one worth printing: the period is unbounded
+   * below and its floor is a sentinel, so the range would read "1 Jan 1970 –
+   * today". The end date alone would be worse — it looks like a single day.
+   * So the widest period names itself and every other one prints its dates.
+   */
   const rangeLabel =
-    page.period.startDate === page.period.endDate
-      ? formatDate(page.period.startDate, locale)
-      : `${formatDate(page.period.startDate, locale)} – ${formatDate(
-          page.period.endDate,
-          locale,
-        )}`;
+    page.period.kind === 'all'
+      ? t('period.all')
+      : page.period.startDate === page.period.endDate
+        ? formatDate(page.period.startDate, locale)
+        : `${formatDate(page.period.startDate, locale)} – ${formatDate(
+            page.period.endDate,
+            locale,
+          )}`;
 
   return (
     <div className="flex flex-col gap-5">

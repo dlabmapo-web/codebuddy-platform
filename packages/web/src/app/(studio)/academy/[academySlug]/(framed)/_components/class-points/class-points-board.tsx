@@ -1,7 +1,7 @@
 'use client';
 
 import type { PointsPeriodKind } from '@cove/shared';
-import { pointsPeriodKinds } from '@cove/shared';
+import { DEFAULT_POINTS_PERIOD, pointsPeriodKinds } from '@cove/shared';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,7 +33,8 @@ export function ClassPointsBoard({
   classId: string;
 }) {
   const { t } = useTranslation('points');
-  const [period, setPeriod] = React.useState<PointsPeriodKind>('day');
+  const [period, setPeriod] =
+    React.useState<PointsPeriodKind>(DEFAULT_POINTS_PERIOD);
 
   const board = useQuery({
     queryKey: ['class-points-board', academyId, classId, period],

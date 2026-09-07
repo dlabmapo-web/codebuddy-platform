@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type * as React from 'react';
 import { useState, useTransition } from 'react';
-import { Moon, Sun, UserRound } from 'lucide-react';
+import { Check, Moon, Sun, UserRound } from 'lucide-react';
 import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
 import type { AcademyRole } from '@cove/shared';
 
@@ -18,7 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
-import { RoleBadge, roleDotClass } from '@/components/studio/role-badge';
+import {
+  RoleBadge,
+  roleDotClass,
+  roleSelectedClass,
+} from '@/components/studio/role-badge';
 import { LocaleFlag } from '@/components/studio/locale-flag';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLayoutTranslation, useLocale } from '@/i18n';
@@ -286,8 +290,17 @@ export function ProfileControl({
               value={role ?? undefined}
             >
               {held.map((option) => (
+                /*
+                 * The role in play is coloured, not just bolder.
+                 *
+                 * This menu answers a question the reader asks in a glance —
+                 * "which hat am I wearing" — and weight alone made them read
+                 * all three labels to find it. Tinted in the role's own hue,
+                 * with the tick that hue too, the answer is the first thing
+                 * seen and it matches the badge beside their name above.
+                 */
                 <DropdownMenuRadioItem
-                  className="gap-2"
+                  className={cn('gap-2', roleSelectedClass(option))}
                   key={option}
                   value={option}
                 >
@@ -296,6 +309,13 @@ export function ProfileControl({
                     className={cn('size-2 rounded-full', roleDotClass(option))}
                   />
                   {t(`common:role.${option}`)}
+                  {option === role ? (
+                    <Check
+                      aria-hidden
+                      className="ml-auto size-3.5"
+                      strokeWidth={2.5}
+                    />
+                  ) : null}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>

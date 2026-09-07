@@ -23,26 +23,34 @@ import { cn } from '@/lib/utils';
  */
 const roleStyles: Record<
   AcademyRole,
-  { chip: string; dot: string; icon: LucideIcon }
+  { chip: string; dot: string; selected: string; icon: LucideIcon }
 > = {
   STUDENT: {
     chip: 'bg-brand/10 text-brand',
     dot: 'bg-brand',
+    selected:
+      'data-[state=checked]:bg-brand/10 data-[state=checked]:text-brand data-[state=checked]:focus:bg-brand/15 data-[state=checked]:focus:text-brand',
     icon: GraduationCap,
   },
   TEACHER: {
     chip: 'bg-peer/10 text-peer',
     dot: 'bg-peer',
+    selected:
+      'data-[state=checked]:bg-peer/10 data-[state=checked]:text-peer data-[state=checked]:focus:bg-peer/15 data-[state=checked]:focus:text-peer',
     icon: UserRound,
   },
   TEAM_LEAD: {
     chip: 'bg-teal/10 text-teal',
     dot: 'bg-teal',
+    selected:
+      'data-[state=checked]:bg-teal/10 data-[state=checked]:text-teal data-[state=checked]:focus:bg-teal/15 data-[state=checked]:focus:text-teal',
     icon: ShieldCheck,
   },
   MANAGER: {
     chip: 'bg-primary/10 text-primary',
     dot: 'bg-primary',
+    selected:
+      'data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary data-[state=checked]:focus:bg-primary/15 data-[state=checked]:focus:text-primary',
     icon: UserCog,
   },
 };
@@ -50,6 +58,27 @@ const roleStyles: Record<
 /** The role's colour as a plain dot, for menus that align their own labels. */
 export function roleDotClass(role: AcademyRole): string {
   return roleStyles[role].dot;
+}
+
+/**
+ * The chosen row of a role menu, wearing the role's colour rather than weight.
+ *
+ * A checked menu row states its state in bold ink, which is the right default
+ * when the options are alternatives of the same kind — languages, themes. The
+ * roles are not that: the reader is asking "which hat am I wearing right now",
+ * and the answer has a colour they already know from the badge beside their
+ * name and from every roster in the academy. Bold ink makes them read four
+ * labels to find it; the colour is seen before any of them are read.
+ *
+ * Keyed off `data-[state=checked]` so the row keeps its resting and hover
+ * styles from the menu primitive and only the chosen one is tinted. The
+ * `focus` pair is not redundant: the primitive paints a highlighted row in
+ * `accent`/`ink`, at the same specificity as a lone data variant, and which of
+ * the two won would then come down to the order Tailwind happened to emit
+ * them in. Stacked, the chosen row keeps its hue while the pointer is on it.
+ */
+export function roleSelectedClass(role: AcademyRole): string {
+  return roleStyles[role].selected;
 }
 
 /**

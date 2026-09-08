@@ -20,10 +20,115 @@
     "label": "Audit pages",
     "position": "Page {{page}} of {{total}}",
     "previous": "Newer",
-    "next": "Older"
+    "next": "Older",
+    "entries_one": "{{count}} entry",
+    "entries_other": "{{count}} entries"
   },
   "unavailable": {
     "title": "The audit trail is unavailable",
     "body": "The platform could not be reached. Try again shortly."
+  },
+  "day_count_one": "{{count}} entry",
+  "day_count_other": "{{count}} entries",
+  "action": {
+    "academy": {
+      "feature": {
+        "updated": "Feature switched"
+      },
+      "invitation": {
+        "accepted": "Invitation accepted",
+        "created": "Invitation sent",
+        "resent": "Invitation resent",
+        "revoked": "Invitation revoked"
+      },
+      "member": {
+        "password": {
+          "issued": "Student password issued",
+          "revealed": "Student password revealed"
+        }
+      },
+      "membership": {
+        "restored": "Member restored",
+        "suspended": "Member suspended"
+      },
+      "people": {
+        "imported": "People imported"
+      },
+      "profile": {
+        "update": "Academy profile updated"
+      }
+    },
+    "class": {
+      "assistants": {
+        "updated": "Class assistants changed"
+      },
+      "courses": {
+        "updated": "Class courses changed"
+      },
+      "created": "Class created",
+      "deleted": "Class deleted",
+      "schedule": {
+        "updated": "Class schedule changed"
+      },
+      "student": {
+        "removed": "Student removed from class"
+      },
+      "students": {
+        "enrolled": "Students enrolled"
+      },
+      "teacher": {
+        "assigned": "Teacher assigned",
+        "removed": "Teacher removed",
+        "replaced": "Teacher replaced"
+      },
+      "updated": "Class updated"
+    },
+    "content": {
+      "course": {
+        "created": "Course created",
+        "deleted": "Course deleted",
+        "updated": "Course updated"
+      },
+      "lecture": {
+        "created": "Lecture created",
+        "deleted": "Lecture deleted",
+        "reordered": "Lectures reordered",
+        "updated": "Lecture updated"
+      }
+    },
+    "platform": {
+      "academy": {
+        "archived": "Academy archived",
+        "created": "Academy created",
+        "deleted": "Academy deleted",
+        "restored": "Academy reopened",
+        "suspended": "Academy suspended",
+        "updated": "Academy updated"
+      },
+      "admin": {
+        "granted": "Platform admin granted"
+      },
+      "library": {
+        "course": {
+          "created": "Library course created"
+        },
+        "created": "Library created"
+      },
+      "organization": {
+        "created": "Organization created"
+      },
+      "support": {
+        "granted": "Support session opened",
+        "revoked": "Support session ended"
+      },
+      "user": {
+        "participation": {
+          "read": "Account history read"
+        }
+      },
+      "users": {
+        "exported": "User list exported"
+      }
+    }
   }
 }

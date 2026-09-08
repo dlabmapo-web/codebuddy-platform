@@ -20,10 +20,115 @@
     "label": "감사 기록 페이지",
     "position": "{{total}}쪽 중 {{page}}쪽",
     "previous": "최신",
-    "next": "이전"
+    "next": "이전",
+    "entries_one": "{{count}}건",
+    "entries_other": "{{count}}건"
   },
   "unavailable": {
     "title": "감사 기록을 불러올 수 없습니다",
     "body": "플랫폼에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."
+  },
+  "day_count_one": "{{count}}건",
+  "day_count_other": "{{count}}건",
+  "action": {
+    "academy": {
+      "feature": {
+        "updated": "기능 변경"
+      },
+      "invitation": {
+        "accepted": "초대 수락",
+        "created": "초대 발송",
+        "resent": "초대 재발송",
+        "revoked": "초대 취소"
+      },
+      "member": {
+        "password": {
+          "issued": "학생 비밀번호 발급",
+          "revealed": "학생 비밀번호 확인"
+        }
+      },
+      "membership": {
+        "restored": "구성원 복구",
+        "suspended": "구성원 정지"
+      },
+      "people": {
+        "imported": "구성원 일괄 등록"
+      },
+      "profile": {
+        "update": "아카데미 정보 수정"
+      }
+    },
+    "class": {
+      "assistants": {
+        "updated": "보조 선생님 변경"
+      },
+      "courses": {
+        "updated": "반 코스 변경"
+      },
+      "created": "반 생성",
+      "deleted": "반 삭제",
+      "schedule": {
+        "updated": "반 시간표 변경"
+      },
+      "student": {
+        "removed": "반에서 학생 제외"
+      },
+      "students": {
+        "enrolled": "학생 배정"
+      },
+      "teacher": {
+        "assigned": "담당 선생님 지정",
+        "removed": "담당 선생님 해제",
+        "replaced": "담당 선생님 교체"
+      },
+      "updated": "반 정보 수정"
+    },
+    "content": {
+      "course": {
+        "created": "코스 생성",
+        "deleted": "코스 삭제",
+        "updated": "코스 수정"
+      },
+      "lecture": {
+        "created": "강의 생성",
+        "deleted": "강의 삭제",
+        "reordered": "강의 순서 변경",
+        "updated": "강의 수정"
+      }
+    },
+    "platform": {
+      "academy": {
+        "archived": "아카데미 보관",
+        "created": "아카데미 생성",
+        "deleted": "아카데미 삭제",
+        "restored": "아카데미 재개",
+        "suspended": "아카데미 정지",
+        "updated": "아카데미 수정"
+      },
+      "admin": {
+        "granted": "플랫폼 관리자 권한 부여"
+      },
+      "library": {
+        "course": {
+          "created": "라이브러리 코스 생성"
+        },
+        "created": "라이브러리 생성"
+      },
+      "organization": {
+        "created": "조직 생성"
+      },
+      "support": {
+        "granted": "지원 세션 시작",
+        "revoked": "지원 세션 종료"
+      },
+      "user": {
+        "participation": {
+          "read": "계정 활동 조회"
+        }
+      },
+      "users": {
+        "exported": "사용자 목록 내보내기"
+      }
+    }
   }
 }

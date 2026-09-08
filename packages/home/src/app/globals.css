@@ -545,21 +545,74 @@ h4 {
  * Scroll reveals are visible by default. The observer opts below-fold
  * elements into motion only after hydration, then reveals each one once.
  */
+/*
+ * Server-rendered content is visible. `data-reveal-ready` is added by the
+ * observer once it is running, and only to elements still below the fold, so
+ * nothing is ever hidden from a reader without JavaScript.
+ */
 .cove-reveal {
   opacity: 1;
 }
 
 .cove-reveal[data-reveal-ready="true"] {
   opacity: 0;
-  transform: translateY(16px);
-  transition:
-    opacity 620ms cubic-bezier(0.22, 0.68, 0, 1),
-    transform 620ms cubic-bezier(0.22, 0.68, 0, 1);
+  transform: translateY(32px);
+  /*
+   * Deliberately no transition on the hidden state. The attribute is added
+   * after first paint, when the element is already drawn at full opacity, so a
+   * transition here would fade it OUT over the same 700ms before it could rise
+   * in — a visible blink on anything near the fold. Declaring the transition
+   * on the shown state below gives the animation one direction: in.
+   */
 }
 
 .cove-reveal[data-reveal-ready="true"][data-shown="true"] {
   opacity: 1;
   transform: none;
+  /*
+   * A long, hard decelerate rather than a symmetric ease: the text arrives
+   * quickly and settles slowly, which reads as the line coming to rest instead
+   * of sliding to a stop. 32px is the smallest travel that still reads as
+   * movement at a glance — 16px was invisible unless you were watching for it.
+   */
+  transition:
+    opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * A section header arrives a line at a time: eyebrow, then heading, then lead.
+ *
+ * The block still reveals as one — the observer watches the wrapper — but the
+ * wrapper itself no longer moves, or the reader would see the whole header
+ * travel and its lines travel again inside it. Only the children move, each
+ * 90ms behind the one above, which is what makes a heading read as arriving
+ * rather than appearing.
+ */
+.cove-reveal-stagger[data-reveal-ready="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"] > * {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > * {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > :nth-child(2) {
+  transition-delay: 90ms;
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > :nth-child(3) {
+  transition-delay: 180ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -568,7 +621,8 @@ h4 {
     animation: none;
   }
 
-  .cove-reveal[data-reveal-ready="true"] {
+  .cove-reveal[data-reveal-ready="true"],
+  .cove-reveal-stagger[data-reveal-ready="true"] > * {
     opacity: 1;
     transform: none;
     transition: none;

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Reveal } from "@/components/site/reveal";
 import { RichText } from "@/components/site/rich-text";
-import { Screenshot, StudentMock } from "@/components/site/screenshot";
+import { Screenshot } from "@/components/site/screenshot";
 import { Section, SectionHead, Shell } from "@/components/site/section";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -68,9 +68,10 @@ export function StudioPreview({ t }: { t: MarketingT }) {
 
           <div className="lg:col-span-7">
             <Reveal delay={80}>
-              <Screenshot alt={t("studio.screenshot_alt")}>
-                <StudentMock />
-              </Screenshot>
+              <Screenshot
+                src="/shots/student-workspace.png"
+                alt={t("studio.screenshot_alt")}
+              />
             </Reveal>
           </div>
         </div>

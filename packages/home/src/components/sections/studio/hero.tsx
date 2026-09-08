@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Screenshot, StudentMock } from "@/components/site/screenshot";
+import { Screenshot } from "@/components/site/screenshot";
 import { Shell } from "@/components/site/section";
 import { buttonVariants } from "@/components/ui/button";
 import { ArrowLeft } from "@/components/ui/icons";
@@ -63,9 +63,10 @@ export function StudioHero({
 
           <div className="lg:col-span-6">
             <div className="cove-rise [animation-delay:180ms]">
-              <Screenshot alt={t("student.shot_alt")}>
-                <StudentMock />
-              </Screenshot>
+              <Screenshot
+                src="/shots/student-workspace.png"
+                alt={t("student.shot_alt")}
+              />
             </div>
           </div>
         </div>

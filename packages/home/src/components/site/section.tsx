@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { hues, type Hue } from "@/lib/hues";
 import { cn } from "@/lib/utils";
 import { Reveal } from "./reveal";
+import { RichText } from "./rich-text";
 
 /** The page's one horizontal measure. Everything lines up to this. */
 export function Shell({
@@ -131,7 +132,7 @@ export function SectionHead({
           onDeep ? "text-on-deep" : "text-ink",
         )}
       >
-        {title}
+        <RichText>{title}</RichText>
       </h2>
       {lead ? (
         <p
@@ -140,7 +141,7 @@ export function SectionHead({
             onDeep ? "text-white/70" : "text-sub",
           )}
         >
-          {lead}
+          <RichText>{lead}</RichText>
         </p>
       ) : null}
     </Reveal>

@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import { Reveal } from "@/components/site/reveal";
+import { RichText } from "@/components/site/rich-text";
 import { Section, SectionHead, Shell } from "@/components/site/section";
 import { Card } from "@/components/ui/card";
 import { Clock, Sparkles, TrendingUp } from "@/components/ui/icons";
@@ -82,10 +83,10 @@ export function Enterprise({ t }: { t: MarketingT }) {
                   <outcome.Icon className="size-6" />
                 </span>
                 <h3 className="relative mt-5 text-[19px] font-bold leading-snug text-ink">
-                  {outcome.title}
+                  <RichText>{outcome.title}</RichText>
                 </h3>
                 <p className="relative mt-3 text-[15px] leading-[1.7] text-sub">
-                  {outcome.body}
+                  <RichText>{outcome.body}</RichText>
                 </p>
               </Card>
             </Reveal>

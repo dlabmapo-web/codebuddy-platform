@@ -5,6 +5,7 @@ import { Wave } from "@/components/brand/wave";
 import { buttonVariants } from "@/components/ui/button";
 import { hues, type Hue } from "@/lib/hues";
 import { cn } from "@/lib/utils";
+import { RichText } from "./rich-text";
 import { Eyebrow, Shell } from "./section";
 
 export type Audience = {
@@ -89,7 +90,7 @@ export function Hero({
           <div className="flex flex-col justify-end lg:col-span-5">
             <div className="cove-rise [animation-delay:340ms]">
               <p className="max-w-[42ch] text-[17px] leading-[1.8] text-sub">
-                {copy.lead}
+                <RichText>{copy.lead}</RichText>
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link

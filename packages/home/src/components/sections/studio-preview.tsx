@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Reveal } from "@/components/site/reveal";
+import { RichText } from "@/components/site/rich-text";
 import { Screenshot, StudentMock } from "@/components/site/screenshot";
 import { Section, SectionHead, Shell } from "@/components/site/section";
 import { buttonVariants } from "@/components/ui/button";
@@ -91,10 +92,10 @@ export function StudioPreview({ t }: { t: MarketingT }) {
                   <point.Icon className="size-5.5" />
                 </span>
                 <h3 className="mt-5 text-[16px] font-bold text-on-deep">
-                  {point.title}
+                  <RichText>{point.title}</RichText>
                 </h3>
                 <p className="mt-2.5 text-[14px] leading-[1.7] text-white/60">
-                  {point.body}
+                  <RichText>{point.body}</RichText>
                 </p>
               </div>
             </Reveal>

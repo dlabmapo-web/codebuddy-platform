@@ -1,4 +1,5 @@
 import { Reveal } from "@/components/site/reveal";
+import { RichText } from "@/components/site/rich-text";
 import { Section, SectionHead, Shell } from "@/components/site/section";
 import { Card, IconPlate } from "@/components/ui/card";
 import {
@@ -59,10 +60,10 @@ export function Areas({ t }: { t: MarketingT }) {
                   <ChevronRight className="size-4 text-sub transition-transform duration-300 group-hover:translate-x-1 group-hover:text-cove-blue motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
                 </h3>
                 <p className="mt-3 text-[15px] font-medium text-ink/70">
-                  {item.body}
+                  <RichText>{item.body}</RichText>
                 </p>
                 <p className="mt-4 text-[15px] leading-[1.75] text-sub">
-                  {item.detail}
+                  <RichText>{item.detail}</RichText>
                 </p>
               </Card>
             </Reveal>

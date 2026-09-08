@@ -453,6 +453,61 @@ h4 {
 }
 
 /* ---------------------------------------------------------------------------
+ * The partner marquee.
+ *
+ * Two tracks of identical content, translated by exactly -50% so the loop is
+ * seamless. Paused on hover: a wall a reader cannot stop to read is decoration
+ * pretending to be evidence.
+ *
+ * The marks travel bare — no tile, border, or shadow behind them. An earlier
+ * version put each in a white card, which on a pale ground read as eight
+ * rectangles sliding past rather than eight logos.
+ * ------------------------------------------------------------------------- */
+@keyframes cove-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.cove-marquee {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: cove-marquee var(--marquee-duration, 42s) linear infinite;
+}
+
+.cove-marquee-mask:hover .cove-marquee,
+.cove-marquee-mask:focus-within .cove-marquee {
+  animation-play-state: paused;
+}
+
+/*
+ * `overflow: hidden` is load-bearing, not tidiness: the track is `max-content`
+ * — sixteen marks wide — and without it that width becomes the document's,
+ * giving every page on the site a horizontal scrollbar.
+ */
+.cove-marquee-mask {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+/* ---------------------------------------------------------------------------
  * Motion: staggered hero entrance, ambient wave, and once-only scroll reveals.
  * ------------------------------------------------------------------------- */
 
@@ -522,6 +577,30 @@ h4 {
   .cove-aura,
   .cove-live-dot {
     animation: none;
+  }
+
+  /* A logo wall that never stops moving is the worst offender on the page. */
+  .cove-marquee {
+    animation: none;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2.5rem;
+  }
+
+  /*
+   * The second copy of the track exists only to make the loop seamless. Once
+   * the loop is gone it is just every mark printed twice, so it goes — it is
+   * already `aria-hidden`, which is exactly the set to drop.
+   */
+  .cove-marquee > [aria-hidden="true"] {
+    display: none;
+  }
+
+  /* Nothing is travelling past an edge any more, so nothing needs fading. */
+  .cove-marquee-mask {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .cove-sheen:hover::after {

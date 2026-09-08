@@ -1,20 +1,18 @@
 /**
- * The partners, in the order the client laid them out.
+ * The partners, travelling.
  *
  * The files are the client's own marks, supplied as artwork rather than lifted
- * out of a PDF, trimmed and sized to a common 120px render height so no mark
- * carries more optical weight than another. Every one has an alpha channel and
- * sits directly on the section, with no tile, border, or shadow behind it —
- * the client asked for the marks themselves rather than a row of cards, and a
- * transparent mark on the page's own ground is what a partner wall is.
+ * out of a PDF, and trimmed to a common 120px render height so no mark carries
+ * more optical weight than another. Every one has an alpha channel and rides
+ * directly on the section — no tile, no border, no shadow. The two things this
+ * section has been through are worth stating so neither is undone by accident:
+ * the marks used to sit in white cards, which read as rectangles sliding past
+ * rather than logos, and the motion was once removed altogether, which turned a
+ * roster into a short list. It is bare marks, moving.
  *
  * They are shown in full colour rather than filtered to grey: half of these
  * marks are a specific colour before they are anything else, and kakao in
  * grayscale is not kakao.
- *
- * A static 4×2 grid, not a marquee. Eight names is a list a reader can take in
- * at once, and moving it meant they had to wait for the one they were looking
- * for to come back around.
  *
  * `src` is optional so a partner can be listed before a usable file exists;
  * the entry then falls back to the name as a wordmark.
@@ -36,35 +34,67 @@ const PARTNERS: Partner[] = [
   { name: "kakao", src: "/partners/kakao.png" },
 ];
 
+function Mark({
+  partner,
+  duplicate,
+}: {
+  partner: Partner;
+  /** The seamless loop needs a second copy of the track; nobody needs to hear it. */
+  duplicate?: boolean;
+}) {
+  return (
+    <li
+      aria-hidden={duplicate || undefined}
+      className="flex w-[200px] shrink-0 items-center justify-center px-6 lg:w-[248px] lg:px-8"
+    >
+      {partner.src ? (
+        /*
+         * A plain <img>: these are small same-origin marks of varying aspect
+         * ratio, already trimmed to a common height, and next/image would
+         * demand intrinsic dimensions per file to add nothing. `object-contain`
+         * keeps each mark's own proportions.
+         */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={partner.src}
+          alt={duplicate ? "" : partner.name}
+          loading="lazy"
+          className="max-h-[46px] w-auto max-w-full object-contain lg:max-h-[54px]"
+        />
+      ) : (
+        <span className="font-display text-center text-[15px] font-semibold tracking-[-0.01em] text-sub">
+          {partner.name}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * A continuous wall rather than a static row.
+ *
+ * Eight names standing still read as a short list; the same eight moving read
+ * as a roster that continues past the edge of the screen, which is the
+ * impression the section is for. The track is duplicated and translated by
+ * exactly -50%, so the loop has no seam. It pauses on hover and on keyboard
+ * focus, and does not move at all under `prefers-reduced-motion`, where the
+ * doubled track wraps into a centred grid instead.
+ */
 export function PartnerWall() {
   return (
-    <ul className="grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-x-12 lg:gap-y-16">
-      {PARTNERS.map((partner) => (
-        <li
-          key={partner.name}
-          className="flex min-h-[72px] items-center justify-center"
-        >
-          {partner.src ? (
-            /*
-             * A plain <img>: these are small same-origin marks of varying
-             * aspect ratio, already trimmed to a common height, and next/image
-             * would demand intrinsic dimensions per file to add nothing.
-             * `object-contain` keeps each mark's own proportions.
-             */
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={partner.src}
-              alt={partner.name}
-              loading="lazy"
-              className="max-h-[52px] w-auto max-w-full object-contain transition-opacity duration-300 hover:opacity-70 motion-reduce:transition-none lg:max-h-[60px]"
-            />
-          ) : (
-            <span className="font-display text-center text-[15px] font-semibold tracking-[-0.01em] text-sub">
-              {partner.name}
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="cove-marquee-mask relative">
+      <ul
+        className="cove-marquee"
+        style={{ "--marquee-duration": "46s" } as React.CSSProperties}
+      >
+        {[...PARTNERS, ...PARTNERS].map((partner, index) => (
+          <Mark
+            key={`${partner.name}-${index}`}
+            partner={partner}
+            duplicate={index >= PARTNERS.length}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }

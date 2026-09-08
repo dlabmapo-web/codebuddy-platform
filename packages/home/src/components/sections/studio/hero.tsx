@@ -68,7 +68,7 @@ export function StudioHero({
           <div className="cove-product-stage mx-auto w-full max-w-[1040px]">
             <div className="cove-product-screen cove-rise [animation-delay:320ms]">
               <Screenshot
-                src="/shots/student-workspace.png"
+                src="/shots/student-workspace-light.png"
                 alt={t("student.shot_alt")}
               />
             </div>

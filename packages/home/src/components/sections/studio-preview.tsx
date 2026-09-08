@@ -70,7 +70,7 @@ export function StudioPreview({ t }: { t: MarketingT }) {
           <div className="w-full max-w-[960px]">
             <Reveal delay={80} className="cove-studio-screen">
               <Screenshot
-                src="/shots/student-workspace.png"
+                src="/shots/student-workspace-dark.png"
                 alt={t("studio.screenshot_alt")}
               />
             </Reveal>

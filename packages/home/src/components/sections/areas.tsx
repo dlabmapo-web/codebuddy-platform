@@ -27,7 +27,7 @@ export function Areas({ t }: { t: MarketingT }) {
     {
       hue: "blue",
       href: "/cove-studio",
-      photo: "/shots/student-workspace.png",
+      photo: "/shots/student-courses-light.png",
       Icon: MonitorPlay,
       label: t("areas.solution_label"),
       body: t("areas.solution_body"),

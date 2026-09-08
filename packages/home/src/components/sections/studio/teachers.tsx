@@ -1,5 +1,5 @@
 import { Reveal } from "@/components/site/reveal";
-import { Screenshot, TeacherMock } from "@/components/site/screenshot";
+import { Screenshot } from "@/components/site/screenshot";
 import { Section, SectionHead, Shell, Stagger } from "@/components/site/section";
 import type { ProductT } from "@/i18n/types";
 import { Points } from "./points";
@@ -20,9 +20,10 @@ export function Teachers({ t }: { t: ProductT }) {
           }
         >
           <Reveal delay={80}>
-            <Screenshot alt={t("teacher.shot_alt")}>
-              <TeacherMock />
-            </Screenshot>
+            <Screenshot
+              src="/shots/teacher-roster-light.png"
+              alt={t("teacher.shot_alt")}
+            />
           </Reveal>
         </Stagger>
 

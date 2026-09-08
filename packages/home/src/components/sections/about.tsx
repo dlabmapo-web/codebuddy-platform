@@ -1,4 +1,5 @@
 import { Reveal } from "@/components/site/reveal";
+import { RichText } from "@/components/site/rich-text";
 import { Section, SectionHead, Shell, Stagger } from "@/components/site/section";
 import type { MarketingT } from "@/i18n/types";
 
@@ -18,10 +19,10 @@ export function About({ t }: { t: MarketingT }) {
         >
           <Reveal delay={80} className="space-y-6">
             <p className="text-[19px] leading-[1.8] text-ink lg:text-[21px]">
-              {t("about.body")}
+              <RichText>{t("about.body")}</RichText>
             </p>
             <p className="text-[17px] leading-[1.8] text-sub">
-              {t("about.body_2")}
+              <RichText>{t("about.body_2")}</RichText>
             </p>
           </Reveal>
         </Stagger>

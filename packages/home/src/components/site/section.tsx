@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { hues, type Hue } from "@/lib/hues";
 import { cn } from "@/lib/utils";
 import { Reveal } from "./reveal";
+import { RichText } from "./rich-text";
 
 /** The page's one horizontal measure. Everything lines up to this. */
 export function Shell({
@@ -24,7 +25,7 @@ export function Shell({
  *
  * `ground` is the only surface decision available: paper, the cool `mist`, or
  * the deep blue used for the two bands that belong to the product and the
- * footer. Nothing on this site sits on a gradient.
+ * footer, with brand gradients giving each surface its own atmosphere.
  */
 export function Section({
   id,
@@ -68,8 +69,10 @@ export function Section({
 
 /**
  * The eyebrow: a short rule in the section's hue, then the label in the Latin
- * display face. This is the spectrum rail's second appearance — the reader
- * learns the colour on the hero panels and meets it again here.
+ * display face. This is where the reader meets the spectrum — the hero panels
+ * used to carry a coloured rail and introduce it first, but they are four
+ * photographs now and the client asked for the rail gone, so the eyebrows are
+ * the only place the hue system is stated.
  */
 export function Eyebrow({
   hue,
@@ -109,6 +112,7 @@ export function SectionHead({
   lead,
   onDeep = false,
   className,
+  centered = false,
 }: {
   hue: Hue;
   eyebrow: string;
@@ -116,9 +120,10 @@ export function SectionHead({
   lead?: string;
   onDeep?: boolean;
   className?: string;
+  centered?: boolean;
 }) {
   return (
-    <Reveal className={className}>
+    <Reveal className={cn(centered && "cove-section-head-centered", className)}>
       <Eyebrow hue={hue} onDeep={onDeep}>
         {eyebrow}
       </Eyebrow>
@@ -131,7 +136,7 @@ export function SectionHead({
           onDeep ? "text-on-deep" : "text-ink",
         )}
       >
-        {title}
+        <RichText>{title}</RichText>
       </h2>
       {lead ? (
         <p
@@ -140,7 +145,7 @@ export function SectionHead({
             onDeep ? "text-white/70" : "text-sub",
           )}
         >
-          {lead}
+          <RichText>{lead}</RichText>
         </p>
       ) : null}
     </Reveal>

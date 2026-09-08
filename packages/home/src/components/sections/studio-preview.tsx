@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { Reveal } from "@/components/site/reveal";
-import { Screenshot, StudentMock } from "@/components/site/screenshot";
+import { RichText } from "@/components/site/rich-text";
+import { Screenshot } from "@/components/site/screenshot";
 import { Section, SectionHead, Shell } from "@/components/site/section";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -40,11 +41,12 @@ export function StudioPreview({ t }: { t: MarketingT }) {
   ];
 
   return (
-    <Section id="studio" ground="deep">
-      <Shell>
-        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-5">
+    <Section id="studio" ground="deep" className="cove-studio-showcase cove-showcase-island">
+      <Shell className="relative">
+        <div className="flex flex-col items-center gap-12">
+          <div className="max-w-[780px] text-center">
             <SectionHead
+              centered
               hue="teal"
               onDeep
               eyebrow={t("studio.eyebrow")}
@@ -65,11 +67,12 @@ export function StudioPreview({ t }: { t: MarketingT }) {
             </Reveal>
           </div>
 
-          <div className="lg:col-span-7">
-            <Reveal delay={80}>
-              <Screenshot alt={t("studio.screenshot_alt")}>
-                <StudentMock />
-              </Screenshot>
+          <div className="w-full max-w-[960px]">
+            <Reveal delay={80} className="cove-studio-screen">
+              <Screenshot
+                src="/shots/student-workspace-dark.png"
+                alt={t("studio.screenshot_alt")}
+              />
             </Reveal>
           </div>
         </div>
@@ -83,7 +86,7 @@ export function StudioPreview({ t }: { t: MarketingT }) {
         <ul className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {points.map((point, index) => (
             <Reveal as="li" key={point.title} delay={index * 80}>
-              <div className="group h-full rounded-[14px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-cove-teal/40 hover:bg-white/[0.07] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+              <div className="group h-full rounded-[24px] border border-white/20 bg-white/[0.08] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-cove-teal/40 hover:bg-white/[0.07] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                 <span
                   aria-hidden="true"
                   className="grid size-11 place-items-center rounded-[12px] bg-cove-teal/15 text-cove-teal transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
@@ -91,10 +94,10 @@ export function StudioPreview({ t }: { t: MarketingT }) {
                   <point.Icon className="size-5.5" />
                 </span>
                 <h3 className="mt-5 text-[16px] font-bold text-on-deep">
-                  {point.title}
+                  <RichText>{point.title}</RichText>
                 </h3>
-                <p className="mt-2.5 text-[14px] leading-[1.7] text-white/60">
-                  {point.body}
+                <p className="mt-2.5 text-[14px] leading-[1.7] text-white/80">
+                  <RichText>{point.body}</RichText>
                 </p>
               </div>
             </Reveal>

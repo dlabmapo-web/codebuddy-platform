@@ -66,7 +66,7 @@
   --on-deep: #ffffff;
   --on-blue: #ffffff;
 
-  --radius: 14px;
+  --radius: 24px;
 
   /* ---------------------------------------------------------------------
    * Gradients.
@@ -274,20 +274,18 @@ h4 {
  */
 .cove-ground-cool {
   background-image:
-    radial-gradient(58% 42% at 8% 0%, rgb(9 94 219 / 0.06), transparent 68%),
-    radial-gradient(52% 40% at 96% 70%, rgb(88 213 195 / 0.1), transparent 70%);
+    radial-gradient(ellipse at 0% 0%, rgb(134 187 241 / 0.23), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(88 213 195 / 0.16), transparent 55%);
 }
 
 .cove-ground-warm {
   background-image:
-    radial-gradient(55% 40% at 12% 0%, rgb(245 107 97 / 0.09), transparent 68%),
-    radial-gradient(50% 45% at 88% 30%, rgb(250 197 23 / 0.11), transparent 70%);
+    radial-gradient(ellipse at 0% 10%, rgb(245 107 97 / 0.14), transparent 60%),
+    radial-gradient(ellipse at 100% 90%, rgb(250 197 23 / 0.16), transparent 60%);
 }
 
 .cove-ground-teal {
-  background-image:
-    radial-gradient(60% 45% at 92% 0%, rgb(88 213 195 / 0.13), transparent 70%),
-    radial-gradient(45% 38% at 4% 84%, rgb(9 94 219 / 0.05), transparent 70%);
+  background-image: linear-gradient(125deg, #effaf8, #fff 55%, #edf5ff);
 }
 
 /*
@@ -385,18 +383,21 @@ h4 {
  * keeps its radius without a wrapper element.
  * ------------------------------------------------------------------------- */
 .cove-card {
+  --card-tint: rgb(9 94 219 / 0.10);
   position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background-color: var(--paper);
-  box-shadow: var(--shadow-card);
+  background-image: radial-gradient(ellipse at 100% 0%, var(--card-tint), transparent 72%);
+  box-shadow: 0 2px 3px rgb(16 28 46 / 0.02), 0 18px 40px -30px rgb(16 28 46 / 0.25);
   transition:
     transform 320ms cubic-bezier(0.22, 0.68, 0, 1),
     box-shadow 320ms cubic-bezier(0.22, 0.68, 0, 1),
     border-color 220ms ease;
 }
 
-.cove-card:hover {
+.cove-card:hover,
+.cove-card:focus-within {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lift);
   border-color: transparent;
@@ -420,7 +421,8 @@ h4 {
   transition: opacity 320ms ease;
 }
 
-.cove-card:hover .cove-card__glow {
+.cove-card:hover .cove-card__glow,
+.cove-card:focus-within .cove-card__glow {
   opacity: 1;
 }
 
@@ -451,64 +453,7 @@ h4 {
 }
 
 /* ---------------------------------------------------------------------------
- * The partner marquee.
- *
- * Two tracks of identical content, translated by exactly -50% so the loop is
- * seamless. Paused on hover: a wall a reader cannot stop to read is decoration
- * pretending to be evidence.
- * ------------------------------------------------------------------------- */
-@keyframes cove-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.cove-marquee {
-  display: flex;
-  width: max-content;
-  animation: cove-marquee var(--marquee-duration, 42s) linear infinite;
-}
-
-.cove-marquee--reverse {
-  animation-direction: reverse;
-}
-
-.cove-marquee-mask:hover .cove-marquee {
-  animation-play-state: paused;
-}
-
-/*
- * `overflow: hidden` is load-bearing, not tidiness: the track is `max-content`
- * — sixteen tiles, some 3,400px — and without it that width becomes the
- * document's, giving every page on the site a horizontal scrollbar.
- */
-.cove-marquee-mask {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-}
-
-/* ---------------------------------------------------------------------------
- * Motion.
- *
- * One orchestrated moment on the page — the hero's two headline lines fade up,
- * then the four audience panels wipe up in sequence. Everything else is a
- * single fade on scroll. No parallax, no counters, no hover tilts.
+ * Motion: staggered hero entrance, ambient wave, and once-only scroll reveals.
  * ------------------------------------------------------------------------- */
 
 @keyframes cove-rise {
@@ -542,12 +487,14 @@ h4 {
 }
 
 /*
- * Scroll reveal. The element starts hidden and is switched on by an
- * IntersectionObserver setting `data-shown`. The `no-js`-safe default is
- * visible: if the observer never runs, `@media (scripting: none)` and the
- * reduced-motion block below both restore full opacity.
+ * Scroll reveals are visible by default. The observer opts below-fold
+ * elements into motion only after hydration, then reveals each one once.
  */
 .cove-reveal {
+  opacity: 1;
+}
+
+.cove-reveal[data-reveal-ready="true"] {
   opacity: 0;
   transform: translateY(16px);
   transition:
@@ -555,7 +502,7 @@ h4 {
     transform 620ms cubic-bezier(0.22, 0.68, 0, 1);
 }
 
-.cove-reveal[data-shown="true"] {
+.cove-reveal[data-reveal-ready="true"][data-shown="true"] {
   opacity: 1;
   transform: none;
 }
@@ -566,7 +513,7 @@ h4 {
     animation: none;
   }
 
-  .cove-reveal {
+  .cove-reveal[data-reveal-ready="true"] {
     opacity: 1;
     transform: none;
     transition: none;
@@ -581,27 +528,19 @@ h4 {
     animation: none;
   }
 
-  /* A logo wall that never stops moving is the worst offender on the page. */
-  .cove-marquee {
-    animation: none;
-    /* Without the animation the doubled track would overflow; show one copy. */
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
   .cove-card,
   .cove-card__glow {
     transition: none;
   }
 
-  .cove-card:hover {
+  .cove-card:hover,
+  .cove-card:focus-within {
     transform: none;
   }
 }
 
 @media (scripting: none) {
-  .cove-reveal {
+  .cove-reveal[data-reveal-ready="true"] {
     opacity: 1;
     transform: none;
   }
@@ -612,4 +551,292 @@ h4 {
   outline: 2px solid var(--cove-blue);
   outline-offset: 3px;
   border-radius: 3px;
+}
+
+/* The home hero opens the logo's wave into a broad, flowing current. */
+.cove-home-hero {
+  background: linear-gradient(165deg, #f0f8ff 0%, #fff 56%, #edf8f7 100%);
+}
+
+.cove-hero-current {
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  width: max(1100px, 125vw);
+  height: 560px;
+  top: 0;
+  left: -12%;
+  transform: rotate(-12deg);
+  opacity: 0.65;
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 80%, transparent);
+}
+
+.cove-hero-wave {
+  animation: cove-current-flow 16s ease-in-out infinite alternate;
+}
+
+.cove-hero-wave path {
+  stroke-width: 11;
+}
+
+.cove-hero-title-accent {
+  background: linear-gradient(110deg, #0749ab 8%, #1b64da 50%, #0b7a6a 95%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  padding-bottom: 0.12em;
+}
+
+.cove-audience-panel {
+  box-shadow: 0 16px 36px -22px rgb(7 73 171 / 0.42);
+}
+
+.cove-studio-showcase {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-image:
+    radial-gradient(ellipse at 100% 0%, rgb(88 213 195 / 0.32), transparent 55%),
+    linear-gradient(130deg, #092754 0%, #124fae 60%, #1b64da 100%);
+}
+
+.cove-studio-showcase::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 10% -25% auto 35%;
+  height: 80%;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 50%;
+  transform: rotate(-25deg);
+  box-shadow: 0 0 0 48px rgb(255 255 255 / 0.025), 0 0 0 96px rgb(255 255 255 / 0.02);
+}
+
+.cove-studio-screen {
+  border-radius: 18px;
+  box-shadow: 0 32px 70px -24px rgb(0 13 49 / 0.6), 0 0 60px -24px rgb(88 213 195 / 0.4);
+}
+
+
+
+
+
+/* Keep filled controls dark enough for white labels across the whole fill. */
+.cove-sheen.cove-grad-brand {
+  background-image: linear-gradient(115deg, #0749ab, #1b64da 62%, #087a80);
+}
+
+@keyframes cove-current-flow {
+  from { transform: translate3d(-2%, -2%, 0) scale(1); }
+  to { transform: translate3d(3%, 4%, 0) scale(1.06); }
+}
+
+@media (min-width: 1024px) {
+  .cove-audiences > :nth-child(even) {
+    padding-top: 28px;
+  }
+  .cove-audiences > :nth-child(odd) {
+    padding-bottom: 28px;
+  }
+}
+
+@media (max-width: 639px) {
+  .cove-hero-current { opacity: 0.35; top: 80px; }
+  .cove-home-hero h1 { letter-spacing: -0.045em; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cove-hero-wave { animation: none; }
+}
+
+/* Cards share a shape, but their color identifies the part of Cove they serve. */
+.cove-card[data-hue="teal"] { --card-tint: rgb(88 213 195 / 0.18); }
+.cove-card[data-hue="coral"] { --card-tint: rgb(245 107 97 / 0.14); }
+.cove-card[data-hue="sun"] { --card-tint: rgb(250 197 23 / 0.18); }
+
+.cove-card--link:focus-visible {
+  outline: 3px solid var(--cove-blue);
+  outline-offset: 5px;
+}
+
+.cove-service-card {
+  min-height: 340px;
+  border-color: rgb(255 255 255 / 0.9);
+}
+
+.cove-service-card::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  width: 160px;
+  height: 160px;
+  right: -65px;
+  top: -65px;
+  border: 1px solid var(--card-tint);
+  border-radius: 50%;
+  box-shadow: 0 0 0 24px var(--card-tint);
+  transition: transform 500ms ease;
+}
+
+.cove-service-card:hover::before,
+.cove-service-card:focus-visible::before {
+  transform: scale(1.18);
+}
+
+.cove-step-card {
+  position: relative;
+  transition: border-color 250ms ease, box-shadow 250ms ease;
+}
+
+.cove-step-card:hover {
+  border-color: rgb(245 107 97 / 0.35);
+  box-shadow: 0 16px 36px -26px rgb(245 107 97 / 0.45);
+}
+
+.cove-product-hero {
+  background-image:
+    radial-gradient(ellipse at 85% 15%, rgb(88 213 195 / 0.3), transparent 55%),
+    linear-gradient(125deg, #0749ab, #1b64da 58%, #147899);
+}
+
+.cove-product-current {
+  position: absolute;
+  pointer-events: none;
+  inset: -20% -25%;
+  opacity: 0.4;
+  transform: rotate(-15deg);
+}
+
+.cove-product-current svg {
+  animation: cove-current-flow 14s ease-in-out infinite alternate;
+}
+
+.cove-product-current path { stroke-width: 14; }
+
+.cove-product-screen {
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.03));
+  box-shadow: 0 36px 70px -28px rgb(0 20 70 / 0.5);
+}
+
+.cove-contact-card {
+  background-image:
+    radial-gradient(ellipse at 100% 0%, rgb(88 213 195 / 0.18), transparent 60%),
+    linear-gradient(135deg, #fff, #f0f6ff);
+  box-shadow: 0 24px 60px -36px rgb(27 100 218 / 0.4);
+}
+
+.cove-menu-panel { animation: cove-menu-enter 240ms ease-out both; }
+
+@keyframes cove-menu-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* A reading-progress accent follows the document without scroll listeners. */
+@supports (animation-timeline: scroll()) {
+  .cove-header::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 2px;
+    background-image: var(--grad-brand);
+    transform-origin: left;
+    animation: cove-reading-progress linear both;
+    animation-timeline: scroll(root);
+    pointer-events: none;
+  }
+}
+
+@keyframes cove-reading-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (min-width: 1024px) {
+  .cove-flow-grid > :nth-child(even) { padding-top: 24px; }
+  .cove-flow-grid > :nth-child(odd) { padding-bottom: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cove-product-current svg,
+  .cove-menu-panel,
+  .cove-header::after { animation: none; }
+  .cove-header::after { display: none; }
+  .cove-service-card::before,
+  .cove-step-card { transition: none; }
+  .cove-service-card:hover::before,
+  .cove-service-card:focus-visible::before { transform: none; }
+}
+
+/* Product-led pacing: centered introductions, generous media, and inset stages. */
+.cove-section-head-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cove-section-head-centered h2 { max-width: 22em; }
+.cove-section-head-centered > p { max-width: 60ch; }
+
+.cove-showcase-island {
+  margin: 16px;
+  border-radius: 32px;
+}
+
+.cove-product-stage {
+  position: relative;
+  padding: clamp(12px, 3vw, 40px);
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse at 0% 100%, rgb(88 213 195 / 0.65), transparent 65%),
+    linear-gradient(120deg, rgb(134 187 241 / 0.65), rgb(255 255 255 / 0.2));
+}
+
+.cove-service-media {
+  background: linear-gradient(140deg, #d6e9ff, #e0f8ef);
+}
+
+.cove-media-card[data-hue="coral"] .cove-service-media {
+  background: linear-gradient(140deg, #fce0db, #fff2c5);
+}
+
+.cove-service-media img {
+  transition: transform 650ms cubic-bezier(0.22, 0.68, 0, 1);
+}
+
+.cove-media-card:hover .cove-service-media img,
+.cove-media-card:focus-visible .cove-service-media img {
+  transform: scale(1.045);
+}
+
+.cove-media-card::before { display: none; }
+.cove-media-card { background-image: none; }
+
+@media (min-width: 1024px) {
+  .cove-showcase-island {
+    max-width: 1440px;
+    margin: 24px auto;
+    width: calc(100% - 64px);
+    border-radius: 48px;
+  }
+}
+
+@media (max-width: 639px) {
+  .cove-showcase-island { margin: 8px; border-radius: 24px; }
+  .cove-product-stage { border-radius: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cove-service-media img { transition: none; }
+  .cove-media-card:hover .cove-service-media img,
+  .cove-media-card:focus-visible .cove-service-media img { transform: none; }
 }

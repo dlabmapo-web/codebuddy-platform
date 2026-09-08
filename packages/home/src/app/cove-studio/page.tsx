@@ -39,6 +39,12 @@ export default async function CoveStudioPage() {
         activeHref="/cove-studio"
         heroTone="deep"
         contactHref="/#contact"
+        sectionLinks={[
+          { href: "#students", label: t("student.eyebrow") },
+          { href: "#teachers", label: t("teacher.eyebrow") },
+          { href: "#flow", label: t("flow.eyebrow") },
+          { href: "#details", label: t("detail.eyebrow") },
+        ]}
       />
 
       <main id="main">

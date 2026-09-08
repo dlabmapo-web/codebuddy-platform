@@ -84,7 +84,7 @@ export function Header({
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-colors duration-300",
+        "cove-header fixed inset-x-0 top-0 z-50 transition-colors duration-300",
         scrolled || open
           ? "border-b border-line bg-paper/90 backdrop-blur-md"
           : "border-b border-transparent",
@@ -167,7 +167,7 @@ export function Header({
       </Shell>
 
       {open ? (
-        <div className="border-t border-line bg-paper lg:hidden">
+        <div className="cove-menu-panel max-h-[calc(100dvh-72px)] overflow-y-auto border-t border-line bg-paper lg:hidden">
           <Shell>
             <nav className="flex flex-col py-2">
               {links.map((link) => (

@@ -34,7 +34,7 @@ export function Details({ t }: { t: ProductT }) {
   ] as const;
 
   return (
-    <Section ground="warm">
+    <Section id="details" ground="warm">
       <Shell>
         <Stagger
           head={
@@ -51,9 +51,9 @@ export function Details({ t }: { t: ProductT }) {
              * appear at once — the same four, in the same order, one last time
              * before the page closes.
              */}
-            <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+            <dl className="grid gap-4 sm:grid-cols-2">
               {items.map((item) => (
-                <div key={item.title} className="group flex gap-4">
+                <div key={item.title} data-hue={item.hue} className="cove-card group flex flex-col gap-5 p-6">
                   <IconPlate hue={item.hue} className="size-11">
                     <item.Icon className="size-5.5" />
                   </IconPlate>

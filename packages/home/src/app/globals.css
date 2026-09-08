@@ -451,59 +451,6 @@ h4 {
 }
 
 /* ---------------------------------------------------------------------------
- * The partner marquee.
- *
- * Two tracks of identical content, translated by exactly -50% so the loop is
- * seamless. Paused on hover: a wall a reader cannot stop to read is decoration
- * pretending to be evidence.
- * ------------------------------------------------------------------------- */
-@keyframes cove-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.cove-marquee {
-  display: flex;
-  width: max-content;
-  animation: cove-marquee var(--marquee-duration, 42s) linear infinite;
-}
-
-.cove-marquee--reverse {
-  animation-direction: reverse;
-}
-
-.cove-marquee-mask:hover .cove-marquee {
-  animation-play-state: paused;
-}
-
-/*
- * `overflow: hidden` is load-bearing, not tidiness: the track is `max-content`
- * — sixteen tiles, some 3,400px — and without it that width becomes the
- * document's, giving every page on the site a horizontal scrollbar.
- */
-.cove-marquee-mask {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-}
-
-/* ---------------------------------------------------------------------------
  * Motion.
  *
  * One orchestrated moment on the page — the hero's two headline lines fade up,
@@ -579,15 +526,6 @@ h4 {
 
   .cove-sheen:hover::after {
     animation: none;
-  }
-
-  /* A logo wall that never stops moving is the worst offender on the page. */
-  .cove-marquee {
-    animation: none;
-    /* Without the animation the doubled track would overflow; show one copy. */
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
   }
 
   .cove-card,

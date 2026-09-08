@@ -27,6 +27,9 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL,
+    // A missing control should fail before a long grading test's overall timeout.
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },

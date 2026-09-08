@@ -14,7 +14,7 @@ concurrency:
   # one shared development database. Overlapping runs would review each other's
   # fixtures. Not cancel-in-progress — a half-finished run leaves fixtures
   # behind, so it is allowed to reach its own cleanup.
-  group: e2e-${{ github.ref }}
+  group: e2e-development-database
   cancel-in-progress: false
 
 jobs:
@@ -93,7 +93,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.preflight.outputs.configured == 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       - name: Run the suite
         if: steps.preflight.outputs.configured == 'true'

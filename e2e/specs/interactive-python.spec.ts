@@ -6,6 +6,7 @@ import { signInAs } from '../support/auth';
 const STUDENT_EMAIL = process.env.E2E_STUDENT_EMAIL ?? 'student@cove.test';
 const STUDENT_PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const ECHO_ID = 'e0000000-0000-4000-8000-000000000030';
+const CLASS_ID = 'e0000000-0000-4000-8000-000000000040';
 
 async function signIn(page: Page): Promise<string> {
   const response = await page.goto(routes.login);
@@ -50,7 +51,7 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   expect(workerResponse.headers()['cache-control']).toContain('immutable');
 
   await page.goto(
-    routes.academyLearnExercise(academySlug, ECHO_ID),
+    routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }),
   );
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
   await expect(page.getByText(/browser cannot run interactive input/i)).toHaveCount(0);
@@ -76,7 +77,7 @@ test('a failing run opens the error coach', async ({ page }) => {
   test.setTimeout(120_000);
   const academySlug = await signIn(page);
 
-  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
+  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }));
 
   const run = page.getByRole('button', { name: /^run$|^실행$/i });
   const coachTab = page.getByRole('tab', {
@@ -98,7 +99,7 @@ test('a failing run opens the error coach', async ({ page }) => {
   // The lesson is the actual mistake, not the exception class.
   await expect(coach).toContainText(/colon|콜론/i);
   // Line and column, their own code, and a caret under the character.
-  await expect(coach).toContainText(/\b1:8\b/);
+  await expect(coach.getByRole('button', { name: '1:8', exact: true })).toBeVisible();
   await expect(coach).toContainText('if True');
   await expect(coach).toContainText('^');
   // A correct example, and what to do next.
@@ -110,6 +111,7 @@ test('a failing run opens the error coach', async ({ page }) => {
   await expect(page.locator('.cove-error-glyph')).toHaveCount(1);
 
   // The terminal keeps Python's own line, without the traceback wall.
+  await page.getByRole('tab', { name: /^terminal$|^터미널$/i }).click();
   await expect(terminal).toContainText('SyntaxError');
   await expect(terminal).not.toContainText('Traceback (most recent call last)');
 
@@ -129,7 +131,7 @@ test('output without a trailing newline belongs to the run that wrote it', async
   test.setTimeout(120_000);
   const academySlug = await signIn(page);
 
-  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
+  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }));
 
   const run = page.getByRole('button', { name: /^run$|^실행$/i });
   const terminal = page.getByTestId('terminal');

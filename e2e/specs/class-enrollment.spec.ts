@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { archiveTestClasses } from '../support/classes';
 
 /**
  * Class management and the access boundary it creates.
@@ -196,4 +197,17 @@ test('a direct URL cannot bypass the assignment check', async ({
   // The response must not name the course it is refusing.
   await expect(studentPage.locator('body')).not.toContainText(SANDBOX_COURSE);
   await studentContext.close();
+});
+
+// Restore access isolation even when a serial test fails before its last step.
+test.afterAll(async ({ browser }) => {
+  if (![classId].some(Boolean)) return;
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await signIn(page, MANAGER_EMAIL);
+    await archiveTestClasses(page, [classId]);
+  } finally {
+    await context.close();
+  }
 });

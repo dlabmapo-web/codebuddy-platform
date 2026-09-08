@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { archiveTestClasses } from '../support/classes';
 
 /**
  * Assigning the one teacher responsible for a class.
@@ -329,4 +330,17 @@ test('a manager removes the teacher and the class stays active', async ({
   await page.goto(classesUrl());
   const row = page.getByRole('row').filter({ hasText: FIRST_CLASS });
   await expect(row.getByText(/not assigned|미지정/i)).toBeVisible();
+});
+
+// Restore access isolation even when a serial test fails before its last step.
+test.afterAll(async ({ browser }) => {
+  if (![firstClassId, secondClassId].some(Boolean)) return;
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await signIn(page, MANAGER_EMAIL);
+    await archiveTestClasses(page, [firstClassId, secondClassId]);
+  } finally {
+    await context.close();
+  }
 });

@@ -5,14 +5,14 @@ import type { MarketingT } from "@/i18n/types";
 /**
  * The hero, with its four audiences bound to copy.
  *
- * The photographs are Pexels (commercial use, no attribution required), one
- * per audience and matched to the age the audience actually is: the 학생 and
- * 학원·학교 panels show East Asian elementary students, because that is who
- * the platform is for, while 대학 and 기업·공공기관 correctly show adults.
+ * All four photographs are now COVE Edu's own rooms, which is what the panels
+ * were always holding a place for: the Mapo classroom mid-lesson, a robotics
+ * session with the kits open, a talk from a lecture-hall stage, and the D·LAB
+ * Alliance Summit. They replaced four Pexels stock photographs of strangers.
  *
- * Every one is a one-line swap for a real COVE Edu photograph, and worth
- * swapping — the campus section keeps its own real room for exactly this
- * reason.
+ * The claim this hero makes is that one company teaches a child their first
+ * `print()` and briefs a room of executives. Stock photography could only
+ * illustrate that claim; these four are evidence for it.
  */
 export function HeroSection({ t }: { t: MarketingT }) {
   return (

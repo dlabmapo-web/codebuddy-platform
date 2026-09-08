@@ -44,16 +44,19 @@ export function Campus({ t }: { t: MarketingT }) {
         >
           <Reveal delay={80}>
             {/*
-             * The classroom at the Mapo campus, from the client's brief.
+             * The Mapo campus itself — the signage, the street, the door.
              *
-             * A real room is the whole argument of this section — it is what
+             * A real address is the whole argument of this section: it is what
              * separates a company that operates a campus from one that says it
-             * does. The scrim exists so the caption stays readable over a
-             * bright, busy photograph.
+             * does. This replaced an interior shot that had a yellow emoji
+             * pasted over every child's face — honest about privacy, but it
+             * read as a placeholder, and a storefront proves the same claim
+             * with nobody's face in it at all. The scrim exists so the caption
+             * stays readable over a bright, busy photograph.
              */}
             <figure className="group relative aspect-16/10 overflow-hidden rounded-[14px] border border-line shadow-card">
               <Image
-                src="/photos/classroom.jpg"
+                src="/photos/campus.jpg"
                 alt={t("campus.photo_alt")}
                 fill
                 sizes="(max-width: 1024px) 100vw, 640px"

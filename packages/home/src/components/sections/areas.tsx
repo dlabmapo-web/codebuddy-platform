@@ -18,6 +18,18 @@ export function Areas({ t }: { t: MarketingT }) {
     {
       hue: "teal",
       href: "#campus",
+      /*
+       * Knowingly the same photograph as the hero's 학생 tile, a screen above.
+       *
+       * The home page has eight slots that want a distinct photograph and the
+       * client has supplied seven, and every student-appropriate one is
+       * already spoken for by a hero tile — so whichever this card takes, it
+       * repeats the tile above it. Reviewed and accepted rather than missed:
+       * the two are far apart, and cropped differently enough (4:5 portrait
+       * against this 4:3 landscape) not to read as an obvious repeat.
+       *
+       * An eighth classroom photograph closes it, and nothing else does.
+       */
       photo: "/photos/audience/student.jpg",
       Icon: BookOpen,
       label: t("areas.education_label"),
@@ -36,7 +48,18 @@ export function Areas({ t }: { t: MarketingT }) {
     {
       hue: "coral",
       href: "#training",
-      photo: "/photos/audience/enterprise.jpg",
+      /*
+       * Not the hero's enterprise tile: the home page shows this card and that
+       * tile on the same scroll, and the same photograph twice reads as a
+       * stock library rather than a company with its own rooms.
+       *
+       * Built from a 900px preview rather than the client's original, which
+       * did not survive — see §10.1 of the 2026-09-08 spec. It is the only
+       * image on the site without a full-resolution master, so it renders
+       * correctly at this card's 334x251 and should not be reused larger
+       * until the original is re-supplied.
+       */
+      photo: "/photos/seminar.jpg",
       Icon: Building,
       label: t("areas.enterprise_label"),
       body: t("areas.enterprise_body"),

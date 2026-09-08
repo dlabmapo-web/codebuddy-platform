@@ -453,6 +453,61 @@ h4 {
 }
 
 /* ---------------------------------------------------------------------------
+ * The partner marquee.
+ *
+ * Two tracks of identical content, translated by exactly -50% so the loop is
+ * seamless. Paused on hover: a wall a reader cannot stop to read is decoration
+ * pretending to be evidence.
+ *
+ * The marks travel bare — no tile, border, or shadow behind them. An earlier
+ * version put each in a white card, which on a pale ground read as eight
+ * rectangles sliding past rather than eight logos.
+ * ------------------------------------------------------------------------- */
+@keyframes cove-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.cove-marquee {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: cove-marquee var(--marquee-duration, 42s) linear infinite;
+}
+
+.cove-marquee-mask:hover .cove-marquee,
+.cove-marquee-mask:focus-within .cove-marquee {
+  animation-play-state: paused;
+}
+
+/*
+ * `overflow: hidden` is load-bearing, not tidiness: the track is `max-content`
+ * — sixteen marks wide — and without it that width becomes the document's,
+ * giving every page on the site a horizontal scrollbar.
+ */
+.cove-marquee-mask {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+/* ---------------------------------------------------------------------------
  * Motion: staggered hero entrance, ambient wave, and once-only scroll reveals.
  * ------------------------------------------------------------------------- */
 
@@ -490,21 +545,74 @@ h4 {
  * Scroll reveals are visible by default. The observer opts below-fold
  * elements into motion only after hydration, then reveals each one once.
  */
+/*
+ * Server-rendered content is visible. `data-reveal-ready` is added by the
+ * observer once it is running, and only to elements still below the fold, so
+ * nothing is ever hidden from a reader without JavaScript.
+ */
 .cove-reveal {
   opacity: 1;
 }
 
 .cove-reveal[data-reveal-ready="true"] {
   opacity: 0;
-  transform: translateY(16px);
-  transition:
-    opacity 620ms cubic-bezier(0.22, 0.68, 0, 1),
-    transform 620ms cubic-bezier(0.22, 0.68, 0, 1);
+  transform: translateY(32px);
+  /*
+   * Deliberately no transition on the hidden state. The attribute is added
+   * after first paint, when the element is already drawn at full opacity, so a
+   * transition here would fade it OUT over the same 700ms before it could rise
+   * in — a visible blink on anything near the fold. Declaring the transition
+   * on the shown state below gives the animation one direction: in.
+   */
 }
 
 .cove-reveal[data-reveal-ready="true"][data-shown="true"] {
   opacity: 1;
   transform: none;
+  /*
+   * A long, hard decelerate rather than a symmetric ease: the text arrives
+   * quickly and settles slowly, which reads as the line coming to rest instead
+   * of sliding to a stop. 32px is the smallest travel that still reads as
+   * movement at a glance — 16px was invisible unless you were watching for it.
+   */
+  transition:
+    opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * A section header arrives a line at a time: eyebrow, then heading, then lead.
+ *
+ * The block still reveals as one — the observer watches the wrapper — but the
+ * wrapper itself no longer moves, or the reader would see the whole header
+ * travel and its lines travel again inside it. Only the children move, each
+ * 90ms behind the one above, which is what makes a heading read as arriving
+ * rather than appearing.
+ */
+.cove-reveal-stagger[data-reveal-ready="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"] > * {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > * {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > :nth-child(2) {
+  transition-delay: 90ms;
+}
+
+.cove-reveal-stagger[data-reveal-ready="true"][data-shown="true"] > :nth-child(3) {
+  transition-delay: 180ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -513,7 +621,8 @@ h4 {
     animation: none;
   }
 
-  .cove-reveal[data-reveal-ready="true"] {
+  .cove-reveal[data-reveal-ready="true"],
+  .cove-reveal-stagger[data-reveal-ready="true"] > * {
     opacity: 1;
     transform: none;
     transition: none;
@@ -522,6 +631,30 @@ h4 {
   .cove-aura,
   .cove-live-dot {
     animation: none;
+  }
+
+  /* A logo wall that never stops moving is the worst offender on the page. */
+  .cove-marquee {
+    animation: none;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2.5rem;
+  }
+
+  /*
+   * The second copy of the track exists only to make the loop seamless. Once
+   * the loop is gone it is just every mark printed twice, so it goes — it is
+   * already `aria-hidden`, which is exactly the set to drop.
+   */
+  .cove-marquee > [aria-hidden="true"] {
+    display: none;
+  }
+
+  /* Nothing is travelling past an edge any more, so nothing needs fading. */
+  .cove-marquee-mask {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   .cove-sheen:hover::after {

@@ -123,7 +123,13 @@ export function SectionHead({
   centered?: boolean;
 }) {
   return (
-    <Reveal className={cn(centered && "cove-section-head-centered", className)}>
+    <Reveal
+      className={cn(
+        "cove-reveal-stagger",
+        centered && "cove-section-head-centered",
+        className,
+      )}
+    >
       <Eyebrow hue={hue} onDeep={onDeep}>
         {eyebrow}
       </Eyebrow>

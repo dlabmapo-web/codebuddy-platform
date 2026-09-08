@@ -9,6 +9,7 @@ export function Partners({ t }: { t: MarketingT }) {
     <Section id="partners" ground="mist">
       <Shell>
         <SectionHead
+          centered
           hue="sun"
           eyebrow={t("partners.eyebrow")}
           title={t("partners.title")}

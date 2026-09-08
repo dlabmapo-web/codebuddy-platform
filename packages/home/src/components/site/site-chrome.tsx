@@ -24,14 +24,16 @@ export function SiteHeader({
   activeHref,
   heroTone = "light",
   contactHref = "#contact",
+  sectionLinks,
 }: {
   t: MarketingT;
   locale: Locale;
   activeHref?: string;
   heroTone?: "light" | "deep";
   contactHref?: string;
+  sectionLinks?: { href: string; label: string }[];
 }) {
-  const links = [
+  const links = sectionLinks ?? [
     { href: "#about", label: t("nav.about") },
     { href: "#areas", label: t("nav.areas") },
     { href: "/cove-studio", label: t("nav.studio") },
@@ -56,7 +58,7 @@ export function SiteHeader({
         // Away from the company page the in-page anchors have to be absolute,
         // or `#about` would look for a section that is not on this document.
         href:
-          contactHref.startsWith("/") && link.href.startsWith("#")
+          !sectionLinks && contactHref.startsWith("/") && link.href.startsWith("#")
             ? `/${link.href}`
             : link.href,
         active: link.href === activeHref,

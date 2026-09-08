@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Wave } from "@/components/brand/wave";
 
 import { Screenshot } from "@/components/site/screenshot";
 import { Shell } from "@/components/site/section";
@@ -11,7 +12,7 @@ import type { ProductT } from "@/i18n/types";
  *
  * Bright rather than the company page's navy: the platform is a light product
  * and a near-black opening promised something it does not look like. The
- * screenshot sits square-on beside the claim — the product is the argument
+ * screenshot sits square-on beneath the claim — the product is the argument
  * here, and a tilt costs legibility to buy the look of every other SaaS page.
  */
 export function StudioHero({
@@ -22,10 +23,13 @@ export function StudioHero({
   appUrl: string;
 }) {
   return (
-    <section className="cove-studio-grad pt-[72px] text-on-deep">
-      <Shell>
-        <div className="grid gap-12 py-16 lg:grid-cols-12 lg:gap-16 lg:py-24">
-          <div className="lg:col-span-6">
+    <section className="cove-product-hero cove-studio-grad relative isolate overflow-hidden pt-[72px] text-on-deep">
+      <div className="cove-product-current" aria-hidden="true">
+        <Wave tone="onDeep" className="h-full w-full" />
+      </div>
+      <Shell className="relative">
+        <div className="flex flex-col gap-12 pt-16 pb-10 lg:gap-16 lg:pt-24 lg:pb-16">
+          <div className="mx-auto max-w-[900px] text-center">
             <Link
               href="/"
               className="font-display cove-eyebrow inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-white/70 transition-colors hover:text-white"
@@ -33,13 +37,13 @@ export function StudioHero({
               <ArrowLeft className="size-3.5" />
               {t("hero.back")}
             </Link>
-            <h1 className="cove-rise mt-8 text-[clamp(2.25rem,5vw,3.75rem)] font-extrabold tracking-[-0.035em] text-on-deep">
+            <h1 className="cove-rise mt-8 text-[clamp(2.25rem,5vw,4.25rem)] font-extrabold tracking-[-0.035em] text-on-deep">
               {t("hero.title")}
             </h1>
-            <p className="cove-rise mt-7 max-w-[46ch] text-[17px] leading-[1.8] text-white/85 [animation-delay:140ms]">
+            <p className="cove-rise mx-auto mt-7 max-w-[64ch] text-[17px] leading-[1.8] text-white/85 [animation-delay:140ms]">
               {t("hero.lead")}
             </p>
-            <div className="cove-rise mt-9 flex flex-wrap gap-3 [animation-delay:240ms]">
+            <div className="cove-rise mt-9 flex flex-wrap justify-center gap-3 [animation-delay:240ms]">
               <Link
                 href="/#contact"
                 className={buttonVariants({
@@ -61,8 +65,8 @@ export function StudioHero({
             </div>
           </div>
 
-          <div className="lg:col-span-6">
-            <div className="cove-rise [animation-delay:180ms]">
+          <div className="cove-product-stage mx-auto w-full max-w-[1040px]">
+            <div className="cove-product-screen cove-rise [animation-delay:320ms]">
               <Screenshot
                 src="/shots/student-workspace.png"
                 alt={t("student.shot_alt")}

@@ -29,11 +29,18 @@ export function Reveal({
     const node = ref.current;
     if (!node) return;
 
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       node.dataset.shown = "true";
       return;
     }
 
+    // Only animate elements below the viewport. Server-rendered content stays
+    // visible until enhancement is ready, including when hydration fails.
+    if (node.getBoundingClientRect().top < window.innerHeight) {
+      node.dataset.shown = "true";
+      return;
+    }
+    node.dataset.revealReady = "true";
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting) return;
@@ -46,7 +53,10 @@ export function Reveal({
     );
 
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      delete node.dataset.revealReady;
+    };
   }, []);
 
   return (

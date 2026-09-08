@@ -52,7 +52,7 @@ export function Startup({ t }: { t: MarketingT }) {
   ];
 
   return (
-    <Section ground="warm">
+    <Section id="startup" ground="warm">
       <Shell>
         <Stagger
           head={
@@ -71,17 +71,17 @@ export function Startup({ t }: { t: MarketingT }) {
            * from coral to sun so the colour says the same thing the number
            * does: how far through the programme this step sits.
            */}
-          <ol className="border-t border-line">
+          <ol className="cove-step-stack space-y-4">
             {steps.map((step, index) => (
               <Reveal
                 as="li"
                 key={step.title}
                 delay={index * 70}
-                className="group grid grid-cols-[3.5rem_1fr] gap-x-5 border-b border-line/70 py-7 transition-colors hover:border-cove-coral/40 sm:grid-cols-[4.5rem_1fr] sm:gap-x-8"
+                className="cove-step-card group grid grid-cols-[3rem_1fr] gap-x-4 rounded-[22px] border border-white bg-white/80 p-6 shadow-card sm:grid-cols-[3.5rem_1fr] sm:gap-x-6"
               >
                 <span
                   aria-hidden="true"
-                  className="font-display tabular grid size-12 place-items-center rounded-[12px] text-[16px] font-bold text-white shadow-[0_8px_18px_-8px_rgb(245_107_97/0.6)] transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                  className="font-display tabular grid size-12 place-items-center rounded-[12px] text-[16px] font-bold text-ink shadow-[0_8px_18px_-8px_rgb(245_107_97/0.6)] transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                   style={{ backgroundImage: STEP_RAMP[index] }}
                 >
                   {String(index + 1).padStart(2, "0")}

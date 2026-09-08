@@ -25,7 +25,7 @@ export function Shell({
  *
  * `ground` is the only surface decision available: paper, the cool `mist`, or
  * the deep blue used for the two bands that belong to the product and the
- * footer. Nothing on this site sits on a gradient.
+ * footer, with brand gradients giving each surface its own atmosphere.
  */
 export function Section({
   id,
@@ -112,6 +112,7 @@ export function SectionHead({
   lead,
   onDeep = false,
   className,
+  centered = false,
 }: {
   hue: Hue;
   eyebrow: string;
@@ -119,9 +120,10 @@ export function SectionHead({
   lead?: string;
   onDeep?: boolean;
   className?: string;
+  centered?: boolean;
 }) {
   return (
-    <Reveal className={className}>
+    <Reveal className={cn(centered && "cove-section-head-centered", className)}>
       <Eyebrow hue={hue} onDeep={onDeep}>
         {eyebrow}
       </Eyebrow>

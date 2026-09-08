@@ -23,14 +23,14 @@ export function Flow({ t }: { t: ProductT }) {
   ];
 
   return (
-    <Section ground="teal">
+    <Section id="flow" ground="teal">
       <Shell>
         <SectionHead
           hue="blue"
           eyebrow={t("flow.eyebrow")}
           title={t("flow.title")}
         />
-        <ol className="mt-14 grid gap-5 md:grid-cols-4">
+        <ol className="cove-flow-grid mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => (
             <Reveal as="li" key={step.title} delay={index * 80}>
               <Card hue="blue" className="p-7">

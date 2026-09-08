@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { hues, type Hue } from "@/lib/hues";
@@ -26,20 +27,30 @@ export function Card({
   hue,
   className,
   children,
+  href,
 }: {
   hue: Hue;
+  href?: string;
   className?: string;
   children: ReactNode;
 }) {
-  return (
-    <div className={cn("cove-card group h-full overflow-hidden", className)}>
+  const content = (
+    <>
       <span
         aria-hidden="true"
         className="cove-card__glow"
         style={{ backgroundImage: glow[hue] }}
       />
       <div className="relative flex h-full flex-col">{children}</div>
-    </div>
+    </>
+  );
+  const classes = cn("cove-card group block h-full overflow-hidden", className);
+  return href ? (
+    <Link href={href} data-hue={hue} className={cn(classes, "cove-card--link")}>
+      {content}
+    </Link>
+  ) : (
+    <div data-hue={hue} className={classes}>{content}</div>
   );
 }
 

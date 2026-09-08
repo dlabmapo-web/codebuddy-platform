@@ -53,7 +53,7 @@ export function Hero({
   contactHref: string;
 }) {
   return (
-    <section className="relative overflow-hidden pt-[72px]">
+    <section className="cove-home-hero relative isolate overflow-hidden pt-[72px]">
       {/*
        * The aura: the mark's four blocks at page scale, blurred into the
        * paper. Positions follow the logo — teal upper left, blue upper right,
@@ -65,13 +65,16 @@ export function Hero({
         className="cove-aura pointer-events-none absolute inset-x-0 top-0 h-[760px]"
       />
 
+      <div className="cove-hero-current" aria-hidden="true">
+        <Wave className="cove-hero-wave h-full w-full" />
+      </div>
       <Shell className="relative">
-        <div className="grid gap-10 pt-14 pb-12 lg:grid-cols-12 lg:gap-16 lg:pt-24 lg:pb-16">
-          <div className="lg:col-span-7">
+        <div className="grid gap-8 pt-16 pb-14 lg:grid-cols-12 lg:gap-12 lg:pt-28 lg:pb-20">
+          <div className="lg:col-span-8">
             <div className="cove-rise">
               <Eyebrow hue="blue">{copy.eyebrow}</Eyebrow>
             </div>
-            <h1 className="mt-6 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold tracking-[-0.035em] text-ink">
+            <h1 className="mt-6 text-[clamp(2.25rem,5.3vw,4.6rem)] font-extrabold tracking-[-0.035em] text-ink">
               {/*
                * The two lines animate separately, 120ms apart. It is the only
                * choreographed moment on the page and it belongs to the
@@ -80,13 +83,13 @@ export function Hero({
               <span className="cove-rise block [animation-delay:80ms]">
                 {copy.titleLead}
               </span>
-              <span className="cove-rise block [animation-delay:200ms]">
+              <span className="cove-rise cove-hero-title-accent block [animation-delay:200ms]">
                 {copy.titleRest}
               </span>
             </h1>
           </div>
 
-          <div className="flex flex-col justify-end lg:col-span-5">
+          <div className="flex flex-col justify-end lg:col-span-4">
             <div className="cove-rise [animation-delay:340ms]">
               <p className="max-w-[42ch] text-[17px] leading-[1.8] text-sub">
                 <RichText>{copy.lead}</RichText>
@@ -115,7 +118,7 @@ export function Hero({
       </Shell>
 
       <Shell className="relative pb-16 lg:pb-24">
-        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <ul className="cove-audiences grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
           {audiences.map((audience, index) => (
             <AudiencePanel
               key={audience.title}
@@ -159,7 +162,7 @@ function AudiencePanel({
     <li className="cove-wipe" style={{ animationDelay: `${delay}ms` }}>
       <div
         className={cn(
-          "group relative flex h-full min-h-[176px] flex-col overflow-hidden rounded-[14px] p-5 lg:min-h-[252px]",
+          "cove-audience-panel group relative flex h-full min-h-[224px] flex-col overflow-hidden rounded-[24px] p-5 lg:min-h-[310px] lg:p-6",
           "border border-line/70 shadow-card",
           "transition-[transform,box-shadow] duration-300 ease-out",
           "hover:-translate-y-1.5 hover:shadow-lift",

@@ -24,7 +24,7 @@ export function Contact({ t }: { t: MarketingT }) {
           }
         >
           <Reveal delay={80} className="space-y-8">
-            <div className="rounded-[14px] border border-line bg-paper p-8 shadow-card">
+            <div className="cove-contact-card rounded-[28px] border border-line bg-paper p-6 shadow-card sm:p-8">
               <p className="font-display cove-eyebrow text-[12px] font-semibold uppercase tracking-[0.14em] text-sub">
                 {t("contact.phone_label")}
               </p>

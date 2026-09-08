@@ -3,6 +3,7 @@
   "description": "Your Cove account, and how you appear in each academy.",
   "open": "My page",
   "back_to_studio": "Back to Studio",
+  "back_to_console": "Back to console",
   "loading": "Loading your profile",
   "load_failed": "Your profile could not be loaded. Reload the page to try again.",
   "identity": {

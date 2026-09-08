@@ -49,13 +49,36 @@
       },
       "membership": {
         "restored": "Member restored",
-        "suspended": "Member suspended"
+        "suspended": "Member suspended",
+        "role_changed": "Member role changed",
+        "role_granted": "Extra role granted",
+        "role_revoked": "Extra role revoked"
       },
       "people": {
-        "imported": "People imported"
+        "imported": "People imported",
+        "bulk": {
+          "enroll": "Members enrolled in bulk",
+          "restore": "Members restored in bulk",
+          "role_change": "Member roles changed in bulk",
+          "suspend": "Members suspended in bulk"
+        }
       },
       "profile": {
-        "update": "Academy profile updated"
+        "update": "Academy profile updated",
+        "media_removed": "Academy image removed"
+      },
+      "join_request": {
+        "approved": "Join request approved",
+        "rejected": "Join request rejected"
+      },
+      "member_profile": {
+        "image_removed": "Member photo removed",
+        "image_replaced": "Member photo replaced",
+        "updated": "Member profile updated"
+      },
+      "point_policy": {
+        "reset": "Point policy reset to defaults",
+        "updated": "Point policy changed"
       }
     },
     "class": {
@@ -81,19 +104,42 @@
         "removed": "Teacher removed",
         "replaced": "Teacher replaced"
       },
-      "updated": "Class updated"
+      "updated": "Class updated",
+      "archived": "Class archived",
+      "restored": "Class reopened"
     },
     "content": {
       "course": {
         "created": "Course created",
         "deleted": "Course deleted",
-        "updated": "Course updated"
+        "updated": "Course updated",
+        "adopted_from_library": "Course adopted from the library",
+        "content_visibility_changed": "Course contents shown or hidden",
+        "visibility_changed": "Course shown or hidden"
       },
       "lecture": {
         "created": "Lecture created",
         "deleted": "Lecture deleted",
         "reordered": "Lectures reordered",
-        "updated": "Lecture updated"
+        "updated": "Lecture updated",
+        "visibility_changed": "Lecture shown or hidden"
+      },
+      "course_module": {
+        "created": "Module created",
+        "deleted": "Module deleted",
+        "reordered": "Modules reordered",
+        "updated": "Module updated",
+        "visibility_changed": "Module shown or hidden"
+      },
+      "curriculum_import": {
+        "committed": "Curriculum imported"
+      },
+      "programming_exercise": {
+        "created": "Problem created",
+        "deleted": "Problem deleted",
+        "reordered": "Problems reordered",
+        "updated": "Problem updated",
+        "visibility_changed": "Problem shown or hidden"
       }
     },
     "platform": {
@@ -103,14 +149,18 @@
         "deleted": "Academy deleted",
         "restored": "Academy reopened",
         "suspended": "Academy suspended",
-        "updated": "Academy updated"
+        "updated": "Academy updated",
+        "first_manager_invitation_resent": "First manager invitation resent",
+        "first_manager_invited": "First manager invited"
       },
       "admin": {
         "granted": "Platform admin granted"
       },
       "library": {
         "course": {
-          "created": "Library course created"
+          "created": "Library course created",
+          "restored": "Library course restored",
+          "retired": "Library course retired"
         },
         "created": "Library created"
       },
@@ -124,10 +174,20 @@
       "user": {
         "participation": {
           "read": "Account history read"
-        }
+        },
+        "deleted": "Account deleted",
+        "operator_granted": "Operator access granted",
+        "operator_revoked": "Operator access revoked",
+        "restored": "Account restored",
+        "suspended": "Account suspended"
       },
       "users": {
         "exported": "User list exported"
+      }
+    },
+    "monitoring": {
+      "exercise_solution": {
+        "viewed": "Model solution viewed"
       }
     }
   }

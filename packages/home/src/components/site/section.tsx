@@ -69,8 +69,10 @@ export function Section({
 
 /**
  * The eyebrow: a short rule in the section's hue, then the label in the Latin
- * display face. This is the spectrum rail's second appearance — the reader
- * learns the colour on the hero panels and meets it again here.
+ * display face. This is where the reader meets the spectrum — the hero panels
+ * used to carry a coloured rail and introduce it first, but they are four
+ * photographs now and the client asked for the rail gone, so the eyebrows are
+ * the only place the hue system is stated.
  */
 export function Eyebrow({
   hue,

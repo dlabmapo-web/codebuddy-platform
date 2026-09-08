@@ -14,11 +14,10 @@ export type Audience = {
   body: string;
   Icon: (props: { className?: string }) => ReactNode;
   /**
-   * Two of the four have a real photograph; the other two carry their icon on
-   * the hue gradient. That asymmetry is deliberate — a real room beats an
-   * illustration wherever one exists, and the panels stay the same size, the
-   * same rail, and the same caption position either way, so the row still
-   * reads as one set. Drop a file in `public/photos/` to fill another.
+   * Every audience has a real photograph now. A panel without one falls back
+   * to its hue as a gradient, at the same size and with the caption in the
+   * same place, so the row still reads as one set. Drop a file in
+   * `public/photos/` if a fifth audience ever arrives without one.
    */
   photo?: string;
 };
@@ -122,7 +121,7 @@ export function Hero({
               key={audience.title}
               audience={audience}
               // The four currents arriving, 90ms apart, after the sentence has
-              // finished. Left to right, the order the rail keeps everywhere.
+              // finished. Left to right, the order the page keeps everywhere.
               delay={520 + index * 90}
             />
           ))}
@@ -134,7 +133,7 @@ export function Hero({
 
 /*
  * Each panel is its hue falling away to paper, not a flat swatch — the colour
- * is strongest at the rail and gone by the caption, so the label always sits
+ * is strongest at the top edge and gone by the caption, so the label always sits
  * on something near-white and the tile reads as lit rather than filled.
  *
  * Per-hue alphas, not one shared value: the logo hues sit at very different
@@ -173,8 +172,8 @@ function AudiencePanel({
       >
         {/*
          * The photograph is its own layer rather than a background on the
-         * panel, so it can scale on hover while the scrim, the rail, the icon
-         * and the caption stay exactly where they are. As a background it
+         * panel, so it can scale on hover while the scrim, the icon and the
+         * caption stay exactly where they are. As a background it
          * would drag the text with it.
          */}
         {audience.photo ? (
@@ -190,14 +189,6 @@ function AudiencePanel({
             />
           </>
         ) : null}
-
-        <span
-          className={cn(
-            "absolute inset-x-0 top-0 h-[3px]",
-            hues[audience.hue].bar,
-          )}
-          aria-hidden="true"
-        />
 
         {/*
          * The mark's wave, faint, across the lower half — only on the panels

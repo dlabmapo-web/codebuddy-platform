@@ -45,6 +45,7 @@ import type { PlatformLibraryService } from "../platform/platform-library.servic
 import type { AcademyLibraryService } from "../content/library/academy-library.service.js";
 import type { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
 import type { PlatformRankingService } from "../platform/platform-ranking.service.js";
+import type { PlatformSettingsService } from "../platform/platform-settings.service.js";
 import type { PlatformUsersService } from "../platform/platform-users.service.js";
 import type { PlatformSupportService } from "../platform/platform-support.service.js";
 import type { PointsService } from "../points/points.service.js";
@@ -109,6 +110,7 @@ export type ORPCDeps = {
   academyLibraryService: AcademyLibraryService;
   platformInvitationsService: PlatformInvitationsService;
   platformRankingService: PlatformRankingService;
+  platformSettingsService: PlatformSettingsService;
   platformUsersService: PlatformUsersService;
   platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;

@@ -11,7 +11,6 @@ export type FooterCopy = {
   contactLabel: string;
   studioLink: string;
   studioApp: string;
-  mvpApp: string;
   campusLink: string;
   aboutLink: string;
   areasLink: string;
@@ -87,17 +86,6 @@ export function Footer({ copy }: { copy: FooterCopy }) {
                   className="text-white/80 transition-colors hover:text-white"
                 >
                   {copy.studioApp}
-                </a>
-              </li>
-              <li>
-                <a
-                  href={
-                    process.env.NEXT_PUBLIC_MVP_URL ??
-                    "https://mvp.coveedu.com"
-                  }
-                  className="text-white/80 transition-colors hover:text-white"
-                >
-                  {copy.mvpApp}
                 </a>
               </li>
             </ul>

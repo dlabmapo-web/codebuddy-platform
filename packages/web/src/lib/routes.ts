@@ -20,6 +20,22 @@ function academyRoot(academySlug: string): string {
   return `/academy/${segment(academySlug)}`;
 }
 
+/**
+ * Which door a reader used to reach a page that has more than one.
+ *
+ * Only the console so far, and deliberately a closed union rather than a free
+ * string: the value decides where a back link points, so an unrecognised one
+ * must fail to compile rather than silently fall through to the default.
+ */
+export const accountOrigins = ['admin'] as const;
+export type AccountOrigin = (typeof accountOrigins)[number];
+
+export function isAccountOrigin(
+  value: string | undefined | null,
+): value is AccountOrigin {
+  return (accountOrigins as readonly string[]).includes(value ?? '');
+}
+
 /** The only public URL policy for Cove Studio. */
 export const routes = {
   home: '/',
@@ -32,13 +48,46 @@ export const routes = {
   invite: '/invite',
   invitation: (token: string) => `/invite/${segment(token)}`,
   account: '/account',
+  /**
+   * My Page, told where the reader came from.
+   *
+   * `/account` decides its own way back, and its first answer is the reader's
+   * first academy — right for a member, wrong for an operator who opened it
+   * from the console and holds a membership as well. The origin says which
+   * door was used, so the page can send them back through it.
+   *
+   * A separate helper rather than a parameter on `account`: the bare address
+   * stays a string for the callers that have no origin to declare, and a
+   * reader of either call site can see which is which.
+   */
+  accountFrom: (origin: AccountOrigin) => withQuery('/account', { from: origin }),
   authCallback: '/auth/callback',
   recoveryConfirm: '/auth/recovery/confirm',
   admin: '/admin',
   adminAcademies: '/admin/academies',
+  /**
+   * Every academy's configuration, across all of them.
+   *
+   * Platform-scoped, so they belong in the console rail — unlike
+   * `adminAcademySettings`, which is one academy's and belongs on it.
+   */
+  adminSettings: '/admin/settings',
+  adminPointPolicies: '/admin/settings/points',
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,
+  /**
+   * What one academy has switched on, and what its work pays — administered
+   * from the console rather than by standing inside the academy.
+   *
+   * They mirror the studio's own two addresses under `/settings`, so an
+   * operator who knows one product can guess the other. `points/` next door
+   * stays the *reads* — a student's balance — and these are the policy.
+   */
+  adminAcademySettings: (academySlug: string) =>
+    `/admin/academies/${segment(academySlug)}/settings`,
+  adminAcademyPointPolicy: (academySlug: string) =>
+    `/admin/academies/${segment(academySlug)}/settings/points`,
   adminAcademyCourses: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}/courses`,
   adminAcademyCourse: (academySlug: string, courseId: string) =>
@@ -138,6 +187,20 @@ export const routes = {
     `${academyRoot(academySlug)}/invitations`,
   academyPoints: (academySlug: string) =>
     `${academyRoot(academySlug)}/points`,
+  /**
+   * What this academy has switched on, and what each kind of work pays.
+   *
+   * Helpers rather than two more `${base}/settings` strings appended in a
+   * sidebar. The canonical-routes lint catches hand-written `/academy/...`
+   * literals, not concatenation onto a helper's result — so a second caller
+   * building these by hand would pass the check and still be a second
+   * definition of the address, which is the drift the check exists to stop.
+   * The console reaches both, so there is now more than one caller.
+   */
+  academySettings: (academySlug: string) =>
+    `${academyRoot(academySlug)}/settings`,
+  academyPointPolicy: (academySlug: string) =>
+    `${academyRoot(academySlug)}/settings/points`,
   academyClassPoints: (academySlug: string) =>
     `${academyRoot(academySlug)}/points/classes`,
   academyStudentPoints: (academySlug: string, membershipId: string) =>

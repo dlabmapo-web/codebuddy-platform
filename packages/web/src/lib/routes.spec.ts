@@ -57,6 +57,43 @@ describe('canonical Cove Studio routes', () => {
     );
   });
 
+  /*
+   * The two settings addresses were built by hand in the studio rail until the
+   * console needed them too. These assert the exact strings that rail produced,
+   * so extracting the helper cannot have moved either page.
+   */
+  it('addresses the academy settings pages the rail always did', () => {
+    expect(routes.academySettings('cove-seoul')).toBe(
+      '/academy/cove-seoul/settings',
+    );
+    expect(routes.academyPointPolicy('cove-seoul')).toBe(
+      '/academy/cove-seoul/settings/points',
+    );
+  });
+
+  /*
+   * My Page has one address and an optional statement of which door was used.
+   * The origin only ever selects between answers the account already has, so
+   * the bare form has to stay untouched for every caller that has none.
+   */
+  it('names the console as the door an operator came through', () => {
+    expect(routes.account).toBe('/account');
+    expect(routes.accountFrom('admin')).toBe('/account?from=admin');
+  });
+
+  /*
+   * Console-owned academy settings. They mirror the studio's two addresses one
+   * level up, so an operator who knows one product can guess the other.
+   */
+  it('addresses the console\'s own academy settings pages', () => {
+    expect(routes.adminAcademySettings('cove-seoul')).toBe(
+      '/admin/academies/cove-seoul/settings',
+    );
+    expect(routes.adminAcademyPointPolicy('cove-seoul')).toBe(
+      '/admin/academies/cove-seoul/settings/points',
+    );
+  });
+
   it('keeps only the approved temporary redirects', () => {
     expect(compatibilityRedirects).toEqual([
       { source: '/auth/login', destination: '/login', permanent: false },

@@ -50,7 +50,7 @@ import { NavPendingHint } from './nav-pending-hint';
 import { NavCountBadge, NavCountDot } from './nav-count-badge';
 import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
-import { ProfileAvatar } from '@/components/studio/profile-avatar';
+import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import { RoleBadge } from '@/components/studio/role-badge';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -105,12 +105,7 @@ export function StudioSidebar({
    * academy — and a face is the one icon nobody has to be taught. Null when the
    * account lookup failed; `ProfileAvatar` draws initials, then a stand-in.
    */
-  viewer: {
-    academyImageUrl: string | null;
-    imageUrl: string | null;
-    avatarUrl: string | null;
-    name: string | null;
-  } | null;
+  viewer: MyPageViewer | null;
   /**
    * The role this reader is working as, which is what the chip under the
    * academy name shows.
@@ -219,77 +214,6 @@ export function StudioSidebar({
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  );
-}
-
-/**
- * The one row in the rail that wears a face.
- *
- * `ProfileAvatar` rather than a `lucide` glyph, and that is the whole point of
- * it: every other row names a part of the academy and takes the icon its
- * subject deserves; this one leads to the reader, and their own photograph
- * says so faster than any glyph could — especially on the collapsed rail,
- * where a row is nothing but its icon.
- *
- * The avatar has to fight the collapsed rail's own rule to survive it.
- * `SidebarMenuButton` hides every direct `<span>` child at icon width, so the
- * label disappears — which is correct — and so would the avatar, which is a
- * span too. The override is deliberate and marked important, because the
- * alternative at that width is a row with nothing in it at all.
- */
-function MyPageRow({
-  href,
-  isActive,
-  viewer,
-}: {
-  href: string;
-  isActive: boolean;
-  viewer: {
-    academyImageUrl: string | null;
-    imageUrl: string | null;
-    avatarUrl: string | null;
-    name: string | null;
-  } | null;
-}) {
-  const { t } = useLayoutTranslation(['nav', 'common']);
-  const { state, isMobile, setOpenMobile } = useSidebar();
-  const collapsed = state === 'collapsed' && !isMobile;
-  const label = t('my_page');
-
-  return (
-    <SidebarGroup>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            asChild
-            isActive={isActive}
-            tooltip={collapsed ? label : undefined}
-          >
-            <Link href={href} onClick={() => setOpenMobile(false)}>
-              {/*
-                `xs`, not the header's `sm`. `ProfileAvatar` sets its width and
-                height as inline styles, so a `size-*` class cannot shrink it —
-                the size has to come from the prop, and asking for the header's
-                size here gave the rail a 32px face standing among 17px glyphs
-                and matching the avatar two corners away pixel for pixel.
-              */}
-              <ProfileAvatar
-                academyImageUrl={viewer?.academyImageUrl}
-                className={cn(
-                  'ring-1 ring-sub/30',
-                  'group-data-[collapsible=icon]:!inline-flex',
-                )}
-                externalAvatarUrl={viewer?.avatarUrl}
-                globalImageUrl={viewer?.imageUrl}
-                name={viewer?.name ?? label}
-                size="xs"
-              />
-              <span>{label}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarGroup>
   );
 }
 
@@ -611,13 +535,17 @@ export function studioNavGroups({
     // Its own group: the features here decide what every other group shows,
     // so it does not belong filed under People.
     const settings: NavLink[] = [
-      { href: `${base}/settings`, labelKey: 'link.settings', icon: Settings },
+      {
+        href: routes.academySettings(academySlug),
+        labelKey: 'link.settings',
+        icon: Settings,
+      },
     ];
     // What each kind of work pays. Only where the academy runs points at all —
     // a page configuring an economy nobody has is worse than no page.
     if (hasPoints) {
       settings.push({
-        href: `${base}/settings/points`,
+        href: routes.academyPointPolicy(academySlug),
         labelKey: 'link.point_policy',
         icon: Coins,
       });

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureCourse, enterFixtureExercise } from '../support/exercise';
 
 /**
  * The answer records acceptance run, against seeded content.
@@ -42,6 +43,7 @@ function recordsUrl() {
  * `setValue` still fires the React `onChange` a real edit would.
  */
 async function typeIntoEditor(page: Page, code: string) {
+  await enterFixtureExercise(page);
   const editor = page.locator('.monaco-editor').first();
   await expect(editor).toBeVisible({ timeout: 30_000 });
   await expect
@@ -68,10 +70,12 @@ async function openEcho(page: Page): Promise<string> {
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
     .click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/);
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/);
+  await enterFixtureCourse(page);
   await page.getByPlaceholder(/search problems|문제 검색/i).fill(ECHO_TITLE);
   await page.getByText(ECHO_TITLE).click();
   await page.waitForURL(/\/learn\/exercises\//);
+  await enterFixtureExercise(page);
   return page.url();
 }
 
@@ -129,10 +133,10 @@ test('the summary counts a solved problem and an accepted rate', async ({
     /problems solved|해결한 문제/i,
     /accepted rate|정답률/i,
   ]) {
-    await expect(page.getByText(label)).toBeVisible();
+    await expect(page.getByRole('main').getByText(label)).toBeVisible();
   }
   // Whole percent, never a fraction.
-  await expect(page.getByText(/^\d{1,3}%$/)).toBeVisible();
+  await expect(page.getByRole('main').getByTestId('records-summary-rate')).toContainText(/\d{1,3}%/);
 });
 
 test('a result facet narrows server results and survives a reload', async ({
@@ -186,7 +190,7 @@ test('review opens the attempt in a fully editable workspace and returns', async
   await page.waitForURL(/\/learn\/exercises\/.*submission=/);
 
   // The submitted code and its verdict, in the ordinary workspace.
-  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await enterFixtureExercise(page);
   await expect(page.getByRole('heading', { name: ECHO_TITLE })).toBeVisible();
   for (const control of [
     /^submit$|^제출$/i,
@@ -200,7 +204,7 @@ test('review opens the attempt in a fully editable workspace and returns', async
   expect(await page.content()).not.toContain(HIDDEN_SENTINEL);
 
   await page
-    .getByRole('link', { name: /back to answer records|제출 기록으로/i })
+    .getByRole('button', { name: /back to answer records|제출 기록으로/i })
     .first()
     .click();
   await expect(page).toHaveURL(url);
@@ -220,7 +224,7 @@ test('a pre-existing draft survives opening and leaving an attempt', async ({
   await page.goto(recordsUrl());
   await page.getByRole('link', { name: /^review|^다시 보기/i }).first().click();
   await page.waitForURL(/submission=/);
-  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await enterFixtureExercise(page);
   // The submitted code, not the draft.
   await expect(page.locator('.monaco-editor')).not.toContainText(marker);
 
@@ -286,7 +290,7 @@ test('another student’s submission cannot be opened by editing the URL', async
     routes.academyLearnExercise(academySlug, materialId) +
       '?submission=00000000-0000-4000-8000-0000000000ff',
   );
-  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await enterFixtureExercise(page);
   await expect(
     page.getByText(/could not be loaded|불러오지 못했습니다/i).first(),
   ).toBeVisible();
@@ -304,8 +308,9 @@ test('a crafted returnTo cannot redirect off the site', async ({ page }) => {
     routes.academyLearnExercise(academySlug, materialId) +
       `?returnTo=${encodeURIComponent('https://evil.example/steal')}`,
   );
+  await enterFixtureExercise(page);
   await page
-    .getByRole('link', { name: /back to answer records|제출 기록으로/i })
+    .getByRole('button', { name: /back to answer records|제출 기록으로/i })
     .first()
     .click();
   // Back lands on this academy's own records root, never off-site.
@@ -320,7 +325,8 @@ test('the course outline shows lecture descriptions and progress', async ({
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
     .click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/);
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/);
+  await enterFixtureCourse(page);
 
   await expect(page.getByText(LECTURE_ONE_DESCRIPTION)).toBeVisible();
   // A count beside the bar, never a bar alone.

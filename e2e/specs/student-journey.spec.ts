@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureCourse, enterFixtureExercise } from '../support/exercise';
 
 /**
  * The student journey against seeded content.
@@ -91,12 +92,12 @@ test.beforeEach(async ({ page }) => {
   await signIn(page);
 });
 
-test('a student lands on their catalog, not the academy overview', async ({
+test('a student lands on their academy overview', async ({
   page,
 }) => {
-  // The overview is a management surface and would be empty for a student.
-  await expect(page).toHaveURL(/\/learn\/courses$/);
-  await expect(page.getByRole('heading', { name: COURSE_TITLE })).toBeVisible();
+  await expect(page).toHaveURL(new URL(routes.academy(academySlug), page.url()).href);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Cove Student');
+  await expect(page.getByRole('link', { name: /my courses|내 코스/i })).toBeVisible();
 });
 
 test('the sidebar shows Learning and hides management groups', async ({
@@ -112,8 +113,10 @@ test('the sidebar shows Learning and hides management groups', async ({
 });
 
 test('the outline hides unpublished lectures and exercises', async ({ page }) => {
+  await page.goto(catalogUrl());
   await courseCard(page).click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/);
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/);
+  await enterFixtureCourse(page);
 
   await expect(page.getByText(ECHO_TITLE)).toBeVisible();
   await expect(page.getByText(HIDDEN_EXERCISE_TITLE)).toHaveCount(0);
@@ -129,9 +132,11 @@ test('no hidden test case reaches the browser', async ({ page }) => {
     bodies.push(await response.text().catch(() => ''));
   });
 
+  await page.goto(catalogUrl());
   await courseCard(page).click();
   await page.getByText(ECHO_TITLE).click();
   await page.waitForURL(/\/learn\/exercises\//);
+  await enterFixtureExercise(page);
   await expect(page.getByRole('heading', { name: ECHO_TITLE })).toBeVisible();
 
   expect(await page.content()).not.toContain(HIDDEN_SENTINEL);
@@ -268,11 +273,13 @@ test('previous and next move between exercises across lectures', async ({
 async function exerciseUrl(page: Page, title: string): Promise<string> {
   await page.goto(catalogUrl());
   await courseCard(page).click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/);
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/);
+  await enterFixtureCourse(page);
   // Only the first module starts expanded. Searching reveals every match
   // regardless of collapse state, which is also what a student would do.
   await page.getByPlaceholder(/search problems|문제 검색/i).fill(title);
   await page.getByText(title).click();
   await page.waitForURL(/\/learn\/exercises\//);
+  await enterFixtureExercise(page);
   return page.url();
 }

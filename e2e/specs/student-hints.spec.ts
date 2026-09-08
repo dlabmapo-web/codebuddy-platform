@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureCourse, enterFixtureExercise } from '../support/exercise';
 
 /**
  * Progressive hint reveal in the student workspace.
@@ -58,11 +59,13 @@ async function openExercise(page: Page, title: string) {
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
     .first()
     .click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/, { timeout: 30_000 });
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/, { timeout: 30_000 });
+  await enterFixtureCourse(page);
   // Only the first module starts expanded; searching reveals every match.
   await page.getByPlaceholder(/search problems|문제 검색/i).fill(title);
   await page.getByText(title).click();
   await page.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await enterFixtureExercise(page);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 }
 

@@ -60,7 +60,9 @@ function courseCard(page: Page) {
 }
 
 function exerciseUrl(materialId: string) {
-  return routes.academyLearnExercise(academySlug, materialId);
+  return routes.academyLearnExercise(academySlug, materialId, {
+    classId: 'e0000000-0000-4000-8000-000000000040',
+  });
 }
 
 async function typeIntoEditor(page: Page, code: string) {

@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureExercise } from '../support/exercise';
 
 /**
  * The shared pointer, on two screens that do not match.
@@ -81,6 +82,7 @@ test('the teacher opens a live watch on the hinted exercise', async () => {
 
   await studentPage.getByText(HINTED_TITLE).first().click();
   await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await enterFixtureExercise(studentPage);
   await expect(statementSurface(studentPage)).toBeVisible({ timeout: 30_000 });
 
   const row = teacherPage.getByRole('row').filter({ hasText: 'Cove Student' });

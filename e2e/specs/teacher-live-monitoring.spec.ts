@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureExercise } from '../support/exercise';
 
 /**
  * Live teacher monitoring, from both sides at once.
@@ -138,6 +139,7 @@ test('a student appears live when the teacher opened the roster first', async ()
 
   await studentPage.getByText(SUM_TITLE).first().click();
   await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await enterFixtureExercise(studentPage);
   await typeIntoEditor(studentPage, 'a = int(input())\n');
 
   const studentRow = teacherPage

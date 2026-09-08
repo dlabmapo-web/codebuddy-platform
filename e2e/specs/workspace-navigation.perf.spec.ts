@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureCourse, enterFixtureExercise } from '../support/exercise';
 
 /**
  * Previous/Next must not pay a server round trip or restart the Python runtime.
@@ -39,9 +40,11 @@ async function openEcho(page: Page) {
     .getByRole('link')
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
     .click();
+  await enterFixtureCourse(page);
   await page.getByPlaceholder(/search problems|문제 검색/i).fill(ECHO_TITLE);
   await page.getByText(ECHO_TITLE).click();
   await page.waitForURL(/\/learn\/exercises\//);
+  await enterFixtureExercise(page);
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
   // Wait for the runtime to be ready so the measurement starts from a warm
   // workspace, which is the state a student actually navigates from.

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
+import { enterFixtureCourse, enterFixtureExercise } from '../support/exercise';
 
 /**
  * The fullscreen curriculum navigator's geometry.
@@ -37,9 +38,11 @@ async function openWorkspace(page: Page) {
     .filter({ has: page.getByRole('heading', { name: COURSE_TITLE }) })
     .first()
     .click();
-  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+$/, { timeout: 30_000 });
+  await page.waitForURL(/\/learn\/courses\/[0-9a-f-]+(?:\?|$)/, { timeout: 30_000 });
+  await enterFixtureCourse(page);
   await page.getByText(EXERCISE_TITLE).first().click();
   await page.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await enterFixtureExercise(page);
 }
 
 const trigger = (page: Page) =>

@@ -35,4 +35,5 @@ describe('academy role diagnostic', () => {
     );
     expect(html).toBe('');
   });
+
 });

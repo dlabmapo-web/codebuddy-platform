@@ -37,6 +37,7 @@ import { AcademyContent } from './academy-content';
 import { AcademyVitals } from './academy-vitals';
 import { EnterAcademyPanel } from './enter-academy';
 import { IdentityPanel } from './identity-panel';
+import { SettingsPanel } from './settings-panel';
 import { cn } from '@/lib/utils';
 
 import { InvitationLink } from '../../../_components/invitation-link';
@@ -67,10 +68,13 @@ export function AcademyDetail({
   academy: initial,
   classes,
   courses,
+  pointsEnabled,
 }: {
   academy: PlatformAcademyDetail;
   classes: PlatformClass[];
   courses: PlatformCourse[];
+  /** Whether this academy runs points — null when it could not be read. */
+  pointsEnabled: boolean | null;
 }) {
   const [academy, setAcademy] = React.useState(initial);
 
@@ -92,6 +96,7 @@ export function AcademyDetail({
       <EnterAcademyPanel academy={academy} />
       <FirstManagerPanel academy={academy} onChange={setAcademy} />
       <IdentityPanel academy={academy} onChange={setAcademy} />
+      <SettingsPanel academy={academy} pointsEnabled={pointsEnabled} />
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <LifecyclePanel academy={academy} onChange={setAcademy} />
         <DetailsPanel academy={academy} />

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Coins,
   Inbox,
   KeyRound,
   Library,
@@ -10,6 +11,7 @@ import {
   type LucideIcon,
   ScrollText,
   Shield,
+  SlidersHorizontal,
   Trophy,
   Users,
 } from 'lucide-react';
@@ -18,6 +20,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
 import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
+import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +36,7 @@ import {
 } from '@/components/studio/sidebar';
 import { useLayoutTranslation } from '@/i18n';
 import { activeNavHref } from '@/lib/nav-active';
+import { routes } from '@/lib/routes';
 import {
   contentLensFromReferrer,
   contentLensHrefs,
@@ -62,8 +66,13 @@ type NavGroup = { id: string; label: string; items: NavLink[] };
  * arrived as a second item and needed no rework, and the list has since grown
  * headings of its own — the same grouped shape the studio rail uses, so an
  * operator who works in both is not reading two different kinds of navigation.
+ *
+ * My Page closes the last difference between the two rails. It was always
+ * reachable here — the header's avatar menu has linked `/account` all along —
+ * but the studio carries it in *both* places, and an operator who learns the
+ * rail in one product should not have to learn a different one here.
  */
-export function PlatformSidebar() {
+export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
   const { t } = useTranslation('platform');
   const { t: common } = useLayoutTranslation('common');
   const pathname = usePathname();
@@ -154,6 +163,29 @@ export function PlatformSidebar() {
         { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
       ],
     },
+    {
+      // Its own group, as it is in the studio rail: what is switched on here
+      // decides what every other group's academies show.
+      //
+      // Both rows are boards across every academy, which is why they are in
+      // the rail at all. One academy's settings live on that academy — the
+      // rail is platform-scoped, and a row that had to ask "which academy?"
+      // before it could show anything would not belong in it.
+      id: 'settings',
+      label: t('nav.group.settings'),
+      items: [
+        {
+          href: routes.adminSettings,
+          label: t('nav.features'),
+          icon: SlidersHorizontal,
+        },
+        {
+          href: routes.adminPointPolicies,
+          label: t('nav.point_policies'),
+          icon: Coins,
+        },
+      ],
+    },
   ];
   const items = groups.flatMap((group) => group.items);
 
@@ -232,6 +264,22 @@ export function PlatformSidebar() {
             </SidebarMenu>
           </SidebarGroup>
         ))}
+        {/*
+         * Last and outside every group, exactly where the studio puts it: the
+         * groups above describe the platform, and the reader is not part of
+         * the platform's shape.
+         *
+         * `isActive` is hardcoded false rather than computed, and that is not
+         * an oversight. `/account` lives outside `/admin` and renders its own
+         * chrome, so this rail is never on screen while its destination is —
+         * the row cannot light, and asking `activeNavHref` would only add a
+         * href that can never match. Leaving the academy is what the link does.
+         */}
+        <MyPageRow
+          href={routes.accountFrom('admin')}
+          isActive={false}
+          viewer={viewer}
+        />
       </SidebarContent>
       <SidebarFooter>
         <SidebarSeparator className="mx-0" />

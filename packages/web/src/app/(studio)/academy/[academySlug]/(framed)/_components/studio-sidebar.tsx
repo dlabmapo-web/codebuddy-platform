@@ -16,6 +16,7 @@ import {
   School,
   Settings,
   Trophy,
+  Wrench,
   type LucideIcon,
   UserCheck,
   Users,
@@ -89,6 +90,7 @@ export function StudioSidebar({
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canRunMaintenance,
   canReviewApplications,
   canMonitor,
   hasPoints,
@@ -119,6 +121,7 @@ export function StudioSidebar({
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canRunMaintenance: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
   hasPoints: boolean;
@@ -133,6 +136,7 @@ export function StudioSidebar({
     canManageAcademy,
     canManageClasses,
     canManageContent,
+    canRunMaintenance,
     canReviewApplications,
     canMonitor,
     hasPoints,
@@ -386,6 +390,7 @@ export function studioNavGroups({
   canManageAcademy,
   canManageClasses,
   canManageContent,
+  canRunMaintenance,
   canReviewApplications,
   canMonitor,
   hasPoints,
@@ -396,6 +401,7 @@ export function studioNavGroups({
   canManageAcademy: boolean;
   canManageClasses: boolean;
   canManageContent: boolean;
+  canRunMaintenance: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
   /** §5 — the academy switched points on. Off means the link is not there. */
@@ -450,18 +456,27 @@ export function studioNavGroups({
     groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });
   }
 
-  if (canManageContent) {
-    groups.push({
-      id: 'content',
-      labelKey: 'group.content',
-      items: [
-        {
-          href: `${base}/content/courses`,
-          labelKey: 'link.courses',
-          icon: BookOpen,
-        },
-      ],
-    });
+  if (canManageContent || canRunMaintenance) {
+    const content: NavLink[] = [];
+    if (canManageContent) {
+      content.push({
+        href: `${base}/content/courses`,
+        labelKey: 'link.courses',
+        icon: BookOpen,
+      });
+    }
+    // Under Curriculum rather than a group of its own: what it repairs is the
+    // damage a curriculum edit does to work already answered, and the person
+    // who reaches for it has just come from the course they edited. A group
+    // holding one row would also be a heading for a page opened twice a term.
+    if (canRunMaintenance) {
+      content.push({
+        href: `${base}/maintenance`,
+        labelKey: 'link.maintenance',
+        icon: Wrench,
+      });
+    }
+    groups.push({ id: 'content', labelKey: 'group.content', items: content });
   }
 
   // One group, two audiences, two routes. `/classes` is the management view a

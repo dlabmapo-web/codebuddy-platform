@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Trophy,
   Users,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -156,14 +157,6 @@ export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
       ],
     },
     {
-      id: 'operations',
-      label: t('nav.group.operations'),
-      items: [
-        { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
-        { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
-      ],
-    },
-    {
       // Its own group, as it is in the studio rail: what is switched on here
       // decides what every other group's academies show.
       //
@@ -184,6 +177,41 @@ export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
           label: t('nav.point_policies'),
           icon: Coins,
         },
+      ],
+    },
+    {
+      // Work the platform does *to* an academy, rather than a setting it holds
+      // or a record of what an operator did. Every row here dispatches
+      // something onto a queue and reports back what happened.
+      //
+      // Fifth rather than second on purpose: a rail is read top to bottom by
+      // how often a row is opened, and a page an operator reaches when a
+      // teacher reports a broken problem does not belong above the academy
+      // list they open every morning.
+      id: 'operations',
+      label: t('nav.group.operations'),
+      items: [
+        {
+          href: routes.adminOperations,
+          label: t('nav.maintenance'),
+          icon: Wrench,
+        },
+      ],
+    },
+    {
+      // Renamed from "Operations", which is what these two rows were called
+      // while nothing else claimed the word. Neither of them is an operation:
+      // one is the authority an operator borrows to work inside an academy, and
+      // the other is the record of how it was used. Naming that honestly is
+      // what freed the word for the group above.
+      //
+      // Last, because it is the record of every group before it — the one an
+      // operator opens after the fact rather than to do something.
+      id: 'accountability',
+      label: t('nav.group.accountability'),
+      items: [
+        { href: '/admin/access', label: t('nav.access'), icon: KeyRound },
+        { href: '/admin/audit', label: t('nav.audit'), icon: ScrollText },
       ],
     },
   ];

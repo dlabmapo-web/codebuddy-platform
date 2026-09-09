@@ -183,6 +183,11 @@
       },
       "users": {
         "exported": "사용자 목록 내보내기"
+      },
+      "regrade": {
+        "planned": "재채점 계획됨",
+        "started": "재채점 시작됨",
+        "completed": "재채점 완료됨"
       }
     },
     "monitoring": {

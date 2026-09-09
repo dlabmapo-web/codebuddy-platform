@@ -187,7 +187,8 @@
       "people": "People",
       "content": "Curriculum",
       "operations": "Operations",
-      "settings": "Settings"
+      "settings": "Settings",
+      "accountability": "Accountability"
     },
     "academies": "Academies",
     "users": "Users",
@@ -202,7 +203,8 @@
     "applications_waiting_other": "{{count}} applications need you",
     "library": "Library",
     "features": "Features",
-    "point_policies": "Point policies"
+    "point_policies": "Point policies",
+    "maintenance": "Maintenance"
   },
   "unavailable": {
     "title": "Academies are unavailable",

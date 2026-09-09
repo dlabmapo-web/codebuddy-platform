@@ -183,6 +183,11 @@
       },
       "users": {
         "exported": "User list exported"
+      },
+      "regrade": {
+        "planned": "Re-grade planned",
+        "started": "Re-grade started",
+        "completed": "Re-grade finished"
       }
     },
     "monitoring": {

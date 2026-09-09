@@ -88,7 +88,7 @@ export async function PlatformShell({
       resources={resources}
     >
       <SidebarProvider defaultOpen={sidebarState !== 'false'}>
-        <PlatformSidebar />
+        <PlatformSidebar viewer={viewer} />
         <SidebarInset>
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">
             <SidebarTrigger className="-ml-1" />
@@ -131,7 +131,8 @@ export async function PlatformShell({
 }
 
 /**
- * The operator's own photo, for the header's My Page control.
+ * The operator's own photo, for the header's My Page control and the rail's
+ * own row.
  *
  * Always returns an account, even when the lookup fails. `HeaderControls` drops
  * the profile link entirely when handed nothing — so returning null on failure

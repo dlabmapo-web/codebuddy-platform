@@ -344,6 +344,9 @@ export class SubmissionService {
         material: {
           is: reachableMaterialWhere(input.academyId, scope),
         },
+        // The student's own attempts at this problem. A platform repair would
+        // take one of these twenty slots and push a real attempt off the end.
+        regradeRunId: null,
       },
       orderBy: { createdAt: "desc" },
       take: 20,

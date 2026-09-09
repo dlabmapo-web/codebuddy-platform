@@ -5,6 +5,7 @@ import * as React from 'react';
 import { Button } from '@/components/studio/button';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
+import { cn } from '@/lib/utils';
 
 /**
  * The one shape every irreversible act in Cove asks for.
@@ -36,6 +37,7 @@ export function DeleteConfirmDialog({
   open,
   pending,
   title,
+  tone = 'danger',
   workingLabel,
 }: {
   body: string;
@@ -49,6 +51,19 @@ export function DeleteConfirmDialog({
   open: boolean;
   pending: boolean;
   title: string;
+  /**
+   * What kind of irreversible this is.
+   *
+   * `danger` is the default and the original case: the thing being confirmed
+   * destroys something. `brand` is for an act that cannot be undone and takes
+   * nothing away — a maintenance re-grade restores records and can only add to
+   * a student's standing, and painting that button red would ask an operator
+   * to brace for damage that is not coming.
+   *
+   * The typed-confirmation itself does not vary. What earns it is
+   * irreversibility, not destruction.
+   */
+  tone?: 'danger' | 'brand';
   workingLabel: string;
 }) {
   const errorText = useErrorText();
@@ -82,11 +97,23 @@ export function DeleteConfirmDialog({
               htmlFor="delete-confirm-value"
             >
               {fieldLabel}
-              <span className="ml-1 text-danger">*</span>
+              <span
+                className={cn(
+                  'ml-1',
+                  tone === 'danger' ? 'text-danger' : 'text-brand',
+                )}
+              >
+                *
+              </span>
             </label>
             <input
               autoComplete="off"
-              className="h-10 w-full rounded-lg border border-border bg-card px-3 text-[14px] text-ink outline-none focus-visible:border-danger focus-visible:ring-2 focus-visible:ring-danger/30"
+              className={cn(
+                'h-10 w-full rounded-lg border border-border bg-card px-3 text-[14px] text-ink outline-none focus-visible:ring-2',
+                tone === 'danger'
+                  ? 'focus-visible:border-danger focus-visible:ring-danger/30'
+                  : 'focus-visible:border-brand focus-visible:ring-brand/30',
+              )}
               id="delete-confirm-value"
               onChange={(event) => setTyped(event.target.value)}
               value={typed}
@@ -109,7 +136,7 @@ export function DeleteConfirmDialog({
             <Button
               disabled={pending || typed.trim() !== confirmValue.trim()}
               type="submit"
-              variant="danger"
+              variant={tone === 'danger' ? 'danger' : 'default'}
             >
               {pending ? workingLabel : confirmLabel}
             </Button>

@@ -121,16 +121,31 @@ export class CurriculumOutlineService {
   ): Promise<ProgressByMaterial> {
     const statuses: ProgressByMaterial = new Map();
     if (materialIds.length === 0) return statuses;
-    const [drafts, progress] = await Promise.all([
+    const [drafts, progress, revisions] = await Promise.all([
       this.prisma.exerciseDraft.findMany({
         where: { userId, materialId: { in: materialIds } },
         select: { materialId: true },
       }),
       this.prisma.studentExerciseProgress.findMany({
         where: { userId, materialId: { in: materialIds } },
-        select: { materialId: true, status: true, bestScore: true },
+        select: {
+          materialId: true,
+          status: true,
+          bestScore: true,
+          gradingRevision: true,
+        },
+      }),
+      // What each problem grades against *now*. Without it this projection
+      // cannot tell a current record from one an author's correction has
+      // already invalidated — see the note on the skip below.
+      this.prisma.programmingExercise.findMany({
+        where: { materialId: { in: materialIds } },
+        select: { materialId: true, gradingRevision: true },
       }),
     ]);
+    const currentRevision = new Map(
+      revisions.map((exercise) => [exercise.materialId, exercise.gradingRevision]),
+    );
     for (const draft of drafts) {
       if (!draft.materialId) continue;
       statuses.set(draft.materialId, {
@@ -140,6 +155,19 @@ export class CurriculumOutlineService {
     }
     for (const record of progress) {
       if (record.status === "NOT_STARTED") continue;
+      // A record graded against a superseded revision is not an answer to the
+      // problem as it stands, and saying otherwise made two pages disagree
+      // about one student: this outline read "Solved, 100/100" while the
+      // problem it linked to read "not solved", because only the problem page
+      // compared the revisions. Skipping leaves whatever the draft loop set —
+      // `IN_PROGRESS` if they have work saved, `NOT_STARTED` if they do not —
+      // which is exactly what `LearnService` falls back to.
+      //
+      // A re-grade restores the record at the current revision and both
+      // surfaces agree again.
+      if (record.gradingRevision !== currentRevision.get(record.materialId)) {
+        continue;
+      }
       statuses.set(record.materialId, {
         status: record.status,
         bestScore: record.bestScore,

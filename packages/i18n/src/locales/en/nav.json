@@ -26,7 +26,8 @@
     "student_analytics": "Student analytics",
     "class_ranking": "Class ranking",
     "settings": "Academy settings",
-    "point_policy": "Points and rewards"
+    "point_policy": "Points and rewards",
+    "maintenance": "Maintenance"
   },
   "academy_switcher": {
     "select": "Select academy",

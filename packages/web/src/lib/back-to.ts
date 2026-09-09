@@ -65,4 +65,18 @@ export const backTo = {
   /** An academy, and the form that creates one → the platform's list. */
   platformAcademy: () => routes.adminAcademies,
   platformAcademyNew: () => routes.adminAcademies,
+
+  /**
+   * An academy's settings → that academy, not the list of them.
+   *
+   * The operator opened one academy and stepped into its settings; the way
+   * back is the page that sent them, which is where every other fact about
+   * this academy still is.
+   */
+  platformAcademySettings: (academySlug: string) =>
+    routes.adminAcademy(academySlug),
+
+  /** The point policy → the settings page beside it, for the same reason. */
+  platformAcademyPointPolicy: (academySlug: string) =>
+    routes.adminAcademySettings(academySlug),
 } as const;

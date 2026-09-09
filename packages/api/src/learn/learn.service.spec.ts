@@ -164,6 +164,7 @@ function createService(options?: {
   role?: AcademyRole;
   selectedSubmission?: LearnSelectedSubmission | null;
   solveSessionStartedAt?: Date;
+  exerciseRevisions?: Array<{ materialId: string; gradingRevision: number }>;
 }) {
   const course = options?.course === undefined ? visibleCourse() : options.course;
   const material =
@@ -185,6 +186,11 @@ function createService(options?: {
     studentExerciseProgress: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(options?.progress ?? null),
+    },
+    // The outline compares each record's revision against the problem's
+    // current one, so it reads them alongside the progress rows.
+    programmingExercise: {
+      findMany: vi.fn().mockResolvedValue(options?.exerciseRevisions ?? []),
     },
     exerciseSolveSession: {
       create: vi.fn().mockResolvedValue({

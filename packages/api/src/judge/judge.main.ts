@@ -12,6 +12,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import { GradingService } from "./grading.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import { JudgeQueue } from "./judge.queue.js";
+import { RegradeRunner } from "./regrade.runner.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 
 /**
@@ -60,6 +61,15 @@ async function bootstrap(): Promise<void> {
     (job) => grading.grade(job.data.submissionId, job.updateProgress),
     environment.JUDGE_CONCURRENCY,
   );
+
+  // Maintenance re-grading, on its own queue so a run cannot put a live
+  // submission behind it. The same process and therefore the same interpreter
+  // pool, which is what `REGRADE_CONCURRENCY` is sized against.
+  const regrade = new RegradeRunner(prisma, grading);
+  const regradeWorker = queue.createRegradeWorker(
+    (job) => regrade.run(job.data),
+    environment.REGRADE_CONCURRENCY,
+  );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
   const healthServer = healthPort > 0
     ? createServer((_request, response) => {
@@ -81,7 +91,7 @@ async function bootstrap(): Promise<void> {
   }, SWEEP_INTERVAL_MS);
 
   logger.log(
-    `judge listening, concurrency ${environment.JUDGE_CONCURRENCY}`,
+    `judge listening, concurrency ${environment.JUDGE_CONCURRENCY}, regrade ${environment.REGRADE_CONCURRENCY}`,
   );
 
   let shuttingDown = false;
@@ -92,6 +102,10 @@ async function bootstrap(): Promise<void> {
     clearInterval(sweeper);
     // Lets in-flight grading finish so a deploy does not strand submissions.
     await worker.close();
+    // A repair left mid-run is picked up by the queue's own retry on the next
+    // boot; the run's counters are advanced only after a verdict lands, so a
+    // restart cannot make one report more work than it did.
+    await regradeWorker.close();
     if (healthServer) {
       await new Promise<void>((resolve, reject) => {
         healthServer.close((error) => error ? reject(error) : resolve());

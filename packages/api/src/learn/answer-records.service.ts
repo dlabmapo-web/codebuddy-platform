@@ -63,6 +63,13 @@ export class AnswerRecordsService {
     const owned: Prisma.SubmissionWhereInput = {
       userId,
       course: { academyId: input.academyId },
+      // A submission the platform wrote to repair this student's record is not
+      // one of their answers. It carries their code, but it is dated the day an
+      // operator pressed a button and they never saw it happen. Excluded here
+      // rather than per query: the summary, the facets, the count and the page
+      // all derive from `owned`, and a partial exclusion would make two numbers
+      // on the same screen disagree.
+      regradeRunId: null,
     };
     const filtered: Prisma.SubmissionWhereInput = {
       ...owned,

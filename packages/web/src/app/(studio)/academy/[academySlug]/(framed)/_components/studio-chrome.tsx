@@ -16,6 +16,7 @@ import {
   canManageClasses,
   canMonitorClasses,
   canReviewApplications,
+  canRegrade,
   canReviewContent,
   isStudent,
 } from '@/lib/academy-access-state';
@@ -207,6 +208,7 @@ export async function StudioChrome({
         canManageAcademy={canManageAcademy(shown) && writable}
         canManageClasses={canManageClasses(shown) && writable}
         canManageContent={canReviewContent(shown)}
+        canRunMaintenance={canRegrade(shown)}
         canReviewApplications={canReviewApplications(shown) && writable}
         /*
          * This gates the *classes* link, not the live watch. A platform

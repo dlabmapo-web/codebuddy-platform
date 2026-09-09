@@ -275,6 +275,17 @@ export const academyPermissions = [
   "curriculum.draft",
   "curriculum.manage",
   "curriculum.publish",
+  /**
+   * Re-grading the work a corrected problem left behind.
+   *
+   * Apart from `curriculum.publish`, which is the authority to change what a
+   * problem asks. This is the authority to repair the records that change
+   * invalidated — a different act, on student data rather than on curriculum,
+   * and one an academy could reasonably want to withhold from someone it lets
+   * author. Held by the same two roles today; separate so that can stop being
+   * true without a migration.
+   */
+  "curriculum.regrade",
   "exercises.manage",
   "content.import",
   "ai-feedback-rules.manage",
@@ -325,6 +336,7 @@ const teamLeadPermissions = [
   "curriculum.draft",
   "curriculum.manage",
   "curriculum.publish",
+  "curriculum.regrade",
   "exercises.manage",
   "content.import",
   "ai-feedback-rules.manage",

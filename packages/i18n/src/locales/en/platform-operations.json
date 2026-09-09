@@ -1,0 +1,83 @@
+{
+  "page": {
+    "title": "Maintenance",
+    "description": "Work the platform runs across an academy, dispatched onto the judge's queue.",
+    "description_academy": "Repair the student records a corrected problem left behind."
+  },
+  "academy": {
+    "label": "Academy",
+    "placeholder": "Choose an academy",
+    "empty": "No academies yet."
+  },
+  "board": {
+    "title": "Problems waiting on a re-grade",
+    "description": "A problem whose grading changed after students had already answered it. Until it is re-graded, every student who solved it sees it as unsolved.",
+    "empty": "Nothing needs re-grading.",
+    "empty_hint": "Every submission in this academy was graded the way its problem grades today.",
+    "problem": "Problem",
+    "location": "Where it sits",
+    "revision": "Revision",
+    "students": "Students affected",
+    "submissions": "Stale answers",
+    "action": "Re-grade",
+    "in_flight": "Running now",
+    "search": "Search problems, courses, lectures…",
+    "course": "Course",
+    "module": "Module",
+    "no_match": "No problem matches these filters.",
+    "truncated": "Showing the {{count}} problems with the most students affected. There are more — re-grade these and reopen the page to see the rest."
+  },
+  "regrade": {
+    "title": "Re-grade a problem's submissions",
+    "description": "When a test case is corrected, two things happen quietly. Every student who had solved that problem stops seeing it as solved. And any student the old test case marked wrong stays marked wrong, even if their code was right.\n\nThis re-runs each affected student's most recent submission against the corrected test cases. Solved marks come back. Students who should have passed are recorded as passing and earn the points for it, including any lecture or course they complete by it.\n\nTheir original submission is kept exactly as it was, and does not change in their records. No student loses a solved mark or a score they already earned, no points are paid twice, and nothing appears as a new attempt of theirs.",
+    "problem_label": "Problem",
+    "problem_placeholder": "Choose a problem from the list above",
+    "submit": "Plan a re-grade",
+    "planning": "Counting…"
+  },
+  "confirm": {
+    "title": "Re-grade {{problem}}?",
+    "body_one": "{{count}} student's most recent submission will be re-run at revision {{revision}}. This usually takes a few minutes and cannot be stopped once started.",
+    "body_other": "{{count}} students' most recent submissions will be re-run at revision {{revision}}. This usually takes a few minutes and cannot be stopped once started.",
+    "type_title": "Type the problem's title to confirm.",
+    "placeholder": "Problem title",
+    "cancel": "Cancel",
+    "submit": "Re-grade",
+    "starting": "Starting…"
+  },
+  "empty_plan": {
+    "title": "Nothing to re-grade",
+    "body": "Every submission for this problem was already graded at revision {{revision}}."
+  },
+  "runs": {
+    "title": "Recent runs",
+    "empty": "No maintenance has been run yet.",
+    "when": "Started",
+    "who": "Operator",
+    "what": "Problem",
+    "academy": "Academy",
+    "progress": "Progress",
+    "state": "State",
+    "deleted_target": "(problem deleted)",
+    "search": "Search runs…"
+  },
+  "status": {
+    "PLANNING": "Awaiting confirmation",
+    "RUNNING": "Running",
+    "COMPLETED": "Finished",
+    "FAILED": "Failed"
+  },
+  "progress": {
+    "planning": "Counting what this would touch",
+    "running": "{{settled}} of {{total}} re-graded",
+    "completed_one": "{{count}} record repaired",
+    "completed_other": "{{count}} records repaired",
+    "completed_with_failures": "{{completed}} repaired, {{failed}} could not be graded",
+    "failed": "Stopped before it finished",
+    "nothing": "Nothing needed re-grading"
+  },
+  "forbidden": {
+    "title": "You cannot run maintenance here",
+    "body": "Only a manager or team lead can re-grade this academy's problems."
+  }
+}

@@ -16,6 +16,7 @@ const common = {
   canLearn: true,
   canManageClasses: false,
   canManageContent: false,
+  canRunMaintenance: false,
   canMonitor: false,
   hasPoints: false,
   isStudent: false,
@@ -29,6 +30,44 @@ function peopleLinks(options: {
     .find(({ id }) => id === 'people');
   return group?.items.map(({ href }) => href) ?? [];
 }
+
+function curriculumLinks(options: {
+  canManageContent: boolean;
+  canRunMaintenance: boolean;
+}) {
+  const group = studioNavGroups({
+    ...common,
+    canManageAcademy: false,
+    canReviewApplications: false,
+    ...options,
+  })
+    .find(({ id }) => id === 'content');
+  return group?.items.map(({ href }) => href) ?? [];
+}
+
+describe('curriculum maintenance in the rail', () => {
+  it('shows the maintenance row to somebody who may re-grade', () => {
+    expect(
+      curriculumLinks({ canManageContent: true, canRunMaintenance: true }),
+    ).toEqual([
+      '/academy/cove-development/content/courses',
+      '/academy/cove-development/maintenance',
+    ]);
+  });
+
+  it('hides it from a teacher, who may read curriculum but not repair it', () => {
+    expect(
+      curriculumLinks({ canManageContent: true, canRunMaintenance: false }),
+    ).toEqual(['/academy/cove-development/content/courses']);
+  });
+
+  it('leaves the group out entirely when neither row is held', () => {
+    // A student. An empty heading would be worse than no heading.
+    expect(
+      curriculumLinks({ canManageContent: false, canRunMaintenance: false }),
+    ).toEqual([]);
+  });
+});
 
 describe('studio application navigation', () => {
   it('shows all people links to a manager', () => {

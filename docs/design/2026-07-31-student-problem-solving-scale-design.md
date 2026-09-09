@@ -239,7 +239,7 @@ POST submit
 judge-worker
   ├─ claim: UPDATE ... SET status=RUNNING WHERE status=QUEUED
   ├─ load grading payload from Redis          (hidden cases, no Postgres)
-  ├─ execute cases in order, early-exit on first failure
+  ├─ execute cases in order, early-exit only on a timeout or memory limit
   ├─ ONE transaction: submission + cases + student_exercise_progress
   └─ PUBLISH submission:{id}                  (result push, §6)
 ```

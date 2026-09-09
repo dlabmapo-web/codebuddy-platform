@@ -146,6 +146,19 @@ export const appErrorCodes = [
    * truncated: a file holding the first five thousand of six looks complete.
    * §2.4 of the console user directory export design. */
   "PLATFORM_EXPORT_TOO_LARGE",
+
+  /* ---------------------------------------------- console operations (§5.B) */
+  "OPERATION_RUN_NOT_FOUND",
+  /* A run against this target is already planning or running. Raised by the
+     partial unique index, not by a read-then-write. */
+  "OPERATION_ALREADY_RUNNING",
+  /* The plan was counted, shown, and confirmed — and by the time it was
+     confirmed there was nothing left to do. */
+  "OPERATION_PLAN_EMPTY",
+  /* Confirming a run that is no longer PLANNING: a second tab, or a back
+     button. */
+  "OPERATION_RUN_NOT_PENDING",
+  "OPERATION_PLAN_TOO_LARGE",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -376,4 +389,16 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   SIGNUP_STUDENT_FAILED: "The student account could not be created.",
   CAPTCHA_FAILED:
     "The security check could not be completed. Refresh the page and try again.",
+  OPERATION_RUN_NOT_FOUND: "That maintenance run was not found.",
+  // Names nobody: the console reads the run itself to say who holds it, so the
+  // sentence does not have to carry an operator's name it may not be allowed
+  // to show.
+  OPERATION_ALREADY_RUNNING:
+    "This problem is already being re-graded. Wait for that run to finish.",
+  OPERATION_PLAN_EMPTY:
+    "There is nothing left to re-grade for this problem.",
+  OPERATION_RUN_NOT_PENDING:
+    "This run has already been started. Open it to see how far it got.",
+  OPERATION_PLAN_TOO_LARGE:
+    "This re-grade is too large to run in one go. Contact engineering.",
 };

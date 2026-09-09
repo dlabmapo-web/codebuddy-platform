@@ -168,7 +168,7 @@
     "case_summary": "{{passed}} of {{total}} cases passed",
     "runtime": "{{ms}} ms",
     "outcome_pending": "Waiting",
-    "stopped_early": "{{count}} remaining cases were skipped after the first failure.",
+    "stopped_early": "{{count}} remaining cases were skipped: your program ran out of time or memory, so they would have stopped the same way.",
     "expected": "Expected",
     "actual": "Actual",
     "hidden_note_one": "{{count}} hidden case shows a result only.",
@@ -227,7 +227,7 @@
       "RUNTIME_ERROR": "Your program stopped with an error.",
       "TIME_LIMIT": "Your program did not finish in time.",
       "MEMORY_LIMIT": "Your program used too much memory.",
-      "SKIPPED": "Skipped after the first failed case."
+      "SKIPPED": "Not run — your program ran out of time or memory before this case."
     },
     "outcome": {
       "PASSED": "Passed",

@@ -359,6 +359,7 @@ model User {
   academiesCreated       Academy[]                 @relation("AcademyCreator")
   supportGrants          PlatformSupportGrant[]    @relation("SupportGrantAdmin")
   supportGrantsRevoked   PlatformSupportGrant[]    @relation("SupportGrantRevoker")
+  operationRuns          PlatformOperationRun[]    @relation("OperationRunActor")
 
   @@index([status])
   @@map("users")
@@ -585,6 +586,7 @@ model Academy {
   pointPolicy            AcademyPointPolicy?
   supportGrants          PlatformSupportGrant[]
   issuedCredentials      StudentIssuedCredential[]
+  operationRuns          PlatformOperationRun[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -1130,6 +1132,97 @@ model PlatformSupportGrant {
   @@map("platform_support_grants")
 }
 
+/// What kind of maintenance work an operator dispatched.
+///
+/// An enum rather than free text because the value decides which worker branch
+/// runs and which blast-radius copy the console showed before it ran. A string
+/// would let a typo dispatch nothing, silently, which is the failure mode the
+/// whole surface exists to remove.
+enum PlatformOperation {
+  /// Re-grade the submissions left behind when a problem's grading changed.
+  REGRADE_STALE_SUBMISSIONS
+}
+
+enum PlatformOperationStatus {
+  /// Counted, shown to the operator, not yet dispatched. The state the
+  /// confirmation dialog is open in.
+  PLANNING
+  RUNNING
+  COMPLETED
+  /// The run could not finish. `failureReason` says why.
+  FAILED
+}
+
+/// One dispatch of one maintenance operation, and how far it got.
+///
+/// The row exists because a queue is not an answer. BullMQ knows a job ran; it
+/// does not know that an operator pressed a button, which problem they were
+/// looking at, what the blast radius was when they confirmed it, or whether the
+/// thing they were repairing is now repaired. An operator asking "did that
+/// work" an hour later reads this table, not Redis.
+///
+/// It is also the concurrency control. A partial unique index — hand-written in
+/// the migration, since Prisma cannot express one — refuses a second in-flight
+/// run against the same target, so two operators pressing the same button race
+/// in Postgres rather than in the queue. The same reasoning
+/// `academy_join_requests_one_pending_key` uses.
+model PlatformOperationRun {
+  id        String            @id @default(uuid()) @db.Uuid
+  academyId String            @map("academy_id") @db.Uuid
+  operation PlatformOperation
+
+  /// What the operation is about: `"material"` and a material id, today.
+  /// Two columns rather than a typed relation because the next operation's
+  /// target is a different table, and `AuditLog` already pairs them this way.
+  targetType String  @map("target_type")
+  targetId   String  @map("target_id")
+
+  actorUserId String @map("actor_user_id") @db.Uuid
+
+  /// The dispatching request's id, carried onto every job this run creates so a
+  /// console click can be found in a worker's log. Minted by `requestId()` from
+  /// `x-request-id`, exactly as `AuditLog.requestId` is.
+  requestId String? @map("request_id")
+
+  /// The support grant the dispatch was authorized by, when it was one.
+  ///
+  /// Copied here rather than read from the request, because the judge writes
+  /// this run's completion audit row and `currentSupportGrantId()` is
+  /// deliberately empty outside a request. Without this column an operator
+  /// working under a grant would have their dispatch attributed and their
+  /// completion not.
+  supportGrantId String? @map("support_grant_id") @db.Uuid
+
+  status PlatformOperationStatus @default(PLANNING)
+
+  /// What the plan found, frozen at confirmation time. `plannedCount` is the
+  /// number the operator agreed to; the counters below are what happened.
+  plannedCount Int @default(0) @map("planned_count")
+  studentCount Int @default(0) @map("student_count")
+
+  dispatchedCount Int @default(0) @map("dispatched_count")
+  completedCount  Int @default(0) @map("completed_count")
+  failedCount     Int @default(0) @map("failed_count")
+
+  failureReason String? @map("failure_reason")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  /// Restrict, matching `PlatformSupportGrant.admin`: an operator's account
+  /// must not be removable while these rows record what they did with it.
+  actor   User    @relation("OperationRunActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  submissions Submission[]
+
+  /// The console's run list, newest first, optionally narrowed to one academy.
+  @@index([academyId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("platform_operation_runs")
+}
+
 model Course {
   id              String  @id @default(uuid()) @db.Uuid
   academyId       String  @map("academy_id") @db.Uuid
@@ -1514,6 +1607,17 @@ model Submission {
   /// reserved for submissions written before class attribution existed.
   classId          String?          @map("class_id") @db.Uuid
   gradingRevision  Int              @map("grading_revision")
+  /// Set when the platform wrote this row to repair a record, rather than a
+  /// student writing it by pressing submit.
+  ///
+  /// A repair carries the student's original code and the problem's *current*
+  /// grading snapshot, because the snapshot below is immutable and the old one
+  /// would prove nothing. It is therefore a real graded submission — the judge
+  /// treats it identically — and is not one of the student's attempts. Two
+  /// things read this: `nextProgress` leaves `attemptCount` alone, and every
+  /// history a person reads filters it out. See §5.1, §5.4 and §5.5 of the
+  /// console operations design.
+  regradeRunId     String?          @map("regrade_run_id") @db.Uuid
   language         ExerciseLanguage
   timeLimitMs      Int              @map("time_limit_ms")
   memoryLimitMb    Int              @map("memory_limit_mb")
@@ -1562,6 +1666,7 @@ model Submission {
   course       Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
   class        Class?                  @relation(fields: [classId], references: [id], onDelete: SetNull)
   solveSession ExerciseSolveSession?   @relation(fields: [solveSessionId], references: [id], onDelete: SetNull)
+  regradeRun   PlatformOperationRun?   @relation(fields: [regradeRunId], references: [id], onDelete: SetNull)
   gradingCases SubmissionGradingCase[]
   cases        SubmissionCase[]
 
@@ -1575,6 +1680,10 @@ model Submission {
   /// By-problem views start from a set of materials.
   @@index([materialId, userId, createdAt(sort: Desc)])
   @@index([classId, userId, createdAt(sort: Desc)])
+  /// A run counting its own progress: how many of the rows it created have
+  /// reached a verdict. Partial in the migration — the column is null on every
+  /// ordinary submission, which is nearly all of them.
+  @@index([regradeRunId, status])
   @@map("submissions")
 }
 

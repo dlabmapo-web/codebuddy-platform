@@ -6,7 +6,9 @@ import { profileNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { getAccount } from '@/lib/orpc-server';
-import { routes } from '@/lib/routes';
+import { isAccountOrigin, routes } from '@/lib/routes';
+
+import { myPageBackDestination } from './back-destination';
 
 import { redirectSlugFor } from '@/components/studio/profile/my-page/academy-selection';
 import { MyPageWorkspace } from '@/components/studio/profile/my-page/my-page-workspace';
@@ -33,10 +35,10 @@ import { MyPageShell } from './_components/my-page-shell';
 export default async function MyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ academy?: string }>;
+  searchParams: Promise<{ academy?: string; from?: string }>;
 }) {
   const { t } = await getServerTranslation(['profile']);
-  const { academy: requested } = await searchParams;
+  const { academy: requested, from } = await searchParams;
 
   let firstAcademySlug: string | null = null;
   let isPlatformAdmin = false;
@@ -68,14 +70,11 @@ export default async function MyPage({
    */
   if (scopedSlug) redirect(routes.academyMe(scopedSlug));
 
-  // Where "back" goes for someone with no academy. A platform operator has one
-  // by design, and pointing them at the sign-in page — the previous answer for
-  // anyone membership-less — would read as though their session had lapsed.
-  const backHref = firstAcademySlug
-    ? routes.academy(firstAcademySlug)
-    : isPlatformAdmin
-      ? routes.admin
-      : routes.login;
+  const back = myPageBackDestination({
+    origin: isAccountOrigin(from) ? from : null,
+    firstAcademySlug,
+    isPlatformAdmin,
+  });
 
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, profileNamespaces);
@@ -87,8 +86,8 @@ export default async function MyPage({
       resources={resources}
     >
       <MyPageShell
-        backHref={backHref}
-        backLabel={t('back_to_studio')}
+        backHref={back.href}
+        backLabel={t(back.labelKey)}
         title={t('title')}
       >
         <MyPageWorkspace academy={null} />

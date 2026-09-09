@@ -166,12 +166,29 @@
     "suspended": "정지됨",
     "archived": "보관됨"
   },
+  "settings": {
+    "title": "설정",
+    "panel_description": "이 아카데미의 동작 방식입니다. 역할로 들어가지 않고 여기에서 바꿉니다.",
+    "description": "이 아카데미가 켜 둔 기능입니다. 변경하면 구성원 모두에게 즉시 적용됩니다.",
+    "back": "아카데미로 돌아가기",
+    "back_to_settings": "설정으로 돌아가기",
+    "features": "기능",
+    "features_hint": "이 아카데미가 켜 둔 기능입니다.",
+    "point_policy": "포인트 정책",
+    "point_policy_hint": "작업별로 지급하는 포인트입니다.",
+    "points_off": "이 아카데미는 포인트가 꺼져 있습니다. 기능에서 켤 수 있습니다.",
+    "points_off_notice": "이 아카데미는 포인트를 운영하지 않아 아직 아무에게도 지급되지 않습니다. 켜기 전에 정책을 미리 설정해 둘 수 있습니다.",
+    "points_off_action": "포인트 켜기",
+    "points_unknown": "이 아카데미의 기능 설정을 불러오지 못했습니다."
+  },
   "nav": {
     "group": {
       "platform": "플랫폼",
       "people": "구성원",
       "content": "커리큘럼",
-      "operations": "운영"
+      "operations": "운영",
+      "settings": "설정",
+      "accountability": "책임 추적"
     },
     "academies": "아카데미",
     "users": "사용자",
@@ -184,7 +201,10 @@
     "invitations": "초대",
     "applications_waiting_one": "{{count}}건의 신청에 답변이 필요합니다",
     "applications_waiting_other": "{{count}}건의 신청에 답변이 필요합니다",
-    "library": "라이브러리"
+    "library": "라이브러리",
+    "features": "기능",
+    "point_policies": "포인트 정책",
+    "maintenance": "유지 보수"
   },
   "unavailable": {
     "title": "아카데미를 불러올 수 없습니다",
@@ -280,5 +300,31 @@
     "empty": "이름이 일치하는 아카데미가 없습니다.",
     "locked": "필터로 선택한 아카데미입니다.",
     "unknown": "알 수 없는 아카데미"
+  },
+  "board": {
+    "features_title": "기능",
+    "features_description": "모든 아카데미가 켜 둔 기능입니다. 여기에서 바꿉니다.",
+    "points_title": "포인트 정책",
+    "points_description": "아카데미별 지급 포인트를 나란히 비교합니다. 수정은 각 아카데미 페이지에서 합니다.",
+    "points_state": "포인트",
+    "points_on": "켜짐",
+    "points_off": "꺼짐",
+    "default": "기본값",
+    "edit": "수정",
+    "search": "이름 또는 주소로 검색",
+    "truncated": "전체 {{count}}개 중 일부만 표시했습니다. 검색으로 범위를 좁혀 주세요.",
+    "column": {
+      "solveEasy": "쉬움",
+      "solveMedium": "보통",
+      "solveHard": "어려움",
+      "lectureCompleted": "강의",
+      "courseCompleted": "코스",
+      "studentDailyCap": "상한"
+    },
+    "of_academies": "전체 {{count}}개 아카데미 중",
+    "tally_running": "포인트 운영 중",
+    "tally_defaults": "기본값 사용",
+    "tally_spread": "어려움 문제 지급",
+    "tally_spread_hint": "포인트를 운영하는 아카데미 기준"
   }
 }

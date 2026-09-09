@@ -20,6 +20,28 @@ import { cn } from '@/lib/utils';
  * underneath. Callers put a `<label>` around this and the text beside it, so
  * the label still moves the switch.
  */
+/**
+ * The hue a switch wears when it is on.
+ *
+ * The product already colours by subject rather than by state — each overview
+ * section owns a hue, and the panel table is its legend. A grid of switches is
+ * the case that needs it most: four identical blue columns are four columns a
+ * reader has to check the header for, where four hues let them read an
+ * academy's whole configuration as a shape.
+ *
+ * Complete class strings, never composed. Tailwind reads source text, so
+ * `bg-${tone}` would be a class that never ships.
+ */
+export type SwitchTone = 'brand' | 'teal' | 'peer' | 'gold' | 'rose';
+
+const switchTones: Record<SwitchTone, string> = {
+  brand: 'bg-brand',
+  teal: 'bg-teal',
+  peer: 'bg-peer',
+  gold: 'bg-rank-gold',
+  rose: 'bg-course-d',
+};
+
 export function Switch({
   busy = false,
   checked,
@@ -27,6 +49,7 @@ export function Switch({
   disabled = false,
   label,
   onCheckedChange,
+  tone = 'brand',
 }: {
   /** This one is mid-request; the rest are merely disabled while it lands. */
   busy?: boolean;
@@ -36,6 +59,8 @@ export function Switch({
   /** Read to assistive technology when no visible label is associated. */
   label?: string;
   onCheckedChange: (checked: boolean) => void;
+  /** Defaults to `brand`, which is every switch outside a coloured grid. */
+  tone?: SwitchTone;
 }) {
   return (
     <button
@@ -43,21 +68,30 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 motion-reduce:transition-none',
+        'group/switch relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-        checked ? 'bg-brand' : 'bg-accent',
+        // The off state carries a hairline of its own. Against a white row the
+        // bare track read as an empty space rather than as a control that is
+        // switched off, which is the one thing it has to say.
+        checked ? switchTones[tone] : 'bg-accent ring-1 ring-inset ring-border',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className,
       )}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
+      data-slot="switch"
       role="switch"
       type="button"
     >
       <span
         aria-hidden
         className={cn(
-          'pointer-events-none absolute top-0.5 left-0.5 grid size-5 place-items-center rounded-full bg-card shadow-sm transition-transform duration-200 motion-reduce:transition-none',
+          'pointer-events-none absolute top-0.5 left-0.5 grid size-5 place-items-center rounded-full bg-card shadow-sm',
+          // Eased rather than linear, and the knob narrows as it travels: the
+          // press should feel like a thing moving, which is the whole argument
+          // for a switch over a checkbox.
+          'transition-[transform,width] duration-200 ease-[cubic-bezier(0.34,1.4,0.64,1)]',
+          'group-active/switch:w-6 motion-reduce:transition-none',
           checked ? 'translate-x-5' : 'translate-x-0',
         )}
       >

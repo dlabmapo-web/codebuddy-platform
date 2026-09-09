@@ -2,7 +2,10 @@ import { requirePlatformAcademyRoute } from '@/lib/academy-route';
 import { notFound } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import {
+  createPlatformServerORPCClient,
+  createServerORPCClient,
+} from '@/lib/orpc-server';
 
 import { BackLink } from '@/components/studio/back-link';
 import { backTo } from '@/lib/back-to';
@@ -33,13 +36,14 @@ export default async function PlatformAcademyPage({
 
   // The first page of each, for the panels. The full lists live in the
   // console's own directories, which these link to once there are more.
-  const [courses, classes] = await Promise.all([
+  const [courses, classes, pointsEnabled] = await Promise.all([
     client.platformContent
       .courses({ academyIds: [academyId], pageSize: 6 })
       .catch(() => null),
     client.platformContent
       .classes({ academyIds: [academyId], pageSize: 6 })
       .catch(() => null),
+    academyPointsEnabled(academyId),
   ]);
 
   return (
@@ -53,7 +57,35 @@ export default async function PlatformAcademyPage({
         academy={academy}
         classes={classes?.rows ?? []}
         courses={courses?.rows ?? []}
+        pointsEnabled={pointsEnabled}
       />
     </PlatformShell>
   );
+}
+
+/**
+ * Whether this academy runs the point economy — true, false, or null when it
+ * could not be asked.
+ *
+ * Three answers rather than two, because the console has three things to say.
+ * An academy with points off is a fact an operator came here to learn, and
+ * collapsing it into the failure case would have the page assert a
+ * configuration it never read.
+ *
+ * Read through the console's own client, which ignores the role cookie: the
+ * answer must not change because the operator took a diagnostic trip as a
+ * Teacher earlier in the day.
+ */
+async function academyPointsEnabled(
+  academyId: string,
+): Promise<boolean | null> {
+  try {
+    const { features } = await createPlatformServerORPCClient()
+      .academyFeatures.list({ academyId });
+    return features.some(
+      (feature) => feature.feature === 'STUDENT_POINTS' && feature.isEnabled,
+    );
+  } catch {
+    return null;
+  }
 }

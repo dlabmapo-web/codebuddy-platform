@@ -5,7 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { validateEnvironment } from "../../src/config/env.schema.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
 import { seedClassFixture } from "./class-fixtures.js";
-import { developmentOrganization } from "./data/organizations.js";
+import { developmentAcademy } from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 import {
   seedLeaderboardClassmates,
@@ -59,8 +59,13 @@ async function main(): Promise<void> {
     adapter: new PrismaPg({ connectionString: environment.DATABASE_URL }),
   });
 
-  const academy = await prisma.academy.findFirstOrThrow({
-    where: { organization: { slug: developmentOrganization.slug } },
+  // Pinned by id, not "the first academy in the development organization".
+  // That organization holds more than one — `seedE2eContent` puts the E2E
+  // profile academy in it too — and an unordered `findFirst` picked whichever
+  // Postgres returned, which is how this fixture started seeding its course
+  // into an academy whose members it then could not find.
+  const academy = await prisma.academy.findUniqueOrThrow({
+    where: { id: developmentAcademy.id },
     select: { id: true, name: true, timeZone: true },
   });
 
@@ -74,7 +79,17 @@ async function main(): Promise<void> {
       isVisible: true,
       createdByUserId: teamLead.id,
     },
-    update: { title: sandbox.courseTitle, isVisible: true },
+    // `academyId` is corrected on update, not just set on create. This fixture
+    // documents itself as rerunnable, and a rerunnable fixture has to converge:
+    // an earlier build resolved the academy with an unordered `findFirst` and
+    // could seed this course into the wrong one, and an update that left
+    // `academyId` alone would leave it stranded there forever — the class below
+    // is created in the right academy, so the two would never meet.
+    update: {
+      academyId: academy.id,
+      title: sandbox.courseTitle,
+      isVisible: true,
+    },
   });
 
   await prisma.courseModule.upsert({

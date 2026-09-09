@@ -830,6 +830,9 @@ export class TeamLeadOverviewRepository {
       JOIN courses crs ON crs.id = cm.course_id
       WHERE crs.academy_id = ${academyId}::uuid
         AND s.created_at < ${endAt}
+        -- A platform re-grade writes a submission dated today for a student who
+        -- may not have opened anything. Counting it would report them active.
+        AND s.regrade_run_id IS NULL
         ${from}
       GROUP BY crs.id
     `;

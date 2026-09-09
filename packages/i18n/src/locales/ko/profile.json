@@ -3,6 +3,7 @@
   "description": "Cove 계정과 학원별로 보이는 내 모습입니다.",
   "open": "마이 페이지",
   "back_to_studio": "스튜디오로 돌아가기",
+  "back_to_console": "콘솔로 돌아가기",
   "loading": "프로필을 불러오는 중",
   "load_failed": "프로필을 불러오지 못했습니다. 페이지를 새로고침해 주세요.",
   "identity": {

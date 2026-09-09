@@ -81,13 +81,16 @@ function createService(options?: { claimed?: number; currentRevision?: number })
 }
 
 describe("GradingService.grade", () => {
-  it("records every remaining case as SKIPPED after the first failure", async () => {
+  it("runs every case after a wrong answer, so each one is reported", async () => {
+    // A wrong answer on one case says nothing about the others. Stopping here
+    // used to score a student for cases nobody ran — the whole reason the
+    // student who fails only case 3 was recorded at 40 instead of 80.
     const { service, tx, engine } = createService();
     const report = vi.fn().mockResolvedValue(undefined);
 
     await service.grade(submissionId, report);
 
-    expect(engine.run).toHaveBeenCalledTimes(1);
+    expect(engine.run).toHaveBeenCalledTimes(2);
     expect(tx.submissionCase.createMany).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
@@ -99,13 +102,18 @@ describe("GradingService.grade", () => {
         expect.objectContaining({
           position: 2,
           isSample: false,
-          outcome: "SKIPPED",
+          outcome: "WRONG_OUTPUT",
+          // Still null: a hidden case reports its outcome and never what the
+          // code produced, whether or not grading continued past it.
           actualOutput: null,
         }),
       ],
     });
     expect(report).toHaveBeenCalledWith(
       expect.objectContaining({ position: 1, isSample: true }),
+    );
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ position: 2, isSample: false }),
     );
     expect(tx.submission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,6 +126,28 @@ describe("GradingService.grade", () => {
         update: expect.objectContaining({ bestScore: 0 }),
       }),
     );
+  });
+
+  it("stops after a timeout, and skips what is left", async () => {
+    // Every remaining case would burn the full time limit and fail the same
+    // way, so continuing costs a judge slot and tells nobody anything.
+    const { service, tx, engine } = createService();
+    (engine.run as ReturnType<typeof vi.fn>).mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      outcome: "TIME_LIMIT",
+      runtimeMs: 1_000,
+    });
+
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+
+    expect(engine.run).toHaveBeenCalledTimes(1);
+    expect(tx.submissionCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ position: 1, outcome: "TIME_LIMIT" }),
+        expect.objectContaining({ position: 2, outcome: "SKIPPED" }),
+      ],
+    });
   });
 
   it("does nothing on duplicate delivery after the conditional claim loses", async () => {

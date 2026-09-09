@@ -5,7 +5,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { validateEnvironment } from "../../src/config/env.schema.js";
 import { PrismaClient } from "../../src/generated/prisma/client.js";
 import { seedClassFixture } from "./class-fixtures.js";
-import { developmentOrganization } from "./data/organizations.js";
+import {
+  developmentAcademy,
+  developmentOrganization,
+} from "./data/organizations.js";
 import { developmentUsers } from "./data/users.js";
 import { seedMonitoringFixture } from "./monitoring-fixtures.js";
 import { progressFixture, seedProgressFixture } from "./progress-fixtures.js";
@@ -61,8 +64,12 @@ export const e2eProfileAcademy = {
 const teamLead = developmentUsers.find((user) => user.academyRole === "TEAM_LEAD")!;
 
 export async function seedE2eContent(prisma: PrismaClient) {
-  const academy = await prisma.academy.findFirstOrThrow({
-    where: { organization: { slug: developmentOrganization.slug } },
+  // Pinned by id for the reason `manual-sandbox.ts` explains: this very
+  // function adds a second academy to the development organization, so an
+  // unordered `findFirst` over that organization can return the one seeded
+  // here rather than the development academy this content belongs to.
+  const academy = await prisma.academy.findUniqueOrThrow({
+    where: { id: developmentAcademy.id },
     select: { id: true },
   });
 

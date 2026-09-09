@@ -57,10 +57,22 @@ describe("caseOutcomeFor", () => {
 });
 
 describe("shouldStopAfter", () => {
-  it("continues only while cases pass", () => {
+  it("keeps going after a wrong answer, so the score counts every case", () => {
+    // The student who fails case 3 and passes 1, 2, 4 and 5 is worth 80, not
+    // 40. Stopping here charged them for cases nobody ran.
     expect(shouldStopAfter("PASSED")).toBe(false);
-    expect(shouldStopAfter("WRONG_OUTPUT")).toBe(true);
+    expect(shouldStopAfter("WRONG_OUTPUT")).toBe(false);
+  });
+
+  it("keeps going after a crash, which is cheap and diagnostic", () => {
+    // "Crashes only on n = 0" is something a student can act on.
+    expect(shouldStopAfter("RUNTIME_ERROR")).toBe(false);
+  });
+
+  it("stops on the failures that cost a judge slot and say nothing", () => {
+    // Every remaining case would burn the full limit and fail the same way.
     expect(shouldStopAfter("TIME_LIMIT")).toBe(true);
+    expect(shouldStopAfter("MEMORY_LIMIT")).toBe(true);
   });
 });
 

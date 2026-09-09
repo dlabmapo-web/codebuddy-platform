@@ -157,7 +157,7 @@
     "case_summary": "{{total}}개 중 {{passed}}개 통과",
     "runtime": "{{ms}}ms",
     "outcome_pending": "대기 중",
-    "stopped_early": "첫 실패 후 남은 테스트 {{count}}개를 건너뛰었습니다.",
+    "stopped_early": "남은 {{count}}개 케이스는 실행하지 않았습니다. 프로그램이 시간 또는 메모리 제한을 넘어, 나머지도 같은 결과가 됩니다.",
     "expected": "예상 출력",
     "actual": "실제 출력",
     "hidden_note_other": "비공개 테스트 {{count}}개는 결과만 표시됩니다.",
@@ -215,7 +215,7 @@
       "RUNTIME_ERROR": "프로그램 실행 중 오류가 발생했습니다.",
       "TIME_LIMIT": "제한 시간 안에 끝나지 않았습니다.",
       "MEMORY_LIMIT": "메모리를 너무 많이 사용했습니다.",
-      "SKIPPED": "첫 실패 이후 실행하지 않았습니다."
+      "SKIPPED": "실행되지 않음 — 이 케이스 전에 시간 또는 메모리 제한을 넘었습니다."
     },
     "outcome": {
       "PASSED": "통과",

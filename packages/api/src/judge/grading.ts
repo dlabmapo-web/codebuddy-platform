@@ -31,12 +31,27 @@ export function caseOutcomeFor(input: {
 }
 
 /**
- * Grading stops at the first failure. Most failing submissions fail on case
- * one, so this removes the majority of executions — and a student learns
- * nothing extra from nine more failures of the same bug.
+ * Grading stops only when continuing would cost a lot and say nothing.
+ *
+ * A wrong answer is cheap to keep going from — the program ran and exited — and
+ * it is the case where finishing matters most. A student who fails case 3 and
+ * passes 1, 2, 4 and 5 needs to be told exactly that: "wrong on `n = 7`" is
+ * something they can act on, where "wrong somewhere after case 2" is not. The
+ * score depends on it too, and that is the part that is not a matter of taste —
+ * `scoreRun` counts unrun cases as failures, so stopping early recorded that
+ * student as 40 out of 100 when their work was worth 80. `bestScore`, their
+ * points and their class ranking all read that number.
+ *
+ * A crash is the same bargain: it ends the process immediately, and "crashes
+ * only on `n = 0`" is a real diagnosis.
+ *
+ * A timeout is not. Every remaining case would burn the full time limit before
+ * failing the same way, so an infinite loop on a five-case problem would hold a
+ * judge slot for five times the limit instead of once, and tell nobody
+ * anything. A memory limit is the same, with memory pressure on top.
  */
 export function shouldStopAfter(outcome: CaseOutcome): boolean {
-  return outcome !== "PASSED";
+  return outcome === "TIME_LIMIT" || outcome === "MEMORY_LIMIT";
 }
 
 export function submissionStatusFor(
@@ -54,8 +69,10 @@ export function submissionStatusFor(
  * `floor`, so 2 of 3 reads 67 rather than 66 — and both ends stay exact, which
  * is what a student actually notices.
  *
- * Skipped cases count toward the denominator. Failing case 1 of 5 scores 0 out
- * of 100: grading stopped early, but the problem still had five cases.
+ * Skipped cases count toward the denominator, and after `shouldStopAfter` only
+ * a timeout or a memory limit skips anything. Those cases would have failed the
+ * same way, so counting them as failures is the honest reading rather than a
+ * penalty for stopping early.
  */
 export function scoreRun(input: {
   passedCount: number;

@@ -73,6 +73,14 @@ export const routes = {
    */
   adminSettings: '/admin/settings',
   adminPointPolicies: '/admin/settings/points',
+  /**
+   * Maintenance work an operator dispatches onto the judge's queue.
+   *
+   * Platform-wide with an academy selector on the page, so it is
+   * `adminOperations` and not one academy's route — the same distinction this
+   * file already draws between `adminSettings` and `adminAcademySettings`.
+   */
+  adminOperations: '/admin/operations',
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,
@@ -130,6 +138,15 @@ export const routes = {
     `${academyRoot(academySlug)}/classes`,
   academyClass: (academySlug: string, classId: string) =>
     `${academyRoot(academySlug)}/classes/${segment(classId)}`,
+  /**
+   * Repairing the records a corrected problem left behind, inside one academy.
+   *
+   * The studio twin of `adminOperations`. Two routes rather than one because
+   * the question differs: this one never asks which academy, and the console's
+   * never assumes.
+   */
+  academyMaintenance: (academySlug: string) =>
+    `/academy/${segment(academySlug)}/maintenance`,
   academyCourses: (academySlug: string) =>
     `${academyRoot(academySlug)}/content/courses`,
   academyCourse: (academySlug: string, courseId: string) =>

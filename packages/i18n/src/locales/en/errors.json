@@ -126,5 +126,10 @@
   "STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE": "Saved passwords are unavailable here. Issue a new one.",
   "SIGNUP_STUDENT_FAILED": "The student account could not be created.",
   "CAPTCHA_FAILED": "The security check failed. Refresh and try again.",
+  "OPERATION_RUN_NOT_FOUND": "That maintenance run was not found.",
+  "OPERATION_ALREADY_RUNNING": "This problem is already being re-graded. Wait for that run to finish.",
+  "OPERATION_PLAN_EMPTY": "There is nothing left to re-grade for this problem.",
+  "OPERATION_RUN_NOT_PENDING": "This run has already been started. Open it to see how far it got.",
+  "OPERATION_PLAN_TOO_LARGE": "This re-grade is too large to run in one go. Contact engineering.",
   "UNKNOWN": "Something went wrong. Try again."
 }

@@ -261,6 +261,17 @@ export const pointsNamespaces = ["points", "errors"] as const;
  */
 export const academyLibraryNamespaces = ["academy-library", "errors"] as const;
 
+/**
+ * The operator's maintenance page.
+ *
+ * Its own list rather than a member of `platformNamespaces`, which every
+ * console page carries: this is four paragraphs explaining what a grading
+ * revision is and what a re-grade does to a student's record, read on one route
+ * by whoever is holding a teacher's bug report. `PlatformShell`'s `namespaces`
+ * prop exists for exactly this, and its own comment names the case.
+ */
+export const operationsNamespaces = ["platform-operations", "errors"] as const;
+
 export type PageNamespace =
   | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]
@@ -273,6 +284,7 @@ export type PageNamespace =
   | (typeof peopleOpsNamespaces)[number]
   | (typeof destructiveNamespaces)[number]
   | (typeof platformNamespaces)[number]
+  | (typeof operationsNamespaces)[number]
   | (typeof supportNamespaces)[number]
   | (typeof contentImportNamespaces)[number]
   | (typeof sessionNamespaces)[number]

@@ -328,6 +328,17 @@ export function canPublishContent(roles: readonly AcademyRole[]): boolean {
   return rolesHavePermission(roles, 'curriculum.publish');
 }
 
+/**
+ * May repair the records a corrected problem left behind.
+ *
+ * Its own permission rather than `curriculum.publish`, and the difference is
+ * the point: publishing decides what a problem asks, and this decides whether
+ * student records are rewritten to match. Held by the same two roles today.
+ */
+export function canRegrade(roles: readonly AcademyRole[]): boolean {
+  return rolesHavePermission(roles, 'curriculum.regrade');
+}
+
 export function academyRoleFor(
   account: AuthMeResponse,
   academyId: string,

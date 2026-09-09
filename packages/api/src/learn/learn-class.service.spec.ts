@@ -133,7 +133,13 @@ function createService(options?: {
   classes?: unknown[];
   detail?: unknown | null;
   role?: AcademyRole;
-  progress?: Array<{ materialId: string; status: string; bestScore: number }>;
+  progress?: Array<{
+    materialId: string;
+    status: string;
+    bestScore: number;
+    gradingRevision?: number;
+  }>;
+  exerciseRevisions?: Array<{ materialId: string; gradingRevision: number }>;
   drafts?: Array<{ materialId: string }>;
   media?: ProfileMediaService;
 }) {
@@ -153,6 +159,11 @@ function createService(options?: {
     exerciseDraft: { findMany: vi.fn().mockResolvedValue(options?.drafts ?? []) },
     studentExerciseProgress: {
       findMany: vi.fn().mockResolvedValue(options?.progress ?? []),
+    },
+    // The outline compares each record's revision against the problem's
+    // current one, so it reads them alongside the progress rows.
+    programmingExercise: {
+      findMany: vi.fn().mockResolvedValue(options?.exerciseRevisions ?? []),
     },
     submission: { findMany: vi.fn() },
   } as unknown as PrismaService;
@@ -458,7 +469,11 @@ describe("LearnClassService detail", () => {
           materialId: "70000000-0000-4000-8000-000000000001",
           status: "SOLVED",
           bestScore: 100,
+          gradingRevision: 4,
         },
+      ],
+      exerciseRevisions: [
+        { materialId: "70000000-0000-4000-8000-000000000001", gradingRevision: 4 },
       ],
     });
 
@@ -470,6 +485,53 @@ describe("LearnClassService detail", () => {
       solved: 1,
     });
     expect(prisma.submission.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not count a solve the problem's grading has moved past", async () => {
+    // The two-pages-disagree bug: this outline read "Solved, 100/100" from a
+    // record graded at revision 4 while the problem it linked to had moved to
+    // 5 and read "not solved". Only the problem page compared the revisions.
+    const { service } = createService({
+      progress: [
+        {
+          materialId: "70000000-0000-4000-8000-000000000001",
+          status: "SOLVED",
+          bestScore: 100,
+          gradingRevision: 4,
+        },
+      ],
+      exerciseRevisions: [
+        { materialId: "70000000-0000-4000-8000-000000000001", gradingRevision: 5 },
+      ],
+    });
+
+    const detail = await service.getClass(identity, { academyId, classId });
+
+    expect(detail.courses[0]!.progress).toEqual({
+      total: 2,
+      started: 0,
+      solved: 0,
+    });
+  });
+
+  it("counts it again once a re-grade brings the record up to date", async () => {
+    const { service } = createService({
+      progress: [
+        {
+          materialId: "70000000-0000-4000-8000-000000000001",
+          status: "SOLVED",
+          bestScore: 100,
+          gradingRevision: 5,
+        },
+      ],
+      exerciseRevisions: [
+        { materialId: "70000000-0000-4000-8000-000000000001", gradingRevision: 5 },
+      ],
+    });
+
+    const detail = await service.getClass(identity, { academyId, classId });
+
+    expect(detail.courses[0]!.progress).toMatchObject({ solved: 1 });
   });
 
   it("reports the same course summary My Courses does", async () => {

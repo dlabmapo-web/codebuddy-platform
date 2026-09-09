@@ -4,7 +4,33 @@ import { Redis } from "ioredis";
 
 export const GRADING_QUEUE = "cove-grading";
 
+/**
+ * Maintenance re-grading, deliberately not `GRADING_QUEUE`.
+ *
+ * BullMQ shares concurrency across one queue's worker, so a repair of every
+ * affected student at one problem would put each live submission behind the
+ * whole run. A student waiting minutes on a queue they cannot see is a worse
+ * failure than the record this is repairing.
+ *
+ * The two queues share a process and therefore share the interpreter pool, so a
+ * repair still takes one of `JUDGE_CONCURRENCY`'s slots while it runs — see
+ * `REGRADE_CONCURRENCY`, which defaults to one for exactly that reason.
+ */
+export const REGRADE_QUEUE = "cove-regrade";
+
 export type GradingJob = { submissionId: string };
+
+/**
+ * One repair, and the run and request it belongs to.
+ *
+ * `requestId` rides along so the console click that caused this can be found in
+ * the worker's log, which is the only place the two meet.
+ */
+export type RegradeJob = {
+  runId: string;
+  submissionId: string;
+  requestId: string | null;
+};
 
 /**
  * Progress pushed while a submission runs, mirroring the `job.updateProgress`
@@ -58,6 +84,7 @@ export function redisConnection(url: string): ConnectionOptions {
 export class JudgeQueue implements OnModuleDestroy {
   private readonly logger = new Logger(JudgeQueue.name);
   private queueInstance: Queue<GradingJob> | null = null;
+  private regradeInstance: Queue<RegradeJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
   private rateLimitConnection: Promise<void> | null = null;
@@ -77,6 +104,22 @@ export class JudgeQueue implements OnModuleDestroy {
     return this.queueInstance;
   }
 
+  get regradeQueue(): Queue<RegradeJob> {
+    this.regradeInstance ??= new Queue<RegradeJob>(REGRADE_QUEUE, {
+      connection: redisConnection(this.redisUrl),
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: "exponential", delay: 5_000 },
+        // Kept far longer than a grading job. A run is read back hours later by
+        // an operator asking what happened, and a failed repair that vanished
+        // overnight is the one they most need to see.
+        removeOnComplete: { age: 86_400, count: 5_000 },
+        removeOnFail: { age: 7 * 86_400 },
+      },
+    });
+    return this.regradeInstance;
+  }
+
   get events(): QueueEvents {
     this.eventsInstance ??= new QueueEvents(GRADING_QUEUE, {
       connection: redisConnection(this.redisUrl),
@@ -94,6 +137,21 @@ export class JudgeQueue implements OnModuleDestroy {
       { submissionId },
       { jobId: submissionId },
     );
+  }
+
+  /**
+   * A repair, identified by its run *and* its submission.
+   *
+   * Deliberately not `jobId: submissionId`, which is what `enqueue` uses so a
+   * double-clicked submit cannot grade twice. A repair is a new row and would
+   * not collide with a live job anyway, but naming the run keeps the id
+   * readable in a worker log and makes a retried dispatch inside one run
+   * deduplicate exactly as the live path does.
+   */
+  async enqueueRegrade(job: RegradeJob): Promise<void> {
+    await this.regradeQueue.add("regrade", job, {
+      jobId: `regrade:${job.runId}:${job.submissionId}`,
+    });
   }
 
   /**
@@ -154,11 +212,30 @@ export class JudgeQueue implements OnModuleDestroy {
     return worker;
   }
 
+  createRegradeWorker(
+    handler: (job: { data: RegradeJob }) => Promise<unknown>,
+    concurrency: number,
+  ): Worker<RegradeJob> {
+    const worker = new Worker<RegradeJob>(
+      REGRADE_QUEUE,
+      async (job) => handler({ data: job.data }),
+      { connection: redisConnection(this.redisUrl), concurrency },
+    );
+    worker.on("failed", (job, error) => {
+      this.logger.error(
+        `[${job?.data.requestId ?? "-"}] regrade job ${job?.id ?? "unknown"} failed: ${error.message}`,
+      );
+    });
+    return worker;
+  }
+
   async close(): Promise<void> {
     await this.queueInstance?.close();
+    await this.regradeInstance?.close();
     await this.eventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
+    this.regradeInstance = null;
     this.eventsInstance = null;
     this.rateLimitClient = null;
     this.rateLimitConnection = null;

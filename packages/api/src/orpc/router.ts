@@ -59,9 +59,12 @@ import { PlatformLibraryService } from "../platform/platform-library.service.js"
 import { AcademyLibraryService } from "../content/library/academy-library.service.js";
 import { createPlatformApplicationsRouters } from "../platform/platform-applications.router.js";
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
+import { createPlatformOperationsRouters } from "../platform/platform-operations.router.js";
 import { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
 import { PlatformRankingService } from "../platform/platform-ranking.service.js";
 import { PlatformSettingsService } from "../platform/platform-settings.service.js";
+import { RegradeService } from "../platform/regrade.service.js";
+import { JudgeQueue } from "../judge/judge.queue.js";
 import { createPlatformInvitationsRouters } from "../platform/platform-invitations.router.js";
 import { createPlatformRankingRouters } from "../platform/platform-ranking.router.js";
 import { createPlatformSettingsRouters } from "../platform/platform-settings.router.js";
@@ -165,6 +168,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformSettingsService: app.get(PlatformSettingsService, {
       strict: false,
     }),
+    regradeService: app.get(RegradeService, { strict: false }),
+    judgeQueue: app.get(JudgeQueue, { strict: false }),
     platformUsersService: app.get(PlatformUsersService, { strict: false }),
     platformSupportService: app.get(PlatformSupportService, {
       strict: false,
@@ -215,6 +220,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const platformInvitationsRouters = createPlatformInvitationsRouters(os, deps);
   const platformRankingRouters = createPlatformRankingRouters(os, deps);
   const platformSettingsRouters = createPlatformSettingsRouters(os, deps);
+  const platformOperationsRouters = createPlatformOperationsRouters(os, deps);
   const platformSupportRouters = createPlatformSupportRouters(os, deps);
   return os.router({
     auth: createAuthRouter(os, deps),
@@ -237,6 +243,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformInvitationsRouters,
     ...platformRankingRouters,
     ...platformSettingsRouters,
+    ...platformOperationsRouters,
     ...platformSupportRouters,
     learn: createLearnRouter(os, deps),
     points: createPointsRouter(os, deps),

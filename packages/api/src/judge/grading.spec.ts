@@ -124,6 +124,46 @@ describe("nextProgress", () => {
     });
   });
 
+  it("does not charge an attempt for a platform repair", () => {
+    // A corrected test case must not add an attempt to every affected student,
+    // and correcting it twice must not add two.
+    expect(
+      nextProgress({
+        previous: { status: "SOLVED", attemptCount: 3, bestPassed: 5, bestScore: 80 },
+        status: "PASSED",
+        passedCount: 5,
+        score: 100,
+        isRepair: true,
+      }),
+    ).toEqual({
+      status: "SOLVED",
+      attemptCount: 3,
+      bestPassed: 5,
+      bestScore: 100,
+      solvedNow: false,
+    });
+  });
+
+  it("still records a solve found by a repair, for a student who had failed", () => {
+    // The wrongly-failed population: a test case with a wrong expected output
+    // failed correct code. Re-grading it is their first solve, and it pays.
+    expect(
+      nextProgress({
+        previous: { status: "IN_PROGRESS", attemptCount: 4, bestPassed: 3, bestScore: 60 },
+        status: "PASSED",
+        passedCount: 5,
+        score: 100,
+        isRepair: true,
+      }),
+    ).toEqual({
+      status: "SOLVED",
+      attemptCount: 4,
+      bestPassed: 5,
+      bestScore: 100,
+      solvedNow: true,
+    });
+  });
+
   it("does not demote a solved problem on a later wrong answer", () => {
     expect(
       nextProgress({

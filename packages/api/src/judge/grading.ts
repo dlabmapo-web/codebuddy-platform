@@ -111,6 +111,13 @@ export function summarizeRun(
  * A judge fault leaves the student's record untouched — it is our failure, not
  * theirs. `SOLVED` is permanent: a later wrong answer on a problem already
  * solved must not demote it.
+ *
+ * `isRepair` is the third case, and it is the same idea as the first. A
+ * platform re-grade carries the student's own code against a corrected test
+ * case, so the verdict is theirs and updates their status and best score — but
+ * pressing an operator's button is not an attempt they made, so the count does
+ * not move. Without it, correcting one test case would silently add an attempt
+ * to every affected student, and correcting it twice would add two.
  */
 export function nextProgress(input: {
   previous: {
@@ -122,6 +129,8 @@ export function nextProgress(input: {
   status: SubmissionStatus;
   passedCount: number;
   score: number;
+  /** True when the platform wrote this submission to repair a record. */
+  isRepair?: boolean;
 }): {
   status: "NOT_STARTED" | "IN_PROGRESS" | "SOLVED";
   attemptCount: number;
@@ -143,9 +152,10 @@ export function nextProgress(input: {
   }
 
   const solved = wasSolved || input.status === "PASSED";
+  const attemptCount = previous?.attemptCount ?? 0;
   return {
     status: solved ? "SOLVED" : "IN_PROGRESS",
-    attemptCount: (previous?.attemptCount ?? 0) + 1,
+    attemptCount: input.isRepair ? attemptCount : attemptCount + 1,
     bestPassed: Math.max(previous?.bestPassed ?? 0, input.passedCount),
     // Never reduced by a later worse attempt, for the same reason SOLVED is
     // permanent: experimenting after succeeding must not cost anything.

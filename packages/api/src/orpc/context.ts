@@ -46,6 +46,8 @@ import type { AcademyLibraryService } from "../content/library/academy-library.s
 import type { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
 import type { PlatformRankingService } from "../platform/platform-ranking.service.js";
 import type { PlatformSettingsService } from "../platform/platform-settings.service.js";
+import type { RegradeService } from "../platform/regrade.service.js";
+import type { JudgeQueue } from "../judge/judge.queue.js";
 import type { PlatformUsersService } from "../platform/platform-users.service.js";
 import type { PlatformSupportService } from "../platform/platform-support.service.js";
 import type { PointsService } from "../points/points.service.js";
@@ -111,6 +113,13 @@ export type ORPCDeps = {
   platformInvitationsService: PlatformInvitationsService;
   platformRankingService: PlatformRankingService;
   platformSettingsService: PlatformSettingsService;
+  regradeService: RegradeService;
+  /**
+   * Null on a deployment without Redis, exactly as it is for the live grading
+   * path. A console that could plan a re-grade and then silently not dispatch
+   * it would be worse than one that refuses.
+   */
+  judgeQueue: JudgeQueue | null;
   platformUsersService: PlatformUsersService;
   platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;

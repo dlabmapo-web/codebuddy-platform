@@ -103,6 +103,15 @@ export const apiEnvironmentSchema = z.object({
     .default(10_000),
   /** CPU-bound work, so this tracks cores rather than being set high. */
   JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  /**
+   * How many repairs a maintenance re-grade runs at once.
+   *
+   * One by default, and low on purpose. The re-grade queue is separate from the
+   * live one so a run cannot put a student behind it, but both workers share
+   * the same interpreter pool — so this is how much of `JUDGE_CONCURRENCY` a
+   * repair is allowed to occupy while it works.
+   */
+  REGRADE_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(1),
   /** Pinned, and shared with the browser so run and submit agree. */
   PYODIDE_VERSION: z.string().default("0.27.5"),
   SUBMISSION_RATE_LIMIT: z.coerce.number().int().min(1).max(120).default(10),

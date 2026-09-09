@@ -183,6 +183,9 @@ export class GradingService {
         status: summary.status,
         passedCount: summary.passedCount,
         score: summary.score,
+        // Read off the row rather than passed in by the caller, so no dispatch
+        // path can forget it. See §5.4 of the console operations design.
+        isRepair: submission.regradeRunId !== null,
       });
 
       await tx.studentExerciseProgress.upsert({

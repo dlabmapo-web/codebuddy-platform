@@ -34,6 +34,7 @@ import { platformUsersContract } from "./orpc/platform-users.contract.js";
 import { platformSupportContract } from "./orpc/platform-support.contract.js";
 import { platformAcademiesContract } from "./orpc/platform.contract.js";
 import { platformSettingsContract } from "./orpc/platform-settings.contract.js";
+import { platformOperationsContract } from "./orpc/platform-operations.contract.js";
 import { pointsContract } from "./orpc/points.contract.js";
 import {
   academyInvitationDeliveryContract,
@@ -70,6 +71,7 @@ export const appContract = {
   notifications: notificationsContract,
   platformAcademies: platformAcademiesContract,
   platformSettings: platformSettingsContract,
+  platformOperations: platformOperationsContract,
   platformApplications: platformApplicationsContract,
   platformAudit: platformAuditContract,
   platformContent: platformContentContract,

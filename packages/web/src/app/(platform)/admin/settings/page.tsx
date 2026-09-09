@@ -19,7 +19,7 @@ import { FeatureBoard } from './_components/feature-board';
  * job it cannot do, which is the thing it exists to replace.
  */
 export default async function PlatformSettingsPage() {
-  const { t } = await getServerTranslation(['platform']);
+  const { t } = await getServerTranslation(['platform-settings']);
 
   let board: PlatformFeatureBoard | null = null;
   try {

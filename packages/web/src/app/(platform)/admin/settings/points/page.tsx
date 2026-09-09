@@ -22,7 +22,7 @@ import { PointPolicyBoard } from './_components/point-policy-board';
  * validated together.
  */
 export default async function PlatformPointPoliciesPage() {
-  const { t } = await getServerTranslation(['platform']);
+  const { t } = await getServerTranslation(['platform-settings']);
 
   let board: PlatformPointPolicyBoard | null = null;
   try {

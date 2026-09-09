@@ -36,7 +36,7 @@ export function SettingsPanel({
   /** Whether this academy runs points — null when it could not be read. */
   pointsEnabled: boolean | null;
 }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation('platform-settings');
 
   // Archived academies are read-only everywhere else in the console, and a
   // settings page is the one place that rule would be easiest to forget.

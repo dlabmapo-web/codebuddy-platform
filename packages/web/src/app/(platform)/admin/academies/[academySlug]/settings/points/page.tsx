@@ -44,7 +44,7 @@ export default async function PlatformAcademyPointPolicyPage({
 }) {
   const { academySlug } = await params;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
-  const { t } = await getServerTranslation(['points', 'platform']);
+  const { t } = await getServerTranslation(['points', 'platform-settings']);
 
   const client = createPlatformServerORPCClient();
   const [state, pointsEnabled] = await Promise.all([
@@ -67,7 +67,7 @@ export default async function PlatformAcademyPointPolicyPage({
       back={
         <BackLink
           href={backTo.platformAcademyPointPolicy(academySlug)}
-          label={t('platform:settings.back_to_settings')}
+          label={t('platform-settings:settings.back_to_settings')}
         />
       }
       description={t('points:policy.description')}

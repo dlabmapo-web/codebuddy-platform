@@ -158,6 +158,13 @@ export const peopleOpsNamespaces = [
 export const platformNamespaces = [
   'platform',
   'platform-audit',
+  // Split from `platform` when the two together passed the per-namespace
+  // budget in `@cove/i18n`'s `locales.spec.ts`. It stays on the console's
+  // shared list rather than taking a page list of its own: five console
+  // routes across two subtrees read it — the two cross-academy boards, an
+  // academy's own settings and point policy, and the settings panel on the
+  // academy detail page — and it is read by nobody who is not Cove staff.
+  'platform-settings',
   'platform-applications',
   'platform-content',
   'platform-invitations',

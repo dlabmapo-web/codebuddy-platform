@@ -166,21 +166,6 @@
     "suspended": "Suspended",
     "archived": "Archived"
   },
-  "settings": {
-    "title": "Settings",
-    "panel_description": "How this academy behaves. Changed here, without standing in one of its roles.",
-    "description": "What this academy has switched on. A change takes effect for everyone in it immediately.",
-    "back": "Back to academy",
-    "back_to_settings": "Back to settings",
-    "features": "Features",
-    "features_hint": "What this academy has switched on.",
-    "point_policy": "Point policy",
-    "point_policy_hint": "What each kind of work pays.",
-    "points_off": "Points are off for this academy. Switch them on in Features.",
-    "points_off_notice": "This academy does not run points, so nothing here pays anyone yet. The policy can still be set, ready for when it is switched on.",
-    "points_off_action": "Switch points on",
-    "points_unknown": "Could not read this academy's features."
-  },
   "nav": {
     "group": {
       "platform": "Platform",
@@ -300,31 +285,5 @@
     "empty": "No academy matches that name.",
     "locked": "The academy you filtered to.",
     "unknown": "Unknown academy"
-  },
-  "board": {
-    "features_title": "Features",
-    "features_description": "What every academy has switched on. Change it here.",
-    "points_title": "Point policies",
-    "points_description": "What every academy pays, side by side. Edit one on its own page.",
-    "points_state": "Points",
-    "points_on": "On",
-    "points_off": "Off",
-    "default": "Default",
-    "edit": "Edit",
-    "search": "Search by name or address",
-    "truncated": "Showing the first academies of {{count}}. Narrow the search to see the rest.",
-    "column": {
-      "solveEasy": "Easy",
-      "solveMedium": "Medium",
-      "solveHard": "Hard",
-      "lectureCompleted": "Lecture",
-      "courseCompleted": "Course",
-      "studentDailyCap": "Cap"
-    },
-    "of_academies": "of {{count}} academies",
-    "tally_running": "Running points",
-    "tally_defaults": "On defaults",
-    "tally_spread": "Hard problem pays",
-    "tally_spread_hint": "across academies running points"
   }
 }

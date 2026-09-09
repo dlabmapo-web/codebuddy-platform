@@ -44,7 +44,7 @@ export default async function PlatformAcademySettingsPage({
 }) {
   const { academySlug } = await params;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
-  const { t } = await getServerTranslation(['platform']);
+  const { t } = await getServerTranslation(['platform-settings']);
 
   let features: AcademyFeatureList | null = null;
   try {

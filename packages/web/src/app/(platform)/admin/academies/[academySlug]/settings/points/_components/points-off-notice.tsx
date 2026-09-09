@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
  * run an economy that something is wrong with them.
  */
 export function PointsOffNotice({ href }: { href: string }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation('platform-settings');
 
   return (
     <div className="mb-5 flex items-start gap-3 rounded-card border border-border bg-accent px-4 py-3.5">

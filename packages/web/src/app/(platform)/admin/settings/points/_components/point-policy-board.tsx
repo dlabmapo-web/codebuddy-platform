@@ -93,7 +93,7 @@ export function PointPolicyBoard({
 }: {
   initialBoard: PlatformPointPolicyBoard | null;
 }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation(['platform-settings', 'platform']);
   const errorText = useErrorText();
 
   const query = useQuery({
@@ -109,7 +109,7 @@ export function PointPolicyBoard({
       {
         id: 'academy',
         accessorFn: (row) => `${row.academyName} ${row.academySlug}`,
-        header: t('table.name'),
+        header: t('platform:table.name'),
         cell: ({ row }) => (
           <div className="min-w-0">
             <Link
@@ -197,7 +197,7 @@ export function PointPolicyBoard({
       ),
       {
         id: 'actions',
-        header: t('table.actions'),
+        header: t('platform:table.actions'),
         enableSorting: false,
         size: 104,
         cell: ({ row }) =>
@@ -247,7 +247,7 @@ export function PointPolicyBoard({
       <DataTable
         columns={columns}
         data={rows}
-        emptyMessage={t('table.empty')}
+        emptyMessage={t('platform:table.empty')}
         layout="fixed"
         facets={[
           {
@@ -275,7 +275,7 @@ export function PointPolicyBoard({
  * and one where the spread is wide needs it badly.
  */
 function PolicyTally({ rows }: { rows: PlatformAcademyPointPolicyRow[] }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation(['platform-settings', 'platform']);
 
   if (rows.length === 0) return null;
 

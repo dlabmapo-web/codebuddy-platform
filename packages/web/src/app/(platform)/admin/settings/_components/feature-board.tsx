@@ -29,11 +29,14 @@ const boardKey = ['platform', 'settings', 'features'] as const;
  * The translation catalogue is typed, and a template key widens to
  * `condition.${string}` — which typechecks against nothing. Written out, a
  * status added later fails to compile here until it has copy.
+ *
+ * Prefixed, because an academy's condition is named by the console's own
+ * `platform` namespace while this board's primary one is `platform-settings`.
  */
 const statusLabels = {
-  ACTIVE: 'condition.running',
-  SUSPENDED: 'condition.suspended',
-  ARCHIVED: 'condition.archived',
+  ACTIVE: 'platform:condition.running',
+  SUSPENDED: 'platform:condition.suspended',
+  ARCHIVED: 'platform:condition.archived',
 } as const;
 
 /**
@@ -117,7 +120,7 @@ export function FeatureBoard({
 }: {
   initialBoard: PlatformFeatureBoard | null;
 }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation(['platform-settings', 'platform']);
   const { t: academy } = useLayoutTranslation('academy');
   const errorText = useErrorText();
   const queryClient = useQueryClient();
@@ -181,7 +184,7 @@ export function FeatureBoard({
       {
         id: 'academy',
         accessorFn: (row) => `${row.academyName} ${row.academySlug}`,
-        header: t('table.name'),
+        header: t('platform:table.name'),
         cell: ({ row }) => (
           <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0">
@@ -302,7 +305,7 @@ export function FeatureBoard({
       <DataTable
         columns={columns}
         data={rows}
-        emptyMessage={t('table.empty')}
+        emptyMessage={t('platform:table.empty')}
         searchPlaceholder={t('board.search')}
       />
     </div>
@@ -321,7 +324,7 @@ export function FeatureBoard({
  * features, and four bars of different lengths say it without arithmetic.
  */
 function FeatureTally({ rows }: { rows: PlatformAcademyFeatureRow[] }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation(['platform-settings', 'platform']);
   const { t: academy } = useLayoutTranslation('academy');
 
   if (rows.length === 0) return null;

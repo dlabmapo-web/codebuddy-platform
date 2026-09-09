@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
  * the operator meets one icon for one subject wherever they are.
  */
 export function PointPolicyLink({ href }: { href: string }) {
-  const { t } = useTranslation('platform');
+  const { t } = useTranslation('platform-settings');
 
   return (
     <Link

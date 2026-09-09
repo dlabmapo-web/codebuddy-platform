@@ -446,8 +446,10 @@ function attemptWhere(input: { userId: string; materialId: string }) {
     sourceMaterialId: input.materialId,
     // Counted attempts only: a queued, cancelled, or judge-faulted row is not
     // something the student did, so it never appears in a history a teacher
-    // reads back to them.
+    // reads back to them. A platform re-grade is the same kind of thing — the
+    // row carries the student's code, but the student did not write it today.
     status: { in: ["PASSED", "FAILED"] satisfies SubmissionStatus[] },
+    regradeRunId: null,
   } satisfies Prisma.SubmissionWhereInput;
 }
 
@@ -474,6 +476,10 @@ function countedScope(input: {
     AND s.material_id = ANY(ARRAY[${Prisma.join(input.materialIds)}]::uuid[])
     AND s.source_material_id = s.material_id
     AND s.status IN ('PASSED', 'FAILED')
+    -- A repair the platform wrote is not an attempt the student made. This
+    -- predicate does not gate on grading revision, so without the exclusion a
+    -- re-grade would add one to every affected student's attempt count.
+    AND s.regrade_run_id IS NULL
   `;
 }
 

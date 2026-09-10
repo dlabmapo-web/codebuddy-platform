@@ -230,11 +230,93 @@ export const reorderLecturesSchema = courseIdInputSchema.extend({
   orderedLectureIds: z.array(z.uuid()).min(1),
 });
 
-export const exerciseTestCaseDraftSchema = z.object({
-  input: z.string().max(100_000),
-  expectedOutput: z.string().max(100_000),
-  visibility: testCaseVisibilitySchema,
-});
+/**
+ * The five ways a case's output can be judged.
+ *
+ * Named for Elice's generated identifiers so an imported grader maps one to
+ * one. `STDOUT` is the normalized equality every case used before this, and
+ * stays the default so existing content is unaffected.
+ */
+export const caseComparators = [
+  "STDOUT",
+  "STDOUT_MATCH",
+  "STDOUT_NOMATCH",
+  "STDOUT_REGEX",
+  "STDOUT_REGEX_NOMATCH",
+] as const;
+export const caseComparatorSchema = z.enum(caseComparators);
+export type CaseComparator = z.infer<typeof caseComparatorSchema>;
+
+export const gradingProfileModes = ["LEGACY_STDIO", "ELICE_STDIO"] as const;
+export const programmingExerciseGradingModeSchema = z.enum(gradingProfileModes);
+export type GradingProfileMode = z.infer<
+  typeof programmingExerciseGradingModeSchema
+>;
+
+/**
+ * Comparison and scoring semantics, by version.
+ *
+ * Dispatch reads the version stored with the exercise or submission, never a
+ * constant in source: a submission graded under `legacy-v1` must keep being
+ * graded that way after a newer version ships, or a regrade would rescore
+ * historical work under rules it was never judged by. An unknown version is a
+ * configuration error, not a wrong answer — fail closed.
+ */
+export const gradingSemanticVersions = ["legacy-v1", "elice-v1"] as const;
+export const gradingSemanticVersionSchema = z.enum(gradingSemanticVersions);
+export type GradingSemanticVersion = z.infer<
+  typeof gradingSemanticVersionSchema
+>;
+
+/** The version new enhanced profiles are authored at. Never used for reading. */
+export const currentEliceSemanticVersion: GradingSemanticVersion = "elice-v1";
+
+export const exerciseTestCaseDraftSchema = z
+  .object({
+    input: z.string().max(100_000),
+    expectedOutput: z.string().max(100_000),
+    visibility: testCaseVisibilitySchema,
+    comparator: caseComparatorSchema.default("STDOUT"),
+    /**
+     * Points this case contributes. Equal weights reproduce the old
+     * equal-percentage scoring exactly. Zero is allowed, for a case that
+     * demonstrates something without being worth anything.
+     */
+    weight: z.number().int().min(0).max(10_000).default(1),
+    timeLimitMsOverride: z.number().int().min(100).max(60_000).nullable().default(null),
+    /** Paired with `softPenalty`; see the refinement below. */
+    softTimeLimitMs: z.number().int().min(1).max(60_000).nullable().default(null),
+    softPenalty: z.number().int().min(0).max(10_000).nullable().default(null),
+    label: z.string().trim().max(200).nullable().default(null),
+  })
+  .refine(
+    (value) =>
+      (value.softTimeLimitMs === null) === (value.softPenalty === null),
+    {
+      error:
+        "A soft time limit and its penalty must be set together.",
+      path: ["softTimeLimitMs"],
+    },
+  )
+  .refine(
+    (value) =>
+      value.softPenalty === null || value.softPenalty <= value.weight,
+    {
+      // Otherwise a slow-but-correct answer would score below a wrong one.
+      error: "A soft penalty cannot exceed the case's weight.",
+      path: ["softPenalty"],
+    },
+  )
+  .refine(
+    (value) =>
+      value.softTimeLimitMs === null ||
+      value.timeLimitMsOverride === null ||
+      value.softTimeLimitMs < value.timeLimitMsOverride,
+    {
+      error: "A soft time limit must be below the case's hard limit.",
+      path: ["softTimeLimitMs"],
+    },
+  );
 
 export const exerciseHintDraftSchema = z.object({
   content: z.string().trim().min(1).max(10_000),

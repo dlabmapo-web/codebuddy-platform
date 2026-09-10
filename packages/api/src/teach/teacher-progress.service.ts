@@ -35,7 +35,7 @@ import {
   type TeacherStudentProgressRow,
   type TeacherStudentsResult,
   type TeacherSubmissionReview,
-} from "@cove/shared";
+  isOutputCorrect,} from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
@@ -628,7 +628,7 @@ export class TeacherProgressService {
           actualOutput: item.isSample ? item.actualOutput : null,
         };
       }),
-      hiddenPassed: hidden.filter((item) => item.outcome === "PASSED").length,
+      hiddenPassed: hidden.filter((item) => isOutputCorrect(item.outcome)).length,
       hiddenTotal: hidden.length,
     };
   }

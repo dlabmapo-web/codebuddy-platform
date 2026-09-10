@@ -175,6 +175,7 @@
       "runtime_value": "{{ms}}ms",
       "outcome": {
         "PASSED": "통과",
+        "PASSED_WITH_WARNING": "통과 (경고)",
         "WRONG_OUTPUT": "출력 불일치",
         "RUNTIME_ERROR": "런타임 오류",
         "TIME_LIMIT": "시간 초과",

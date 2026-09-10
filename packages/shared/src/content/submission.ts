@@ -22,6 +22,14 @@ export type SubmissionStatus = z.infer<typeof submissionStatusSchema>;
 
 export const caseOutcomes = [
   "PASSED",
+  /**
+   * Output correct, but slower than the case's soft threshold.
+   *
+   * Correct for "did this run pass", and not the same as PASSED for scoring:
+   * the case awards `weight - softPenalty`. Anything deciding points must
+   * distinguish the two; anything deciding correctness must treat them alike.
+   */
+  "PASSED_WITH_WARNING",
   "WRONG_OUTPUT",
   "RUNTIME_ERROR",
   "TIME_LIMIT",
@@ -30,6 +38,19 @@ export const caseOutcomes = [
 ] as const;
 export const caseOutcomeSchema = z.enum(caseOutcomes);
 export type CaseOutcome = z.infer<typeof caseOutcomeSchema>;
+
+/**
+ * Whether a case produced the right output.
+ *
+ * A soft-timeout warning did: the student's answer was correct and only the
+ * points differ. Correctness and scoring diverge from here on, so anything
+ * asking "did this case pass" must call this rather than compare to `PASSED`,
+ * and anything asking "what did it earn" must read the awarded weight instead
+ * of inferring points from a passed count.
+ */
+export function isOutputCorrect(outcome: CaseOutcome): boolean {
+  return outcome === "PASSED" || outcome === "PASSED_WITH_WARNING";
+}
 
 /** A verdict is in hand; anything else is still moving. */
 export function isTerminalStatus(status: SubmissionStatus): boolean {

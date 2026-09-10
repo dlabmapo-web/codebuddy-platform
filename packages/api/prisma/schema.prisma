@@ -189,12 +189,70 @@ enum SubmissionStatus {
 
 enum CaseOutcome {
   PASSED
+  /// Output correct, but slower than the case's soft threshold, so the case
+  /// awards `weight - softPenalty` rather than its full weight. Correct for the
+  /// purposes of "did this run pass", and not the same as PASSED for scoring.
+  PASSED_WITH_WARNING
   WRONG_OUTPUT
   RUNTIME_ERROR
   TIME_LIMIT
   MEMORY_LIMIT
   /// Not run, because an earlier case already failed.
   SKIPPED
+}
+
+/// How a case's output is compared, named for Elice's five generated
+/// identifiers so an import maps one to one. `STDOUT` is the normalized
+/// equality every existing case uses.
+enum CaseComparator {
+  STDOUT
+  STDOUT_MATCH
+  STDOUT_NOMATCH
+  STDOUT_REGEX
+  STDOUT_REGEX_NOMATCH
+}
+
+/// Which grading semantics an exercise opted into. Every exercise that existed
+/// before weighted grading stays LEGACY_STDIO, and its stored scores keep their
+/// original meaning. CUSTOM is deliberately absent until grader scripts exist.
+enum GradingProfileMode {
+  LEGACY_STDIO
+  ELICE_STDIO
+}
+
+/// Whether a failing case ends the run. Legacy stops on a resource verdict
+/// because every later case would burn the same limit; enhanced mode continues
+/// while the total job budget allows, which is what Elice's loop does.
+enum ContinuationPolicy {
+  LEGACY_STOP_ON_RESOURCE
+  CONTINUE_WITHIN_BUDGET
+}
+
+/// What a non-zero exit means. Only one policy exists until V2 establishes what
+/// Elice does with a program that prints correct output and then exits badly.
+enum ExitStatusPolicy {
+  FAIL_ON_RUNTIME_ERROR
+}
+
+/// How earned weight becomes the material's score.
+enum MaterialScorePolicy {
+  PROPORTIONAL
+  ABSOLUTE_CAP
+}
+
+/// Whether a case actually ran. A skipped case must never be readable as an
+/// executed wrong answer.
+enum CaseExecutionState {
+  EXECUTED
+  NOT_RUN
+}
+
+/// Why a run ended without a complete verdict. Distinct from any case outcome:
+/// none of these is the student's fault, and none finalizes a grade.
+enum GradingAbortReason {
+  TOTAL_DEADLINE
+  INFRASTRUCTURE_FAILURE
+  POLICY_REVOKED
 }
 
 /// What a stored image is *for*. The purpose decides which relation may own
@@ -1174,8 +1232,8 @@ model PlatformOperationRun {
   /// What the operation is about: `"material"` and a material id, today.
   /// Two columns rather than a typed relation because the next operation's
   /// target is a different table, and `AuditLog` already pairs them this way.
-  targetType String  @map("target_type")
-  targetId   String  @map("target_id")
+  targetType String @map("target_type")
+  targetId   String @map("target_id")
 
   actorUserId String @map("actor_user_id") @db.Uuid
 
@@ -1511,8 +1569,31 @@ model ProgrammingExercise {
   memoryLimitMb     Int                @default(256) @map("memory_limit_mb")
   aiFeedbackEnabled Boolean            @default(false) @map("ai_feedback_enabled")
   gradingRevision   Int                @default(1) @map("grading_revision")
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// The grading profile. Copied onto every submission at admission and never
+  /// read back from here while grading, so editing an exercise cannot
+  /// reinterpret work a student has already handed in.
+  gradingMode               GradingProfileMode   @default(LEGACY_STDIO) @map("grading_mode")
+  /// Which version of the comparison and scoring semantics applies. Dispatch
+  /// reads the value stored with the data, never a constant in source.
+  gradingSemanticVersion    String               @default("legacy-v1") @map("grading_semantic_version")
+  /// Whole-job budget, covering runner startup, every case and every
+  /// comparison. Null for legacy, which has only the per-case limit.
+  totalTimeLimitMs          Int?                 @map("total_time_limit_ms")
+  /// Parent-owned ceiling on one comparison, so a catastrophic pattern cannot
+  /// hold a judge slot.
+  comparatorTimeLimitMs     Int?                 @map("comparator_time_limit_ms")
+  continuationPolicy        ContinuationPolicy   @default(LEGACY_STOP_ON_RESOURCE) @map("continuation_policy")
+  exitStatusPolicy          ExitStatusPolicy     @default(FAIL_ON_RUNTIME_ERROR) @map("exit_status_policy")
+  /// Material points in integer hundredths, so scoring never rounds through a
+  /// float. Null for legacy, where every problem is worth the same 100.
+  materialMaximumHundredths Int?                 @map("material_maximum_hundredths")
+  materialScorePolicy       MaterialScorePolicy? @map("material_score_policy")
+  /// Six message templates and what case detail a student may see. Versioned
+  /// and validated on read; never arbitrary expressions.
+  feedbackPolicy            Json?                @map("feedback_policy")
+  createdAt                 DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   material  Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
   testCases ExerciseTestCase[]
@@ -1524,14 +1605,29 @@ model ProgrammingExercise {
 }
 
 model ExerciseTestCase {
-  id                 String             @id @default(uuid()) @db.Uuid
-  exerciseMaterialId String             @map("exercise_material_id") @db.Uuid
-  position           Int
-  input              String
-  expectedOutput     String             @map("expected_output")
-  visibility         TestCaseVisibility
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  String             @id @default(uuid()) @db.Uuid
+  exerciseMaterialId  String             @map("exercise_material_id") @db.Uuid
+  position            Int
+  input               String
+  expectedOutput      String             @map("expected_output")
+  visibility          TestCaseVisibility
+  /// How this case's output is judged. Every case that existed before the five
+  /// comparison modes is normalized equality, which is what STDOUT means.
+  comparator          CaseComparator     @default(STDOUT)
+  /// Points this case contributes. Equal weights reproduce the old
+  /// equal-percentage scoring exactly, so a backfill is a default rather than a
+  /// data migration. Zero is allowed, for a demonstration-only case.
+  weight              Int                @default(1)
+  /// Per-case hard limit, overriding the exercise default when set.
+  timeLimitMsOverride Int?               @map("time_limit_ms_override")
+  /// Paired with `softPenalty`: correct output slower than this threshold
+  /// still passes, but awards `weight - softPenalty`. Validated
+  /// `0 < soft < hard` and `0 <= penalty <= weight`.
+  softTimeLimitMs     Int?               @map("soft_time_limit_ms")
+  softPenalty         Int?               @map("soft_penalty")
+  label               String?
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   exercise ProgrammingExercise @relation(fields: [exerciseMaterialId], references: [materialId], onDelete: Cascade)
 
@@ -1630,13 +1726,45 @@ model Submission {
   /// two. Derived from cases passed, never stored per case.
   score            Int              @default(0)
   runtimeMs        Int?             @map("runtime_ms")
+
+  /// The grading profile as it stood when this attempt was admitted.
+  ///
+  /// Copied, not referenced: the exercise's settings may change tomorrow, and
+  /// a regrade of this submission must reproduce the rules it was judged under,
+  /// not the rules that happen to be current.
+  gradingMode               GradingProfileMode   @default(LEGACY_STDIO) @map("grading_mode")
+  gradingSemanticVersion    String               @default("legacy-v1") @map("grading_semantic_version")
+  totalTimeLimitMs          Int?                 @map("total_time_limit_ms")
+  comparatorTimeLimitMs     Int?                 @map("comparator_time_limit_ms")
+  continuationPolicy        ContinuationPolicy   @default(LEGACY_STOP_ON_RESOURCE) @map("continuation_policy")
+  exitStatusPolicy          ExitStatusPolicy     @default(FAIL_ON_RUNTIME_ERROR) @map("exit_status_policy")
+  materialMaximumHundredths Int?                 @map("material_maximum_hundredths")
+  materialScorePolicy       MaterialScorePolicy? @map("material_score_policy")
+  feedbackPolicy            Json?                @map("feedback_policy")
+  /// Effective ceilings, output cap, comparator budget and runtime identity,
+  /// versioned and validated. Never holds a secret.
+  gradingPolicySnapshot     Json?                @map("grading_policy_snapshot")
+
+  /// Raw weighted result. Null on every legacy row, where `score` is the only
+  /// number and case count is the denominator.
+  earnedWeight           Int? @map("earned_weight")
+  possibleWeight         Int? @map("possible_weight")
+  /// The material score in integer hundredths, derived from the weights above
+  /// under `materialScorePolicy`. Deliberately separate from `score`, which
+  /// keeps its 0-100 meaning for every existing reader.
+  appliedScoreHundredths Int? @map("applied_score_hundredths")
+
+  /// Set when the run ended without a complete verdict. An aborted run is not a
+  /// grade: it must not update best score, completion or rewards.
+  gradingAborted     Boolean             @default(false) @map("grading_aborted")
+  gradingAbortReason GradingAbortReason? @map("grading_abort_reason")
   /// Which runtime produced the verdict, so a future upgrade stays auditable.
-  engineVersion    String           @map("engine_version")
-  failureReason    String?          @map("failure_reason")
+  engineVersion      String              @map("engine_version")
+  failureReason      String?             @map("failure_reason")
   /// Server-owned. v1 accepted a client-reported elapsed time.
-  startedAt        DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
-  gradedAt         DateTime?        @map("graded_at") @db.Timestamptz(6)
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt          DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
+  gradedAt           DateTime?           @map("graded_at") @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
 
   /// The solve session this attempt was made in, and the time it took.
   ///
@@ -1720,6 +1848,18 @@ model SubmissionGradingCase {
   expectedOutput String  @map("expected_output")
   isSample       Boolean @map("is_sample")
 
+  /// Mirrors of the case definition, frozen with the submission. Without them a
+  /// regrade would re-read the exercise and judge old work by new rules.
+  comparator           CaseComparator @default(STDOUT)
+  weight               Int            @default(1)
+  timeLimitMsOverride  Int?           @map("time_limit_ms_override")
+  softTimeLimitMs      Int?           @map("soft_time_limit_ms")
+  softPenalty          Int?           @map("soft_penalty")
+  label                String?
+  /// The limit actually applied, after the per-case override resolved against
+  /// the exercise default. Null on legacy rows, which used the submission's.
+  effectiveTimeLimitMs Int?           @map("effective_time_limit_ms")
+
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@unique([submissionId, position])
@@ -1727,16 +1867,22 @@ model SubmissionGradingCase {
 }
 
 model SubmissionCase {
-  id           String      @id @default(uuid()) @db.Uuid
-  submissionId String      @map("submission_id") @db.Uuid
-  position     Int
-  isSample     Boolean     @map("is_sample")
-  outcome      CaseOutcome
-  runtimeMs    Int?        @map("runtime_ms")
+  id             String             @id @default(uuid()) @db.Uuid
+  submissionId   String             @map("submission_id") @db.Uuid
+  position       Int
+  isSample       Boolean            @map("is_sample")
+  outcome        CaseOutcome
+  runtimeMs      Int?               @map("runtime_ms")
+  /// Points this case actually earned: its full weight when correct, weight
+  /// minus the soft penalty on a warning, zero otherwise. Null on legacy rows.
+  awardedWeight  Int?               @map("awarded_weight")
+  /// Whether the case ran at all. A case that was never executed must not read
+  /// as an executed wrong answer to anything downstream.
+  executionState CaseExecutionState @default(EXECUTED) @map("execution_state")
   /// Populated only for SAMPLE cases. A hidden case records an outcome and
   /// nothing else — otherwise a student could reconstruct hidden expectations
   /// by submitting probes.
-  actualOutput String?     @map("actual_output")
+  actualOutput   String?            @map("actual_output")
 
   submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 

@@ -211,6 +211,7 @@
     "outcome_detail": {
       "PENDING": "채점을 기다리고 있어요.",
       "PASSED": "출력이 일치합니다.",
+      "PASSED_WITH_WARNING": "출력은 일치했지만 이 테스트의 권장 시간을 초과하여 점수가 일부 감점되었습니다.",
       "WRONG_OUTPUT": "출력이 예상 결과와 다릅니다.",
       "RUNTIME_ERROR": "프로그램 실행 중 오류가 발생했습니다.",
       "TIME_LIMIT": "제한 시간 안에 끝나지 않았습니다.",
@@ -219,6 +220,7 @@
     },
     "outcome": {
       "PASSED": "통과",
+      "PASSED_WITH_WARNING": "통과 (경고)",
       "WRONG_OUTPUT": "출력 불일치",
       "RUNTIME_ERROR": "런타임 오류",
       "TIME_LIMIT": "시간 초과",

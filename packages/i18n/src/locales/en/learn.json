@@ -223,6 +223,7 @@
     "outcome_detail": {
       "PENDING": "Waiting for the judge.",
       "PASSED": "Your output matched.",
+      "PASSED_WITH_WARNING": "Your output matched, but the program was slower than this case's time bonus threshold, so it earned reduced points.",
       "WRONG_OUTPUT": "Your output did not match the expected result.",
       "RUNTIME_ERROR": "Your program stopped with an error.",
       "TIME_LIMIT": "Your program did not finish in time.",
@@ -231,6 +232,7 @@
     },
     "outcome": {
       "PASSED": "Passed",
+      "PASSED_WITH_WARNING": "Passed with warning",
       "WRONG_OUTPUT": "Wrong output",
       "RUNTIME_ERROR": "Runtime error",
       "TIME_LIMIT": "Time limit exceeded",

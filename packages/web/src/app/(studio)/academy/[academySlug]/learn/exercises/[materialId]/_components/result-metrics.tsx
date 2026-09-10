@@ -1,5 +1,6 @@
 'use client';
 
+import { isOutputCorrect } from '@cove/shared';
 import type { CaseCell, SubmissionResult } from '@cove/shared';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -29,7 +30,7 @@ export function ResultMetrics({
 }) {
   const { t } = useLayoutTranslation('learn');
   const passedWhileGrading = cells.filter(
-    (cell) => cell.state === 'done' && cell.outcome === 'PASSED',
+    (cell) => cell.state === 'done' && isOutputCorrect(cell.outcome),
   ).length;
   const total = result?.totalCount ?? cells.length;
   const passed = result?.passedCount ?? passedWhileGrading;

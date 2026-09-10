@@ -102,6 +102,9 @@ export function hiddenResultCount(result: SubmissionResult | null): number {
 
 export const outcomeTone: Record<CaseOutcome, 'pass' | 'fail' | 'limit' | 'idle'> = {
   PASSED: 'pass',
+  // The answer was right, so it reads as a pass; the points it earned are a
+  // separate question, and the detail line is where the penalty is explained.
+  PASSED_WITH_WARNING: 'pass',
   WRONG_OUTPUT: 'fail',
   RUNTIME_ERROR: 'fail',
   TIME_LIMIT: 'limit',

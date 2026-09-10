@@ -1,4 +1,4 @@
-import type { CaseOutcome, SubmissionStatus } from "@cove/shared";
+import { isOutputCorrect, type CaseOutcome, type SubmissionStatus } from "@cove/shared";
 
 /**
  * Pure grading decisions, kept out of the worker so they are testable without
@@ -58,7 +58,9 @@ export function submissionStatusFor(
   outcomes: ReadonlyArray<CaseOutcome>,
 ): SubmissionStatus {
   if (outcomes.length === 0) return "ERRORED";
-  return outcomes.every((outcome) => outcome === "PASSED") ? "PASSED" : "FAILED";
+  // A soft-timeout warning is a correct answer that earned fewer points, so
+  // it must not fail the run; the weighted score is where it shows up.
+  return outcomes.every(isOutputCorrect) ? "PASSED" : "FAILED";
 }
 
 /**
@@ -82,6 +84,84 @@ export function scoreRun(input: {
   return Math.round((input.passedCount / input.totalCount) * 100);
 }
 
+/**
+ * What one case earned.
+ *
+ * Correct output pays the full weight; a soft-timeout warning pays the weight
+ * less its penalty, which is the only place the two differ; everything else
+ * pays nothing. Never derived from a passed count — a run of warnings is fully
+ * correct and still worth less than full marks.
+ */
+export function awardedWeightFor(input: {
+  outcome: CaseOutcome;
+  weight: number;
+  softPenalty: number | null;
+}): number {
+  if (input.outcome === "PASSED") return input.weight;
+  if (input.outcome !== "PASSED_WITH_WARNING") return 0;
+  // Clamped rather than trusted: a penalty above the weight would pay a correct
+  // answer less than a wrong one, and validation is not the judge's job.
+  const penalty = Math.min(Math.max(input.softPenalty ?? 0, 0), input.weight);
+  return input.weight - penalty;
+}
+
+/**
+ * The 0-100 figure every existing reader still wants.
+ *
+ * `Submission.score` keeps its meaning, so `bestScore`, records, rankings and
+ * points need no migration; the weighted truth lives beside it in
+ * `earnedWeight`/`possibleWeight`. Half-up, matching `scoreRun`, so a student
+ * sees the same rounding whichever mode their exercise uses.
+ */
+export function scoreWeightedRun(input: {
+  earnedWeight: number;
+  possibleWeight: number;
+}): number {
+  if (input.possibleWeight <= 0) return 0;
+  return Math.round((input.earnedWeight / input.possibleWeight) * 100);
+}
+
+/**
+ * The material score in integer hundredths.
+ *
+ * Integer arithmetic throughout: a grade that decides a transcript should not
+ * inherit a float's rounding, and hundredths are the smallest unit anything
+ * displays.
+ */
+export function appliedScoreHundredthsFor(input: {
+  earnedWeight: number;
+  possibleWeight: number;
+  materialMaximumHundredths: number;
+  policy: "PROPORTIONAL" | "ABSOLUTE_CAP";
+}): number {
+  if (input.possibleWeight <= 0) return 0;
+  if (input.policy === "ABSOLUTE_CAP") {
+    return Math.min(input.materialMaximumHundredths, input.earnedWeight * 100);
+  }
+  const scaled =
+    (input.earnedWeight * input.materialMaximumHundredths) / input.possibleWeight;
+  return Math.round(scaled);
+}
+
+/**
+ * Whether an enhanced run must stop entirely.
+ *
+ * Deliberately none of the per-case verdicts: enhanced mode continues after a
+ * wrong answer, a crash and an individual timeout, which is what the observed
+ * Elice loop does. Only the job-level conditions end it, and an aborted run is
+ * not a grade — partial weights stay diagnostic and nothing updates best score,
+ * completion or rewards.
+ */
+export function shouldAbortEnhancedRun(input: {
+  deadlineExceeded: boolean;
+  infrastructureFailed: boolean;
+  policyRevoked: boolean;
+}): boolean {
+  return (
+    input.deadlineExceeded || input.infrastructureFailed || input.policyRevoked
+  );
+}
+
 export type GradeSummary = {
   status: SubmissionStatus;
   passedCount: number;
@@ -95,7 +175,7 @@ export function summarizeRun(
    *  exercise's case count, not the number actually executed. */
   totalCount: number = cases.length,
 ): GradeSummary {
-  const passedCount = cases.filter((item) => item.outcome === "PASSED").length;
+  const passedCount = cases.filter((item) => isOutputCorrect(item.outcome)).length;
   return {
     status: submissionStatusFor(cases.map((item) => item.outcome)),
     passedCount,

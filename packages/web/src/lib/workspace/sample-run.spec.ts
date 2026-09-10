@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createSampleInputQueue,
+  stdinActionFor,
   isSampleOutputMatch,
   normalizeSampleOutput,
   resolveSampleVerdict,
@@ -88,5 +89,35 @@ describe('resolveSampleVerdict', () => {
     expect(
       resolveSampleVerdict({ ...base, stopped: true, failed: true }),
     ).toEqual({ kind: 'skipped', reason: 'stopped' });
+  });
+});
+
+describe('stdinActionFor', () => {
+  it('feeds the next queued line while one remains', () => {
+    expect(stdinActionFor({ next: '9', hasFixedInput: true })).toEqual({
+      kind: 'line',
+      text: '9',
+    });
+  });
+
+  it('reports end of input once a sample run runs out', () => {
+    // `sys.stdin.read()` reads until EOF. Prompting instead left the run
+    // waiting on a student with nothing left to type, so a program that
+    // passed on Submit hung in the browser.
+    expect(stdinActionFor({ next: undefined, hasFixedInput: true })).toEqual({
+      kind: 'eof',
+    });
+  });
+
+  it('reports end of input for a sample whose input is empty', () => {
+    expect(
+      stdinActionFor({ next: undefined, hasFixedInput: true }),
+    ).toEqual({ kind: 'eof' });
+  });
+
+  it('still prompts a plain run, where a person is the input', () => {
+    expect(stdinActionFor({ next: undefined, hasFixedInput: false })).toEqual({
+      kind: 'prompt',
+    });
   });
 });

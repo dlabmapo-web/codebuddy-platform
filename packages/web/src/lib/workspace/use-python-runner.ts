@@ -8,7 +8,7 @@ import {
 } from '@/lib/pyodide/interactiveRunner';
 import type { PythonExecutionError } from '@/lib/pyodide/pythonError';
 
-import { createSampleInputQueue } from './sample-run';
+import { createSampleInputQueue, stdinActionFor } from './sample-run';
 import {
   appendToTranscript,
   emptyTranscript,
@@ -101,6 +101,17 @@ export function usePythonRunner(options?: {
   const failedRef = React.useRef(false);
   const errorRef = React.useRef<PythonExecutionError | null>(null);
   const queueRef = React.useRef<string[]>([]);
+  /**
+   * True when this run was given a fixed input rather than a person to ask.
+   *
+   * A sample run has exactly the input the case supplies and no more, so an
+   * exhausted queue is end-of-input and must be reported as such: without it
+   * `sys.stdin.read()` — which reads until EOF — sat waiting for a student who
+   * had nothing left to type, and the run hung where the same program passed
+   * on Submit. A plain Run still prompts, because there a person really is the
+   * input.
+   */
+  const fixedInputRef = React.useRef(false);
   const bufferRef = React.useRef<TerminalLine[]>([]);
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // The transcript as the last commit left it. Socket handlers and worker
@@ -230,10 +241,15 @@ export function usePythonRunner(options?: {
         case 'stdin': {
           // A queued sample answers automatically; otherwise the student is
           // prompted, exactly as a terminal would.
-          const next = queueRef.current.shift();
-          if (next !== undefined) {
-            append(`${next}\n`, 'in');
-            runner.provideInput(next);
+          const action = stdinActionFor({
+            next: queueRef.current.shift(),
+            hasFixedInput: fixedInputRef.current,
+          });
+          if (action.kind === 'line') {
+            append(`${action.text}\n`, 'in');
+            runner.provideInput(action.text);
+          } else if (action.kind === 'eof') {
+            runner.sendEOF();
           } else {
             setWaiting(true);
           }
@@ -306,6 +322,7 @@ export function usePythonRunner(options?: {
       queueRef.current = options?.stdin
         ? createSampleInputQueue(options.stdin)
         : [];
+      fixedInputRef.current = options?.stdin !== undefined;
       ranCodeRef.current = code;
       setLastError(null);
       const clientRunId = options?.clientRunId ?? crypto.randomUUID();

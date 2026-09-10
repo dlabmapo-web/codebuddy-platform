@@ -23,6 +23,29 @@ export function createSampleInputQueue(input: string): string[] {
   return lines;
 }
 
+/** What a run should do when Python asks for a line of input. */
+export type StdinAction =
+  | { kind: 'line'; text: string }
+  | { kind: 'eof' }
+  | { kind: 'prompt' };
+
+/**
+ * Whether an exhausted input queue means "ask the student" or "that is all".
+ *
+ * A sample run carries exactly the input its case supplies, so running out is
+ * end-of-input. Reporting it as a prompt left `sys.stdin.read()` — which reads
+ * until EOF — waiting for a student with nothing left to type, so the run hung
+ * in the browser while the same program passed on Submit. A plain Run has no
+ * fixed input and really is waiting for a person.
+ */
+export function stdinActionFor(input: {
+  next: string | undefined;
+  hasFixedInput: boolean;
+}): StdinAction {
+  if (input.next !== undefined) return { kind: 'line', text: input.next };
+  return input.hasFixedInput ? { kind: 'eof' } : { kind: 'prompt' };
+}
+
 /**
  * Trailing whitespace is invisible in the editor, so holding a student's answer
  * wrong over a missing final newline teaches nothing. Interior whitespace is

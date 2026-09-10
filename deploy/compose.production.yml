@@ -140,6 +140,17 @@ services:
   judge-worker:
     <<: *application
     image: ${JUDGE_IMAGE:?set JUDGE_IMAGE in deployment.env}
+    # This container runs untrusted student code. The runner process drops what
+    # it can reach from inside (see `lockDownHost` in pyodide-runner.ts), but a
+    # denylist in the same process as the judge is not a boundary: the runner
+    # shares this container's OS identity, filesystem and network namespace.
+    #
+    # `egress` cannot simply be removed here — the database is external
+    # (Supavisor), so the judge itself needs outbound. Separating student
+    # execution from the judge needs its own network-isolated sandbox; until
+    # then these limit the blast radius rather than closing it.
+    cap_drop:
+      - ALL
     env_file:
       - ./secrets/api.env
     environment:

@@ -10,7 +10,7 @@
   },
   "include": [
     "src/**/*.ts",
-    "../api/src/judge/pyodide-thread.ts"
+    "../api/src/judge/pyodide-runner.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

@@ -76,6 +76,8 @@ describe('studio application navigation', () => {
       canReviewApplications: true,
     })).toEqual([
       '/academy/cove-development/people',
+      '/academy/cove-development/students',
+      '/academy/cove-development/staff',
       '/academy/cove-development/applications',
       '/academy/cove-development/invitations',
     ]);

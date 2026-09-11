@@ -36,6 +36,7 @@ import type { PeopleBulkService } from "../manage/people-bulk.service.js";
 import type { PeopleImportService } from "../manage/people-import.service.js";
 import type { ManagerOverviewService } from "../manage/manager-overview.service.js";
 import type { PeopleDirectoryService } from "../manage/people-directory.service.js";
+import type { PeopleRosterService } from "../manage/people-roster.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
 import type { PlatformAcademyService } from "../platform/platform-academy.service.js";
 import type { PlatformAuditService } from "../platform/platform-audit.service.js";
@@ -101,6 +102,7 @@ export type ORPCDeps = {
   pointPolicyService: PointPolicyService;
   academyOperationsProfileService: AcademyOperationsProfileService;
   peopleDirectoryService: PeopleDirectoryService;
+  peopleRosterService: PeopleRosterService;
   peopleImportService: PeopleImportService;
   peopleBulkService: PeopleBulkService;
   invitationDeliveryService: InvitationDeliveryService;

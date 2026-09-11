@@ -10,6 +10,14 @@ import {
   listPeopleInputSchema,
   peoplePageSchema,
 } from "../../memberships/people-directory.js";
+import {
+  listStaffRosterInputSchema,
+  staffRosterPageSchema,
+} from "../../memberships/staff-roster.js";
+import {
+  listStudentRosterInputSchema,
+  studentRosterPageSchema,
+} from "../../memberships/student-roster.js";
 
 /**
  * The manager's control tower, and the directory beneath it.
@@ -40,6 +48,18 @@ export const academyOperationsProfileContract = {
     .output(academyProfileSchema),
 };
 
+/**
+ * The directory, and the two rosters cut from the same membership table.
+ *
+ * `students` and `staff` are their own procedures rather than filters on
+ * `list` because their rows differ — a student carries a guardian and classes,
+ * a staff member a title and the classes they teach — and one row shape for
+ * all three would be half empty on every page.
+ */
 export const academyPeopleContract = {
   list: oc.input(listPeopleInputSchema).output(peoplePageSchema),
+  students: oc
+    .input(listStudentRosterInputSchema)
+    .output(studentRosterPageSchema),
+  staff: oc.input(listStaffRosterInputSchema).output(staffRosterPageSchema),
 };

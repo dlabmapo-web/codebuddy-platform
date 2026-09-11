@@ -45,6 +45,7 @@ import { PeopleBulkService } from "../manage/people-bulk.service.js";
 import { PeopleImportService } from "../manage/people-import.service.js";
 import { ManagerOverviewService } from "../manage/manager-overview.service.js";
 import { PeopleDirectoryService } from "../manage/people-directory.service.js";
+import { PeopleRosterService } from "../manage/people-roster.service.js";
 import { createManageRouters } from "../manage/manage.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
 import { createMonitoringRouter } from "../monitoring/monitoring.router.js";
@@ -144,6 +145,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
       strict: false,
     }),
     peopleDirectoryService: app.get(PeopleDirectoryService, { strict: false }),
+    peopleRosterService: app.get(PeopleRosterService, { strict: false }),
     peopleImportService: app.get(PeopleImportService, { strict: false }),
     peopleBulkService: app.get(PeopleBulkService, { strict: false }),
     invitationDeliveryService: app.get(InvitationDeliveryService, {

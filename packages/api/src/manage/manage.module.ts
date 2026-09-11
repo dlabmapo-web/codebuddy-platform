@@ -20,6 +20,7 @@ import { ManagerScopeService } from "./manager-scope.service.js";
 import { PeopleBulkService } from "./people-bulk.service.js";
 import { PointPolicyService } from "./point-policy.service.js";
 import { PeopleDirectoryService } from "./people-directory.service.js";
+import { PeopleRosterService } from "./people-roster.service.js";
 import { PeopleImportController } from "./people-import.controller.js";
 import { PeopleImportService } from "./people-import.service.js";
 
@@ -60,6 +61,7 @@ import { PeopleImportService } from "./people-import.service.js";
     AcademyOperationsProfileService,
     AcademyMediaService,
     PeopleDirectoryService,
+    PeopleRosterService,
     PeopleImportService,
     PeopleBulkService,
     InvitationDeliveryService,
@@ -75,6 +77,7 @@ import { PeopleImportService } from "./people-import.service.js";
     PointPolicyService,
     AcademyOperationsProfileService,
     PeopleDirectoryService,
+    PeopleRosterService,
     PeopleImportService,
     PeopleBulkService,
     InvitationDeliveryService,

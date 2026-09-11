@@ -198,6 +198,9 @@ export const routes = {
     `${academyRoot(academySlug)}/people`,
   academyPerson: (academySlug: string, membershipId: string) =>
     `${academyRoot(academySlug)}/people/${segment(membershipId)}`,
+  academyStudents: (academySlug: string) =>
+    `${academyRoot(academySlug)}/students`,
+  academyStaff: (academySlug: string) => `${academyRoot(academySlug)}/staff`,
   academyApplications: (academySlug: string) =>
     `${academyRoot(academySlug)}/applications`,
   academyInvitations: (academySlug: string) =>

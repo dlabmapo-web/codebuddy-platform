@@ -138,6 +138,20 @@ export const peopleOpsNamespaces = [
 ] as const;
 
 /**
+ * The Students and Staff rosters.
+ *
+ * Their own namespace because `manager` is within a kilobyte of the
+ * per-namespace budget in `@cove/i18n`'s `locales.spec.ts`. `manager` rides
+ * along for the role and status labels, which must read exactly as they do on
+ * Members: one spelling of "Team lead" across the three people tables.
+ */
+export const peopleRosterNamespaces = [
+  "manager",
+  "people-rosters",
+  "errors",
+] as const;
+
+/**
  * The audit action vocabulary, on its own.
  *
  * Split out of `manager` when the two together passed the per-namespace budget
@@ -289,6 +303,7 @@ export type PageNamespace =
   | (typeof learningNamespaces)[number]
   | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
+  | (typeof peopleRosterNamespaces)[number]
   | (typeof destructiveNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof operationsNamespaces)[number]

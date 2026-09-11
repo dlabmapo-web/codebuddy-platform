@@ -27,7 +27,9 @@ async function initialize(): Promise<void> {
   pyodide = await loadPyodide({ indexURL });
   pyodide.setInterruptBuffer(interrupt);
   await pyodide.runPythonAsync(harness);
-  parentPort?.postMessage({ type: "ready" });
+  // The interpreter's own account of what it is, not a configured claim: the
+  // judge compares it with the runtime recorded on each submission.
+  parentPort?.postMessage({ type: "ready", version: pyodide.version });
 }
 
 parentPort?.on(

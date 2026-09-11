@@ -2,14 +2,66 @@ import { Injectable, Logger } from "@nestjs/common";
 
 import { PrismaService } from "../database/prisma.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
-import type { ExecutionEngine } from "./execution-engine.js";
+import type { Prisma } from "../generated/prisma/client.js";
+import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
+import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import {
+  awardedWeightFor,
   caseOutcomeFor,
+  eliceCaseDecisionFor,
   nextProgress,
   shouldStopAfter,
   summarizeRun,
+  summarizeWeightedRun,
+  type GradeSummary,
 } from "./grading.js";
+import {
+  resolveGradingProfile,
+  runtimeMismatch,
+  type ResolvedGradingProfile,
+} from "./grading-profile.js";
 import type { GradingProgress } from "./judge.queue.js";
+
+const gradingInclude = {
+  gradingCases: { orderBy: { position: "asc" } },
+  material: {
+    include: { programmingExercise: true },
+  },
+} as const satisfies Prisma.SubmissionInclude;
+
+type GradingSubmission = Prisma.SubmissionGetPayload<{
+  include: typeof gradingInclude;
+}>;
+type EliceProfile = Extract<ResolvedGradingProfile, { kind: "elice" }>;
+
+type CaseRow = {
+  position: number;
+  isSample: boolean;
+  outcome: ExecutionResult["outcome"];
+  runtimeMs: number;
+  actualOutput: string | null;
+  awardedWeight: number | null;
+  executionState: "EXECUTED" | "NOT_RUN";
+};
+
+type AbortReason = "TOTAL_DEADLINE" | "INFRASTRUCTURE_FAILURE";
+
+/**
+ * How long past the remaining total budget an engine call may take to settle.
+ * The run itself is capped at the remaining budget; this covers the forced
+ * termination and pipe drain after it, not more student time.
+ */
+const ENGINE_SETTLE_GRACE_MS = 2_500;
+
+/** Ends an enhanced run early without it becoming a grade. */
+class GradingAbort extends Error {
+  constructor(
+    readonly reason: AbortReason,
+    readonly failureReason: string,
+  ) {
+    super(failureReason);
+  }
+}
 
 /**
  * Grades one submission.
@@ -17,6 +69,12 @@ import type { GradingProgress } from "./judge.queue.js";
  * Runs only inside the judge process (see `judge.main.ts`): it is the one place
  * that loads untrusted student code, and it must never share a process with
  * request serving.
+ *
+ * Dispatch is on the profile frozen with the submission, never the exercise's
+ * current settings. Legacy submissions take exactly the path they always did;
+ * enhanced ones are judged case by case with their own comparator, weight and
+ * limits inside one total budget. Anything unrecognised is refused as a judge
+ * fault rather than graded by guesswork.
  */
 @Injectable()
 export class GradingService {
@@ -32,6 +90,12 @@ export class GradingService {
      * lookup per accepted first solve and nothing else.
      */
     private readonly points: PointAwardService,
+    /**
+     * The five comparison modes, in an interpreter that never sees submitted
+     * code. Only enhanced profiles use it; legacy comparison stays the pure
+     * function it always was.
+     */
+    private readonly comparator: OutputComparator,
   ) {}
 
   async grade(
@@ -48,15 +112,13 @@ export class GradingService {
       this.logger.debug(`submission ${submissionId} was already claimed`);
       return;
     }
+    // The total budget starts at the claim: runner startup, every case and
+    // every comparison spend it. Queue wait is not the student's time.
+    const claimedAt = Date.now();
 
     const submission = await this.prisma.submission.findUnique({
       where: { id: submissionId },
-      include: {
-        gradingCases: { orderBy: { position: "asc" } },
-        material: {
-          include: { programmingExercise: true },
-        },
-      },
+      include: gradingInclude,
     });
 
     if (!submission || submission.gradingCases.length === 0) {
@@ -64,13 +126,47 @@ export class GradingService {
       return;
     }
 
-    const results: Array<{
-      position: number;
-      isSample: boolean;
-      outcome: ReturnType<typeof caseOutcomeFor>;
-      runtimeMs: number;
-      actualOutput: string | null;
-    }> = [];
+    const profile = resolveGradingProfile(
+      submission,
+      submission.gradingCases,
+      submission.gradingMode === "LEGACY_STDIO"
+        ? undefined
+        : submission.gradingPolicySnapshot,
+    );
+    if (profile.kind === "unsupported") {
+      this.logger.error(
+        `submission ${submissionId} has an unsupported grading profile: ${profile.reason}`,
+      );
+      await this.fail(submissionId, "UNSUPPORTED_GRADING_PROFILE");
+      return;
+    }
+    if (profile.kind === "legacy") {
+      await this.gradeLegacy(submission, report);
+      return;
+    }
+    // Graded only on the runtimes it was recorded against. Checked before a
+    // single case runs, so a mismatch costs nothing but a judge error.
+    const mismatch = profile.policy
+      ? runtimeMismatch(profile.policy, {
+          engine: this.engine.version,
+          comparator: this.comparator.version,
+        })
+      : "no policy snapshot";
+    if (mismatch) {
+      this.logger.error(`submission ${submissionId} runtime mismatch: ${mismatch}`);
+      await this.fail(submissionId, "RUNTIME_VERSION_MISMATCH");
+      return;
+    }
+    await this.gradeElice(submission, profile, claimedAt, report);
+  }
+
+  /** The original path, unchanged in behaviour: equal cases, legacy rules. */
+  private async gradeLegacy(
+    submission: GradingSubmission,
+    report: (progress: GradingProgress) => Promise<void>,
+  ): Promise<void> {
+    const submissionId = submission.id;
+    const results: CaseRow[] = [];
 
     try {
       let stopped = false;
@@ -79,13 +175,7 @@ export class GradingService {
         const isSample = testCase.isSample;
 
         if (stopped) {
-          results.push({
-            position,
-            isSample,
-            outcome: "SKIPPED",
-            runtimeMs: 0,
-            actualOutput: null,
-          });
+          results.push(skipped(position, isSample));
           continue;
         }
 
@@ -110,6 +200,8 @@ export class GradingService {
           // records its outcome and nothing else, or a student could
           // reconstruct hidden expectations by submitting probes.
           actualOutput: isSample ? run.stdout.slice(0, 10_000) : null,
+          awardedWeight: null,
+          executionState: "EXECUTED",
         });
 
         await report({
@@ -132,7 +224,219 @@ export class GradingService {
       results.filter((item) => item.outcome !== "SKIPPED"),
       submission.gradingCases.length,
     );
+    await this.finalize(submission, summary, results, {});
+  }
 
+  /**
+   * Weighted grading with the five comparators.
+   *
+   * Continues past a wrong answer, a crash and an individual timeout, each
+   * case in its own fresh runner, while the total budget lasts. What ends it
+   * early is never the student's verdict: the total deadline, or a fault of
+   * ours — the runner, or a comparator that could not judge the output. Such a
+   * run is recorded as aborted, keeps its partial weights as diagnostics, and
+   * touches no best score, completion or reward.
+   */
+  private async gradeElice(
+    submission: GradingSubmission,
+    profile: EliceProfile,
+    claimedAt: number,
+    report: (progress: GradingProgress) => Promise<void>,
+  ): Promise<void> {
+    const submissionId = submission.id;
+    const deadline = claimedAt + profile.totalTimeLimitMs;
+    const results: CaseRow[] = [];
+    const cases = submission.gradingCases;
+
+    try {
+      let stopped = false;
+      for (const testCase of cases) {
+        const { position, isSample } = testCase;
+        if (stopped) {
+          results.push({ ...skipped(position, isSample), awardedWeight: 0 });
+          continue;
+        }
+
+        assertWithin(deadline);
+        const remaining = deadline - Date.now();
+        // The lesser of the case's own limit and what is left of the run's. A
+        // case cut short by the second is the run's deadline, not the
+        // student's time limit on that case.
+        const caseLimitMs = testCase.effectiveTimeLimitMs ?? submission.timeLimitMs;
+        const limit = Math.min(caseLimitMs, remaining);
+        const run = await settleWithin(
+          this.engine.run({
+            code: submission.code,
+            stdin: testCase.input,
+            timeLimitMs: limit,
+            memoryLimitMb: submission.memoryLimitMb,
+          }),
+          remaining + ENGINE_SETTLE_GRACE_MS,
+        );
+        if (run === "expired" || (run.outcome === "TIME_LIMIT" && limit < caseLimitMs)) {
+          throw new GradingAbort("TOTAL_DEADLINE", "TOTAL_DEADLINE");
+        }
+        // Waiting for a runner is not bounded by the case's limit, so a run
+        // can come back after the budget is gone. Its verdict is too late.
+        assertWithin(deadline);
+
+        let comparison: ComparisonResult | null = null;
+        if (run.outcome === "PASSED") {
+          // The deadline, not just a budget: queueing for a comparator is the
+          // run's time too, and the pool enforces the lesser of the two.
+          comparison = await this.comparator.compare({
+            comparator: testCase.comparator,
+            actual: run.stdout,
+            expected: testCase.expectedOutput,
+            budgetMs: profile.comparatorTimeLimitMs,
+            deadlineAt: deadline,
+          });
+          assertWithin(deadline);
+        }
+
+        const decision = eliceCaseDecisionFor({
+          engineOutcome: run.outcome,
+          runtimeMs: run.runtimeMs,
+          softTimeLimitMs: testCase.softTimeLimitMs,
+          comparison,
+        });
+        if (decision.kind === "deadline") {
+          throw new GradingAbort("TOTAL_DEADLINE", "TOTAL_DEADLINE");
+        }
+        if (decision.kind === "grader-fault") {
+          // Never a wrong answer: the output was not judged at all.
+          this.logger.error(
+            `grading ${submissionId} case ${position}: ${decision.fault}${
+              decision.detail ? ` (${decision.detail})` : ""
+            }`,
+          );
+          throw new GradingAbort("INFRASTRUCTURE_FAILURE", decision.fault);
+        }
+        const outcome = decision.outcome;
+        results.push({
+          position,
+          isSample,
+          outcome,
+          runtimeMs: run.runtimeMs,
+          actualOutput: isSample ? run.stdout.slice(0, 10_000) : null,
+          awardedWeight: awardedWeightFor({
+            outcome,
+            weight: testCase.weight,
+            softPenalty: testCase.softPenalty,
+          }),
+          executionState: "EXECUTED",
+        });
+
+        await report({
+          submissionId,
+          position,
+          of: cases.length,
+          outcome,
+          isSample,
+        });
+
+        if (
+          profile.continuationPolicy === "LEGACY_STOP_ON_RESOURCE" &&
+          shouldStopAfter(outcome)
+        ) {
+          stopped = true;
+        }
+      }
+      // Once more before anything is final: reporting progress also takes
+      // time, and a grade must never be recorded after its run's deadline.
+      assertWithin(deadline);
+    } catch (error) {
+      const abort =
+        error instanceof GradingAbort
+          ? error
+          : new GradingAbort("INFRASTRUCTURE_FAILURE", "ENGINE_FAILURE");
+      if (!(error instanceof GradingAbort)) {
+        this.logger.error(`grading ${submissionId} threw: ${String(error)}`);
+      }
+      await this.abort(submission, abort, results);
+      return;
+    }
+
+    const summary = summarizeWeightedRun({
+      cases: results.map((item) => ({
+        outcome: item.outcome,
+        runtimeMs: item.runtimeMs,
+        awardedWeight: item.awardedWeight ?? 0,
+      })),
+      caseWeights: cases.map((testCase) => testCase.weight),
+      materialMaximumHundredths: profile.materialMaximumHundredths,
+      materialScorePolicy: profile.materialScorePolicy,
+    });
+    await this.finalize(submission, summary, results, {
+      earnedWeight: summary.earnedWeight,
+      possibleWeight: summary.possibleWeight,
+      appliedScoreHundredths: summary.appliedScoreHundredths,
+    });
+  }
+
+  /**
+   * An enhanced run that ended without a verdict.
+   *
+   * Recorded as a judge fault — no attempt, no best score, no completion, no
+   * points — with the cases that did run kept as evidence and the rest marked
+   * as never executed, so none of them reads as a wrong answer.
+   */
+  private async abort(
+    submission: GradingSubmission,
+    abort: GradingAbort,
+    executed: CaseRow[],
+  ): Promise<void> {
+    const ran = new Set(executed.map((item) => item.position));
+    const rows = [
+      ...executed,
+      ...submission.gradingCases
+        .filter((testCase) => !ran.has(testCase.position))
+        .map((testCase) => ({
+          ...skipped(testCase.position, testCase.isSample),
+          awardedWeight: 0,
+        })),
+    ].sort((left, right) => left.position - right.position);
+    const earnedWeight = executed.reduce(
+      (total, item) => total + (item.awardedWeight ?? 0),
+      0,
+    );
+    const possibleWeight = submission.gradingCases.reduce(
+      (total, testCase) => total + testCase.weight,
+      0,
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.submission.updateMany({
+        where: { id: submission.id, status: "RUNNING" },
+        data: {
+          status: "ERRORED",
+          failureReason: abort.failureReason,
+          gradingAborted: true,
+          gradingAbortReason: abort.reason,
+          earnedWeight,
+          possibleWeight,
+          gradedAt: new Date(),
+        },
+      });
+      if (updated.count === 0) return;
+      await tx.submissionCase.createMany({
+        data: rows.map((item) => ({ submissionId: submission.id, ...item })),
+      });
+    });
+  }
+
+  /** Persists a completed verdict and the progress it implies, atomically. */
+  private async finalize(
+    submission: GradingSubmission,
+    summary: GradeSummary,
+    results: CaseRow[],
+    weighted: {
+      earnedWeight?: number;
+      possibleWeight?: number;
+      appliedScoreHundredths?: number | null;
+    },
+  ): Promise<void> {
+    const submissionId = submission.id;
     // One transaction: a verdict and the progress it implies must never be
     // observable apart.
     await this.prisma.$transaction(async (tx) => {
@@ -143,20 +447,14 @@ export class GradingService {
           passedCount: summary.passedCount,
           score: summary.score,
           runtimeMs: summary.runtimeMs,
+          ...weighted,
           gradedAt: new Date(),
         },
       });
       if (updated.count === 0) return;
 
       await tx.submissionCase.createMany({
-        data: results.map((item) => ({
-          submissionId,
-          position: item.position,
-          isSample: item.isSample,
-          outcome: item.outcome,
-          runtimeMs: item.runtimeMs,
-          actualOutput: item.actualOutput,
-        })),
+        data: results.map((item) => ({ submissionId, ...item })),
       });
 
       const materialId = submission.materialId;
@@ -273,4 +571,51 @@ export class GradingService {
     }
     return { requeue: queued.map((item) => item.id), errored: errored.count };
   }
+}
+
+/**
+ * The engine's answer, or `"expired"` once the budget is gone.
+ *
+ * A late settlement is swallowed rather than left unhandled: the engine still
+ * bounds that run by its own limit and retires its runner; the caller has
+ * simply stopped waiting for it.
+ */
+function settleWithin<T>(
+  operation: Promise<T>,
+  ms: number,
+): Promise<T | "expired"> {
+  return new Promise<T | "expired">((resolve, reject) => {
+    const timer = setTimeout(() => resolve("expired"), Math.max(0, ms));
+    timer.unref();
+    operation.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/** Aborts the run once its total budget is spent. */
+function assertWithin(deadline: number): void {
+  if (Date.now() > deadline) {
+    throw new GradingAbort("TOTAL_DEADLINE", "TOTAL_DEADLINE");
+  }
+}
+
+/** A case that never ran. Never readable as an executed wrong answer. */
+function skipped(position: number, isSample: boolean): CaseRow {
+  return {
+    position,
+    isSample,
+    outcome: "SKIPPED",
+    runtimeMs: 0,
+    actualOutput: null,
+    awardedWeight: null,
+    executionState: "NOT_RUN",
+  };
 }

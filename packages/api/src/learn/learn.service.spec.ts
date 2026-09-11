@@ -540,6 +540,8 @@ describe("getExerciseBootstrap with a selected submission", () => {
       passedCount: 1,
       totalCount: 2,
       score: 50,
+      earnedWeight: null,
+      possibleWeight: null,
       runtimeMs: 12,
       failureReason: null,
       elapsedSec: 3,

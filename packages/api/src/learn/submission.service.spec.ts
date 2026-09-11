@@ -28,12 +28,61 @@ const solveSessionId = "70000000-0000-4000-8000-000000000001";
 const classId = "80000000-0000-4000-8000-000000000001";
 const SECRET = "HIDDEN_EXPECTATION_SENTINEL";
 
+const legacyCase = {
+  comparator: "STDOUT",
+  weight: 1,
+  timeLimitMsOverride: null,
+  softTimeLimitMs: null,
+  softPenalty: null,
+  label: null,
+};
+
+const legacyProfile = {
+  gradingMode: "LEGACY_STDIO",
+  gradingSemanticVersion: "legacy-v1",
+  totalTimeLimitMs: null,
+  comparatorTimeLimitMs: null,
+  continuationPolicy: "LEGACY_STOP_ON_RESOURCE",
+  exitStatusPolicy: "FAIL_ON_RUNTIME_ERROR",
+  materialMaximumHundredths: null,
+  materialScorePolicy: null,
+};
+
+/** The fixture's material, with its exercise replaced. */
+function materialWith(exercise: Record<string, unknown>) {
+  return {
+    id: materialId,
+    title: "Sum two numbers",
+    position: 3,
+    programmingExercise: {
+      gradingRevision: 3,
+      language: "PYTHON",
+      timeLimitMs: 1_000,
+      memoryLimitMb: 256,
+      ...legacyProfile,
+      testCases: [],
+      ...exercise,
+    },
+    lecture: {
+      title: "Addition",
+      position: 2,
+      courseModule: {
+        courseId: "60000000-0000-4000-8000-000000000001",
+        title: "Basics",
+        position: 1,
+        course: { title: "Python Foundations" },
+      },
+    },
+  };
+}
+
 function createService(options?: {
   allowed?: boolean;
   material?: unknown;
   createError?: unknown;
   solveSession?: { id: string; startedAt: Date } | null;
   now?: string;
+  submission?: Record<string, unknown>;
 }) {
   const material = (options?.material ?? {
     id: materialId,
@@ -44,13 +93,15 @@ function createService(options?: {
       language: "PYTHON",
       timeLimitMs: 1_000,
       memoryLimitMb: 256,
+      ...legacyProfile,
       testCases: [
-        { position: 1, visibility: "SAMPLE", input: "1", expectedOutput: "1" },
+        { position: 1, visibility: "SAMPLE", input: "1", expectedOutput: "1", ...legacyCase },
         {
           position: 2,
           visibility: "HIDDEN",
           input: `${SECRET}_INPUT`,
           expectedOutput: `${SECRET}_OUTPUT`,
+          ...legacyCase,
         },
       ],
     },
@@ -75,6 +126,10 @@ function createService(options?: {
     passedCount: 1,
     totalCount: 2,
     score: 50,
+    gradingMode: "LEGACY_STDIO",
+    earnedWeight: null,
+    possibleWeight: null,
+    gradingAborted: false,
     runtimeMs: 12,
     failureReason: null,
     createdAt: new Date("2026-07-31T00:00:00Z"),
@@ -86,6 +141,7 @@ function createService(options?: {
         outcome: "PASSED",
         runtimeMs: 10,
         actualOutput: "1",
+        awardedWeight: null,
       },
       {
         position: 2,
@@ -93,17 +149,20 @@ function createService(options?: {
         outcome: "WRONG_OUTPUT",
         runtimeMs: 12,
         actualOutput: null,
+        awardedWeight: null,
       },
     ],
     gradingCases: [
-      { position: 1, isSample: true, input: "1", expectedOutput: "1" },
+      { position: 1, isSample: true, input: "1", expectedOutput: "1", weight: 1 },
       {
         position: 2,
         isSample: false,
         input: `${SECRET}_INPUT`,
         expectedOutput: `${SECRET}_OUTPUT`,
+        weight: 1,
       },
     ],
+    ...options?.submission,
   };
   const submissionCreate = options?.createError
     ? vi.fn().mockRejectedValue(options.createError)
@@ -460,6 +519,146 @@ describe("SubmissionService record labels", () => {
         }),
       }),
     );
+  });
+});
+
+describe("SubmissionService.submit grading snapshot", () => {
+  const weightedCases = [30, 30, 40].map((weight, index) => ({
+    position: index + 1,
+    visibility: index === 0 ? "SAMPLE" : "HIDDEN",
+    input: String(index),
+    expectedOutput: String(index),
+    ...legacyCase,
+    weight,
+    comparator: index === 2 ? "STDOUT_REGEX" : "STDOUT",
+    timeLimitMsOverride: index === 1 ? 2_500 : null,
+    softTimeLimitMs: index === 2 ? 400 : null,
+    softPenalty: index === 2 ? 10 : null,
+    label: index === 2 ? "pattern" : null,
+  }));
+  const eliceProfile = {
+    gradingMode: "ELICE_STDIO",
+    gradingSemanticVersion: "elice-v1",
+    totalTimeLimitMs: 60_000,
+    comparatorTimeLimitMs: 100,
+    continuationPolicy: "CONTINUE_WITHIN_BUDGET",
+    exitStatusPolicy: "FAIL_ON_RUNTIME_ERROR",
+    materialMaximumHundredths: 10_000,
+    materialScorePolicy: "PROPORTIONAL",
+  };
+
+  it("copies every case setting and the whole profile onto the submission", async () => {
+    // The finding: the snapshot kept input, output and visibility only, so a
+    // regrade — or the judge itself — would grade by defaults.
+    const { service, prisma } = createService({
+      material: materialWith({ ...eliceProfile, testCases: weightedCases }),
+    });
+
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
+
+    const data = (prisma.submission.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].data;
+    expect(data).toEqual(
+      expect.objectContaining({
+        ...eliceProfile,
+        gradingPolicySnapshot: expect.objectContaining({
+          version: 1,
+          semanticVersion: "elice-v1",
+          comparator: expect.objectContaining({ budgetMs: 100 }),
+          ceilings: expect.objectContaining({ totalTimeLimitMs: 60_000, caseTimeLimitMs: 1_000 }),
+        }),
+      }),
+    );
+    expect(data.gradingCases.create).toEqual([
+      expect.objectContaining({ weight: 30, comparator: "STDOUT", effectiveTimeLimitMs: 1_000 }),
+      expect.objectContaining({ weight: 30, timeLimitMsOverride: 2_500, effectiveTimeLimitMs: 2_500 }),
+      expect.objectContaining({
+        weight: 40,
+        comparator: "STDOUT_REGEX",
+        softTimeLimitMs: 400,
+        softPenalty: 10,
+        label: "pattern",
+      }),
+    ]);
+  });
+
+  it("keeps a legacy snapshot exactly as it was", async () => {
+    const { service, prisma } = createService();
+
+    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
+
+    const data = (prisma.submission.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].data;
+    expect(data.gradingMode).toBe("LEGACY_STDIO");
+    expect(data).not.toHaveProperty("gradingPolicySnapshot");
+    expect(data.gradingCases.create[0]).toEqual(
+      expect.objectContaining({ weight: 1, comparator: "STDOUT", effectiveTimeLimitMs: null }),
+    );
+  });
+
+  it("refuses to admit work no grader can judge, before any attempt is recorded", async () => {
+    const { service, prisma } = createService({
+      material: materialWith({
+        ...eliceProfile,
+        gradingSemanticVersion: "elice-v99",
+        testCases: weightedCases,
+      }),
+    });
+
+    await expect(
+      service.submit(identity, { academyId, classId, materialId, code: "print(1)" }),
+    ).rejects.toMatchObject({ code: "GRADING_UNAVAILABLE" });
+    expect(prisma.submission.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("SubmissionService.get on weighted results", () => {
+  const weighted = {
+    gradingMode: "ELICE_STDIO",
+    score: 40,
+    earnedWeight: 40,
+    possibleWeight: 100,
+    cases: [
+      { position: 1, isSample: true, outcome: "WRONG_OUTPUT", runtimeMs: 10, actualOutput: "0", awardedWeight: 0 },
+      { position: 2, isSample: false, outcome: "PASSED", runtimeMs: 12, actualOutput: null, awardedWeight: 40 },
+    ],
+    gradingCases: [
+      { position: 1, isSample: true, input: "1", expectedOutput: "1", weight: 60 },
+      { position: 2, isSample: false, input: `${SECRET}_INPUT`, expectedOutput: `${SECRET}_OUTPUT`, weight: 40 },
+    ],
+  };
+
+  it("shows the points behind the score, and what each case earned", async () => {
+    const { service } = createService({ submission: weighted });
+
+    const result = await service.get(identity, { academyId, submissionId });
+
+    expect(result).toEqual(
+      expect.objectContaining({ score: 40, earnedWeight: 40, possibleWeight: 100 }),
+    );
+    expect(result.cases.map((item) => [item.weight, item.awardedWeight])).toEqual([
+      [60, 0],
+      [40, 40],
+    ]);
+    expect(JSON.stringify(result)).not.toContain(SECRET);
+  });
+
+  it("does not present an aborted run's partial points as a score", async () => {
+    const { service } = createService({
+      submission: { ...weighted, status: "ERRORED", gradingAborted: true, score: 0 },
+    });
+
+    const result = await service.get(identity, { academyId, submissionId });
+
+    expect(result.earnedWeight).toBeNull();
+    expect(result.possibleWeight).toBeNull();
+  });
+
+  it("reports no weights at all on a legacy result", async () => {
+    const { service } = createService();
+
+    const result = await service.get(identity, { academyId, submissionId });
+
+    expect(result.earnedWeight).toBeNull();
+    expect(result.cases.every((item) => item.weight === null && item.awardedWeight === null)).toBe(true);
   });
 });
 

@@ -1,5 +1,7 @@
 import { isOutputCorrect, type CaseOutcome, type SubmissionStatus } from "@cove/shared";
 
+import type { ComparisonResult } from "./comparator-pool.js";
+
 /**
  * Pure grading decisions, kept out of the worker so they are testable without
  * a Redis, a database, or a Python runtime.
@@ -160,6 +162,129 @@ export function shouldAbortEnhancedRun(input: {
   return (
     input.deadlineExceeded || input.infrastructureFailed || input.policyRevoked
   );
+}
+
+/**
+ * Why an enhanced case could not be judged. Every one is ours — a matcher that
+ * ran out of budget, a pattern the author wrote that Python cannot compile, a
+ * comparator that failed — so none of them may become the student's verdict.
+ */
+export type GraderFault =
+  | "COMPARATOR_TIMEOUT"
+  | "COMPARATOR_INVALID_PATTERN"
+  | "COMPARATOR_FAILURE";
+
+export type EliceCaseDecision =
+  | { kind: "verdict"; outcome: CaseOutcome }
+  | { kind: "grader-fault"; fault: GraderFault; detail?: string }
+  /** The run's total budget ran out before this case could be judged. */
+  | { kind: "deadline" };
+
+/**
+ * One enhanced case, in the order §6 of the implementation spec fixes.
+ *
+ * A resource verdict or a crash stands on its own, before any comparison:
+ * runtime-error-before-comparison is kept as an explicit divergence from the
+ * observed Elice decision function until V2 establishes what the surrounding
+ * platform does with a program that prints the right thing and then fails.
+ * Otherwise the comparator decides, and the soft threshold only ever applies
+ * to output that already matched — strictly slower than the threshold, so a
+ * run that lands exactly on it keeps its full weight.
+ */
+export function eliceCaseDecisionFor(input: {
+  engineOutcome: CaseOutcome;
+  runtimeMs: number;
+  softTimeLimitMs: number | null;
+  comparison: ComparisonResult | null;
+}): EliceCaseDecision {
+  if (input.engineOutcome !== "PASSED") {
+    return { kind: "verdict", outcome: input.engineOutcome };
+  }
+  const comparison = input.comparison;
+  if (!comparison) {
+    return { kind: "grader-fault", fault: "COMPARATOR_FAILURE" };
+  }
+  switch (comparison.kind) {
+    case "no-match":
+      return { kind: "verdict", outcome: "WRONG_OUTPUT" };
+    case "match":
+      return {
+        kind: "verdict",
+        outcome:
+          input.softTimeLimitMs !== null && input.runtimeMs > input.softTimeLimitMs
+            ? "PASSED_WITH_WARNING"
+            : "PASSED",
+      };
+    case "timeout":
+      return { kind: "grader-fault", fault: "COMPARATOR_TIMEOUT" };
+    case "deadline":
+      return { kind: "deadline" };
+    case "invalid-pattern":
+      return {
+        kind: "grader-fault",
+        fault: "COMPARATOR_INVALID_PATTERN",
+        detail: comparison.detail,
+      };
+    case "error":
+      return {
+        kind: "grader-fault",
+        fault: "COMPARATOR_FAILURE",
+        detail: comparison.detail,
+      };
+  }
+}
+
+export type WeightedGradeSummary = GradeSummary & {
+  earnedWeight: number;
+  possibleWeight: number;
+  appliedScoreHundredths: number | null;
+};
+
+/**
+ * The verdict of a completed enhanced run.
+ *
+ * Status, passed count and runtime come from the same function the legacy
+ * path uses, so "did this run pass" means one thing everywhere. Only the score
+ * differs: it is earned weight over possible weight, where possible weight is
+ * every case's — a case that never ran contributes its weight to the
+ * denominator and nothing to the numerator, exactly as a legacy skip counts
+ * against the case total.
+ */
+export function summarizeWeightedRun(input: {
+  cases: ReadonlyArray<{
+    outcome: CaseOutcome;
+    runtimeMs: number;
+    awardedWeight: number;
+  }>;
+  caseWeights: ReadonlyArray<number>;
+  materialMaximumHundredths: number | null;
+  materialScorePolicy: "PROPORTIONAL" | "ABSOLUTE_CAP" | null;
+}): WeightedGradeSummary {
+  const executed = input.cases.filter((item) => item.outcome !== "SKIPPED");
+  const base = summarizeRun(executed, input.caseWeights.length);
+  const earnedWeight = input.cases.reduce(
+    (total, item) => total + item.awardedWeight,
+    0,
+  );
+  const possibleWeight = input.caseWeights.reduce(
+    (total, weight) => total + weight,
+    0,
+  );
+  return {
+    ...base,
+    score: scoreWeightedRun({ earnedWeight, possibleWeight }),
+    earnedWeight,
+    possibleWeight,
+    appliedScoreHundredths:
+      input.materialMaximumHundredths !== null && input.materialScorePolicy !== null
+        ? appliedScoreHundredthsFor({
+            earnedWeight,
+            possibleWeight,
+            materialMaximumHundredths: input.materialMaximumHundredths,
+            policy: input.materialScorePolicy,
+          })
+        : null,
+  };
 }
 
 export type GradeSummary = {

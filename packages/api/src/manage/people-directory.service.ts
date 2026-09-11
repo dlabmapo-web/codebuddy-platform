@@ -20,6 +20,7 @@ import {
 import { ProfileMediaService } from "../profile/profile-media.service.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { ManagerScopeService } from "./manager-scope.service.js";
+import { peopleWhere } from "./people-where.js";
 
 /**
  * The academy's people, one page at a time.
@@ -75,13 +76,22 @@ export class PeopleDirectoryService {
       statuses: [],
     });
 
-    const [total, roleFacets, statusFacets, academy] = await Promise.all([
+    const [total, roleCounts, statusFacets, academy] = await Promise.all([
       this.prisma.academyMembership.count({ where }),
-      this.prisma.academyMembership.groupBy({
-        by: ["role"],
-        where: searchWhere,
-        _count: { _all: true },
-      }),
+      // One count per role rather than a `groupBy` on the column: the column
+      // is the primary role only, and the count beside "Teacher" has to include
+      // the manager who also teaches, because the filter it predicts does.
+      Promise.all(
+        academyRoles.map((role) =>
+          this.prisma.academyMembership.count({
+            where: this.buildWhere(actor.academyId, {
+              ...input,
+              roles: [role],
+              statuses: [],
+            }),
+          }),
+        ),
+      ),
       this.prisma.academyMembership.groupBy({
         by: ["status"],
         where: searchWhere,
@@ -179,10 +189,9 @@ export class PeopleDirectoryService {
         // Every value in the vocabulary, including the ones nobody currently
         // holds. A filter that appears only once it would return something is a
         // filter a manager cannot use to confirm an academy has no team leads.
-        roles: academyRoles.map((value) => ({
+        roles: academyRoles.map((value, index) => ({
           value,
-          count:
-            roleFacets.find((row) => row.role === value)?._count._all ?? 0,
+          count: roleCounts[index] ?? 0,
         })),
         statuses: membershipStatuses.map((value) => ({
           value,
@@ -199,40 +208,15 @@ export class PeopleDirectoryService {
    *
    * Built once rather than twice so a page and its total cannot describe
    * different sets — which is what makes "1 of 4 pages" trustworthy enough to
-   * act on.
-   *
-   * Search is case-insensitive `contains` over the name and the email, and
-   * covers the academy override as well as the account name: a manager looking
-   * for the student they renamed "Minji (Wed)" must find them by what this
-   * academy calls them.
+   * act on. The predicate itself is `peopleWhere`, shared with the bulk
+   * selection and the rosters; see there for why a role matches when it is
+   * held rather than only when it is primary.
    */
   private buildWhere(
     academyId: string,
-    input: ListPeopleInput,
+    input: Pick<ListPeopleInput, "search" | "roles" | "statuses">,
   ): Prisma.AcademyMembershipWhereInput {
-    const search = input.search.trim();
-    return {
-      academyId,
-      // `LEFT` memberships are history rather than people. §10's directory is
-      // who is in this academy; a member who left appears in the audit trail.
-      status: input.statuses.length > 0 ? { in: input.statuses } : { not: "LEFT" },
-      ...(input.roles.length > 0 ? { role: { in: input.roles } } : {}),
-      user: { status: { not: "DELETED" } },
-      ...(search
-        ? {
-            OR: [
-              { user: { displayName: { contains: search, mode: "insensitive" } } },
-              { user: { username: { contains: search, mode: "insensitive" } } },
-              { user: { email: { contains: search, mode: "insensitive" } } },
-              {
-                memberProfile: {
-                  academyDisplayName: { contains: search, mode: "insensitive" },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
+    return peopleWhere(academyId, input);
   }
 }
 

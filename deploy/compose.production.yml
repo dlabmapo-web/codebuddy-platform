@@ -140,15 +140,11 @@ services:
   judge-worker:
     <<: *application
     image: ${JUDGE_IMAGE:?set JUDGE_IMAGE in deployment.env}
-    # This container runs untrusted student code. The runner process drops what
-    # it can reach from inside (see `lockDownHost` in pyodide-runner.ts), but a
-    # denylist in the same process as the judge is not a boundary: the runner
-    # shares this container's OS identity, filesystem and network namespace.
-    #
-    # `egress` cannot simply be removed here — the database is external
-    # (Supavisor), so the judge itself needs outbound. Separating student
-    # execution from the judge needs its own network-isolated sandbox; until
-    # then these limit the blast radius rather than closing it.
+    # Holds the database and Redis credentials and needs `egress` to reach the
+    # external database, so it runs no student code at all: every case goes
+    # over the socket below to `judge-sandbox`. The judge refuses to start in
+    # production without it, and refuses a sandbox that did not verify its own
+    # isolation. It still runs the output comparators, which never see code.
     cap_drop:
       - ALL
     env_file:
@@ -158,14 +154,20 @@ services:
       NODE_OPTIONS: --max-old-space-size=512
       JUDGE_HEALTH_PORT: 4101
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      JUDGE_SANDBOX_SOCKET: /run/cove-sandbox/judge.sock
+      PYODIDE_VERSION: ${PYODIDE_VERSION:-0.27.5}
     networks:
       - backend
       - egress
+    volumes:
+      - judge_sandbox_socket:/run/cove-sandbox:ro
     depends_on:
       redis:
         condition: service_healthy
+      judge-sandbox:
+        condition: service_healthy
     tmpfs:
-      - /tmp:rw,nosuid,size=512m,uid=1001,gid=1001
+      - /tmp:rw,noexec,nosuid,size=128m,uid=1001,gid=1001
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4101/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -173,9 +175,74 @@ services:
       retries: 5
       start_period: 120s
     stop_grace_period: 10m
-    mem_limit: 2g
-    cpus: 2.00
-    pids_limit: 512
+    # Comparator interpreters and the judge itself; the runners live next door.
+    mem_limit: 768m
+    cpus: 0.75
+    pids_limit: 256
+
+  # The only place student code runs. Same image as the judge, different entry
+  # point, and none of what the judge holds:
+  #
+  # - `network_mode: none`: no interface but loopback. The sandbox checks this
+  #   itself at boot and refuses to serve if it can see a network.
+  # - no `env_file`: no database, Redis or any other secret. Also checked at
+  #   boot, by name.
+  # - its own filesystem, read-only, with a small noexec tmpfs.
+  # - root inside the container with every capability dropped except the
+  #   three it needs to give each runner a uid of its own (SETUID, SETGID) and
+  #   to end runners that are not its uid (KILL). A runner has no capabilities
+  #   at all and cannot signal, trace or read the private /proc files of the
+  #   server or of another student's runner; a uid is swept before reuse.
+  # - its own memory, CPU and pid ceilings, so a runaway is contained here and
+  #   not in the judge.
+  #
+  # The judge reaches it only through the socket in `judge_sandbox_socket`,
+  # which is mode 0660 in the judge's group; runner uids cannot connect to it.
+  judge-sandbox:
+    image: ${JUDGE_IMAGE:?set JUDGE_IMAGE in deployment.env}
+    restart: unless-stopped
+    init: true
+    user: "0:0"
+    command: ["node", "dist/api/src/judge/sandbox.main.js"]
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - KILL
+    environment:
+      NODE_ENV: production
+      PYODIDE_VERSION: ${PYODIDE_VERSION:-0.27.5}
+      SANDBOX_REQUIRE_ISOLATION: "1"
+      SANDBOX_SOCKET_PATH: /run/cove-sandbox/judge.sock
+      SANDBOX_CLIENT_GID: "1001"
+      SANDBOX_RUNNER_UID_BASE: "20000"
+      SANDBOX_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      SANDBOX_SPARE: "1"
+    volumes:
+      - judge_sandbox_socket:/run/cove-sandbox
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('net').createConnection('/run/cove-sandbox/judge.sock');s.on('connect',()=>s.write(JSON.stringify({type:'health',id:require('crypto').randomUUID()})+'\\n'));s.on('data',d=>process.exit(/\"isolated\":true/.test(d)?0:1));s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),4000)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 30s
+    # ~170 MB per warm runner, (concurrency + spare) of them, plus the server.
+    mem_limit: 1280m
+    cpus: 1.50
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
 
   redis:
     image: redis:8.0.3-alpine
@@ -437,6 +504,8 @@ secrets:
     file: ./secrets/redis-password
 
 volumes:
+  # The judge ↔ sandbox socket, and nothing else.
+  judge_sandbox_socket:
   caddy_data:
   caddy_config:
   caddy_logs:

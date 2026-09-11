@@ -1,18 +1,29 @@
 import { Eye, EyeOff, ListChecks, Plus, Trash2 } from 'lucide-react';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
+
+import {
+  caseComparators,
+  defaultExerciseTimeLimitMs,
+  type CaseComparator,
+  type ExerciseGradingProfile,
+  type GradingIssue,
+} from '@cove/shared';
 
 import {
   newClientKey,
+  newTestCaseDraft,
   replaceAt,
   type TestCaseDraft,
 } from '../_lib/exercise-draft';
 import {
+  Field,
+  inputClass,
   secondaryButtonClass,
   SectionCard,
   TextAreaField,
 } from './authoring-fields';
+import { GradingSettings, parseSeconds } from './grading-settings';
 
 /** Mirrors the 50-case ceiling enforced by exerciseDraftFieldsSchema. */
 const MAX_TEST_CASES = 50;
@@ -21,14 +32,21 @@ export function AnswersEditor({
   editable,
   error,
   testCases,
+  grading,
+  gradingIssues,
   update,
+  updateGrading,
 }: {
   editable: boolean;
   error?: string | null;
   testCases: TestCaseDraft[];
+  grading: ExerciseGradingProfile;
+  gradingIssues: GradingIssue[];
   update: (testCases: TestCaseDraft[]) => void;
+  updateGrading: (grading: ExerciseGradingProfile, testCases: TestCaseDraft[]) => void;
 }) {
   const { t } = useTranslation('content');
+  const weighted = grading.mode === 'ELICE_STDIO';
 
   return (
     <SectionCard
@@ -38,15 +56,7 @@ export function AnswersEditor({
             className={`${secondaryButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
             disabled={testCases.length >= MAX_TEST_CASES}
             onClick={() =>
-              update([
-                ...testCases,
-                {
-                  key: newClientKey(),
-                  input: '',
-                  expectedOutput: '',
-                  visibility: 'HIDDEN',
-                },
-              ])
+              update([...testCases, newTestCaseDraft(newClientKey(), 'HIDDEN')])
             }
             type="button"
           >
@@ -59,6 +69,14 @@ export function AnswersEditor({
       icon={ListChecks}
       title={t('exercise.section.tests')}
     >
+      <GradingSettings
+        editable={editable}
+        grading={grading}
+        issues={gradingIssues}
+        onChange={updateGrading}
+        testCases={testCases}
+      />
+
       {error ? (
         <p className="rounded-lg bg-danger/5 px-3.5 py-2.5 text-[13.5px] font-semibold text-danger">
           {error}
@@ -81,6 +99,11 @@ export function AnswersEditor({
               <div className="flex items-center gap-2.5">
                 <h3 className="text-[14.5px] font-bold">
                   {t('exercise.test.label', { number: index + 1 })}
+                  {weighted && testCase.label.trim() ? (
+                    <span className="ml-1.5 font-semibold text-sub">
+                      · {testCase.label.trim()}
+                    </span>
+                  ) : null}
                 </h3>
                 <button
                   aria-pressed={isSample}
@@ -147,7 +170,7 @@ export function AnswersEditor({
               <TextAreaField
                 dark
                 disabled={!editable}
-                label={t('exercise.test.expected')}
+                label={t(expectedLabelKey(testCase.comparator))}
                 onChange={(expectedOutput) =>
                   update(
                     replaceAt(testCases, index, {
@@ -159,10 +182,144 @@ export function AnswersEditor({
                 value={testCase.expectedOutput}
               />
             </div>
+            {weighted ? (
+              <CaseGrading
+                editable={editable}
+                onChange={(next) => update(replaceAt(testCases, index, next))}
+                testCase={testCase}
+              />
+            ) : null}
           </article>
           );
         })}
       </div>
     </SectionCard>
+  );
+}
+
+function expectedLabelKey(comparator: CaseComparator) {
+  switch (comparator) {
+    case 'STDOUT':
+      return 'exercise.test.expected' as const;
+    case 'STDOUT_MATCH':
+    case 'STDOUT_NOMATCH':
+      return 'exercise.grading.expected_text' as const;
+    case 'STDOUT_REGEX':
+    case 'STDOUT_REGEX_NOMATCH':
+      return 'exercise.grading.expected_pattern' as const;
+  }
+}
+
+/** One answer's weighted-grading settings: rule, points, label, limits. */
+function CaseGrading({
+  editable,
+  testCase,
+  onChange,
+}: {
+  editable: boolean;
+  testCase: TestCaseDraft;
+  onChange: (testCase: TestCaseDraft) => void;
+}) {
+  const { t } = useTranslation('content');
+  const seconds = (ms: number | null) => (ms === null ? '' : ms / 1000);
+  const whole = (value: string) => {
+    if (value.trim() === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
+  };
+  const usesPattern =
+    testCase.comparator === 'STDOUT_REGEX' ||
+    testCase.comparator === 'STDOUT_REGEX_NOMATCH';
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4">
+      <div className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr]">
+        <Field label={t('exercise.grading.comparator')}>
+          <select
+            className={inputClass}
+            disabled={!editable}
+            onChange={(event) =>
+              onChange({ ...testCase, comparator: event.target.value as CaseComparator })
+            }
+            value={testCase.comparator}
+          >
+            {caseComparators.map((comparator) => (
+              <option key={comparator} value={comparator}>
+                {t(`exercise.grading.comparator_${comparator}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('exercise.grading.points')}>
+          <input
+            className={inputClass}
+            disabled={!editable}
+            min={0}
+            onChange={(event) => onChange({ ...testCase, weight: whole(event.target.value) ?? 0 })}
+            step={1}
+            type="number"
+            value={testCase.weight}
+          />
+        </Field>
+        <Field label={t('exercise.grading.case_label')}>
+          <input
+            className={inputClass}
+            disabled={!editable}
+            maxLength={200}
+            onChange={(event) => onChange({ ...testCase, label: event.target.value })}
+            value={testCase.label}
+          />
+        </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label={t('exercise.grading.time_limit')}>
+          <input
+            className={inputClass}
+            disabled={!editable}
+            min={0.1}
+            onChange={(event) =>
+              onChange({ ...testCase, timeLimitMsOverride: parseSeconds(event.target.value) })
+            }
+            placeholder={t('exercise.grading.time_limit_placeholder', {
+              seconds: defaultExerciseTimeLimitMs / 1000,
+            })}
+            step={0.1}
+            type="number"
+            value={seconds(testCase.timeLimitMsOverride)}
+          />
+        </Field>
+        <Field label={t('exercise.grading.soft_limit')}>
+          <input
+            className={inputClass}
+            disabled={!editable}
+            min={0.001}
+            onChange={(event) =>
+              onChange({ ...testCase, softTimeLimitMs: parseSeconds(event.target.value) })
+            }
+            step={0.1}
+            type="number"
+            value={seconds(testCase.softTimeLimitMs)}
+          />
+        </Field>
+        <Field label={t('exercise.grading.soft_penalty')}>
+          <input
+            className={inputClass}
+            disabled={!editable}
+            min={0}
+            onChange={(event) =>
+              onChange({ ...testCase, softPenalty: whole(event.target.value) })
+            }
+            step={1}
+            type="number"
+            value={testCase.softPenalty ?? ''}
+          />
+        </Field>
+      </div>
+      {usesPattern ? (
+        <p className="text-[13px] leading-[1.5] text-sub">
+          {t('exercise.grading.regex_checked_on_submit')}
+        </p>
+      ) : null}
+    </div>
   );
 }

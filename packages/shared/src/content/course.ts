@@ -18,6 +18,63 @@ export const testCaseVisibilities = ["SAMPLE", "HIDDEN"] as const;
 export const testCaseVisibilitySchema = z.enum(testCaseVisibilities);
 export type TestCaseVisibility = z.infer<typeof testCaseVisibilitySchema>;
 
+/**
+ * The five ways a case's output can be judged.
+ *
+ * Named for Elice's generated identifiers so an imported grader maps one to
+ * one. `STDOUT` is the normalized equality every case used before this, and
+ * stays the default so existing content is unaffected.
+ */
+export const caseComparators = [
+  "STDOUT",
+  "STDOUT_MATCH",
+  "STDOUT_NOMATCH",
+  "STDOUT_REGEX",
+  "STDOUT_REGEX_NOMATCH",
+] as const;
+export const caseComparatorSchema = z.enum(caseComparators);
+export type CaseComparator = z.infer<typeof caseComparatorSchema>;
+
+export const gradingProfileModes = ["LEGACY_STDIO", "ELICE_STDIO"] as const;
+export const programmingExerciseGradingModeSchema = z.enum(gradingProfileModes);
+export type GradingProfileMode = z.infer<
+  typeof programmingExerciseGradingModeSchema
+>;
+
+/**
+ * Comparison and scoring semantics, by version.
+ *
+ * Dispatch reads the version stored with the exercise or submission, never a
+ * constant in source: a submission graded under `legacy-v1` must keep being
+ * graded that way after a newer version ships, or a regrade would rescore
+ * historical work under rules it was never judged by. An unknown version is a
+ * configuration error, not a wrong answer — fail closed.
+ */
+export const gradingSemanticVersions = ["legacy-v1", "elice-v1"] as const;
+export const gradingSemanticVersionSchema = z.enum(gradingSemanticVersions);
+export type GradingSemanticVersion = z.infer<
+  typeof gradingSemanticVersionSchema
+>;
+
+/** The version new enhanced profiles are authored at. Never used for reading. */
+export const currentEliceSemanticVersion: GradingSemanticVersion = "elice-v1";
+
+/** The version a mode is authored at. Reading always uses the stored value. */
+export function semanticVersionForMode(
+  mode: GradingProfileMode,
+): GradingSemanticVersion {
+  return mode === "ELICE_STDIO" ? currentEliceSemanticVersion : "legacy-v1";
+}
+
+/**
+ * How earned weight becomes the material's score. `PROPORTIONAL` is Cove's
+ * policy for new profiles, not verified Elice Relative behaviour (V1);
+ * `ABSOLUTE_CAP` is Elice's Absolute grade, `min(maximum, earned)`.
+ */
+export const materialScorePolicies = ["PROPORTIONAL", "ABSOLUTE_CAP"] as const;
+export const materialScorePolicySchema = z.enum(materialScorePolicies);
+export type MaterialScorePolicy = z.infer<typeof materialScorePolicySchema>;
+
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(10_000);
 export const programmingExerciseDescriptionMaxLength = 500_000;
@@ -72,6 +129,16 @@ export const exerciseTestCaseSchema = z.object({
   input: z.string(),
   expectedOutput: z.string(),
   visibility: testCaseVisibilitySchema,
+  /**
+   * Read back so the editor writes back exactly what is stored. An editor
+   * that did not know these fields would save every case at weight 1.
+   */
+  comparator: caseComparatorSchema,
+  weight: z.number().int().nonnegative(),
+  timeLimitMsOverride: z.number().int().positive().nullable(),
+  softTimeLimitMs: z.number().int().positive().nullable(),
+  softPenalty: z.number().int().nonnegative().nullable(),
+  label: z.string().nullable(),
 });
 
 export const exerciseHintSchema = z.object({
@@ -96,6 +163,16 @@ export const programmingExerciseSchema = z.object({
   memoryLimitMb: z.number().int().min(16).max(4_096),
   aiFeedbackEnabled: z.boolean(),
   gradingRevision: z.number().int().positive(),
+  /** The stored profile, including the semantic version it was authored at. */
+  grading: z.object({
+    mode: programmingExerciseGradingModeSchema,
+    /** A string, not the registry enum: a stored version is reported as is. */
+    semanticVersion: z.string(),
+    totalTimeLimitMs: z.number().int().positive().nullable(),
+    comparatorTimeLimitMs: z.number().int().positive().nullable(),
+    materialMaximumHundredths: z.number().int().positive().nullable(),
+    materialScorePolicy: materialScorePolicySchema.nullable(),
+  }),
   updatedAt: z.iso.datetime(),
   testCases: z.array(exerciseTestCaseSchema),
   hints: z.array(exerciseHintSchema),
@@ -231,63 +308,98 @@ export const reorderLecturesSchema = courseIdInputSchema.extend({
 });
 
 /**
- * The five ways a case's output can be judged.
- *
- * Named for Elice's generated identifiers so an imported grader maps one to
- * one. `STDOUT` is the normalized equality every case used before this, and
- * stays the default so existing content is unaffected.
+ * The per-case limit every authored exercise runs at. Exercise-level limits
+ * are not editable yet; a case override is the only way to change one.
  */
-export const caseComparators = [
-  "STDOUT",
-  "STDOUT_MATCH",
-  "STDOUT_NOMATCH",
-  "STDOUT_REGEX",
-  "STDOUT_REGEX_NOMATCH",
-] as const;
-export const caseComparatorSchema = z.enum(caseComparators);
-export type CaseComparator = z.infer<typeof caseComparatorSchema>;
-
-export const gradingProfileModes = ["LEGACY_STDIO", "ELICE_STDIO"] as const;
-export const programmingExerciseGradingModeSchema = z.enum(gradingProfileModes);
-export type GradingProfileMode = z.infer<
-  typeof programmingExerciseGradingModeSchema
->;
+export const defaultExerciseTimeLimitMs = 3_000;
 
 /**
- * Comparison and scoring semantics, by version.
+ * Server-enforced ceilings on an enhanced profile.
  *
- * Dispatch reads the version stored with the exercise or submission, never a
- * constant in source: a submission graded under `legacy-v1` must keep being
- * graded that way after a newer version ships, or a regrade would rescore
- * historical work under rules it was never judged by. An unknown version is a
- * configuration error, not a wrong answer — fail closed.
+ * The total stays well under the judge's ten-minute stale sweep, or a long but
+ * legitimate run would be reported lost while it was still grading.
  */
-export const gradingSemanticVersions = ["legacy-v1", "elice-v1"] as const;
-export const gradingSemanticVersionSchema = z.enum(gradingSemanticVersions);
-export type GradingSemanticVersion = z.infer<
-  typeof gradingSemanticVersionSchema
->;
+export const gradingProfileBounds = {
+  totalTimeLimitMs: { min: 1_000, max: 300_000, default: 60_000 },
+  comparatorTimeLimitMs: { min: 10, max: 2_000, default: 100 },
+  /** Material points in hundredths: 0.01 to 1,000.00. */
+  materialMaximumHundredths: { min: 1, max: 100_000, default: 10_000 },
+} as const;
 
-/** The version new enhanced profiles are authored at. Never used for reading. */
-export const currentEliceSemanticVersion: GradingSemanticVersion = "elice-v1";
+/**
+ * The exercise-level half of a grading profile, as an author writes it.
+ *
+ * Every field is stated on every write, never defaulted: a client that did
+ * not know about weighted grading would otherwise save an enhanced exercise
+ * back to legacy, and its weights with it, without anyone having chosen that.
+ */
+export const exerciseGradingProfileSchema = z.object({
+  mode: programmingExerciseGradingModeSchema,
+  totalTimeLimitMs: z
+    .number()
+    .int()
+    .min(gradingProfileBounds.totalTimeLimitMs.min)
+    .max(gradingProfileBounds.totalTimeLimitMs.max)
+    .nullable(),
+  comparatorTimeLimitMs: z
+    .number()
+    .int()
+    .min(gradingProfileBounds.comparatorTimeLimitMs.min)
+    .max(gradingProfileBounds.comparatorTimeLimitMs.max)
+    .nullable(),
+  materialMaximumHundredths: z
+    .number()
+    .int()
+    .min(gradingProfileBounds.materialMaximumHundredths.min)
+    .max(gradingProfileBounds.materialMaximumHundredths.max)
+    .nullable(),
+  materialScorePolicy: materialScorePolicySchema.nullable(),
+});
+export type ExerciseGradingProfile = z.infer<typeof exerciseGradingProfileSchema>;
+
+export const legacyGradingProfile: ExerciseGradingProfile = {
+  mode: "LEGACY_STDIO",
+  totalTimeLimitMs: null,
+  comparatorTimeLimitMs: null,
+  materialMaximumHundredths: null,
+  materialScorePolicy: null,
+};
+
+export const defaultEliceGradingProfile: ExerciseGradingProfile = {
+  mode: "ELICE_STDIO",
+  totalTimeLimitMs: gradingProfileBounds.totalTimeLimitMs.default,
+  comparatorTimeLimitMs: gradingProfileBounds.comparatorTimeLimitMs.default,
+  materialMaximumHundredths: gradingProfileBounds.materialMaximumHundredths.default,
+  materialScorePolicy: "PROPORTIONAL",
+};
+
+/** A case exactly as legacy grading understands it. */
+export const legacyCaseGrading = {
+  comparator: "STDOUT",
+  weight: 1,
+  timeLimitMsOverride: null,
+  softTimeLimitMs: null,
+  softPenalty: null,
+} as const;
 
 export const exerciseTestCaseDraftSchema = z
   .object({
     input: z.string().max(100_000),
     expectedOutput: z.string().max(100_000),
     visibility: testCaseVisibilitySchema,
-    comparator: caseComparatorSchema.default("STDOUT"),
+    /** Required for the same reason as the profile: never silently reset. */
+    comparator: caseComparatorSchema,
     /**
      * Points this case contributes. Equal weights reproduce the old
      * equal-percentage scoring exactly. Zero is allowed, for a case that
      * demonstrates something without being worth anything.
      */
-    weight: z.number().int().min(0).max(10_000).default(1),
-    timeLimitMsOverride: z.number().int().min(100).max(60_000).nullable().default(null),
+    weight: z.number().int().min(0).max(10_000),
+    timeLimitMsOverride: z.number().int().min(100).max(60_000).nullable(),
     /** Paired with `softPenalty`; see the refinement below. */
-    softTimeLimitMs: z.number().int().min(1).max(60_000).nullable().default(null),
-    softPenalty: z.number().int().min(0).max(10_000).nullable().default(null),
-    label: z.string().trim().max(200).nullable().default(null),
+    softTimeLimitMs: z.number().int().min(1).max(60_000).nullable(),
+    softPenalty: z.number().int().min(0).max(10_000).nullable(),
+    label: z.string().trim().max(200).nullable(),
   })
   .refine(
     (value) =>
@@ -323,6 +435,138 @@ export const exerciseHintDraftSchema = z.object({
   triggerExpression: z.string().trim().max(2_000).nullable(),
 });
 
+export type ExerciseTestCaseDraft = z.infer<typeof exerciseTestCaseDraftSchema>;
+
+export const gradingIssueCodes = [
+  "needs_weighted_grading",
+  "needs_setting",
+  "no_points",
+  "soft_limit_not_below_hard",
+  "case_limit_exceeds_total",
+  "empty_negative_rule",
+] as const;
+export type GradingIssueCode = (typeof gradingIssueCodes)[number];
+
+/** A code for the editor to translate, a message for everyone else. */
+export type GradingIssue = {
+  code: GradingIssueCode;
+  path: Array<string | number>;
+  message: string;
+};
+
+/**
+ * What a grading profile and its cases may not say together.
+ *
+ * Shared by the editor and the server, so an author sees the refusal before
+ * saving and a client that skips the editor is refused all the same. Legacy
+ * grading has no way to honour a comparator, a weight or a limit, so a legacy
+ * exercise carrying one is rejected rather than saved with the setting quietly
+ * ignored — that silent loss is exactly what this exists to prevent.
+ *
+ * `timeLimitMs` is the exercise's own per-case limit; the server passes the
+ * stored value, the editor the authoring default.
+ */
+export function gradingProfileIssues(input: {
+  grading: ExerciseGradingProfile;
+  testCases: ReadonlyArray<ExerciseTestCaseDraft>;
+  timeLimitMs?: number;
+}): GradingIssue[] {
+  const issues: GradingIssue[] = [];
+  const { grading, testCases } = input;
+  const exerciseLimit = input.timeLimitMs ?? defaultExerciseTimeLimitMs;
+
+  if (grading.mode === "LEGACY_STDIO") {
+    const profileFields = [
+      "totalTimeLimitMs",
+      "comparatorTimeLimitMs",
+      "materialMaximumHundredths",
+      "materialScorePolicy",
+    ] as const;
+    for (const field of profileFields) {
+      if (grading[field] !== null) {
+        issues.push({
+          code: "needs_weighted_grading",
+          path: ["grading", field],
+          message: "This setting needs weighted grading.",
+        });
+      }
+    }
+    testCases.forEach((testCase, index) => {
+      for (const field of Object.keys(legacyCaseGrading) as Array<
+        keyof typeof legacyCaseGrading
+      >) {
+        if (testCase[field] !== legacyCaseGrading[field]) {
+          issues.push({
+            code: "needs_weighted_grading",
+            path: ["testCases", index, field],
+            message:
+              "Standard grading scores every case equally by exact output. Switch to weighted grading to use this setting.",
+          });
+        }
+      }
+    });
+    return issues;
+  }
+
+  const required = [
+    "totalTimeLimitMs",
+    "comparatorTimeLimitMs",
+    "materialMaximumHundredths",
+    "materialScorePolicy",
+  ] as const;
+  for (const field of required) {
+    if (grading[field] === null) {
+      issues.push({
+        code: "needs_setting",
+        path: ["grading", field],
+        message: "Weighted grading needs this setting.",
+      });
+    }
+  }
+  if (
+    testCases.length > 0 &&
+    testCases.reduce((total, testCase) => total + testCase.weight, 0) <= 0
+  ) {
+    // An automatically scored profile worth nothing cannot produce a score.
+    issues.push({
+      code: "no_points",
+      path: ["testCases"],
+      message: "At least one case must be worth points.",
+    });
+  }
+  testCases.forEach((testCase, index) => {
+    const hardLimit = testCase.timeLimitMsOverride ?? exerciseLimit;
+    if (testCase.softTimeLimitMs !== null && testCase.softTimeLimitMs >= hardLimit) {
+      issues.push({
+        code: "soft_limit_not_below_hard",
+        path: ["testCases", index, "softTimeLimitMs"],
+        message: "A soft time limit must be below the case's hard limit.",
+      });
+    }
+    if (grading.totalTimeLimitMs !== null && hardLimit > grading.totalTimeLimitMs) {
+      issues.push({
+        code: "case_limit_exceeds_total",
+        path: ["testCases", index, "timeLimitMsOverride"],
+        message: "A case's time limit cannot exceed the whole run's.",
+      });
+    }
+    if (
+      (testCase.comparator === "STDOUT_NOMATCH" ||
+        testCase.comparator === "STDOUT_REGEX_NOMATCH") &&
+      testCase.expectedOutput.length === 0
+    ) {
+      // Everything contains the empty string and every pattern search finds
+      // it, so this rule can never pass. Refused rather than published.
+      issues.push({
+        code: "empty_negative_rule",
+        path: ["testCases", index, "expectedOutput"],
+        message: "An empty text makes a 'does not contain' rule impossible to pass.",
+      });
+    }
+  });
+  return issues;
+}
+
 export const exerciseDraftFieldsSchema = z.object({
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
@@ -350,9 +594,20 @@ export const exerciseDraftFieldsSchema = z.object({
    * the question.
    */
   testCases: z.array(exerciseTestCaseDraftSchema).max(50),
+  /** How the cases above are judged and scored. See `gradingProfileIssues`. */
+  grading: exerciseGradingProfileSchema,
   hints: z.array(exerciseHintDraftSchema),
 });
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
+
+function refineGrading(
+  value: Pick<ExerciseDraftFields, "grading" | "testCases">,
+  context: z.RefinementCtx,
+) {
+  for (const issue of gradingProfileIssues(value)) {
+    context.addIssue({ code: "custom", message: issue.message, path: issue.path });
+  }
+}
 
 /**
  * Whether a student would be shown a worked example.
@@ -377,7 +632,8 @@ export const exerciseParentInputSchema = courseIdInputSchema.extend({
 
 export const createProgrammingExerciseSchema = exerciseParentInputSchema
   .extend(exerciseDraftFieldsSchema.shape)
-  .strict();
+  .strict()
+  .superRefine(refineGrading);
 
 export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
   materialId: z.uuid(),
@@ -401,7 +657,8 @@ export const updateProgrammingExerciseSchema = exerciseMaterialInputSchema
     ...exerciseDraftFieldsSchema.shape,
     expectedUpdatedAt: z.iso.datetime(),
   })
-  .strict();
+  .strict()
+  .superRefine(refineGrading);
 
 export const deleteProgrammingExerciseSchema = exerciseMaterialInputSchema;
 

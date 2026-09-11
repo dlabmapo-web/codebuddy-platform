@@ -3,11 +3,21 @@ import { describe, expect, it } from "vitest";
 import {
   courseHasNoVisibleContent,
   createCourseSchema,
+  defaultEliceGradingProfile,
   hasSampleTestCase,
   createProgrammingExerciseSchema,
+  legacyCaseGrading,
+  legacyGradingProfile,
   programmingExerciseDescriptionMaxLength,
   programmingExerciseSchema,
+  updateProgrammingExerciseSchema,
+  type ExerciseTestCaseDraft,
 } from "./course.js";
+
+const legacy: Omit<ExerciseTestCaseDraft, "input" | "expectedOutput" | "visibility"> = {
+  ...legacyCaseGrading,
+  label: null,
+};
 
 const validExercise = {
   academyId: "20000000-0000-4000-8000-000000000001",
@@ -27,7 +37,9 @@ const validExercise = {
     input: "1 2",
     expectedOutput: "3",
     visibility: "SAMPLE" as const,
+    ...legacy,
   }],
+  grading: legacyGradingProfile,
   hints: [],
 };
 
@@ -94,8 +106,8 @@ describe("manual programming exercise schemas", () => {
     const result = createProgrammingExerciseSchema.safeParse({
       ...validExercise,
       testCases: [
-        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const },
-        { input: "4 5", expectedOutput: "9", visibility: "SAMPLE" as const },
+        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const, ...legacy },
+        { input: "4 5", expectedOutput: "9", visibility: "SAMPLE" as const, ...legacy },
       ],
     });
 
@@ -123,7 +135,7 @@ describe("manual programming exercise schemas", () => {
     const result = createProgrammingExerciseSchema.safeParse({
       ...validExercise,
       testCases: [
-        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const },
+        { input: "1 2", expectedOutput: "3", visibility: "HIDDEN" as const, ...legacy },
       ],
     });
 
@@ -157,9 +169,119 @@ describe("manual programming exercise schemas", () => {
         input: "1 2",
         expectedOutput: "3",
         visibility: "SAMPLE" as const,
+        ...legacy,
       })),
     });
 
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("grading profile on the exercise contract", () => {
+  const weighted = (overrides: Array<Partial<typeof legacy>> = [], grading = defaultEliceGradingProfile) => ({
+    ...validExercise,
+    grading,
+    testCases: [30, 30, 40].map((weight, index) => ({
+      input: String(index),
+      expectedOutput: String(index),
+      visibility: "HIDDEN" as const,
+      ...legacy,
+      weight,
+      ...(overrides[index] ?? {}),
+    })),
+  });
+  const messages = (input: unknown) => {
+    const result = createProgrammingExerciseSchema.safeParse(input);
+    return result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
+  };
+
+  it("accepts a 30/30/40 weighted problem with all five comparators available", () => {
+    expect(
+      messages(
+        weighted([
+          { comparator: "STDOUT_REGEX" },
+          { comparator: "STDOUT_MATCH", timeLimitMsOverride: 5_000 },
+          { comparator: "STDOUT", softTimeLimitMs: 1_000, softPenalty: 10 },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("requires the grading fields to be stated, never defaulted", () => {
+    // A client that omitted them would otherwise save a weighted problem
+    // back as legacy, weights and all, without anyone choosing that.
+    const { grading: _grading, ...withoutProfile } = validExercise;
+    expect(createProgrammingExerciseSchema.safeParse(withoutProfile).success).toBe(false);
+
+    const [first] = validExercise.testCases;
+    const { weight: _weight, ...caseWithoutWeight } = first!;
+    expect(
+      createProgrammingExerciseSchema.safeParse({
+        ...validExercise,
+        testCases: [caseWithoutWeight],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("refuses a weight, comparator or limit on a legacy problem instead of ignoring it", () => {
+    expect(messages(weighted([], legacyGradingProfile))).toEqual([
+      "testCases.0.weight",
+      "testCases.1.weight",
+      "testCases.2.weight",
+    ]);
+    expect(
+      messages({
+        ...validExercise,
+        testCases: [{ ...validExercise.testCases[0]!, comparator: "STDOUT_REGEX" }],
+      }),
+    ).toEqual(["testCases.0.comparator"]);
+    expect(
+      messages({ ...validExercise, grading: { ...legacyGradingProfile, totalTimeLimitMs: 60_000 } }),
+    ).toEqual(["grading.totalTimeLimitMs"]);
+  });
+
+  it("refuses a weighted problem worth nothing", () => {
+    expect(messages(weighted([{ weight: 0 }, { weight: 0 }, { weight: 0 }]))).toEqual([
+      "testCases",
+    ]);
+  });
+
+  it("refuses a weighted profile without its budgets", () => {
+    expect(
+      messages(weighted([], { ...defaultEliceGradingProfile, totalTimeLimitMs: null })),
+    ).toEqual(["grading.totalTimeLimitMs"]);
+  });
+
+  it("refuses a soft limit at or above the default hard limit", () => {
+    expect(messages(weighted([{ softTimeLimitMs: 3_000, softPenalty: 5 }]))).toEqual([
+      "testCases.0.softTimeLimitMs",
+    ]);
+  });
+
+  it("refuses a case limit longer than the whole run's", () => {
+    expect(
+      messages(
+        weighted([{ timeLimitMsOverride: 5_000 }], {
+          ...defaultEliceGradingProfile,
+          totalTimeLimitMs: 4_000,
+        }),
+      ),
+    ).toEqual(["testCases.0.timeLimitMsOverride"]);
+  });
+
+  it("refuses a 'does not contain' rule on empty text, which no program can pass", () => {
+    const exercise = weighted([{ comparator: "STDOUT_NOMATCH" }]);
+    exercise.testCases[0] = { ...exercise.testCases[0]!, expectedOutput: "" };
+
+    expect(messages(exercise)).toEqual(["testCases.0.expectedOutput"]);
+  });
+
+  it("applies the same rules to an update", () => {
+    const result = updateProgrammingExerciseSchema.safeParse({
+      ...weighted([], legacyGradingProfile),
+      materialId: "a0000000-0000-4000-8000-000000000001",
+      expectedUpdatedAt: new Date(0).toISOString(),
+    });
     expect(result.success).toBe(false);
   });
 });

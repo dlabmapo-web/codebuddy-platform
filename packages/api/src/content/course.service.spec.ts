@@ -298,6 +298,31 @@ describe("CourseService hierarchy revisions", () => {
   });
 });
 
+const legacyCase = {
+  comparator: "STDOUT" as const,
+  weight: 1,
+  timeLimitMsOverride: null,
+  softTimeLimitMs: null,
+  softPenalty: null,
+  label: null,
+};
+
+const legacyGrading = {
+  mode: "LEGACY_STDIO" as const,
+  totalTimeLimitMs: null,
+  comparatorTimeLimitMs: null,
+  materialMaximumHundredths: null,
+  materialScorePolicy: null,
+};
+
+const weightedGrading = {
+  mode: "ELICE_STDIO" as const,
+  totalTimeLimitMs: 60_000,
+  comparatorTimeLimitMs: 100,
+  materialMaximumHundredths: 10_000,
+  materialScorePolicy: "PROPORTIONAL" as const,
+};
+
 function exerciseRecord() {
   return {
     id: materialId,
@@ -334,6 +359,15 @@ function exerciseRecord() {
       memoryLimitMb: 256,
       aiFeedbackEnabled: false,
       gradingRevision: 1,
+      gradingMode: "LEGACY_STDIO",
+      gradingSemanticVersion: "legacy-v1",
+      totalTimeLimitMs: null,
+      comparatorTimeLimitMs: null,
+      continuationPolicy: "LEGACY_STOP_ON_RESOURCE",
+      exitStatusPolicy: "FAIL_ON_RUNTIME_ERROR",
+      materialMaximumHundredths: null,
+      materialScorePolicy: null,
+      feedbackPolicy: null,
       createdAt: now,
       updatedAt: now,
       testCases: [
@@ -344,6 +378,7 @@ function exerciseRecord() {
           input: "1 2",
           expectedOutput: "3",
           visibility: "SAMPLE",
+          ...legacyCase,
           createdAt: now,
           updatedAt: now,
         },
@@ -374,8 +409,10 @@ const exerciseInput = {
       input: "1 2",
       expectedOutput: "3",
       visibility: "SAMPLE" as const,
+      ...legacyCase,
     },
   ],
+  grading: legacyGrading,
   hints: [],
 };
 
@@ -486,6 +523,7 @@ describe("CourseService direct problem editing", () => {
           input: "2 2",
           expectedOutput: "4",
           visibility: "SAMPLE",
+          ...legacyCase,
         },
       ],
     });
@@ -555,6 +593,121 @@ describe("CourseService direct problem editing", () => {
       }),
     );
     expect(transaction.studentExerciseProgress.updateMany).not.toHaveBeenCalled();
+  });
+
+  describe("grading profile", () => {
+    const weightedCases = [30, 30, 40].map((weight, index) => ({
+      input: `${index} ${index}`,
+      expectedOutput: String(index * 2),
+      visibility: index === 0 ? ("SAMPLE" as const) : ("HIDDEN" as const),
+      ...legacyCase,
+      weight,
+    }));
+
+    it("stores every case setting and the profile, instead of dropping them", async () => {
+      // The finding: comparator, weight and limits were accepted by the
+      // contract and never written, so a 30/30/40 problem saved as 1/1/1.
+      const { service, transaction } = createExerciseService();
+
+      await service.updateExercise(identity, {
+        ...exerciseInput,
+        grading: weightedGrading,
+        testCases: [
+          { ...weightedCases[0]!, comparator: "STDOUT_REGEX", label: "shape" },
+          { ...weightedCases[1]!, timeLimitMsOverride: 2_000 },
+          { ...weightedCases[2]!, softTimeLimitMs: 500, softPenalty: 10 },
+        ],
+      });
+
+      expect(transaction.exerciseTestCase.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            weight: 30,
+            comparator: "STDOUT_REGEX",
+            label: "shape",
+          }),
+          expect.objectContaining({ weight: 30, timeLimitMsOverride: 2_000 }),
+          expect.objectContaining({
+            weight: 40,
+            softTimeLimitMs: 500,
+            softPenalty: 10,
+          }),
+        ],
+      });
+      expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            gradingRevision: 2,
+            gradingMode: "ELICE_STDIO",
+            gradingSemanticVersion: "elice-v1",
+            continuationPolicy: "CONTINUE_WITHIN_BUDGET",
+            totalTimeLimitMs: 60_000,
+            comparatorTimeLimitMs: 100,
+            materialMaximumHundredths: 10_000,
+            materialScorePolicy: "PROPORTIONAL",
+          }),
+        }),
+      );
+    });
+
+    it("treats a changed weight alone as a grading change", async () => {
+      const { service, transaction } = createExerciseService();
+
+      await service.updateExercise(identity, {
+        ...exerciseInput,
+        grading: weightedGrading,
+        testCases: [{ ...exerciseInput.testCases[0]!, weight: 5 }],
+      });
+
+      expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ gradingRevision: 2 }),
+        }),
+      );
+      expect(transaction.studentExerciseProgress.updateMany).toHaveBeenCalled();
+    });
+
+    it("does not reset progress for a relabelled case", async () => {
+      const { service, transaction } = createExerciseService();
+
+      await service.updateExercise(identity, {
+        ...exerciseInput,
+        testCases: [{ ...exerciseInput.testCases[0]!, label: "Adds two numbers" }],
+      });
+
+      expect(transaction.studentExerciseProgress.updateMany).not.toHaveBeenCalled();
+      expect(transaction.exerciseTestCase.createMany).toHaveBeenCalledWith({
+        data: [expect.objectContaining({ label: "Adds two numbers" })],
+      });
+    });
+
+    it("refuses a legacy exercise carrying a weight rather than saving it unused", async () => {
+      const { service, transaction } = createExerciseService();
+
+      await expect(
+        service.updateExercise(identity, {
+          ...exerciseInput,
+          testCases: [{ ...exerciseInput.testCases[0]!, weight: 30 }],
+        }),
+      ).rejects.toMatchObject({ code: "EXERCISE_VALIDATION_FAILED" });
+      expect(transaction.exerciseTestCase.createMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a soft limit at or above the exercise's own hard limit", async () => {
+      // The contract checks against the authoring default; the service checks
+      // against the limit this exercise really has.
+      const { service } = createExerciseService();
+
+      await expect(
+        service.updateExercise(identity, {
+          ...exerciseInput,
+          grading: weightedGrading,
+          testCases: [
+            { ...exerciseInput.testCases[0]!, softTimeLimitMs: 3_000, softPenalty: 1 },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "EXERCISE_VALIDATION_FAILED" });
+    });
   });
 
   it("blocks deleting a lecture that has descendant submissions", async () => {

@@ -1,10 +1,14 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
+  gradingProfileIssues,
   isCourseCustomized,
   librarySyncState,
+  semanticVersionForMode,
   stableKeyFromUuid,
   type CourseProvenance,
+  type ExerciseGradingProfile,
+  type ExerciseTestCaseDraft,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -25,6 +29,7 @@ import {
   rewritePositions,
 } from "./content-positions.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
+import { exerciseProfileColumns } from "../judge/grading-profile.js";
 
 type ContentRequestContext = { requestId?: string };
 
@@ -129,11 +134,8 @@ type ExerciseWriteInput = {
   solutionCode: string;
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
-  testCases: Array<{
-    input: string;
-    expectedOutput: string;
-    visibility: "SAMPLE" | "HIDDEN";
-  }>;
+  testCases: ExerciseTestCaseDraft[];
+  grading: ExerciseGradingProfile;
   hints: Array<{ content: string; triggerExpression: string | null }>;
 };
 
@@ -789,6 +791,7 @@ export class CourseService {
   ) {
     const actor = await this.requireExerciseManager(identity, input.academyId);
     await this.requireLecture(input.courseId, input.lectureId);
+    assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
     const record = await this.prisma.$transaction(async (tx) => {
       const position = await nextMaterialPosition(tx, input.lectureId);
       const material = await tx.material.create({
@@ -812,10 +815,12 @@ export class CourseService {
               starterCode: input.starterCode,
               solutionCode: input.solutionCode,
               language: "PYTHON",
-              timeLimitMs: 3000,
+              timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
               memoryLimitMb: 256,
               aiFeedbackEnabled: input.aiFeedbackEnabled,
               gradingRevision: 1,
+              ...exerciseProfileColumns(input.grading),
+              gradingSemanticVersion: semanticVersionForMode(input.grading.mode),
               testCases: { create: testCaseCreates(input.testCases) },
               hints: { create: hintCreates(input.hints) },
             },
@@ -851,7 +856,13 @@ export class CourseService {
     if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
     }
-    const gradingChanged = !sameGradingDefinition(exercise.testCases, input.testCases);
+    // Checked against the limit this exercise actually has, which an imported
+    // or migrated problem may not share with the authoring default.
+    assertGradingSupported(input, exercise.timeLimitMs);
+    const profileColumns = exerciseProfileColumns(input.grading);
+    const gradingChanged =
+      !sameGradingDefinition(exercise.testCases, input.testCases) ||
+      !sameGradingProfile(exercise, profileColumns);
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.programmingExercise.updateMany({
@@ -865,7 +876,15 @@ export class CourseService {
           starterCode: input.starterCode,
           solutionCode: input.solutionCode,
           aiFeedbackEnabled: input.aiFeedbackEnabled,
-          ...(gradingChanged ? { gradingRevision: nextRevision } : {}),
+          ...(gradingChanged
+            ? {
+                gradingRevision: nextRevision,
+                ...profileColumns,
+                // A changed profile is authored now, at the version current
+                // now. An unchanged one keeps the version it was authored at.
+                gradingSemanticVersion: semanticVersionForMode(input.grading.mode),
+              }
+            : {}),
         },
       });
       if (claimed.count !== 1) {
@@ -1192,12 +1211,46 @@ export class CourseService {
   }
 }
 
+/** The time limit a newly authored exercise runs at. */
+const CREATED_EXERCISE_TIME_LIMIT_MS = 3000;
+
+/**
+ * Refuses a profile the judge could not honour, before anything is written.
+ *
+ * The schema already ran the same rules against the authoring default; this
+ * repeats them against the exercise's real per-case limit. Rejecting is the
+ * point: a setting accepted here and then ignored by grading is the defect
+ * this replaces.
+ */
+function assertGradingSupported(input: ExerciseWriteInput, timeLimitMs: number) {
+  const issues = gradingProfileIssues({
+    grading: input.grading,
+    testCases: input.testCases,
+    timeLimitMs,
+  });
+  const [first] = issues;
+  if (first) {
+    throw new AppException(
+      "EXERCISE_VALIDATION_FAILED",
+      HttpStatus.BAD_REQUEST,
+      `${first.path.join(".")}: ${first.message}`,
+    );
+  }
+}
+
+/** Every stored field of every case: grading reads all of them. */
 function testCaseCreates(testCases: ExerciseWriteInput["testCases"]) {
   return testCases.map((testCase, index) => ({
     position: index + 1,
     input: testCase.input,
     expectedOutput: testCase.expectedOutput,
     visibility: testCase.visibility,
+    comparator: testCase.comparator,
+    weight: testCase.weight,
+    timeLimitMsOverride: testCase.timeLimitMsOverride,
+    softTimeLimitMs: testCase.softTimeLimitMs,
+    softPenalty: testCase.softPenalty,
+    label: emptyToNull(testCase.label),
   }));
 }
 
@@ -1214,11 +1267,22 @@ function emptyToNull(value: string | null) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Whether the cases grade the same way. Every field that changes a verdict or a
+ * score counts — a new weight rescored nothing before, which is how a 30/30/40
+ * edit could have been saved without the revision moving. A label changes
+ * neither, so relabelling does not reset anyone's progress.
+ */
 function sameGradingDefinition(
   current: Array<{
     input: string;
     expectedOutput: string;
     visibility: "SAMPLE" | "HIDDEN";
+    comparator: string;
+    weight: number;
+    timeLimitMsOverride: number | null;
+    softTimeLimitMs: number | null;
+    softPenalty: number | null;
   }>,
   next: ExerciseWriteInput["testCases"],
 ) {
@@ -1227,8 +1291,22 @@ function sameGradingDefinition(
     return candidate !== undefined &&
       testCase.input === candidate.input &&
       testCase.expectedOutput === candidate.expectedOutput &&
-      testCase.visibility === candidate.visibility;
+      testCase.visibility === candidate.visibility &&
+      testCase.comparator === candidate.comparator &&
+      testCase.weight === candidate.weight &&
+      testCase.timeLimitMsOverride === candidate.timeLimitMsOverride &&
+      testCase.softTimeLimitMs === candidate.softTimeLimitMs &&
+      testCase.softPenalty === candidate.softPenalty;
   });
+}
+
+function sameGradingProfile(
+  current: ReturnType<typeof exerciseProfileColumns>,
+  next: ReturnType<typeof exerciseProfileColumns>,
+) {
+  return (Object.keys(next) as Array<keyof typeof next>).every(
+    (field) => current[field] === next[field],
+  );
 }
 
 function moduleAudit(record: {
@@ -1265,11 +1343,13 @@ function exerciseAuditFromInput(
     difficulty: input.difficulty,
     position,
     language: "PYTHON",
-    timeLimitMs: 3000,
+    timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
     memoryLimitMb: 256,
     aiFeedbackEnabled: input.aiFeedbackEnabled,
     isVisible,
     gradingRevision,
+    gradingMode: input.grading.mode,
+    totalWeight: input.testCases.reduce((total, testCase) => total + testCase.weight, 0),
     testCaseCount: input.testCases.length,
     sampleTestCaseCount: input.testCases.filter(
       (testCase) => testCase.visibility === "SAMPLE",
@@ -1291,6 +1371,11 @@ function exerciseRecordAudit(record: ExerciseRecord) {
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
     isVisible: record.isVisible,
     gradingRevision: exercise.gradingRevision,
+    gradingMode: exercise.gradingMode,
+    totalWeight: exercise.testCases.reduce(
+      (total, testCase) => total + testCase.weight,
+      0,
+    ),
     testCaseCount: exercise.testCases.length,
     sampleTestCaseCount: exercise.testCases.filter(
       (testCase) => testCase.visibility === "SAMPLE",
@@ -1459,6 +1544,14 @@ function serializeExercise(exercise: NonNullable<
     memoryLimitMb: exercise.memoryLimitMb,
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
     gradingRevision: exercise.gradingRevision,
+    grading: {
+      mode: exercise.gradingMode,
+      semanticVersion: exercise.gradingSemanticVersion,
+      totalTimeLimitMs: exercise.totalTimeLimitMs,
+      comparatorTimeLimitMs: exercise.comparatorTimeLimitMs,
+      materialMaximumHundredths: exercise.materialMaximumHundredths,
+      materialScorePolicy: exercise.materialScorePolicy,
+    },
     updatedAt: exercise.updatedAt.toISOString(),
     testCases: exercise.testCases.map((testCase) => ({
       id: testCase.id,
@@ -1466,6 +1559,12 @@ function serializeExercise(exercise: NonNullable<
       input: testCase.input,
       expectedOutput: testCase.expectedOutput,
       visibility: testCase.visibility,
+      comparator: testCase.comparator,
+      weight: testCase.weight,
+      timeLimitMsOverride: testCase.timeLimitMsOverride,
+      softTimeLimitMs: testCase.softTimeLimitMs,
+      softPenalty: testCase.softPenalty,
+      label: testCase.label,
     })),
     hints: exercise.hints.map((hint) => ({
       id: hint.id,

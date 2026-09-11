@@ -140,6 +140,7 @@
     "too_many_hints": "A problem can have at most 20 hints.",
     "tests_missing": "This problem has no tests. Add at least one.",
     "sample_test_missing": "This problem needs at least one SAMPLE test.",
+    "weighted_tests_not_importable": "This problem uses weighted grading, which a workbook cannot express. Edit its tests in the problem editor instead.",
     "duplicate_key_in_workbook": "Two rows use this key. Keys must be unique in the course.",
     "parent_conflict": "This already exists somewhere else in the course. Import cannot move it.",
     "title_conflict": "Another item already has this title under a different key.",

@@ -61,8 +61,14 @@ export function ExerciseWorkspace({
         <AnswersEditor
           editable={editable}
           error={authoring.errorFor('test')}
+          grading={draft.grading}
+          gradingIssues={authoring.gradingIssues}
           testCases={draft.testCases}
           update={(testCases) => update('testCases', testCases)}
+          updateGrading={(grading, testCases) => {
+            update('grading', grading);
+            update('testCases', testCases);
+          }}
         />
         <HintsEditor
           editable={editable}

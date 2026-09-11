@@ -958,15 +958,28 @@ export class ContentImportService {
       },
     });
 
-    await tx.exerciseTestCase.deleteMany({
-      where: { exerciseMaterialId: existing.id },
-    });
-    await tx.exerciseTestCase.createMany({
-      data: planned.testCases.map((testCase) => ({
-        exerciseMaterialId: existing.id,
-        ...testCase,
-      })),
-    });
+    // A weighted problem's cases carry comparators, weights and limits the
+    // workbook has no columns for. The planner refuses a workbook that changes
+    // them; when it does not, they are left exactly as they are rather than
+    // rewritten from rows that would reset every one to equal, exact output.
+    if (currentExercise?.gradingMode === "ELICE_STDIO") {
+      if (planned.gradingChanged) {
+        throw new AppException(
+          "CONTENT_IMPORT_VALIDATION_FAILED",
+          HttpStatus.CONFLICT,
+        );
+      }
+    } else {
+      await tx.exerciseTestCase.deleteMany({
+        where: { exerciseMaterialId: existing.id },
+      });
+      await tx.exerciseTestCase.createMany({
+        data: planned.testCases.map((testCase) => ({
+          exerciseMaterialId: existing.id,
+          ...testCase,
+        })),
+      });
+    }
 
     await tx.exerciseHint.deleteMany({
       where: { exerciseMaterialId: existing.id },
@@ -1172,6 +1185,7 @@ function toProjection(course: CourseWithContent): CourseProjection {
               starterCode: exercise.starterCode,
               solutionCode: exercise.solutionCode,
               aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+              gradingMode: exercise.gradingMode,
               testCases: exercise.testCases.map((testCase) => ({
                 position: testCase.position,
                 input: testCase.input,

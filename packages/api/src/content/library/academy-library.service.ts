@@ -284,6 +284,18 @@ export class AcademyLibraryService {
             aiFeedbackEnabled: exercise.aiFeedbackEnabled,
             // Restarts at 1. The copy has graded nothing, and inheriting the
             // master's grading revision would claim otherwise.
+            //
+            // The profile travels whole, at the version the master was
+            // authored at: an adopted 30/30/40 problem must score 40, 60 and
+            // 100 in the branch exactly as it does in the library.
+            gradingMode: exercise.gradingMode,
+            gradingSemanticVersion: exercise.gradingSemanticVersion,
+            totalTimeLimitMs: exercise.totalTimeLimitMs,
+            comparatorTimeLimitMs: exercise.comparatorTimeLimitMs,
+            continuationPolicy: exercise.continuationPolicy,
+            exitStatusPolicy: exercise.exitStatusPolicy,
+            materialMaximumHundredths: exercise.materialMaximumHundredths,
+            materialScorePolicy: exercise.materialScorePolicy,
           });
           for (const testCase of exercise.testCases) {
             testCases.push({
@@ -292,6 +304,12 @@ export class AcademyLibraryService {
               input: testCase.input,
               expectedOutput: testCase.expectedOutput,
               visibility: testCase.visibility,
+              comparator: testCase.comparator,
+              weight: testCase.weight,
+              timeLimitMsOverride: testCase.timeLimitMsOverride,
+              softTimeLimitMs: testCase.softTimeLimitMs,
+              softPenalty: testCase.softPenalty,
+              label: testCase.label,
             });
           }
           for (const hint of exercise.hints) {

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * The alphabet a manager-issued student password is drawn from.
  *
@@ -60,4 +62,47 @@ export function issuedPasswordPrefix(password: string): string {
 export function maskIssuedPassword(prefix: string, length: number): string {
   const hidden = Math.max(0, length - prefix.length);
   return `${prefix}${"•".repeat(hidden)}`;
+}
+
+/**
+ * The characters a manager may type into a student's password: printable
+ * ASCII, no spaces.
+ *
+ * The restriction is about keyboards, not strength. A manager whose keyboard
+ * is in 한글 mode types `ㅡㅑㅜㅓㅑ` believing they typed `minji`, and that
+ * password can never be typed back on a login form in English mode — so it is
+ * refused here with a message that says why, rather than becoming an account
+ * nobody can open. ASCII also makes the 72 below a byte count, which is the
+ * limit bcrypt actually enforces.
+ */
+export const STUDENT_PASSWORD_PATTERN = /^[\x21-\x7E]+$/;
+export const STUDENT_PASSWORD_MIN_LENGTH = 8;
+export const STUDENT_PASSWORD_MAX_LENGTH = 72;
+
+/**
+ * A password a manager chose for a student.
+ *
+ * The same length rule as `signUpStudent`, so a password a manager sets is
+ * never one the student could not have chosen themselves. Shared by the form
+ * and the API, so the browser's "Save" and the server's refusal cannot
+ * disagree about what is allowed.
+ */
+export const studentPasswordSchema = z
+  .string()
+  .min(STUDENT_PASSWORD_MIN_LENGTH)
+  .max(STUDENT_PASSWORD_MAX_LENGTH)
+  .regex(STUDENT_PASSWORD_PATTERN);
+
+/** Why a typed password is refused, for the form's inline message. */
+export type StudentPasswordProblem = "too_short" | "too_long" | "bad_characters";
+
+export function studentPasswordProblem(
+  password: string,
+): StudentPasswordProblem | null {
+  if (password.length > 0 && !STUDENT_PASSWORD_PATTERN.test(password)) {
+    return "bad_characters";
+  }
+  if (password.length < STUDENT_PASSWORD_MIN_LENGTH) return "too_short";
+  if (password.length > STUDENT_PASSWORD_MAX_LENGTH) return "too_long";
+  return null;
 }

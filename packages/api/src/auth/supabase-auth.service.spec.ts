@@ -79,3 +79,36 @@ describe("SupabaseAuthService.passwordIdentityStatus", () => {
     );
   });
 });
+
+describe("SupabaseAuthService.setPassword", () => {
+  function withUpdate(result: unknown) {
+    const { service } = createService();
+    const updateUserById = vi.fn().mockResolvedValue(result);
+    Object.defineProperty(service, "client", {
+      value: { auth: { admin: { updateUserById } } },
+    });
+    return { service, updateUserById };
+  }
+
+  it("reports a password Supabase finds too weak as rejected, not as a bad target", async () => {
+    const { service } = withUpdate({
+      data: { user: null },
+      error: { code: "weak_password", status: 422 },
+    });
+
+    await expect(
+      service.setPassword("auth-user-id", "password"),
+    ).rejects.toMatchObject({ code: "STUDENT_PASSWORD_REJECTED" });
+  });
+
+  it("keeps every other refusal as a target failure", async () => {
+    const { service } = withUpdate({
+      data: { user: null },
+      error: { code: "user_not_found", status: 404 },
+    });
+
+    await expect(
+      service.setPassword("auth-user-id", "minji1234"),
+    ).rejects.toMatchObject({ code: "STUDENT_CREDENTIAL_TARGET_INVALID" });
+  });
+});

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { studentPasswordSchema } from "../auth/student-password.js";
+
 /**
  * What a manager can see about a student's password without asking to read it.
  *
@@ -53,7 +55,16 @@ export type StudentCredentialState = z.infer<
 >;
 
 export const issueStudentPasswordInputSchema = z
-  .object({ academyId: z.uuid(), membershipId: z.uuid() })
+  .object({
+    academyId: z.uuid(),
+    membershipId: z.uuid(),
+    /**
+     * The password the manager typed. Absent means "generate one", which is
+     * what every client did before managers could choose — kept so a browser
+     * still holding the previous build keeps working through a deploy.
+     */
+    password: studentPasswordSchema.optional(),
+  })
   .strict();
 
 export const revealStudentPasswordInputSchema = z

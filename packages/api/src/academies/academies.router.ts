@@ -202,6 +202,7 @@ export function createAcademiesRouters(os: ORPCImplementer, deps: ORPCDeps) {
             actor.userId,
             input.academyId,
             input.membershipId,
+            input.password,
           );
         }),
       reveal: os.academyStudentCredentials.reveal

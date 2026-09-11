@@ -287,13 +287,21 @@
   "credentials": {
     "title": "Password",
     "reveal": "Show",
-    "issue": "Issue new password",
+    "set": "Set new password",
+    "new_password": "New password",
+    "rule_hint": "8 or more characters · English letters, numbers, symbols",
+    "suggest": "Suggest",
+    "save": "Save",
+    "cancel": "Cancel",
+    "too_short": "Use at least 8 characters.",
+    "too_long": "Use 72 characters or fewer.",
+    "bad_characters": "Korean letters and spaces cannot be used. Check that the keyboard is in English mode.",
     "issued_meta": "Issued {{date}} by {{issuer}} · read {{count}} times",
     "unknown_issuer": "Unknown",
     "changed_by_student": "The student changed this themselves",
-    "changed_by_student_hint": "Cove does not know this password. If the student forgets it, issue a new one.",
+    "changed_by_student_hint": "Cove does not know this password. If the student forgets it, set a new one.",
     "reveal_audited": "This read has been recorded.",
-    "explanation": "Student accounts have no email, so they cannot reset a password themselves. Cove keeps only the password it issued, and destroys it the moment the student chooses their own."
+    "explanation": "Student accounts have no email, so they cannot reset a password themselves. Cove keeps only a password a manager set, and destroys it the moment the student chooses their own."
   },
   "roles": {
     "title": "Roles",

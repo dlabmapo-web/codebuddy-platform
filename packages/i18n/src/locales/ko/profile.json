@@ -287,13 +287,21 @@
   "credentials": {
     "title": "비밀번호",
     "reveal": "표시",
-    "issue": "새 비밀번호 발급",
+    "set": "새 비밀번호 설정",
+    "new_password": "새 비밀번호",
+    "rule_hint": "8자 이상 · 영문, 숫자, 기호",
+    "suggest": "추천",
+    "save": "저장",
+    "cancel": "취소",
+    "too_short": "8자 이상 입력하세요.",
+    "too_long": "72자 이하로 입력하세요.",
+    "bad_characters": "한글이나 공백은 쓸 수 없습니다. 키보드가 영문 상태인지 확인하세요.",
     "issued_meta": "{{date}} · {{issuer}} 발급 · {{count}}회 열람됨",
     "unknown_issuer": "알 수 없음",
     "changed_by_student": "학생이 직접 변경했습니다",
-    "changed_by_student_hint": "코브는 이 비밀번호를 알 수 없습니다. 학생이 잊었다면 새 비밀번호를 발급하세요.",
+    "changed_by_student_hint": "코브는 이 비밀번호를 알 수 없습니다. 학생이 잊었다면 새 비밀번호를 설정하세요.",
     "reveal_audited": "이 열람은 기록되었습니다.",
-    "explanation": "학생 계정은 이메일이 없어 스스로 비밀번호를 재설정할 수 없습니다. 코브는 발급한 비밀번호만 보관하며, 학생이 직접 바꾸는 즉시 삭제합니다."
+    "explanation": "학생 계정은 이메일이 없어 스스로 비밀번호를 재설정할 수 없습니다. 코브는 관리자가 설정한 비밀번호만 보관하며, 학생이 직접 바꾸는 즉시 삭제합니다."
   },
   "roles": {
     "title": "역할",

@@ -11,6 +11,7 @@ import {
   generateIssuedPassword,
   isStudentRoleSet,
   issuedPasswordPrefix,
+  studentPasswordProblem,
   type StudentCredentialState,
   type StudentPasswordReveal,
 } from "@cove/shared";
@@ -36,12 +37,12 @@ const currentKeyVersion = 1;
  * cannot read back is one they must reissue every time a child forgets, which
  * is why this service keeps what it issued rather than only showing it once.
  *
- * The invariant that makes that defensible: Cove stores only passwords **it
- * generated**, and destroys the row the moment the student replaces it. It
- * never holds a secret whose owner believes it is private, and it never claims
- * to know a password it did not issue — a hash is all Supabase has, and
- * creating a readable copy of every student password would turn one leaked
- * server key into every child's account.
+ * The invariant that makes that defensible: Cove stores only passwords **a
+ * manager set** — typed or generated — and destroys the row the moment the
+ * student replaces it. It never holds a secret whose owner believes it is
+ * private, and it never claims to know a password it did not issue — a hash is
+ * all Supabase has, and creating a readable copy of every student password
+ * would turn one leaked server key into every child's account.
  */
 @Injectable()
 export class StudentCredentialService {
@@ -73,7 +74,14 @@ export class StudentCredentialService {
   }
 
   /**
-   * Generates a password, sets it in Supabase, and returns it once.
+   * Sets a password in Supabase — the one the manager typed, or a generated
+   * one when they did not — and returns it once.
+   *
+   * A typed password is the point of the panel: a random ten characters is
+   * secure and is also a support call from a seven-year-old every week. The
+   * manager choosing something the child can remember is safe for the same
+   * reason an issued one is: the child never believed it was private, and it
+   * is destroyed the moment they choose their own.
    *
    * The Supabase call comes first. If storing the copy fails afterwards the
    * student's password has still changed, and the manager is still holding the
@@ -84,7 +92,25 @@ export class StudentCredentialService {
     actorUserId: string,
     academyId: string,
     membershipId: string,
+    chosen?: string,
   ): Promise<StudentPasswordReveal> {
+    // The contract already refuses these; checked again because this is the
+    // last line before Supabase, and a caller that is not the contract gets a
+    // refusal that says what is wrong rather than a Supabase error.
+    const problem =
+      chosen === undefined ? null : studentPasswordProblem(chosen);
+    if (problem === "bad_characters") {
+      throw new AppException(
+        "STUDENT_PASSWORD_CHARACTERS",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (problem !== null) {
+      throw new AppException(
+        "STUDENT_PASSWORD_REJECTED",
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
     const target = await this.requireStudentTarget(academyId, membershipId);
     if (!target.authUserId) {
       throw new AppException(
@@ -93,7 +119,7 @@ export class StudentCredentialService {
       );
     }
 
-    const password = generateIssuedPassword();
+    const password = chosen ?? generateIssuedPassword();
     await this.supabaseAuth.setPassword(target.authUserId, password);
 
     if (this.key) {
@@ -135,6 +161,9 @@ export class StudentCredentialService {
       action: "academy.member.password.issued",
       targetType: "membership",
       targetId: membershipId,
+      // Which kind, never the value. A typed password and a generated one are
+      // the same act with different risk, and a reviewer should see which.
+      after: { source: chosen === undefined ? "generated" : "typed" },
     });
 
     return {

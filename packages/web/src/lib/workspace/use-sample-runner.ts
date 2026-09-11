@@ -1,11 +1,15 @@
 'use client';
 
-import type { LearnSampleTestCase } from '@cove/shared';
+import type { GradingProfileMode, LearnSampleTestCase } from '@cove/shared';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 
-import { resolveSampleVerdict, type SampleVerdict } from './sample-run';
+import {
+  comparesSampleLocally,
+  resolveSampleVerdict,
+  type SampleVerdict,
+} from './sample-run';
 import type { PythonRunnerState, RunOutcome } from './use-python-runner';
 
 export type SampleRun = {
@@ -16,6 +20,11 @@ export type SampleRun = {
 
 /**
  * Running one sample case and narrating the result in the terminal.
+ *
+ * Legacy problems are compared here, with the normalizer that is byte-for-byte
+ * the judge's legacy one. Weighted grading compares in CPython, which the
+ * browser does not reproduce, so those samples show what the program printed
+ * and leave the verdict to Submit rather than claim one by different rules.
  *
  * Shared by the student's workspace and the teacher's live copy of it, so the
  * two see the same banner, the same tick or cross, and the same expected
@@ -34,6 +43,8 @@ export function useSampleRunner(runner: PythonRunnerState) {
         /** Shared with the run this student reports to a watching teacher. */
         clientRunId?: string;
         sampleCount?: number;
+        /** How the server grades this problem; decides if a verdict is ours to give. */
+        gradingMode?: GradingProfileMode;
       },
     ): Promise<SampleRun> => {
       const outcome = await runner.run(code, {
@@ -56,6 +67,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
         expectedOutput: sample.expectedOutput,
         stopped: outcome.stopped,
         failed: outcome.failed,
+        comparesLocally: comparesSampleLocally(options?.gradingMode),
       });
 
       if (verdict.kind === 'match') {
@@ -72,7 +84,12 @@ export function useSampleRunner(runner: PythonRunnerState) {
           `${t('workspace.expected')}\n${verdict.expected || '(empty)'}\n`,
           'info',
         );
-      } else if (verdict.reason === 'error') {
+      } else if (verdict.kind === 'unchecked') {
+        runner.appendLine(
+          `\n${t('workspace.sample_checked_on_submit', { number: index + 1 })}\n`,
+          'info',
+        );
+      } else if (verdict.kind === 'skipped' && verdict.reason === 'error') {
         // A crash has no output worth comparing, and saying "wrong answer"
         // here would point at the wrong problem entirely.
         runner.appendLine(`\n${t('workspace.sample_skipped')}\n`, 'info');

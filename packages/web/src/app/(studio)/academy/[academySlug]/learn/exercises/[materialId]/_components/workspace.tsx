@@ -212,6 +212,7 @@ export function Workspace({
       const { outcome, verdict } = await runSample(draft.code, sample, index, {
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
+        gradingMode: exercise.gradingMode,
       });
       setActiveSample(null);
       if (!outcome || !verdict) {
@@ -229,13 +230,23 @@ export function Workspace({
       // field here a hidden case could travel in.
       monitoring.publishRun({
         clientRunId,
-        lifecycle: verdict.kind === 'match' ? 'COMPLETED' : 'FAILED',
+        // A run whose verdict is left to Submit completed; it did not fail.
+        lifecycle:
+          verdict.kind === 'match' || verdict.kind === 'unchecked'
+            ? 'COMPLETED'
+            : 'FAILED',
         sampleCount: exercise.sampleTestCases.length,
         passedCount: verdict.kind === 'match' ? 1 : 0,
         output: outcome.stdout,
       });
     },
-    [draft.code, exercise.sampleTestCases, monitoring, runSample],
+    [
+      draft.code,
+      exercise.gradingMode,
+      exercise.sampleTestCases,
+      monitoring,
+      runSample,
+    ],
   );
 
   /**

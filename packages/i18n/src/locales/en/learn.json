@@ -148,7 +148,14 @@
     "submission_unavailable": "That submission could not be loaded. This is the current version of the problem.",
     "back_to_records": "Back to answer records",
     "hints_description": "Open them one at a time — try the earlier ones first.",
-    "hints_none_yet": "No hints opened yet."
+    "hints_none_yet": "No hints opened yet.",
+    "sample_checked_on_submit": "Test {{number}} ran. This problem is graded by rules the browser does not reproduce exactly, so its result is decided when you submit.",
+    "sample_rule": {
+      "STDOUT_MATCH": "Output must contain this text",
+      "STDOUT_NOMATCH": "Output must not contain this text",
+      "STDOUT_REGEX": "Output must match this pattern",
+      "STDOUT_REGEX_NOMATCH": "Output must not match this pattern"
+    }
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",
@@ -160,6 +167,7 @@
     "score": "{{score}} / 100",
     "metric_score": "Score",
     "metric_passed": "Passed",
+    "metric_points": "Points",
     "metric_runtime": "Runtime",
     "test_results": "Test results",
     "sample_case": "Sample",

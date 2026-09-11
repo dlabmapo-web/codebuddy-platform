@@ -300,12 +300,14 @@ export class LearnService {
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
+        gradingMode: exercise.gradingMode,
         sampleTestCases: exercise.testCases
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
+            comparator: testCase.comparator,
           })),
         hints: exercise.hints.map((hint) => ({
           position: hint.position,

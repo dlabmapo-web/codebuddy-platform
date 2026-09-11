@@ -34,9 +34,20 @@ export function ResultMetrics({
   ).length;
   const total = result?.totalCount ?? cells.length;
   const passed = result?.passedCount ?? passedWhileGrading;
+  // Weighted grading only. Shown beside the score rather than instead of it:
+  // the score is what records and rankings read, the points are why it is 40
+  // and not 33.
+  const weighted =
+    result !== null &&
+    result.earnedWeight !== null &&
+    result.possibleWeight !== null;
 
   return (
-    <dl className="grid grid-cols-[1.35fr_1fr_1fr] gap-2">
+    <dl
+      className={`grid gap-2 ${
+        weighted ? 'grid-cols-[1.35fr_1fr_1fr_1fr]' : 'grid-cols-[1.35fr_1fr_1fr]'
+      }`}
+    >
       <Metric
         accent
         accentClass={scoreTone[presentation]}
@@ -51,6 +62,13 @@ export function ResultMetrics({
         testId="result-passed"
         value={total > 0 ? `${passed} / ${total}` : '— / —'}
       />
+      {weighted ? (
+        <Metric
+          label={t('submit.metric_points')}
+          testId="result-points"
+          value={`${result.earnedWeight} / ${result.possibleWeight}`}
+        />
+      ) : null}
       <Metric
         label={t('submit.metric_runtime')}
         testId="result-runtime"

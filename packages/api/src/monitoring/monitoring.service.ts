@@ -656,6 +656,7 @@ export class MonitoringService {
             starterCode: true,
             timeLimitMs: true,
             memoryLimitMb: true,
+            gradingMode: true,
             testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
             hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
           },
@@ -693,6 +694,7 @@ export class MonitoringService {
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
+        gradingMode: exercise.gradingMode,
         // Sample cases only, and hidden ones as a count. The teacher surface
         // reuses the student shape precisely so it cannot become the one place
         // a hidden expectation leaks.
@@ -702,6 +704,7 @@ export class MonitoringService {
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
+            comparator: testCase.comparator,
           })),
         hints: exercise.hints.map((hint) => ({
           position: hint.position,

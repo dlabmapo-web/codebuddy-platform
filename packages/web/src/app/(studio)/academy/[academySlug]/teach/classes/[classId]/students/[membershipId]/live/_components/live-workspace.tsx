@@ -246,10 +246,12 @@ export function LiveWorkspace({
       if (!sample) return;
       setOutputTab('you');
       setActiveSample(index);
-      await runSample(getCode(), sample, index);
+      await runSample(getCode(), sample, index, {
+        gradingMode: liveExercise?.exercise.gradingMode,
+      });
       setActiveSample(null);
     },
-    [getCode, runSample, sampleTestCases],
+    [getCode, liveExercise, runSample, sampleTestCases],
   );
 
   // A run the teacher has not looked at is worth a dot; one they are watching

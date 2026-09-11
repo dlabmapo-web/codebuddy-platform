@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  comparesSampleLocally,
   createSampleInputQueue,
   stdinActionFor,
   isSampleOutputMatch,
@@ -119,5 +120,37 @@ describe('stdinActionFor', () => {
     expect(stdinActionFor({ next: undefined, hasFixedInput: false })).toEqual({
       kind: 'prompt',
     });
+  });
+});
+
+describe('samples on weighted problems', () => {
+  it('claims no verdict when the server grades by rules the browser does not reproduce', () => {
+    expect(
+      resolveSampleVerdict({
+        stdout: 'A  \nB',
+        expectedOutput: 'A\nB',
+        stopped: false,
+        failed: false,
+        comparesLocally: false,
+      }),
+    ).toEqual({ kind: 'unchecked' });
+  });
+
+  it('still reports a crash, which needs no comparison', () => {
+    expect(
+      resolveSampleVerdict({
+        stdout: '',
+        expectedOutput: 'x',
+        stopped: false,
+        failed: true,
+        comparesLocally: false,
+      }),
+    ).toEqual({ kind: 'skipped', reason: 'error' });
+  });
+
+  it('compares locally only for legacy grading', () => {
+    expect(comparesSampleLocally('LEGACY_STDIO')).toBe(true);
+    expect(comparesSampleLocally(undefined)).toBe(true);
+    expect(comparesSampleLocally('ELICE_STDIO')).toBe(false);
   });
 });

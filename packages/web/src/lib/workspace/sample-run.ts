@@ -62,7 +62,25 @@ export function isSampleOutputMatch(actual: string, expected: string): boolean {
 export type SampleVerdict =
   | { kind: 'match' }
   | { kind: 'mismatch'; expected: string; actual: string }
-  | { kind: 'skipped'; reason: 'error' | 'stopped' };
+  | { kind: 'skipped'; reason: 'error' | 'stopped' }
+  /**
+   * The program ran, and this problem is graded by rules the browser does not
+   * reproduce — so no verdict is claimed. The server decides on Submit.
+   */
+  | { kind: 'unchecked' };
+
+/**
+ * Whether a sample's verdict can be decided here exactly as the server will.
+ *
+ * Only legacy comparison is: `normalizeSampleOutput` is byte-for-byte the
+ * judge's legacy normalizer. Weighted grading compares in CPython — Python's
+ * `splitlines`, `re.search`, substring rules — and a JavaScript imitation
+ * would pass samples that fail on Submit, or the reverse. Better to say
+ * nothing than to say something the grade will contradict.
+ */
+export function comparesSampleLocally(gradingMode: string | undefined): boolean {
+  return (gradingMode ?? 'LEGACY_STDIO') === 'LEGACY_STDIO';
+}
 
 /**
  * A run that crashed or was stopped has no output worth comparing — reporting
@@ -74,9 +92,12 @@ export function resolveSampleVerdict(input: {
   expectedOutput: string;
   stopped: boolean;
   failed: boolean;
+  /** False when the server grades by rules not reproduced here. */
+  comparesLocally?: boolean;
 }): SampleVerdict {
   if (input.stopped) return { kind: 'skipped', reason: 'stopped' };
   if (input.failed) return { kind: 'skipped', reason: 'error' };
+  if (input.comparesLocally === false) return { kind: 'unchecked' };
   if (isSampleOutputMatch(input.stdout, input.expectedOutput)) {
     return { kind: 'match' };
   }

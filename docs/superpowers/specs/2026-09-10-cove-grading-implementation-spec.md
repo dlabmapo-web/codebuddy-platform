@@ -1,7 +1,7 @@
 # Cove grading: buildable implementation spec
 
 Date: 2026-09-10
-Status: Milestone 0 implemented and tested (§2.5). Milestones 1–7 proposed; no schema migrated, no commit authorized.
+Status: Milestones 0–2 implemented and tested, including the student-code sandbox (§7.2). Milestone 3 authoring is partly delivered: the editor writes weighted profiles, but reference validation runs and publication diffs remain. Milestones 4–7 proposed.
 Source baseline: local HEAD `68e12de`, verified by reading the files cited below.
 
 ## 1. What this document is for
@@ -291,9 +291,9 @@ Sequenced so that nothing is authorable before a worker enforces it, per roles s
 
 | # | Deliverable | Exit gate |
 | --- | --- | --- |
-| **0** ⚠️ | Section 2 fresh execution, trusted result capture and hard termination | **Open.** Result integrity, termination, stdio fidelity, resource limits and the build gap are fixed and pinned by 42 tests (995 API tests, typecheck and lint clean). The sandbox boundary is a release blocker and is not addressed: student execution still shares the judge's container, identity and network namespace. |
+| **0** ✅ | Section 2 fresh execution, trusted result capture and hard termination | Result integrity, termination, stdio fidelity, resource limits and the build gap pinned by 42 tests. The sandbox boundary is closed by §7.2: student code runs in a separate network-less, secret-less container, one uid per case, demonstrated against the real image. |
 | 1 ✅ | Section 4 migration; section 5 contracts; `PASSED_WITH_WARNING` switch audit; legacy backfill | `grading.spec.ts` and `grading.service.spec.ts` green with zero score changes on existing fixtures |
-| 2 ◐ | Python comparator pool (section 3); five comparators; weights; soft limits; per-case + total budgets | Research spec §13 differential matrix passes; hard termination bounds catastrophic matching; supported local fixtures pass and Elice-executed comparisons are separately recorded |
+| 2 ✅ | Python comparator pool (section 3); five comparators; weights; soft limits; per-case + total budgets | Research spec §13 differential matrix passes; hard termination bounds catastrophic matching; wired into grading by §7.2. Elice-executed comparisons are still to be recorded separately. |
 | 3 | Authoring in existing `answers-editor.tsx` + library editor; reference-solution validation runs; publication diff | Team Lead and Manager independently publish the 30/30/40 fixture; adoption preserves it |
 | 4 | Student/teacher delivery; browser sample agreement (section 3.2); weighted records | End-to-end verdicts consistent; private cases and patterns never leave the server |
 | 5 | Academy Results board; adjustment lifecycle; extended Maintenance | Roles spec §12 scope and audit scenarios |
@@ -329,6 +329,81 @@ Three regression tests cover it, and all three fail against the previous code �
 **What has not changed:** no submission uses any of this yet. `GradingService` still runs the legacy path exclusively, so student-visible behaviour is identical. Wiring the enhanced path — profile dispatch, per-case comparator selection, weighted totals, continue-within-budget and abort handling — is the remaining half of milestone 2.
 
 `packages/api`: 1038 tests pass; workspace typecheck and lint clean.
+
+### 7.2 Review round: settings dropped, legacy-only grading, comparator lifecycle, sandbox
+
+Four findings against the branch. All four are fixed.
+
+**Grading settings were silently dropped.** The contract accepted comparator, weight and limits, and nothing wrote them. The fields had defaults on the wire too, so the editor — which sent only input, output and visibility — would have saved a 30/30/40 problem back as 1/1/1. Now:
+
+- Every case field and the exercise-level profile (`grading`) are *required* on create and update, never defaulted.
+- `gradingProfileIssues` (shared by editor and server) rejects what legacy grading cannot honour, rather than storing it unused. It also rejects a weighted profile worth nothing, a soft limit at or above the hard one, a case limit above the run's, and a negative rule on empty text.
+- `CourseService` persists, serializes and audits all of it. A change to any grading-affecting field — including a weight alone — bumps the revision.
+- One snapshot function (`grading-profile.ts`) freezes profile, cases, resolved per-case limits and a versioned policy snapshot. Both admission paths use it: `SubmissionService` and maintenance regrade.
+- Library adoption copies the profile.
+- A workbook cannot express weights, so an import that would change a weighted problem's tests is refused at planning (`weighted_tests_not_importable`). A weighted problem's cases are never rewritten on commit.
+
+**Student submissions used legacy grading.** `GradingService` now dispatches on the snapshotted mode *and* semantic version, and fails closed on anything unrecognised. That includes an unknown version, a missing policy snapshot, a weighted profile worth nothing, and a legacy snapshot carrying enhanced settings. Admission refuses the same profiles before an attempt exists.
+
+The enhanced path follows the §6 decision order:
+
+- Each case gets its own comparator (the CPython pool), its own limit capped by the remaining total budget, and its soft penalty.
+- It continues past wrong answers, crashes and individual timeouts.
+- A comparator timeout, invalid pattern or failure, an engine fault, and the total deadline all abort as `ERRORED` with `gradingAborted`, remaining cases `NOT_RUN`, and no progress, attempt or points. None of them becomes `WRONG_OUTPUT`.
+- Legacy grading is unchanged except that its skipped cases are now written `NOT_RUN`.
+
+The student sees earned/possible points beside the score, and per-case points. A slow-but-correct case is no longer picked as "the failure". A sample run on a weighted problem shows its output and says the verdict is decided on Submit, instead of judging it by the browser's legacy normalizer.
+
+**Comparator shutdown left work running.** The pool tracked only idle threads. It now tracks every thread (idle, leased, starting) and `dispose` returns only once each has stopped; a leased comparison settles as a grader error rather than running to its deadline. A thread that exits unexpectedly settles its request immediately. Replacement retries are bounded, and a failure is persistent: a caller with nothing idle, leased or starting fails at once and triggers a background recovery, instead of queueing forever. A retirement reserves its replacement's slot synchronously, so no caller sees an empty pool mid-replacement. `comparator-thread.ts` was also missing from the judge-worker build include — the same gap the runner had — and is now shipped and pinned by a test.
+
+**Student execution now has an enforced sandbox boundary.** `judge-sandbox` is a separate container from the same image (`sandbox.main.ts`):
+
+- `network_mode: none`, no `env_file`, and a read-only root with a small noexec tmpfs.
+- Root with every capability dropped except SETUID, SETGID and KILL, which it uses to spawn each runner under its own uid.
+- Each uid is swept of leftover processes before it is reused.
+- The judge reaches it only through a Unix socket that is `0660` in the judge's group, over a versioned, size-capped protocol. The judge validates every reply by request id and schema; anything else is an infrastructure fault.
+- The sandbox verifies its own isolation at boot and exits 78 if it can see a network interface, a secret-looking variable, or lacks identity switching.
+- The production judge refuses to start without `JUDGE_SANDBOX_SOCKET`, and refuses a sandbox whose version differs or that did not verify its isolation.
+
+Demonstrated against the built image, not argued:
+
+| Probe | Result |
+| --- | --- |
+| Sandbox self-check in its compose configuration | `isolated: true`; socket `srw-rw---- 0:1001`; three warm runners at uids 20000–20002; server CapEff `0xe0` (KILL, SETGID, SETUID); a runner's CapEff `0` |
+| Judge-uid container, `network: none`, socket mounted read-only | warm-up verified; `print(a+b)` → `PASSED 42`; each case under a fresh uid; `js.process.env` empty; `js.fetch` gone; `process.kill`/`exit` gone → `RUNTIME_ERROR`; busy loop → `TIME_LIMIT`; memory growth → `MEMORY_LIMIT` |
+| A runner uid with native code, i.e. the JS denylist fully bypassed | server and other runners' `environ`/`mem` → `EACCES`; signalling either → `EPERM`; TCP → `ENETUNREACH`; DNS → `EAI_AGAIN`; judge socket → `EACCES`; image filesystem → `EROFS`; interfaces: `lo` only |
+| Misconfigured sandbox | with a network, with `DATABASE_URL`/`REDIS_URL`, or as uid 1001: refuses, exit 78 |
+| Production judge without a sandbox socket | refuses to start |
+
+The per-case memory limit is still RSS sampling inside the sandbox (see §2.5). The container's own `mem_limit`/`pids_limit` are now the hard ceiling, and they bound a runaway to the sandbox rather than the judge.
+
+**The decisive test** (`weighted-grading.integration.spec.ts`, opt-in with `COVE_INTEGRATION_DATABASE_URL`):
+
+- Setup: a fresh PostgreSQL with every migration applied, real `CourseService`/`SubmissionService`/`GradingService`, a real runner per case and the real comparator.
+- A Manager authors E2 at 30/30/40 through the create contract. It reads back as written.
+- Real student submissions passing only the third case, the first two, and all three are shown **40, 60 and 100**. They print trailing spaces that only the Elice normalizer forgives, so the legacy path would have scored 0.
+- Each row carries the frozen profile, weights, resolved limits and `appliedScoreHundredths` 4000/6000/10000. Progress ends `SOLVED`, best 100, three attempts.
+- A submission queued before the Manager reweighted to 50/25/25 still grades 40; the next grades 25.
+
+**Follow-up review: two correctness gaps, both fixed.**
+
+*The total deadline could be exceeded waiting for a comparator.* A comparison's budget started only once it had an interpreter, and nothing checked the deadline before finalizing.
+- The pool now takes the submission's absolute `deadlineAt`, so queueing counts. A waiter still queued at the deadline leaves the queue.
+- A comparison cut short by the deadline returns `deadline`, distinct from its own `timeout`; the grader aborts it as `TOTAL_DEADLINE`.
+- The grader re-checks the deadline after every run, after every comparison, and once more before finalizing. A result that arrives late — for example after waiting for a runner — is aborted, not graded.
+
+*Recorded runtime versions were not enforced.* Weighted grading is now refused as `RUNTIME_VERSION_MISMATCH` (a judge fault, no attempt) unless the runner and comparator running now are the ones the policy snapshot records.
+- Both report their *actual* runtime: the engine reads the installed `pyodide` package and refuses a `PYODIDE_VERSION` that disagrees; each comparator thread reports `pyodide.version` when it becomes ready.
+- The pool refuses a replacement reporting a different version, or none, so it never mixes runtimes.
+- Legacy grading is deliberately not gated this way, to keep its behaviour unchanged. After an upgrade, a maintenance regrade snapshots against the new runtime and is the audited way forward.
+
+**Still open:**
+
+- Reference-solution validation runs and the publication diff (milestone 3).
+- Regex syntax is checked by the grader, not on save: a bad pattern surfaces as a judge error, never a wrong answer.
+- The browser does not yet run the Python comparator for samples (§3.2).
+- Message templates (`feedbackPolicy`) are neither authored nor applied.
+- The integration test drives the in-process engine; the sandbox round trip is covered separately in `sandbox.spec.ts` and in the container probes above.
 
 ## 8. Explicitly deferred
 

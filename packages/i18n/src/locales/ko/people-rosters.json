@@ -1,0 +1,54 @@
+{
+  "loading": "목록을 불러오는 중",
+  "not_set": "—",
+  "view_profile": "{{name}} 프로필 보기",
+  "showing": "{{total}}명 중 {{from}}–{{to}}",
+  "failed": "목록을 불러오지 못했습니다.",
+  "students": {
+    "title": "학생",
+    "description": "이 학원의 모든 학생입니다. 아이디, 반, 연락처를 한눈에 보고 프로필에서 수정할 수 있습니다.",
+    "search_placeholder": "이름, 아이디 또는 원생 번호",
+    "filter_class": "반",
+    "filter_status": "상태",
+    "column": {
+      "student": "학생",
+      "id": "아이디",
+      "number": "원생 번호",
+      "classes": "반",
+      "school": "학교 · 학년",
+      "guardian": "보호자",
+      "status": "상태",
+      "joined": "합류일"
+    },
+    "no_class": "미배정",
+    "empty_academy_title": "아직 학생이 없습니다",
+    "empty_academy_body": "학생이 가입하거나 구성원 페이지에서 가져오면 여기에 표시됩니다.",
+    "empty_title": "조건에 맞는 학생이 없습니다",
+    "empty_body": "검색어를 바꾸거나 필터를 지워 보세요."
+  },
+  "staff": {
+    "title": "교직원",
+    "description": "이 학원의 모든 선생님, 팀장, 관리자입니다. 여러 역할을 가진 사람은 각 역할에 모두 표시됩니다.",
+    "search_placeholder": "이름, 아이디, 이메일 또는 사번",
+    "filter_role": "역할",
+    "filter_status": "상태",
+    "column": {
+      "staff": "교직원",
+      "id": "아이디",
+      "roles": "역할",
+      "title": "직함",
+      "classes": "담당 반",
+      "phone": "연락처",
+      "status": "상태",
+      "employee_number": "사번",
+      "joined": "합류일"
+    },
+    "assistant_suffix": "(보조)",
+    "no_class": "없음",
+    "multi_role_note": "여러 역할을 가진 사람은 각 역할 필터에 모두 포함됩니다.",
+    "empty_academy_title": "아직 교직원이 없습니다",
+    "empty_academy_body": "구성원 페이지에서 선생님과 팀장을 초대하세요.",
+    "empty_title": "조건에 맞는 교직원이 없습니다",
+    "empty_body": "검색어를 바꾸거나 필터를 지워 보세요."
+  }
+}

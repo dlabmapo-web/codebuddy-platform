@@ -4,6 +4,7 @@ import type { AcademyRole } from '@cove/shared';
 import {
   BarChart3,
   BookOpen,
+  BriefcaseBusiness,
   ChevronsUpDown,
   ClipboardList,
   Coins,
@@ -527,6 +528,19 @@ export function studioNavGroups({
   const people: NavLink[] = [];
   if (canManageAcademy) {
     people.push({ href: `${base}/people`, labelKey: 'link.members', icon: Users });
+    // Two read-only views of the same memberships, beside the directory that
+    // changes them: the students an office looks up by class and guardian,
+    // and the staff it looks up by role. Manager-only, as the directory is.
+    people.push({
+      href: routes.academyStudents(academySlug),
+      labelKey: 'link.students',
+      icon: GraduationCap,
+    });
+    people.push({
+      href: routes.academyStaff(academySlug),
+      labelKey: 'link.staff',
+      icon: BriefcaseBusiness,
+    });
   }
   if (canReviewApplications) {
     people.push({

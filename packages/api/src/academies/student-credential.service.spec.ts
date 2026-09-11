@@ -116,6 +116,69 @@ describe("StudentCredentialService.issue", () => {
   });
 });
 
+describe("StudentCredentialService.issue with a typed password", () => {
+  it("sets exactly the password the manager typed and keeps it readable", async () => {
+    const { service, setPassword, upsert } = build();
+    const result = await service.issue(
+      actorId,
+      academyId,
+      membershipId,
+      "minji1234",
+    );
+
+    expect(setPassword).toHaveBeenCalledWith(authUserId, "minji1234");
+    expect(result.password).toBe("minji1234");
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(result.state.credential?.visiblePrefix).toBe("min");
+    expect(result.state.credential?.length).toBe(9);
+
+    const read = await service.reveal(actorId, academyId, membershipId);
+    expect(read.password).toBe("minji1234");
+  });
+
+  it("records that the password was typed, never what it was", async () => {
+    const { service, prisma } = build();
+    await service.issue(actorId, academyId, membershipId, "minji1234");
+
+    const create = prisma.auditLog.create as ReturnType<typeof vi.fn>;
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "academy.member.password.issued",
+          after: { source: "typed" },
+        }),
+      }),
+    );
+    expect(JSON.stringify(create.mock.calls)).not.toContain("minji1234");
+  });
+
+  it("records a generated password as generated", async () => {
+    const { service, prisma } = build();
+    await service.issue(actorId, academyId, membershipId);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ after: { source: "generated" } }),
+      }),
+    );
+  });
+
+  it("refuses Hangul typed in the wrong keyboard mode before touching Supabase", async () => {
+    const { service, setPassword } = build();
+    await expect(
+      service.issue(actorId, academyId, membershipId, "ㅡㅑㅜㅓㅑ1234"),
+    ).rejects.toMatchObject({ code: "STUDENT_PASSWORD_CHARACTERS" });
+    expect(setPassword).not.toHaveBeenCalled();
+  });
+
+  it("refuses a password that is too short", async () => {
+    const { service, setPassword } = build();
+    await expect(
+      service.issue(actorId, academyId, membershipId, "abc123"),
+    ).rejects.toMatchObject({ code: "STUDENT_PASSWORD_REJECTED" });
+    expect(setPassword).not.toHaveBeenCalled();
+  });
+});
+
 describe("StudentCredentialService target checks", () => {
   it("refuses a member who holds a staff role", async () => {
     const { service } = build({

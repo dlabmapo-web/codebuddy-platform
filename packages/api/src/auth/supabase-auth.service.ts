@@ -127,6 +127,16 @@ export class SupabaseAuthService {
     const { error } = await this.client.auth.admin.updateUserById(authUserId, {
       password,
     });
+    // Supabase's own policy refusing the value — too weak, too common. Now
+    // that a manager chooses the password, this is the refusal they will
+    // actually meet, and "passwords can only be issued to students" would
+    // send them looking for a permissions problem that is not there.
+    if (error && (error.code === "weak_password" || error.status === 422)) {
+      throw new AppException(
+        "STUDENT_PASSWORD_REJECTED",
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
     if (error) {
       throw new AppException(
         "STUDENT_CREDENTIAL_TARGET_INVALID",

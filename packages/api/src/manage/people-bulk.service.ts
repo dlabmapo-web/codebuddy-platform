@@ -26,6 +26,7 @@ import {
   type ManagerActor,
 } from "./manager-scope.service.js";
 import { bumpPeopleRevision } from "./people-revision.js";
+import { peopleWhere } from "./people-where.js";
 
 /**
  * §12 — bulk enrolment, role changes, suspension, and restoration.
@@ -311,49 +312,14 @@ export class PeopleBulkService {
       selection.mode === "ids"
         ? { academyId, id: { in: selection.membershipIds } }
         : {
-            academyId,
+            // The Members page's own predicate, so "all matching" is exactly
+            // the set the manager was looking at — any held role, the same
+            // search fields — and never a near neighbour of it.
+            ...peopleWhere(academyId, selection),
             id:
               selection.excludedMembershipIds.length > 0
                 ? { notIn: selection.excludedMembershipIds }
                 : undefined,
-            status:
-              selection.statuses.length > 0
-                ? { in: selection.statuses }
-                : { not: "LEFT" },
-            ...(selection.roles.length > 0
-              ? { role: { in: selection.roles } }
-              : {}),
-            user: { status: { not: "DELETED" } },
-            ...(selection.search
-              ? {
-                  OR: [
-                    {
-                      user: {
-                        displayName: {
-                          contains: selection.search,
-                          mode: "insensitive",
-                        },
-                      },
-                    },
-                    {
-                      user: {
-                        email: {
-                          contains: selection.search,
-                          mode: "insensitive",
-                        },
-                      },
-                    },
-                    {
-                      memberProfile: {
-                        academyDisplayName: {
-                          contains: selection.search,
-                          mode: "insensitive",
-                        },
-                      },
-                    },
-                  ],
-                }
-              : {}),
           };
 
     const members = await client.academyMembership.findMany({

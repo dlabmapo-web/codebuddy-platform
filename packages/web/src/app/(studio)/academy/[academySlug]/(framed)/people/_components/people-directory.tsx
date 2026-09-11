@@ -16,7 +16,6 @@ import {
   academyRoles,
   canCombineAcademyRoles,
   membershipStatuses,
-  peoplePageSizes,
   peopleSortFields,
 } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -49,7 +48,11 @@ import {
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { cn } from '@/lib/utils';
 
-import { roleTones, statusTones } from '../../_lib/manager-view';
+import { PageSizePicker } from '../../_components/page-size-picker';
+import { StatusBadge, UsernameCell } from '../../_components/people-cells';
+import { useDebouncedSearch } from '../../_hooks/use-url-table-query';
+import { compactDate } from '../../_lib/compact-date';
+import { roleTones } from '../../_lib/manager-view';
 import { EmptyState, Panel, toneStyles } from '../../_components/overview-ui/panel';
 import {
   usePeopleDirectoryQuery,
@@ -96,7 +99,7 @@ export function PeopleDirectory({
   // grew past the per-file budget in `@cove/i18n` — and this page mounts both.
   const { t: tOps } = useTranslation('people-ops');
   const errorText = useErrorText();
-  const { query, change } = usePeopleDirectoryState(academyId);
+  const { query, change } = usePeopleDirectoryState();
   const page = usePeopleDirectoryQuery(academyId, query, initialData, initialKey);
   const mutations = usePeopleMutations(academyId);
   const [importing, setImporting] = React.useState(false);
@@ -133,25 +136,14 @@ export function PeopleDirectory({
     setExcluded(new Set());
   }, []);
 
-  // Typed locally and pushed to the URL on a pause, so a manager typing "kim"
-  // makes one request rather than three.
-  //
-  // The box adopts the URL during render rather than from an effect. A Back
-  // navigation changes the query while the reader is not typing, and syncing it
-  // after paint would show the previous search in the box for one frame — on a
-  // control the reader is looking straight at.
-  const [searchInput, setSearchInput] = React.useState(query.search);
-  const [adopted, setAdopted] = React.useState(query.search);
-  if (adopted !== query.search) {
-    setAdopted(query.search);
-    setSearchInput(query.search);
-  }
-
-  React.useEffect(() => {
-    if (searchInput === query.search) return;
-    const timer = window.setTimeout(() => change({ search: searchInput }), 300);
-    return () => window.clearTimeout(timer);
-  }, [change, query.search, searchInput]);
+  const commitSearch = React.useCallback(
+    (search: string) => change({ search }),
+    [change],
+  );
+  const [searchInput, setSearchInput] = useDebouncedSearch(
+    query.search,
+    commitSearch,
+  );
 
   const data = page.data;
 
@@ -263,6 +255,16 @@ export function PeopleDirectory({
         ),
       },
       {
+        // The sign-in name, under the word a Korean manager uses for it —
+        // 아이디 — rather than "username", which reads as the display name.
+        id: 'username',
+        accessorFn: (row) => row.username,
+        header: t('people.column.id'),
+        size: 128,
+        enableHiding: false,
+        cell: ({ row }) => <UsernameCell username={row.original.username} />,
+      },
+      {
         id: 'role',
         accessorFn: (row) => row.role,
         header: t('people.column.role'),
@@ -293,16 +295,7 @@ export function PeopleDirectory({
         accessorFn: (row) => row.status,
         header: t('people.column.status'),
         size: 112,
-        cell: ({ row }) => (
-          <span
-            className={cn(
-              'inline-flex rounded-full px-2.5 py-0.5 text-[11.5px] font-bold',
-              statusTones[row.original.status],
-            )}
-          >
-            {t(`status.${row.original.status}`)}
-          </span>
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: 'classes',
@@ -828,67 +821,4 @@ function RowActions({
       </DropdownMenu>
     </div>
   );
-}
-
-/**
- * How many rows a page holds.
- *
- * Three sizes rather than a free number, because the server accepts three: a
- * control that could ask for 5,000 rows would be a control that sometimes
- * returns an error a manager cannot act on.
- *
- * Changing it deliberately does *not* reset the page. It widens the window on
- * the result the manager is already reading, rather than sending them back to
- * the top of it.
- */
-function PageSizePicker({
-  onChange,
-  value,
-}: {
-  onChange: (pageSize: (typeof peoplePageSizes)[number]) => void;
-  value: number;
-}) {
-  const { t } = useTranslation('manager');
-  const id = React.useId();
-  return (
-    <span className="flex items-center gap-1.5">
-      <label className="text-[12px] font-bold text-sub" htmlFor={id}>
-        {t('people.page_size')}
-      </label>
-      <select
-        className="h-10 rounded-lg border border-border bg-card px-2 text-[13px] font-bold outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
-        id={id}
-        onChange={(event) =>
-          onChange(
-            Number(event.target.value) as (typeof peoplePageSizes)[number],
-          )
-        }
-        value={value}
-      >
-        {peoplePageSizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
-    </span>
-  );
-}
-
-/**
- * A date short enough to fit a fixed column.
- *
- * `2026-07-23` rather than `Jul 23, 2026`: it is a third narrower, it sorts
- * visually, and in tabular figures a column of them lines up so a manager can
- * scan for the recent ones. The long form is what pushed this table into a
- * horizontal scrollbar.
- */
-function compactDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .format(new Date(iso))
-    .replace(/\s/g, '');
 }

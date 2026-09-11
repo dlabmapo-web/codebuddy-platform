@@ -142,7 +142,7 @@ test('signing up with an address that already has an account says so', async ({
   await page.getByRole('combobox').click();
   await page.getByRole('option').first().click();
   await page.getByLabel('Name', { exact: true }).fill('Already Registered');
-  await page.getByLabel('Username').fill(`dupe-${Date.now().toString(36)}`);
+  await page.getByLabel('ID', { exact: true }).fill(`dupe-${Date.now().toString(36)}`);
   await page.getByLabel('Email').fill(EXISTING_EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
 

@@ -14,77 +14,42 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import * as React from 'react';
-
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { orpc } from '@/lib/orpc';
+
+import { useUrlTableQuery } from '../../_hooks/use-url-table-query';
 
 export type PeopleQuery = Omit<ListPeopleInput, 'academyId'>;
 
 /**
- * The directory's table state, held in the URL.
- *
- * §10 — page, size, search, filters, sort, and direction all live in the
- * address, so a manager can send "suspended teachers, by join date" to a
- * colleague and Back from a member's profile returns to the page they were on
- * rather than to a reset table.
- *
- * Changes are written with `replaceState`. Typing seven characters into the
- * search box must not put seven entries in the reader's history, and Back from
- * this page should leave it rather than walk backwards through their own
- * keystrokes.
- *
- * Anything unparseable falls back to a default rather than failing. The query
- * string is user-editable text arriving from bookmarks, chat messages, and
- * previous versions of this page; §10 makes an invalid address a page, never an
- * error.
+ * The directory's table state, held in the URL — §10. The mechanics are
+ * `useUrlTableQuery`'s, shared with the Students and Staff rosters; what is
+ * the directory's own is its reader, its writer, and its page-one rule.
  */
-export function usePeopleDirectoryState(academyId: string) {
+export function usePeopleDirectoryState() {
   const academySlug = useAcademySlug();
-  const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
+  return useUrlTableQuery<PeopleQuery>({
+    basePath: routes.academyPeople(academySlug),
+    parse: parsePeopleQuery,
+    resetsToFirstPage: directoryResetsToFirstPage,
+    serialize: serializePeopleQuery,
+  });
+}
 
-  const urlQuery = React.useMemo(
-    () => parsePeopleQuery(Object.fromEntries(readAll(searchKey))),
-    [searchKey],
+/** §10's rule, on the query without its academy. */
+function directoryResetsToFirstPage(
+  previous: PeopleQuery,
+  next: PeopleQuery,
+): boolean {
+  return resetsToFirstPage(
+    { ...previous, academyId: '' },
+    { ...next, academyId: '' },
   );
-
-  const [query, setQuery] = React.useState<PeopleQuery>(urlQuery);
-  const [urlKey, setUrlKey] = React.useState(searchKey);
-  if (urlKey !== searchKey) {
-    setUrlKey(searchKey);
-    setQuery(urlQuery);
-  }
-
-  const path = peoplePath(academySlug, query);
-  React.useEffect(() => {
-    if (path !== `${window.location.pathname}${window.location.search}`) {
-      window.history.replaceState(null, '', path);
-    }
-  }, [path]);
-
-  const change = React.useCallback((partial: Partial<PeopleQuery>) => {
-    setQuery((current) => {
-      const next = { ...current, ...partial };
-      // §10 — anything that changes *which* rows match sends the reader back to
-      // page one. Staying on page 9 of a result that now has two pages is the
-      // fastest way to make a working table look broken.
-      return resetsToFirstPage(
-        { ...current, academyId: '' } as ListPeopleInput,
-        { ...next, academyId: '' } as ListPeopleInput,
-      )
-        ? { ...next, page: 1 }
-        : next;
-    });
-  }, []);
-
-  return { query, path, change };
 }
 
 export function peoplePath(academySlug: string, query: PeopleQuery): string {
   const search = serializePeopleQuery(query);
-  const base = `${routes.academy(academySlug)}/people`;
+  const base = routes.academyPeople(academySlug);
   return search ? `${base}?${search}` : base;
 }
 
@@ -110,19 +75,6 @@ export function usePeopleDirectoryQuery(
     staleTime: 15_000,
     retry: false,
   });
-}
-
-/** Repeated parameters kept as arrays, which is how filters arrive. */
-function readAll(search: string): [string, string | string[]][] {
-  const params = new URLSearchParams(search);
-  const grouped = new Map<string, string[]>();
-  for (const [key, value] of params.entries()) {
-    grouped.set(key, [...(grouped.get(key) ?? []), value]);
-  }
-  return [...grouped.entries()].map(([key, values]) => [
-    key,
-    values.length === 1 ? values[0] : values,
-  ]);
 }
 
 /** Roles a manager may filter by, in the vocabulary's own order. */
@@ -154,6 +106,14 @@ export function usePeopleMutations(academyId: string) {
   const invalidate = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['academy-people', academyId] }),
+      // The rosters read the same memberships. A teacher suspended here must
+      // not still read as active on Staff for the next fifteen seconds.
+      queryClient.invalidateQueries({
+        queryKey: ['academy-student-roster', academyId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['academy-staff-roster', academyId],
+      }),
       queryClient.invalidateQueries({
         queryKey: ['academy-operations-overview', academyId],
       }),

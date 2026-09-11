@@ -23,6 +23,13 @@ export type FacetOption = {
   label: string;
   value: string;
   icon?: React.ComponentType<{ className?: string }>;
+  /**
+   * How many rows this value would return, as the server counted it.
+   *
+   * For a server-paged table, whose faceted row model only sees the page in
+   * hand. Shown when `showCounts` is on, in place of the browser's count.
+   */
+  count?: number;
 };
 
 export type TableFacet = {
@@ -155,9 +162,10 @@ export function FacetedFilter<TData, TValue>({
                       <option.icon className="size-4 text-sub" />
                     ) : null}
                     <span className="flex-1">{option.label}</span>
-                    {counts?.get(option.value) ? (
+                    {showCounts &&
+                    (option.count ?? counts?.get(option.value)) !== undefined ? (
                       <span className="font-mono text-[12px] tabular-nums text-sub">
-                        {counts.get(option.value)}
+                        {option.count ?? counts?.get(option.value)}
                       </span>
                     ) : null}
                   </CommandItem>

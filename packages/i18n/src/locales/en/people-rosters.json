@@ -1,0 +1,54 @@
+{
+  "loading": "Loading the list",
+  "not_set": "—",
+  "view_profile": "Open {{name}}'s profile",
+  "showing": "{{from}}–{{to}} of {{total}}",
+  "failed": "The list could not load.",
+  "students": {
+    "title": "Students",
+    "description": "Every student in this academy, with their ID, classes, and contact details. Open a profile to edit it.",
+    "search_placeholder": "Name, ID, or student number",
+    "filter_class": "Class",
+    "filter_status": "Status",
+    "column": {
+      "student": "Student",
+      "id": "ID",
+      "number": "Student no.",
+      "classes": "Classes",
+      "school": "School · Grade",
+      "guardian": "Guardian",
+      "status": "Status",
+      "joined": "Joined"
+    },
+    "no_class": "No class",
+    "empty_academy_title": "No students yet",
+    "empty_academy_body": "Students appear here once they join or are imported on the Members page.",
+    "empty_title": "No students match",
+    "empty_body": "Try a different search or clear a filter."
+  },
+  "staff": {
+    "title": "Staff",
+    "description": "Every teacher, team lead, and manager in this academy. Someone with several roles appears under each of them.",
+    "search_placeholder": "Name, ID, email, or employee no.",
+    "filter_role": "Role",
+    "filter_status": "Status",
+    "column": {
+      "staff": "Staff",
+      "id": "ID",
+      "roles": "Roles",
+      "title": "Title",
+      "classes": "Classes taught",
+      "phone": "Phone",
+      "status": "Status",
+      "employee_number": "Employee no.",
+      "joined": "Joined"
+    },
+    "assistant_suffix": "(assistant)",
+    "no_class": "None",
+    "multi_role_note": "People with several roles are counted under each role filter.",
+    "empty_academy_title": "No staff yet",
+    "empty_academy_body": "Invite teachers and team leads from the Members page.",
+    "empty_title": "No staff match",
+    "empty_body": "Try a different search or clear a filter."
+  }
+}

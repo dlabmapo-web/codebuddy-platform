@@ -29,6 +29,8 @@ export const appErrorCodes = [
   "STUDENT_CREDENTIAL_TARGET_INVALID",
   "STUDENT_CREDENTIAL_NOT_STORED",
   "STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE",
+  "STUDENT_PASSWORD_REJECTED",
+  "STUDENT_PASSWORD_CHARACTERS",
   "SIGNUP_STUDENT_FAILED",
   "CAPTCHA_FAILED",
   "RATE_LIMITED",
@@ -386,6 +388,15 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // shows the password once; there is simply nothing kept to read back.
   STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE:
     "Saved passwords are not available on this server. Issue a new one to see it once.",
+  // Supabase's own password policy refused it — too common, or too weak for
+  // the project's settings. Distinct from "not your student", which is what
+  // every refusal used to read as.
+  STUDENT_PASSWORD_REJECTED:
+    "This password cannot be used. Try a longer or less common one.",
+  // Hangul, spaces, or anything outside printable ASCII. The form catches
+  // this first; the API says the same for a request that skipped the form.
+  STUDENT_PASSWORD_CHARACTERS:
+    "Use only English letters, numbers, and symbols, with no spaces.",
   SIGNUP_STUDENT_FAILED: "The student account could not be created.",
   CAPTCHA_FAILED:
     "The security check could not be completed. Refresh the page and try again.",

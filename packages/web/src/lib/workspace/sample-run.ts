@@ -61,6 +61,11 @@ export function isSampleOutputMatch(actual: string, expected: string): boolean {
 
 export type SampleVerdict =
   | { kind: 'match' }
+  /**
+   * Server-judged only: the output matched, but slower than the case's soft
+   * threshold, so on Submit this case would lose points. Never a plain pass.
+   */
+  | { kind: 'warning' }
   | { kind: 'mismatch'; expected: string; actual: string }
   | { kind: 'skipped'; reason: 'error' | 'stopped' }
   /**
@@ -106,4 +111,32 @@ export function resolveSampleVerdict(input: {
     expected: normalizeSampleOutput(input.expectedOutput),
     actual: normalizeSampleOutput(input.stdout),
   };
+}
+
+/** A server check in flight, as far as stopping it is concerned. */
+export type StoppableCheck = {
+  /** Null until the server has accepted the check and named it. */
+  checkId: string | null;
+  /** A cancel already on its way; a second press must not double-send. */
+  cancelInFlight: boolean;
+};
+
+export type StopAction =
+  /** Nothing to stop. */
+  | { kind: 'none' }
+  /**
+   * The check is still being accepted, so there is no id to cancel yet.
+   * The press is remembered and sent the moment the id arrives — dropping it
+   * would leave a student who pressed Stop early watching a check they
+   * believed they had stopped.
+   */
+  | { kind: 'defer' }
+  | { kind: 'send'; checkId: string };
+
+/** What a Stop press should do about the check in flight. */
+export function stopActionFor(check: StoppableCheck | null): StopAction {
+  if (!check) return { kind: 'none' };
+  if (check.cancelInFlight) return { kind: 'none' };
+  if (!check.checkId) return { kind: 'defer' };
+  return { kind: 'send', checkId: check.checkId };
 }

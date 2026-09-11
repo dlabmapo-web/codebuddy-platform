@@ -155,7 +155,25 @@
       "STDOUT_NOMATCH": "Output must not contain this text",
       "STDOUT_REGEX": "Output must match this pattern",
       "STDOUT_REGEX_NOMATCH": "Output must not match this pattern"
-    }
+    },
+    "sample_check_banner": "sample check · Test {{number}}",
+    "sample_check_queued": "Queued on the grading server…",
+    "sample_check_running": "Running on the grading server…",
+    "sample_check_stopping": "Stopping… a program already running finishes its bounded run first.",
+    "sample_check_passed": "Sample {{number}} passed. Submit checks all grading cases.",
+    "sample_check_warning": "Sample {{number}}'s output matched, but it ran slower than this case's time target, so it would lose points on Submit.",
+    "sample_check_mismatch": "Sample {{number}} did not match.",
+    "sample_check_runtime_error": "Sample {{number}} raised an error.",
+    "sample_check_time_limit": "Sample {{number}} exceeded its time limit.",
+    "sample_check_memory_limit": "Sample {{number}} exceeded its memory limit.",
+    "sample_check_unavailable": "Sample could not be checked. Try again later.",
+    "sample_check_timed_out": "Sample check timed out. Try again.",
+    "sample_check_cancelled": "Sample check stopped.",
+    "sample_check_expired": "This sample check expired. Run it again.",
+    "sample_check_truncated": "(Output shortened for display. The whole output was checked.)",
+    "sample_check_earlier_code": "This result is for your code as it was when you pressed Test {{number}}.",
+    "sample_check_refresh": "This problem changed after the check. Refresh the page to see its current samples.",
+    "stopping": "Stopping…"
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",

@@ -97,7 +97,7 @@ export function Workspace({
   const formatError = usePythonErrorLines();
   const headline = usePythonErrorHeadline();
   const runner = usePythonRunner({ formatError });
-  const runSample = useSampleRunner(runner);
+  const { runSample, serverCheck } = useSampleRunner(runner);
   const navigation = useExerciseNavigation({
     academyId,
     bootstrap,
@@ -191,6 +191,15 @@ export function Workspace({
     minPx: monitoring.collaborating ? STATEMENT_CANVAS_MIN_WIDTH : undefined,
     max: STATEMENT_PANE.maxPercent,
   });
+  /**
+   * The editor's code now. A server check snapshots the code at the click,
+   * and a result that comes back after the student kept typing says so.
+   */
+  const latestCodeRef = React.useRef(draft.code);
+  React.useEffect(() => {
+    latestCodeRef.current = draft.code;
+  }, [draft.code]);
+
   const handleRunSample = React.useCallback(
     async (index: number) => {
       const sample = exercise.sampleTestCases[index];
@@ -209,12 +218,35 @@ export function Workspace({
       // One id for both halves of the report: the presence summary and the
       // mirrored terminal describe the same execution, so a teacher cannot see
       // a transcript from one run beside a verdict from another.
-      const { outcome, verdict } = await runSample(draft.code, sample, index, {
+      const { outcome, verdict, report } = await runSample(draft.code, sample, index, {
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
         gradingMode: exercise.gradingMode,
+        // Judged on the server, by Submit's rules, where the academy has it
+        // on. Otherwise the browser runs it and says nothing it cannot back.
+        server: exercise.serverSampleChecks
+          ? {
+              academyId,
+              classId,
+              materialId: exercise.materialId,
+              workspaceRevision: exercise.gradingRevision,
+              currentCode: () => latestCodeRef.current,
+            }
+          : undefined,
       });
       setActiveSample(null);
+      // A server check that ended without judging the program — stopped,
+      // timed out, unavailable — reports as cancelled, never as a wrong answer.
+      if (report && (report.lifecycle === 'CANCELLED' || !outcome)) {
+        monitoring.publishRun({
+          clientRunId,
+          lifecycle: 'CANCELLED',
+          sampleCount: exercise.sampleTestCases.length,
+          passedCount: 0,
+          output: outcome?.stdout ?? '',
+        });
+        return;
+      }
       if (!outcome || !verdict) {
         monitoring.publishRun({
           clientRunId,
@@ -232,18 +264,24 @@ export function Workspace({
         clientRunId,
         // A run whose verdict is left to Submit completed; it did not fail.
         lifecycle:
-          verdict.kind === 'match' || verdict.kind === 'unchecked'
+          report?.lifecycle ??
+          (verdict.kind === 'match' || verdict.kind === 'unchecked'
             ? 'COMPLETED'
-            : 'FAILED',
+            : 'FAILED'),
         sampleCount: exercise.sampleTestCases.length,
-        passedCount: verdict.kind === 'match' ? 1 : 0,
+        passedCount: report?.passedCount ?? (verdict.kind === 'match' ? 1 : 0),
         output: outcome.stdout,
       });
     },
     [
+      academyId,
+      classId,
       draft.code,
       exercise.gradingMode,
+      exercise.gradingRevision,
+      exercise.materialId,
       exercise.sampleTestCases,
+      exercise.serverSampleChecks,
       monitoring,
       runSample,
     ],
@@ -359,6 +397,9 @@ export function Workspace({
       canStart: () => !busy,
       beforeCommit: () => {
         draft.flushNow();
+        // A server check belongs to the problem being left: its answer must
+        // not land in the next problem's terminal, and the server can stop it.
+        serverCheck.abandon();
         runner.stop();
         runner.clear();
         submission.reset();
@@ -371,7 +412,7 @@ export function Workspace({
     return () => {
       beforeTransitionRef.current = null;
     };
-  }, [busy, draft, runner, submission]);
+  }, [busy, draft, runner, serverCheck, submission]);
 
   const handleNavigate = navigation.navigate;
 
@@ -570,6 +611,7 @@ export function Workspace({
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
+              serverCheck={serverCheck}
               onTabChange={handleOutputTabChange}
               runner={runner}
               sampleTestCases={exercise.sampleTestCases}

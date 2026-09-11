@@ -50,6 +50,7 @@ export function EditorPane({
   onEditorMount,
   onFocusLine,
   unreadResult,
+  serverCheck,
 }: {
   code: string;
   onCodeChange: (value: string) => void;
@@ -67,6 +68,8 @@ export function EditorPane({
   unreadResult: boolean;
   /** Puts the editor caret on the line the coach is pointing at. */
   onFocusLine?: (line: number, column: number) => void;
+  /** A sample check judged on the server, which Stop must reach too. */
+  serverCheck?: { active: boolean; stopping: boolean; stop: () => void };
 }) {
   const { t } = useLayoutTranslation('learn');
   const preferences = useEditorPreferences();
@@ -205,9 +208,10 @@ export function EditorPane({
             activeSample={activeSample}
             onRun={onRun}
             onRunSample={onRunSample}
-            onStop={runner.stop}
+            onStop={serverCheck?.active ? serverCheck.stop : runner.stop}
             ready={runner.ready}
-            running={runner.running}
+            running={runner.running || Boolean(serverCheck?.active)}
+            stopping={Boolean(serverCheck?.stopping)}
             sampleTestCases={sampleTestCases}
           />
         </div>

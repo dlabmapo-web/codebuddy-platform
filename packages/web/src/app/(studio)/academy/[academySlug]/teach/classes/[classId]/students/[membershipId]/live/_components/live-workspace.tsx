@@ -76,7 +76,8 @@ export function LiveWorkspace({
     studentMembershipId: membershipId,
   });
   const runner = usePythonRunner();
-  const runSample = useSampleRunner(runner);
+  // Local runs only: the teacher's copy never claims a server verdict.
+  const { runSample } = useSampleRunner(runner);
   const preferences = useEditorPreferences();
 
   const [outputTab, setOutputTab] = React.useState<LiveOutputTab>('you');

@@ -5,6 +5,7 @@ import {
   createSampleInputQueue,
   stdinActionFor,
   isSampleOutputMatch,
+  stopActionFor,
   normalizeSampleOutput,
   resolveSampleVerdict,
 } from './sample-run';
@@ -152,5 +153,30 @@ describe('samples on weighted problems', () => {
     expect(comparesSampleLocally('LEGACY_STDIO')).toBe(true);
     expect(comparesSampleLocally(undefined)).toBe(true);
     expect(comparesSampleLocally('ELICE_STDIO')).toBe(false);
+  });
+});
+
+describe('stopping a server check', () => {
+  it('remembers a Stop pressed before the check has an id', () => {
+    // The reported issue: the press was dropped, so a student who hit Stop
+    // while the check was being accepted watched it run anyway.
+    expect(stopActionFor({ checkId: null, cancelInFlight: false })).toEqual({
+      kind: 'defer',
+    });
+  });
+
+  it('cancels by id once there is one', () => {
+    expect(stopActionFor({ checkId: 'c1', cancelInFlight: false })).toEqual({
+      kind: 'send',
+      checkId: 'c1',
+    });
+  });
+
+  it('does not send a second cancel while one is on its way', () => {
+    expect(stopActionFor({ checkId: 'c1', cancelInFlight: true })).toEqual({ kind: 'none' });
+  });
+
+  it('has nothing to stop when no check is in flight', () => {
+    expect(stopActionFor(null)).toEqual({ kind: 'none' });
   });
 });

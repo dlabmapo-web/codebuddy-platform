@@ -438,6 +438,64 @@ export function usePythonRunner(options?: {
     [commit, flush, publish],
   );
 
+  /**
+   * A transcript for a program that runs somewhere else.
+   *
+   * A server-judged sample check executes in the grading sandbox, not in this
+   * worker, but the student's terminal and the teacher's mirror of it must
+   * still show one run with a beginning, narration and an end. This starts
+   * that run exactly as `run` does — same reset, same event — without
+   * executing anything here; `finishExternalRun` closes it.
+   */
+  const beginExternalRun = React.useCallback(
+    (options: { clientRunId: string; banner: TerminalLine[]; sampleCount: number }) => {
+      bufferRef.current = [];
+      stdoutRef.current = '';
+      failedRef.current = false;
+      errorRef.current = null;
+      setLastError(null);
+      runRef.current = {
+        clientRunId: options.clientRunId,
+        sampleCount: options.sampleCount,
+        lifecycle: null,
+      };
+      commit(
+        startTranscript(transcriptRef.current, {
+          clientRunId: options.clientRunId,
+          lines: options.banner,
+          sampleCount: options.sampleCount,
+          awaitingInput: false,
+        }),
+      );
+      publish({
+        type: 'reset',
+        clientRunId: options.clientRunId,
+        lines: options.banner,
+        sampleCount: options.sampleCount,
+        awaitingInput: false,
+      });
+    },
+    [commit, publish],
+  );
+
+  const finishExternalRun = React.useCallback(
+    (lifecycle: Exclude<TerminalLifecycle, 'STARTED'>, passedCount: number) => {
+      const run = runRef.current;
+      if (!run) return;
+      flush();
+      run.lifecycle = lifecycle;
+      commit(
+        settleTranscript(transcriptRef.current, {
+          lifecycle,
+          passedCount,
+          sampleCount: run.sampleCount,
+        }),
+      );
+      publish({ type: 'finish', lifecycle, passedCount, sampleCount: run.sampleCount });
+    },
+    [commit, flush, publish],
+  );
+
   const clear = React.useCallback(() => {
     bufferRef.current = [];
     runRef.current = null;
@@ -483,6 +541,8 @@ export function usePythonRunner(options?: {
     submitInput,
     appendLine,
     settleRun,
+    beginExternalRun,
+    finishExternalRun,
     subscribeTerminal,
     readTranscript,
     clear,

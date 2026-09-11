@@ -30,8 +30,14 @@ export function RunControls({
   onRun,
   onRunSample,
   onStop,
+  stopping = false,
 }: {
   running: boolean;
+  /**
+   * A server check asked to stop, whose program is still finishing its
+   * bounded run. Shown rather than hidden: the slot is not free yet.
+   */
+  stopping?: boolean;
   ready: boolean;
   sampleTestCases: LearnSampleTestCase[];
   activeSample: number | null;
@@ -44,12 +50,17 @@ export function RunControls({
   if (running) {
     return (
       <button
-        className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger"
+        className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger disabled:opacity-60"
+        disabled={stopping}
         onClick={onStop}
         type="button"
       >
-        <Square className="size-3" />
-        {t('workspace.stop')}
+        {stopping ? (
+          <LoaderCircle className="size-3 animate-spin" />
+        ) : (
+          <Square className="size-3" />
+        )}
+        {stopping ? t('workspace.stopping') : t('workspace.stop')}
       </button>
     );
   }

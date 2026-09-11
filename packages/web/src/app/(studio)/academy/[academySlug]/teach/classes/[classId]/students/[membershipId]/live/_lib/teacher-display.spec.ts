@@ -46,6 +46,8 @@ function snapshot(materialId: string): MonitoringExercisePreview {
       timeLimitMs: 1_000,
       memoryLimitMb: 256,
       gradingMode: 'LEGACY_STDIO',
+      gradingRevision: 1,
+      serverSampleChecks: false,
       sampleTestCases: [],
       hints: [],
       hiddenTestCaseCount: 0,

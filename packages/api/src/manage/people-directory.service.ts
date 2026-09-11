@@ -161,6 +161,7 @@ export class PeopleDirectoryService {
         membership.user.username?.trim() ||
         displayableEmail(membership.user.email) ||
         "—",
+      username: membership.user.username,
       email: displayableEmail(membership.user.email),
       role: membership.role,
       roles: [
@@ -238,6 +239,11 @@ function orderFor(
   switch (input.sort) {
     case "displayName":
       return [{ user: { displayName: direction } }, { id: "asc" }];
+    case "username":
+      return [
+        { user: { username: { sort: direction, nulls: "last" } } },
+        { id: "asc" },
+      ];
     case "email":
       return [{ user: { email: direction } }, { id: "asc" }];
     case "role":

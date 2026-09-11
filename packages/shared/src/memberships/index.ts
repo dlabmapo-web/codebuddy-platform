@@ -6,5 +6,6 @@ export * from "./invitation-delivery.js";
 export * from "./people-bulk.js";
 export * from "./people-directory.js";
 export * from "./people-import.js";
+export * from "./people-query.js";
 export * from "./status.js";
 export * from "./student-credentials.js";

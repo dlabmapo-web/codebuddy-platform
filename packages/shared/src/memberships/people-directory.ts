@@ -2,6 +2,14 @@ import { z } from "zod";
 
 import { academyRoleSchema, academyRoles } from "../auth/roles.js";
 import { membershipStatusSchema, membershipStatuses } from "./status.js";
+import {
+  parseEnumListParam,
+  parseEnumParam,
+  parsePageParam,
+  parsePageSizeParam,
+  sameSet,
+  singleParam,
+} from "./people-query.js";
 
 /**
  * The people directory's request and response, and the rules that keep them
@@ -50,6 +58,7 @@ export const DEFAULT_PEOPLE_PAGE_SIZE: PeoplePageSize = 25;
 
 export const peopleSortFields = [
   "displayName",
+  "username",
   "email",
   "role",
   "status",
@@ -128,6 +137,12 @@ export const peopleRowSchema = z
     userId: z.uuid(),
     /** The academy-scoped override if one exists, else the account name. */
     displayName: z.string().min(1).max(200),
+    /**
+     * The sign-in name, shown under "ID" (아이디) because that is what a Korean
+     * reader calls it. Null for accounts that arrived through OAuth or predate
+     * usernames.
+     */
+    username: z.string().nullable(),
     email: z.email().nullable(),
     /** The member's highest role — what the column sorts and filters on. */
     role: academyRoleSchema,
@@ -245,13 +260,6 @@ export function resetsToFirstPage(
   );
 }
 
-function sameSet(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length !== right.length) return false;
-  const sortedLeft = [...left].sort();
-  const sortedRight = [...right].sort();
-  return sortedLeft.every((value, index) => value === sortedRight[index]);
-}
-
 /**
  * A URL's worth of table state, read as leniently as §10 requires.
  *
@@ -265,14 +273,22 @@ export function parsePeopleQuery(
   params: Record<string, string | string[] | undefined>,
 ): Omit<ListPeopleInput, "academyId"> {
   return {
-    page: parsePage(single(params.page)),
-    pageSize: parsePageSize(single(params.size)),
-    search: (single(params.q) ?? "").trim().slice(0, 120),
-    roles: parseEnumList(params.role, academyRoles),
-    statuses: parseEnumList(params.status, membershipStatuses),
-    sort: parseEnum(single(params.sort), peopleSortFields, DEFAULT_PEOPLE_SORT),
-    direction: parseEnum(
-      single(params.dir),
+    page: parsePageParam(singleParam(params.page)),
+    pageSize: parsePageSizeParam(
+      singleParam(params.size),
+      peoplePageSizes,
+      DEFAULT_PEOPLE_PAGE_SIZE,
+    ),
+    search: (singleParam(params.q) ?? "").trim().slice(0, 120),
+    roles: parseEnumListParam(params.role, academyRoles),
+    statuses: parseEnumListParam(params.status, membershipStatuses),
+    sort: parseEnumParam(
+      singleParam(params.sort),
+      peopleSortFields,
+      DEFAULT_PEOPLE_SORT,
+    ),
+    direction: parseEnumParam(
+      singleParam(params.dir),
       ["asc", "desc"] as const,
       DEFAULT_PEOPLE_DIRECTION,
     ),
@@ -304,49 +320,4 @@ export function serializePeopleQuery(
     params.set("dir", query.direction);
   }
   return params.toString();
-}
-
-function single(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function parsePage(value: string | undefined): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 100_000
-    ? parsed
-    : 1;
-}
-
-function parsePageSize(value: string | undefined): PeoplePageSize {
-  const parsed = Number(value);
-  return (peoplePageSizes as readonly number[]).includes(parsed)
-    ? (parsed as PeoplePageSize)
-    : DEFAULT_PEOPLE_PAGE_SIZE;
-}
-
-function parseEnum<T extends string>(
-  value: string | undefined,
-  allowed: readonly T[],
-  fallback: T,
-): T {
-  return allowed.includes(value as T) ? (value as T) : fallback;
-}
-
-/**
- * Repeated query parameters as a deduplicated set, in the vocabulary's own
- * order.
- *
- * Sorted by the enum rather than by arrival so `?role=TEACHER&role=STUDENT` and
- * `?role=STUDENT&role=TEACHER` produce one canonical URL and one cache key.
- */
-function parseEnumList<T extends string>(
-  value: string | string[] | undefined,
-  allowed: readonly T[],
-): T[] {
-  const raw = Array.isArray(value) ? value : value ? [value] : [];
-  const flattened = raw.flatMap((entry) => entry.split(","));
-  const found = new Set(flattened.filter((entry): entry is T =>
-    allowed.includes(entry as T),
-  ));
-  return allowed.filter((entry) => found.has(entry));
 }

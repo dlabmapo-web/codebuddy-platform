@@ -9,6 +9,11 @@ import {
   submitExerciseSchema,
 } from "../../content/submission.js";
 import {
+  sampleCheckInputSchema,
+  sampleCheckViewSchema,
+  startSampleCheckSchema,
+} from "../../content/sample-check.js";
+import {
   answerRecordsResultSchema,
   listAnswerRecordsInputSchema,
   solveSessionSchema,
@@ -125,4 +130,11 @@ export const learnContract = {
   listSubmissions: oc
     .input(learnMaterialInputSchema)
     .output(z.object({ submissions: z.array(submissionSummarySchema) })),
+  /**
+   * Public sample checks: practice runs of one SAMPLE case, judged by the
+   * server with Submit's rules. Never a submission and never an attempt.
+   */
+  startSampleCheck: oc.input(startSampleCheckSchema).output(sampleCheckViewSchema),
+  getSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
+  cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
 };

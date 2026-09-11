@@ -233,6 +233,17 @@ export const learnExerciseSchema = z.object({
    * rules that differ from the server's.
    */
   gradingMode: programmingExerciseGradingModeSchema.default("LEGACY_STDIO"),
+  /**
+   * The grading revision this workspace was loaded at. A sample check names
+   * it, and a mismatch means the case list may have moved: refresh first.
+   */
+  gradingRevision: z.number().int().positive().default(1),
+  /**
+   * Whether this academy judges public samples of enhanced problems on the
+   * server. Off, a sample run shows its output and leaves the verdict to
+   * Submit, as before.
+   */
+  serverSampleChecks: z.boolean().default(false),
   sampleTestCases: z.array(learnSampleTestCaseSchema),
   hints: z.array(learnHintSchema),
   /** A count. The cases themselves never cross this boundary. */

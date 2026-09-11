@@ -15,6 +15,7 @@ import { StudentOverviewAccessService } from "./student-overview-access.service.
 import { StudentOverviewRepository } from "./student-overview.repository.js";
 import { StudentOverviewService } from "./student-overview.service.js";
 import { SubmissionController } from "./submission.controller.js";
+import { SampleCheckService } from "./sample-check.service.js";
 import { SubmissionService } from "./submission.service.js";
 
 /**
@@ -36,6 +37,7 @@ import { SubmissionService } from "./submission.service.js";
     StudentOverviewRepository,
     StudentOverviewService,
     SubmissionService,
+    SampleCheckService,
     {
       provide: JudgeQueue,
       inject: [ConfigService],

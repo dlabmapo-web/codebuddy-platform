@@ -119,6 +119,9 @@ enum AcademyFeature {
   /// computed differently would eventually disagree. §18.2 of the student
   /// points design.
   STUDENT_CLASS_LEADERBOARD
+  /// Public Test buttons on enhanced-grading problems are judged by the server
+  /// with Submit's rules. A rollout gate, off until an academy turns it on.
+  SERVER_SAMPLE_CHECKS
 }
 
 /// Why one student earned points.

@@ -85,7 +85,7 @@ describe("every academy's features, in one board", () => {
     const board = await service.features(identity, {});
 
     const never = board.rows.find((row) => row.academyId === seoul)!;
-    expect(never.features).toHaveLength(4);
+    expect(never.features).toHaveLength(5);
     expect(never.features.every((state) => state.isEnabled === false)).toBe(
       true,
     );

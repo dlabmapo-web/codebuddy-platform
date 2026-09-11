@@ -8,7 +8,7 @@ import type {
 import { academyFeatureNames, academyFeatureRequires } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coins, Eye, Trophy, Users } from 'lucide-react';
+import { ClipboardCheck, Coins, Eye, Trophy, Users } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,6 +86,14 @@ const featureStyles: Record<
     chip: 'bg-course-d-soft text-course-d',
     meter: 'bg-course-d',
     icon: Trophy,
+  },
+  // The grading server's colour: this switch sends practice runs to the judge.
+  SERVER_SAMPLE_CHECKS: {
+    tone: 'brand',
+    dot: 'bg-brand',
+    chip: 'bg-brand-soft text-brand',
+    meter: 'bg-brand',
+    icon: ClipboardCheck,
   },
 };
 

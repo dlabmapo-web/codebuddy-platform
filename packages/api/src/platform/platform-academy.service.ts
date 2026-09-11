@@ -1,4 +1,4 @@
-import { academyFeatureNames } from "@cove/shared";
+import { academyFeatureNames, academyRolloutFeatures } from "@cove/shared";
 import { randomBytes } from "node:crypto";
 
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -394,9 +394,14 @@ export class PlatformAcademyService {
        * academy created without them found monitoring and ranking dead with
        * no way to revive them. A manager may switch any of them off from the
        * academy settings page.
+       *
+       * Features still in rollout are the exception: they start off, and are
+       * switched on academy by academy.
        */
       await transaction.academyFeatureFlag.createMany({
-        data: academyFeatureNames.map((feature) => ({
+        data: academyFeatureNames
+          .filter((feature) => !academyRolloutFeatures.has(feature))
+          .map((feature) => ({
           academyId: academy.id,
           feature,
           isEnabled: true,

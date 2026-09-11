@@ -41,7 +41,7 @@ describe("AcademyFeaturesService", () => {
 
     const { features } = await service.list(identity, { academyId });
 
-    expect(features).toHaveLength(4);
+    expect(features).toHaveLength(5);
     expect(features.find((f) => f.feature === "STUDENT_POINTS")?.isEnabled).toBe(true);
     // No row is off — the same rule every reader of these flags applies.
     expect(features.find((f) => f.feature === "TEACHER_LIVE_MONITORING")?.isEnabled).toBe(false);

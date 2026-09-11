@@ -34,6 +34,10 @@
       "STUDENT_CLASS_LEADERBOARD": {
         "title": "Class leaderboard",
         "body": "A named ranking of the class, by points. Replaces class standing where both are on."
+      },
+      "SERVER_SAMPLE_CHECKS": {
+        "title": "Server-checked samples",
+        "body": "The Test buttons on weighted problems run on the grading server and show pass or fail by the same rules as Submit. Practice only: never an attempt or a score."
       }
     }
   }

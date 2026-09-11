@@ -112,6 +112,19 @@ export const apiEnvironmentSchema = z.object({
    * repair is allowed to occupy while it works.
    */
   REGRADE_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(1),
+  /**
+   * Interpreters that compare output for weighted grading. They never run
+   * submitted code and a comparison takes milliseconds, so one is enough for
+   * most judges; each costs a warm Pyodide in the judge's own memory.
+   */
+  JUDGE_COMPARATOR_POOL_SIZE: z.coerce.number().int().min(1).max(8).default(1),
+  /**
+   * Where the judge reaches the student-code sandbox: a Unix socket shared
+   * with a separate, network-less container (see `sandbox-server.ts`). Unset
+   * means student code runs in child processes of the judge itself, which is
+   * allowed only outside production.
+   */
+  JUDGE_SANDBOX_SOCKET: z.string().min(1).optional(),
   /** Pinned, and shared with the browser so run and submit agree. */
   PYODIDE_VERSION: z.string().default("0.27.5"),
   SUBMISSION_RATE_LIMIT: z.coerce.number().int().min(1).max(120).default(10),

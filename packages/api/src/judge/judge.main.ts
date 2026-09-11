@@ -13,7 +13,10 @@ import { GradingService } from "./grading.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import { JudgeQueue } from "./judge.queue.js";
 import { RegradeRunner } from "./regrade.runner.js";
+import { ComparatorPool } from "./comparator-pool.js";
+import type { ExecutionEngine } from "./execution-engine.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
+import { SandboxExecutionEngine } from "./sandbox-engine.js";
 
 /**
  * The judge is its own process, not a thread inside the API.
@@ -46,15 +49,45 @@ async function bootstrap(): Promise<void> {
       typeof PrismaService
     >[0],
   );
-  const engine = new PyodideExecutionEngine(
-    environment.PYODIDE_VERSION,
-    environment.JUDGE_CONCURRENCY,
+  // Student code runs in the sandbox container whenever one is configured,
+  // and production refuses to run without it: the judge holds the database and
+  // Redis credentials and needs the network, so a runner beside it — however
+  // locked down from inside — shares everything the boundary exists to keep
+  // from it. In-process runners remain for development only.
+  let engine: ExecutionEngine & { warmUp(): Promise<void> };
+  if (environment.JUDGE_SANDBOX_SOCKET) {
+    engine = new SandboxExecutionEngine(
+      environment.JUDGE_SANDBOX_SOCKET,
+      environment.PYODIDE_VERSION,
+      environment.NODE_ENV === "production",
+    );
+  } else if (environment.NODE_ENV === "production") {
+    logger.error(
+      "JUDGE_SANDBOX_SOCKET is required in production: student code must not run inside the judge's container",
+    );
+    process.exitCode = 1;
+    await prisma.$disconnect();
+    return;
+  } else {
+    logger.warn(
+      "no JUDGE_SANDBOX_SOCKET: running student code in local child processes (development only)",
+    );
+    engine = new PyodideExecutionEngine(
+      environment.PYODIDE_VERSION,
+      environment.JUDGE_CONCURRENCY,
+    );
+  }
+  const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE);
+  const grading = new GradingService(
+    prisma,
+    engine,
+    new PointAwardService(prisma),
+    comparator,
   );
-  const grading = new GradingService(prisma, engine, new PointAwardService(prisma));
   const queue = new JudgeQueue(environment.REDIS_URL);
 
   // Paid once at startup rather than by the first student to submit.
-  await engine.warmUp();
+  await Promise.all([engine.warmUp(), comparator.warmUp()]);
   logger.log(`python runtime ready (${engine.version})`);
 
   const worker = queue.createWorker(
@@ -113,6 +146,7 @@ async function bootstrap(): Promise<void> {
     }
     await queue.close();
     await engine.dispose();
+    await comparator.dispose();
     await prisma.$disconnect();
     process.exit(0);
   };

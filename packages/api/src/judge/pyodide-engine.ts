@@ -1,17 +1,22 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type {
-  ExecutionEngine,
-  ExecutionRequest,
-  ExecutionResult,
+import {
+  MAX_OUTPUT_BYTES,
+  type ExecutionEngine,
+  type ExecutionRequest,
+  type ExecutionResult,
 } from "./execution-engine.js";
-
-const MAX_OUTPUT_BYTES = 256 * 1024;
 /** After the deadline the runner is signalled, then killed if it ignores it. */
 const TERMINATE_GRACE_MS = 100;
 /** A runner that never reports readiness is an infrastructure fault. */
@@ -25,6 +30,87 @@ const DRAIN_GRACE_MS = 2_000;
 /** Consecutive unreadable samples before a case is abandoned as unmeasurable. */
 const BLIND_SAMPLES_ALLOWED = 5;
 const PAGE_BYTES = 4096;
+
+/** An OS identity one runner executes as, and nothing else does meanwhile. */
+export type RunnerIdentity = { uid: number; gid: number };
+
+/**
+ * Hands each runner a uid of its own, and takes it back only once nothing is
+ * left running under it.
+ *
+ * Runs in the sandbox, whose server is the only holder of the capabilities to
+ * switch identity and to signal across uids. A runner with its own uid and no
+ * capabilities cannot signal, trace or read the private `/proc` files of the
+ * server or of another student's runner — the boundary the in-process
+ * denylist could only approximate. The sweep on release is what makes reuse
+ * safe: a program that escaped its process group and left something behind
+ * would otherwise be waiting, under the same uid, for the next student.
+ */
+export class RunnerIdentityPool {
+  private readonly free: RunnerIdentity[];
+
+  constructor(
+    base: number,
+    count: number,
+    private readonly sweep: (uid: number) => void = killProcessesOwnedBy,
+  ) {
+    if (!Number.isInteger(base) || base <= 0) {
+      throw new Error("runner uid base must be a positive integer");
+    }
+    this.free = Array.from({ length: count }, (_unused, index) => ({
+      uid: base + index,
+      gid: base + index,
+    }));
+  }
+
+  get size(): number {
+    return this.free.length;
+  }
+
+  acquire(): RunnerIdentity {
+    const identity = this.free.shift();
+    if (!identity) throw new Error("no runner identity available");
+    return identity;
+  }
+
+  release(identity: RunnerIdentity): void {
+    this.sweep(identity.uid);
+    this.free.push(identity);
+  }
+}
+
+/**
+ * SIGKILLs every process running as `uid`, repeating until none is left.
+ *
+ * Linux only, and only meaningful with CAP_KILL: that is the sandbox server's
+ * situation and nobody else's. Repeated because a process can fork between the
+ * read and the kill; bounded because the container's pid limit bounds how many
+ * there can be.
+ */
+export function killProcessesOwnedBy(uid: number): void {
+  for (let round = 0; round < 10; round += 1) {
+    let found = 0;
+    let entries: string[];
+    try {
+      entries = readdirSync("/proc");
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!/^\d+$/.test(entry)) continue;
+      try {
+        const status = readFileSync(`/proc/${entry}/status`, "utf8");
+        const uids = /^Uid:\s+(\d+)\s+(\d+)\s+(\d+)/m.exec(status);
+        if (!uids || !uids.slice(1).includes(String(uid))) continue;
+        found += 1;
+        process.kill(Number(entry), "SIGKILL");
+      } catch {
+        // Gone already, or not ours to read.
+      }
+    }
+    if (found === 0) return;
+  }
+}
 
 /**
  * One student program's process, used once and killed.
@@ -55,6 +141,9 @@ class RunnerProcess {
     pyodideDir: string,
     /** Injected so the fail-closed path is testable without breaking /proc. */
     private readonly readRssMb: (pid: number) => number | null,
+    /** In the sandbox, the uid this runner alone executes as. */
+    private identity: RunnerIdentity | null = null,
+    private readonly identities: RunnerIdentityPool | null = null,
   ) {
     this.child = spawn(
       process.execPath,
@@ -79,6 +168,10 @@ class RunnerProcess {
         // Its own process group, so that killing it kills anything it managed
         // to start rather than leaving orphans behind holding the CPU.
         detached: true,
+        // A uid of its own, and with it no capabilities at all: this process
+        // cannot signal or trace the server that spawned it, or any other
+        // student's runner.
+        ...(identity ? { uid: identity.uid, gid: identity.gid } : {}),
       },
     );
 
@@ -376,19 +469,29 @@ class RunnerProcess {
   }
 
   async dispose(): Promise<void> {
-    if (this.closed) return;
-    this.kill();
-    await new Promise<void>((resolve) => {
-      if (this.closed) {
-        resolve();
-        return;
-      }
-      this.onClose = resolve;
-      // Same safety net: a killed process whose `close` is lost must not hold
-      // shutdown open for ever.
-      const fallback = setTimeout(resolve, DRAIN_GRACE_MS);
-      fallback.unref();
-    });
+    if (!this.closed) {
+      this.kill();
+      await new Promise<void>((resolve) => {
+        if (this.closed) {
+          resolve();
+          return;
+        }
+        this.onClose = resolve;
+        // Same safety net: a killed process whose `close` is lost must not
+        // hold shutdown open for ever.
+        const fallback = setTimeout(resolve, DRAIN_GRACE_MS);
+        fallback.unref();
+      });
+    }
+    this.releaseIdentity();
+  }
+
+  /** Once, after the process is gone: sweep its uid, then hand it back. */
+  private releaseIdentity(): void {
+    if (!this.identity || !this.identities) return;
+    const identity = this.identity;
+    this.identity = null;
+    this.identities.release(identity);
   }
 }
 
@@ -459,14 +562,37 @@ export class PyodideExecutionEngine implements ExecutionEngine {
   private spawnFailure: Error | null = null;
 
   constructor(
-    version = process.env.PYODIDE_VERSION ?? "0.27.5",
+    /**
+     * The version this deployment is configured for. Checked against the
+     * package the runners actually load, never trusted in its place.
+     */
+    version: string | undefined = process.env.PYODIDE_VERSION,
     concurrency = 1,
     spare = 1,
     private readonly readRssMb: (pid: number) => number | null = readProcessRssMb,
+    /** Sandbox only: one uid per runner. Absent, runners share ours. */
+    private readonly identities: RunnerIdentityPool | null = null,
   ) {
-    this.version = `pyodide-${version}`;
+    // The runtime's identity comes from the Pyodide package the runners boot
+    // from — the thing that decides how student code behaves — rather than
+    // from a setting that can drift from it. Grading compares this with the
+    // version recorded on each submission, so a configuration that disagrees
+    // with the installed runtime is refused here rather than stamped on work
+    // it did not grade.
+    const installed = (
+      createRequire(import.meta.url)("pyodide/package.json") as { version: string }
+    ).version;
+    if (version !== undefined && version !== installed) {
+      throw new Error(
+        `PYODIDE_VERSION is ${version}, but the installed runtime is ${installed}`,
+      );
+    }
+    this.version = `pyodide-${installed}`;
     this.capacity = Math.max(1, concurrency);
     this.spare = Math.max(0, spare);
+    if (identities && identities.size < this.capacity + this.spare) {
+      throw new Error("fewer runner identities than runners");
+    }
     this.runningTypeScript = import.meta.url.endsWith(".ts");
     this.runnerPath = fileURLToPath(
       new URL(
@@ -620,6 +746,8 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       this.runnerPath,
       this.pyodideDir,
       this.readRssMb,
+      this.identities?.acquire() ?? null,
+      this.identities,
     );
     this.warmingRunners.add(runner);
     try {

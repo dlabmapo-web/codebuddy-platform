@@ -18,6 +18,19 @@ export const GRADING_QUEUE = "cove-grading";
  */
 export const REGRADE_QUEUE = "cove-regrade";
 
+/**
+ * Public sample checks, a queue of their own.
+ *
+ * Practice runs are short and ephemeral: a job is removed the moment it ends,
+ * and is never retried — replaying a student's code automatically after a
+ * crash would run it twice for one click. What protects official grading from
+ * them is not this queue but the judge's shared capacity gate, which reserves
+ * a slot for submissions (`execution-capacity.ts`).
+ */
+export const SAMPLE_QUEUE = "cove-sample-checks";
+
+export type SampleCheckJob = { checkId: string };
+
 export type GradingJob = { submissionId: string };
 
 /**
@@ -85,6 +98,7 @@ export class JudgeQueue implements OnModuleDestroy {
   private readonly logger = new Logger(JudgeQueue.name);
   private queueInstance: Queue<GradingJob> | null = null;
   private regradeInstance: Queue<RegradeJob> | null = null;
+  private sampleInstance: Queue<SampleCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
   private rateLimitConnection: Promise<void> | null = null;
@@ -118,6 +132,32 @@ export class JudgeQueue implements OnModuleDestroy {
       },
     });
     return this.regradeInstance;
+  }
+
+  get sampleQueue(): Queue<SampleCheckJob> {
+    this.sampleInstance ??= new Queue<SampleCheckJob>(SAMPLE_QUEUE, {
+      connection: redisConnection(this.redisUrl),
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: true,
+        removeOnFail: { age: 3_600 },
+      },
+    });
+    return this.sampleInstance;
+  }
+
+  /** `jobId` is the check id: a retried dispatch cannot run a check twice. */
+  async enqueueSampleCheck(checkId: string): Promise<void> {
+    await this.sampleQueue.add("sample", { checkId }, { jobId: checkId });
+  }
+
+  /**
+   * Removes a check that has not started. A job already running is locked
+   * and stays; the worker sees the cancel and discards its result.
+   */
+  async removeSampleCheck(checkId: string): Promise<void> {
+    const job = await this.sampleQueue.getJob(checkId);
+    await job?.remove().catch(() => undefined);
   }
 
   get events(): QueueEvents {
@@ -159,11 +199,12 @@ export class JudgeQueue implements OnModuleDestroy {
    * queue means a Redis outage fails submission before a durable row is
    * created, avoiding a permanently in-flight record that blocks retries.
    */
-  async consumeSubmissionToken(
-    userId: string,
-    capacity: number,
-    windowMs: number,
-  ): Promise<boolean> {
+  /**
+   * A plain Redis client for counters and short-lived records, shared by the
+   * submission limiter and sample checks. Fails fast rather than queueing
+   * commands, so a Redis outage is an error the caller can report.
+   */
+  async redis(): Promise<Redis> {
     if (!this.rateLimitClient || this.rateLimitClient.status === "end") {
       this.rateLimitClient = new Redis(this.redisUrl, {
         maxRetriesPerRequest: 1,
@@ -171,12 +212,21 @@ export class JudgeQueue implements OnModuleDestroy {
         lazyConnect: true,
       });
       this.rateLimitClient.on("error", (error) => {
-        this.logger.warn(`submission rate limiter: ${error.message}`);
+        this.logger.warn(`redis client: ${error.message}`);
       });
       this.rateLimitConnection = this.rateLimitClient.connect();
     }
     await this.rateLimitConnection;
-    const result = await this.rateLimitClient.eval(
+    return this.rateLimitClient;
+  }
+
+  async consumeSubmissionToken(
+    userId: string,
+    capacity: number,
+    windowMs: number,
+  ): Promise<boolean> {
+    const client = await this.redis();
+    const result = await client.eval(
       TOKEN_BUCKET_SCRIPT,
       1,
       `cove:submission-rate:${userId}`,
@@ -229,13 +279,33 @@ export class JudgeQueue implements OnModuleDestroy {
     return worker;
   }
 
+  createSampleWorker(
+    handler: (job: { data: SampleCheckJob }) => Promise<unknown>,
+    concurrency: number,
+    onFailed: (checkId: string, error: Error) => void,
+  ): Worker<SampleCheckJob> {
+    const worker = new Worker<SampleCheckJob>(
+      SAMPLE_QUEUE,
+      async (job) => handler({ data: job.data }),
+      { connection: redisConnection(this.redisUrl), concurrency },
+    );
+    worker.on("failed", (job, error) => {
+      if (job) onFailed(job.data.checkId, error);
+      // Never the source or the expected output: only which check failed.
+      this.logger.error(`sample check ${job?.id ?? "unknown"} failed: ${error.message}`);
+    });
+    return worker;
+  }
+
   async close(): Promise<void> {
     await this.queueInstance?.close();
     await this.regradeInstance?.close();
+    await this.sampleInstance?.close();
     await this.eventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
     this.regradeInstance = null;
+    this.sampleInstance = null;
     this.eventsInstance = null;
     this.rateLimitClient = null;
     this.rateLimitConnection = null;

@@ -14,6 +14,9 @@ import { PointAwardService } from "../points/point-award.service.js";
 import { JudgeQueue } from "./judge.queue.js";
 import { RegradeRunner } from "./regrade.runner.js";
 import { ComparatorPool } from "./comparator-pool.js";
+import { ExecutionCapacity } from "./execution-capacity.js";
+import { SampleCheckRunner } from "./sample-check.runner.js";
+import { SampleCheckStore } from "./sample-check.store.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 import { SandboxExecutionEngine } from "./sandbox-engine.js";
@@ -90,8 +93,16 @@ async function bootstrap(): Promise<void> {
   await Promise.all([engine.warmUp(), comparator.warmUp()]);
   logger.log(`python runtime ready (${engine.version})`);
 
+  // One gate for every consumer of the runners: official grading is never
+  // delayed by it, and background work — regrades and sample checks together
+  // — can never take the slot it reserves for submissions.
+  const capacity = new ExecutionCapacity(environment.JUDGE_CONCURRENCY);
+
   const worker = queue.createWorker(
-    (job) => grading.grade(job.data.submissionId, job.updateProgress),
+    (job) =>
+      capacity.runOfficial(() =>
+        grading.grade(job.data.submissionId, job.updateProgress),
+      ),
     environment.JUDGE_CONCURRENCY,
   );
 
@@ -100,8 +111,23 @@ async function bootstrap(): Promise<void> {
   // pool, which is what `REGRADE_CONCURRENCY` is sized against.
   const regrade = new RegradeRunner(prisma, grading);
   const regradeWorker = queue.createRegradeWorker(
-    (job) => regrade.run(job.data),
+    (job) => capacity.runBackground(() => regrade.run(job.data)),
     environment.REGRADE_CONCURRENCY,
+  );
+
+  // Public sample checks: practice runs of one public case, judged by the
+  // same evaluator as official grading and written only to their own
+  // short-lived records.
+  const samples = new SampleCheckRunner(
+    new SampleCheckStore(() => queue.redis()),
+    engine,
+    comparator,
+    capacity,
+  );
+  const sampleWorker = queue.createSampleWorker(
+    (job) => samples.run(job.data.checkId),
+    environment.SAMPLE_CHECK_CONCURRENCY,
+    (checkId) => void samples.markFailed(checkId),
   );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
   const healthServer = healthPort > 0
@@ -139,6 +165,7 @@ async function bootstrap(): Promise<void> {
     // boot; the run's counters are advanced only after a verdict lands, so a
     // restart cannot make one report more work than it did.
     await regradeWorker.close();
+    await sampleWorker.close();
     if (healthServer) {
       await new Promise<void>((resolve, reject) => {
         healthServer.close((error) => error ? reject(error) : resolve());

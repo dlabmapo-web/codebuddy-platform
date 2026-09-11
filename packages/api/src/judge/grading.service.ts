@@ -3,12 +3,12 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
+import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
+import { evaluateEnhancedCase } from "./case-evaluator.js";
 import {
   awardedWeightFor,
   caseOutcomeFor,
-  eliceCaseDecisionFor,
   nextProgress,
   shouldStopAfter,
   summarizeRun,
@@ -46,18 +46,17 @@ type CaseRow = {
 
 type AbortReason = "TOTAL_DEADLINE" | "INFRASTRUCTURE_FAILURE";
 
-/**
- * How long past the remaining total budget an engine call may take to settle.
- * The run itself is capped at the remaining budget; this covers the forced
- * termination and pipe drain after it, not more student time.
- */
-const ENGINE_SETTLE_GRACE_MS = 2_500;
-
 /** Ends an enhanced run early without it becoming a grade. */
 class GradingAbort extends Error {
   constructor(
     readonly reason: AbortReason,
     readonly failureReason: string,
+    /**
+     * An engine request still running when the run was abandoned. The verdict
+     * does not wait for it, but the job does: its slot is counted until the
+     * program has actually stopped.
+     */
+    readonly pendingExecution?: Promise<void>,
   ) {
     super(failureReason);
   }
@@ -257,62 +256,40 @@ export class GradingService {
           continue;
         }
 
-        assertWithin(deadline);
-        const remaining = deadline - Date.now();
-        // The lesser of the case's own limit and what is left of the run's. A
-        // case cut short by the second is the run's deadline, not the
-        // student's time limit on that case.
-        const caseLimitMs = testCase.effectiveTimeLimitMs ?? submission.timeLimitMs;
-        const limit = Math.min(caseLimitMs, remaining);
-        const run = await settleWithin(
-          this.engine.run({
+        const evaluation = await evaluateEnhancedCase(
+          { engine: this.engine, comparator: this.comparator },
+          {
             code: submission.code,
-            stdin: testCase.input,
-            timeLimitMs: limit,
             memoryLimitMb: submission.memoryLimitMb,
-          }),
-          remaining + ENGINE_SETTLE_GRACE_MS,
-        );
-        if (run === "expired" || (run.outcome === "TIME_LIMIT" && limit < caseLimitMs)) {
-          throw new GradingAbort("TOTAL_DEADLINE", "TOTAL_DEADLINE");
-        }
-        // Waiting for a runner is not bounded by the case's limit, so a run
-        // can come back after the budget is gone. Its verdict is too late.
-        assertWithin(deadline);
-
-        let comparison: ComparisonResult | null = null;
-        if (run.outcome === "PASSED") {
-          // The deadline, not just a budget: queueing for a comparator is the
-          // run's time too, and the pool enforces the lesser of the two.
-          comparison = await this.comparator.compare({
-            comparator: testCase.comparator,
-            actual: run.stdout,
-            expected: testCase.expectedOutput,
-            budgetMs: profile.comparatorTimeLimitMs,
+            comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
             deadlineAt: deadline,
-          });
-          assertWithin(deadline);
+            testCase: {
+              input: testCase.input,
+              expectedOutput: testCase.expectedOutput,
+              comparator: testCase.comparator,
+              softTimeLimitMs: testCase.softTimeLimitMs,
+              caseLimitMs: testCase.effectiveTimeLimitMs ?? submission.timeLimitMs,
+            },
+          },
+        );
+        if (evaluation.kind === "deadline") {
+          throw new GradingAbort(
+            "TOTAL_DEADLINE",
+            "TOTAL_DEADLINE",
+            evaluation.pendingExecution,
+          );
         }
-
-        const decision = eliceCaseDecisionFor({
-          engineOutcome: run.outcome,
-          runtimeMs: run.runtimeMs,
-          softTimeLimitMs: testCase.softTimeLimitMs,
-          comparison,
-        });
-        if (decision.kind === "deadline") {
-          throw new GradingAbort("TOTAL_DEADLINE", "TOTAL_DEADLINE");
-        }
-        if (decision.kind === "grader-fault") {
+        if (evaluation.kind === "grader-fault") {
           // Never a wrong answer: the output was not judged at all.
           this.logger.error(
-            `grading ${submissionId} case ${position}: ${decision.fault}${
-              decision.detail ? ` (${decision.detail})` : ""
+            `grading ${submissionId} case ${position}: ${evaluation.fault}${
+              evaluation.detail ? ` (${evaluation.detail})` : ""
             }`,
           );
-          throw new GradingAbort("INFRASTRUCTURE_FAILURE", decision.fault);
+          throw new GradingAbort("INFRASTRUCTURE_FAILURE", evaluation.fault);
         }
-        const outcome = decision.outcome;
+        const run = evaluation.run;
+        const outcome = evaluation.outcome;
         results.push({
           position,
           isSample,
@@ -353,7 +330,14 @@ export class GradingService {
       if (!(error instanceof GradingAbort)) {
         this.logger.error(`grading ${submissionId} threw: ${String(error)}`);
       }
-      await this.abort(submission, abort, results);
+      try {
+        await this.abort(submission, abort, results);
+      } finally {
+        // In `finally` because recording the abort is itself fallible: a
+        // database that refuses the write does not make the program the judge
+        // stopped waiting for stop running. The slot is counted until it does.
+        await abort.pendingExecution;
+      }
       return;
     }
 
@@ -571,33 +555,6 @@ export class GradingService {
     }
     return { requeue: queued.map((item) => item.id), errored: errored.count };
   }
-}
-
-/**
- * The engine's answer, or `"expired"` once the budget is gone.
- *
- * A late settlement is swallowed rather than left unhandled: the engine still
- * bounds that run by its own limit and retires its runner; the caller has
- * simply stopped waiting for it.
- */
-function settleWithin<T>(
-  operation: Promise<T>,
-  ms: number,
-): Promise<T | "expired"> {
-  return new Promise<T | "expired">((resolve, reject) => {
-    const timer = setTimeout(() => resolve("expired"), Math.max(0, ms));
-    timer.unref();
-    operation.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 /** Aborts the run once its total budget is spent. */

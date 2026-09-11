@@ -720,3 +720,29 @@ describe("GradingService.grade — recorded runtimes", () => {
   });
 });
 
+describe("GradingService.grade — a run given up on is still waited for", () => {
+  it("does not finish a submission while its abandoned engine request is still running", async () => {
+    // The shared evaluator's side of issue 1: official grading must not end,
+    // and free its job, while the engine is still executing its code.
+    let engineSettled = false;
+    const { service, tx } = createService({
+      profile: { ...eliceProfile, totalTimeLimitMs: 1_000 },
+      cases: weightedCases(),
+      run: () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            engineSettled = true;
+            resolve({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: 1_000 });
+          }, 3_700),
+        ),
+    });
+
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+
+    expect(tx.submission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ gradingAbortReason: "TOTAL_DEADLINE" }) }),
+    );
+    expect(engineSettled).toBe(true);
+  }, 15_000);
+});
+

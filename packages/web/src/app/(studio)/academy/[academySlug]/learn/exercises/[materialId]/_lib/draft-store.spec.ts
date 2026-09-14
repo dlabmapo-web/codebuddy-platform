@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canSeedCollaboration,
+  localDraftKey,
   promotesReviewBuffer,
   resolveReviewBuffer,
   resolveSaveState,
@@ -29,7 +31,13 @@ describe('shouldSyncDraft', () => {
 });
 
 describe('resolveSaveState', () => {
-  const base = { dirty: false, syncing: false, failed: false, everSynced: false };
+  const base = {
+    dirty: false,
+    syncing: false,
+    failed: false,
+    conflict: false,
+    everSynced: false,
+  };
 
   it('is idle before anything happens', () => {
     expect(resolveSaveState(base)).toBe('idle');
@@ -122,6 +130,9 @@ describe('reviewing a historical submission', () => {
     expect(promotesReviewBuffer('reset')).toBe(true);
     expect(promotesReviewBuffer('open')).toBe(false);
     expect(promotesReviewBuffer('navigate')).toBe(false);
+    // A teacher opening the student is not a decision to replace their draft
+    // with the old attempt they happened to be reading.
+    expect(promotesReviewBuffer('collaborate')).toBe(false);
   });
 
   /** An untouched view is not unsaved work, so the header stays quiet. */
@@ -131,8 +142,106 @@ describe('reviewing a historical submission', () => {
         dirty: false,
         syncing: false,
         failed: false,
+        conflict: false,
         everSynced: false,
       }),
     ).toBe('idle');
+  });
+});
+
+describe('localDraftKey', () => {
+  const owner = {
+    userId: 'user-1',
+    academyId: 'academy-1',
+    materialId: 'material-1',
+  };
+
+  it('addresses a record by learner, academy, and problem', () => {
+    expect(localDraftKey(owner)).toBe('user-1:academy-1:material-1');
+  });
+
+  it('gives two learners on one browser profile different records', () => {
+    // The fault this exists to remove: one school machine, two students, and
+    // a workspace that opened on code its reader never wrote.
+    expect(localDraftKey({ ...owner, userId: 'user-2' })).not.toBe(
+      localDraftKey(owner),
+    );
+  });
+
+  it('gives one learner one record per problem', () => {
+    expect(localDraftKey({ ...owner, materialId: 'material-2' })).not.toBe(
+      localDraftKey(owner),
+    );
+  });
+
+  it('never collides with a record written before ownership was in the key', () => {
+    // Those used the bare material id. They stay unreachable rather than
+    // being adopted by whoever opens the problem next: who wrote them cannot
+    // be established.
+    expect(localDraftKey(owner)).not.toBe(owner.materialId);
+  });
+});
+
+describe('resolveSaveState when the server refuses a stale buffer', () => {
+  const base = {
+    dirty: true,
+    syncing: false,
+    failed: false,
+    conflict: false,
+    everSynced: true,
+  };
+
+  it('reports the refusal rather than a generic failure', () => {
+    expect(resolveSaveState({ ...base, conflict: true })).toBe('conflict');
+  });
+
+  it('prefers the refusal over a failure, which would suggest retrying', () => {
+    expect(resolveSaveState({ ...base, conflict: true, failed: true })).toBe(
+      'conflict',
+    );
+  });
+
+  it('still says saving while a save is actually in flight', () => {
+    expect(resolveSaveState({ ...base, conflict: true, syncing: true })).toBe(
+      'saving',
+    );
+  });
+});
+
+describe('canSeedCollaboration', () => {
+  it('allows the handoff for a settled draft', () => {
+    expect(canSeedCollaboration({ hydrated: true, reviewing: false })).toBe(true);
+  });
+
+  it('waits for local recovery to answer', () => {
+    // On a cached revisit the editor briefly holds the code the workspace
+    // query was cached with, which can be older than what is on this machine.
+    expect(canSeedCollaboration({ hydrated: false, reviewing: false })).toBe(
+      false,
+    );
+  });
+
+  it('refuses to publish an untouched submission as the student draft', () => {
+    // A teacher opening a student who is reading an old attempt must not turn
+    // that attempt into their work — and skipping the flush is not enough,
+    // because seeding writes it into the document directly.
+    expect(canSeedCollaboration({ hydrated: true, reviewing: true })).toBe(false);
+  });
+
+  it('stays refused while both are true', () => {
+    expect(canSeedCollaboration({ hydrated: false, reviewing: true })).toBe(
+      false,
+    );
+  });
+
+  it('matches the actions that promote a review buffer', () => {
+    // Whatever promotes the buffer is what makes it seedable, so the two rules
+    // cannot drift apart without this failing.
+    for (const action of ['edit', 'submit', 'reset'] as const) {
+      expect(promotesReviewBuffer(action)).toBe(true);
+    }
+    for (const action of ['open', 'navigate', 'collaborate'] as const) {
+      expect(promotesReviewBuffer(action)).toBe(false);
+    }
   });
 });

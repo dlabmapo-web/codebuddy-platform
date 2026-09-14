@@ -7,7 +7,7 @@ import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { exerciseNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 
 import { safeReturnTo } from '@/app/(studio)/academy/[academySlug]/(framed)/learn/records/_lib/records-url';
 import { Workspace } from './_components/workspace';
@@ -92,6 +92,9 @@ export default async function ExerciseWorkspacePage({
   // moment a teacher joins or a run raises.
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, exerciseNamespaces);
+  // Local drafts belong to a learner, not to a browser profile. Resolved on
+  // the server so the client never has to guess whose buffer it is holding.
+  const { user } = await getAccount();
 
   return (
     <PageTranslationsProvider
@@ -105,6 +108,7 @@ export default async function ExerciseWorkspacePage({
         classId={bootstrap.classContext.classId}
         returnTo={returnTo}
         submissionRequested={Boolean(submissionId)}
+        userId={user.id}
       />
     </PageTranslationsProvider>
   );

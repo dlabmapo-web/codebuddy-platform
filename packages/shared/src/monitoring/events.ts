@@ -228,8 +228,19 @@ export const watchStartedEventSchema = z.object({
 });
 
 export const watchEndedEventSchema = z.object({
+  /** Durable handoff back to autosave after the final watch closes. */
+  snapshot: z.object({ code: z.string(), updatedAt: z.iso.datetime() }).nullable().optional(),
   classId: z.uuid(),
   studentMembershipId: z.uuid(),
+  /**
+   * Which watch ended.
+   *
+   * Carried so a client can tell a stale ending from its own. A student who
+   * has moved to another exercise — or whose previous watch was replaced —
+   * would otherwise clear a live indicator and drop a live document because an
+   * event about a session they have already left arrived late.
+   */
+  draftId: z.uuid().nullable(),
   reason: monitoringVisitEndReasonSchema,
   endedAt: z.iso.datetime(),
 });
@@ -247,8 +258,16 @@ export const documentSyncedEventSchema = documentSyncResultSchema;
 export const documentUpdatedEventSchema = z.object({
   draftId: z.uuid(),
   update: binaryUpdateSchema,
-  /** Teacher-originated edits switch the student indicator to helping. */
-  origin: z.enum(["STUDENT", "TEACHER"]),
+  /**
+   * Who produced this update.
+   *
+   * Teacher-originated edits switch the student indicator to helping.
+   * `SERVER` is the one update nobody typed: a line-ending repair the
+   * collaboration service made to a document written before LF was the rule,
+   * delivered so that no peer is left computing offsets against a string the
+   * server no longer holds.
+   */
+  origin: z.enum(["STUDENT", "TEACHER", "SERVER"]),
 });
 
 export const awarenessChangedEventSchema = awarenessUpdatePayloadSchema.extend({

@@ -34,6 +34,7 @@ import {
   terminalSnapshotMessageSchema,
   terminalStartMessageSchema,
   terminalStateMessageSchema,
+  toSharedDocumentText,
   watchStartPayloadSchema,
   type AppErrorCode,
   type DocumentSyncResult,
@@ -269,6 +270,24 @@ export class MonitoringGateway
         persisted: event.persisted,
       });
     });
+    /**
+     * A change the server made reaches every peer in the room.
+     *
+     * Delivered as an ordinary document update because that is exactly what it
+     * is. A client left holding text the server has replaced would compute
+     * offsets against a string nobody else has, which is the fault this exists
+     * to remove — so it must never be applied on the server alone.
+     */
+    this.documents.onServerUpdate((event) => {
+      const room = this.draftRooms.get(event.draftId);
+      if (!room) return;
+      this.metrics.increment("document.server_update");
+      server.to(room).emit(monitoringServerEvents.documentUpdated, {
+        draftId: event.draftId,
+        update: event.update,
+        origin: "SERVER",
+      });
+    });
   }
 
   /**
@@ -482,6 +501,7 @@ export class MonitoringGateway
         ]);
         const teacher = socket.data.teacher ?? { claims: new Map(), watch: null };
         teacher.claims.set(classClaim.classId, classClaim);
+        this.documents.beginWatch(draftId, visit.id);
         teacher.watch = { claim, visitId: visit.id, draftId, helping: false };
         socket.data.teacher = teacher;
 
@@ -1425,7 +1445,7 @@ export class MonitoringGateway
         materialId: claim.materialId,
         sourceMaterialId: claim.materialId,
         courseId: claim.courseId,
-        code: exercise?.starterCode ?? "",
+        code: toSharedDocumentText(exercise?.starterCode ?? ""),
       },
       select: { id: true },
     });
@@ -1599,14 +1619,19 @@ export class MonitoringGateway
         watch.claim.studentMembershipId,
       ),
     );
+    const snapshot = await this.documents.endWatch(watch.draftId, watch.visitId);
     const endedAt = new Date().toISOString();
     const payload = {
+      snapshot,
       classId: watch.claim.classId,
       studentMembershipId: watch.claim.studentMembershipId,
+      draftId: watch.draftId,
       reason,
       endedAt,
     };
     socket.emit(monitoringServerEvents.watchEnded, payload);
+    // Another teacher still owns the room; the student must stay bound.
+    if (this.documents.hasWatch(watch.draftId)) return;
     // The indicator disappears only on a confirmed end. A dropped connection
     // shows reconnecting instead, so a blink never reads as "they left".
     this.server
@@ -1633,6 +1658,7 @@ export class MonitoringGateway
       candidate.emit(monitoringServerEvents.watchEnded, {
         classId: data.teacher.watch.claim.classId,
         studentMembershipId: data.teacher.watch.claim.studentMembershipId,
+        draftId: data.teacher.watch.draftId,
         reason: "WATCH_REPLACED",
         endedAt: new Date().toISOString(),
       });

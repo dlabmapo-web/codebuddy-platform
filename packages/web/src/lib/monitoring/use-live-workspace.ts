@@ -149,10 +149,24 @@ export function useLiveWorkspace({
   const startWatchRef = React.useRef<(() => void) | null>(null);
   const follow = React.useCallback(() => startWatchRef.current?.(), []);
 
+  /**
+   * Which watch attempt an acknowledgement belongs to.
+   *
+   * `Return to live`, a reconnection, and a student moving can each start a
+   * watch while one is already in flight, and the answers can come back in
+   * either order. The visit check on the synchronization acknowledgement below
+   * cannot help here: at watch-start time there is no visit yet to compare.
+   * Without this, the slower of two attempts publishes its session last and
+   * the teacher ends up watching the exercise they did not choose.
+   */
+  const watchTokenRef = React.useRef(0);
+
   React.useEffect(() => {
     if (!socket) return;
 
     const startWatch = () => {
+      const token = watchTokenRef.current + 1;
+      watchTokenRef.current = token;
       socket.emit(
         monitoringClientEvents.watchStart,
         {
@@ -162,6 +176,8 @@ export function useLiveWorkspace({
           studentMembershipId,
         },
         monitoringAck<LiveWorkspaceSession>((ack) => {
+          // Superseded while in flight: a newer attempt owns the workspace.
+          if (watchTokenRef.current !== token) return;
           if (!ack?.ok) {
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
             if (ack?.code === 'MONITORING_ACCESS_DENIED') {
@@ -214,6 +230,7 @@ export function useLiveWorkspace({
               // arrives.
               if (
                 !syncAck?.ok ||
+                watchTokenRef.current !== token ||
                 sessionRef.current?.visitId !== ack.data.visitId
               ) {
                 return;
@@ -340,8 +357,18 @@ export function useLiveWorkspace({
 
   React.useEffect(() => {
     if (!socket) return;
-    const onRun = (event: RunActivityPayload) => setRun(event);
-    const onResult = (event: ResultChangedEvent) => setResult(event);
+    // Each of these names the draft it is about. A run, a verdict, or a note
+    // that arrives after the teacher has followed the student elsewhere
+    // describes the previous exercise, and showing it beside this one's code
+    // is the same fault as showing the wrong code.
+    const onRun = (event: RunActivityPayload) => {
+      if (event.draftId !== sessionRef.current?.draftId) return;
+      setRun(event);
+    };
+    const onResult = (event: ResultChangedEvent) => {
+      if (event.draftId !== sessionRef.current?.draftId) return;
+      setResult(event);
+    };
     /**
      * Replaced by id, not appended.
      *
@@ -351,6 +378,7 @@ export function useLiveWorkspace({
      * wording the teacher just replaced.
      */
     const onFeedback = (event: FeedbackCreatedEvent) => {
+      if (event.draftId !== sessionRef.current?.draftId) return;
       setFeedback((current) => {
         const index = current.findIndex((item) => item.id === event.feedback.id);
         if (index === -1) return [...current, event.feedback];
@@ -376,6 +404,12 @@ export function useLiveWorkspace({
       );
     };
     const onEnded = (event: WatchEndedEvent) => {
+      // An ending about a watch this teacher has already left behind must not
+      // close the one they are in.
+      const current = sessionRef.current;
+      if (event.draftId !== null && current && event.draftId !== current.draftId) {
+        return;
+      }
       setEnded(event.reason);
       setSyncedDraftId(null);
       sessionRef.current = null;

@@ -29,6 +29,8 @@ const saveStateStyles: Record<Exclude<DraftSaveState, 'idle'>, string> = {
   saving: 'text-sub',
   saved: 'text-success',
   error: 'text-danger',
+  // A refusal, not a failure: the work is safe, it is the server that disagrees.
+  conflict: 'text-warning',
 };
 
 export function WorkspaceHeader({

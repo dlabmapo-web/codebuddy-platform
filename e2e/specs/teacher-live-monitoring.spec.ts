@@ -29,6 +29,8 @@ const TEACHER_NAME = 'Cove Teacher';
 
 const CLASS_NAME = 'E2E Cohort';
 const SUM_TITLE = 'Sum two numbers';
+/** Seeded with CRLF starter code — see `prisma/seed/e2e-content`. */
+const CRLF_TITLE = 'Windows line endings';
 
 let academySlug = '';
 let studentContext: BrowserContext;
@@ -205,6 +207,135 @@ test("the teacher's edit reaches the student and changes the indicator", async (
     studentPage.getByText(/teacher is helping|도와주고 있습니다/i),
   ).toBeVisible({ timeout: 30_000 });
   await expect(studentPage.getByText(TEACHER_NAME)).toHaveCount(0);
+});
+
+/** The model's own line ending, which is what its offsets are counted in. */
+async function editorEol(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const monaco = (
+      window as unknown as {
+        monaco?: { editor: { getModels(): { getEOL(): string }[] } };
+      }
+    ).monaco;
+    return monaco?.editor.getModels()[0]?.getEOL() ?? '';
+  });
+}
+
+async function lineOf(page: Page, lineNumber: number): Promise<string> {
+  return page.evaluate((line) => {
+    const monaco = (
+      window as unknown as {
+        monaco?: {
+          editor: { getModels(): { getLineContent(line: number): string }[] };
+        };
+      }
+    ).monaco;
+    return monaco?.editor.getModels()[0]?.getLineContent(line) ?? '';
+  }, lineNumber);
+}
+
+/**
+ * Inserts at an exact position, as a caret there would.
+ *
+ * Deliberately positional rather than a whole-model write: the fault under
+ * test was entirely in the arithmetic between a position and the offset that
+ * describes it, and a `setValue` would never exercise it.
+ */
+async function insertAt(
+  page: Page,
+  at: { lineNumber: number; column: number },
+  text: string,
+) {
+  await page.evaluate(
+    ({ at, text }) => {
+      const monaco = (
+        window as unknown as {
+          monaco?: {
+            editor: {
+              getModels(): {
+                applyEdits(
+                  edits: {
+                    range: {
+                      startLineNumber: number;
+                      startColumn: number;
+                      endLineNumber: number;
+                      endColumn: number;
+                    };
+                    text: string;
+                  }[],
+                ): void;
+              }[];
+            };
+          };
+        }
+      ).monaco;
+      monaco?.editor.getModels()[0]?.applyEdits([
+        {
+          range: {
+            startLineNumber: at.lineNumber,
+            startColumn: at.column,
+            endLineNumber: at.lineNumber,
+            endColumn: at.column,
+          },
+          text,
+        },
+      ]);
+    },
+    { at, text },
+  );
+}
+
+/**
+ * Line endings arriving into a session that is already live.
+ *
+ * The handoff case — a problem whose stored starter code has always had CRLF —
+ * is covered at the end of this file, where a watch can be opened from nothing.
+ * This one covers what happens when such text reaches an editor that is
+ * already bound, which a paste or an older client can still do.
+ *
+ * The caret assertions elsewhere in this file cannot catch either. Awareness
+ * sends a line and a column, which are the same number whatever the line
+ * ending is, so they passed throughout. Only comparing the text does.
+ */
+test('text arriving with foreign line endings keeps both editors in step', async () => {
+  // The precondition, and the whole of what the fault needed: a buffer whose
+  // line endings are not the editor's own. Several exercises migrated from v1
+  // store exactly this.
+  const crlf = [
+    "beat1 = '덩덕'",
+    "beat2 = '쿵덕'",
+    'hello',
+    '',
+    '',
+    '',
+    '# merge',
+  ].join('\r\n');
+  await typeIntoEditor(studentPage, crlf);
+
+  // Both models are pinned, and the document they share holds neither a
+  // carriage return nor a disagreement.
+  await expect.poll(() => editorEol(studentPage), { timeout: 30_000 }).toBe('\n');
+  await expect.poll(() => editorEol(teacherPage), { timeout: 30_000 }).toBe('\n');
+  await expect
+    .poll(() => editorText(teacherPage), { timeout: 30_000 })
+    .toBe(await editorText(studentPage));
+
+  // Line 4, column 1. Three line breaks above it, which is exactly how far out
+  // the teacher's copy used to land.
+  await insertAt(studentPage, { lineNumber: 4, column: 1 }, 'hi');
+
+  await expect.poll(() => lineOf(teacherPage, 4), { timeout: 30_000 }).toBe('hi');
+  expect(await lineOf(teacherPage, 7)).toBe('# merge');
+  expect(await editorText(teacherPage)).toBe(await editorText(studentPage));
+
+  // And the same the other way: a teacher's correction must land where they
+  // put it, not early and inside a token the student was in the middle of.
+  await insertAt(teacherPage, { lineNumber: 3, column: 6 }, '!');
+
+  await expect
+    .poll(() => lineOf(studentPage, 3), { timeout: 30_000 })
+    .toBe('hello!');
+  expect(await editorText(studentPage)).toBe(await editorText(teacherPage));
 });
 
 /** Sweeps the mouse across a surface, as a person moving it would. */
@@ -815,4 +946,117 @@ test('the student indicator clears when the teacher leaves', async () => {
   await expect(
     studentPage.getByText(/teacher is (monitoring|helping)|모니터링|도와주고/i),
   ).toHaveCount(0, { timeout: 30_000 });
+});
+
+/**
+ * The reported production fault, at the moment a watch is handed over.
+ *
+ * The student typed on line 4 and the teacher saw it on line 7, because the
+ * two editors disagreed about what a line ending is: Monaco counts offsets in
+ * its model's, Yjs counts indices in the string's, and a document carrying
+ * CRLF puts them one character apart for every line above the edit.
+ *
+ * Nothing here injects a line ending. `Windows line endings` is seeded with
+ * CRLF starter code, as several exercises migrated from v1 are, and the watch
+ * below is opened from nothing — so this is the production path end to end:
+ * stored text, a fresh draft, a first bind, and then a keystroke.
+ */
+test('a problem stored with CRLF hands over without drifting', async () => {
+  // Both sides start from outside a watch: the previous case left the teacher
+  // on the class page and the student on their catalog.
+  await studentPage.goto(routes.academyLearnCourses(academySlug));
+  await studentPage.getByText(CRLF_TITLE).first().click();
+  await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  await expect(studentPage.locator('.monaco-editor').first()).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // The student's own editor is canonical before anybody joins. Without this
+  // the model counts CRLF offsets and nothing downstream can agree with it.
+  await expect.poll(() => editorEol(studentPage), { timeout: 30_000 }).toBe('\n');
+  expect(await editorText(studentPage)).not.toContain('\r');
+
+  const studentRow = teacherPage
+    .getByRole('row')
+    .filter({ hasText: 'Cove Student' });
+  await expect(
+    studentRow.getByRole('link', { name: /open live|실시간 보기/i }),
+  ).toBeVisible({ timeout: 30_000 });
+  await studentRow
+    .getByRole('link', { name: /open live|실시간 보기/i })
+    .first()
+    .click();
+  await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {
+    timeout: 30_000,
+  });
+
+  // The handoff itself: the teacher's editor is built from the shared
+  // document, and both are pinned.
+  await expect.poll(() => editorEol(teacherPage), { timeout: 30_000 }).toBe('\n');
+  await expect
+    .poll(() => editorText(teacherPage), { timeout: 30_000 })
+    .toBe(await editorText(studentPage));
+  expect(await lineOf(studentPage, 7)).toBe('# merge');
+
+  // Line 4, column 1. Three line breaks above it, which is exactly how far out
+  // the teacher's copy used to land.
+  await insertAt(studentPage, { lineNumber: 4, column: 1 }, 'hi');
+
+  await expect.poll(() => lineOf(teacherPage, 4), { timeout: 30_000 }).toBe('hi');
+  expect(await lineOf(teacherPage, 7)).toBe('# merge');
+  expect(await editorText(teacherPage)).toBe(await editorText(studentPage));
+
+  // And the same the other way: a teacher's correction must land where they
+  // put it, not early and inside a token the student was in the middle of.
+  await insertAt(teacherPage, { lineNumber: 3, column: 6 }, '!');
+  await expect
+    .poll(() => lineOf(studentPage, 3), { timeout: 30_000 })
+    .toBe('hello!');
+  expect(await editorText(studentPage)).toBe(await editorText(teacherPage));
+});
+
+/**
+ * Moving between problems while somebody is watching.
+ *
+ * The workspace is kept alive across exercises on purpose, so the editor
+ * outlives the problem in it. While a watch is open that editor is also bound
+ * to a shared document, and the destination's code arriving in it is an
+ * ordinary local edit as far as the binding can tell — which is how one
+ * problem's buffer was published into another's.
+ */
+test('a watched student moving to another problem does not carry code across', async () => {
+  const carried = await editorText(studentPage);
+  expect(carried).toContain('hi');
+
+  await studentPage.getByRole('button', { name: /^previous$|^이전$/i }).click();
+  await expect(
+    studentPage.getByRole('heading', { name: SUM_TITLE }),
+  ).toBeVisible({ timeout: 30_000 });
+
+  // The destination opens on its own draft. Nothing from the problem just left
+  // may be in it, and the outgoing buffer must not have been written here on
+  // the way through.
+  await expect
+    .poll(() => editorText(studentPage), { timeout: 30_000 })
+    .not.toContain('# merge');
+  expect(await editorText(studentPage)).not.toContain('beat1');
+
+  // The teacher follows, and lands on the problem the student is actually on.
+  await teacherPage
+    .getByRole('button', { name: /return to live|실시간.*돌아/i })
+    .click()
+    .catch(() => undefined);
+  await expect
+    .poll(() => editorText(teacherPage), { timeout: 30_000 })
+    .not.toContain('# merge');
+
+  // And back again: the CRLF problem still holds its own work.
+  await studentPage.getByRole('button', { name: /^next$|^다음$/i }).click();
+  await expect(
+    studentPage.getByRole('heading', { name: CRLF_TITLE }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => editorText(studentPage), { timeout: 30_000 })
+    .toContain('# merge');
+  expect(await editorText(studentPage)).not.toContain('\r');
 });

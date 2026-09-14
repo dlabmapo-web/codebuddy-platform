@@ -79,6 +79,9 @@ function createGateway(overrides?: {
       .mockImplementation(overrides?.snapshot ?? (async () => null)),
   };
   const documents = {
+    endWatch: vi.fn().mockResolvedValue(null),
+    hasWatch: vi.fn().mockReturnValue(false),
+    beginWatch: vi.fn(),
     flush: vi.fn().mockImplementation(overrides?.flush ?? (async () => undefined)),
     sync: vi.fn().mockImplementation(
       overrides?.sync ??
@@ -871,7 +874,7 @@ describe("terminalResync", () => {
 
 describe("watchStop", () => {
   it("clears the teacher's pointer and caret for the student left behind", async () => {
-    const { gateway, emissions } = createGateway();
+    const { gateway, emissions, documents } = createGateway();
     const socket = createSocket({
       teacher: {
         claims: new Map(),
@@ -880,6 +883,7 @@ describe("watchStop", () => {
     });
 
     await gateway.watchStop(socket, { eventId: visitId });
+    expect(documents.endWatch).toHaveBeenCalledWith(draftId, visitId);
 
     expect(awarenessClears(emissions)).toEqual([
       {

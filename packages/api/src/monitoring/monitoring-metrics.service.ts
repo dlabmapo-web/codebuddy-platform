@@ -22,6 +22,8 @@ export type MonitoringCounter =
   | "document.update.applied"
   | "document.update.rejected"
   | "document.resync"
+  /** A repair or a folded-in snapshot the server produced itself. */
+  | "document.server_update"
   | "document.flush.failed"
   | "feedback.created"
   | "feedback.idempotent"

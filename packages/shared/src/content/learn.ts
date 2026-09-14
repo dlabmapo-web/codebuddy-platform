@@ -404,7 +404,31 @@ export const DRAFT_MAX_BYTES = 262_144;
 
 export const saveDraftSchema = learnMaterialInputSchema.extend({
   code: z.string().max(DRAFT_MAX_BYTES),
+  /**
+   * The revision this buffer was edited from.
+   *
+   * Sent so the server can refuse a replacement written against a draft it has
+   * since moved past — a second tab, another device, or a teacher's live edit.
+   * Optional because a beacon fired by a closing tab cannot always say, and a
+   * write is better than a refusal at that point.
+   */
+  baseUpdatedAt: z.iso.datetime().nullish(),
 });
+
+/**
+ * What became of a save.
+ *
+ * A refusal is reported rather than thrown: the caller still holds the text,
+ * and the code the server has travels back with it so the disagreement can be
+ * put in front of the student instead of one side of it being dropped.
+ */
+export const saveDraftResultSchema = z.object({
+  outcome: z.enum(["SAVED", "CONFLICT"]),
+  updatedAt: z.iso.datetime(),
+  /** Present only on a conflict: what the server holds instead. */
+  serverCode: z.string().nullable(),
+});
+export type SaveDraftResult = z.infer<typeof saveDraftResultSchema>;
 
 /* ------------------------------------------------------------ pure logic */
 

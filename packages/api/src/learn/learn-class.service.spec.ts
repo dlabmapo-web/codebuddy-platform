@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import { DraftCoordinator } from "../drafts/draft-coordinator.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
@@ -185,6 +186,7 @@ function createService(options?: {
     ),
     courses: new LearnService(
       prisma,
+      new DraftCoordinator(prisma),
       access,
       curriculum,
       { findSelected: vi.fn().mockResolvedValue(null) } as unknown as SubmissionService,

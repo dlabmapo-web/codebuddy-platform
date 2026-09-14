@@ -31,6 +31,7 @@ import {
   learnExerciseBootstrapSchema,
   learnExerciseWorkspaceSchema,
   learnMaterialInputSchema,
+  saveDraftResultSchema,
   saveDraftSchema,
 } from "../../content/learn.js";
 
@@ -114,9 +115,7 @@ export const learnContract = {
   listDrafts: oc
     .input(learnAcademyInputSchema)
     .output(z.object({ drafts: z.array(learnDraftSummarySchema) })),
-  saveDraft: oc
-    .input(saveDraftSchema)
-    .output(z.object({ updatedAt: z.iso.datetime() })),
+  saveDraft: oc.input(saveDraftSchema).output(saveDraftResultSchema),
   discardDraft: oc
     .input(learnMaterialInputSchema)
     .output(z.object({ discarded: z.boolean() })),

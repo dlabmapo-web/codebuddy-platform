@@ -201,3 +201,29 @@ Blocked login or unrun cases are reported as incomplete, not passing tests.
 Deploy matching API/web protocol support, refresh clients, and verify a quiet,
 scrolled student can be joined without moving their reading position. Do not mark
 this spec implemented until the changes and required validation are completed.
+
+## 10. Implementation checkpoint (2026-09-14)
+
+Source changes now include a stable statement wrapper/iframe tree, local text/image
+reading anchors, element geometry observation, and bound-Yjs editor mouse anchors
+projected through Monaco. Each reader's caret and scrolling remain separate.
+
+Compatibility uses an additive `editorPointer` awareness envelope rather than a
+watch-start version exchange: code anchors are never sent in the legacy `pointer`
+field, which is null for code movement. Old servers strip the extension and old
+clients ignore it, so unsupported peers see no code arrow. New clients suppress
+legacy percentage editor arrows. This achieves the spec's safe unsupported-peer
+behavior without introducing a second watch negotiation lifecycle.
+
+Regression tests cover relative anchors after insertion (including emoji), receiver
+geometry changes, bad anchors, non-code/off-screen targets, cleanup, legacy wire
+compatibility, and local reading-offset restoration. Browser cases now include a
+long persisted statement handoff with iframe identity checks and bidirectional code
+arrows at unequal viewports. The E2E seed must be refreshed for that long fixture.
+
+Validation: 357 focused unit/component tests passed, together with shared build,
+web/API/E2E typechecks and targeted web lint. Browser acceptance remains incomplete:
+Chromium and WebKit both stopped at the disabled sign-in button in authentication
+setup; respectively 28 and 23 following tests did not run. No browser claim of
+2-pixel reading retention or arrow accuracy is made. The complete browser matrix
+and rollout remain outstanding.

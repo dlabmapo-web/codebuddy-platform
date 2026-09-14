@@ -250,3 +250,19 @@ export function pointDirection(
   if (point.top > surfaceBox.top + surfaceBox.height) return 'below';
   return null;
 }
+
+/** Avoid asserting a document coordinate while authored content is still loading. */
+export function canvasLayoutReady(canvas: HTMLElement): boolean {
+  for (const image of canvas.querySelectorAll('img')) {
+    if (!image.complete) return false;
+  }
+  for (const frame of canvas.querySelectorAll('iframe')) {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc?.body || doc.readyState !== 'complete' || doc.fonts?.status === 'loading') return false;
+      if (!doc.body.scrollHeight) return false;
+      for (const image of doc.querySelectorAll('img')) if (!image.complete) return false;
+    } catch { return false; }
+  }
+  return canvas.ownerDocument.fonts?.status !== 'loading';
+}

@@ -3,6 +3,7 @@
 import { carriageReturnRepairs, toSharedDocumentText } from '@cove/shared';
 import type { OnMount } from '@monaco-editor/react';
 import * as Y from 'yjs';
+import { registerCodePointer } from './awareness/code-pointer';
 
 /**
  * The bridge between one Yjs text and one Monaco model.
@@ -56,6 +57,7 @@ export function bindYTextToMonaco(
   editor: MonacoCodeEditor,
   options: {
     onLocalChange?: () => void;
+    pointerIdentity?: { draftId: string; material: string };
     /**
      * Which side wins at the moment of binding.
      *
@@ -217,8 +219,12 @@ export function bindYTextToMonaco(
     options.onLocalChange?.();
   });
 
+  const stopPointer = options.pointerIdentity
+    ? registerCodePointer({ editor, text: ytext, ...options.pointerIdentity })
+    : () => undefined;
   return {
     destroy: () => {
+      stopPointer();
       subscription.dispose();
       ytext.unobserve(observer);
     },

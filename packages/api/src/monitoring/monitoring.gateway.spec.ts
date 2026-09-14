@@ -448,6 +448,21 @@ describe("handleDisconnect", () => {
 });
 
 describe("awarenessUpdate", () => {
+  it("relays code anchors separately and refuses another draft's anchor", async () => {
+    const { gateway } = createGateway();
+    const socket = createSocket({ teacher: { claims: new Map(), watch: { claim, visitId, draftId, helping: false } } });
+    const editorPointer = {
+      surface: "editor", space: "surface", material: claim.materialId, x: 0, y: 0,
+      code: { kind: "yjs", draftId, line: 1, column: 1, relative: [0, 1] },
+    };
+    await gateway.awarenessUpdate(socket, { draftId, sequence: 1, cursor: null, pointer: null, editorPointer });
+    expect(socket.broadcast).toHaveLength(1);
+    expect(socket.broadcast[0]?.payload).toMatchObject({ pointer: null, editorPointer });
+    await gateway.awarenessUpdate(socket, { draftId, sequence: 2, cursor: null, pointer: null,
+      editorPointer: { ...editorPointer, code: { ...editorPointer.code, draftId: "ffffffff-ffff-4fff-8fff-ffffffffffff" } } });
+    expect(socket.broadcast).toHaveLength(1);
+  });
+
   it("does not let an older authorized packet overwrite a newer position", async () => {
     const { gateway } = createGateway();
     const socket = createSocket({

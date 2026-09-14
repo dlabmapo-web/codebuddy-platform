@@ -1009,6 +1009,8 @@ export class MonitoringGateway
     if (!this.allow(socket, "awareness.update")) return;
     const parsed = awarenessUpdatePayloadSchema.safeParse(body);
     if (!parsed.success) return void this.rejectPayload(socket);
+    if (parsed.data.editorPointer?.code?.draftId !== undefined &&
+        parsed.data.editorPointer.code.draftId !== parsed.data.draftId) return void this.rejectPayload(socket);
     let room: string;
     try {
       room = await this.requireDraftAccess(socket, parsed.data.draftId);

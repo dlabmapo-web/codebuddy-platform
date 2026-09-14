@@ -11,6 +11,7 @@ import {
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
+import { captureCodePointer } from './code-pointer';
 import {
   expireCursor,
   expirePointer,
@@ -28,6 +29,7 @@ import {
   type RemoteAwarenessLifecycle,
 } from './pointer-lifecycle';
 import {
+  canvasLayoutReady,
   pointerBoxFor,
   resolvePointerSurface,
   toCanvasPosition,
@@ -170,7 +172,8 @@ export function useAwareness({
         draftId: currentDraft,
         sequence: nextAwarenessSequence(socket),
         cursor: cursorRef.current,
-        pointer: pointerRef.current,
+        pointer: pointerRef.current?.code ? null : pointerRef.current,
+        editorPointer: pointerRef.current?.code ? pointerRef.current : null,
       });
     },
     [socket],
@@ -267,10 +270,18 @@ export function useAwareness({
         // lifecycle decides whether it fades or remains until session end.
         return;
       }
+      if (resolved.surface === 'editor') {
+        publishPointer(captureCodePointer(resolved.element, point, draftId));
+        return;
+      }
       // The canvas when the point is inside one, the pane otherwise. A canvas
       // box is the same box on both screens; a pane box is not, and the space
       // travels with the position so a receiver in the other mode names the
       // region instead of drawing somewhere plausible and wrong.
+      if (resolved.canvas && !canvasLayoutReady(resolved.canvas)) {
+        publishPointer(null);
+        return;
+      }
       const { box, material, space } = pointerBoxFor(resolved);
       const position =
         space === 'canvas'
@@ -323,7 +334,8 @@ export function useAwareness({
     if (!socket) return;
     const onAwareness = (event: AwarenessChangedEvent) => {
       if (event.origin !== peerOrigin) return;
-      setReceived((current) => receiveAwareness(current, event, Date.now()));
+      if (event.editorPointer?.code && event.editorPointer.code.draftId !== event.draftId) return;
+      setReceived((current) => receiveAwareness(current, { ...event, pointer: event.editorPointer ?? (event.pointer?.surface === 'editor' ? null : event.pointer) }, Date.now()));
     };
     socket.on(monitoringServerEvents.awarenessChanged, onAwareness);
     return () => {

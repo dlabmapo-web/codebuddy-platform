@@ -174,7 +174,11 @@ export const awarenessUpdatePayloadSchema = z.object({
   /** Monotonic for one Socket.IO client; prevents async authorization reorder. */
   sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   cursor: collaborationCursorSchema.nullable(),
-  pointer: collaborationPointerSchema.nullable(),
+  pointer: collaborationPointerSchema.refine((pointer) => !pointer.code).nullable(),
+  // Legacy readers see pointer:null and ignore this optional extension.
+  editorPointer: collaborationPointerSchema.refine(
+    (pointer) => pointer.surface === "editor" && pointer.material !== null && !!pointer.code,
+  ).nullable().optional(),
 });
 
 /**

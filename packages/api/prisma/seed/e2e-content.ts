@@ -269,6 +269,9 @@ export async function seedE2eContent(prisma: PrismaClient) {
   ];
 
   for (const exercise of exercises) {
+    const description = exercise.materialId === e2eContent.crlfMaterialId
+      ? Array.from({ length: 40 }, (_, index) => `<p>Reading anchor ${index + 1}: Read this problem carefully before writing code. Thinking without moving the mouse is part of solving.</p>`).join("")
+      : `<p>${exercise.title}</p>`;
     await prisma.material.upsert({
       where: { id: exercise.materialId },
       create: {
@@ -288,13 +291,13 @@ export async function seedE2eContent(prisma: PrismaClient) {
         materialId: exercise.materialId,
         externalKey: exercise.externalKey,
         difficulty: exercise.difficulty,
-        description: `<p>${exercise.title}</p>`,
+        description,
         inputFormat: "Standard input",
         outputFormat: "Standard output",
         constraints: "",
         starterCode: exercise.starterCode,
       },
-      update: { starterCode: exercise.starterCode, difficulty: exercise.difficulty },
+      update: { starterCode: exercise.starterCode, difficulty: exercise.difficulty, description },
     });
 
     await prisma.exerciseTestCase.deleteMany({

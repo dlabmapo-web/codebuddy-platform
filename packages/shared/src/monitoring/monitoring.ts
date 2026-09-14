@@ -233,6 +233,14 @@ export const collaborationPointerSchema = z.object({
    * that predate the field, which are handled as unverifiable.
    */
   material: z.string().max(64).nullable().default(null),
+  /** Code anchors travel in the separate editorPointer wire field. */
+  code: z.object({
+    kind: z.literal("yjs"),
+    draftId: z.uuid(),
+    line: z.number().int().min(1).max(10_000_000),
+    column: z.number().int().min(1).max(10_000_000),
+    relative: z.array(z.number().int().min(0).max(255)).min(1).max(256),
+  }).optional(),
 });
 export type CollaborationPointer = z.infer<typeof collaborationPointerSchema>;
 

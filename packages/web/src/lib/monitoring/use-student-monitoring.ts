@@ -258,6 +258,7 @@ export function useStudentMonitoring({
       !readyRef.current ||
       !syncedRef.current ||
       current.draftId === null ||
+      current.materialId === null ||
       current.phase === 'retired'
     ) {
       return;
@@ -266,6 +267,7 @@ export function useStudentMonitoring({
     handedOffRef.current.add(current.draftId);
     bindingRef.current = bindYTextToMonaco(docRef.current.getText('code'), editor, {
       seed: firstHandoff ? 'model' : 'text',
+      pointerIdentity: { draftId: current.draftId, material: current.materialId },
     });
     publish({ ...current, phase: 'bound' });
   }, [publish]);

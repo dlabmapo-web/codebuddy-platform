@@ -5,7 +5,9 @@ import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { codeGeometryEvent, projectCodePointer } from '@/lib/monitoring/awareness/code-pointer';
 import {
+  canvasLayoutReady,
   findCanvasElement,
   findSurfaceElement,
   fromCanvasPosition,
@@ -34,7 +36,7 @@ type Placement = {
 };
 
 const placementKey = (pointer: CollaborationPointer) =>
-  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}`;
+  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}:${JSON.stringify(pointer.code)}`;
 
 const noStore = () => () => undefined;
 
@@ -94,12 +96,25 @@ export function RemotePointer({
     };
 
     place();
+    window.addEventListener(codeGeometryEvent, place);
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(place);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    // Ancestors cover sibling-driven movement as well as the pane's own size.
+    let element: HTMLElement | null = findCanvasElement(pointer.surface) ?? findSurfaceElement(pointer.surface);
+    while (element) {
+      observer?.observe(element);
+      mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
+      element = element.parentElement;
+    }
     window.addEventListener('resize', place);
     // Capture: the panes scroll, not the window, and a listener on the window
     // alone would never fire for them.
     window.addEventListener('scroll', place, true);
     return () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
+      mutations?.disconnect();
+      window.removeEventListener(codeGeometryEvent, place);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
@@ -160,7 +175,7 @@ export function RemotePointer({
       data-peer-surface={pointer.surface}
       data-testid="peer-pointer"
       className="pointer-events-none fixed z-[95] block motion-safe:transition-[left,top] motion-safe:duration-100 motion-safe:ease-linear"
-      style={{ left, top }}
+      style={{ left: left - 4.5, top: top - 2.5 }}
     >
       <svg
         className="block drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
@@ -196,6 +211,10 @@ export function RemotePointer({
  * than the diffuse error this design set out to remove.
  */
 function measure(pointer: CollaborationPointer): Placement['view'] {
+  if (pointer.surface === 'editor') {
+    const point = projectCodePointer(pointer);
+    return point ? { kind: 'arrow', ...point } : { kind: 'elsewhere' };
+  }
   const surfaceElement = findSurfaceElement(pointer.surface);
   if (!surfaceElement) return { kind: 'elsewhere' };
 
@@ -218,6 +237,7 @@ function measure(pointer: CollaborationPointer): Placement['view'] {
   // divides out of the position and multiplies back in here.
   const canvas =
     pointer.space === 'canvas' ? findCanvasElement(pointer.surface) : null;
+  if (canvas && !canvasLayoutReady(canvas)) return { kind: 'elsewhere' };
   const box = canvas ? canvas.getBoundingClientRect() : surfaceBox;
   if (box.width <= 0 || box.height <= 0) return { kind: 'elsewhere' };
 

@@ -42,39 +42,29 @@ export function StatementCanvas({
   surface: CollaborationSurface;
 }) {
   const { paneRef, canvasRef, engaged, scale, contentHeight } =
-    useStatementCanvas(active);
+    useStatementCanvas(active, material);
 
   return (
-    <div className="w-full" ref={paneRef}>
-      {engaged ? (
-        /*
-          Reserves the scaled footprint. A transform does not affect layout, so
-          without this the scroll container would size itself to the *logical*
-          height and leave a gap under a scaled-down statement. Height is left
-          to the content for the first frame, before the measurement arrives.
-        */
+    <div className="w-full" ref={paneRef} style={{ overflowAnchor: 'none' }}>
+      <div
+        className="mx-auto"
+        style={engaged ? {
+          width: STATEMENT_CANVAS_WIDTH * scale,
+          height: contentHeight > 0 ? contentHeight * scale : undefined,
+        } : undefined}
+      >
         <div
-          className="mx-auto"
-          style={{
-            width: STATEMENT_CANVAS_WIDTH * scale,
-            height: contentHeight > 0 ? contentHeight * scale : undefined,
-          }}
+          ref={canvasRef}
+          style={engaged ? {
+            width: STATEMENT_CANVAS_WIDTH,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          } : undefined}
+          {...(engaged ? canvasProps(surface, material) : {})}
         >
-          <div
-            ref={canvasRef}
-            style={{
-              width: STATEMENT_CANVAS_WIDTH,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            }}
-            {...canvasProps(surface, material)}
-          >
-            {children}
-          </div>
+          {children}
         </div>
-      ) : (
-        children
-      )}
+      </div>
     </div>
   );
 }

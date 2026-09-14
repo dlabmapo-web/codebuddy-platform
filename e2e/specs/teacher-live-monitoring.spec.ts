@@ -340,6 +340,16 @@ test('text arriving with foreign line endings keeps both editors in step', async
 
 /** Sweeps the mouse across a surface, as a person moving it would. */
 async function sweep(page: Page, surface: string) {
+  if (surface === 'editor') {
+    const text = page.locator('.monaco-editor .view-line span span').filter({ hasText: /\S/ }).first();
+    const box = await text.boundingBox();
+    expect(box).not.toBeNull();
+    for (let step = 0; step < 7; step += 1) {
+      await page.mouse.move(box!.x + Math.min(box!.width - 1, 2 + step), box!.y + box!.height / 2);
+      await page.waitForTimeout(120);
+    }
+    return;
+  }
   const box = await page.locator(`[data-collab-surface="${surface}"]`).first().boundingBox();
   expect(box).not.toBeNull();
   for (let step = 0; step <= 6; step += 1) {
@@ -401,6 +411,44 @@ test('each side sees where the other is pointing', async ({}, testInfo) => {
       'statement',
       { timeout: 30_000 },
     );
+  }
+});
+
+async function codePoint(page: Page, lineNumber: number, column: number) {
+  return page.evaluate(({ lineNumber, column }) => {
+    const monaco = (window as unknown as { monaco: { editor: { getEditors(): {
+      getDomNode(): HTMLElement; getScrolledVisiblePosition(position: { lineNumber: number; column: number }): { left: number; top: number; height: number };
+    }[] } } }).monaco;
+    const editor = monaco.editor.getEditors()[0]!;
+    const position = editor.getScrolledVisiblePosition({ lineNumber, column });
+    const box = editor.getDomNode().getBoundingClientRect();
+    return { x: box.left + position.left, y: box.top + position.top, height: position.height };
+  }, { lineNumber, column });
+}
+
+test('code arrows use the same code boundary at unequal viewport sizes', async () => {
+  const original = await editorText(studentPage);
+  const studentViewport = studentPage.viewportSize()!;
+  const teacherViewport = teacherPage.viewportSize()!;
+  try {
+    await studentPage.setViewportSize({ width: 1500, height: 900 });
+    await teacherPage.setViewportSize({ width: 1100, height: 720 });
+    await typeIntoEditor(studentPage, '# pointer fixture\nprint("🎉 한국어")\n');
+    await expect.poll(() => editorText(teacherPage)).toBe(await editorText(studentPage));
+    for (const [sender, receiver] of [[studentPage, teacherPage], [teacherPage, studentPage]]) {
+      const point = await codePoint(sender!, 2, 3);
+      await sender!.mouse.move(point.x + 1, point.y + point.height / 2);
+      await expect(receiver!.getByTestId('peer-pointer')).toHaveAttribute('data-peer-surface', 'editor');
+      await expect.poll(async () => {
+        const expected = await codePoint(receiver!, 2, 3);
+        const arrow = await receiver!.getByTestId('peer-pointer').boundingBox();
+        return arrow ? Math.max(Math.abs(arrow.x + 4.5 - expected.x), Math.abs(arrow.y + 2.5 - expected.y)) : Infinity;
+      }).toBeLessThanOrEqual(2);
+    }
+  } finally {
+    await typeIntoEditor(studentPage, original);
+    await studentPage.setViewportSize(studentViewport);
+    await teacherPage.setViewportSize(teacherViewport);
   }
 });
 
@@ -976,6 +1024,21 @@ test('a problem stored with CRLF hands over without drifting', async () => {
   await expect.poll(() => editorEol(studentPage), { timeout: 30_000 }).toBe('\n');
   expect(await editorText(studentPage)).not.toContain('\r');
 
+  // Preserve the exact authored iframe and the visible paragraph through handoff.
+  const statementFrame = studentPage.locator('[data-collab-surface="statement"] iframe').first();
+  const originalFrame = await statementFrame.elementHandle();
+  await expect(studentPage.frameLocator('[data-collab-surface="statement"] iframe').locator('p')).toHaveCount(40);
+  await statementFrame.evaluate((frame) => {
+    const iframe = frame as HTMLIFrameElement;
+    const paragraph = iframe.contentDocument!.querySelectorAll('p')[20]!;
+    const pane = iframe.closest('[data-collab-surface="statement"]')!;
+    pane.scrollTop += iframe.getBoundingClientRect().top + paragraph.getBoundingClientRect().top
+      - pane.getBoundingClientRect().top - 8;
+  });
+  const readingParagraph = studentPage.frameLocator('[data-collab-surface="statement"] iframe').locator('p').nth(20);
+  const beforeReading = await readingParagraph.boundingBox();
+  expect(beforeReading).not.toBeNull();
+
   const studentRow = teacherPage
     .getByRole('row')
     .filter({ hasText: 'Cove Student' });
@@ -989,6 +1052,10 @@ test('a problem stored with CRLF hands over without drifting', async () => {
   await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {
     timeout: 30_000,
   });
+
+  await expect.poll(() => originalFrame!.evaluate((frame) => frame.isConnected)).toBe(true);
+  await expect.poll(async () => Math.abs((await readingParagraph.boundingBox())!.y - beforeReading!.y),
+    { timeout: 10_000 }).toBeLessThanOrEqual(2);
 
   // The handoff itself: the teacher's editor is built from the shared
   // document, and both are pinned.

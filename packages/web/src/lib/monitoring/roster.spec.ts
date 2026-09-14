@@ -81,11 +81,7 @@ describe('mergeRoster', () => {
     });
   });
 
-  /**
-   * Both hold an exercise, and neither has anything live in it: Idle has done
-   * nothing for a minute, and Online's workspace is behind another window.
-   */
-  it('does not open a student who holds an exercise but is not working', () => {
+  it('keeps monitoring available for legacy quiet workspace states', () => {
     const [idle] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'IDLE', materialId })],
@@ -94,8 +90,8 @@ describe('mergeRoster', () => {
       [student({ membershipId: 'b' })],
       [presence('b', { state: 'ONLINE', materialId })],
     );
-    expect(idle!.canOpenLive).toBe(false);
-    expect(online!.canOpenLive).toBe(false);
+    expect(idle!.canOpenLive).toBe(true);
+    expect(online!.canOpenLive).toBe(true);
   });
 
   it('names the problem a student is in, as the student sees it numbered', () => {

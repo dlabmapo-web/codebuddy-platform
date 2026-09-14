@@ -96,7 +96,7 @@ export const monitoringTiming = {
    * mouse dragged across the editor would publish at screen refresh rate.
    */
   activityPublishFloorMs: 3_000,
-  /** No editor, run, pointer, or navigation activity for this long is idle. */
+  /** Legacy inactivity threshold; open problems no longer become idle. */
   idleAfterMs: 60_000,
   /** How long an interrupted connection reads as reconnecting, not offline. */
   recoveryGraceMs: 30_000,
@@ -471,47 +471,19 @@ export function resolveLiveState(
       : "OFFLINE";
   }
   if (signals.materialId === null) return "ONLINE";
-  // Activity outranks visibility, and the order is the whole point.
-  //
-  // WebKit reports a page as hidden when its window is merely covered by
-  // another, where Chromium reports it only on a tab switch. Checking
-  // visibility first therefore demoted a Safari student the instant anything
-  // overlapped their window — including the teacher's own roster — and undid
-  // the keystroke they had just typed.
-  //
-  // Someone who typed four seconds ago is working, whatever is stacked on top
-  // of them. Someone who walked away stops producing signals and falls out of
-  // Solving within the minute regardless, so nothing is lost by trusting the
-  // activity first.
-  if (
-    signals.lastActivityAt !== null &&
-    now - signals.lastActivityAt <= timing.idleAfterMs
-  ) {
-    return "SOLVING";
-  }
-  // Quiet and out of sight is a student who left the page open, not one
-  // sitting in front of a problem doing nothing. Only the second is Idle.
-  if (signals.visibility === "HIDDEN") return "ONLINE";
-  return "IDLE";
+  // Reading and thinking are part of solving. Activity and visibility remain
+  // telemetry; neither revokes access to a connected student's open problem.
+  return "SOLVING";
 }
 
-/**
- * Whether a teacher may open this student's workspace.
- *
- * Solving only: there has to be something live to join. Both other rows that
- * can hold an exercise have been quiet for a minute — Idle in front of it,
- * Online with it left open behind something else — so opening either shows a
- * still frame and calls it live.
- *
- * The consequence is that the button leaves a row the moment the student goes
- * quiet, including under the cursor of a teacher about to click it. The server
- * re-authorizes every watch regardless, so a stale click is refused rather than
- * mishandled.
- */
+/** Connected students with an open problem can be monitored even while quiet. */
 export function canOpenLiveWorkspace(
   presence: { state: MonitoringLiveState; materialId: string | null },
 ): boolean {
-  return presence.materialId !== null && presence.state === "SOLVING";
+  // Accept legacy quiet states during rollout as well as current SOLVING rows.
+  return presence.materialId !== null &&
+    (presence.state === "SOLVING" || presence.state === "IDLE" ||
+      presence.state === "ONLINE");
 }
 
 /**

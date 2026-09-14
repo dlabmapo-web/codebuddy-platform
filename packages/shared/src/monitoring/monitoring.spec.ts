@@ -281,26 +281,35 @@ describe("resolveLiveState", () => {
     );
   });
 
-  it("is online once a hidden workspace also goes quiet", () => {
+  it("keeps a quiet hidden workspace solving", () => {
     const signals = {
       ...base,
       visibility: "HIDDEN" as const,
       lastActivityAt: now - monitoringTiming.idleAfterMs - 1,
     };
-    expect(resolveLiveState(signals, now)).toBe("ONLINE");
+    expect(resolveLiveState(signals, now)).toBe("SOLVING");
   });
 
   it("is solving with recent activity in a visible workspace", () => {
     expect(resolveLiveState(base, now)).toBe("SOLVING");
   });
 
-  it("is idle after the idle threshold without activity", () => {
+  it("keeps a reading student solving after the activity threshold", () => {
     const signals = {
       ...base,
       lastActivityAt: now - monitoringTiming.idleAfterMs - 1,
     };
-    expect(resolveLiveState(signals, now)).toBe("IDLE");
+    expect(resolveLiveState(signals, now)).toBe("SOLVING");
   });
+
+  it.each(["VISIBLE", "HIDDEN"] as const)(
+    "keeps a quiet %s problem monitorable after thirty minutes",
+    (visibility) => {
+      const state = resolveLiveState({ ...base, visibility, lastActivityAt: null }, now + 30 * 60_000);
+      expect(state).toBe("SOLVING");
+      expect(canOpenLiveWorkspace({ state, materialId })).toBe(true);
+    },
+  );
 
   it("never infers a connection from activity history alone", () => {
     const signals = { ...base, connection: "NONE" as const, lastActivityAt: now };
@@ -313,14 +322,9 @@ describe("canOpenLiveWorkspace", () => {
     expect(canOpenLiveWorkspace({ state: "SOLVING", materialId })).toBe(true);
   });
 
-  /**
-   * There has to be something live to join. Idle is in an exercise but has
-   * done nothing for a minute, and Online's exercise is behind another window;
-   * opening either shows a still frame and calls it live.
-   */
-  it("does not open a student who is in an exercise but not working", () => {
-    expect(canOpenLiveWorkspace({ state: "IDLE", materialId })).toBe(false);
-    expect(canOpenLiveWorkspace({ state: "ONLINE", materialId })).toBe(false);
+  it("opens legacy quiet states while the student still has a problem", () => {
+    expect(canOpenLiveWorkspace({ state: "IDLE", materialId })).toBe(true);
+    expect(canOpenLiveWorkspace({ state: "ONLINE", materialId })).toBe(true);
   });
 
   it("does not open without a current exercise", () => {

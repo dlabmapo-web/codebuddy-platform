@@ -961,14 +961,15 @@ export type MonitoringWatchMode = z.infer<typeof monitoringWatchModeSchema>;
 /**
  * The version of the watch-session protocol this build speaks.
  *
- * Bumped when the lifecycle changes shape rather than when a field is added.
+ * Bumped when lifecycle or durability semantics require clients to refresh.
+ * Version 3 requires the teacher to match committed text before showing Saved.
  * A client that omits it, or sends a lower number, is refused with
  * `MONITORING_REFRESH_REQUIRED` instead of being half-admitted: the old
  * singleton `watch.ended` semantics and the aggregate ones cannot both be true
  * for one student at the same time, and mixing them is what would silently
  * unbind a document another tab is still using.
  */
-export const monitoringProtocolVersion = 2;
+export const monitoringProtocolVersion = 3;
 
 /** Lease lifetimes for one watch session, renewed while its socket lives. */
 export const monitoringWatchLease = {

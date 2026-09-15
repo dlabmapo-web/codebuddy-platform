@@ -341,6 +341,7 @@ export class MonitoringGateway
         draftId: event.draftId,
         snapshotVersion: event.snapshotVersion.toString(),
         persisted: event.persisted,
+        codeHash: event.codeHash,
       });
     });
     /**
@@ -1312,6 +1313,7 @@ export class MonitoringGateway
           draftId: payload.draftId,
           update: sync.update,
           stateVector: sync.stateVector,
+          persistedCodeHash: sync.persistedCodeHash,
         };
         socket.emit(monitoringServerEvents.documentSynced, result);
         this.metrics.increment("document.resync");
@@ -1358,6 +1360,7 @@ export class MonitoringGateway
               draftId: payload.draftId,
               update: sync.update,
               stateVector: sync.stateVector,
+              persistedCodeHash: sync.persistedCodeHash,
             });
             throw publicError("MONITORING_EDIT_NOT_ENABLED");
           }

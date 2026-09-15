@@ -1400,7 +1400,7 @@ describe("student movement", () => {
       visibility: "VISIBLE" | "HIDDEN" = "VISIBLE",
     ) =>
       harness.gateway.presencePublish(socket, {
-        protocolVersion: 2,
+        protocolVersion: 3,
         academyId,
         materialId: material,
         courseId: openCourseId,
@@ -1579,7 +1579,7 @@ describe("direct live page watch", () => {
     Object.assign(visits, { start: vi.fn().mockResolvedValue({ id: visitId, startedAt: new Date(), replaced: null }) });
     const socket = createSocket({});
     try {
-      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 2 });
+      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3 });
       expect(result.ok).toBe(true);
       expect(socket.join).toHaveBeenCalledWith(expect.arrayContaining([monitoringRooms.teacher(academyId, teacherMembershipId)]));
     } finally {

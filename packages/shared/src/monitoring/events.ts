@@ -381,6 +381,7 @@ export const protocolRefreshRequiredEventSchema = z.object({
 });
 
 export const documentSyncResultSchema = z.object({
+  persistedCodeHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   draftId: z.uuid(),
   /** Only what the peer is missing, empty when it is already current. */
   update: responseBinaryUpdateSchema,
@@ -451,6 +452,8 @@ export const resultChangedEventSchema = z.object({
  * else, so it can never claim a save that did not happen.
  */
 export const documentPersistedEventSchema = z.object({
+  /** SHA-256 of the exact text committed, not the latest in-memory revision. */
+  codeHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   draftId: z.uuid(),
   /** A BigInt on the server, so it crosses the wire as a string. */
   snapshotVersion: z.string(),
@@ -586,6 +589,7 @@ export type WatchStartPayload = z.infer<typeof watchStartPayloadSchema>;
 export type PresencePublishPayload = z.infer<typeof presencePublishPayloadSchema>;
 export type DocumentSyncPayload = z.infer<typeof documentSyncPayloadSchema>;
 export type DocumentSyncResult = {
+  persistedCodeHash?: string;
   draftId: string;
   update: Uint8Array | ArrayBuffer;
   stateVector: Uint8Array | ArrayBuffer;

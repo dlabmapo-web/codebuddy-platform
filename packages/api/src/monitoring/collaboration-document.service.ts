@@ -65,6 +65,8 @@ type CachedDocument = {
    */
   supersededHistory: boolean;
   flushTimer: NodeJS.Timeout | null;
+  flushFailures: number;
+  persistedCodeHash: string;
   lastTouchedAt: number;
 };
 
@@ -73,6 +75,7 @@ function isDirty(cached: CachedDocument): boolean {
 }
 
 export type DocumentSync = {
+  persistedCodeHash: string;
   /** Only what the asking peer is missing. */
   update: Uint8Array;
   stateVector: Uint8Array;
@@ -98,6 +101,7 @@ export type FlushListener = (event: {
   draftId: string;
   persisted: boolean;
   snapshotVersion: bigint;
+  codeHash?: string;
 }) => void;
 
 /**
@@ -119,6 +123,9 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
   private readonly logger = new Logger(CollaborationDocumentService.name);
   private readonly documents = new Map<string, CachedDocument>();
   private readonly watches = new Map<string, Set<string>>();
+  /** One database transaction per draft, shared by every caller. */
+  private readonly flushing = new Map<string, Promise<FlushOutcome>>();
+  private stopping = false;
   /** Cold loads in flight, so two callers cannot build two documents for one draft. */
   private readonly loading = new Map<string, Promise<CachedDocument>>();
   private readonly flushListeners = new Set<FlushListener>();
@@ -145,7 +152,7 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
       readCode: (draftId) => this.readCode(draftId),
       persist: async (draftId) => {
         const result = await this.flush(draftId);
-        return result.persisted ? result.snapshot ?? null : null;
+        return result.persisted && !this.hasUnsavedWork(draftId) ? result.snapshot ?? null : null;
       },
       forget: (draftId) => this.forget(draftId),
     });
@@ -213,9 +220,10 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
     draftId: string,
     persisted: boolean,
     snapshotVersion: bigint,
+    codeHash?: string,
   ): void {
     for (const listener of this.flushListeners) {
-      listener({ draftId, persisted, snapshotVersion });
+      listener({ draftId, persisted, snapshotVersion, codeHash });
     }
   }
 
@@ -308,12 +316,20 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
       persistedRevision: 0,
       supersededHistory: superseded,
       flushTimer: null,
+      flushFailures: 0,
+      persistedCodeHash: hashOf(stored),
       lastTouchedAt: Date.now(),
     };
     this.documents.set(draftId, cached);
     // Before the document is answered to any peer: nobody is ever handed a
     // carriage return to compute an offset against.
     this.normalizeCached(draftId, cached);
+    // A plain legacy draft was normalized before constructing the Y.Doc.
+    // It still needs a durable LF write even though there was no CRDT repair.
+    if (!isDirty(cached) && hashOf(doc.getText(codeField).toString()) !== cached.persistedCodeHash) {
+      cached.revision += 1;
+      this.scheduleFlush(draftId, cached);
+    }
     return cached;
   }
 
@@ -358,8 +374,10 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
    * arrive.
    */
   async sync(draftId: string, stateVector: Uint8Array): Promise<DocumentSync> {
-    const doc = await this.load(draftId);
+    const cached = await this.loadCached(draftId);
+    const doc = cached.doc;
     return {
+      persistedCodeHash: cached.persistedCodeHash,
       update: Y.encodeStateAsUpdate(doc, stateVector),
       stateVector: Y.encodeStateVector(doc),
     };
@@ -392,7 +410,17 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
    * overwrite the other: the loser merges the newer stored state into its own
    * document and retries, which is safe precisely because Yjs updates merge.
    */
-  async flush(draftId: string): Promise<FlushOutcome> {
+  flush(draftId: string): Promise<FlushOutcome> {
+    const pending = this.flushing.get(draftId);
+    if (pending) return pending;
+    const promise = this.flushOnce(draftId).finally(() => {
+      if (this.flushing.get(draftId) === promise) this.flushing.delete(draftId);
+    });
+    this.flushing.set(draftId, promise);
+    return promise;
+  }
+
+  private async flushOnce(draftId: string): Promise<FlushOutcome> {
     const cached = this.documents.get(draftId);
     if (!cached) return { persisted: false, snapshotVersion: 0n };
     this.cancelFlush(cached);
@@ -445,7 +473,7 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
             codeHash,
           },
         });
-        return { snapshotVersion: nextVersion, writtenRevision, snapshot: savedDraft };
+        return { snapshotVersion: nextVersion, writtenRevision, codeHash, snapshot: savedDraft };
       });
       cached.snapshotVersion = persisted.snapshotVersion;
       // What is stored is now this document's own.
@@ -453,7 +481,11 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
       if (persisted.writtenRevision > cached.persistedRevision) {
         cached.persistedRevision = persisted.writtenRevision;
       }
-      this.announce(draftId, true, persisted.snapshotVersion);
+      cached.flushFailures = 0;
+      cached.persistedCodeHash = persisted.codeHash;
+      // The hash identifies exactly the text made durable, including deletions.
+      // Clients compare it with their current text before showing Saved.
+      this.announce(draftId, true, persisted.snapshotVersion, persisted.codeHash);
       // Anything that arrived while the write was in flight is still unsaved,
       // and anything that did not means the timer a repair scheduled during
       // the transaction has nothing left to do.
@@ -472,6 +504,9 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
       // Said out loud, so the editor keeps showing unsaved work rather than
       // implying a save that did not happen.
       this.announce(draftId, false, cached.snapshotVersion);
+      cached.flushFailures = Math.min(cached.flushFailures + 1, 6);
+      this.cancelFlush(cached);
+      this.scheduleFlush(draftId, cached);
       return { persisted: false, snapshotVersion: cached.snapshotVersion };
     }
   }
@@ -571,6 +606,8 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
+    for (const cached of this.documents.values()) this.cancelFlush(cached);
     this.watches.clear();
     this.unregisterAuthority?.();
     this.unregisterAuthority = null;
@@ -623,11 +660,16 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
   }
 
   private scheduleFlush(draftId: string, cached: CachedDocument): void {
-    if (cached.flushTimer) return;
+    if (this.stopping || this.documents.get(draftId) !== cached || cached.flushTimer) return;
+    // Keep trying at a bounded rate while the only durable copy is pending.
+    // New keystrokes do not reset an outage's backoff.
+    const delay = cached.flushFailures === 0
+      ? monitoringTiming.documentFlushDebounceMs
+      : Math.min(30_000, 1_000 * 2 ** (cached.flushFailures - 1)) * (0.8 + Math.random() * 0.2);
     cached.flushTimer = setTimeout(() => {
       cached.flushTimer = null;
       void this.flush(draftId);
-    }, monitoringTiming.documentFlushDebounceMs);
+    }, delay);
     // A pending flush must never keep the process alive on shutdown.
     cached.flushTimer.unref?.();
   }

@@ -602,3 +602,136 @@ describe("watch authority handoff", () => {
     expect(await drafts.save({ userId: "u", materialId: "m", sourceMaterialId: "m", courseId: "c", code: "stale", baseUpdatedAt: null })).toMatchObject({ outcome: "CONFLICT" });
   });
 });
+
+describe("flush outage and concurrency recovery", () => {
+  it("retries without another edit, backs off, and stops once durable", async () => {
+    vi.useFakeTimers();
+    const options = { failWrite: true };
+    const { service, state, prisma } = createService(options);
+    try {
+      await service.applyUpdate(draftId, Y.encodeStateAsUpdate(clientDoc("keep me")));
+      await service.flush(draftId);
+      expect(prisma.exerciseDraft.update).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(prisma.exerciseDraft.update).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(prisma.exerciseDraft.update).toHaveBeenCalledTimes(2);
+      options.failWrite = false;
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(prisma.exerciseDraft.update).toHaveBeenCalledTimes(3);
+      expect(state.draftCode).toBe("keep me");
+      expect(service.hasUnsavedWork(draftId)).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      await service.onModuleDestroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps retry pressure bounded during a long outage and cancels timers on shutdown", async () => {
+    vi.useFakeTimers();
+    const { service, prisma } = createService({ failWrite: true });
+    try {
+      await service.applyUpdate(draftId, Y.encodeStateAsUpdate(clientDoc("resident")));
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(prisma.exerciseDraft.update.mock.calls.length).toBeGreaterThan(6);
+      expect(prisma.exerciseDraft.update.mock.calls.length).toBeLessThan(15);
+      expect(service.hasUnsavedWork(draftId)).toBe(true);
+      await service.onModuleDestroy();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(await service.readCode(draftId)).toBe("resident");
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("persists normalization of a legacy plain draft without requiring a keystroke", async () => {
+    vi.useFakeTimers();
+    const { service, state } = createService({ draftCode: "a\r\nb" });
+    try {
+      await service.load(draftId);
+      expect(service.hasUnsavedWork(draftId)).toBe(true);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(state.draftCode).toBe("a\nb");
+      const sync = await service.sync(draftId, Y.encodeStateVector(new Y.Doc()));
+      expect(sync.persistedCodeHash).toBe(createHash("sha256").update("a\nb").digest("hex"));
+      expect(service.hasUnsavedWork(draftId)).toBe(false);
+    } finally {
+      await service.onModuleDestroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it("coalesces concurrent callers and subsequently saves edits made during the write", async () => {
+    const held = gate();
+    const { service, prisma, state } = createService({ holdWrite: held.hold });
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(clientDoc("first")));
+    const first = service.flush(draftId);
+    await held.entered;
+    const second = service.flush(draftId);
+    const third = service.flush(draftId);
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+    const client = new Y.Doc();
+    Y.applyUpdate(client, Y.encodeStateAsUpdate(await service.load(draftId)));
+    client.getText("code").insert(5, "-late");
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(client));
+    expect(prisma.exerciseCollaborationDocument.upsert).toHaveBeenCalledTimes(1);
+    held.open();
+    await Promise.all([first, second, third]);
+    expect(service.hasUnsavedWork(draftId)).toBe(true);
+    await service.flush(draftId);
+    expect(state.draftCode).toBe("first-late");
+    expect(prisma.exerciseCollaborationDocument.upsert).toHaveBeenCalledTimes(2);
+    client.destroy();
+    await service.onModuleDestroy();
+  });
+
+  it("does not return an older coalesced snapshot as an HTTP conflict", async () => {
+    const held = gate();
+    const { service, drafts, state } = createService({ holdWrite: held.hold });
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(clientDoc("old")));
+    const flushing = service.flush(draftId);
+    await held.entered;
+    const client = new Y.Doc();
+    Y.applyUpdate(client, Y.encodeStateAsUpdate(await service.load(draftId)));
+    client.getText("code").insert(3, "-new");
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(client));
+    const save = drafts.save({
+      userId: "u", materialId: "m", sourceMaterialId: "m", courseId: "c",
+      code: "old-new", baseUpdatedAt: null,
+    });
+    const result = expect(save).rejects.toThrow("could not be persisted");
+    held.open();
+    await flushing;
+    await result;
+    await service.flush(draftId);
+    expect(state.draftCode).toBe("old-new");
+    client.destroy();
+    await service.onModuleDestroy();
+  });
+
+  it("announces the committed text's hash, not the later in-memory text", async () => {
+    const held = gate();
+    const { service } = createService({ holdWrite: held.hold });
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(clientDoc("abc")));
+    const events = vi.fn();
+    service.onFlush(events);
+    const pending = service.flush(draftId);
+    await held.entered;
+    const client = new Y.Doc();
+    Y.applyUpdate(client, Y.encodeStateAsUpdate(await service.load(draftId)));
+    client.getText("code").delete(2, 1);
+    await service.applyUpdate(draftId, Y.encodeStateAsUpdate(client));
+    held.open();
+    await pending;
+    expect(events).toHaveBeenLastCalledWith(expect.objectContaining({
+      persisted: true, codeHash: createHash("sha256").update("abc").digest("hex"),
+    }));
+    expect(service.hasUnsavedWork(draftId)).toBe(true);
+    await service.flush(draftId);
+    expect(events).toHaveBeenLastCalledWith(expect.objectContaining({
+      persisted: true, codeHash: createHash("sha256").update("ab").digest("hex"),
+    }));
+    client.destroy();
+    await service.onModuleDestroy();
+  });
+});

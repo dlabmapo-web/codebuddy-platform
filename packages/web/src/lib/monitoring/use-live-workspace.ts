@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  documentSyncResultSchema,
   monitoringClientEvents,
   monitoringProtocolVersion,
   monitoringServerEvents,
@@ -30,6 +31,7 @@ import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { canEditSynchronizedDraft } from './connection';
 import { applyDocumentSyncResult, toBytes } from './document-sync';
+import { SavedTextTracker } from './saved-text';
 import { monitoringAck, type MonitoringAckResult } from './types';
 import { useMonitoringSocket } from './use-monitoring-socket';
 
@@ -129,6 +131,13 @@ export function useLiveWorkspace({
   // with.
   const docRef = React.useRef(doc);
   const sessionRef = React.useRef<LiveWorkspaceSession | null>(null);
+  const savedTextRef = React.useRef<SavedTextTracker | null>(null);
+  React.useEffect(() => {
+    savedTextRef.current = new SavedTextTracker(
+      () => docRef.current.getText('code').toString(), setUnsaved,
+    );
+    return () => savedTextRef.current?.cancel();
+  }, []);
   // Every session mutation publishes to this ref synchronously before state.
   // A passive effect copying state back can overwrite a newer acknowledgement
   // with the previous visit (or its ending) and discard the new sync response.
@@ -151,6 +160,8 @@ export function useLiveWorkspace({
       ) {
         return false;
       }
+      const parsed = documentSyncResultSchema.parse(result);
+      void savedTextRef.current?.confirm(parsed.persistedCodeHash);
       setSyncedDraftId(current.draftId);
       report({ type: 'synchronized' });
       return true;
@@ -244,13 +255,14 @@ export function useLiveWorkspace({
           // any of it forward would show one problem's output beside another
           // problem's code.
           if (sessionRef.current?.visitId !== ack.data.visitId) {
+            savedTextRef.current?.changed();
             const replacement = new Y.Doc();
             docRef.current = replacement;
             setDoc(replacement);
             setRun(null);
             setResult(null);
             setFeedback([]);
-            setUnsaved(false);
+            setUnsaved(true);
             terminalRef.current = emptyTranscript;
             setTerminal(emptyTranscript);
           }
@@ -326,13 +338,15 @@ export function useLiveWorkspace({
     // A delayed same-draft broadcast can belong to a retired visit.
     const onUpdated = (event: DocumentUpdatedEvent) => {
       if (event.draftId !== sessionRef.current?.draftId) return;
+      savedTextRef.current?.changed();
       Y.applyUpdate(docRef.current, toBytes(event.update), 'remote');
     };
 
     const onPersisted = (event: DocumentPersistedEvent) => {
       if (event.draftId !== sessionRef.current?.draftId) return;
       // Cleared by a confirmed write and by nothing else.
-      setUnsaved(!event.persisted);
+      if (event.persisted) void savedTextRef.current?.confirm(event.codeHash);
+      else savedTextRef.current?.changed();
     };
 
     socket.on(monitoringServerEvents.documentUpdated, onUpdated);
@@ -348,8 +362,8 @@ export function useLiveWorkspace({
     if (!socket) return;
     const onUpdate = (update: Uint8Array, origin: unknown) => {
       const current = sessionRef.current;
+      savedTextRef.current?.changed();
       if (!current || origin === 'remote' || origin === 'server') return;
-      setUnsaved(true);
       socket.emit(
         monitoringClientEvents.documentUpdate,
         {

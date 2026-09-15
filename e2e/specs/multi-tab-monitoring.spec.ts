@@ -306,11 +306,22 @@ test('code pointers and carets retain their anchors across unequal layouts', asy
     await watch.setViewportSize({ width: 1100, height: 720 });
     await edit(student, '# pointer fixture\nprint("🎉 한국어")\n');
     await matches(watch, '# pointer fixture\nprint("🎉 한국어")\n');
+    // Teacher awareness intentionally expires on the student's screen after
+    // three idle seconds. Browser/driver latency must not turn this geometry
+    // assertion into an accidental expiry test. Advance frames explicitly while
+    // keeping this resize within the marker's lifetime.
+    const now = new Date();
+    await student.clock.install({ time: now });
+    await student.clock.pauseAt(new Date(now.getTime() + 1_000));
     for (const [sender, receiver] of [[student, watch], [watch, student]] as const) {
       const point = await codePoint(sender, 2, 3);
       await sender.mouse.move(point.x + 1, point.y + point.height / 2);
-      await expect(receiver.getByTestId('peer-pointer')).toHaveAttribute('data-peer-surface', 'editor');
       await expect.poll(async () => {
+        await student.clock.runFor(16);
+        return receiver.evaluate(() => document.querySelector('[data-testid="peer-pointer"]')?.getAttribute('data-peer-surface') ?? null);
+      }).toBe('editor');
+      await expect.poll(async () => {
+        await student.clock.runFor(16);
         const expected = await codePoint(receiver, 2, 3);
         const arrow = await receiver.getByTestId('peer-pointer').boundingBox();
         return arrow ? Math.max(Math.abs(arrow.x + 4.5 - expected.x), Math.abs(arrow.y + 2.5 - expected.y)) : Infinity;
@@ -319,22 +330,41 @@ test('code pointers and carets retain their anchors across unequal layouts', asy
         const editor = (window as any).monaco.editor.getEditors()[0];
         editor.focus(); editor.setPosition({ lineNumber: 2, column: 3 });
       });
-      await expect(receiver.locator('.cove-peer-cursor')).toHaveCount(1);
+      await expect.poll(async () => {
+        await student.clock.runFor(16);
+        return receiver.locator('.cove-peer-cursor').count();
+      }).toBe(1);
     }
-    // Resize only the receiving pane; the sending pointer stays stationary.
-    const before = await codePoint(student, 2, 3);
-    const divider = await student.locator('.cursor-col-resize').first().boundingBox();
-    await student.mouse.move(divider!.x + 2, divider!.y + 80);
-    await student.mouse.down();
-    await student.mouse.move(divider!.x + 42, divider!.y + 80, { steps: 5 });
-    await student.mouse.up();
-    await expect.poll(async () => Math.abs((await codePoint(student, 2, 3)).x - before.x)).toBeGreaterThan(5);
-    await expect.poll(async () => {
-      const expected = await codePoint(student, 2, 3);
-      const arrow = await student.getByTestId('peer-pointer').boundingBox();
-      return arrow ? Math.max(Math.abs(arrow.x + 4.5 - expected.x), Math.abs(arrow.y + 2.5 - expected.y)) : Infinity;
-    }).toBeLessThanOrEqual(2);
+    // Resize either receiver while its peer's code anchor stays stationary.
+    for (const receiver of [student, watch]) {
+      const sender = receiver === student ? watch : student;
+      const anchor = await codePoint(sender, 2, 3);
+      await sender.mouse.move(anchor.x + 1, anchor.y + anchor.height / 2);
+      await expect.poll(async () => {
+        await student.clock.runFor(16);
+        return receiver.evaluate(() => document.querySelector('[data-testid="peer-pointer"]')?.getAttribute('data-peer-surface') ?? null);
+      }).toBe('editor');
+      const before = await codePoint(receiver, 2, 3);
+      const divider = await receiver.locator('.cursor-col-resize').first().boundingBox();
+      await receiver.mouse.move(divider!.x + 2, divider!.y + 80);
+      await receiver.mouse.down();
+      await receiver.mouse.move(divider!.x + 42, divider!.y + 80, { steps: 5 });
+      await receiver.mouse.up();
+      await expect.poll(async () => Math.abs((await codePoint(receiver, 2, 3)).x - before.x)).toBeGreaterThan(5);
+      await expect.poll(async () => {
+        await student.clock.runFor(16);
+        const expected = await codePoint(receiver, 2, 3);
+        const arrow = await receiver.getByTestId('peer-pointer').boundingBox();
+        return arrow ? Math.max(Math.abs(arrow.x + 4.5 - expected.x), Math.abs(arrow.y + 2.5 - expected.y)) : Infinity;
+      }).toBeLessThanOrEqual(2);
+      if (receiver === student) {
+        // Geometry changes must not keep a stationary teacher marker alive.
+        await student.clock.runFor(3_100);
+        await expect(student.getByTestId('peer-pointer')).toHaveCount(0);
+      }
+    }
   } finally {
+    await student.clock.resume();
     await student.setViewportSize(studentViewport);
     await watch.setViewportSize(teacherViewport);
   }

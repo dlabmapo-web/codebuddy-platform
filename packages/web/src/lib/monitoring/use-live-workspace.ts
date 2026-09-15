@@ -31,6 +31,7 @@ import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { canEditSynchronizedDraft, isExpectedWatchReplacement } from './connection';
 import { applyDocumentSyncResult, toBytes } from './document-sync';
+import { canReplayPendingDocument } from './pending-document';
 import { PendingTeacherUpdates } from './pending-teacher-updates';
 import { retryMonitoringCommand } from './retry-command';
 import { SavedTextTracker } from './saved-text';
@@ -79,6 +80,11 @@ export function useLiveWorkspace({
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
   const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
+  const pendingDocumentRef = React.useRef<{ draftId: string; baseVector: Uint8Array } | null>(null);
+  const recoveringRef = React.useRef(false);
+  const recoveryHistoryReadyRef = React.useRef(false);
+  const recoveryUpdatesRef = React.useRef<Uint8Array[]>([]);
+  const [pendingRecovery, setPendingRecovery] = React.useState<'recovering' | 'blocked' | null>(null);
   const preservePendingBufferRef = React.useRef(false);
   const [switching, setSwitching] = React.useState(false);
   const prepareStudentSwitch = React.useCallback(async () => {
@@ -91,6 +97,15 @@ export function useLiveWorkspace({
   const cancelStudentSwitch = React.useCallback(() => {
     setSwitching(false);
   }, []);
+  React.useEffect(() => {
+    const unload = (event: BeforeUnloadEvent) => {
+      if (!pendingUpdates.pending || !pendingDocumentRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', unload);
+    return () => window.removeEventListener('beforeunload', unload);
+  }, [pendingUpdates]);
   /**
    * This workspace's identity, created once at mount and held only in memory.
    *
@@ -163,7 +178,7 @@ export function useLiveWorkspace({
    * readiness marker can unlock Monaco.
    */
   const completeDocumentSync = React.useCallback(
-    (result: unknown) => {
+    (result: unknown, markReady = true) => {
       const current = sessionRef.current;
       if (
         !current ||
@@ -177,8 +192,10 @@ export function useLiveWorkspace({
       }
       const parsed = documentSyncResultSchema.parse(result);
       void savedTextRef.current?.confirm(parsed.persistedCodeHash);
-      setSyncedDraftId(current.draftId);
-      report({ type: 'synchronized' });
+      if (markReady) {
+        setSyncedDraftId(current.draftId);
+        report({ type: 'synchronized' });
+      }
       return true;
     },
     [report],
@@ -232,13 +249,21 @@ export function useLiveWorkspace({
 
     let cancelCommand = () => {};
     const unavailable = () => {
+      if (recoveringRef.current) setPendingRecovery('blocked');
       setSyncedDraftId(null);
       setDenied('MONITORING_REALTIME_UNAVAILABLE');
       report({ type: 'degraded' });
     };
     const startWatch = () => {
-      // Reconnecting must not replace a buffer a pending switch is preserving.
-      if (preservePendingBufferRef.current && pendingUpdates.pending) return;
+      // Reauthorize the watch without discarding its undelivered operations.
+      const retained = pendingUpdates.pending ? pendingDocumentRef.current : null;
+      recoveringRef.current = retained !== null;
+      recoveryHistoryReadyRef.current = false;
+      recoveryUpdatesRef.current = [];
+      if (retained) {
+        pendingUpdates.pause();
+        setPendingRecovery('recovering');
+      }
       cancelCommand();
       setSyncedDraftId(null);
       report({ type: 'recovery_failed' });
@@ -267,6 +292,7 @@ export function useLiveWorkspace({
           if (watchTokenRef.current !== token) return;
           replacingVisitRef.current = null;
           if (!ack?.ok) {
+            if (retained) setPendingRecovery('blocked');
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
             if (!ack || ack.code === 'MONITORING_REALTIME_UNAVAILABLE') unavailable();
             if (ack?.code === 'MONITORING_ACCESS_DENIED') {
@@ -277,6 +303,11 @@ export function useLiveWorkspace({
             if (ack?.code === 'MONITORING_REFRESH_REQUIRED') {
               setRefreshRequired(true);
             }
+            return;
+          }
+          if (retained && retained.draftId !== ack.data.draftId) {
+            // The old text remains available for download; never replay into B.
+            setPendingRecovery('blocked');
             return;
           }
           setDenied(null);
@@ -292,9 +323,11 @@ export function useLiveWorkspace({
           // describes an exercise this teacher is no longer on, and carrying
           // any of it forward would show one problem's output beside another
           // problem's code.
-          if (sessionRef.current?.visitId !== ack.data.visitId) {
+          if (!retained && sessionRef.current?.visitId !== ack.data.visitId) {
             savedTextRef.current?.changed();
             pendingUpdates.reset();
+            pendingDocumentRef.current = null;
+            setPendingRecovery(null);
             const replacement = new Y.Doc();
             docRef.current = replacement;
             setDoc(replacement);
@@ -343,6 +376,7 @@ export function useLiveWorkspace({
                 return;
               }
               if (!syncAck?.ok) {
+                if (retained) setPendingRecovery('blocked');
                 if (syncAck?.code === 'MONITORING_ACCESS_DENIED') {
                   setDenied(syncAck.code);
                   report({ type: 'revoked' });
@@ -353,8 +387,60 @@ export function useLiveWorkspace({
                 }
                 return;
               }
-              if (completeDocumentSync(syncAck.data)) setDenied(null);
-              else unavailable();
+              if (retained && !canReplayPendingDocument(retained.baseVector, toBytes(syncAck.data.stateVector))) {
+                setPendingRecovery('blocked');
+                return;
+              }
+              recoveryHistoryReadyRef.current = true;
+              if (!completeDocumentSync(syncAck.data, !retained)) { unavailable(); return; }
+              for (const update of recoveryUpdatesRef.current) Y.applyUpdate(docRef.current, update, 'remote');
+              recoveryUpdatesRef.current = [];
+              setDenied(null);
+              if (!retained) return;
+
+              const changeRecoveryMode = (mode: MonitoringWatchMode, done: () => void) => {
+                cancelCommand = retryMonitoringCommand<{ mode: MonitoringWatchMode }>({
+                  onRetry: unavailable,
+                  send: (reply) => socket.emit(monitoringClientEvents.watchMode, {
+                    eventId: crypto.randomUUID(), identity: identityOf(ack.data), mode,
+                  }, monitoringAck(reply)),
+                  onResult: (permission) => {
+                    if (watchTokenRef.current !== token || sessionRef.current?.visitId !== ack.data.visitId) return;
+                    if (!permission?.ok || permission.data.mode !== mode) {
+                      setPendingRecovery('blocked');
+                      if (permission && !permission.ok && permission.code === 'MONITORING_ACCESS_DENIED') {
+                        setDenied(permission.code);
+                        report({ type: 'revoked' });
+                      } else if (permission && !permission.ok && permission.code === 'MONITORING_REFRESH_REQUIRED') {
+                        setRefreshRequired(true);
+                      } else unavailable();
+                      return;
+                    }
+                    const next = { ...sessionRef.current, mode };
+                    sessionRef.current = next;
+                    setSession(next);
+                    done();
+                  },
+                });
+              };
+              // The previous edit intent does not grant a new visit permission.
+              // Ask the server, replay only the retained operations, then lock.
+              changeRecoveryMode('HELPING', () => {
+                pendingUpdates.resume();
+                void pendingUpdates.settle().then((applied) => {
+                  if (watchTokenRef.current !== token || sessionRef.current?.visitId !== ack.data.visitId) return;
+                  if (!applied) { unavailable(); return; }
+                  changeRecoveryMode('MONITORING', () => {
+                    recoveringRef.current = false;
+                    pendingDocumentRef.current = null;
+                    preservePendingBufferRef.current = false;
+                    setPendingRecovery(null);
+                    setDenied(null);
+                    setSyncedDraftId(ack.data.draftId);
+                    report({ type: 'synchronized' });
+                  });
+                });
+              });
             },
           });
         },
@@ -367,6 +453,15 @@ export function useLiveWorkspace({
       replacingVisitRef.current = null;
     };
     startWatchRef.current = startWatch;
+    const disconnect = () => {
+      if (!pendingUpdates.pending || !pendingDocumentRef.current) return;
+      pendingUpdates.pause();
+      recoveringRef.current = true;
+      recoveryHistoryReadyRef.current = false;
+      setPendingRecovery('recovering');
+      setSyncedDraftId(null);
+    };
+    socket.on('disconnect', disconnect);
     socket.on('connect', startWatch);
     if (socket.connected) startWatch();
 
@@ -377,6 +472,7 @@ export function useLiveWorkspace({
       cancelWatchRef.current = null;
       startWatchRef.current = null;
       socket.off('connect', startWatch);
+      socket.off('disconnect', disconnect);
       // Names the watch it means to stop. A tab closing races its own
       // replacement on reload, and an unqualified stop would close whichever
       // watch this connection happened to hold by the time it arrived.
@@ -412,7 +508,13 @@ export function useLiveWorkspace({
     // Only the identity-fenced request acknowledgement may complete a sync.
     // A delayed same-draft broadcast can belong to a retired visit.
     const onUpdated = (event: DocumentUpdatedEvent) => {
+      // Sync contains the complete server delta; do not mix unknown history
+      // into the retained buffer before validating that response.
       if (event.draftId !== sessionRef.current?.draftId) return;
+      if (recoveringRef.current && !recoveryHistoryReadyRef.current) {
+        recoveryUpdatesRef.current.push(toBytes(event.update));
+        return;
+      }
       savedTextRef.current?.changed();
       Y.applyUpdate(docRef.current, toBytes(event.update), 'remote');
     };
@@ -435,35 +537,48 @@ export function useLiveWorkspace({
   /** Local edits leave as bounded updates, never as a whole document. */
   React.useEffect(() => {
     if (!socket) return;
+    let beforeVector = Y.encodeStateVector(doc);
+    const beforeTransaction = () => {
+      if (!pendingUpdates.pending) beforeVector = Y.encodeStateVector(doc);
+    };
     const onUpdate = (update: Uint8Array, origin: unknown) => {
       const current = sessionRef.current;
       savedTextRef.current?.changed();
       if (!current || origin === 'remote' || origin === 'server') return;
+      if (!pendingUpdates.pending && current.mode === 'HELPING' && !recoveringRef.current) {
+        pendingDocumentRef.current = { draftId: current.draftId, baseVector: beforeVector };
+      }
       const eventId = crypto.randomUUID();
       pendingUpdates.add(eventId, (done) => {
-        if (sessionRef.current?.visitId !== current.visitId || !socket.connected) {
+        const active = sessionRef.current;
+        if (!active || active.draftId !== current.draftId || (active.visitId !== current.visitId && active.mode !== 'HELPING') || !socket.connected) {
           done(false);
           return;
         }
         socket.emit(
           monitoringClientEvents.documentUpdate,
-          { eventId, draftId: current.draftId, update, identity: identityOf(current) },
+          { eventId, draftId: current.draftId, update, identity: identityOf(active) },
           monitoringAck((ack) => {
             done(ack?.ok === true);
-            if (!pendingUpdates.pending) preservePendingBufferRef.current = false;
-            if (ack?.ok || sessionRef.current?.visitId !== current.visitId) return;
+            if (sessionRef.current?.visitId !== active.visitId) return;
+            if (!pendingUpdates.pending && !recoveringRef.current) {
+              preservePendingBufferRef.current = false;
+              pendingDocumentRef.current = null;
+            }
+            if (ack?.ok) return;
             // Keep the local buffer while a switch is waiting or has failed.
             // The teacher can retry its exact operations without losing text.
             setSyncedDraftId(null);
             report({ type: 'recovery_failed' });
-            if (preservePendingBufferRef.current) return;
+            if (preservePendingBufferRef.current || recoveringRef.current) return;
             startWatchRef.current?.();
           }),
         );
       });
     };
+    doc.on('beforeTransaction', beforeTransaction);
     doc.on('update', onUpdate);
-    return () => doc.off('update', onUpdate);
+    return () => { doc.off('beforeTransaction', beforeTransaction); doc.off('update', onUpdate); };
   }, [doc, pendingUpdates, report, socket]);
 
   /* ------------------------------------------------------- terminal mirror */
@@ -578,6 +693,10 @@ export function useLiveWorkspace({
       if (isExpectedWatchReplacement(event, replacingVisitRef.current)) return;
       cancelWatchRef.current?.();
       setEnded(event.reason);
+      if (pendingDocumentRef.current && pendingUpdates.pending) {
+        pendingUpdates.pause();
+        setPendingRecovery('blocked');
+      }
       setSyncedDraftId(null);
       sessionRef.current = null;
       setSession(null);
@@ -636,7 +755,7 @@ export function useLiveWorkspace({
         onRefreshRequired,
       );
     };
-  }, [socket]);
+  }, [socket, pendingUpdates]);
 
   /* -------------------------------------------------------------- awareness */
 
@@ -741,6 +860,18 @@ export function useLiveWorkspace({
   return {
     doc,
     text,
+    pendingRecovery,
+    discardPendingEdits: () => {
+      cancelWatchRef.current?.();
+      pendingDocumentRef.current = null;
+      pendingUpdates.reset();
+      recoveringRef.current = false;
+      preservePendingBufferRef.current = false;
+      setPendingRecovery(null);
+      // Force a clean document even if a previous acknowledgement was retained.
+      sessionRef.current = null;
+      startWatchRef.current?.();
+    },
     prepareStudentSwitch,
     cancelStudentSwitch,
     /** Re-resolves the student's current exercise and replaces the watch. */
@@ -815,7 +946,7 @@ export function useLiveWorkspace({
      * this is the UI agreeing with the gate rather than being it.
      */
     canEditCode:
-      !switching &&
+      !switching && !pendingRecovery &&
       session?.mode === 'HELPING' &&
       canEditSynchronizedDraft({
         state,

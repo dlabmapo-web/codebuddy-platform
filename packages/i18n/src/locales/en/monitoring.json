@@ -103,7 +103,12 @@
     "narrow_title": "Screen too small for live help",
     "narrow_body": "Use a wider screen to edit alongside a student.",
     "mirror_waiting": "Waiting for the student's input",
-    "mirror_catching_up": "Catching up…"
+    "mirror_catching_up": "Catching up…",
+    "pending_recovering": "Recovering your unsynced edits. Editing is paused.",
+    "pending_blocked": "Your unsynced edits are retained. They could not be safely restored to this watch.",
+    "pending_download": "Download retained code",
+    "pending_discard": "Discard retained edits",
+    "pending_discard_confirm": "Discard your unsynced edits and load the current live document? Download a copy first if you need to keep them."
   },
   "feedback": {
     "title": "Feedback",

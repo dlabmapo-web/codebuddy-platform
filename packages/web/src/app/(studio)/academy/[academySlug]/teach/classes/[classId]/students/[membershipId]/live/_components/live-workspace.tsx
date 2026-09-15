@@ -347,7 +347,25 @@ export function LiveWorkspace({
         />
       </div>
 
-      {live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ? (
+      {live.pendingRecovery ? (
+        <div role="status" className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-sm">
+          <span>{t(live.pendingRecovery === 'recovering' ? 'workspace.pending_recovering' : 'workspace.pending_blocked')}</span>
+          <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => {
+            const url = URL.createObjectURL(new Blob([live.text.toString()], { type: 'text/plain;charset=utf-8' }));
+            const link = document.createElement('a');
+            link.href = url; link.download = 'unsynced-teacher-code.py'; link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1_000);
+          }}>{t('workspace.pending_download')}</button>
+          {live.pendingRecovery === 'blocked' ? <>
+            <button type="button" className="rounded-md border border-border px-2 py-1" onClick={live.follow}>{t('workspace.retry_connection')}</button>
+            <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => {
+              if (window.confirm(t('workspace.pending_discard_confirm'))) live.discardPendingEdits();
+            }}>{t('workspace.pending_discard')}</button>
+          </> : null}
+        </div>
+      ) : null}
+
+      {!live.pendingRecovery && live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ? (
         <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2 text-[13px] text-sub" role="status">
           <span>{t('workspace.recovery_body')}</span>
           <button className="rounded-md border border-border px-2 py-1 font-semibold" onClick={live.follow} type="button">

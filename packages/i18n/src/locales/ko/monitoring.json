@@ -101,7 +101,12 @@
     "narrow_title": "화면이 너무 좁습니다",
     "narrow_body": "학생과 함께 코드를 편집하려면 더 넓은 화면을 사용하세요.",
     "mirror_waiting": "학생의 입력을 기다리는 중",
-    "mirror_catching_up": "따라잡는 중…"
+    "mirror_catching_up": "따라잡는 중…",
+    "pending_recovering": "동기화되지 않은 수정 내용을 복구하고 있습니다. 편집이 일시 중지됩니다.",
+    "pending_blocked": "동기화되지 않은 수정 내용을 보관하고 있습니다. 현재 모니터링에 안전하게 복원할 수 없습니다.",
+    "pending_download": "보관된 코드 다운로드",
+    "pending_discard": "보관된 수정 내용 버리기",
+    "pending_discard_confirm": "동기화되지 않은 수정 내용을 버리고 현재 실시간 문서를 불러올까요? 보관하려면 먼저 코드를 다운로드하세요."
   },
   "feedback": {
     "title": "피드백",

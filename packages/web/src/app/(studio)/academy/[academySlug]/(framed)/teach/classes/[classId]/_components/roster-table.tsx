@@ -6,10 +6,12 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import type { ColumnDef } from '@tanstack/react-table';
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DataTable } from '@/components/studio/data-table';
+import { Tooltip, TooltipProvider } from '@/components/studio/primitives';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useLocale } from '@/i18n';
 import {
@@ -166,7 +168,7 @@ export function RosterTable({
         header: '',
         enableSorting: false,
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
             {/*
              * §5.1 — the per-student ledger, from the roster. "Why does 지호
              * have 40 points" is a question a parent asks a teacher, and this
@@ -175,7 +177,7 @@ export function RosterTable({
              * academy without points answers with its own not-found page.
              */}
             <Link
-              className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-[13px] font-bold text-sub transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="inline-flex h-9 items-center whitespace-nowrap rounded-lg border border-border px-3 text-[13px] font-semibold text-sub transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
               href={`${routes.academy(academySlug)}/points/students/${row.original.membershipId}`}
             >
               {t('roster.open_points')}
@@ -186,12 +188,26 @@ export function RosterTable({
              * refuse the watch anyway.
              */}
             {row.original.canOpenLive ? (
-              <Link
-                className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                href={`${routes.academy(academySlug)}/teach/classes/${classId}/students/${row.original.membershipId}/live`}
-              >
-                {t('roster.open_live')}
-              </Link>
+              <div className="inline-flex shrink-0 items-center gap-2">
+                <Link
+                  className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-brand px-3.5 text-[13px] font-semibold text-on-brand shadow-sm transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  href={routes.academyTeachStudentLive(academySlug, classId, row.original.membershipId)}
+                >
+                  {t('roster.open_live')}
+                </Link>
+                <Tooltip content={t('roster.open_live_new_tab')} side="top">
+                  <Link
+                    aria-label={t('roster.open_live_new_tab')}
+                    className="inline-flex size-9 items-center justify-center rounded-lg border border-brand/25 bg-brand/5 text-brand transition-colors hover:border-brand/50 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    href={routes.academyTeachStudentLive(academySlug, classId, row.original.membershipId)}
+                    prefetch={false}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <ExternalLink aria-hidden="true" className="size-4" strokeWidth={2} />
+                  </Link>
+                </Tooltip>
+              </div>
             ) : null}
           </div>
         ),
@@ -201,15 +217,17 @@ export function RosterTable({
   );
 
   return (
-    <DataTable
-      columns={columns}
-      data={rows}
-      emptyMessage={emptyMessage}
-      // No page size on purpose. Paging would let a student start solving on
-      // page two and stay invisible, which is what this page exists to prevent.
-      searchPlaceholder={t('roster.search_placeholder')}
-      toolbarFilters={filters}
-    />
+    <TooltipProvider delayDuration={250}>
+      <DataTable
+        columns={columns}
+        data={rows}
+        emptyMessage={emptyMessage}
+        // No page size on purpose. Paging would let a student start solving on
+        // page two and stay invisible, which is what this page exists to prevent.
+        searchPlaceholder={t('roster.search_placeholder')}
+        toolbarFilters={filters}
+      />
+    </TooltipProvider>
   );
 }
 

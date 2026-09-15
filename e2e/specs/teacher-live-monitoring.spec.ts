@@ -161,12 +161,12 @@ test('a student appears live when the teacher opened the roster first', async ()
     teacherPage.getByText(/live updates unavailable|사용할 수 없습니다/i),
   ).toHaveCount(0);
   await expect(
-    studentRow.getByRole('link', { name: /open live|실시간 보기/i }),
+    studentRow.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }),
   ).toBeVisible({ timeout: 30_000 });
 });
 
 test('the teacher opens the live workspace and the student is told', async () => {
-  await teacherPage.getByRole('link', { name: /open live|실시간 보기/i }).first().click();
+  await teacherPage.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }).first().click();
   await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {
     timeout: 30_000,
   });
@@ -1048,10 +1048,10 @@ test('a problem stored with CRLF hands over without drifting', async () => {
     .getByRole('row')
     .filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
   await expect(
-    studentRow.getByRole('link', { name: /open live|실시간 보기/i }),
+    studentRow.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }),
   ).toBeVisible({ timeout: 30_000 });
   await studentRow
-    .getByRole('link', { name: /open live|실시간 보기/i })
+    .getByRole('link', { name: /^(?:open live|실시간 보기)$/i })
     .first()
     .click();
   await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {

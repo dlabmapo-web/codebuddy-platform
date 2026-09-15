@@ -85,9 +85,9 @@ test('the teacher opens a live watch on the hinted exercise', async () => {
 
   const row = teacherPage.getByRole('row').filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
   await expect(
-    row.getByRole('link', { name: /open live|실시간 보기/i }),
+    row.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }),
   ).toBeVisible({ timeout: 30_000 });
-  await row.getByRole('link', { name: /open live|실시간 보기/i }).click();
+  await row.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }).click();
   await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {
     timeout: 30_000,
   });

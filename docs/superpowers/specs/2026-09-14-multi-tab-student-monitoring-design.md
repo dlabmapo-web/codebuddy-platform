@@ -1,7 +1,8 @@
 # Multi-tab student monitoring
 
 Date: 2026-09-14
-Status: Proposed; implementation not started
+Status: Implemented through section 8; section 9's browser matrix and the
+Redis-backed cross-instance tests are outstanding, so no rollout is cleared.
 
 ## 1. Outcome and scope
 
@@ -108,8 +109,11 @@ it must not discard student code or claim a durable save.
 Remove teacher-wide visit replacement from `MonitoringVisitService.start()`.
 Persist one audit visit per watch lifetime, closing only the addressed visit.
 A reconnect may replace that session's old visit; another tab's visit is untouched.
-Indexes must support scoped revocation and open-visit cleanup. Any schema changes
-are additive; preserve historical visit records and end reasons.
+Indexes must support scoped revocation and open-visit cleanup. Replace the existing
+`teacher_monitoring_visits_one_open_per_teacher_idx` unique partial index with a
+nonunique open-visit index. Its singleton constraint prevents the second tab from
+opening even when application and Redis logic support it. Preserve all historical
+visit records and end reasons; no table rows are removed by this migration.
 
 Normal disconnect cleanup ends only that visit. Full reload may briefly overlap the
 old and new leases; aggregation must tolerate this without losing the draft.
@@ -268,3 +272,154 @@ Current evidence: existing pointer/reading implementation committed as `4ec1552`
 Earlier local manual checks verified bidirectional temporary edits and one pointer
 direction; reading retention and reverse pointers were not fully cleared. This
 spec makes no claim that those outstanding browser gates or multi-tab gates passed.
+
+## 11. Implementation review and verification (2026-09-14–15)
+
+The implementation review found issues that the original mocked suites did not
+cover. The changes now include:
+
+- A database migration replacing the unique open-visit-per-teacher index with a
+  nonunique partial index. The old index rejected the second real browser watch.
+  No draft or audit rows are deleted. Migration
+  `20260914120000_multi_tab_monitoring_visits` was applied and recorded in the
+  development database during the authorized implementation verification.
+- Lease renewal refreshes every index and checks the current session fence;
+  superseded leases cannot renew, authorize commands, or contribute to counts.
+  Summary counts and their revision are computed atomically in Redis. Persistent
+  generation/revision counters do not reset while clients can retain old fences.
+- Identity checks cover document sync/update, feedback, terminal resync and stop.
+  Commands on a socket are ordered. Rejected teacher edits rebuild a fresh
+  read-only document rather than attempting to undo a rejected Yjs operation by
+  merging a snapshot. Only the guarded sync acknowledgement unlocks the teacher.
+- Revocation targets exact remote visits and independently removes scoped roster
+  grants, including when no audit visit is open. Owner cleanup releases timers
+  and document holds; failed cleanup retries. Direct live pages join the teacher
+  notification room. Disconnect cleanup waits for pending watch creation.
+- The student restores an existing watch after reload through verified presence,
+  polls aggregate summaries to recover missed endings, and retains its binding
+  when a final durable snapshot is unavailable. Departed awareness peers retain
+  generation fences so delayed packets cannot resurrect their markers; awareness
+  from a different draft is ignored.
+- First-watch draft creation adopts a concurrent first autosave after a unique
+  conflict without overwriting the student's text.
+- Cached teacher authorization rechecks the student's enrollment and material
+  reachability as well as the teacher's class grant. The teacher's synchronous
+  session ref is never overwritten by a delayed React effect from an older
+  visit; this prevents dropping a replacement watch's sync acknowledgement.
+- Five dedicated browser students (`student2` through `student6`) avoid sharing
+  the ordinary manually used development student. The CRLF fixture has its own
+  material ID, distinct from the progress fixture: the prior shared ID caused
+  seeding to overwrite it with “Reverse a string.” A regression checks these IDs.
+
+Real Redis coverage uses two command connections and two actual Socket.IO servers
+with the Redis Streams adapter. It checks concurrent generations, renewal/index
+repair, expiry, ordered summaries, exact remote revocation and roster cleanup.
+It does **not** establish distributed CRDT document ownership; §6 still applies.
+
+Browser setup uses opt-in, gitignored authenticated storage states generated only
+for fixed development accounts by `packages/web/scripts/prepare-monitoring-auth.mts`.
+It establishes the normal student inactivity lease as part of preparing each
+session. No production authentication path is bypassed or modified. Run with
+`E2E_AUTH_STATE_DIR` and a localhost `E2E_BASE_URL`; regenerate states when expired.
+Trace recording can be disabled for the ten-editor run to reduce local overhead.
+
+Reproduce against the seeded development API, web app and application Redis:
+
+```sh
+pnpm --filter @cove/api exec tsx --env-file=.env ../web/scripts/prepare-monitoring-auth.mts
+E2E_BASE_URL=http://localhost:3000 E2E_AUTH_STATE_DIR="$PWD/e2e/.auth" E2E_SKIP_SEED=1 pnpm e2e --trace=off --project=chromium --project=webkit-monitoring e2e/specs/multi-tab-monitoring.spec.ts --workers=1
+```
+
+The real Redis suites are opt-in and require a separate disposable Redis, never
+the application's Redis. Set `MONITORING_TEST_REDIS_URL` and run
+`pnpm --filter @cove/api exec vitest run src/monitoring/watch-session.redis.spec.ts src/monitoring/monitoring-revocation.redis.spec.ts`.
+
+Verification results: shared 816, API 1,064 and web 995 unit tests passed
+(the API full run had 1,063, followed by the 53-test gateway run including the
+additional enrollment-revalidation regression); i18n's 113 checks also passed;
+eight additional integration tests passed against disposable Redis. Typecheck,
+route, theme and lint checks passed (0 lint errors, 78 existing warnings). The
+local production web build also compiled and passed its TypeScript check.
+
+Browser acceptance completed on 2026-09-15:
+
+| Browser | Executed acceptance evidence | Failures / skips in final run |
+| --- | --- | --- |
+| Chromium | All 14 unique scenarios passed across the main and targeted runs. The final five-case run rechecked full-text delivery, repeated read-only recovery, duplicate pointers, reading retention and persisted revision after reload. | Final targeted run: 5 passed, 0 failed, 0 skipped |
+| WebKit | Full 14-case matrix passed in one run, including the full five-minute background interval, scoped revocation, independent help permissions, unequal-layout code pointers/carets and concurrent editing. | 14 passed, 0 failed, 0 skipped |
+
+The final runs used the locally built standalone web app against the development
+API, database and Redis. Earlier attempts encountered development chunk/navigation
+failures and, during an interrupted overnight run, database timeouts. Those runs
+are not counted as acceptance. The tests also exposed and corrected a session-ref
+race; the reading assertion now measures the identifiable text character rather
+than the paragraph's changing line box, with the same 2 CSS-pixel tolerance.
+The duplicate-pointer test keeps both pointers active while asserting coexistence,
+then verifies that closing one watch removes only its marker.
+
+Measured five-stream edit-and-assert batch: Chromium 297 ms, WebKit 4,261 ms.
+These include driving five edits and comparing five complete buffers; they are
+not individual network-latency measurements. Chromium's five teacher pages used
+about 24.6–26.3 MiB of JavaScript heap each in the final local build run. This
+excludes browser-native, student-page and server memory. The differing timings
+and local-machine load do not establish production capacity beyond the five
+simultaneous watches tested here. §6's single document-authority requirement
+remains a rollout constraint.
+
+Production has not been migrated or deployed. Deploy the index migration along
+with the compatible API/web protocol after draining watches. Rollback must drain
+all new watches before restoring any singleton uniqueness rule; never delete
+visit history to make the old index fit. The development migration history also
+contains two pre-existing migrations absent from this checkout; this review
+applied only the new index migration, without resetting or reconciling that history.
+
+## 12. Larger-class checks (2026-09-15)
+
+The registry has no five- or ten-watch cap. Socket rate limits apply to each
+connection, not to the teacher's total tab count. This is a code property, not
+a guarantee of unlimited capacity.
+
+Development fixtures now include fifteen dedicated students (`student2` through
+`student16`), separate from the ordinary manually used student. Select the test
+load with `E2E_MONITORING_STUDENTS=10` or `15` for both authentication preparation
+and Playwright. This variable bounds the fixture, not the product.
+
+| Load / check | Observed result |
+| --- | --- |
+| 10 distinct student/watch pairs: full-text isolation, closing/reopening one tab, reloading another, repeated delivery beyond the 90-second lease | 2 passed, 0 failed, 0 skipped |
+| 15 distinct student/watch pairs: the same delivery and lifecycle checks | 2 passed, 0 failed, 0 skipped |
+| Original simultaneous-typing harness | 10-student live-text assertions passed, but API flush failures were logged. The 15-student run timed out with stale teacher text. Neither establishes reliable persistence. |
+| Corrected bounded 15-student typing plus persistence check | 1 passed, 0 failed, 0 skipped. Each student made 60 incremental edits: 900 edits total over the shared 15-second interval. All fifteen teacher buffers matched, and every final buffer was verified through the database-backed workspace endpoint. No collaboration flush failures or monitoring access-denied errors appeared in the API log during this rerun. |
+
+The original typing harness started each timer while preparing the remaining
+editors. On a slow host the first student therefore typed for minutes, rather
+than sharing a bounded interval with everyone else. The corrected harness
+prepares all buffers before starting timers concurrently and stops them
+concurrently. This improves the workload definition; it does not prove that
+earlier save errors were caused solely by the harness. Earlier logs retained
+only the Prisma error class, so their precise database cause remains unconfirmed.
+Temporary error-code diagnostics were applied only to the compiled local test
+API, not to application source or production.
+
+Initial edit-and-compare batches took 5,668 ms at ten streams and 55,529 ms at
+fifteen in the earlier runs; teacher JavaScript heaps totaled about 252 MiB and
+310 MiB respectively. The corrected typing run's final fifteen-buffer comparison
+took 4,296 ms. These are automation batch timings, not per-keystroke latency;
+heap figures exclude student pages, browser-native memory and servers. Both
+sides ran on one local machine. The larger checks used Chromium and a locally
+built web app with the development API/database/Redis; the complete fourteen-case
+WebKit matrix in §11 was at five students, not fifteen.
+
+Reproduce the larger checks after preparing the matching development auth states:
+
+```sh
+E2E_MONITORING_STUDENTS=15 pnpm --filter @cove/api exec tsx --env-file=.env ../web/scripts/prepare-monitoring-auth.mts
+E2E_MONITORING_STUDENTS=15 E2E_BASE_URL=http://localhost:3000 E2E_AUTH_STATE_DIR="$PWD/e2e/.auth" E2E_SKIP_SEED=1 pnpm e2e --trace=off --project=chromium e2e/specs/multi-tab-monitoring.spec.ts --grep 'tabs receive|larger class'
+```
+
+Conclusion: fifteen independent watches and a bounded simultaneous editing
+workload are verified locally. Counts above fifteen, long-duration heavy load,
+and production performance remain unverified. The earlier save failures warrant
+attention during further load testing; neither a hard fifteen-tab limit nor
+unlimited reliability follows from these results. No production deployment was
+performed for these checks; §6 and §10 still govern rollout.

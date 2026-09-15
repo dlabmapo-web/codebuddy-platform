@@ -8,7 +8,10 @@ const materialId = 'e0000000-0000-4000-8000-000000000031';
 const ids = ['40000000-0000-4000-8000-000000000102', '40000000-0000-4000-8000-000000000103'];
 const url = (index: number) => routes.academyTeachStudentLive(slug, classId, ids[index]!);
 const text = (page: Page) => page.evaluate(() => (window as any).monaco?.editor.getModels()[0]?.getValue());
-const edit = (page: Page, code: string) => page.evaluate(code => (window as any).monaco.editor.getModels()[0].setValue(code), code);
+const edit = (page: Page, code: string) => page.evaluate(code => {
+  const editor = (window as any).monaco.editor.getEditors()[0];
+  editor.executeEdits('e2e', [{ range: editor.getModel().getFullModelRange(), text: code }]);
+}, code);
 const ready = async (page: Page) => {
   await expect(page.getByRole('button', { name: /^Read-only$|읽기 전용/i })).toBeEnabled({ timeout: 45_000 });
   // Document sync can finish before the lazy Monaco bundle mounts.
@@ -197,6 +200,63 @@ test('lost teacher update acknowledgement preserves code and retry switches only
     await expect.poll(() => text(page)).toBe(code);
   } finally { await page.close(); }
 });
+
+for (const switching of [false, true]) {
+  test(`reconnect retains an undelivered teacher edit${switching ? ' and unblocks switching students' : ''}`, async () => {
+    const page = await teacherContext.newPage();
+    let block = false;
+    let dropped = 0;
+    let disconnect: (() => Promise<void>) | undefined;
+    await page.routeWebSocket('**/socket.io/**', socket => {
+      const server = socket.connectToServer();
+      let attachments = 0;
+      socket.onMessage(message => {
+        if (typeof message === 'string' && message.includes('"student.watch.start"')) {
+          disconnect = async () => { await server.close(); await socket.close(); };
+        }
+        if (attachments) { attachments--; return; }
+        if (block && typeof message === 'string' && message.includes('"document.update"')) {
+          attachments = Number(/^45(\d+)-/.exec(message)?.[1] ?? 0);
+          dropped++;
+          return;
+        }
+        server.send(message);
+      });
+    });
+    try {
+      await page.goto(url(0)); await ready(page);
+      const baseline = await text(page);
+      const code = baseline + `\n# retained through reconnect ${switching}\n`;
+      await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
+      await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toHaveAttribute('aria-pressed', 'true');
+      block = true;
+      await edit(page, code);
+      await expect.poll(() => dropped).toBeGreaterThan(0);
+      expect(await text(students[0]!)).toBe(baseline);
+      if (switching) {
+        await open(page);
+        await panel(page).locator(`a[href="${url(1)}"]:not([target])`).click();
+        await expect(panel(page).getByRole('button', { name: /Retry switch|전환 다시/ })).toBeVisible({ timeout: 15_000 });
+      }
+      block = false;
+      expect(disconnect).toBeDefined();
+      await disconnect!();
+      await expect.poll(() => text(students[0]!), { timeout: 45_000 }).toBe(code);
+      if (switching) {
+        await panel(page).getByRole('button', { name: /Retry switch|전환 다시/ }).click();
+        await expect(page).toHaveURL(new RegExp(ids[1]!));
+        await ready(page);
+        await expect.poll(() => text(page)).toBe(await text(students[1]!));
+      } else {
+        await ready(page);
+        await expect.poll(() => text(page)).toBe(code);
+      }
+    } catch (error) {
+      console.log('Recovery failure UI:', await page.locator('body').innerText());
+      throw error;
+    } finally { await page.close(); }
+  });
+}
 
 test('a missing roster snapshot disables destinations without disabling the live editor', async () => {
   const page = await teacherContext.newPage();

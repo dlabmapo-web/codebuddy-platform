@@ -409,3 +409,39 @@ E2E_BASE_URL=http://localhost:3000 E2E_AUTH_STATE_DIR="$PWD/e2e/.auth" E2E_SKIP_
 E2E_BASE_URL=http://localhost:3000 E2E_AUTH_STATE_DIR="$PWD/e2e/.auth" E2E_SKIP_SEED=1 pnpm e2e multi-tab-monitoring --project=webkit-monitoring --grep 'code pointers and carets'
 pnpm --filter @cove/web test
 ```
+
+### Reconnect recovery follow-up (2026-09-15)
+
+A teacher's unacknowledged edits belong to the original draft, independently of
+its watch visit. Reconnecting must retain that Y.Doc and pause the pending-update
+queue. A fresh watch must confirm the same draft and compatible server CRDT
+history, then obtain server-confirmed editing permission before replaying the
+original operations with its fresh visit identity. Successful recovery restores
+read-only mode. A pending switch can finish only after those operations are
+accepted; acknowledgements from the disconnected transport cannot release it.
+
+If the student moved to another problem, history was rebuilt, or authorization
+cannot be recovered, retain the original code and keep editing locked. Provide
+Download retained code, Retry connection, and explicitly confirmed Discard
+retained edits. Discard cancels an awaiting handoff rather than treating it as a
+successful save. Browser unload warns while authorized edits remain pending.
+These buffers are tab-memory recovery, not durable storage across browser exit.
+
+Regression coverage includes paused-queue deadlines, stale acknowledgements,
+discard cancellation, history compatibility, ordinary interrupted delivery, and
+interrupted delivery followed by switching students. Browser validation of this
+follow-up is recorded separately from the original switcher matrix above.
+
+Follow-up validation: all **1,031 web unit tests** passed, including six new
+queue/history regressions. Web and e2e typechecks, targeted ESLint, i18n validation
+(113 catalog tests), canonical routes, theme checks, and `git diff --check` passed.
+The combined recovery/switcher browser run passed **28/28** in Chromium and WebKit,
+including both new interrupted-delivery cases in each browser. The switcher
+fixture now uses Monaco `executeEdits` so student setup and cleanup follow the
+actual edit pipeline. These are local-stack results; no production rollout was
+performed.
+
+The five-student read-only/forged-edit permission regression also passed in both
+Chromium and WebKit (2/2), bringing follow-up browser coverage to 30 passing cases.
+Its first attempt stopped in setup on an expired saved student login; refreshing
+the local test sessions resolved that setup failure before the successful rerun.

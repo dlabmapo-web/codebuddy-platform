@@ -34,6 +34,10 @@ import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useTeacherDisplay } from '../_hooks/use-teacher-display';
 import { LiveEditor } from './live-editor';
+import { feedbackScope } from '@/lib/monitoring/feedback-draft-store';
+import { useFeedbackDraft } from '@/lib/monitoring/feedback-draft-provider';
+import { StudentSwitcher } from '@/components/monitoring/student-switcher';
+
 import { FeedbackDock } from './live-feedback';
 import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
@@ -287,6 +291,7 @@ export function LiveWorkspace({
   const student =
     context.student.displayName ?? context.student.email ?? membershipId;
 
+  const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, materialId ?? null));
   return (
     <div className="flex h-dvh flex-col bg-canvas">
       {/* The student's mouse, drawn wherever this teacher's layout puts the
@@ -295,6 +300,7 @@ export function LiveWorkspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
+          studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           answer={
             display.isLive && live.session && liveExercise ? (
               <AnswerCodeModal
@@ -541,11 +547,16 @@ export function LiveWorkspace({
               <div className="shrink-0" {...surfaceProps('feedback')}>
                 <FeedbackDock
                   canSend={live.canEdit && display.isLive}
-                  draft={display.feedbackDraft}
+                  draft={note.text}
                   feedback={feedback}
                   materialId={materialId ?? null}
-                  onDraftChange={display.setFeedbackDraft}
-                  onSend={live.sendFeedback}
+                  onDraftChange={note.edit}
+                  onHydrate={note.hydrate}
+                  onSend={async (body) => {
+                    const ack = await live.sendFeedback(body);
+                    if (ack?.ok) note.acknowledge(body);
+                    return ack;
+                  }}
                   teacherMembershipRef={teacherMembershipRef}
                 />
               </div>

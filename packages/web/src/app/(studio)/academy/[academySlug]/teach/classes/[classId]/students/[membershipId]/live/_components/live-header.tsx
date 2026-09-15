@@ -31,9 +31,9 @@ const difficultyStyles = {
  * on?
  */
 export function LiveHeader({
+  studentSwitcher,
   classId,
   connection,
-  context,
   curriculum,
   exercise,
   liveStatus,
@@ -41,6 +41,7 @@ export function LiveHeader({
   answer,
   helpMode,
 }: {
+  studentSwitcher: React.ReactNode;
   classId: string;
   connection: React.ComponentProps<typeof ConnectionBadge>['state'];
   context: MonitoringStudentContext;
@@ -69,14 +70,12 @@ export function LiveHeader({
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tc } = useLayoutTranslation('courses');
-  const student =
-    context.student.displayName ??
-    context.student.email ??
-    context.student.membershipId;
+
 
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2">
       <Link
+        data-monitoring-class-exit
         aria-label={t('workspace.back')}
         className="grid size-8 shrink-0 place-items-center rounded-lg text-sub transition-colors hover:bg-canvas hover:text-ink"
         href={`${routes.academy(academySlug)}/teach/classes/${classId}`}
@@ -86,21 +85,7 @@ export function LiveHeader({
 
       {curriculum}
 
-      <div className="flex min-w-0 items-center gap-2.5">
-        {/* The peer violet, the same one their caret draws in. */}
-        <span
-          aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-full bg-peer-soft text-[13px] font-bold text-peer"
-        >
-          {[...student][0]?.toUpperCase() ?? '?'}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-bold leading-tight">
-            {student}
-          </p>
-          <p className="truncate text-[11.5px] text-sub">{context.class.name}</p>
-        </div>
-      </div>
+      {studentSwitcher}
 
       {exercise ? (
         <div className="hidden min-w-0 flex-1 border-l border-border pl-3 xl:block">

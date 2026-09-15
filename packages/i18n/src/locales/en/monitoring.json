@@ -189,5 +189,20 @@
     "close": "Close",
     "missing": "No answer added yet.",
     "failed": "The answer is no longer available. Close this window and confirm the live session is still active."
+  },
+  "switcher": {
+    "trigger": "Switch student, current student {{name}}",
+    "title": "Students",
+    "waiting": "Waiting for your code changes before switching…",
+    "failed": "Your changes have not been acknowledged. You are still on this student’s workspace.",
+    "retry_switch": "Retry switch",
+    "stay": "Stay here",
+    "leave_notes": "Leave this class and discard unsent feedback?",
+    "updating": "Updating student availability…",
+    "unavailable": "Student list unavailable. Your live workspace is still open.",
+    "retry": "Retry",
+    "no_matches": "No students match your search.",
+    "current": "Current",
+    "new_tab": "Open {{name}}’s live workspace in a new tab"
   }
 }

@@ -1,3 +1,4 @@
+import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { MonitoringStudentContext } from '@cove/shared';
@@ -43,7 +44,7 @@ export default async function LiveStudentPage({
     // link rather than a student who left the class.
     if (code === 'MONITORING_STUDENT_UNAVAILABLE') {
       return (
-        <StudentUnavailable academySlug={academySlug} classId={classId} />
+        <StudentUnavailable academySlug={academySlug} academyId={academyId} classId={classId} membershipId={membershipId} />
       );
     }
     // Not assigned, not enrolled, and not there are one answer: a teacher must
@@ -61,6 +62,7 @@ export default async function LiveStudentPage({
 
   return (
     <LiveWorkspace
+      key={`${academyId}:${classId}:${membershipId}`}
       academyId={academyId}
       classId={classId}
       context={context}
@@ -72,16 +74,22 @@ export default async function LiveStudentPage({
 
 async function StudentUnavailable({
   academySlug,
+  academyId,
+  membershipId,
   classId,
 }: {
   academySlug: string;
+  academyId: string;
+  membershipId: string;
   classId: string;
 }) {
   const { t } = await getServerTranslation(['monitoring']);
+  const roster = await createServerORPCClient().monitoring.getClassRoster({ academyId, classId });
 
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-6">
       <div className="max-w-md text-center">
+        <StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={t('switcher.title')} className={roster.class.name} />
         <h1 className="text-[18px] font-bold">
           {t('workspace.unavailable_title')}
         </h1>
@@ -89,6 +97,7 @@ async function StudentUnavailable({
           {t('workspace.unavailable_body')}
         </p>
         <Link
+          data-monitoring-class-exit
           className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-[13.5px] font-bold text-on-brand"
           href={`${routes.academy(academySlug)}/teach/classes/${classId}`}
         >

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canActLive,
+  isExpectedWatchReplacement,
+  monitoringRevocationApplies,
   canEditSynchronizedDraft,
   monitoringSocketUrl,
   nextConnectionState,
@@ -109,5 +111,37 @@ describe('canEditSynchronizedDraft', () => {
         ended: true,
       }),
     ).toBe(false);
+  });
+});
+
+
+describe('scoped monitoring revocation', () => {
+  it('preserves student presence revocation without a teacher scope', () => {
+    expect(monitoringRevocationApplies(undefined, { classId: 'class', studentMembershipId: 'student' })).toBe(true);
+  });
+  it('does not revoke a whole roster when one student is removed', () => {
+    expect(monitoringRevocationApplies({ classId: 'class' }, { classId: 'class', studentMembershipId: 'student' })).toBe(false);
+  });
+  it('revokes the matching watch and leaves another student watch alone', () => {
+    const scope = { classId: 'class', studentMembershipId: 'a' };
+    expect(monitoringRevocationApplies(scope, { classId: 'class', studentMembershipId: 'a' })).toBe(true);
+    expect(monitoringRevocationApplies(scope, { classId: 'class', studentMembershipId: 'b' })).toBe(false);
+  });
+  it('keeps whole-class revocation terminal only for that class', () => {
+    expect(monitoringRevocationApplies({ classId: 'class' }, { classId: 'class' })).toBe(true);
+    expect(monitoringRevocationApplies({ classId: 'other' }, { classId: 'class' })).toBe(false);
+  });
+});
+
+
+describe('expected watch retirement', () => {
+  it('keeps a requested successor alive when its exact predecessor ends', () => {
+    expect(isExpectedWatchReplacement({ visitId: 'old', reason: 'WATCH_REPLACED' }, 'old')).toBe(true);
+  });
+  it('never suppresses revocation, another visit, or an unrequested replacement', () => {
+    expect(isExpectedWatchReplacement({ visitId: 'old', reason: 'ENROLLMENT_REMOVED' }, 'old')).toBe(false);
+    expect(isExpectedWatchReplacement({ visitId: 'other', reason: 'WATCH_REPLACED' }, 'old')).toBe(false);
+    expect(isExpectedWatchReplacement({ visitId: 'old', reason: 'WATCH_REPLACED' }, null)).toBe(false);
+    expect(isExpectedWatchReplacement({ reason: 'WATCH_REPLACED' }, 'old')).toBe(false);
   });
 });

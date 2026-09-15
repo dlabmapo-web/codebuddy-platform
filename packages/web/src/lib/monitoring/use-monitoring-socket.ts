@@ -6,6 +6,7 @@ import type { Socket } from 'socket.io-client';
 import { createMonitoringSocket } from './socket';
 import {
   nextConnectionState,
+  monitoringRevocationApplies,
   type ConnectionEvent,
   type MonitoringConnectionState,
 } from './connection';
@@ -63,8 +64,7 @@ export function useMonitoringSocket(scope?: { classId: string; studentMembership
       });
       instance.on('access.revoked', (event: { classId?: string; studentMembershipId?: string | null }) => {
         const current = scopeRef.current;
-        if (current && event.classId !== current.classId) return;
-        if (current?.studentMembershipId && event.studentMembershipId && event.studentMembershipId !== current.studentMembershipId) return;
+        if (!monitoringRevocationApplies(current, event)) return;
         report({ type: 'revoked' });
       });
 

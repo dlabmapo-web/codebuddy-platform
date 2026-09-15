@@ -29,8 +29,9 @@ import {
 
 import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
-import { canEditSynchronizedDraft } from './connection';
+import { canEditSynchronizedDraft, isExpectedWatchReplacement } from './connection';
 import { applyDocumentSyncResult, toBytes } from './document-sync';
+import { PendingTeacherUpdates } from './pending-teacher-updates';
 import { retryMonitoringCommand } from './retry-command';
 import { SavedTextTracker } from './saved-text';
 import { monitoringAck, type MonitoringAckResult } from './types';
@@ -77,6 +78,19 @@ export function useLiveWorkspace({
   studentMembershipId: string;
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
+  const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
+  const preservePendingBufferRef = React.useRef(false);
+  const [switching, setSwitching] = React.useState(false);
+  const prepareStudentSwitch = React.useCallback(async () => {
+    preservePendingBufferRef.current = true;
+    setSwitching(true);
+    const ready = await pendingUpdates.settle();
+    if (!pendingUpdates.pending) preservePendingBufferRef.current = false;
+    return ready;
+  }, [pendingUpdates]);
+  const cancelStudentSwitch = React.useCallback(() => {
+    setSwitching(false);
+  }, []);
   /**
    * This workspace's identity, created once at mount and held only in memory.
    *
@@ -211,6 +225,7 @@ export function useLiveWorkspace({
    * the teacher ends up watching the exercise they did not choose.
    */
   const watchTokenRef = React.useRef(0);
+  const replacingVisitRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     if (!socket) return;
@@ -222,11 +237,14 @@ export function useLiveWorkspace({
       report({ type: 'degraded' });
     };
     const startWatch = () => {
+      // Reconnecting must not replace a buffer a pending switch is preserving.
+      if (preservePendingBufferRef.current && pendingUpdates.pending) return;
       cancelCommand();
       setSyncedDraftId(null);
       report({ type: 'recovery_failed' });
       const token = watchTokenRef.current + 1;
       watchTokenRef.current = token;
+      replacingVisitRef.current = sessionRef.current?.visitId ?? null;
       cancelCommand = retryMonitoringCommand<LiveWorkspaceSession>({
         onRetry: unavailable,
         send: (done) => {
@@ -247,6 +265,7 @@ export function useLiveWorkspace({
         onResult: (ack) => {
           // Superseded while in flight: a newer attempt owns the workspace.
           if (watchTokenRef.current !== token) return;
+          replacingVisitRef.current = null;
           if (!ack?.ok) {
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
             if (!ack || ack.code === 'MONITORING_REALTIME_UNAVAILABLE') unavailable();
@@ -275,6 +294,7 @@ export function useLiveWorkspace({
           // problem's code.
           if (sessionRef.current?.visitId !== ack.data.visitId) {
             savedTextRef.current?.changed();
+            pendingUpdates.reset();
             const replacement = new Y.Doc();
             docRef.current = replacement;
             setDoc(replacement);
@@ -344,6 +364,7 @@ export function useLiveWorkspace({
     cancelWatchRef.current = () => {
       cancelCommand();
       watchTokenRef.current += 1;
+      replacingVisitRef.current = null;
     };
     startWatchRef.current = startWatch;
     socket.on('connect', startWatch);
@@ -352,6 +373,7 @@ export function useLiveWorkspace({
     return () => {
       cancelCommand();
       watchTokenRef.current += 1;
+      replacingVisitRef.current = null;
       cancelWatchRef.current = null;
       startWatchRef.current = null;
       socket.off('connect', startWatch);
@@ -372,6 +394,7 @@ export function useLiveWorkspace({
     academyId,
     classId,
     completeDocumentSync,
+    pendingUpdates,
     report,
     socket,
     studentMembershipId,
@@ -416,27 +439,32 @@ export function useLiveWorkspace({
       const current = sessionRef.current;
       savedTextRef.current?.changed();
       if (!current || origin === 'remote' || origin === 'server') return;
-      socket.emit(
-        monitoringClientEvents.documentUpdate,
-        {
-          eventId: crypto.randomUUID(),
-          draftId: current.draftId,
-          update,
-          identity: identityOf(current),
-        },
-        monitoringAck((ack) => {
-          if (ack?.ok || sessionRef.current?.visitId !== current.visitId) return;
-          // A Yjs merge cannot undo a rejected local operation. Start a fresh,
-          // read-only watch and document, then load the canonical server state.
-          setSyncedDraftId(null);
-          report({ type: 'recovery_failed' });
-          startWatchRef.current?.();
-        }),
-      );
+      const eventId = crypto.randomUUID();
+      pendingUpdates.add(eventId, (done) => {
+        if (sessionRef.current?.visitId !== current.visitId || !socket.connected) {
+          done(false);
+          return;
+        }
+        socket.emit(
+          monitoringClientEvents.documentUpdate,
+          { eventId, draftId: current.draftId, update, identity: identityOf(current) },
+          monitoringAck((ack) => {
+            done(ack?.ok === true);
+            if (!pendingUpdates.pending) preservePendingBufferRef.current = false;
+            if (ack?.ok || sessionRef.current?.visitId !== current.visitId) return;
+            // Keep the local buffer while a switch is waiting or has failed.
+            // The teacher can retry its exact operations without losing text.
+            setSyncedDraftId(null);
+            report({ type: 'recovery_failed' });
+            if (preservePendingBufferRef.current) return;
+            startWatchRef.current?.();
+          }),
+        );
+      });
     };
     doc.on('update', onUpdate);
     return () => doc.off('update', onUpdate);
-  }, [doc, report, socket]);
+  }, [doc, pendingUpdates, report, socket]);
 
   /* ------------------------------------------------------- terminal mirror */
 
@@ -544,6 +572,10 @@ export function useLiveWorkspace({
       } else if (event.draftId !== null && event.draftId !== current.draftId) {
         return;
       }
+      // The server retires this visit before acknowledging its replacement.
+      // Only this exact expected retirement is ignored; revocation and other
+      // terminal reasons must still cancel an in-flight restart.
+      if (isExpectedWatchReplacement(event, replacingVisitRef.current)) return;
       cancelWatchRef.current?.();
       setEnded(event.reason);
       setSyncedDraftId(null);
@@ -630,7 +662,10 @@ export function useLiveWorkspace({
     (body: string) =>
       new Promise<MonitoringAckResult<{ feedbackId: string }>>((resolve) => {
         const current = sessionRef.current;
-        if (!socket || !current) {
+        // A socket event may advance the canonical visit before React commits.
+        // Reject a composer from the previous render rather than send its note
+        // to the student's newly opened exercise.
+        if (!socket || !current || current.visitId !== session?.visitId || current.draftId !== session?.draftId) {
           resolve(undefined);
           return;
         }
@@ -648,7 +683,7 @@ export function useLiveWorkspace({
           monitoringAck(resolve),
         );
       }),
-    [socket],
+    [session, socket],
   );
 
   /**
@@ -706,6 +741,8 @@ export function useLiveWorkspace({
   return {
     doc,
     text,
+    prepareStudentSwitch,
+    cancelStudentSwitch,
     /** Re-resolves the student's current exercise and replaces the watch. */
     follow,
     session,
@@ -778,6 +815,7 @@ export function useLiveWorkspace({
      * this is the UI agreeing with the gate rather than being it.
      */
     canEditCode:
+      !switching &&
       session?.mode === 'HELPING' &&
       canEditSynchronizedDraft({
         state,

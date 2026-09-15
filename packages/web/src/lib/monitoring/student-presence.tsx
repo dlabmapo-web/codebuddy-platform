@@ -2,6 +2,7 @@
 
 import {
   monitoringClientEvents,
+  monitoringProtocolVersion,
   monitoringTiming,
   shouldPublishActivity,
 } from '@cove/shared';
@@ -32,6 +33,15 @@ type StudentPresence = {
    * joined by presence is also the room on which they hear watch events.
    */
   socket: Socket | null;
+  /**
+   * Which academy this student's connection belongs to.
+   *
+   * Exposed so a collaboration consumer can address a server command that
+   * needs the academy — re-reading the aggregate watch summary after a
+   * reconnect — without opening a second socket or threading the id through
+   * every page that renders a workspace.
+   */
+  academyId: string | null;
   state: MonitoringConnectionState;
   report: (event: ConnectionEvent) => void;
   /**
@@ -51,6 +61,7 @@ type StudentPresence = {
  */
 const noop: StudentPresence = {
   socket: null,
+  academyId: null,
   state: 'connecting',
   report: () => undefined,
   setOpenMaterial: () => undefined,
@@ -129,6 +140,7 @@ export function StudentPresenceProvider({
     const publish = () => {
       lastPublishedAtRef.current = Date.now();
       socket.emit(monitoringClientEvents.presencePublish, {
+        protocolVersion: monitoringProtocolVersion,
         academyId,
         materialId: materialRef.current?.materialId ?? null,
         courseId: materialRef.current?.courseId ?? null,
@@ -190,8 +202,8 @@ export function StudentPresenceProvider({
   }, [academyId, closeActivity, markActive, socket]);
 
   const value = React.useMemo(
-    () => ({ markActive, report, setOpenMaterial, socket, state }),
-    [markActive, report, setOpenMaterial, socket, state],
+    () => ({ academyId, markActive, report, setOpenMaterial, socket, state }),
+    [academyId, markActive, report, setOpenMaterial, socket, state],
   );
 
   return (

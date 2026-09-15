@@ -937,3 +937,95 @@ export const studentIndicatorStates = [
 ] as const;
 export const studentIndicatorStateSchema = z.enum(studentIndicatorStates);
 export type StudentIndicatorState = z.infer<typeof studentIndicatorStateSchema>;
+
+/* ------------------------------------------------------------- watch mode */
+
+/**
+ * What one watch session is currently allowed to do.
+ *
+ * `MONITORING` is the default and the only state a watch may start in: a
+ * teacher who opens a student's workspace is reading it. `HELPING` is entered
+ * by an explicit, acknowledged command and is the sole thing that makes the
+ * teacher's editor writable — the server checks this mode on every document
+ * update, so a client that unlocks Monaco by itself still cannot write.
+ *
+ * Deliberately not derived from "a teacher typed recently". An indicator built
+ * from keystrokes tells the student that help stopped whenever the teacher
+ * paused to read, which is exactly when they are most likely to be composing
+ * the fix.
+ */
+export const monitoringWatchModes = ["MONITORING", "HELPING"] as const;
+export const monitoringWatchModeSchema = z.enum(monitoringWatchModes);
+export type MonitoringWatchMode = z.infer<typeof monitoringWatchModeSchema>;
+
+/**
+ * The version of the watch-session protocol this build speaks.
+ *
+ * Bumped when the lifecycle changes shape rather than when a field is added.
+ * A client that omits it, or sends a lower number, is refused with
+ * `MONITORING_REFRESH_REQUIRED` instead of being half-admitted: the old
+ * singleton `watch.ended` semantics and the aggregate ones cannot both be true
+ * for one student at the same time, and mixing them is what would silently
+ * unbind a document another tab is still using.
+ */
+export const monitoringProtocolVersion = 2;
+
+/** Lease lifetimes for one watch session, renewed while its socket lives. */
+export const monitoringWatchLease = {
+  /** How long a lease survives without renewal. A crashed API expires here. */
+  ttlMs: 90_000,
+  /** How often a live, authorized socket renews its own lease. */
+  renewIntervalMs: 30_000,
+} as const;
+
+/**
+ * What every watcher of one student's exercise adds up to.
+ *
+ * Counts, never tab details: the student is told how many people are reading
+ * and whether any of them can type, and nothing about who or from where. The
+ * revision is what makes a late summary discardable — aggregate state arrives
+ * both as a push and as a reconnect fetch, and the older of the two must lose
+ * regardless of which one the network delivers second.
+ */
+export const monitoringWatchSummarySchema = z.object({
+  /**
+   * Null when the summary was built for a student rather than for one class.
+   *
+   * A student enrolled in two classes can be watched from either, and their
+   * indicator is about being watched, not about by whom — so the student-side
+   * fetch deliberately does not narrow by class and has no class to report.
+   */
+  classId: z.uuid().nullable(),
+  studentMembershipId: z.uuid(),
+  /** Null when the summary describes a student with no watched draft. */
+  draftId: z.uuid().nullable(),
+  /** Monotonic per student scope. A lower revision is ignored, never applied. */
+  revision: z.number().int().nonnegative(),
+  /** Watches currently reading, including those that may also be helping. */
+  watcherCount: z.number().int().nonnegative(),
+  /** Watches whose mode is `HELPING` right now. */
+  helpingCount: z.number().int().nonnegative(),
+  /** What the student's own indicator should read, derived from the counts. */
+  indicator: studentIndicatorStateSchema,
+});
+export type MonitoringWatchSummary = z.infer<
+  typeof monitoringWatchSummarySchema
+>;
+
+/**
+ * The indicator a set of live watches means.
+ *
+ * `HELPING` wins over `MONITORING` because it is the stronger claim and the
+ * one the student needs to act on — somebody can change this file. Zero
+ * watchers is `NONE`; `RECONNECTING` is never derived here, because it is a
+ * statement about this student's own transport rather than about who is
+ * watching them.
+ */
+export function watchSummaryIndicator(counts: {
+  watcherCount: number;
+  helpingCount: number;
+}): StudentIndicatorState {
+  if (counts.helpingCount > 0) return "HELPING";
+  if (counts.watcherCount > 0) return "MONITORING";
+  return "NONE";
+}

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { monitoringLimits } from "./monitoring.js";
+import {
+  monitoringLimits,
+  monitoringWatchSummarySchema,
+  watchSummaryIndicator,
+} from "./monitoring.js";
 import {
   documentSyncResultSchema,
   documentUpdatePayloadSchema,
@@ -10,6 +14,8 @@ import {
   presencePublishPayloadSchema,
   resultChangedEventSchema,
   runActivityPayloadSchema,
+  watchIdentitySchema,
+  watchModePayloadSchema,
   watchStartPayloadSchema,
 } from "./events.js";
 import { z } from "zod";
@@ -49,17 +55,156 @@ describe("monitoringRooms", () => {
 });
 
 describe("watchStartPayloadSchema", () => {
+  const sessionId = "88888888-8888-4888-8888-888888888888";
+
   it("names the target but never the actor", () => {
     const parsed = watchStartPayloadSchema.parse({
       eventId,
       academyId,
       classId,
+      sessionId,
       studentMembershipId: membershipId,
       teacherMembershipId: "66666666-6666-4666-8666-666666666666",
       userId: "77777777-7777-4777-8777-777777777777",
     });
     expect(parsed).not.toHaveProperty("teacherMembershipId");
     expect(parsed).not.toHaveProperty("userId");
+  });
+
+  /**
+   * The workspace's own id, which is what makes two tabs two watches rather
+   * than one replacing the other.
+   */
+  it("requires a session id", () => {
+    expect(() =>
+      watchStartPayloadSchema.parse({
+        eventId,
+        academyId,
+        classId,
+        studentMembershipId: membershipId,
+      }),
+    ).toThrow();
+  });
+
+  /**
+   * Optional in the schema on purpose: an old client has to reach the handler
+   * so it can be answered with `MONITORING_REFRESH_REQUIRED` and told that a
+   * reload fixes it. Rejecting it here would surface as a generic payload
+   * error naming no remedy.
+   */
+  it("admits a client that sent no protocol version", () => {
+    const parsed = watchStartPayloadSchema.parse({
+      eventId,
+      academyId,
+      classId,
+      sessionId,
+      studentMembershipId: membershipId,
+    });
+    expect(parsed.protocolVersion).toBeUndefined();
+  });
+});
+
+describe("watchIdentitySchema", () => {
+  const identity = {
+    sessionId: "88888888-8888-4888-8888-888888888888",
+    visitId: "99999999-9999-4999-8999-999999999999",
+    generation: 3,
+  };
+
+  it("carries all three values together", () => {
+    expect(watchIdentitySchema.parse(identity)).toEqual(identity);
+  });
+
+  /** Any one of them missing makes the other two unable to fence anything. */
+  it.each(["sessionId", "visitId", "generation"] as const)(
+    "rejects an identity missing %s",
+    (field) => {
+      const partial: Record<string, unknown> = { ...identity };
+      delete partial[field];
+      expect(() => watchIdentitySchema.parse(partial)).toThrow();
+    },
+  );
+});
+
+describe("watchModePayloadSchema", () => {
+  const identity = {
+    sessionId: "88888888-8888-4888-8888-888888888888",
+    visitId: "99999999-9999-4999-8999-999999999999",
+    generation: 3,
+  };
+
+  it("names the watch it changes", () => {
+    const parsed = watchModePayloadSchema.parse({
+      eventId,
+      identity,
+      mode: "HELPING",
+    });
+    expect(parsed).toMatchObject({ identity, mode: "HELPING" });
+  });
+
+  it("refuses a mode that is not one of the two", () => {
+    expect(() =>
+      watchModePayloadSchema.parse({ eventId, identity, mode: "ADMIN" }),
+    ).toThrow();
+  });
+
+  /** A mode change with no watch to change is not a mode change. */
+  it("requires an identity", () => {
+    expect(() =>
+      watchModePayloadSchema.parse({ eventId, mode: "HELPING" }),
+    ).toThrow();
+  });
+});
+
+describe("monitoringWatchSummarySchema", () => {
+  const base = {
+    classId: null,
+    studentMembershipId: membershipId,
+    draftId,
+    revision: 4,
+    watcherCount: 2,
+    helpingCount: 1,
+    indicator: "HELPING" as const,
+  };
+
+  it("carries counts and no tab detail", () => {
+    const parsed = monitoringWatchSummarySchema.parse({
+      ...base,
+      visitIds: ["visit-1", "visit-2"],
+      teacherNames: ["Ms Park"],
+    });
+    expect(parsed).not.toHaveProperty("visitIds");
+    expect(parsed).not.toHaveProperty("teacherNames");
+  });
+
+  it("allows a student-scoped summary with no class", () => {
+    expect(monitoringWatchSummarySchema.parse(base).classId).toBeNull();
+  });
+
+  it("refuses a negative count", () => {
+    expect(() =>
+      monitoringWatchSummarySchema.parse({ ...base, watcherCount: -1 }),
+    ).toThrow();
+  });
+});
+
+describe("watchSummaryIndicator", () => {
+  it("prefers helping, which is the stronger claim", () => {
+    expect(watchSummaryIndicator({ watcherCount: 5, helpingCount: 1 })).toBe(
+      "HELPING",
+    );
+  });
+
+  it("reports monitoring while anybody is reading", () => {
+    expect(watchSummaryIndicator({ watcherCount: 2, helpingCount: 0 })).toBe(
+      "MONITORING",
+    );
+  });
+
+  it("reports nobody when the last watch has gone", () => {
+    expect(watchSummaryIndicator({ watcherCount: 0, helpingCount: 0 })).toBe(
+      "NONE",
+    );
   });
 });
 
@@ -209,6 +354,7 @@ describe("feedbackSendPayloadSchema", () => {
       feedbackSendPayloadSchema.safeParse({
         eventId,
         draftId,
+        identity: { sessionId: eventId, visitId: draftId, generation: 1 },
         body: "try a loop",
       }).success,
     ).toBe(false);
@@ -218,6 +364,7 @@ describe("feedbackSendPayloadSchema", () => {
     const parsed = feedbackSendPayloadSchema.parse({
       eventId,
       draftId,
+      identity: { sessionId: eventId, visitId: draftId, generation: 1 },
       idempotencyKey: eventId,
       body: "  try a loop  ",
     });

@@ -42,6 +42,33 @@ const claim: MonitoringMaterialClaim = {
   courseId: "90000000-0000-4000-8000-000000000001",
 };
 
+const sessionId = "c0000000-0000-4000-8000-000000000001";
+
+/**
+ * One open watch as the gateway holds it.
+ *
+ * The three identity fields are what a test is usually exercising even when it
+ * does not say so: a message is accepted because it names this session, this
+ * visit and this generation, and rejected when it names a superseded one.
+ */
+function watchState(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    claim,
+    sessionId,
+    visitId,
+    generation: 1,
+    draftId,
+    mode: "MONITORING" as const,
+    peerId: `teacher:${visitId}`,
+    peerLabel: null,
+    renewTimer: null,
+    ...overrides,
+  };
+}
+
+/** The identity a well-behaved client stamps on a privileged message. */
+const identity = { sessionId, visitId, generation: 1 };
+
 type Emission = { room: string; event: string; payload: unknown };
 type GatewaySocket = Parameters<MonitoringGateway["handleDisconnect"]>[0];
 
@@ -54,6 +81,9 @@ function createGateway(overrides?: {
     stateVector: Uint8Array,
   ) => Promise<{ update: Uint8Array; stateVector: Uint8Array }>;
   prisma?: unknown;
+  isCurrent?: () => Promise<unknown>;
+  watcherCount?: () => Promise<number>;
+  summarize?: () => Promise<unknown>;
 }) {
   const emissions: Emission[] = [];
   const server = {
@@ -79,6 +109,7 @@ function createGateway(overrides?: {
       .mockImplementation(overrides?.snapshot ?? (async () => null)),
   };
   const documents = {
+    applyUpdate: vi.fn().mockResolvedValue(undefined),
     endWatch: vi.fn().mockResolvedValue(null),
     hasWatch: vi.fn().mockReturnValue(false),
     beginWatch: vi.fn(),
@@ -92,9 +123,40 @@ function createGateway(overrides?: {
     ),
   };
   const visits = { end: vi.fn().mockResolvedValue(undefined) };
-  const activeWatches = {
-    clear: vi.fn().mockResolvedValue(undefined),
-    isActive: vi.fn().mockResolvedValue(true),
+  const watchSessions = {
+    isAvailable: true,
+    nextGeneration: vi.fn().mockResolvedValue(1),
+    register: vi
+      .fn()
+      .mockResolvedValue({ ok: true, replacedVisitId: null }),
+    renew: vi.fn().mockResolvedValue(true),
+    read: vi.fn().mockResolvedValue(null),
+    // A watch is current unless a test says otherwise. The lease it returns is
+    // what the read-only gate reads the mode back from, so the default is the
+    // default mode: monitoring, not helping.
+    isCurrent: vi
+      .fn()
+      .mockImplementation(
+        overrides?.isCurrent ?? (async () => ({ mode: "MONITORING" })),
+      ),
+    end: vi.fn().mockResolvedValue(true),
+    endByVisitId: vi.fn().mockResolvedValue(null),
+    list: vi.fn().mockResolvedValue([]),
+    watcherCount: vi
+      .fn()
+      .mockImplementation(overrides?.watcherCount ?? (async () => 0)),
+    summarize: vi.fn().mockImplementation(
+      overrides?.summarize ??
+        (async () => ({
+          classId: null,
+          studentMembershipId: "student",
+          draftId: null,
+          revision: 1,
+          watcherCount: 0,
+          helpingCount: 0,
+          indicator: "NONE" as const,
+        })),
+    ),
   };
   const metrics = { increment: vi.fn(), incrementWithReason: vi.fn() };
   const activity = {
@@ -113,7 +175,7 @@ function createGateway(overrides?: {
     absent,
     presence as never,
     documents as never,
-    activeWatches as never,
+    watchSessions as never,
     visits as never,
     absent,
     absent,
@@ -128,7 +190,7 @@ function createGateway(overrides?: {
     presence,
     documents,
     visits,
-    activeWatches,
+    watchSessions,
     metrics,
     activity,
   };
@@ -195,17 +257,13 @@ describe("documentSync", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: {
-          claim: { ...claim, grantedAt: Date.now() },
-          visitId,
-          draftId,
-          helping: false,
-        },
+        watch: watchState({ claim: { ...claim, grantedAt: Date.now() } }),
       },
     });
 
     const ack = await gateway.documentSync(socket, {
       eventId: visitId,
+      identity,
       draftId,
       stateVector: new Uint8Array(),
     });
@@ -228,17 +286,13 @@ describe("documentSync", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: {
-          claim: { ...claim, grantedAt: Date.now() },
-          visitId,
-          draftId,
-          helping: false,
-        },
+        watch: watchState({ claim: { ...claim, grantedAt: Date.now() } }),
       },
     });
 
     const ack = await gateway.documentSync(socket, {
       eventId: visitId,
+      identity,
       draftId: "a0000000-0000-4000-8000-0000000000ff",
       stateVector: new Uint8Array(),
     });
@@ -249,6 +303,152 @@ describe("documentSync", () => {
       code: "MONITORING_ACCESS_DENIED",
     });
     expect(documents.sync).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The authorization gate the previous design did not have.
+ *
+ * A teacher write used to be accepted on the strength of holding a watch, and
+ * "helping" was then inferred from the write having happened — so a client
+ * that unlocked its own Monaco could change a student's code, and the
+ * student's indicator was a report of past keystrokes rather than a statement
+ * about permission. Permission is now a server-recorded mode, and these are
+ * the tests that say a modified client gains nothing by bypassing the UI.
+ */
+describe("documentUpdate authorization", () => {
+  const update = new Uint8Array([7, 8, 9]);
+
+  function teacherOnDraft(overrides: Record<string, unknown> = {}) {
+    return createSocket({
+      teacher: {
+        claims: new Map(),
+        watch: watchState({
+          claim: { ...claim, grantedAt: Date.now() },
+          ...overrides,
+        }),
+      },
+    });
+  }
+
+  it("refuses a teacher write while the watch is read-only", async () => {
+    const { gateway } = createGateway();
+    const ack = await gateway.documentUpdate(teacherOnDraft(), {
+      eventId: visitId,
+      identity,
+      draftId,
+      update,
+    });
+
+    expect(ack).toMatchObject({
+      ok: false,
+      code: "MONITORING_EDIT_NOT_ENABLED",
+    });
+  });
+
+  it("does not merge the refused update", async () => {
+    const { gateway, documents } = createGateway();
+    await gateway.documentUpdate(teacherOnDraft(), {
+      eventId: visitId,
+      identity,
+      draftId,
+      update,
+    });
+
+    expect(documents.applyUpdate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The refusal is not a silent drop. The client has already applied this
+   * locally, so it must be brought back to the canonical text — by
+   * resynchronizing, never by letting it push a whole buffer it was not
+   * allowed to write.
+   */
+  it("resynchronizes the refused client onto the canonical document", async () => {
+    const { gateway } = createGateway();
+    const socket = teacherOnDraft();
+
+    await gateway.documentUpdate(socket, {
+      eventId: visitId,
+      identity,
+      draftId,
+      update,
+    });
+
+    expect(
+      socket.emitted.map((emission) => emission.event),
+    ).toContain(monitoringServerEvents.documentSynced);
+  });
+
+  it("accepts the write once help mode is confirmed on the lease", async () => {
+    const { gateway, documents } = createGateway({
+      isCurrent: async () => ({ mode: "HELPING" }),
+    });
+
+    const ack = await gateway.documentUpdate(teacherOnDraft(), {
+      eventId: visitId,
+      identity,
+      draftId,
+      update,
+    });
+
+    expect(ack).toMatchObject({ ok: true });
+    expect(documents.applyUpdate).toHaveBeenCalledWith(draftId, update);
+  });
+
+  /**
+   * The lease, not the socket's optimistic copy. Withdrawing permission has to
+   * bind across instances, and a write already on the wire when the teacher
+   * stepped back must be refused on arrival.
+   */
+  it("refuses a write whose socket believes it is helping but the lease does not", async () => {
+    const { gateway, documents } = createGateway({
+      isCurrent: async () => ({ mode: "MONITORING" }),
+    });
+
+    const ack = await gateway.documentUpdate(
+      teacherOnDraft({ mode: "HELPING" }),
+      { eventId: visitId,
+      identity, draftId, update },
+    );
+
+    expect(ack).toMatchObject({
+      ok: false,
+      code: "MONITORING_EDIT_NOT_ENABLED",
+    });
+    expect(documents.applyUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a write stamped with a superseded generation", async () => {
+    const { gateway, documents } = createGateway({
+      isCurrent: async () => ({ mode: "HELPING" }),
+    });
+
+    const ack = await gateway.documentUpdate(teacherOnDraft(), {
+      eventId: visitId,
+      draftId,
+      update,
+      identity: { ...identity, generation: 0 },
+    });
+
+    expect(ack).toMatchObject({ ok: false, code: "MONITORING_ACCESS_DENIED" });
+    expect(documents.applyUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a write whose lease has been revoked or expired", async () => {
+    const { gateway, documents } = createGateway({
+      isCurrent: async () => null,
+    });
+
+    const ack = await gateway.documentUpdate(teacherOnDraft(), {
+      eventId: visitId,
+      identity,
+      draftId,
+      update,
+    });
+
+    expect(ack).toMatchObject({ ok: false });
+    expect(documents.applyUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -274,7 +474,15 @@ describe("handleDisconnect", () => {
       {
         room: monitoringRooms.draft(academyId, draftId),
         event: monitoringServerEvents.awarenessChanged,
-        payload: { draftId, cursor: null, pointer: null, origin: "STUDENT" },
+        payload: {
+          draftId,
+          cursor: null,
+          pointer: null,
+          origin: "STUDENT",
+          // One peer per student, so a reconnect reasserts the same marker
+          // rather than leaving a second arrow beside the first.
+          peerId: `student:${studentMembershipId}`,
+        },
       },
     ]);
   });
@@ -450,12 +658,13 @@ describe("handleDisconnect", () => {
 describe("awarenessUpdate", () => {
   it("relays code anchors separately and refuses another draft's anchor", async () => {
     const { gateway } = createGateway();
-    const socket = createSocket({ teacher: { claims: new Map(), watch: { claim, visitId, draftId, helping: false } } });
+    const socket = createSocket({ teacher: { claims: new Map(), watch: watchState() } });
     const editorPointer = {
       surface: "editor", space: "surface", material: claim.materialId, x: 0, y: 0,
       code: { kind: "yjs", draftId, line: 1, column: 1, relative: [0, 1] },
     };
-    await gateway.awarenessUpdate(socket, { draftId, sequence: 1, cursor: null, pointer: null, editorPointer });
+    await gateway.awarenessUpdate(socket, { draftId, identity,
+      sequence: 1, cursor: null, pointer: null, editorPointer });
     expect(socket.broadcast).toHaveLength(1);
     expect(socket.broadcast[0]?.payload).toMatchObject({ pointer: null, editorPointer });
     await gateway.awarenessUpdate(socket, { draftId, sequence: 2, cursor: null, pointer: null,
@@ -468,18 +677,20 @@ describe("awarenessUpdate", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
 
     await gateway.awarenessUpdate(socket, {
       draftId,
+      identity,
       sequence: 2,
       cursor: null,
       pointer: { surface: "editor", x: 0.5, y: 0.5 },
     });
     await gateway.awarenessUpdate(socket, {
       draftId,
+      identity,
       sequence: 1,
       cursor: null,
       pointer: { surface: "statement", x: 0.25, y: 0.25 },
@@ -501,6 +712,12 @@ describe("awarenessUpdate", () => {
             material: null,
           },
           origin: "TEACHER",
+          // Stamped by the server from the authenticated watch, never read
+          // off the payload: a client that could name its own peer could
+          // overwrite or erase another teacher's cursor.
+          peerId: `teacher:${visitId}`,
+          peerLabel: null,
+          generation: 1,
         },
       },
     ]);
@@ -625,7 +842,7 @@ describe("terminal mirroring", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
       student: {
         academyId,
@@ -849,11 +1066,11 @@ describe("terminalResync", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
 
-    await gateway.terminalResync(socket, { draftId });
+    await gateway.terminalResync(socket, { draftId, identity });
 
     expect(emissions).toEqual([
       {
@@ -870,7 +1087,7 @@ describe("terminalResync", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
 
@@ -893,18 +1110,30 @@ describe("watchStop", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
 
-    await gateway.watchStop(socket, { eventId: visitId });
-    expect(documents.endWatch).toHaveBeenCalledWith(draftId, visitId);
+    await gateway.watchStop(socket, { eventId: visitId, identity });
+    expect(documents.endWatch).toHaveBeenCalledWith(draftId, visitId, {
+      remoteWatchers: 0,
+    });
 
+    // Addressed to this watch's peer alone. A teacher leaving one of five
+    // tabs must not take the other four teachers' arrows off the student's
+    // screen, which an unqualified `TEACHER` clear would do.
     expect(awarenessClears(emissions)).toEqual([
       {
         room: monitoringRooms.draft(academyId, draftId),
         event: monitoringServerEvents.awarenessChanged,
-        payload: { draftId, cursor: null, pointer: null, origin: "TEACHER" },
+        payload: {
+          draftId,
+          cursor: null,
+          pointer: null,
+          origin: "TEACHER",
+          peerId: `teacher:${visitId}`,
+          generation: 1,
+        },
       },
     ]);
   });
@@ -914,7 +1143,7 @@ describe("watchStop", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
     let clearsAtLeave = -1;
@@ -922,7 +1151,7 @@ describe("watchStop", () => {
       clearsAtLeave = awarenessClears(emissions).length;
     }) as unknown as GatewaySocket["leave"];
 
-    await gateway.watchStop(socket, { eventId: visitId });
+    await gateway.watchStop(socket, { eventId: visitId, identity });
     expect(clearsAtLeave).toBe(1);
   });
 
@@ -935,11 +1164,11 @@ describe("watchStop", () => {
     const socket = createSocket({
       teacher: {
         claims: new Map(),
-        watch: { claim, visitId, draftId, helping: false },
+        watch: watchState(),
       },
     });
 
-    await gateway.watchStop(socket, { eventId: visitId });
+    await gateway.watchStop(socket, { eventId: visitId, identity });
 
     expect(socket.leave).toHaveBeenCalledWith(
       monitoringRooms.watchContext(academyId, classId, studentMembershipId),
@@ -950,9 +1179,157 @@ describe("watchStop", () => {
     const { gateway, emissions, visits } = createGateway();
     const socket = createSocket({});
 
-    await gateway.watchStop(socket, { eventId: visitId });
+    await gateway.watchStop(socket, { eventId: visitId, identity });
     expect(awarenessClears(emissions)).toHaveLength(0);
     expect(visits.end).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A tab closing races its own replacement on reload. An unqualified stop
+   * would close whichever watch this connection happened to hold when it
+   * arrived — which, after the reload has already started, is the new one.
+   */
+  it("ignores a stop naming a watch this connection no longer holds", async () => {
+    const { gateway, visits } = createGateway();
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, {
+      eventId: visitId,
+      identity: { ...identity, generation: 0 },
+    });
+
+    expect(visits.end).not.toHaveBeenCalled();
+    expect(
+      (socket.data as { teacher: { watch: unknown } }).teacher.watch,
+    ).not.toBeNull();
+  });
+
+  it("accepts a stop that names the watch it holds", async () => {
+    const { gateway, visits } = createGateway();
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId,
+      identity });
+
+    expect(visits.end).toHaveBeenCalledWith(visitId, "TEACHER_LEFT");
+  });
+});
+
+/**
+ * What the student is told when one of several watches ends.
+ *
+ * The single-watch design emitted `watch.ended` into the student's room and
+ * the student unbound its document on it. With five watchers that is wrong in
+ * the most damaging way available: the first teacher to close a tab would take
+ * the shared document away from the other four, mid-edit.
+ */
+describe("ending one of several watches", () => {
+  it("publishes the aggregate summary to the student", async () => {
+    const { gateway, emissions } = createGateway({
+      watcherCount: async () => 1,
+      summarize: async () => ({
+        classId,
+        studentMembershipId,
+        draftId,
+        revision: 4,
+        watcherCount: 1,
+        helpingCount: 0,
+        indicator: "MONITORING" as const,
+      }),
+    });
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId,
+      identity });
+
+    const summary = emissions.find(
+      (emission) => emission.event === monitoringServerEvents.watchSummary,
+    );
+    expect(summary?.room).toBe(
+      monitoringRooms.student(academyId, studentMembershipId),
+    );
+    expect(summary?.payload).toMatchObject({
+      watcherCount: 1,
+      indicator: "MONITORING",
+    });
+  });
+
+  it("does not release the document while another instance still watches", async () => {
+    const { gateway, documents } = createGateway({
+      watcherCount: async () => 2,
+    });
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId,
+      identity });
+
+    expect(documents.endWatch).toHaveBeenCalledWith(draftId, visitId, {
+      remoteWatchers: 2,
+    });
+  });
+
+  /**
+   * The handoff is a promise that the authoritative text is durable. It may
+   * only be made once, on the final release, and only after a flush that
+   * actually succeeded — `documents.endWatch` returns null otherwise.
+   */
+  it("offers the snapshot only when nothing else is watching", async () => {
+    const { gateway, emissions } = createGateway({
+      watcherCount: async () => 0,
+      summarize: async () => ({
+        classId,
+        studentMembershipId,
+        draftId,
+        revision: 5,
+        watcherCount: 0,
+        helpingCount: 0,
+        indicator: "NONE" as const,
+      }),
+    });
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId,
+      identity });
+
+    const summary = emissions.find(
+      (emission) => emission.event === monitoringServerEvents.watchSummary,
+    );
+    expect(summary?.payload).toMatchObject({
+      watcherCount: 0,
+      indicator: "NONE",
+    });
+    // Null because the stubbed flush returned none; the field is present, so
+    // the student can tell "no snapshot offered" from "no field at all".
+    expect(summary?.payload).toHaveProperty("snapshot", null);
+  });
+
+  /** The teacher's own ending still goes to the teacher, named by visit. */
+  it("tells the teacher which of their watches ended", async () => {
+    const { gateway, emissions } = createGateway();
+    const socket = createSocket({
+      teacher: { claims: new Map(), watch: watchState() },
+    });
+
+    await gateway.watchStop(socket, { eventId: visitId,
+      identity });
+
+    const ended = emissions.find(
+      (emission) => emission.event === monitoringServerEvents.watchEnded,
+    );
+    expect(ended?.room).toBe(
+      monitoringRooms.teacher(academyId, teacherMembershipId),
+    );
+    expect(ended?.payload).toMatchObject({ visitId, draftId });
   });
 });
 
@@ -1023,6 +1400,7 @@ describe("student movement", () => {
       visibility: "VISIBLE" | "HIDDEN" = "VISIBLE",
     ) =>
       harness.gateway.presencePublish(socket, {
+        protocolVersion: 2,
         academyId,
         materialId: material,
         courseId: openCourseId,
@@ -1166,5 +1544,60 @@ describe("student movement", () => {
       "path",
       "studentMembershipId",
     ]);
+  });
+});
+
+describe("first watch draft creation", () => {
+  it("adopts a draft created by a concurrent student autosave without overwriting it", async () => {
+    const findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: draftId });
+    const create = vi.fn().mockRejectedValue({ code: "P2002" });
+    const prisma = {
+      exerciseDraft: { findUnique, create },
+      programmingExercise: { findUnique: vi.fn().mockResolvedValue({ starterCode: "starter" }) },
+    };
+    const { gateway } = createGateway({ prisma });
+    const ensure = gateway as unknown as { ensureDraft(claim: MonitoringMaterialClaim): Promise<string> };
+    expect(await ensure.ensureDraft(claim)).toBe(draftId);
+    expect(findUnique).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("direct live page watch", () => {
+  it("joins the teacher notification room without needing a roster subscription", async () => {
+    const { gateway, visits } = createGateway({
+      snapshot: async () => ({ entries: [{ studentMembershipId, materialId }] }) as unknown as PresenceSnapshot,
+    });
+    Object.assign(gateway, {
+      requireClassClaim: vi.fn().mockResolvedValue(claim),
+      ensureDraft: vi.fn().mockResolvedValue(draftId),
+      access: {
+        requireMonitorableStudent: vi.fn().mockResolvedValue(claim),
+        requireMonitorableMaterial: vi.fn().mockResolvedValue(claim),
+      },
+    });
+    Object.assign(visits, { start: vi.fn().mockResolvedValue({ id: visitId, startedAt: new Date(), replaced: null }) });
+    const socket = createSocket({});
+    try {
+      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 2 });
+      expect(result.ok).toBe(true);
+      expect(socket.join).toHaveBeenCalledWith(expect.arrayContaining([monitoringRooms.teacher(academyId, teacherMembershipId)]));
+    } finally {
+      gateway.onModuleDestroy();
+    }
+  });
+});
+
+describe("expired watch authorization", () => {
+  it("rechecks enrollment rather than renewing from a teacher's class grant alone", async () => {
+    const { gateway } = createGateway();
+    const requireMonitorableStudent = vi.fn().mockRejectedValue(new Error("unenrolled"));
+    Object.assign(gateway, {
+      requireClassClaim: vi.fn().mockResolvedValue({ ...claim, grantedAt: Date.now() }),
+      access: { requireMonitorableStudent },
+    });
+    const revalidate = gateway as unknown as { revalidate(socket: GatewaySocket, claim: MonitoringMaterialClaim): Promise<void> };
+    await expect(revalidate.revalidate(createSocket({}), { ...claim, grantedAt: 0 })).rejects.toThrow("unenrolled");
+    expect(requireMonitorableStudent).toHaveBeenCalledWith(expect.anything(), studentMembershipId);
   });
 });

@@ -40,6 +40,7 @@ import { LiveOutput, type LiveOutputTab } from './live-output';
 import { PreviewBanner } from './preview-banner';
 import { PreviewEditor } from './preview-editor';
 import { AnswerCodeModal } from './answer-code-modal';
+import { HelpModeToggle } from './help-mode-toggle';
 
 /**
  * One student's exercise, opened beside them.
@@ -70,6 +71,8 @@ export function LiveWorkspace({
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tl } = useLayoutTranslation('learn');
+  /** One request at a time; the server's answer is what changes the label. */
+  const [helpPending, setHelpPending] = React.useState(false);
   const live = useLiveWorkspace({
     academyId,
     classId,
@@ -221,6 +224,24 @@ export function LiveWorkspace({
   } = useSplitPane({ axis: 'vertical', initial: 240, min: 96, max: 1_200 });
 
   /** The shared document as text, read at the moment a run starts. */
+  /**
+   * Asking the server to grant or withdraw edit permission.
+   *
+   * The hook locks the editor immediately when stepping back and waits for the
+   * acknowledgement before unlocking — so this only has to keep a second press
+   * from racing the first, and to stop showing a spinner once the answer is in
+   * regardless of which way it went.
+   */
+  const requestHelpMode = React.useCallback(
+    (next: boolean) => {
+      setHelpPending(true);
+      void live.setMode(next ? 'HELPING' : 'MONITORING').finally(() => {
+        setHelpPending(false);
+      });
+    },
+    [live],
+  );
+
   const getCode = React.useCallback(() => live.text.toString(), [live.text]);
 
   /**
@@ -301,6 +322,14 @@ export function LiveWorkspace({
             />
           }
           exercise={shown}
+          helpMode={
+            <HelpModeToggle
+              busy={helpPending}
+              disabled={!live.canEdit || !display.isLive}
+              helping={live.helping}
+              onToggle={requestHelpMode}
+            />
+          }
           liveStatus={
             display.live.available
               ? t('live.on_exercise', {
@@ -459,7 +488,7 @@ export function LiveWorkspace({
                     fontSize={preferences.fontSize}
                     onCursor={live.publishCursor}
                     peerName={student}
-                    readOnly={!live.canEdit || !display.isLive}
+                    readOnly={!live.canEditCode || !display.isLive}
                     remoteCursor={live.remote.cursor}
                     text={live.text}
                   />

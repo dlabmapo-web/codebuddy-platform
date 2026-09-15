@@ -17,6 +17,20 @@ export type MonitoringCounter =
   | "watch.started"
   | "watch.denied"
   | "watch.replaced"
+  /** A start this same session had already superseded before it landed. */
+  | "watch.superseded"
+  /** A client speaking a retired watch protocol was told to refresh. */
+  | "watch.protocol_stale"
+  /** Refused because cross-instance watch state was unavailable. */
+  | "watch.degraded"
+  /** A lease renewal was refused, so the watch closed itself. */
+  | "watch.lease.lost"
+  | "watch.summary.failed"
+  /** Explicit edit-permission transitions, which the indicator answers to. */
+  | "watch.help.enabled"
+  | "watch.help.disabled"
+  /** A teacher document write arrived without acknowledged edit permission. */
+  | "document.update.unauthorized"
   /** Movement events emitted into an authorized watch-context room. */
   | "watch.context.changed"
   | "document.update.applied"

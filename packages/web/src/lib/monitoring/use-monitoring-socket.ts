@@ -18,12 +18,14 @@ import {
  * joined after the teacher navigated away from it. Each page opens and closes
  * its own.
  */
-export function useMonitoringSocket(): {
+export function useMonitoringSocket(scope?: { classId: string; studentMembershipId?: string }): {
   socket: Socket | null;
   state: MonitoringConnectionState;
   /** Lets a page report its own synchronization progress. */
   report: (event: ConnectionEvent) => void;
 } {
+  const scopeRef = React.useRef(scope);
+  React.useEffect(() => { scopeRef.current = scope; }, [scope]);
   const [socket, setSocket] = React.useState<Socket | null>(null);
   const [state, setState] = React.useState<MonitoringConnectionState>(
     'connecting',
@@ -59,7 +61,12 @@ export function useMonitoringSocket(): {
       instance.on('server.degraded', (payload: { degraded: boolean }) => {
         if (payload.degraded) report({ type: 'degraded' });
       });
-      instance.on('access.revoked', () => report({ type: 'revoked' }));
+      instance.on('access.revoked', (event: { classId?: string; studentMembershipId?: string | null }) => {
+        const current = scopeRef.current;
+        if (current && event.classId !== current.classId) return;
+        if (current?.studentMembershipId && event.studentMembershipId && event.studentMembershipId !== current.studentMembershipId) return;
+        report({ type: 'revoked' });
+      });
 
       // Browsers can enter offline mode without immediately closing an
       // established WebSocket. Reflect the browser's network signal instead

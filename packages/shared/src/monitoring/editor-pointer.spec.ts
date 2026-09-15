@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { awarenessUpdatePayloadSchema } from './events';
+import { awarenessUpdatePayloadSchema } from './events.js';
 
 const draftId = '10000000-0000-4000-8000-000000000001';
 const editorPointer = {

@@ -78,6 +78,8 @@
     "back": "반으로 돌아가기",
     "student_left": "학생이 나갔습니다",
     "unsaved": "저장되지 않은 변경",
+    "editing_on": "도움 / 코드 편집",
+    "editing_off": "읽기 전용",
     "saved": "저장됨",
     "editing_together": "{{name}} 학생과 함께 편집 중",
     "tab_you": "내 실행",

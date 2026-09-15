@@ -75,6 +75,8 @@ export const appErrorCodes = [
   "MONITORING_PAYLOAD_TOO_LARGE",
   "MONITORING_REALTIME_UNAVAILABLE",
   "MONITORING_FEEDBACK_INVALID",
+  "MONITORING_REFRESH_REQUIRED",
+  "MONITORING_EDIT_NOT_ENABLED",
   "TEACHER_PROGRESS_ACCESS_DENIED",
   "TEACHER_PROGRESS_NOT_FOUND",
   "TEACHER_OVERVIEW_ACCESS_DENIED",
@@ -253,6 +255,14 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   MONITORING_PAYLOAD_TOO_LARGE: "That change was too large to send.",
   MONITORING_REALTIME_UNAVAILABLE: "Live monitoring is temporarily unavailable.",
   MONITORING_FEEDBACK_INVALID: "Feedback must be between 1 and 2,000 characters.",
+  // The client is speaking an older watch protocol than this server. Named
+  // rather than folded into a generic denial, because the fix is a reload
+  // and a teacher who is told "access denied" will go looking for a
+  // permission that was never the problem.
+  MONITORING_REFRESH_REQUIRED:
+    "Live monitoring was updated. Refresh this page to continue.",
+  MONITORING_EDIT_NOT_ENABLED:
+    "Turn on Help / Edit code before changing this student's work.",
   // The same one message for every access failure, for the same reason as
   // monitoring: a teacher must not be able to map another academy's classes
   // by reading which error comes back.

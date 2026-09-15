@@ -507,7 +507,17 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
     this.documents.delete(draftId);
   }
 
-  /** A cached document is retained while any authorized teacher still uses it. */
+  /**
+   * Whether *this process* is still serving a watch on the draft.
+   *
+   * Bookkeeping, not authority. It answers "may I drop my cache", and it
+   * cannot answer "is anybody anywhere watching this student" — another API
+   * instance holds its own set and this one has never seen it. Releasing a
+   * document on this answer alone is how a student would be handed back to
+   * local drafting while a teacher on the other instance was still typing, so
+   * the global count comes from the watch-session registry and is passed in to
+   * {@link endWatch} by the caller that has it.
+   */
   hasWatch(draftId: string): boolean {
     return Boolean(this.watches.get(draftId)?.size);
   }
@@ -518,7 +528,22 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
     this.watches.set(draftId, visits);
   }
 
-  async endWatch(draftId: string, visitId: string): Promise<{
+  /**
+   * Closes one watch's hold on a document.
+   *
+   * `remoteWatchers` is how many watches other API instances still have open
+   * on this draft — zero is the only value that permits the handoff. A
+   * returned snapshot is a promise to the student that the authoritative text
+   * is durable and they may resume ordinary autosave, so it is offered only
+   * after a successful flush *and* only when nothing else is still writing.
+   * A failed flush keeps the document in memory and returns null, which the
+   * caller reports as pending recovery rather than as a completed handoff.
+   */
+  async endWatch(
+    draftId: string,
+    visitId: string,
+    options: { remoteWatchers?: number } = {},
+  ): Promise<{
     code: string;
     updatedAt: string;
   } | null> {
@@ -526,6 +551,9 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
     visits?.delete(visitId);
     if (visits?.size) return null;
     this.watches.delete(draftId);
+    // Another instance is still the document's reader or writer. Dropping the
+    // local cache is safe and correct; declaring the watch over is not.
+    if ((options.remoteWatchers ?? 0) > 0) return null;
     await this.release(draftId);
     // A failed flush retains authority: never tell the student to resume
     // snapshot writes against a document whose only current copy is in memory.

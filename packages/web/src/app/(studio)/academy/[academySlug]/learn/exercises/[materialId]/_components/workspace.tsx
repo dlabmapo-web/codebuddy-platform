@@ -414,12 +414,19 @@ export function Workspace({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      {/* The teacher's mouse while one is helping, drawn over whichever pane
-          they are pointing at. */}
-      <RemotePointer
-        name={tm('peer.teacher')}
-        pointer={monitoring.remote.pointer}
-      />
+      {/* Every watching teacher's mouse, drawn over whichever pane each of
+          them is pointing at. One arrow per peer rather than one in total:
+          two teachers reading the same exercise point at two different
+          things, and collapsing them into a single marker made the arrow
+          jump between their positions. Keyed by the server-assigned peer id,
+          so a teacher leaving removes their own arrow and nobody else's. */}
+      {monitoring.peers.map((peer) => (
+        <RemotePointer
+          key={peer.peerId}
+          name={peer.label ?? tm('peer.teacher')}
+          pointer={peer.pointer}
+        />
+      ))}
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader

@@ -9,6 +9,8 @@ import {
   monitoringFeedbackSchema,
   monitoringLimits,
   monitoringVisitEndReasonSchema,
+  monitoringWatchModeSchema,
+  monitoringWatchSummarySchema,
   presenceDeltaSchema,
   presenceSnapshotSchema,
   studentIndicatorStateSchema,
@@ -99,13 +101,81 @@ export const classJoinPayloadSchema = commandBase.extend({
 
 export const classLeavePayloadSchema = classJoinPayloadSchema;
 
+/**
+ * Which watch a message belongs to.
+ *
+ * Three values, each answering a different question. `sessionId` is the
+ * client's own correlation value for one mounted workspace — it survives a
+ * transport reconnect and is never authorization, because a browser chooses
+ * it. `visitId` is the server's audit identity for the watch that session
+ * currently holds. `generation` fences it: a reconnect issues a new one, and
+ * an in-flight command stamped with the previous generation is rejected rather
+ * than applied to its replacement.
+ *
+ * All three are required together on every privileged message, so a delayed
+ * write from a superseded visit — including a second visit to the same draft —
+ * can be told apart from a current one. Matching on the draft alone cannot do
+ * that, which is the hole this closes.
+ */
+export const watchIdentitySchema = z.object({
+  sessionId: z.uuid(),
+  visitId: z.uuid(),
+  generation: z.number().int().nonnegative(),
+});
+export type WatchIdentity = z.infer<typeof watchIdentitySchema>;
+
 export const watchStartPayloadSchema = commandBase.extend({
   academyId: z.uuid(),
   classId: z.uuid(),
   studentMembershipId: z.uuid(),
+  /**
+   * This workspace's own identity, generated at mount and held in memory only.
+   *
+   * Never persisted to localStorage or sessionStorage: duplicating a browser
+   * tab copies sessionStorage, and two tabs that agreed on a session id would
+   * fence each other out of existence — which is the multi-tab failure this
+   * whole protocol is for.
+   */
+  sessionId: z.uuid(),
+  /**
+   * Optional so an old client reaches the handler at all.
+   *
+   * A missing or lower version is answered with `MONITORING_REFRESH_REQUIRED`.
+   * Rejecting it in the schema instead would surface as a generic payload
+   * error, and the teacher would have no way to know a reload fixes it.
+   */
+  protocolVersion: z.number().int().positive().optional(),
 });
 
-export const watchStopPayloadSchema = commandBase;
+/** Stopping names the watch to stop, so a stale tab cannot close a live one. */
+export const watchStopPayloadSchema = commandBase.extend({
+  identity: watchIdentitySchema.optional(),
+});
+
+/**
+ * Turning edit permission on and off, explicitly and with an acknowledgement.
+ *
+ * A command rather than an inference. The server records the mode against the
+ * named visit and generation, so returning to `MONITORING` withdraws
+ * permission at the source: a write already in flight when the teacher stepped
+ * back is refused on arrival, not merged and then apologized for.
+ */
+export const watchModePayloadSchema = commandBase.extend({
+  identity: watchIdentitySchema,
+  mode: monitoringWatchModeSchema,
+});
+
+/**
+ * Asking for the current aggregate rather than replaying the events that built
+ * it. A reconnecting student has no way to know which summaries it missed.
+ */
+export const watchSummaryFetchPayloadSchema = commandBase.extend({
+  academyId: z.uuid(),
+  draftId: z.uuid(),
+});
+export type WatchSummaryFetchPayload = z.infer<
+  typeof watchSummaryFetchPayloadSchema
+>;
 
 /**
  * A student's own signals. The state label is the server's to decide, so this
@@ -113,6 +183,7 @@ export const watchStopPayloadSchema = commandBase;
  * and never a `SOLVING` claim.
  */
 export const presencePublishPayloadSchema = z.object({
+  protocolVersion: z.number().int().positive().optional(),
   academyId: z.uuid(),
   materialId: z.uuid().nullable(),
   courseId: z.uuid().nullable(),
@@ -162,15 +233,19 @@ const responseStateVectorSchema = z.union([
 export const documentSyncPayloadSchema = commandBase.extend({
   draftId: z.uuid(),
   stateVector: stateVectorSchema,
+  /** Absent from a student's own sync: a student has no watch to fence. */
+  identity: watchIdentitySchema.optional(),
 });
 
 export const documentUpdatePayloadSchema = commandBase.extend({
   draftId: z.uuid(),
   update: binaryUpdateSchema,
+  identity: watchIdentitySchema.optional(),
 });
 
 export const awarenessUpdatePayloadSchema = z.object({
   draftId: z.uuid(),
+  identity: watchIdentitySchema.optional(),
   /** Monotonic for one Socket.IO client; prevents async authorization reorder. */
   sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   cursor: collaborationCursorSchema.nullable(),
@@ -210,6 +285,7 @@ export const resultPublishPayloadSchema = z.object({
 });
 
 export const feedbackSendPayloadSchema = commandBase.extend({
+  identity: watchIdentitySchema,
   draftId: z.uuid(),
   /** The durable idempotency key. A retry of the same send stores one row. */
   idempotencyKey: z.uuid(),
@@ -226,6 +302,15 @@ export const watchStartedEventSchema = z.object({
   studentMembershipId: z.uuid(),
   materialId: z.uuid(),
   draftId: z.uuid(),
+  /**
+   * Which watch began.
+   *
+   * The student's copy carries it so an aggregate summary and a per-visit
+   * event can be reconciled without guessing, and so a second watcher joining
+   * an already-bound document is recognisable as an addition rather than as a
+   * fresh session that should reseed the Y.Doc.
+   */
+  visitId: z.uuid().optional(),
   /** The student's copy carries the indicator state and nothing identifying. */
   indicator: studentIndicatorStateSchema,
   startedAt: z.iso.datetime(),
@@ -245,8 +330,54 @@ export const watchEndedEventSchema = z.object({
    * event about a session they have already left arrived late.
    */
   draftId: z.uuid().nullable(),
+  /**
+   * Which visit ended, when the sender knows.
+   *
+   * A teacher tab discards an ending that is not its own current visit. The
+   * student no longer acts on this event's presence at all — `watch.summary`
+   * owns the indicator and the document's lifetime — because one of five
+   * watches ending is not the student's session ending, and the draft id alone
+   * cannot tell those apart.
+   */
+  visitId: z.uuid().nullable().optional(),
   reason: monitoringVisitEndReasonSchema,
   endedAt: z.iso.datetime(),
+});
+
+/**
+ * The authoritative count of who is watching one student's exercise.
+ *
+ * Sent to the student on every change and fetched again after a reconnect,
+ * because an incremental stream cannot establish freshness across a gap. It
+ * replaces the student's use of `watch.ended`: only the final release — the
+ * summary reaching zero watchers — hands the document back to local drafting.
+ */
+export const watchSummaryEventSchema = monitoringWatchSummarySchema.extend({
+  /** Present only on the final release, and only when the flush succeeded. */
+  snapshot: z
+    .object({ code: z.string(), updatedAt: z.iso.datetime() })
+    .nullable()
+    .optional(),
+});
+
+/** The mode one watch is now in, echoed to the teacher that asked. */
+export const watchModeChangedEventSchema = z.object({
+  visitId: z.uuid(),
+  generation: z.number().int().nonnegative(),
+  mode: monitoringWatchModeSchema,
+});
+
+/**
+ * This client speaks a retired watch protocol.
+ *
+ * Explicit, and terminal until the page reloads. The alternative — admitting
+ * the old client and translating — would mean emitting singleton `watch.ended`
+ * semantics into a session where several watches are legitimately open, and
+ * the first tab to close would unbind a document the others are still editing.
+ */
+export const protocolRefreshRequiredEventSchema = z.object({
+  required: z.literal(true),
+  serverProtocolVersion: z.number().int().positive(),
 });
 
 export const documentSyncResultSchema = z.object({
@@ -278,6 +409,21 @@ export const awarenessChangedEventSchema = awarenessUpdatePayloadSchema.extend({
   // Server-authored lifecycle clears have no client sequence.
   sequence: awarenessUpdatePayloadSchema.shape.sequence.optional(),
   origin: z.enum(["STUDENT", "TEACHER"]),
+  /**
+   * Which peer this position belongs to, assigned by the server.
+   *
+   * Five teachers watching one student are five peers with five independent
+   * carets, arrows, sequences and expiries. Keying remote awareness by origin
+   * alone — one slot for `TEACHER` — meant the second tab overwrote the first
+   * and either one leaving erased both. The client never supplies this: it is
+   * derived from the authenticated watch, so a payload cannot claim to be
+   * somebody else's cursor.
+   */
+  peerId: z.string().min(1).optional(),
+  /** A display name for a teacher peer. Duplicate tabs may share one. */
+  peerLabel: z.string().min(1).max(120).nullable().optional(),
+  /** Fences a stale clear: it may not erase a newer generation's marker. */
+  generation: z.number().int().nonnegative().optional(),
 });
 
 export const runChangedEventSchema = runActivityPayloadSchema;
@@ -364,6 +510,10 @@ export const monitoringClientEvents = {
   classLeave: "class.leave",
   watchStart: "student.watch.start",
   watchStop: "student.watch.stop",
+  /** Explicitly enabling or disabling edit permission for one watch. */
+  watchMode: "student.watch.mode",
+  /** Re-reads aggregate watch state after a gap, rather than inferring it. */
+  watchSummaryFetch: "student.watch.summary",
   presencePublish: "presence.publish",
   documentSync: "document.sync",
   documentUpdate: "document.update",
@@ -393,6 +543,12 @@ export const monitoringServerEvents = {
   presenceChanged: "presence.changed",
   watchStarted: "watch.started",
   watchEnded: "watch.ended",
+  /** Aggregate, versioned, student-scoped. The indicator answers to this. */
+  watchSummary: "watch.summary",
+  /** One watch's confirmed edit permission, for the teacher that owns it. */
+  watchModeChanged: "watch.mode.changed",
+  /** This client must reload before it may join the current protocol. */
+  protocolRefreshRequired: "protocol.refresh.required",
   /** Sent only into the watch-context room of an authorized focused watch. */
   studentContextChanged: "student.context.changed",
   documentSynced: "document.synced",
@@ -444,6 +600,15 @@ export type DocumentPersistedEvent = z.infer<
 export type FeedbackSendPayload = z.infer<typeof feedbackSendPayloadSchema>;
 export type WatchStartedEvent = z.infer<typeof watchStartedEventSchema>;
 export type WatchEndedEvent = z.infer<typeof watchEndedEventSchema>;
+export type WatchModePayload = z.infer<typeof watchModePayloadSchema>;
+export type WatchStopPayload = z.infer<typeof watchStopPayloadSchema>;
+export type WatchSummaryEvent = z.infer<typeof watchSummaryEventSchema>;
+export type WatchModeChangedEvent = z.infer<
+  typeof watchModeChangedEventSchema
+>;
+export type ProtocolRefreshRequiredEvent = z.infer<
+  typeof protocolRefreshRequiredEventSchema
+>;
 export type DocumentSyncedEvent = DocumentSyncResult;
 export type DocumentUpdatedEvent = z.infer<typeof documentUpdatedEventSchema>;
 export type AwarenessChangedEvent = z.infer<typeof awarenessChangedEventSchema>;

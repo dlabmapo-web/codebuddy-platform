@@ -6,6 +6,7 @@ import {
   type StudentIndicatorState,
   type WatchEndedEvent,
   type WatchStartedEvent,
+  type WatchSummaryEvent,
 } from '@cove/shared';
 import * as React from 'react';
 import * as Y from 'yjs';
@@ -118,12 +119,25 @@ export function useStudentMonitoring({
   teacherLabel: string;
 }) {
   const {
+    academyId,
     markActive,
     setOpenMaterial,
     socket,
     state,
   } = useStudentPresence();
   const [indicator, setIndicator] = React.useState<StudentIndicatorState>('NONE');
+  /**
+   * The last aggregate this workspace accepted.
+   *
+   * Revision, not arrival order: a summary is published by whichever API
+   * instance handled the change, two of them do not share a clock, and the
+   * older of two can reach this client second. `-1` means none has been
+   * accepted for the current draft yet.
+   */
+  const summaryRevisionRef = React.useRef(-1);
+  const receiveSummaryRef = React.useRef<(event: WatchSummaryEvent) => void>(() => undefined);
+  /** How many watches the server last said were open on this draft. */
+  const watcherCountRef = React.useRef(0);
   const [session, setSession] = React.useState<StudentSession>(() => ({
     generation: 0,
     classId,
@@ -295,6 +309,21 @@ export function useStudentMonitoring({
       ) {
         return;
       }
+      // A second teacher joining a draft this workspace is already bound to
+      // is an addition, not a new session. Reseeding here would destroy a
+      // Y.Doc the first teacher is actively editing, tear down the binding
+      // under the student's cursor, and remount the statement they are
+      // reading — all because somebody else opened a tab.
+      if (current.draftId === event.draftId && current.phase === 'bound') {
+        // The summary that follows carries the authoritative indicator; this
+        // is the optimistic half, so the student is not told "nobody" for the
+        // width of a round trip.
+        setIndicator((previous) =>
+          previous === 'HELPING' ? previous : event.indicator,
+        );
+        return;
+      }
+
       setIndicator(event.indicator);
       // A different draft is a different document. Reusing this one would
       // merge two problems' histories and send the result to the server.
@@ -307,6 +336,12 @@ export function useStudentMonitoring({
         docRef.current = replacement;
         setDoc(replacement);
         stale.destroy();
+      }
+      // A new draft is a new aggregate; the previous draft's revisions say
+      // nothing about it and must not suppress its first summary.
+      if (current.draftId !== event.draftId) {
+        summaryRevisionRef.current = -1;
+        watcherCountRef.current = 0;
       }
       syncedRef.current = false;
       publish({ ...current, draftId: event.draftId, phase: 'syncing' });
@@ -333,22 +368,45 @@ export function useStudentMonitoring({
       setIndicator(payload.state);
     };
 
-    const onWatchEnded = (event: WatchEndedEvent) => {
+    /**
+     * The authoritative count of who is watching this exercise.
+     *
+     * This — and not `watch.ended` — owns the indicator and the document's
+     * lifetime. A per-visit ending cannot: one of several teachers closing a
+     * tab is not this student's session ending, and acting on it would clear
+     * the indicator and unbind the document while the others were still
+     * reading, or still typing.
+     */
+    const onWatchSummary = (event: WatchSummaryEvent) => {
       const current = sessionRef.current;
-      // A watch that ended somewhere else says nothing about this one. The
-      // payload carries the draft precisely so a stale ending cannot silence
-      // an indicator for a session that is still live.
+      if (current.phase === 'retired') return;
+      // A summary about a draft this workspace has left describes a document
+      // whose lifetime is no longer this session's to decide.
       if (event.draftId !== null && event.draftId !== current.draftId) return;
-      if (event.classId !== current.classId) return;
-      if (event.snapshot) onAfterCollaborate?.(event.snapshot);
-      // Only a confirmed end clears the indicator. A dropped connection shows
-      // reconnecting instead, so a blink never reads as "they left".
-      setIndicator('NONE');
+      // Strictly newer, so a summary that lost a race on the wire cannot
+      // resurrect a count that has already been superseded.
+      if (event.revision <= summaryRevisionRef.current) return;
+      summaryRevisionRef.current = event.revision;
+      watcherCountRef.current = event.watcherCount;
+      setIndicator(event.indicator);
+
+      // Somebody is still watching. Everything stays bound: the document, the
+      // binding, and the statement the student is reading.
+      if (event.watcherCount > 0) return;
+
+      // The final release, and the only place the handoff may happen. A
+      // snapshot is present only when the authoritative document flushed
+      // successfully; without one the server is still holding the text, and
+      // resuming ordinary snapshot writes would race it.
+      if (!event.snapshot) return;
+      onAfterCollaborate?.(event.snapshot);
+      if (current.draftId === null) return;
       bindingRef.current?.destroy();
       bindingRef.current = null;
       syncedRef.current = false;
       handedOffRef.current = new Set();
-      // The document goes with the watch. The editor is untouched and the
+      // Keep the revision fence until the material identity changes.
+      // The document goes with the last watch. The editor is untouched and the
       // ordinary autosave still owns this text, so nothing is lost — and a
       // later watch starts from the server's copy rather than from a history
       // this client has been carrying around unattached.
@@ -358,6 +416,24 @@ export function useStudentMonitoring({
       setDoc(replacement);
       stale.destroy();
       publish({ ...current, draftId: null, phase: 'local' });
+    };
+
+    /**
+     * One teacher's watch ended.
+     *
+     * Deliberately almost inert on this side now. It is retained only for the
+     * durable snapshot a single-watcher release carries, and even that is
+     * applied only when the aggregate agrees nobody is left — because a
+     * snapshot handed over while another teacher is still typing would let
+     * this client's autosave overwrite what they wrote.
+     */
+    const onWatchEnded = (event: WatchEndedEvent) => {
+      const current = sessionRef.current;
+      if (current.phase === 'retired') return;
+      if (event.draftId !== null && event.draftId !== current.draftId) return;
+      if (event.classId !== current.classId) return;
+      if (watcherCountRef.current > 0) return;
+      if (event.snapshot) onAfterCollaborate?.(event.snapshot);
     };
 
     const onSynced = (event: {
@@ -393,17 +469,57 @@ export function useStudentMonitoring({
 
     socket.on(monitoringServerEvents.watchStarted, onWatchStarted);
     socket.on(monitoringServerEvents.watchEnded, onWatchEnded);
+    receiveSummaryRef.current = onWatchSummary;
+    socket.on(monitoringServerEvents.watchSummary, onWatchSummary);
     socket.on(monitoringServerEvents.studentIndicator, onIndicator);
     socket.on(monitoringServerEvents.documentSynced, onSynced);
     socket.on(monitoringServerEvents.documentUpdated, onUpdated);
     return () => {
       socket.off(monitoringServerEvents.watchStarted, onWatchStarted);
       socket.off(monitoringServerEvents.watchEnded, onWatchEnded);
+      socket.off(monitoringServerEvents.watchSummary, onWatchSummary);
       socket.off(monitoringServerEvents.studentIndicator, onIndicator);
       socket.off(monitoringServerEvents.documentSynced, onSynced);
       socket.off(monitoringServerEvents.documentUpdated, onUpdated);
     };
   }, [bindIfReady, onAfterCollaborate, onBeforeCollaborate, publish, socket]);
+
+  /**
+   * After a gap, ask rather than infer.
+   *
+   * A workspace whose transport was down cannot know which summaries it
+   * missed, and an indicator rebuilt from an incomplete event stream is wrong
+   * in both directions — it can claim a teacher who has left, or clear one who
+   * is still reading. The reconnect therefore re-reads the authoritative
+   * aggregate, and the revision guard discards it if a push happened to win
+   * the race.
+   */
+  React.useEffect(() => {
+    if (!socket || !academyId) return;
+    const refetchSummary = () => {
+      const current = sessionRef.current;
+      if (!current.draftId || current.phase === 'retired') return;
+      socket.emit(
+        monitoringClientEvents.watchSummaryFetch,
+        {
+          eventId: crypto.randomUUID(),
+          academyId,
+          draftId: current.draftId,
+        },
+        (ack: { ok: boolean; data?: WatchSummaryEvent } | undefined) => {
+          if (!ack?.ok || !ack.data) return;
+          receiveSummaryRef.current(ack.data);
+        },
+      );
+    };
+    socket.on('connect', refetchSummary);
+    const timer = setInterval(() => { if (socket.connected) refetchSummary(); }, 30_000);
+    if (socket.connected) refetchSummary();
+    return () => {
+      clearInterval(timer);
+      socket.off('connect', refetchSummary);
+    };
+  }, [academyId, socket]);
 
   /** Local edits leave as bounded updates while a teacher is in the room. */
   React.useEffect(() => {
@@ -446,7 +562,7 @@ export function useStudentMonitoring({
   // is working, not supervising, and an arrow parked over their code says
   // somebody is following along when nobody may be.
   const draftId = session.draftId;
-  const { remote, publishCursor } = useAwareness({
+  const { peers, remote, publishCursor } = useAwareness({
     draftId,
     peerOrigin: 'TEACHER',
     remoteCursor: expiresWhenIdle,
@@ -577,6 +693,15 @@ export function useStudentMonitoring({
     publishRun,
     /** The teacher's mouse, for the page to draw over its own panes. */
     remote,
+    /**
+     * Every teacher currently pointing at this workspace.
+     *
+     * Plural because five of them can be, and each has an arrow of their own.
+     * The single `remote` above is the first of these, kept for the caret —
+     * Monaco draws one remote caret, and a student being helped is being
+     * helped by whoever is typing.
+     */
+    peers,
     /** Handed to the editor so collaboration can bind to the live model. */
     registerEditor: React.useCallback(
       (instance: MonacoCodeEditor) => {

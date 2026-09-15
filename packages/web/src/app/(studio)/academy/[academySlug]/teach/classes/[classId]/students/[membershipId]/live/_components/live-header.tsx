@@ -39,6 +39,7 @@ export function LiveHeader({
   liveStatus,
   unsaved,
   answer,
+  helpMode,
 }: {
   classId: string;
   connection: React.ComponentProps<typeof ConnectionBadge>['state'];
@@ -56,6 +57,14 @@ export function LiveHeader({
   liveStatus?: string;
   unsaved: boolean;
   answer?: React.ReactNode;
+  /**
+   * The read-only / help control, owned by the page.
+   *
+   * Passed in rather than built here for the same reason `answer` is: the
+   * header knows where things go, and the page knows what the server has
+   * agreed to.
+   */
+  helpMode?: React.ReactNode;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -120,6 +129,7 @@ export function LiveHeader({
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        {helpMode}
         {answer}
         <span
           aria-live="polite"

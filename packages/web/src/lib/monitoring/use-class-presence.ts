@@ -30,7 +30,7 @@ export function useClassPresence({
   academyId: string;
   classId: string;
 }) {
-  const { socket, state, report } = useMonitoringSocket();
+  const { socket, state, report } = useMonitoringSocket({ classId });
   const [presence, setPresence] = React.useState<{
     entries: PresenceEntry[];
     version: number;

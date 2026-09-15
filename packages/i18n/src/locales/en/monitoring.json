@@ -80,6 +80,8 @@
     "back": "Back to class",
     "student_left": "Student left",
     "unsaved": "Unsaved changes",
+    "editing_on": "Help / Edit code",
+    "editing_off": "Read-only",
     "saved": "Saved",
     "editing_together": "Editing with {{name}}",
     "tab_you": "Your run",

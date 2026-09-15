@@ -63,7 +63,7 @@ export default defineConfig({
       name: 'webkit-monitoring',
       grepInvert:
         /teacher runs|submitting stays|feedback is stored|temporary disconnect|indicator clears/,
-      testMatch: /(?:teacher-live-monitoring|multi-tab-monitoring)\.spec\.ts/,
+      testMatch: /(?:teacher-live-monitoring|multi-tab-monitoring|monitoring-recovery)\.spec\.ts/,
       use: { ...devices['Desktop Safari'] },
     },
     {

@@ -31,6 +31,7 @@ import { staysUntilCleared } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { canEditSynchronizedDraft } from './connection';
 import { applyDocumentSyncResult, toBytes } from './document-sync';
+import { retryMonitoringCommand } from './retry-command';
 import { SavedTextTracker } from './saved-text';
 import { monitoringAck, type MonitoringAckResult } from './types';
 import { useMonitoringSocket } from './use-monitoring-socket';
@@ -196,6 +197,7 @@ export function useLiveWorkspace({
    * the draft the teacher may actually join.
    */
   const startWatchRef = React.useRef<(() => void) | null>(null);
+  const cancelWatchRef = React.useRef<(() => void) | null>(null);
   const follow = React.useCallback(() => startWatchRef.current?.(), []);
 
   /**
@@ -213,24 +215,41 @@ export function useLiveWorkspace({
   React.useEffect(() => {
     if (!socket) return;
 
+    let cancelCommand = () => {};
+    const unavailable = () => {
+      setSyncedDraftId(null);
+      setDenied('MONITORING_REALTIME_UNAVAILABLE');
+      report({ type: 'degraded' });
+    };
     const startWatch = () => {
+      cancelCommand();
+      setSyncedDraftId(null);
+      report({ type: 'recovery_failed' });
       const token = watchTokenRef.current + 1;
       watchTokenRef.current = token;
-      socket.emit(
-        monitoringClientEvents.watchStart,
-        {
-          eventId: crypto.randomUUID(),
-          academyId,
-          classId,
-          studentMembershipId,
-          sessionId: sessionIdRef.current,
-          protocolVersion: monitoringProtocolVersion,
+      cancelCommand = retryMonitoringCommand<LiveWorkspaceSession>({
+        onRetry: unavailable,
+        send: (done) => {
+          if (!socket.connected) { done(undefined); return; }
+          socket.emit(
+            monitoringClientEvents.watchStart,
+            {
+              eventId: crypto.randomUUID(),
+              academyId,
+              classId,
+              studentMembershipId,
+              sessionId: sessionIdRef.current,
+              protocolVersion: monitoringProtocolVersion,
+            },
+            monitoringAck(done),
+          );
         },
-        monitoringAck<LiveWorkspaceSession>((ack) => {
+        onResult: (ack) => {
           // Superseded while in flight: a newer attempt owns the workspace.
           if (watchTokenRef.current !== token) return;
           if (!ack?.ok) {
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
+            if (!ack || ack.code === 'MONITORING_REALTIME_UNAVAILABLE') unavailable();
             if (ack?.code === 'MONITORING_ACCESS_DENIED') {
               report({ type: 'revoked' });
             }
@@ -274,37 +293,66 @@ export function useLiveWorkspace({
           setSession(ack.data);
           // Synchronization follows the watch: the surface is not live until
           // the server has answered with the document it holds.
-          socket.emit(
-            monitoringClientEvents.documentSync,
-            {
-              eventId: crypto.randomUUID(),
-              draftId: ack.data.draftId,
-              stateVector: Y.encodeStateVector(docRef.current),
-              identity: identityOf(ack.data),
+          cancelCommand = retryMonitoringCommand<DocumentSyncResult>({
+            onRetry: unavailable,
+            send: (done) => {
+              if (!socket.connected) { done(undefined); return; }
+              socket.emit(
+                monitoringClientEvents.documentSync,
+                {
+                  eventId: crypto.randomUUID(),
+                  draftId: ack.data.draftId,
+                  stateVector: Y.encodeStateVector(docRef.current),
+                  identity: identityOf(ack.data),
+                },
+                monitoringAck<DocumentSyncResult>((reply) => {
+                  // A malformed success is a failed sync, not permission to edit.
+                  done(reply?.ok && !documentSyncResultSchema.safeParse(reply.data).success
+                    ? undefined : reply);
+                }),
+              );
             },
-            monitoringAck<DocumentSyncResult>((syncAck) => {
+            onResult: (syncAck) => {
               // A replaced watch may name the same draft, so the visit as well
               // as the draft must still be current when its acknowledgement
               // arrives.
               if (
-                !syncAck?.ok ||
                 watchTokenRef.current !== token ||
                 sessionRef.current?.visitId !== ack.data.visitId
               ) {
                 return;
               }
-              completeDocumentSync(syncAck.data);
-            }),
-          );
-        }),
-      );
+              if (!syncAck?.ok) {
+                if (syncAck?.code === 'MONITORING_ACCESS_DENIED') {
+                  setDenied(syncAck.code);
+                  report({ type: 'revoked' });
+                } else if (syncAck?.code === 'MONITORING_REFRESH_REQUIRED') {
+                  setRefreshRequired(true);
+                } else {
+                  unavailable();
+                }
+                return;
+              }
+              if (completeDocumentSync(syncAck.data)) setDenied(null);
+              else unavailable();
+            },
+          });
+        },
+      });
     };
 
+    cancelWatchRef.current = () => {
+      cancelCommand();
+      watchTokenRef.current += 1;
+    };
     startWatchRef.current = startWatch;
     socket.on('connect', startWatch);
     if (socket.connected) startWatch();
 
     return () => {
+      cancelCommand();
+      watchTokenRef.current += 1;
+      cancelWatchRef.current = null;
       startWatchRef.current = null;
       socket.off('connect', startWatch);
       // Names the watch it means to stop. A tab closing races its own
@@ -328,6 +376,10 @@ export function useLiveWorkspace({
     socket,
     studentMembershipId,
   ]);
+
+  React.useEffect(() => {
+    if (state === 'revoked' || refreshRequired) cancelWatchRef.current?.();
+  }, [state, refreshRequired]);
 
   /* ---------------------------------------------------------- the document */
 
@@ -492,10 +544,12 @@ export function useLiveWorkspace({
       } else if (event.draftId !== null && event.draftId !== current.draftId) {
         return;
       }
+      cancelWatchRef.current?.();
       setEnded(event.reason);
       setSyncedDraftId(null);
       sessionRef.current = null;
       setSession(null);
+      if (event.reason === 'CONNECTION_EXPIRED') startWatchRef.current?.();
     };
 
     /**
@@ -522,7 +576,11 @@ export function useLiveWorkspace({
       setSession(next);
     };
 
-    const onRefreshRequired = () => setRefreshRequired(true);
+    const onRefreshRequired = () => {
+      cancelWatchRef.current?.();
+      setSyncedDraftId(null);
+      setRefreshRequired(true);
+    };
 
     socket.on(monitoringServerEvents.runChanged, onRun);
     socket.on(monitoringServerEvents.resultChanged, onResult);

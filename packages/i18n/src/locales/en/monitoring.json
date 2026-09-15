@@ -76,6 +76,8 @@
     "revoked_body": "You are no longer the assigned teacher for this class."
   },
   "workspace": {
+    "recovery_body": "Live monitoring is temporarily unavailable. Reconnection is attempted automatically; you can retry if it remains unavailable. Editing is paused until synchronization completes.",
+    "retry_connection": "Retry connection",
     "title": "Live help",
     "back": "Back to class",
     "student_left": "Student left",

@@ -50,6 +50,11 @@ async function signIn(page: Page, email: string): Promise<string> {
  * the autosave under test run exactly as they would for a typed edit.
  */
 async function typeIntoEditor(page: Page, code: string) {
+  if (page.url().includes('/teach/')) {
+    const toggle = page.getByRole('button', { name: /^Read-only$|읽기 전용/i });
+    if (await toggle.count()) await toggle.click();
+    await expect(page.getByRole('button', { name: /Help \/ Edit code|코드 편집/i })).toHaveAttribute('aria-pressed', 'true');
+  }
   await expect(page.locator('.monaco-editor').first()).toBeVisible({
     timeout: 30_000,
   });
@@ -144,7 +149,7 @@ test('a student appears live when the teacher opened the roster first', async ()
 
   const studentRow = teacherPage
     .getByRole('row')
-    .filter({ hasText: 'Cove Student' });
+    .filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
   // Scope this to the row. The summary card and filter also say "Solving" and
   // allowed the old snapshot-only test to pass while the student stayed
   // visibly offline.
@@ -1041,7 +1046,7 @@ test('a problem stored with CRLF hands over without drifting', async () => {
 
   const studentRow = teacherPage
     .getByRole('row')
-    .filter({ hasText: 'Cove Student' });
+    .filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
   await expect(
     studentRow.getByRole('link', { name: /open live|실시간 보기/i }),
   ).toBeVisible({ timeout: 30_000 });

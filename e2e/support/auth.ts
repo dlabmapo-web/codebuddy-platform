@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { expect, type BrowserContext, type Page } from '@playwright/test';
 
 type StoredState = Awaited<ReturnType<BrowserContext['storageState']>>;
@@ -21,6 +23,7 @@ export async function signInAs({
   identifier,
   password,
   landing = /\/academy\//,
+  initialPath,
 }: {
   page: Page;
   identifier: string;
@@ -32,14 +35,28 @@ export async function signInAs({
    * wait out its timeout on a page that is already correct.
    */
   landing?: RegExp;
+  /** Enter the tested surface directly when using a prepared session. */
+  initialPath?: string;
 }): Promise<string> {
+  if (process.env.E2E_AUTH_STATE_DIR) {
+    const base = new URL(process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_WEB_PORT ?? 3000}`);
+    if (!['localhost', '127.0.0.1'].includes(base.hostname)) throw new Error('Stored test auth requires localhost');
+    if (!/^(manager|teacher2?|teamlead|student(?:[2-9]|1[0-6])?)@cove\.test$/.test(identifier)) throw new Error('Unsupported stored test account');
+    const state = JSON.parse(await readFile(resolve(process.env.E2E_AUTH_STATE_DIR, `${identifier}.json`), 'utf8')) as StoredState;
+    await page.context().clearCookies();
+    await page.context().addCookies(state.cookies);
+    // One navigation avoids racing the root page's streamed redirect in WebKit.
+    await page.goto(new URL(initialPath ?? '/academy/development-academy', base).toString());
+    await page.waitForURL(landing);
+    return academySlugFrom(page);
+  }
   const key = `${identifier}\u0000${password}`;
   const cached = sessions.get(key);
 
   await page.context().clearCookies();
   if (cached) {
     await page.context().addCookies(cached.state.cookies);
-    await page.goto(cached.landingPath);
+    await page.goto(initialPath ?? cached.landingPath);
     return cached.academySlug;
   }
 
@@ -59,6 +76,7 @@ export async function signInAs({
     landingPath: new URL(page.url()).pathname,
     state: await page.context().storageState(),
   });
+  if (initialPath) await page.goto(initialPath);
   return academySlug;
 }
 

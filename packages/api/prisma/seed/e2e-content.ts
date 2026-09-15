@@ -34,7 +34,7 @@ export const e2eContent = {
   echoMaterialId: "e0000000-0000-4000-8000-000000000030",
   sumMaterialId: "e0000000-0000-4000-8000-000000000031",
   hiddenMaterialId: "e0000000-0000-4000-8000-000000000032",
-  crlfMaterialId: "e0000000-0000-4000-8000-000000000033",
+  crlfMaterialId: "e0000000-0000-4000-8000-000000000034",
   courseTitle: "E2E Python Basics",
   echoTitle: "Echo the input",
   sumTitle: "Sum two numbers",
@@ -242,7 +242,7 @@ export async function seedE2eContent(prisma: PrismaClient) {
       materialId: e2eContent.crlfMaterialId,
       lectureId: e2eContent.lectureTwoId,
       title: e2eContent.crlfTitle,
-      position: 2,
+      position: 4,
       isVisible: true,
       externalKey: "e2e-crlf",
       // Stored exactly as v1 left it. Everything that reads it is expected to

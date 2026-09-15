@@ -98,4 +98,18 @@ export const developmentUsers = [
     platformRole: "USER",
     academyRole: "STUDENT",
   },
+  // Dedicated monitoring accounts preserve the ordinary manually used student.
+  ...Array.from({ length: 15 }, (_, index): DevelopmentUser => {
+    const number = index + 2;
+    const suffix = String(100 + number).padStart(12, "0");
+    return {
+      id: `30000000-0000-4000-8000-${suffix}`,
+      membershipId: `40000000-0000-4000-8000-${suffix}`,
+      email: `student${number}@cove.test`,
+      username: `cove-student${number}`,
+      displayName: `Cove Student ${number}`,
+      platformRole: "USER",
+      academyRole: "STUDENT",
+    };
+  }),
 ] as const satisfies readonly DevelopmentUser[];

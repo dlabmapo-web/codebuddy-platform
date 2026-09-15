@@ -93,6 +93,7 @@ function samePointer(
   if (left === right) return true;
   if (!left || !right) return false;
   return (
+    JSON.stringify(left.code) === JSON.stringify(right.code) &&
     left.surface === right.surface &&
     left.x === right.x &&
     left.y === right.y &&

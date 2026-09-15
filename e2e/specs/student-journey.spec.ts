@@ -264,6 +264,164 @@ test('previous and next move between exercises across lectures', async ({
   await expect(page.getByRole('heading', { name: ECHO_TITLE })).toBeVisible();
 });
 
+
+/** What the model actually holds, rather than what the DOM has rendered. */
+async function editorText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const monaco = (
+      window as unknown as {
+        monaco?: { editor: { getModels(): { getValue(): string }[] } };
+      }
+    ).monaco;
+    return monaco?.editor.getModels()[0]?.getValue() ?? '';
+  });
+}
+
+/** Empties this origin's local draft store, leaving only the server copy. */
+async function clearLocalDrafts(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const request = indexedDB.deleteDatabase('cove-learn');
+        request.onsuccess = () => resolve();
+        request.onerror = () => resolve();
+        request.onblocked = () => resolve();
+      }),
+  );
+}
+
+/**
+ * The second reported production fault, as a release gate.
+ *
+ * Moving between problems deliberately does not remount the workspace — the
+ * editor and the Pyodide worker are kept alive, which is what makes
+ * Previous/Next instant. That is also what made it possible for one problem's
+ * buffer to be published into another's: the editor outlives the exercise, so
+ * every listener attached to it has to be retired with the exercise rather
+ * than with the component.
+ *
+ * Two things this deliberately does not do. It does not wait for the save
+ * indicator before switching — the transition itself has to carry the outgoing
+ * buffer, and waiting first would test the idle timer instead. And it clears
+ * IndexedDB before reloading, so what comes back is the server's copy and not
+ * this browser's.
+ */
+test('switching problems keeps each draft to its own problem', async ({
+  page,
+}) => {
+  const stamp = Date.now();
+  const echoMarker = `# echo-${stamp}`;
+  const sumMarker = `# sum-${stamp}`;
+
+  const echoUrl = await exerciseUrl(page, ECHO_TITLE);
+  await page.goto(echoUrl);
+  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await typeIntoEditor(page, echoMarker);
+
+  // Straight into the transition, with the idle timer still running. Echo ends
+  // module 1 and Sum opens module 2, so this crosses a lecture as well.
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
+  await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
+
+  // The destination opens on its own draft. Nothing from the problem just
+  // left may be in it, and the outgoing buffer must not have been written
+  // here on the way.
+  await expect
+    .poll(() => editorText(page), { timeout: 30_000 })
+    .not.toContain(echoMarker);
+  await typeIntoEditor(page, sumMarker);
+
+  await page.getByRole('button', { name: /^previous$|^이전$/i }).click();
+  await expect(page.getByRole('heading', { name: ECHO_TITLE })).toBeVisible();
+  await expect
+    .poll(() => editorText(page), { timeout: 30_000 })
+    .toContain(echoMarker);
+  expect(await editorText(page)).not.toContain(sumMarker);
+
+  // The transition's save has landed by the time the indicator says so, and
+  // this is the point of the test: both problems are now on the server.
+  await expect(page.getByText(/^Saved$|^저장됨$/)).toBeVisible({ timeout: 30_000 });
+
+  // Take this browser's copy away, so what comes back can only be the
+  // server's. Without this the reload proves nothing about durability.
+  await clearLocalDrafts(page);
+  await page.reload();
+  await expect(page.locator('.monaco-editor')).toContainText(echoMarker, {
+    timeout: 30_000,
+  });
+  expect(await editorText(page)).not.toContain(sumMarker);
+
+  await page.getByRole('button', { name: /^next$|^다음$/i }).click();
+  await expect(page.getByRole('heading', { name: SUM_TITLE })).toBeVisible();
+  await expect
+    .poll(() => editorText(page), { timeout: 30_000 })
+    .toContain(sumMarker);
+  expect(await editorText(page)).not.toContain(echoMarker);
+});
+
+/**
+ * Two accounts, one browser profile.
+ *
+ * IndexedDB is per profile, not per account, and local drafts used to be keyed
+ * by problem alone — so on a shared school machine the next student to open a
+ * problem was handed the previous one's code.
+ *
+ * Asserted against the stored keys rather than by signing a second student in:
+ * the seed has only one, and the other accounts are staff, whom the workspace
+ * route sends to the authoring view instead. What matters is that no record is
+ * reachable by problem alone, and that is exactly what the keys show.
+ */
+test('a local draft is stored against the learner, not just the problem', async ({
+  page,
+}) => {
+  const url = await exerciseUrl(page, ECHO_TITLE);
+  await page.goto(url);
+  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await typeIntoEditor(page, `# owned-${Date.now()}`);
+
+  const materialId = /\/learn\/exercises\/([0-9a-f-]+)/.exec(url)?.[1] ?? '';
+  expect(materialId).not.toBe('');
+
+  await expect
+    .poll(() => localDraftKeys(page).then((keys) => keys.length), {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(0);
+  const keys = await localDraftKeys(page);
+
+  // Learner, academy, problem — and never the bare problem, which is what the
+  // next person to sign in on this machine would have picked up.
+  expect(keys).not.toContain(materialId);
+  expect(keys.some((key) => key.endsWith(`:${materialId}`))).toBe(true);
+  for (const key of keys) {
+    expect(key.split(':')).toHaveLength(3);
+  }
+});
+
+/** Every key in this origin's local draft store. */
+async function localDraftKeys(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const open = indexedDB.open('cove-learn');
+        open.onsuccess = () => {
+          try {
+            const all = open.result
+              .transaction('drafts')
+              .objectStore('drafts')
+              .getAllKeys();
+            all.onsuccess = () => resolve(all.result.map(String));
+            all.onerror = () => resolve([]);
+          } catch {
+            resolve([]);
+          }
+        };
+        open.onerror = () => resolve([]);
+        open.onblocked = () => resolve([]);
+      }),
+  );
+}
+
 /** Resolves an exercise URL by walking the outline, as a student would. */
 async function exerciseUrl(page: Page, title: string): Promise<string> {
   await page.goto(catalogUrl());

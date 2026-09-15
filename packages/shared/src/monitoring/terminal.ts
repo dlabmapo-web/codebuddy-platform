@@ -268,11 +268,11 @@ export type TerminalMirrorEvent = z.infer<typeof terminalMirrorEventSchema>;
  * repairing itself — which is the same discipline the monitoring indicator
  * follows.
  */
-export const terminalSnapshotRequestSchema = z.object({ draftId: z.uuid() });
+export const terminalSnapshotRequestSchema = z.object({ draftId: z.uuid(), identity: z.object({ sessionId: z.uuid(), visitId: z.uuid(), generation: z.number().int().positive() }).optional() });
 export type TerminalSnapshotRequest = z.infer<
   typeof terminalSnapshotRequestSchema
 >;
 
 /** A teacher asking the server to have the snapshot re-sent. */
-export const terminalResyncPayloadSchema = z.object({ draftId: z.uuid() });
+export const terminalResyncPayloadSchema = z.object({ draftId: z.uuid(), identity: z.object({ sessionId: z.uuid(), visitId: z.uuid(), generation: z.number().int().positive() }).optional() });
 export type TerminalResyncPayload = z.infer<typeof terminalResyncPayloadSchema>;

@@ -11,13 +11,16 @@ import {
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
+import { captureCodePointer } from './code-pointer';
+import { idleAwarenessState } from './awareness-state';
 import {
-  expireCursor,
-  expirePointer,
-  idleAwarenessState,
-  receiveAwareness,
-  type ReceivedAwarenessState,
-} from './awareness-state';
+  expirePeerMarker,
+  noPeers,
+  peersOn,
+  receivePeerAwareness,
+  type PeerAwarenessMap,
+  type PeerAwarenessState,
+} from './peer-awareness';
 import {
   observeSurfaceIframes,
   type PointerCaptureSurface,
@@ -28,6 +31,7 @@ import {
   type RemoteAwarenessLifecycle,
 } from './pointer-lifecycle';
 import {
+  canvasLayoutReady,
   pointerBoxFor,
   resolvePointerSurface,
   toCanvasPosition,
@@ -45,6 +49,25 @@ function nextAwarenessSequence(socket: Socket): number {
   const sequence = (awarenessSequences.get(socket) ?? -1) + 1;
   awarenessSequences.set(socket, sequence);
   return sequence;
+}
+
+/**
+ * Effect keys that change when a marker or its activity stamp does.
+ *
+ * React compares dependencies by identity, and the peer array is rebuilt on
+ * every packet — so without these, every teacher's countdown would restart
+ * whenever any one of them moved, and an idle arrow would never expire.
+ */
+function peerPointerKey(peers: PeerAwarenessState[]): string {
+  return peers
+    .map((peer) => `${peer.peerId}:${peer.pointer ? peer.pointerMovedAt : 0}`)
+    .join('|');
+}
+
+function peerCursorKey(peers: PeerAwarenessState[]): string {
+  return peers
+    .map((peer) => `${peer.peerId}:${peer.cursor ? peer.cursorMovedAt : 0}`)
+    .join('|');
 }
 
 export type RemoteAwareness = {
@@ -75,6 +98,7 @@ export type RemoteAwareness = {
  */
 export function useAwareness({
   draftId,
+  identity,
   peerOrigin,
   remoteCursor,
   remotePointer,
@@ -82,6 +106,18 @@ export function useAwareness({
 }: {
   /** Null until a shared document exists; publishing is off until then. */
   draftId: string | null;
+  /**
+   * Which watch this client's own packets belong to, when it holds one.
+   *
+   * Null for a student, who has no watch to fence. For a teacher it is what
+   * lets the server drop a packet published before a reconnect instead of
+   * forwarding it into the session that replaced it.
+   */
+  identity?: {
+    sessionId: string;
+    visitId: string;
+    generation: number;
+  } | null;
   peerOrigin: AwarenessChangedEvent['origin'];
   /** Whether the peer's Monaco caret expires or stays until an explicit clear. */
   remoteCursor: RemoteAwarenessLifecycle;
@@ -89,15 +125,40 @@ export function useAwareness({
   remotePointer: RemoteAwarenessLifecycle;
   socket: Socket | null;
 }): {
+  /**
+   * The peer to render when there can only be one.
+   *
+   * A teacher watches one student, so their side genuinely has a single peer
+   * and reads this. A student may be watched by several teachers at once and
+   * reads `peers` instead; this reports the first of them so that callers
+   * which have not been taught about the plural case still show something
+   * true rather than nothing.
+   */
   remote: RemoteAwareness;
+  /** Every peer on this document, each with independent markers. */
+  peers: PeerAwarenessState[];
   publishCursor: (cursor: CollaborationCursor | null) => void;
 } {
-  const [received, setReceived] =
-    React.useState<ReceivedAwarenessState>(idleAwarenessState);
+  const [received, setReceived] = React.useState<PeerAwarenessMap>(noPeers);
 
   // Handlers outlive the render that created them, so the parts that change
   // often are read through refs rather than closed over.
   const draftRef = React.useRef(draftId);
+  /**
+   * Which watch this client's packets belong to, read by handlers that outlive
+   * the render that created them.
+   *
+   * Synchronized in the *first* effect this hook declares, which is what makes
+   * it safe: effects run in declaration order, so by the time any publisher
+   * below — or any event handler, which runs later still — reads this, it
+   * already holds the identity of the commit it is running in. A packet can
+   * therefore never carry the generation of a watch that has just been
+   * replaced, which is exactly the case the server would drop.
+   */
+  const identityRef = React.useRef(identity);
+  React.useEffect(() => {
+    identityRef.current = identity;
+  }, [identity]);
   const pointerRef = React.useRef<CollaborationPointer | null>(null);
   const cursorRef = React.useRef<CollaborationCursor | null>(null);
   const lastPointerAt = React.useRef(0);
@@ -149,10 +210,17 @@ export function useAwareness({
    * cancelled to make that true, which matters for markers configured without
    * an idle expiry.
    */
-  const remote: RemoteAwareness =
-    draftId !== null && received.draftId === draftId
-      ? received
-      : idleAwarenessState;
+  const peers = React.useMemo(
+    () => peersOn(received, draftId),
+    [draftId, received],
+  );
+  const remote: RemoteAwareness = peers[0] ?? idleAwarenessState;
+  // Extracted so the expiry effects below have statically checkable
+  // dependencies: the peer array is rebuilt on every packet, and keying the
+  // countdowns on it directly would restart every teacher's timer whenever
+  // any one of them moved.
+  const pointerExpiryKey = peerPointerKey(peers);
+  const cursorExpiryKey = peerCursorKey(peers);
 
   /**
    * @param reliable Movement is volatile: the next event supersedes this one
@@ -170,7 +238,9 @@ export function useAwareness({
         draftId: currentDraft,
         sequence: nextAwarenessSequence(socket),
         cursor: cursorRef.current,
-        pointer: pointerRef.current,
+        pointer: pointerRef.current?.code ? null : pointerRef.current,
+        editorPointer: pointerRef.current?.code ? pointerRef.current : null,
+        ...(identityRef.current ? { identity: identityRef.current } : {}),
       });
     },
     [socket],
@@ -267,10 +337,18 @@ export function useAwareness({
         // lifecycle decides whether it fades or remains until session end.
         return;
       }
+      if (resolved.surface === 'editor') {
+        publishPointer(captureCodePointer(resolved.element, point, draftId));
+        return;
+      }
       // The canvas when the point is inside one, the pane otherwise. A canvas
       // box is the same box on both screens; a pane box is not, and the space
       // travels with the position so a receiver in the other mode names the
       // region instead of drawing somewhere plausible and wrong.
+      if (resolved.canvas && !canvasLayoutReady(resolved.canvas)) {
+        publishPointer(null);
+        return;
+      }
       const { box, material, space } = pointerBoxFor(resolved);
       const position =
         space === 'canvas'
@@ -313,6 +391,7 @@ export function useAwareness({
         sequence: nextAwarenessSequence(socket),
         cursor: null,
         pointer: null,
+        ...(identityRef.current ? { identity: identityRef.current } : {}),
       });
     };
   }, [draftId, socket]);
@@ -322,14 +401,26 @@ export function useAwareness({
   React.useEffect(() => {
     if (!socket) return;
     const onAwareness = (event: AwarenessChangedEvent) => {
-      if (event.origin !== peerOrigin) return;
-      setReceived((current) => receiveAwareness(current, event, Date.now()));
+      if (event.origin !== peerOrigin || event.draftId !== draftId) return;
+      if (event.editorPointer?.code && event.editorPointer.code.draftId !== event.draftId) return;
+      setReceived((current) =>
+        receivePeerAwareness(
+          current,
+          {
+            ...event,
+            pointer:
+              event.editorPointer ??
+              (event.pointer?.surface === 'editor' ? null : event.pointer),
+          },
+          Date.now(),
+        ),
+      );
     };
     socket.on(monitoringServerEvents.awarenessChanged, onAwareness);
     return () => {
       socket.off(monitoringServerEvents.awarenessChanged, onAwareness);
     };
-  }, [peerOrigin, socket]);
+  }, [draftId, peerOrigin, socket]);
 
   /**
    * A pointer that stopped arriving disappears — where the caller asked for it.
@@ -344,24 +435,40 @@ export function useAwareness({
    * Cursor expiry is scheduled independently below. Mouse traffic must never
    * prolong a caret, and cursor traffic must never prolong an arrow.
    */
-  React.useEffect(
-    () =>
-      // Measured from what is on screen, not from what arrived: awareness for
-      // a document this hook has already left is never counted down, and
-      // never reaches back into state to remove something it does not own.
-      scheduleRemoteAwarenessExpiry(remotePointer, remote.pointer, () =>
-        setReceived(expirePointer),
-      ),
-    [remote.pointer, remote.pointerMovedAt, remotePointer],
-  );
+  // Measured from what is on screen, not from what arrived: awareness for a
+  // document this hook has already left is never counted down, and never
+  // reaches back into state to remove something it does not own.
+  //
+  // One timer per peer per marker. A single pair of timers over a merged
+  // position would let the most recently active teacher keep four idle
+  // teachers' arrows alive, and let one going idle remove all five.
+  React.useEffect(() => {
+    const disarms = peers
+      .map((peer) =>
+        scheduleRemoteAwarenessExpiry(remotePointer, peer.pointer, () =>
+          setReceived((current) =>
+            expirePeerMarker(current, peer.peerId, 'pointer'),
+          ),
+        ),
+      )
+      .filter((disarm): disarm is () => void => disarm !== undefined);
+    return () => disarms.forEach((disarm) => disarm());
+    // Keyed on each peer's own pointer and its own activity stamp, so one
+    // peer's movement never restarts another's countdown.
+  }, [pointerExpiryKey, peers, remotePointer]);
 
-  React.useEffect(
-    () =>
-      scheduleRemoteAwarenessExpiry(remoteCursor, remote.cursor, () =>
-        setReceived(expireCursor),
-      ),
-    [remote.cursor, remote.cursorMovedAt, remoteCursor],
-  );
+  React.useEffect(() => {
+    const disarms = peers
+      .map((peer) =>
+        scheduleRemoteAwarenessExpiry(remoteCursor, peer.cursor, () =>
+          setReceived((current) =>
+            expirePeerMarker(current, peer.peerId, 'cursor'),
+          ),
+        ),
+      )
+      .filter((disarm): disarm is () => void => disarm !== undefined);
+    return () => disarms.forEach((disarm) => disarm());
+  }, [cursorExpiryKey, peers, remoteCursor]);
 
-  return { remote, publishCursor };
+  return { remote, peers, publishCursor };
 }

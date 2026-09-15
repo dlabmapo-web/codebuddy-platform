@@ -83,11 +83,11 @@ test('the teacher opens a live watch on the hinted exercise', async () => {
   await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
   await expect(statementSurface(studentPage)).toBeVisible({ timeout: 30_000 });
 
-  const row = teacherPage.getByRole('row').filter({ hasText: 'Cove Student' });
+  const row = teacherPage.getByRole('row').filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
   await expect(
-    row.getByRole('link', { name: /open live|실시간 보기/i }),
+    row.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }),
   ).toBeVisible({ timeout: 30_000 });
-  await row.getByRole('link', { name: /open live|실시간 보기/i }).click();
+  await row.getByRole('link', { name: /^(?:open live|실시간 보기)$/i }).click();
   await teacherPage.waitForURL(/\/students\/[0-9a-f-]+\/live$/, {
     timeout: 30_000,
   });

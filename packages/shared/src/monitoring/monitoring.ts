@@ -96,7 +96,7 @@ export const monitoringTiming = {
    * mouse dragged across the editor would publish at screen refresh rate.
    */
   activityPublishFloorMs: 3_000,
-  /** No editor, run, pointer, or navigation activity for this long is idle. */
+  /** Legacy inactivity threshold; open problems no longer become idle. */
   idleAfterMs: 60_000,
   /** How long an interrupted connection reads as reconnecting, not offline. */
   recoveryGraceMs: 30_000,
@@ -233,6 +233,14 @@ export const collaborationPointerSchema = z.object({
    * that predate the field, which are handled as unverifiable.
    */
   material: z.string().max(64).nullable().default(null),
+  /** Code anchors travel in the separate editorPointer wire field. */
+  code: z.object({
+    kind: z.literal("yjs"),
+    draftId: z.uuid(),
+    line: z.number().int().min(1).max(10_000_000),
+    column: z.number().int().min(1).max(10_000_000),
+    relative: z.array(z.number().int().min(0).max(255)).min(1).max(256),
+  }).optional(),
 });
 export type CollaborationPointer = z.infer<typeof collaborationPointerSchema>;
 
@@ -471,47 +479,19 @@ export function resolveLiveState(
       : "OFFLINE";
   }
   if (signals.materialId === null) return "ONLINE";
-  // Activity outranks visibility, and the order is the whole point.
-  //
-  // WebKit reports a page as hidden when its window is merely covered by
-  // another, where Chromium reports it only on a tab switch. Checking
-  // visibility first therefore demoted a Safari student the instant anything
-  // overlapped their window — including the teacher's own roster — and undid
-  // the keystroke they had just typed.
-  //
-  // Someone who typed four seconds ago is working, whatever is stacked on top
-  // of them. Someone who walked away stops producing signals and falls out of
-  // Solving within the minute regardless, so nothing is lost by trusting the
-  // activity first.
-  if (
-    signals.lastActivityAt !== null &&
-    now - signals.lastActivityAt <= timing.idleAfterMs
-  ) {
-    return "SOLVING";
-  }
-  // Quiet and out of sight is a student who left the page open, not one
-  // sitting in front of a problem doing nothing. Only the second is Idle.
-  if (signals.visibility === "HIDDEN") return "ONLINE";
-  return "IDLE";
+  // Reading and thinking are part of solving. Activity and visibility remain
+  // telemetry; neither revokes access to a connected student's open problem.
+  return "SOLVING";
 }
 
-/**
- * Whether a teacher may open this student's workspace.
- *
- * Solving only: there has to be something live to join. Both other rows that
- * can hold an exercise have been quiet for a minute — Idle in front of it,
- * Online with it left open behind something else — so opening either shows a
- * still frame and calls it live.
- *
- * The consequence is that the button leaves a row the moment the student goes
- * quiet, including under the cursor of a teacher about to click it. The server
- * re-authorizes every watch regardless, so a stale click is refused rather than
- * mishandled.
- */
+/** Connected students with an open problem can be monitored even while quiet. */
 export function canOpenLiveWorkspace(
   presence: { state: MonitoringLiveState; materialId: string | null },
 ): boolean {
-  return presence.materialId !== null && presence.state === "SOLVING";
+  // Accept legacy quiet states during rollout as well as current SOLVING rows.
+  return presence.materialId !== null &&
+    (presence.state === "SOLVING" || presence.state === "IDLE" ||
+      presence.state === "ONLINE");
 }
 
 /**
@@ -957,3 +937,96 @@ export const studentIndicatorStates = [
 ] as const;
 export const studentIndicatorStateSchema = z.enum(studentIndicatorStates);
 export type StudentIndicatorState = z.infer<typeof studentIndicatorStateSchema>;
+
+/* ------------------------------------------------------------- watch mode */
+
+/**
+ * What one watch session is currently allowed to do.
+ *
+ * `MONITORING` is the default and the only state a watch may start in: a
+ * teacher who opens a student's workspace is reading it. `HELPING` is entered
+ * by an explicit, acknowledged command and is the sole thing that makes the
+ * teacher's editor writable — the server checks this mode on every document
+ * update, so a client that unlocks Monaco by itself still cannot write.
+ *
+ * Deliberately not derived from "a teacher typed recently". An indicator built
+ * from keystrokes tells the student that help stopped whenever the teacher
+ * paused to read, which is exactly when they are most likely to be composing
+ * the fix.
+ */
+export const monitoringWatchModes = ["MONITORING", "HELPING"] as const;
+export const monitoringWatchModeSchema = z.enum(monitoringWatchModes);
+export type MonitoringWatchMode = z.infer<typeof monitoringWatchModeSchema>;
+
+/**
+ * The version of the watch-session protocol this build speaks.
+ *
+ * Bumped when lifecycle or durability semantics require clients to refresh.
+ * Version 3 requires the teacher to match committed text before showing Saved.
+ * A client that omits it, or sends a lower number, is refused with
+ * `MONITORING_REFRESH_REQUIRED` instead of being half-admitted: the old
+ * singleton `watch.ended` semantics and the aggregate ones cannot both be true
+ * for one student at the same time, and mixing them is what would silently
+ * unbind a document another tab is still using.
+ */
+export const monitoringProtocolVersion = 3;
+
+/** Lease lifetimes for one watch session, renewed while its socket lives. */
+export const monitoringWatchLease = {
+  /** How long a lease survives without renewal. A crashed API expires here. */
+  ttlMs: 90_000,
+  /** How often a live, authorized socket renews its own lease. */
+  renewIntervalMs: 30_000,
+} as const;
+
+/**
+ * What every watcher of one student's exercise adds up to.
+ *
+ * Counts, never tab details: the student is told how many people are reading
+ * and whether any of them can type, and nothing about who or from where. The
+ * revision is what makes a late summary discardable — aggregate state arrives
+ * both as a push and as a reconnect fetch, and the older of the two must lose
+ * regardless of which one the network delivers second.
+ */
+export const monitoringWatchSummarySchema = z.object({
+  /**
+   * Null when the summary was built for a student rather than for one class.
+   *
+   * A student enrolled in two classes can be watched from either, and their
+   * indicator is about being watched, not about by whom — so the student-side
+   * fetch deliberately does not narrow by class and has no class to report.
+   */
+  classId: z.uuid().nullable(),
+  studentMembershipId: z.uuid(),
+  /** Null when the summary describes a student with no watched draft. */
+  draftId: z.uuid().nullable(),
+  /** Monotonic per student scope. A lower revision is ignored, never applied. */
+  revision: z.number().int().nonnegative(),
+  /** Watches currently reading, including those that may also be helping. */
+  watcherCount: z.number().int().nonnegative(),
+  /** Watches whose mode is `HELPING` right now. */
+  helpingCount: z.number().int().nonnegative(),
+  /** What the student's own indicator should read, derived from the counts. */
+  indicator: studentIndicatorStateSchema,
+});
+export type MonitoringWatchSummary = z.infer<
+  typeof monitoringWatchSummarySchema
+>;
+
+/**
+ * The indicator a set of live watches means.
+ *
+ * `HELPING` wins over `MONITORING` because it is the stronger claim and the
+ * one the student needs to act on — somebody can change this file. Zero
+ * watchers is `NONE`; `RECONNECTING` is never derived here, because it is a
+ * statement about this student's own transport rather than about who is
+ * watching them.
+ */
+export function watchSummaryIndicator(counts: {
+  watcherCount: number;
+  helpingCount: number;
+}): StudentIndicatorState {
+  if (counts.helpingCount > 0) return "HELPING";
+  if (counts.watcherCount > 0) return "MONITORING";
+  return "NONE";
+}

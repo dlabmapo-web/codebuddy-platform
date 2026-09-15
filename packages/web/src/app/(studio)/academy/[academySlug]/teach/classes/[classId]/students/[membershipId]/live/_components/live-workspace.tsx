@@ -34,12 +34,17 @@ import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { useTeacherDisplay } from '../_hooks/use-teacher-display';
 import { LiveEditor } from './live-editor';
+import { feedbackScope } from '@/lib/monitoring/feedback-draft-store';
+import { useFeedbackDraft } from '@/lib/monitoring/feedback-draft-provider';
+import { StudentSwitcher } from '@/components/monitoring/student-switcher';
+
 import { FeedbackDock } from './live-feedback';
 import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
 import { PreviewBanner } from './preview-banner';
 import { PreviewEditor } from './preview-editor';
 import { AnswerCodeModal } from './answer-code-modal';
+import { HelpModeToggle } from './help-mode-toggle';
 
 /**
  * One student's exercise, opened beside them.
@@ -70,6 +75,8 @@ export function LiveWorkspace({
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tl } = useLayoutTranslation('learn');
+  /** One request at a time; the server's answer is what changes the label. */
+  const [helpPending, setHelpPending] = React.useState(false);
   const live = useLiveWorkspace({
     academyId,
     classId,
@@ -221,6 +228,24 @@ export function LiveWorkspace({
   } = useSplitPane({ axis: 'vertical', initial: 240, min: 96, max: 1_200 });
 
   /** The shared document as text, read at the moment a run starts. */
+  /**
+   * Asking the server to grant or withdraw edit permission.
+   *
+   * The hook locks the editor immediately when stepping back and waits for the
+   * acknowledgement before unlocking — so this only has to keep a second press
+   * from racing the first, and to stop showing a spinner once the answer is in
+   * regardless of which way it went.
+   */
+  const requestHelpMode = React.useCallback(
+    (next: boolean) => {
+      setHelpPending(true);
+      void live.setMode(next ? 'HELPING' : 'MONITORING').finally(() => {
+        setHelpPending(false);
+      });
+    },
+    [live],
+  );
+
   const getCode = React.useCallback(() => live.text.toString(), [live.text]);
 
   /**
@@ -266,6 +291,7 @@ export function LiveWorkspace({
   const student =
     context.student.displayName ?? context.student.email ?? membershipId;
 
+  const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, materialId ?? null));
   return (
     <div className="flex h-dvh flex-col bg-canvas">
       {/* The student's mouse, drawn wherever this teacher's layout puts the
@@ -274,6 +300,7 @@ export function LiveWorkspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
+          studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           answer={
             display.isLive && live.session && liveExercise ? (
               <AnswerCodeModal
@@ -301,6 +328,14 @@ export function LiveWorkspace({
             />
           }
           exercise={shown}
+          helpMode={
+            <HelpModeToggle
+              busy={helpPending}
+              disabled={!live.canEdit || !display.isLive}
+              helping={live.helping}
+              onToggle={requestHelpMode}
+            />
+          }
           liveStatus={
             display.live.available
               ? t('live.on_exercise', {
@@ -312,6 +347,32 @@ export function LiveWorkspace({
         />
       </div>
 
+      {live.pendingRecovery ? (
+        <div role="status" className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-sm">
+          <span>{t(live.pendingRecovery === 'recovering' ? 'workspace.pending_recovering' : 'workspace.pending_blocked')}</span>
+          <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => {
+            const url = URL.createObjectURL(new Blob([live.text.toString()], { type: 'text/plain;charset=utf-8' }));
+            const link = document.createElement('a');
+            link.href = url; link.download = 'unsynced-teacher-code.py'; link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1_000);
+          }}>{t('workspace.pending_download')}</button>
+          {live.pendingRecovery === 'blocked' ? <>
+            <button type="button" className="rounded-md border border-border px-2 py-1" onClick={live.follow}>{t('workspace.retry_connection')}</button>
+            <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => {
+              if (window.confirm(t('workspace.pending_discard_confirm'))) live.discardPendingEdits();
+            }}>{t('workspace.pending_discard')}</button>
+          </> : null}
+        </div>
+      ) : null}
+
+      {!live.pendingRecovery && live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ? (
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2 text-[13px] text-sub" role="status">
+          <span>{t('workspace.recovery_body')}</span>
+          <button className="rounded-md border border-border px-2 py-1 font-semibold" onClick={live.follow} type="button">
+            {t('workspace.retry_connection')}
+          </button>
+        </div>
+      ) : null}
       {live.ended ? (
         <p className="shrink-0 border-b border-danger/25 bg-danger/5 px-4 py-2 text-[13px] font-semibold text-danger">
           {t('workspace.ended_title')} · {t(`end_reason.${live.ended}`)}
@@ -455,10 +516,11 @@ export function LiveWorkspace({
                   />
                 ) : (
                   <LiveEditor
+                    pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined}
                     fontSize={preferences.fontSize}
                     onCursor={live.publishCursor}
                     peerName={student}
-                    readOnly={!live.canEdit || !display.isLive}
+                    readOnly={!live.canEditCode || !display.isLive}
                     remoteCursor={live.remote.cursor}
                     text={live.text}
                   />
@@ -503,11 +565,16 @@ export function LiveWorkspace({
               <div className="shrink-0" {...surfaceProps('feedback')}>
                 <FeedbackDock
                   canSend={live.canEdit && display.isLive}
-                  draft={display.feedbackDraft}
+                  draft={note.text}
                   feedback={feedback}
                   materialId={materialId ?? null}
-                  onDraftChange={display.setFeedbackDraft}
-                  onSend={live.sendFeedback}
+                  onDraftChange={note.edit}
+                  onHydrate={note.hydrate}
+                  onSend={async (body) => {
+                    const ack = await live.sendFeedback(body);
+                    if (ack?.ok) note.acknowledge(body);
+                    return ack;
+                  }}
                   teacherMembershipRef={teacherMembershipRef}
                 />
               </div>

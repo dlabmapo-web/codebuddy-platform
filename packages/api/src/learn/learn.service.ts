@@ -10,6 +10,7 @@ import {
   type LearnCourseSummary,
   type LearnExerciseBootstrap,
   type LearnExerciseWorkspace,
+  type SaveDraftResult,
   type SolveSession,
 } from "@cove/shared";
 
@@ -21,6 +22,7 @@ import {
 } from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { DraftCoordinator } from "../drafts/draft-coordinator.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import {
   courseSummaryFor,
@@ -70,6 +72,7 @@ type WorkspaceMaterial = Omit<
 export class LearnService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly drafts: DraftCoordinator,
     private readonly access: AcademyAccessService,
     private readonly curriculum: CurriculumOutlineService,
     private readonly submissions: SubmissionService,
@@ -361,29 +364,50 @@ export class LearnService {
     };
   }
 
+  /**
+   * The student's work, written through the one authority that owns it.
+   *
+   * Not a bare upsert any more: while a teacher is in the room the CRDT owns
+   * this draft's text, and a plain snapshot written past it would be undone by
+   * the next flush and would take the other person's edits with it. The
+   * coordinator decides which writer is authoritative and reconciles rather
+   * than overwrites.
+   */
   async saveDraft(
     identity: SupabaseIdentity,
-    input: { academyId: string; materialId: string; code: string },
-  ) {
+    input: {
+      academyId: string;
+      materialId: string;
+      code: string;
+      baseUpdatedAt?: string | null;
+    },
+  ): Promise<SaveDraftResult> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const material = await this.requireVisibleMaterial(
       input.academyId,
       input.materialId,
       scope,
     );
-    const draft = await this.prisma.exerciseDraft.upsert({
-      where: { userId_materialId: { userId, materialId: input.materialId } },
-      create: {
-        userId,
-        materialId: input.materialId,
-        sourceMaterialId: input.materialId,
-        courseId: material.lecture.courseModule.courseId,
-        code: input.code,
-      },
-      update: { code: input.code },
-      select: { updatedAt: true },
+    const base = input.baseUpdatedAt ? new Date(input.baseUpdatedAt) : null;
+    const result = await this.drafts.save({
+      userId,
+      materialId: input.materialId,
+      sourceMaterialId: input.materialId,
+      courseId: material.lecture.courseModule.courseId,
+      code: input.code,
+      baseUpdatedAt: base && !Number.isNaN(base.getTime()) ? base : null,
     });
-    return { updatedAt: draft.updatedAt.toISOString() };
+    return result.outcome === "SAVED"
+      ? {
+          outcome: "SAVED",
+          updatedAt: result.updatedAt.toISOString(),
+          serverCode: null,
+        }
+      : {
+          outcome: "CONFLICT",
+          updatedAt: result.updatedAt.toISOString(),
+          serverCode: result.code,
+        };
   }
 
   async discardDraft(
@@ -392,10 +416,13 @@ export class LearnService {
   ) {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
     await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
-    const { count } = await this.prisma.exerciseDraft.deleteMany({
-      where: { userId, materialId: input.materialId },
+    // Through the coordinator, so any live document goes with the row rather
+    // than outliving it and failing its next flush against a missing draft.
+    const discarded = await this.drafts.discard({
+      userId,
+      materialId: input.materialId,
     });
-    return { discarded: count > 0 };
+    return { discarded };
   }
 
   /**

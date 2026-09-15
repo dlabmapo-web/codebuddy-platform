@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Redis } from "ioredis";
 
-import { ActiveWatchRegistry } from "./active-watch.registry.js";
+import { WatchSessionRegistry } from "./watch-session.registry.js";
 import { MonitoringMetricsService } from "./monitoring-metrics.service.js";
 import { MonitoringRevocationService } from "./monitoring-revocation.service.js";
 import { MonitoringVisitService } from "./monitoring-visit.service.js";
@@ -32,7 +32,7 @@ import { MONITORING_REDIS } from "./monitoring.tokens.js";
           : null;
       },
     },
-    ActiveWatchRegistry,
+    WatchSessionRegistry,
     MonitoringVisitService,
     MonitoringMetricsService,
     MonitoringRevocationService,
@@ -41,7 +41,7 @@ import { MONITORING_REDIS } from "./monitoring.tokens.js";
     MonitoringVisitService,
     MonitoringMetricsService,
     MonitoringRevocationService,
-    ActiveWatchRegistry,
+    WatchSessionRegistry,
     MONITORING_REDIS,
   ],
 })

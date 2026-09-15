@@ -26,7 +26,7 @@ describe("development seed manifest", () => {
       .toEqual([
         "MANAGER",
         "MANAGER",
-        "STUDENT",
+        ...Array.from({ length: 16 }, () => "STUDENT"),
         "TEACHER",
         "TEACHER",
         "TEAM_LEAD",

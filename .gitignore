@@ -73,3 +73,6 @@ deploy/generated/*
 deploy/load/results/
 .env-backups/
 docs/operations/*.local.md
+
+# Local browser authentication states contain session credentials.
+e2e/.auth/

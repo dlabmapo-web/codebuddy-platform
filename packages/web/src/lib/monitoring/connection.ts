@@ -1,4 +1,4 @@
-import { monitoringNamespace } from '@cove/shared';
+import { monitoringNamespace, type WatchEndedEvent } from '@cove/shared';
 
 /**
  * Pure connection vocabulary for the monitoring surfaces.
@@ -97,4 +97,25 @@ export function canEditSynchronizedDraft({
     syncedDraftId === sessionDraftId &&
     !ended
   );
+}
+
+/** Roster sockets handle student removals in their list, not as a class-wide denial. */
+export function monitoringRevocationApplies(
+  scope: { classId: string; studentMembershipId?: string } | undefined,
+  event: { classId?: string; studentMembershipId?: string | null },
+): boolean {
+  // Student presence also uses this hook without a teacher workspace scope;
+  // its server-scoped revocation must continue to be terminal.
+  if (!scope) return true;
+  if (event.classId !== scope.classId) return false;
+  return !event.studentMembershipId || event.studentMembershipId === scope.studentMembershipId;
+}
+
+
+/** The retirement caused by our own pending restart must not cancel its successor. */
+export function isExpectedWatchReplacement(
+  event: Pick<WatchEndedEvent, 'visitId' | 'reason'>,
+  replacingVisitId: string | null,
+): boolean {
+  return replacingVisitId !== null && event.visitId === replacingVisitId && event.reason === 'WATCH_REPLACED';
 }

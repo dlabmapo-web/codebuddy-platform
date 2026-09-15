@@ -7,15 +7,38 @@ import type { MonitoringMaterialClaim } from "./monitoring-access.service.js";
 /**
  * The record of who could see whom, and when.
  *
- * Opening a visit is also what enforces one watched student per teacher: the
- * previous visit is closed as replaced in the same step, so a second browser
- * tab moves the watch rather than creating a second, invisible one.
+ * Opening a visit used to double as the enforcement of one watched student per
+ * teacher: a teacher-wide advisory lock closed every other open visit in the
+ * same transaction, so a second browser tab moved the watch instead of adding
+ * one. That is exactly what five live workspaces cannot tolerate, so the
+ * replacement is now scoped to the *session* that asked — a reconnect or a
+ * follow closes its own previous visit, and another tab's visit is untouched.
+ *
+ * Nothing here is retroactive. Historical rows and their end reasons are
+ * preserved; the only change is which rows a new visit is allowed to close.
  */
 @Injectable()
 export class MonitoringVisitService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async start(claim: MonitoringMaterialClaim): Promise<{
+  /**
+   * Opens one audit visit for one watch session.
+   *
+   * `replacesVisitId` is the visit this same session previously held — a
+   * reconnect, or the teacher following the student to another exercise. It is
+   * closed in the same transaction so the audit log never shows one session
+   * holding two open visits, and it is named explicitly rather than discovered
+   * by querying the teacher, because "this teacher's other open visit" is now
+   * a legitimate state belonging to a different tab.
+   *
+   * The advisory lock is keyed on the session for the same reason: competing
+   * starts from one workspace are serialized, and two workspaces never wait
+   * on each other.
+   */
+  async start(
+    claim: MonitoringMaterialClaim,
+    session: { sessionId: string; replacesVisitId: string | null },
+  ): Promise<{
     id: string;
     startedAt: Date;
     /** The visit this one displaced, so its rooms can be left. */
@@ -24,19 +47,21 @@ export class MonitoringVisitService {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRawUnsafe(
         "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))::text AS locked",
-        `monitoring-teacher:${claim.membershipId}`,
+        `monitoring-watch-session:${claim.membershipId}:${session.sessionId}`,
       );
-      const open = await tx.teacherMonitoringVisit.findFirst({
-        where: {
-          teacherMembershipRef: claim.membershipId,
-          endedAt: null,
-        },
-        select: { id: true, studentMembershipRef: true },
-        orderBy: { startedAt: "desc" },
-      });
+      const open = session.replacesVisitId
+        ? await tx.teacherMonitoringVisit.findFirst({
+            where: {
+              id: session.replacesVisitId,
+              teacherMembershipRef: claim.membershipId,
+              endedAt: null,
+            },
+            select: { id: true, studentMembershipRef: true },
+          })
+        : null;
       if (open) {
         await tx.teacherMonitoringVisit.updateMany({
-          where: { teacherMembershipRef: claim.membershipId, endedAt: null },
+          where: { id: open.id, endedAt: null },
           data: { endedAt: new Date(), endReason: "WATCH_REPLACED" },
         });
       }

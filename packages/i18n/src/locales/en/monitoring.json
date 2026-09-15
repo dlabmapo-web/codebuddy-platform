@@ -39,6 +39,7 @@
     "no_enrollments": "Nobody is enrolled in this class yet.",
     "truncated": "Showing the first {{count}} students of this class.",
     "open_live": "Open live",
+    "open_live_new_tab": "Open live in new tab",
     "open_points": "Points",
     "no_exercise": "Not in an exercise",
     "never_seen": "Never",
@@ -76,10 +77,14 @@
     "revoked_body": "You are no longer the assigned teacher for this class."
   },
   "workspace": {
+    "recovery_body": "Live monitoring is temporarily unavailable. Reconnection is attempted automatically; you can retry if it remains unavailable. Editing is paused until synchronization completes.",
+    "retry_connection": "Retry connection",
     "title": "Live help",
     "back": "Back to class",
     "student_left": "Student left",
     "unsaved": "Unsaved changes",
+    "editing_on": "Help / Edit code",
+    "editing_off": "Read-only",
     "saved": "Saved",
     "editing_together": "Editing with {{name}}",
     "tab_you": "Your run",
@@ -98,7 +103,12 @@
     "narrow_title": "Screen too small for live help",
     "narrow_body": "Use a wider screen to edit alongside a student.",
     "mirror_waiting": "Waiting for the student's input",
-    "mirror_catching_up": "Catching up…"
+    "mirror_catching_up": "Catching up…",
+    "pending_recovering": "Recovering your unsynced edits. Editing is paused.",
+    "pending_blocked": "Your unsynced edits are retained. They could not be safely restored to this watch.",
+    "pending_download": "Download retained code",
+    "pending_discard": "Discard retained edits",
+    "pending_discard_confirm": "Discard your unsynced edits and load the current live document? Download a copy first if you need to keep them."
   },
   "feedback": {
     "title": "Feedback",
@@ -184,5 +194,20 @@
     "close": "Close",
     "missing": "No answer added yet.",
     "failed": "The answer is no longer available. Close this window and confirm the live session is still active."
+  },
+  "switcher": {
+    "trigger": "Switch student, current student {{name}}",
+    "title": "Students",
+    "waiting": "Waiting for your code changes before switching…",
+    "failed": "Your changes have not been acknowledged. You are still on this student’s workspace.",
+    "retry_switch": "Retry switch",
+    "stay": "Stay here",
+    "leave_notes": "Leave this class and discard unsent feedback?",
+    "updating": "Updating student availability…",
+    "unavailable": "Student list unavailable. Your live workspace is still open.",
+    "retry": "Retry",
+    "no_matches": "No students match your search.",
+    "current": "Current",
+    "new_tab": "Open {{name}}’s live workspace in a new tab"
   }
 }

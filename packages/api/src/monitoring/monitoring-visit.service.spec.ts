@@ -10,6 +10,10 @@ const teacherMembershipId = "40000000-0000-4000-8000-000000000001";
 const studentMembershipId = "60000000-0000-4000-8000-000000000001";
 const materialId = "80000000-0000-4000-8000-000000000001";
 const startedAt = new Date("2026-08-04T09:00:00.000Z");
+const sessionId = "a0000000-0000-4000-8000-000000000001";
+
+/** One workspace opening its first watch: it replaces nothing. */
+const freshSession = { sessionId, replacesVisitId: null } as const;
 
 const claim: MonitoringMaterialClaim = {
   userId: "30000000-0000-4000-8000-000000000001",
@@ -42,22 +46,23 @@ function createService(options?: {
       .mockResolvedValue({ count: options?.updatedCount ?? 1 }),
     create: vi.fn().mockResolvedValue({ id: "visit-1", startedAt }),
   };
+  const lock = vi.fn().mockResolvedValue([{ pg_advisory_xact_lock: null }]);
   const prisma = {
     teacherMonitoringVisit: visit,
     $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
         teacherMonitoringVisit: visit,
-        $queryRawUnsafe: vi.fn().mockResolvedValue([{ pg_advisory_xact_lock: null }]),
+        $queryRawUnsafe: lock,
       })
     ),
   } as unknown as PrismaService;
-  return { service: new MonitoringVisitService(prisma), visit };
+  return { service: new MonitoringVisitService(prisma), visit, lock };
 }
 
 describe("start", () => {
   it("records the immutable membership pair beside the live relations", async () => {
     const { service, visit } = createService();
-    await service.start(claim);
+    await service.start(claim, freshSession);
     expect(visit.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -73,18 +78,21 @@ describe("start", () => {
 
   it("records no code, cursor, or feedback field", async () => {
     const { service, visit } = createService();
-    await service.start(claim);
+    await service.start(claim, freshSession);
     const data = visit.create.mock.calls[0]![0].data as Record<string, unknown>;
     for (const forbidden of ["code", "body", "cursor", "pointer", "output"]) {
       expect(data).not.toHaveProperty(forbidden);
     }
   });
 
-  it("closes the teacher's previous watch as replaced", async () => {
+  it("closes the visit this same session names, as replaced", async () => {
     const { service, visit } = createService({
       openVisit: { id: "visit-0", studentMembershipRef: "other" },
     });
-    const result = await service.start(claim);
+    const result = await service.start(claim, {
+      sessionId,
+      replacesVisitId: "visit-0",
+    });
     expect(visit.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ endReason: "WATCH_REPLACED" }),
@@ -95,8 +103,55 @@ describe("start", () => {
 
   it("does not invent a replacement when nothing was open", async () => {
     const { service } = createService();
-    const result = await service.start(claim);
+    const result = await service.start(claim, freshSession);
     expect(result.replaced).toBeNull();
+  });
+
+  /**
+   * The behaviour multi-tab monitoring turns on.
+   *
+   * Before this, opening a watch took a teacher-wide advisory lock and closed
+   * every other open visit that teacher had. Five students in five tabs would
+   * have collapsed to one — and the four closed visits would have been
+   * recorded in the audit log as replaced, which is not what happened.
+   */
+  it("leaves another tab's open visit alone", async () => {
+    const { service, visit } = createService({
+      openVisit: { id: "other-tab-visit", studentMembershipRef: "other" },
+    });
+    const result = await service.start(claim, freshSession);
+    expect(visit.updateMany).not.toHaveBeenCalled();
+    expect(result.replaced).toBeNull();
+  });
+
+  /** A session may only close the visit it actually held. */
+  it("ignores a named replacement belonging to another teacher", async () => {
+    const { service, visit } = createService({ openVisit: null });
+    const result = await service.start(claim, {
+      sessionId,
+      replacesVisitId: "visit-from-elsewhere",
+    });
+    expect(visit.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "visit-from-elsewhere",
+          teacherMembershipRef: teacherMembershipId,
+          endedAt: null,
+        }),
+      }),
+    );
+    expect(visit.updateMany).not.toHaveBeenCalled();
+    expect(result.replaced).toBeNull();
+  });
+
+  /** Competing starts from one workspace serialize; two workspaces never do. */
+  it("locks on the session rather than on the teacher", async () => {
+    const { service, lock } = createService();
+    await service.start(claim, freshSession);
+    expect(lock).toHaveBeenCalledWith(
+      expect.any(String),
+      `monitoring-watch-session:${teacherMembershipId}:${sessionId}`,
+    );
   });
 });
 

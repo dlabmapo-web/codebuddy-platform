@@ -109,7 +109,7 @@ describe("PresenceRegistry", () => {
     expect(entry?.state).toBe("SOLVING");
   });
 
-  it("reports online once a hidden workspace also goes quiet", async () => {
+  it("keeps a quiet hidden workspace solving", async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date("2026-08-04T09:00:00.000Z"));
@@ -118,9 +118,7 @@ describe("PresenceRegistry", () => {
       const entry = await registry.publish(
         signal({ active: false, visibility: "HIDDEN" }),
       );
-      // Left open behind something else, rather than sat in front of and
-      // ignored — which is what keeps this out of Idle.
-      expect(entry?.state).toBe("ONLINE");
+      expect(entry?.state).toBe("SOLVING");
     } finally {
       vi.useRealTimers();
     }
@@ -133,9 +131,8 @@ describe("PresenceRegistry", () => {
       await registry.publish(signal({ active: true }));
       vi.setSystemTime(new Date("2026-08-04T09:02:00.000Z"));
       const entry = await registry.publish(signal({ active: false }));
-      // Two minutes of heartbeats with nothing happening is idle, and the
-      // roster has to say so.
-      expect(entry?.state).toBe("IDLE");
+      expect(entry?.state).toBe("SOLVING");
+      expect(entry?.lastActivityAt).toBe(new Date("2026-08-04T09:00:00.000Z").toISOString());
     } finally {
       vi.useRealTimers();
     }

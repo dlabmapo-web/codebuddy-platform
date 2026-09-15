@@ -4,7 +4,7 @@ import { routes } from '@/lib/routes';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
-import type { LearnExerciseBootstrap } from '@cove/shared';
+import { toSharedDocumentText, type LearnExerciseBootstrap } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,6 +27,7 @@ import {
 } from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
+import { canSeedCollaboration } from '../_lib/draft-store';
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { useSolveSession } from '../_hooks/use-solve-session';
 import {
@@ -51,10 +52,19 @@ export function Workspace({
   classId,
   returnTo,
   submissionRequested = false,
+  userId,
 }: {
   academyId: string;
   bootstrap: LearnExerciseBootstrap;
   classId: string;
+  /**
+   * The signed-in learner.
+   *
+   * Local drafts are addressed by them as well as by the problem: IndexedDB is
+   * per browser profile, and two students sharing a school machine would
+   * otherwise open each other's buffers.
+   */
+  userId: string;
   /**
    * The validated Answer records location to return to, or null when the
    * student arrived through My Courses. Never a caller-supplied URL: the
@@ -140,6 +150,8 @@ export function Workspace({
   });
   const draft = useDraftAutosave({
     academyId,
+    classId,
+    userId,
     materialId: exercise.materialId,
     serverDraft: workspace.draft,
     starterCode: exercise.starterCode,
@@ -153,7 +165,17 @@ export function Workspace({
     classId,
     courseId: workspace.breadcrumb.course.id,
     materialId: exercise.materialId,
-    onBeforeCollaborate: draft.flushNow,
+    // Persists, but promotes nothing: a teacher opening a student who is
+    // reading an old attempt must not turn that attempt into their draft.
+    onBeforeCollaborate: draft.flushWithoutPromoting,
+    onAfterCollaborate: draft.acceptCollaborationSnapshot,
+    // Not flushing a reviewed attempt is not enough on its own: the first
+    // bind seeds the shared document from the editor. See
+    // `canSeedCollaboration`.
+    ready: canSeedCollaboration({
+      hydrated: draft.hydrated,
+      reviewing: draft.reviewing,
+    }),
     // Never a name: the student is told a teacher is here, not which one.
     teacherLabel: tm('peer.teacher'),
     // The terminal the student is looking at, as its own events. The mirror is
@@ -347,7 +369,16 @@ export function Workspace({
     beforeTransitionRef.current = {
       canStart: () => !busy,
       beforeCommit: () => {
-        draft.flushNow();
+        // Order matters, and this is the whole of the second reported fault.
+        //
+        // The outgoing buffer is enqueued first, under the identity it was
+        // written with. Collaboration is then detached — while it is attached,
+        // the destination's code arriving in the controlled `value` is an
+        // ordinary local edit as far as the binding can tell, and is published
+        // into the problem the student has just left. Only then may anything
+        // replace what is in the editor.
+        void draft.flushWithoutPromoting();
+        monitoring.retire();
         runner.stop();
         runner.clear();
         submission.reset();
@@ -360,7 +391,7 @@ export function Workspace({
     return () => {
       beforeTransitionRef.current = null;
     };
-  }, [busy, draft, runner, submission]);
+  }, [busy, draft, monitoring, runner, submission]);
 
   const handleNavigate = navigation.navigate;
 
@@ -383,12 +414,19 @@ export function Workspace({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      {/* The teacher's mouse while one is helping, drawn over whichever pane
-          they are pointing at. */}
-      <RemotePointer
-        name={tm('peer.teacher')}
-        pointer={monitoring.remote.pointer}
-      />
+      {/* Every watching teacher's mouse, drawn over whichever pane each of
+          them is pointing at. One arrow per peer rather than one in total:
+          two teachers reading the same exercise point at two different
+          things, and collapsing them into a single marker made the arrow
+          jump between their positions. Keyed by the server-assigned peer id,
+          so a teacher leaving removes their own arrow and nobody else's. */}
+      {monitoring.peers.map((peer) => (
+        <RemotePointer
+          key={peer.peerId}
+          name={peer.label ?? tm('peer.teacher')}
+          pointer={peer.pointer}
+        />
+      ))}
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader
@@ -424,9 +462,17 @@ export function Workspace({
             )
           }
           onReset={() => {
-            if (draft.code === exercise.starterCode) return;
+            const starter = toSharedDocumentText(exercise.starterCode);
+            if (draft.code === starter) return;
             if (!window.confirm(t('workspace.reset_confirm'))) return;
-            draft.resetTo(exercise.starterCode);
+            // The one whole-buffer replacement a bound editor is allowed. It
+            // goes through the shared document rather than around it, so a
+            // watching teacher's editor follows instead of diverging — and
+            // through the ordinary edit pipeline, so it is written locally and
+            // saved rather than relying on Monaco reporting back a change it
+            // was told to make.
+            draft.resetTo(starter);
+            monitoring.replaceDocument(starter);
           }}
           onSubmit={handleSubmit}
           backToRecords={returnTo !== null}

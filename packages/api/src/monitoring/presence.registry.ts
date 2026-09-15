@@ -103,7 +103,7 @@ export class PresenceRegistry {
    * Records one student's signals and returns the state the server derived.
    *
    * The stored `lastActivityAt` only moves on real activity, so a student who
-   * leaves a tab open heartbeating goes idle exactly as the roster claims.
+   * reads quietly keeps their actual last-activity time while remaining solving.
    */
   async publish(signal: PresenceSignal): Promise<PresenceEntry | null> {
     const redis = this.client();

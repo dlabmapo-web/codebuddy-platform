@@ -24,12 +24,12 @@ describe("toPublicErrorCode", () => {
     ).toBe("MONITORING_STUDENT_UNAVAILABLE");
   });
 
-  it("reduces a database failure to a generic denial", () => {
+  it("reduces a database failure to a recoverable public error", () => {
     const prismaError = Object.assign(
       new Error('relation "classes" does not exist'),
       { code: "P2021" },
     );
-    expect(toPublicErrorCode(prismaError)).toBe("MONITORING_ACCESS_DENIED");
+    expect(toPublicErrorCode(prismaError)).toBe("MONITORING_REALTIME_UNAVAILABLE");
   });
 
   it("never returns a code outside the public vocabulary", () => {

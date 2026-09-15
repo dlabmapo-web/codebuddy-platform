@@ -19,9 +19,11 @@ import {
   monitoringClientEvents,
   monitoringLimits,
   monitoringNamespace,
+  monitoringProtocolVersion,
   monitoringRooms,
   monitoringServerEvents,
   monitoringTiming,
+  monitoringWatchLease,
   presencePublishPayloadSchema,
   resultPublishPayloadSchema,
   runActivityPayloadSchema,
@@ -34,13 +36,20 @@ import {
   terminalSnapshotMessageSchema,
   terminalStartMessageSchema,
   terminalStateMessageSchema,
+  toSharedDocumentText,
+  watchModePayloadSchema,
   watchStartPayloadSchema,
+  watchStopPayloadSchema,
+  watchSummaryFetchPayloadSchema,
   type AppErrorCode,
   type DocumentSyncResult,
   type MonitoringAck,
   type MonitoringVisitEndReason,
+  type MonitoringWatchMode,
+  type MonitoringWatchSummary,
   type NavigatorPath,
   type PresenceEntry,
+  type WatchIdentity,
 } from "@cove/shared";
 import type { Server, Socket } from "socket.io";
 import type { z } from "zod";
@@ -52,7 +61,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 import { LearningActivityAccumulator } from "../teach/learning-activity.accumulator.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
-import { ActiveWatchRegistry } from "./active-watch.registry.js";
+import { WatchSessionRegistry, type WatchLease } from "./watch-session.registry.js";
 import {
   MonitoringAccessService,
   type MonitoringClassClaim,
@@ -85,15 +94,47 @@ import {
  * a browser payload.
  */
 
+/**
+ * One live workspace, as this connection sees it.
+ *
+ * The three identity fields are not redundant. `sessionId` is the workspace's
+ * own correlation value and survives a transport reconnect; `visitId` names
+ * the audit row this watch currently owns; `generation` is what makes a
+ * command from before a reconnect distinguishable from one after it, even when
+ * both name the same draft. Every privileged message is checked against all
+ * three and against the registry lease behind them.
+ */
 type WatchState = {
   claim: MonitoringMaterialClaim;
+  sessionId: string;
   visitId: string;
+  generation: number;
   draftId: string;
-  /** Set by the first teacher-originated edit; drives the student indicator. */
-  helping: boolean;
+  /**
+   * Read-only until an acknowledged command says otherwise.
+   *
+   * The authority is the registry lease, not this field — a client that
+   * unlocked its own editor still has its writes refused, because
+   * `documentUpdate` reads the mode back from the lease rather than from the
+   * socket's optimistic copy.
+   */
+  mode: MonitoringWatchMode;
+  /** Server-assigned awareness identity. Five tabs are five distinct peers. */
+  peerId: string;
+  peerLabel: string | null;
+  /** Keeps the lease alive while this socket is connected and authorized. */
+
 };
 
 type TeacherState = {
+  /**
+   * Whose socket this is.
+   *
+   * Held so a scoped revocation can tell one teacher's roster subscription
+   * from a colleague's without re-deriving identity from a claim that may
+   * already have been removed.
+   */
+  membershipId: string;
   claims: Map<string, MonitoringClassClaim>;
   watch: WatchState | null;
 };
@@ -137,6 +178,7 @@ type PublishedContext = {
 };
 
 type StudentState = {
+  awarenessGeneration?: number;
   academyId: string;
   membershipId: string;
   classes: StudentClassMembership[];
@@ -168,6 +210,16 @@ type MonitoringSocketData = {
   awarenessSequence: number;
   teacher: TeacherState | null;
   student: StudentState | null;
+  /**
+   * Serializes watch starts on this connection.
+   *
+   * `Return to live`, a reconnect, and a student moving can each begin a watch
+   * while one is still opening. Interleaved, they can register a lease against
+   * a generation the other has already superseded and leave the audit log with
+   * two open visits for one session. Chaining them costs a few milliseconds on
+   * a path that already does several round trips.
+   */
+  watchStarts: Promise<unknown>;
 };
 
 type MonitoringSocket = Socket & { data: MonitoringSocketData };
@@ -198,6 +250,10 @@ export class MonitoringGateway
    * to re-derive from a client.
    */
   private readonly draftRooms = new Map<string, string>();
+  private readonly localWatches = new Map<string, { socket: MonitoringSocket; watch: WatchState }>();
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
+  private sweepRunning = false;
+  private readonly renewTimers = new Map<string, ReturnType<typeof setInterval>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -206,7 +262,7 @@ export class MonitoringGateway
     private readonly access: MonitoringAccessService,
     private readonly presence: PresenceRegistry,
     private readonly documents: CollaborationDocumentService,
-    private readonly activeWatches: ActiveWatchRegistry,
+    private readonly watchSessions: WatchSessionRegistry,
     private readonly visits: MonitoringVisitService,
     private readonly feedback: MonitoringFeedbackService,
     private readonly feedbackBroadcaster: MonitoringFeedbackBroadcaster,
@@ -242,6 +298,7 @@ export class MonitoringGateway
             awarenessSequence: -1,
             teacher: null,
             student: null,
+            watchStarts: Promise.resolve(),
           };
           next();
         })
@@ -252,7 +309,24 @@ export class MonitoringGateway
     });
     // Revocation needs to reach rooms on every instance, which is the adapter's
     // job — so it borrows the server rather than opening its own channel.
-    this.revocation.attach(server);
+    const revokeLocal = async (visitId: string, reason: MonitoringVisitEndReason) => {
+      const owner = this.localWatches.get(visitId);
+      if (owner && owner.socket.data.teacher?.watch === owner.watch) await this.endWatch(owner.socket, reason);
+    };
+    server.on("monitoring:revoke-visit", (visitId: string, reason: MonitoringVisitEndReason) => {
+      void revokeLocal(visitId, reason).catch(() => this.metrics.increment("watch.summary.failed"));
+    });
+    this.revocation.attach(server, async (visitId, reason) => {
+      server.serverSideEmit("monitoring:revoke-visit", visitId, reason);
+      await revokeLocal(visitId, reason);
+    });
+    this.sweepTimer = setInterval(() => {
+      if (this.sweepRunning) return;
+      this.sweepRunning = true;
+      void this.sweepExpiredVisits().catch(() => this.metrics.increment("watch.summary.failed"))
+        .finally(() => { this.sweepRunning = false; });
+    }, monitoringWatchLease.renewIntervalMs);
+    this.sweepTimer.unref?.();
     // The read receipt travels the same way, and for the same reason: the
     // student's read is an HTTP write on whichever instance served it, and the
     // watching teacher may be connected to another one.
@@ -267,8 +341,49 @@ export class MonitoringGateway
         draftId: event.draftId,
         snapshotVersion: event.snapshotVersion.toString(),
         persisted: event.persisted,
+        codeHash: event.codeHash,
       });
     });
+    /**
+     * A change the server made reaches every peer in the room.
+     *
+     * Delivered as an ordinary document update because that is exactly what it
+     * is. A client left holding text the server has replaced would compute
+     * offsets against a string nobody else has, which is the fault this exists
+     * to remove — so it must never be applied on the server alone.
+     */
+    this.documents.onServerUpdate((event) => {
+      const room = this.draftRooms.get(event.draftId);
+      if (!room) return;
+      this.metrics.increment("document.server_update");
+      server.to(room).emit(monitoringServerEvents.documentUpdated, {
+        draftId: event.draftId,
+        update: event.update,
+        origin: "SERVER",
+      });
+    });
+  }
+
+  onModuleDestroy(): void {
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    for (const timer of this.renewTimers.values()) clearInterval(timer);
+  }
+
+  private async sweepExpiredVisits(): Promise<void> {
+    if (!this.watchSessions.isAvailable) return;
+    const visits = await this.prisma.teacherMonitoringVisit.findMany({
+      where: { endedAt: null, startedAt: { lt: new Date(Date.now() - monitoringWatchLease.ttlMs) } },
+      select: { id: true },
+    });
+    for (const visit of visits) {
+      if (await this.watchSessions.read(visit.id)) continue;
+      const owner = this.localWatches.get(visit.id);
+      if (owner && owner.socket.data.teacher?.watch === owner.watch) {
+        await this.endWatch(owner.socket, "CONNECTION_EXPIRED");
+      } else {
+        await this.visits.end(visit.id, "CONNECTION_EXPIRED");
+      }
+    }
   }
 
   /**
@@ -284,6 +399,8 @@ export class MonitoringGateway
   async handleDisconnect(socket: MonitoringSocket): Promise<void> {
     const data = socket.data as MonitoringSocketData | undefined;
     if (!data) return;
+    // Finish in-flight acknowledged commands before cleaning up their holds.
+    await data.watchStarts;
 
     if (data.student) {
       // Best effort, and deliberately before the presence work: a clean tab
@@ -326,6 +443,8 @@ export class MonitoringGateway
           data.student.academyId,
           data.student.draftId,
           "STUDENT",
+          studentPeerId(data.student.membershipId),
+          data.student.awarenessGeneration,
         );
         await this.documents.flush(data.student.draftId);
       }
@@ -364,7 +483,11 @@ export class MonitoringGateway
           monitoringRooms.teacher(claim.academyId, claim.membershipId),
           monitoringRooms.classPresence(claim.academyId, claim.classId),
         ]);
-        const teacher = socket.data.teacher ?? { claims: new Map(), watch: null };
+        const teacher = socket.data.teacher ?? {
+      membershipId: claim.membershipId,
+      claims: new Map(),
+      watch: null,
+    };
         teacher.claims.set(claim.classId, claim);
         socket.data.teacher = teacher;
 
@@ -401,139 +524,367 @@ export class MonitoringGateway
   }
 
   /**
-   * Opens one live workspace.
+   * Opens one live workspace, independently of every other one.
    *
    * The exercise is taken from the server's own presence state, never from the
    * payload: a teacher may open what the student actually has in front of
    * them, not any material they can name.
+   *
+   * What changed for multi-tab: this no longer displaces the teacher's other
+   * watches. A session replaces only the visit *it* previously held — a
+   * reconnect, or following this student to another exercise — so five tabs
+   * hold five leases, five audit visits, and five independent lifecycles.
    */
   @SubscribeMessage(monitoringClientEvents.watchStart)
   async watchStart(
     @ConnectedSocket() socket: MonitoringSocket,
     @MessageBody() body: unknown,
   ): Promise<
-    MonitoringAck<{ draftId: string; materialId: string; visitId: string }>
+    MonitoringAck<{
+      draftId: string;
+      materialId: string;
+      visitId: string;
+      sessionId: string;
+      generation: number;
+      mode: MonitoringWatchMode;
+    }>
   > {
+    if (!body || typeof body !== "object" || !("protocolVersion" in body) || body.protocolVersion !== monitoringProtocolVersion) {
+      socket.emit(monitoringServerEvents.protocolRefreshRequired, { required: true, serverProtocolVersion: monitoringProtocolVersion });
+      return { ok: false, eventId: eventIdOf(body), code: "MONITORING_REFRESH_REQUIRED" };
+    }
     return this.command(
       socket,
       monitoringClientEvents.watchStart,
       watchStartPayloadSchema,
       body,
       async (payload) => {
-        const classClaim = await this.requireClassClaim(
-          socket,
-          payload.academyId,
-          payload.classId,
-        );
-        const studentClaim = await this.access.requireMonitorableStudent(
-          classClaim,
-          payload.studentMembershipId,
-        );
-
-        const snapshot = await this.presence.snapshot(
-          classClaim.academyId,
-          classClaim.classId,
-        );
-        const entry = snapshot?.entries.find(
-          (candidate) =>
-            candidate.studentMembershipId === payload.studentMembershipId,
-        );
-        if (!entry?.materialId) {
-          this.metrics.increment("watch.denied");
-          throw publicError("MONITORING_STUDENT_UNAVAILABLE");
-        }
-
-        const claim = await this.access.requireMonitorableMaterial(
-          studentClaim,
-          entry.materialId,
-        );
-        const draftId = await this.ensureDraft(claim);
-
-        // Replacing the previous watch is part of opening this one, so a second
-        // tab moves the session instead of quietly watching two students.
-        if (socket.data.teacher?.watch) {
-          await this.endWatch(socket, "WATCH_REPLACED");
-        }
-        const visit = await this.visits.start(claim);
-        const redisReplacedVisitId = await this.activeWatches.replace(
-          claim.membershipId,
-          visit.id,
-        );
-        const replacedVisitId = redisReplacedVisitId ?? visit.replaced?.id ?? null;
-        if (replacedVisitId && replacedVisitId !== visit.id) {
-          await this.disconnectReplacedWatch(
-            claim.academyId,
-            claim.membershipId,
-            replacedVisitId,
-          );
-          this.metrics.increment("watch.replaced");
-        }
-
-        await socket.join([
-          monitoringRooms.draft(claim.academyId, draftId),
-          // Joined by the server, after the whole predicate has passed. The
-          // room name is never accepted from a client, and a teacher without
-          // an authorized watch is never in it.
-          monitoringRooms.watchContext(
-            claim.academyId,
-            claim.classId,
-            claim.studentMembershipId,
-          ),
-        ]);
-        const teacher = socket.data.teacher ?? { claims: new Map(), watch: null };
-        teacher.claims.set(classClaim.classId, classClaim);
-        teacher.watch = { claim, visitId: visit.id, draftId, helping: false };
-        socket.data.teacher = teacher;
-
-        const startedAt = visit.startedAt.toISOString();
-        socket.emit(monitoringServerEvents.watchStarted, {
-          classId: claim.classId,
-          studentMembershipId: claim.studentMembershipId,
-          materialId: claim.materialId,
-          draftId,
-          indicator: "MONITORING",
-          startedAt,
-        });
-        // The student's own room, so the indicator follows the person rather
-        // than whichever socket happened to be in the draft room.
-        this.server
-          .to(monitoringRooms.student(claim.academyId, claim.studentMembershipId))
-          .emit(monitoringServerEvents.watchStarted, {
-            classId: claim.classId,
-            studentMembershipId: claim.studentMembershipId,
-            materialId: claim.materialId,
-            draftId,
-            indicator: "MONITORING",
-            startedAt,
+        // An old client's singleton `watch.ended` semantics and this protocol's
+        // aggregate ones cannot both hold for one student. Refuse explicitly
+        // and name the remedy rather than admitting it into a session where
+        // the first tab to close would unbind a document others are editing.
+        if ((payload.protocolVersion ?? 0) < monitoringProtocolVersion) {
+          socket.emit(monitoringServerEvents.protocolRefreshRequired, {
+            required: true as const,
+            serverProtocolVersion: monitoringProtocolVersion,
           });
+          this.metrics.increment("watch.protocol_stale");
+          throw publicError("MONITORING_REFRESH_REQUIRED");
+        }
+        // Fail closed. Without cross-instance lease state there is no way to
+        // know who else is watching, and guessing in either direction is worse
+        // than refusing: too low hands a live document back to the student,
+        // too high strands them in a session nobody is in.
+        if (!this.watchSessions.isAvailable) {
+          this.metrics.increment("watch.degraded");
+          throw publicError("MONITORING_REALTIME_UNAVAILABLE");
+        }
 
-        // A student may already be mid-run. Asking now is what makes the
-        // mirrored terminal show the transcript they are looking at rather than
-        // an empty pane until their next execution.
-        this.requestTerminalSnapshot(
-          claim.academyId,
-          claim.studentMembershipId,
-          draftId,
-        );
-
-        this.metrics.increment("watch.started");
-        return {
-          draftId,
-          materialId: claim.materialId,
-          visitId: visit.id,
-        };
+        return this.openWatch(socket, payload);
       },
     );
   }
 
+  /**
+   * The whole of opening a watch, after authorization has passed.
+   *
+   * Split out so the serialization above wraps one function rather than the
+   * acknowledgement machinery around it.
+   */
+  private async openWatch(
+    socket: MonitoringSocket,
+    payload: {
+      academyId: string;
+      classId: string;
+      studentMembershipId: string;
+      sessionId: string;
+    },
+  ): Promise<{
+    draftId: string;
+    materialId: string;
+    visitId: string;
+    sessionId: string;
+    generation: number;
+    mode: MonitoringWatchMode;
+  }> {
+    const classClaim = await this.requireClassClaim(
+      socket,
+      payload.academyId,
+      payload.classId,
+    );
+    const studentClaim = await this.access.requireMonitorableStudent(
+      classClaim,
+      payload.studentMembershipId,
+    );
+
+    const snapshot = await this.presence.snapshot(
+      classClaim.academyId,
+      classClaim.classId,
+    );
+    const entry = snapshot?.entries.find(
+      (candidate) =>
+        candidate.studentMembershipId === payload.studentMembershipId,
+    );
+    if (!entry?.materialId) {
+      this.metrics.increment("watch.denied");
+      throw publicError("MONITORING_STUDENT_UNAVAILABLE");
+    }
+
+    const claim = await this.access.requireMonitorableMaterial(
+      studentClaim,
+      entry.materialId,
+    );
+    const draftId = await this.ensureDraft(claim);
+    if (socket.disconnected) throw publicError("MONITORING_REALTIME_UNAVAILABLE");
+
+    // This connection's previous watch, if it had one. Ended here rather than
+    // left to the registry, because its rooms and its document hold are local
+    // facts this process owns — and because the teacher is moving, not
+    // leaving, so the student's summary must be recomputed either way.
+    if (socket.data.teacher?.watch) {
+      await this.endWatch(socket, "WATCH_REPLACED");
+    }
+
+    const generation = await this.watchSessions.nextGeneration(
+      claim.membershipId,
+      payload.sessionId,
+    );
+    const visit = await this.visits.start(claim, {
+      sessionId: payload.sessionId,
+      replacesVisitId: null,
+    });
+    const lease: WatchLease = {
+      visitId: visit.id,
+      sessionId: payload.sessionId,
+      generation,
+      teacherMembershipId: claim.membershipId,
+      academyId: claim.academyId,
+      classId: claim.classId,
+      studentMembershipId: claim.studentMembershipId,
+      draftId,
+      mode: "MONITORING",
+    };
+    const registered = await this.watchSessions.register(lease);
+    if (!registered.ok) {
+      // A newer start from this same session won the race while this one was
+      // in flight. Close the row it opened and let the winner stand.
+      await this.visits.end(visit.id, "WATCH_REPLACED");
+      this.metrics.increment("watch.superseded");
+      throw publicError("MONITORING_WATCH_REPLACED");
+    }
+    // A reload overlaps the old lease and the new one. The old one belongs to
+    // this same session — never to another tab — so releasing it here is what
+    // keeps the audit log to one open visit per session without touching
+    // anybody else's.
+    if (registered.replacedVisitId && registered.replacedVisitId !== visit.id) {
+      await this.releaseSupersededVisit(registered.replacedVisitId);
+      this.metrics.increment("watch.replaced");
+    }
+
+    if (socket.disconnected) {
+      await this.watchSessions.end(lease);
+      await this.visits.end(visit.id, "CONNECTION_EXPIRED");
+      throw publicError("MONITORING_REALTIME_UNAVAILABLE");
+    }
+    await socket.join([
+      monitoringRooms.teacher(claim.academyId, claim.membershipId),
+      monitoringRooms.draft(claim.academyId, draftId),
+      // Joined by the server, after the whole predicate has passed. The
+      // room name is never accepted from a client, and a teacher without
+      // an authorized watch is never in it.
+      monitoringRooms.watchContext(
+        claim.academyId,
+        claim.classId,
+        claim.studentMembershipId,
+      ),
+    ]);
+    const teacher = socket.data.teacher ?? {
+          membershipId: claim.membershipId,
+          claims: new Map(),
+          watch: null,
+        };
+    teacher.claims.set(classClaim.classId, classClaim);
+    this.documents.beginWatch(draftId, visit.id);
+    teacher.watch = {
+      claim,
+      sessionId: payload.sessionId,
+      visitId: visit.id,
+      generation,
+      draftId,
+      mode: "MONITORING",
+      // Derived from the visit, so five tabs of one teacher are five peers
+      // that cannot overwrite each other's caret — and so a client can never
+      // claim to be somebody else's pointer by editing a payload.
+      peerId: `teacher:${visit.id}`,
+      // Deliberately unnamed. The student is told that somebody is watching
+      // and whether they can type, and nothing else — the same rule the
+      // indicator has always followed. Peers stay distinguishable to the
+      // renderer through `peerId`, which identifies a session rather than a
+      // person.
+      peerLabel: null,
+
+    };
+    socket.data.teacher = teacher;
+    this.localWatches.set(visit.id, { socket, watch: teacher.watch });
+    this.scheduleLeaseRenewal(socket, teacher.watch);
+
+    const startedAt = visit.startedAt.toISOString();
+    socket.emit(monitoringServerEvents.watchStarted, {
+      classId: claim.classId,
+      studentMembershipId: claim.studentMembershipId,
+      materialId: claim.materialId,
+      draftId,
+      visitId: visit.id,
+      indicator: "MONITORING",
+      startedAt,
+    });
+    // The student's own room, so the indicator follows the person rather
+    // than whichever socket happened to be in the draft room. A second
+    // watcher arriving is an addition: the student uses the visit id to
+    // recognise it as one and keeps the document it has already bound.
+    this.server
+      .to(monitoringRooms.student(claim.academyId, claim.studentMembershipId))
+      .emit(monitoringServerEvents.watchStarted, {
+        classId: claim.classId,
+        studentMembershipId: claim.studentMembershipId,
+        materialId: claim.materialId,
+        draftId,
+        visitId: visit.id,
+        indicator: "MONITORING",
+        startedAt,
+      });
+    await this.publishWatchSummary({
+      academyId: claim.academyId,
+      classId: claim.classId,
+      studentMembershipId: claim.studentMembershipId,
+      draftId,
+    });
+
+    // A student may already be mid-run. Asking now is what makes the
+    // mirrored terminal show the transcript they are looking at rather than
+    // an empty pane until their next execution.
+    this.requestTerminalSnapshot(
+      claim.academyId,
+      claim.studentMembershipId,
+      draftId,
+    );
+
+    this.metrics.increment("watch.started");
+    return {
+      draftId,
+      materialId: claim.materialId,
+      visitId: visit.id,
+      sessionId: payload.sessionId,
+      generation,
+      mode: "MONITORING" as const,
+    };
+  }
+
+  /**
+   * Stopping names the watch it means to stop.
+   *
+   * A tab that is closing races its own replacement on reload, and an
+   * unqualified stop would close whichever watch this socket happened to hold
+   * by the time it arrived.
+   */
   @SubscribeMessage(monitoringClientEvents.watchStop)
   async watchStop(
     @ConnectedSocket() socket: MonitoringSocket,
     @MessageBody() body: unknown,
   ): Promise<MonitoringAck<{ ended: true }>> {
     const eventId = eventIdOf(body);
-    await this.endWatch(socket, "TEACHER_LEFT");
+    const parsed = watchStopPayloadSchema.safeParse(body);
+    const identity = parsed.success ? parsed.data.identity : undefined;
+    const watch = socket.data?.teacher?.watch;
+    if (watch && identity && matchesWatch(watch, identity)) {
+      await this.endWatch(socket, "TEACHER_LEFT");
+    }
     return { ok: true, eventId, data: { ended: true } };
+  }
+
+  /**
+   * Turning edit permission on and off for one watch.
+   *
+   * The acknowledgement is the permission: Monaco stays read-only until this
+   * returns, and `documentUpdate` reads the mode back from the lease, so the
+   * UI control is a request rather than the gate. Withdrawing it takes effect
+   * at the server immediately — a write already in flight is refused on
+   * arrival rather than merged and then undone.
+   */
+  @SubscribeMessage(monitoringClientEvents.watchMode)
+  async watchMode(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<MonitoringAck<{ mode: MonitoringWatchMode }>> {
+    return this.command(
+      socket,
+      monitoringClientEvents.watchMode,
+      watchModePayloadSchema,
+      body,
+      async (payload) => {
+        const watch = await this.requireCurrentWatch(socket, payload.identity);
+        // The claim is re-run rather than trusted: enabling editing is the
+        // moment a read-only session becomes a writing one, and an assignment
+        // that changed since the watch opened must be caught here.
+        await this.revalidate(socket, watch.claim);
+        const renewed = await this.watchSessions.renew(leaseOf(watch), payload.mode);
+        if (!renewed) throw publicError("MONITORING_ACCESS_DENIED");
+        watch.mode = payload.mode;
+        socket.emit(monitoringServerEvents.watchModeChanged, {
+          visitId: watch.visitId,
+          generation: watch.generation,
+          mode: payload.mode,
+        });
+        await this.publishWatchSummary({
+          academyId: watch.claim.academyId,
+          classId: watch.claim.classId,
+          studentMembershipId: watch.claim.studentMembershipId,
+          draftId: watch.draftId,
+        });
+        this.metrics.increment(
+          payload.mode === "HELPING" ? "watch.help.enabled" : "watch.help.disabled",
+        );
+        return { mode: payload.mode };
+      },
+    );
+  }
+
+  /**
+   * A student asking what is currently true, rather than replaying what it
+   * missed.
+   *
+   * A reconnecting workspace cannot know which summaries were delivered while
+   * its transport was down, and an indicator rebuilt from an incomplete event
+   * stream is wrong in both directions. This is the authoritative answer.
+   */
+  @SubscribeMessage(monitoringClientEvents.watchSummaryFetch)
+  async watchSummaryFetch(
+    @ConnectedSocket() socket: MonitoringSocket,
+    @MessageBody() body: unknown,
+  ): Promise<MonitoringAck<MonitoringWatchSummary>> {
+    return this.command(
+      socket,
+      monitoringClientEvents.watchSummaryFetch,
+      watchSummaryFetchPayloadSchema,
+      body,
+      async (payload) => {
+        const student = await this.resolveStudent(socket, payload.academyId);
+        // Only about one's own draft. The summary is a count, but a count of
+        // who is watching a named student is still a fact about that student.
+        if (!student) throw publicError("MONITORING_ACCESS_DENIED");
+        await this.requireDraftAccess(socket, payload.draftId, "identity" in payload ? payload.identity as WatchIdentity : undefined);
+        const scope = {
+          academyId: student.academyId, classId: null,
+          studentMembershipId: student.membershipId, draftId: payload.draftId,
+        };
+        const before = await this.watchSessions.summarize(scope);
+        const snapshot = before.watcherCount === 0
+          ? await this.documents.endWatch(payload.draftId, "summary-recovery", { remoteWatchers: 0 })
+          : null;
+        const summary = await this.watchSessions.summarize({ ...scope, classId: null });
+        return { ...summary, snapshot: summary.watcherCount === 0 ? snapshot : null };
+      },
+    );
   }
 
   /* ------------------------------------------------------------- student */
@@ -553,6 +904,11 @@ export class MonitoringGateway
     if (!this.allow(socket, "presence.publish")) return;
     const parsed = presencePublishPayloadSchema.safeParse(body);
     if (!parsed.success) return void this.rejectPayload(socket);
+    if (parsed.data.protocolVersion !== monitoringProtocolVersion) {
+      socket.emit(monitoringServerEvents.protocolRefreshRequired, { required: true, serverProtocolVersion: monitoringProtocolVersion });
+      return;
+    }
+
     if (!this.presence.isAvailable) return;
 
     const student = await this.resolveStudent(socket, parsed.data.academyId);
@@ -618,7 +974,9 @@ export class MonitoringGateway
       verifiedCourseId && parsed.data.classId && eligibleClassIds.has(parsed.data.classId)
         ? parsed.data.classId
         : null;
-    student.materialId = material && verifiedClassId ? material.id : null;
+    const nextMaterialId = material && verifiedClassId ? material.id : null;
+    if (student.materialId !== nextMaterialId) student.draftId = null;
+    student.materialId = nextMaterialId;
     // Moving to another course closes the interval that belonged to the last
     // one, so time is attributed to the course the student was actually in.
     if (
@@ -672,6 +1030,30 @@ export class MonitoringGateway
               }
             : null,
       });
+    }
+
+    // Reopen a student's binding after reload even when no teacher starts a
+    // new watch. Their new connection missed the original watchStarted event.
+    if (student.materialId && verifiedClassId && !student.draftId) {
+      const leases = await this.watchSessions.list({
+        academyId: student.academyId, classId: verifiedClassId,
+        studentMembershipId: student.membershipId,
+      });
+      if (leases.length) {
+        const draft = await this.prisma.exerciseDraft.findFirst({
+          where: { id: { in: leases.map((lease) => lease.draftId) }, materialId: student.materialId },
+          select: { id: true },
+        });
+        if (draft) {
+          socket.emit(monitoringServerEvents.watchStarted, {
+            classId: verifiedClassId, studentMembershipId: student.membershipId,
+            materialId: student.materialId, draftId: draft.id,
+            indicator: "MONITORING", startedAt: new Date().toISOString(),
+          });
+          await this.publishWatchSummary({ academyId: student.academyId, classId: verifiedClassId,
+            studentMembershipId: student.membershipId, draftId: draft.id });
+        }
+      }
     }
 
     // Counted active learning time, §7.1.
@@ -895,10 +1277,11 @@ export class MonitoringGateway
     const parsed = terminalResyncPayloadSchema.safeParse(body);
     if (!parsed.success) return void this.rejectPayload(socket);
     const watch = socket.data?.teacher?.watch;
-    if (!watch || watch.draftId !== parsed.data.draftId) return;
-    if (!(await this.activeWatches.isActive(watch.claim.membershipId, watch.visitId))) {
-      return;
-    }
+    if (!watch || watch.draftId !== parsed.data.draftId || !parsed.data.identity || !matchesWatch(watch, parsed.data.identity)) return;
+    // The lease, not the socket's memory: a watch whose access was revoked on
+    // another instance must stop being able to ask the student for their
+    // transcript, and this socket has not been told yet.
+    if (!(await this.watchSessions.isCurrent(watch))) return;
     this.requestTerminalSnapshot(
       watch.claim.academyId,
       watch.claim.studentMembershipId,
@@ -919,7 +1302,7 @@ export class MonitoringGateway
       documentSyncPayloadSchema,
       body,
       async (payload) => {
-        const room = await this.requireDraftAccess(socket, payload.draftId);
+        const room = await this.requireDraftAccess(socket, payload.draftId, "identity" in payload ? payload.identity as WatchIdentity : undefined);
         await socket.join(room);
         this.draftRooms.set(payload.draftId, room);
         const sync = await this.documents.sync(
@@ -930,6 +1313,7 @@ export class MonitoringGateway
           draftId: payload.draftId,
           update: sync.update,
           stateVector: sync.stateVector,
+          persistedCodeHash: sync.persistedCodeHash,
         };
         socket.emit(monitoringServerEvents.documentSynced, result);
         this.metrics.increment("document.resync");
@@ -949,31 +1333,47 @@ export class MonitoringGateway
       documentUpdatePayloadSchema,
       body,
       async (payload) => {
-        const room = await this.requireDraftAccess(socket, payload.draftId);
+        const room = await this.requireDraftAccess(socket, payload.draftId, "identity" in payload ? payload.identity as WatchIdentity : undefined);
+        const watch = socket.data.teacher?.watch;
+
+        if (watch) {
+          // The authorization gate the previous version did not have: a
+          // teacher write was accepted on the strength of holding a watch, and
+          // "helping" was then *inferred* from the write having happened. So a
+          // client that unlocked its own Monaco could edit a student's code
+          // without the student's indicator ever being a promise about
+          // permission. Now permission is a server-recorded mode, checked
+          // here, before a byte is merged.
+          const lease = await this.requireEditPermission(watch, payload.identity);
+          if (lease.mode !== "HELPING") {
+            this.metrics.increment("document.update.unauthorized");
+            // A refusal is not a silent drop: the client's document has
+            // already applied this locally, so it has to be brought back to
+            // the canonical text rather than left holding a divergent buffer.
+            // Resynchronizing is the repair — never a whole-buffer overwrite
+            // from a client that was not allowed to write in the first place.
+            const sync = await this.documents.sync(
+              payload.draftId,
+              new Uint8Array([0]),
+            );
+            socket.emit(monitoringServerEvents.documentSynced, {
+              draftId: payload.draftId,
+              update: sync.update,
+              stateVector: sync.stateVector,
+              persistedCodeHash: sync.persistedCodeHash,
+            });
+            throw publicError("MONITORING_EDIT_NOT_ENABLED");
+          }
+        }
+
         await this.documents.applyUpdate(payload.draftId, payload.update);
-        const origin = socket.data.teacher?.watch ? "TEACHER" : "STUDENT";
+        const origin = watch ? "TEACHER" : "STUDENT";
 
         socket.to(room).emit(monitoringServerEvents.documentUpdated, {
           draftId: payload.draftId,
           update: payload.update,
           origin,
         });
-
-        // The first teacher edit is what turns "monitoring" into "helping".
-        // Individual edits are never written to the audit log; only this
-        // transition is visible, and only to the student.
-        const watch = socket.data.teacher?.watch;
-        if (watch && !watch.helping) {
-          watch.helping = true;
-          this.server
-            .to(
-              monitoringRooms.student(
-                watch.claim.academyId,
-                watch.claim.studentMembershipId,
-              ),
-            )
-            .emit(monitoringServerEvents.studentIndicator, { state: "HELPING" });
-        }
 
         this.metrics.increment("document.update.applied");
         return { applied: true as const };
@@ -989,9 +1389,11 @@ export class MonitoringGateway
     if (!this.allow(socket, "awareness.update")) return;
     const parsed = awarenessUpdatePayloadSchema.safeParse(body);
     if (!parsed.success) return void this.rejectPayload(socket);
+    if (parsed.data.editorPointer?.code?.draftId !== undefined &&
+        parsed.data.editorPointer.code.draftId !== parsed.data.draftId) return void this.rejectPayload(socket);
     let room: string;
     try {
-      room = await this.requireDraftAccess(socket, parsed.data.draftId);
+      room = await this.requireDraftAccess(socket, parsed.data.draftId, parsed.data.identity);
     } catch {
       return;
     }
@@ -999,11 +1401,34 @@ export class MonitoringGateway
     // Never let an older caret/pointer overwrite a newer position (or clear).
     if (parsed.data.sequence <= socket.data.awarenessSequence) return;
     socket.data.awarenessSequence = parsed.data.sequence;
+    const watch = socket.data?.teacher?.watch;
+    if (watch) {
+      // A teacher's pointer belongs to the watch that is current, not to
+      // whichever one this payload names. A packet stamped with a superseded
+      // generation is dropped rather than forwarded, so a reconnect's arrow
+      // cannot be erased by the arrow that preceded it.
+      if (!parsed.data.identity || !matchesWatch(watch, parsed.data.identity)) {
+        return;
+      }
+      // Pointing is not editing. A read-only teacher may show a student where
+      // to look — that is the whole of what monitoring is for — and the caret
+      // they publish grants them nothing, because permission lives in the
+      // lease and is checked on write.
+    }
     // Volatile by design: a cursor that arrives late is worse than one that
     // never arrives, and none of this is ever persisted.
     socket.to(room).emit(monitoringServerEvents.awarenessChanged, {
       ...parsed.data,
-      origin: socket.data.teacher?.watch ? "TEACHER" : "STUDENT",
+      identity: undefined,
+      origin: watch ? "TEACHER" : "STUDENT",
+      // Assigned here, never accepted from the payload. Five tabs are five
+      // peers; a client that could name its own peer id could overwrite
+      // another teacher's cursor or erase it.
+      peerId: watch
+        ? watch.peerId
+        : studentPeerId(socket.data.student?.membershipId ?? "unknown"),
+      peerLabel: watch ? watch.peerLabel : null,
+      generation: watch?.generation ?? socket.data.student?.awarenessGeneration,
     });
   }
 
@@ -1081,6 +1506,7 @@ export class MonitoringGateway
         if (!watch || watch.draftId !== payload.draftId) {
           throw publicError("MONITORING_ACCESS_DENIED");
         }
+        await this.requireCurrentWatch(socket, payload.identity);
         // Revalidated on a durable command: the claim may be a minute old, and
         // a minute is long enough to have lost the class.
         await this.revalidate(socket, watch.claim);
@@ -1130,7 +1556,10 @@ export class MonitoringGateway
       return { ok: false, eventId, code: "MONITORING_PAYLOAD_TOO_LARGE" };
     }
     try {
-      return { ok: true, eventId, data: await run(parsed.data) };
+      const previous = socket.data.watchStarts ?? Promise.resolve();
+      const pending = previous.then(() => run(parsed.data));
+      socket.data.watchStarts = pending.catch(() => undefined);
+      return { ok: true, eventId, data: await pending };
     } catch (error) {
       const code = toPublicErrorCode(error);
       this.metrics.incrementWithReason("watch.denied", code);
@@ -1298,7 +1727,17 @@ export class MonitoringGateway
     claim: MonitoringClassClaim,
   ): Promise<void> {
     if (Date.now() - claim.grantedAt < monitoringTiming.accessClaimTtlMs) return;
-    await this.requireClassClaim(socket, claim.academyId, claim.classId);
+    const renewed = await this.requireClassClaim(socket, claim.academyId, claim.classId);
+    // A class grant alone says nothing about a student who was unenrolled or
+    // material that stopped belonging to this class. This is also the backstop
+    // when a revocation notification could not reach the owning instance.
+    if ("studentMembershipId" in claim && typeof claim.studentMembershipId === "string") {
+      const student = await this.access.requireMonitorableStudent(renewed, claim.studentMembershipId);
+      if ("materialId" in claim && typeof claim.materialId === "string") {
+        await this.access.requireMonitorableMaterial(student, claim.materialId);
+      }
+    }
+    claim.grantedAt = renewed.grantedAt;
   }
 
   /**
@@ -1311,11 +1750,13 @@ export class MonitoringGateway
   private async requireDraftAccess(
     socket: MonitoringSocket,
     draftId: string,
+    identity?: WatchIdentity,
   ): Promise<string> {
     const watch = socket.data?.teacher?.watch;
     if (watch) {
+      if (!identity || !matchesWatch(watch, identity)) throw publicError("MONITORING_ACCESS_DENIED");
       if (watch.draftId !== draftId) throw publicError("MONITORING_ACCESS_DENIED");
-      if (!(await this.activeWatches.isActive(watch.claim.membershipId, watch.visitId))) {
+      if (!(await this.watchSessions.isCurrent(watch))) {
         throw publicError("MONITORING_ACCESS_DENIED");
       }
       await this.revalidate(socket, watch.claim);
@@ -1377,6 +1818,7 @@ export class MonitoringGateway
     if (!membership) return null;
 
     const state: StudentState = {
+      awarenessGeneration: this.watchSessions.isAvailable ? await this.watchSessions.nextGeneration(membership.id, "student") : undefined,
       academyId,
       membershipId: membership.id,
       classes: membership.classEnrollments.map((enrollment) => ({
@@ -1419,17 +1861,30 @@ export class MonitoringGateway
       where: { materialId: claim.materialId },
       select: { starterCode: true },
     });
-    const draft = await this.prisma.exerciseDraft.create({
-      data: {
-        userId: claim.studentUserId,
-        materialId: claim.materialId,
-        sourceMaterialId: claim.materialId,
-        courseId: claim.courseId,
-        code: exercise?.starterCode ?? "",
-      },
-      select: { id: true },
-    });
-    return draft.id;
+    try {
+      const draft = await this.prisma.exerciseDraft.create({
+        data: {
+          userId: claim.studentUserId,
+          materialId: claim.materialId,
+          sourceMaterialId: claim.materialId,
+          courseId: claim.courseId,
+          code: toSharedDocumentText(exercise?.starterCode ?? ""),
+        },
+        select: { id: true },
+      });
+      return draft.id;
+    } catch (error) {
+      // The student's first autosave or another watch can create this row
+      // between our read and insert. Adopt that draft without replacing its text.
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        const concurrent = await this.prisma.exerciseDraft.findUnique({
+          where: { userId_materialId: { userId: claim.studentUserId, materialId: claim.materialId } },
+          select: { id: true },
+        });
+        if (concurrent) return concurrent.id;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -1557,10 +2012,22 @@ export class MonitoringGateway
    *
    * Nothing here is stored; this is the absence of state, published.
    */
+  /**
+   * One peer's markers, withdrawn.
+   *
+   * `peerId` is what makes this safe with several teachers in the room. The
+   * previous version cleared every `TEACHER` marker on the draft, so the
+   * moment one of five tabs closed, the student's screen lost all five
+   * arrows — and the four still-live teachers had to move the mouse before
+   * reappearing. The generation travels with it so a clear that was delayed
+   * behind a reconnect cannot erase the session that replaced it.
+   */
   private clearAwareness(
     academyId: string,
     draftId: string,
     origin: "STUDENT" | "TEACHER",
+    peerId: string,
+    generation?: number,
   ): void {
     this.server
       .to(monitoringRooms.draft(academyId, draftId))
@@ -1569,9 +2036,21 @@ export class MonitoringGateway
         cursor: null,
         pointer: null,
         origin,
+        peerId,
+        ...(generation === undefined ? {} : { generation }),
       });
   }
 
+  /**
+   * Ends the watch this connection holds, and nothing else.
+   *
+   * Every step is scoped to one visit: the audit row, the lease, this socket's
+   * rooms, this process's document hold, and this teacher's own
+   * `watch.ended`. What the *student* is told is a recomputed aggregate, never
+   * this event — one of five watchers leaving is not the student's session
+   * ending, and sending a bare ending would unbind a document the other four
+   * are still reading.
+   */
   private async endWatch(
     socket: MonitoringSocket,
     reason: MonitoringVisitEndReason,
@@ -1579,13 +2058,22 @@ export class MonitoringGateway
     const watch = socket.data?.teacher?.watch;
     if (!watch) return;
     socket.data.teacher!.watch = null;
+    clearInterval(this.renewTimers.get(watch.visitId));
+    this.renewTimers.delete(watch.visitId);
 
-    await this.visits.end(watch.visitId, reason);
-    await this.activeWatches.clear(watch.claim.membershipId, watch.visitId);
     // Said while the room still exists and this socket is still in it. After
     // the leave below there is no longer anything to send it through, and the
-    // student would be left with the teacher's last caret on their screen.
-    this.clearAwareness(watch.claim.academyId, watch.draftId, "TEACHER");
+    // student would be left with this teacher's last caret on their screen.
+    // Addressed to this peer alone: another tab's arrow is not this one's to
+    // remove, and a lifecycle clear that erased every teacher marker is
+    // precisely how duplicate watches used to wipe each other out.
+    this.clearAwareness(
+      watch.claim.academyId,
+      watch.draftId,
+      "TEACHER",
+      watch.peerId,
+      watch.generation,
+    );
     await socket.leave(
       monitoringRooms.draft(watch.claim.academyId, watch.draftId),
     );
@@ -1599,46 +2087,276 @@ export class MonitoringGateway
         watch.claim.studentMembershipId,
       ),
     );
+    await this.finishEndedWatch(watch, reason);
+  }
+
+  private async finishEndedWatch(watch: WatchState, reason: MonitoringVisitEndReason): Promise<void> {
+    try {
+      await this.visits.end(watch.visitId, reason);
+      await this.watchSessions.end(leaseOf(watch));
+      await this.releaseDocumentHold(watch, reason);
+      this.localWatches.delete(watch.visitId);
+      this.renewTimers.delete(watch.visitId);
+    } catch {
+      // Room eviction has already happened. Retry persistence/lease cleanup
+      // without ever reopening this socket or losing the document hold.
+      this.metrics.increment("watch.summary.failed");
+      const timer = setTimeout(() => { void this.finishEndedWatch(watch, reason); }, monitoringWatchLease.renewIntervalMs);
+      timer.unref?.();
+      this.renewTimers.set(watch.visitId, timer);
+    }
+  }
+
+  /**
+   * Hands the document back only when the last watch anywhere has gone.
+   *
+   * The local visit set answers "may this process drop its cache"; the
+   * registry answers "is anybody still watching", and only the second may
+   * authorize the student to resume ordinary autosave. A failed flush returns
+   * no snapshot, and the student is told the count rather than being handed a
+   * revision that was never written.
+   */
+  private async releaseDocumentHold(
+    watch: WatchState,
+    reason: MonitoringVisitEndReason,
+  ): Promise<void> {
+    const remoteWatchers = await this.watchSessions.watcherCount(watch.draftId);
+    const snapshot = await this.documents.endWatch(watch.draftId, watch.visitId, {
+      remoteWatchers,
+    });
     const endedAt = new Date().toISOString();
     const payload = {
+      snapshot,
       classId: watch.claim.classId,
       studentMembershipId: watch.claim.studentMembershipId,
+      draftId: watch.draftId,
+      visitId: watch.visitId,
       reason,
       endedAt,
     };
-    socket.emit(monitoringServerEvents.watchEnded, payload);
-    // The indicator disappears only on a confirmed end. A dropped connection
-    // shows reconnecting instead, so a blink never reads as "they left".
+    // The teacher's own tab is told its own watch ended. The other four tabs
+    // hold different visit ids and discard this.
     this.server
-      .to(
-        monitoringRooms.student(
-          watch.claim.academyId,
-          watch.claim.studentMembershipId,
-        ),
-      )
+      .to(monitoringRooms.teacher(watch.claim.academyId, watch.claim.membershipId))
       .emit(monitoringServerEvents.watchEnded, payload);
+    await this.publishWatchSummary(
+      {
+        academyId: watch.claim.academyId,
+        classId: watch.claim.classId,
+        studentMembershipId: watch.claim.studentMembershipId,
+        draftId: watch.draftId,
+      },
+      // Offered on the final release and only then: a snapshot is a promise
+      // that the authoritative text is durable, and it is the one thing that
+      // lets the student's editor stop deferring to the shared document.
+      snapshot,
+    );
   }
 
-  private async disconnectReplacedWatch(
-    academyId: string,
-    teacherMembershipId: string,
-    visitId: string,
+  /**
+   * Closes a visit this same session is replacing after a reload.
+   *
+   * The old socket may be on another instance, or already gone. Either way the
+   * lease and the audit row are this session's to close, and the student's
+   * count has to be recomputed so a reload does not read as a new watcher
+   * arriving while the old one lingers.
+   */
+  private async releaseSupersededVisit(visitId: string): Promise<void> {
+    const lease = await this.watchSessions.endByVisitId(visitId);
+    if (!lease) return;
+    await this.visits.end(visitId, "WATCH_REPLACED");
+    this.server.serverSideEmit("monitoring:revoke-visit", visitId, "WATCH_REPLACED");
+    const previousOwner = this.localWatches.get(visitId);
+    if (previousOwner?.socket.data.teacher?.watch === previousOwner?.watch && previousOwner) {
+      await this.endWatch(previousOwner.socket, "WATCH_REPLACED");
+      return;
+    }
+    const remoteWatchers = await this.watchSessions.watcherCount(lease.draftId);
+    await this.documents.endWatch(lease.draftId, visitId, { remoteWatchers });
+    this.clearAwareness(
+      lease.academyId,
+      lease.draftId,
+      "TEACHER",
+      `teacher:${visitId}`,
+      lease.generation,
+    );
+    await this.publishWatchSummary({
+      academyId: lease.academyId,
+      classId: lease.classId,
+      studentMembershipId: lease.studentMembershipId,
+      draftId: lease.draftId,
+    });
+  }
+
+  /**
+   * The student's authoritative count, published after anything that changes it.
+   *
+   * Versioned rather than ordered by arrival: two instances can publish about
+   * one student within the same millisecond, and the client discards by
+   * revision instead of trusting the wire.
+   */
+  private async publishWatchSummary(
+    scope: {
+      academyId: string;
+      classId: string | null;
+      studentMembershipId: string;
+      draftId: string | null;
+    },
+    snapshot?: { code: string; updatedAt: string } | null,
   ): Promise<void> {
-    const sockets = await this.server
-      .in(monitoringRooms.teacher(academyId, teacherMembershipId))
-      .fetchSockets();
-    for (const candidate of sockets) {
-      const data = candidate.data as Partial<MonitoringSocketData>;
-      if (data.teacher?.watch?.visitId !== visitId) continue;
-      candidate.emit(monitoringServerEvents.watchEnded, {
-        classId: data.teacher.watch.claim.classId,
-        studentMembershipId: data.teacher.watch.claim.studentMembershipId,
-        reason: "WATCH_REPLACED",
-        endedAt: new Date().toISOString(),
-      });
-      candidate.disconnect(true);
+    if (!this.watchSessions.isAvailable) return;
+    try {
+      const summary = await this.watchSessions.summarize({ ...scope, classId: null });
+      this.server
+        .to(
+          monitoringRooms.student(scope.academyId, scope.studentMembershipId),
+        )
+        .emit(monitoringServerEvents.watchSummary, {
+          ...summary,
+          ...(snapshot === undefined ? {} : { snapshot }),
+        });
+    } catch (error) {
+      // A summary that cannot be built must not take the watch down with it.
+      // The student keeps the state they have; the next change republishes.
+      this.metrics.increment("watch.summary.failed");
+      this.logger.warn(
+        monitoringLogLine({
+          event: "monitoring.summary_failed",
+          academyId: scope.academyId,
+          reason: toPublicErrorCode(error),
+        }),
+      );
     }
   }
+
+  /**
+   * Keeps one lease alive while its socket is connected and authorized.
+   *
+   * Browser activity is deliberately not a condition: a teacher reading a
+   * student's code for four minutes without touching the mouse is watching,
+   * and a lease that expired under them would clear the student's indicator
+   * while somebody was still looking.
+   *
+   * A refused renewal means this generation no longer owns the session — it
+   * was superseded, or the lease lapsed while the process was unreachable —
+   * and the watch is closed here rather than left believing it is live.
+   */
+  private scheduleLeaseRenewal(
+    socket: MonitoringSocket,
+    watch: WatchState,
+  ): void {
+    const timer = setInterval(() => {
+      void (async () => {
+        if (socket.data?.teacher?.watch !== watch) {
+          clearInterval(this.renewTimers.get(watch.visitId));
+    this.renewTimers.delete(watch.visitId);
+    this.localWatches.delete(watch.visitId);
+          return;
+        }
+        let renewed = false;
+        try {
+          await this.revalidate(socket, watch.claim);
+          renewed = await this.watchSessions.renew(leaseOf(watch));
+        } catch {
+          renewed = false;
+        }
+        if (renewed && !socket.disconnected) return;
+        this.metrics.increment("watch.lease.lost");
+        if (socket.data.teacher?.watch === watch) await this.endWatch(socket, "CONNECTION_EXPIRED");
+      })().catch(() => this.metrics.increment("watch.summary.failed"));
+    }, monitoringWatchLease.renewIntervalMs);
+    // A renewal timer must never be the reason a process stays alive.
+    this.renewTimers.set(watch.visitId, timer);
+    timer.unref?.();
+  }
+
+  /**
+   * The lease a teacher write must satisfy, read fresh.
+   *
+   * Never the socket's optimistic copy of the mode: withdrawing edit
+   * permission has to bind immediately and across instances, and a write that
+   * was already on the wire when the teacher stepped back must be refused on
+   * arrival. Where the client names an identity, it must be this watch's — a
+   * write from a superseded generation is not a write from this session.
+   */
+  private async requireEditPermission(
+    watch: WatchState,
+    identity?: WatchIdentity,
+  ): Promise<WatchLease> {
+    if (!identity || !matchesWatch(watch, identity)) {
+      throw publicError("MONITORING_ACCESS_DENIED");
+    }
+    const lease = await this.watchSessions.isCurrent(watch);
+    if (!lease) throw publicError("MONITORING_ACCESS_DENIED");
+    // Keeps the socket's own copy honest for the UI it drives, without ever
+    // being the thing that authorized the write.
+    watch.mode = lease.mode;
+    return lease;
+  }
+
+  /**
+   * The watch a privileged teacher message claims to belong to.
+   *
+   * Checked against three things in order: the socket's own server-held state,
+   * the identity the payload names, and the registry lease behind it. The
+   * first is what a client cannot forge, the second is what tells two visits
+   * to the same draft apart, and the third is what makes a revoked or expired
+   * watch stop working on every instance at once.
+   */
+  private async requireCurrentWatch(
+    socket: MonitoringSocket,
+    identity: WatchIdentity,
+  ): Promise<WatchState> {
+    const watch = socket.data?.teacher?.watch;
+    if (!watch || !matchesWatch(watch, identity)) {
+      throw publicError("MONITORING_ACCESS_DENIED");
+    }
+    const lease = await this.watchSessions.isCurrent(identity);
+    if (!lease) throw publicError("MONITORING_ACCESS_DENIED");
+    return watch;
+  }
+}
+
+/**
+ * A watch as the registry stores it.
+ *
+ * The gateway holds the claim, which carries the teacher's membership; the
+ * registry indexes on that membership directly. Converting in one place keeps
+ * the two shapes from drifting into a silent mismatch on an index key.
+ */
+function leaseOf(watch: WatchState): WatchLease {
+  return {
+    visitId: watch.visitId,
+    sessionId: watch.sessionId,
+    generation: watch.generation,
+    teacherMembershipId: watch.claim.membershipId,
+    academyId: watch.claim.academyId,
+    classId: watch.claim.classId,
+    studentMembershipId: watch.claim.studentMembershipId,
+    draftId: watch.draftId,
+    mode: watch.mode,
+  };
+}
+
+/**
+ * The student's awareness peer id.
+ *
+ * One per student per draft rather than per socket: a student has a single
+ * caret and a single arrow, and every teacher watching them renders the same
+ * one. A reconnect must therefore reuse the id, not create a second peer the
+ * teachers would draw beside the first.
+ */
+function studentPeerId(studentMembershipId: string): string {
+  return `student:${studentMembershipId}`;
+}
+
+/** Identity is all three values together, never the visit alone. */
+function matchesWatch(watch: WatchState, identity: WatchIdentity): boolean {
+  return (
+    watch.visitId === identity.visitId &&
+    watch.generation === identity.generation &&
+    watch.sessionId === identity.sessionId
+  );
 }
 
 function bearerFromHandshake(socket: Socket): string | null {

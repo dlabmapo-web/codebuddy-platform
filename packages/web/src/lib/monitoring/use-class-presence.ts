@@ -30,11 +30,12 @@ export function useClassPresence({
   academyId: string;
   classId: string;
 }) {
-  const { socket, state, report } = useMonitoringSocket();
+  const { socket, state, report } = useMonitoringSocket({ classId });
   const [presence, setPresence] = React.useState<{
     entries: PresenceEntry[];
     version: number;
   }>({ entries: [], version: 0 });
+  const [snapshotReady, setSnapshotReady] = React.useState(false);
   const [denied, setDenied] = React.useState<string | null>(null);
   // Socket events arrive outside React. Advance their canonical value
   // synchronously before scheduling a render so two deltas in one render
@@ -70,6 +71,8 @@ export function useClassPresence({
       const next = { entries: snapshot.entries, version: snapshot.version };
       presenceRef.current = next;
       setPresence(next);
+      setSnapshotReady(true);
+      setDenied(null);
       report({ type: 'synchronized' });
     };
 
@@ -78,6 +81,7 @@ export function useClassPresence({
       const result = applyPresenceDelta(presenceRef.current, delta);
       if (result.outcome === 'stale') return;
       if (result.outcome === 'gap') {
+        setSnapshotReady(false);
         // One authoritative refresh, then back to deltas. The old state stays
         // visible until that snapshot arrives; no partial delta is guessed.
         requestSnapshot(socket);
@@ -90,10 +94,12 @@ export function useClassPresence({
 
     // Named, so the cleanup can actually remove it: an inline arrow here
     // accumulates a listener per mount and rejoins the room N times.
-    const onConnect = () => requestSnapshot(socket);
+    const onConnect = () => { setSnapshotReady(false); requestSnapshot(socket); };
 
     socket.on(monitoringServerEvents.classSnapshot, onSnapshot);
     socket.on(monitoringServerEvents.presenceChanged, onDelta);
+    const onDisconnect = () => setSnapshotReady(false);
+    socket.on('disconnect', onDisconnect);
     socket.on('connect', onConnect);
     if (socket.connected) requestSnapshot(socket);
 
@@ -101,6 +107,7 @@ export function useClassPresence({
       socket.off(monitoringServerEvents.classSnapshot, onSnapshot);
       socket.off(monitoringServerEvents.presenceChanged, onDelta);
       socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.emit(monitoringClientEvents.classLeave, {
         eventId: crypto.randomUUID(),
         academyId,
@@ -117,13 +124,21 @@ export function useClassPresence({
     // after the grace period. The small margin absorbs clock and timer jitter
     // so a snapshot cannot arrive just before the server's boundary.
     const timer = setTimeout(
-      () => requestSnapshot(socket),
+      () => { setSnapshotReady(false); requestSnapshot(socket); },
       Math.max(0, deadline - Date.now()) + 100,
     );
     return () => clearTimeout(timer);
   }, [presence.entries, requestSnapshot, socket]);
 
+  const refresh = React.useCallback(() => {
+    setSnapshotReady(false);
+    if (socket?.connected) requestSnapshot(socket);
+    else socket?.connect();
+  }, [requestSnapshot, socket]);
+
   return {
+    refresh,
+    snapshotReady: snapshotReady && state === 'live' && denied === null,
     entries: presence.entries,
     version: presence.version,
     state,

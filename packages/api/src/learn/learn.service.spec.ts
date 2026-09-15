@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { AcademyAccessService } from "../authorization/academy-access.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import { DraftCoordinator } from "../drafts/draft-coordinator.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
 import type { LearningClassContextService } from "./learning-class-context.service.js";
@@ -178,7 +179,10 @@ function createService(options?: {
     exerciseDraft: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(options?.draft ?? null),
-      upsert: vi.fn().mockResolvedValue({
+      create: vi.fn().mockResolvedValue({
+        updatedAt: new Date("2026-08-03T01:00:00Z"),
+      }),
+      update: vi.fn().mockResolvedValue({
         updatedAt: new Date("2026-08-03T01:00:00Z"),
       }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -225,6 +229,7 @@ function createService(options?: {
     submissions,
     service: new LearnService(
       prisma,
+      new DraftCoordinator(prisma),
       access,
       curriculum,
       submissions,
@@ -369,9 +374,11 @@ describe("LearnService visible curriculum", () => {
       code: "print(3)",
     });
 
-    expect(prisma.exerciseDraft.upsert).toHaveBeenCalledWith(
+    // Written through the draft coordinator, which is what owns this row —
+    // see `drafts/draft-coordinator.service`.
+    expect(prisma.exerciseDraft.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
+        data: expect.objectContaining({
           userId,
           materialId,
           sourceMaterialId: materialId,

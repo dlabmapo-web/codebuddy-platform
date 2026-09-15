@@ -8,6 +8,7 @@ import { AuthorizationModule } from "./authorization/authorization.module.js";
 import { ClassesModule } from "./classes/classes.module.js";
 import { validateEnvironment } from "./config/env.schema.js";
 import { DatabaseModule } from "./database/database.module.js";
+import { DraftsModule } from "./drafts/drafts.module.js";
 import { ContentModule } from "./content/content.module.js";
 import { LeadModule } from "./lead/lead.module.js";
 import { LearnModule } from "./learn/learn.module.js";
@@ -29,6 +30,7 @@ import { TeachModule } from "./teach/teach.module.js";
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    DraftsModule,
     AcademiesModule,
     AuthModule,
     AuthorizationModule,

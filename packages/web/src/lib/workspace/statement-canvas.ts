@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useReadingPosition } from './use-reading-position';
 
 /**
  * The logical width the statement lays out at while collaborating.
@@ -80,7 +81,7 @@ export type StatementCanvasMeasurement = {
  * in ordinary reflowing space, and the position's `space` field is what keeps
  * the peer from drawing a canvas coordinate against it.
  */
-export function useStatementCanvas(active: boolean): {
+export function useStatementCanvas(active: boolean, material = ''): {
   paneRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLDivElement | null>;
   engaged: boolean;
@@ -98,11 +99,8 @@ export function useStatementCanvas(active: boolean): {
   const engaged = active && measurement.paneWidth >= STATEMENT_CANVAS_MIN_WIDTH;
 
   React.useEffect(() => {
-    // No reset on the way out: `engaged` already requires `active`, so a stale
-    // measurement changes nothing while collaboration is off, and keeping it
-    // means re-entering a session does not flash through an unscaled frame
-    // before the first observation lands.
-    if (!active) return;
+    // Measure in both modes. The mounted canvas survives watch transitions,
+    // and a retained footprint prevents temporary scroll-range collapse.
     const pane = paneRef.current;
     if (!pane || typeof ResizeObserver === 'undefined') return;
 
@@ -136,9 +134,11 @@ export function useStatementCanvas(active: boolean): {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-    // `engaged` re-runs this so the canvas is observed from the render that
-    // first creates it, rather than a resize later.
+    // Re-measure after mode changes without replacing the observed content.
   }, [active, engaged]);
+
+  useReadingPosition(paneRef, material,
+    `${engaged}:${measurement.paneWidth}:${measurement.contentHeight}`);
 
   return {
     paneRef,

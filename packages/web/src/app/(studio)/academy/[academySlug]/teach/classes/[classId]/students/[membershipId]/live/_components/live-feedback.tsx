@@ -27,12 +27,13 @@ export function FeedbackDock({
   feedback,
   materialId,
   onDraftChange,
+  onHydrate,
   onSend,
   teacherMembershipRef,
 }: {
   canSend: boolean;
   /**
-   * The composer's text, held by the page and keyed by material.
+   * The composer's text, retained above student navigation by full note scope.
    *
    * Controlled rather than local because this dock outlives the exercise it
    * is about: a teacher who types half a sentence, reads ahead through the
@@ -44,6 +45,7 @@ export function FeedbackDock({
   /** Which thread is on screen. Null before a watch has resolved one. */
   materialId: string | null;
   onDraftChange: (body: string) => void;
+  onHydrate: (body: string) => void;
   onSend: (body: string) => Promise<MonitoringAckResult<{ feedbackId: string }>>;
   /** Identifies the teacher's own note without naming its author. */
   teacherMembershipRef: string | null;
@@ -82,18 +84,9 @@ export function FeedbackDock({
    * half-typed revision alone the rest of the time. Arriving at a thread the
    * teacher already has unsent words on leaves those words alone too.
    */
-  const filledRef = React.useRef<{ materialId: string | null; body: string }>({
-    materialId: null,
-    body: '',
-  });
   React.useEffect(() => {
-    const filled = filledRef.current;
-    const arrived = filled.materialId !== materialId;
-    if (!arrived && filled.body === stored) return;
-    filledRef.current = { materialId, body: stored };
-    if (arrived && draft.length > 0) return;
-    onDraftChange(stored);
-  }, [draft.length, materialId, onDraftChange, stored]);
+    onHydrate(stored);
+  }, [materialId, onHydrate, stored]);
 
   const body = draft;
   const trimmed = body.trim();
@@ -101,7 +94,7 @@ export function FeedbackDock({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (trimmed.length === 0 || unchanged || sending) return;
+    if (!canSend || trimmed.length === 0 || unchanged || sending) return;
     setSending(true);
     setFailed(false);
     const ack = await onSend(trimmed);

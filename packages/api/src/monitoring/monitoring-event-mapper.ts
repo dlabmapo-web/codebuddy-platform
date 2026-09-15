@@ -7,7 +7,7 @@ import { AppException } from "../common/app-exception.js";
  *
  * A socket acknowledgement has no HTTP status to fall back on, so every
  * failure has to be reduced to a public code here. Anything unrecognized
- * becomes a generic denial rather than leaking a Prisma constraint name, a
+ * becomes a temporary realtime failure rather than leaking a Prisma constraint name, a
  * Redis key, or a stack trace into a browser.
  */
 export function toPublicErrorCode(error: unknown): AppErrorCode {
@@ -20,7 +20,7 @@ export function toPublicErrorCode(error: unknown): AppErrorCode {
   ) {
     return (error as { code: AppErrorCode }).code;
   }
-  return "MONITORING_ACCESS_DENIED";
+  return "MONITORING_REALTIME_UNAVAILABLE";
 }
 
 /**

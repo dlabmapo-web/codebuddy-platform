@@ -128,7 +128,8 @@
       "local": "기기에 저장됨",
       "saving": "저장 중…",
       "saved": "저장됨",
-      "error": "동기화 안 됨"
+      "error": "동기화 안 됨",
+      "conflict": "다른 곳에서 수정됨"
     },
     "resize_terminal": "터미널 크기 조절",
     "submit": "제출",

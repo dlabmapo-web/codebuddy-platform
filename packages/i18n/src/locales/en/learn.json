@@ -139,7 +139,8 @@
       "local": "Saved locally",
       "saving": "Saving…",
       "saved": "Saved",
-      "error": "Not synced"
+      "error": "Not synced",
+      "conflict": "Changed elsewhere"
     },
     "resize_terminal": "Resize terminal",
     "submit": "Submit",

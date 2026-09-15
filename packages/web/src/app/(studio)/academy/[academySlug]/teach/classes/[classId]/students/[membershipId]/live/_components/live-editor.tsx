@@ -39,6 +39,7 @@ function EditorFallback() {
  * neither one's scroll position jumps when the other types.
  */
 export function LiveEditor({
+  pointerIdentity,
   fontSize,
   onCursor,
   peerName,
@@ -46,6 +47,7 @@ export function LiveEditor({
   remoteCursor,
   text,
 }: {
+  pointerIdentity?: { draftId: string; material: string };
   fontSize: number;
   onCursor: (cursor: CollaborationCursor | null) => void;
   /** Whose caret the label names — the student, by name. */
@@ -54,6 +56,8 @@ export function LiveEditor({
   remoteCursor: CollaborationCursor | null;
   text: Y.Text;
 }) {
+  const pointerDraftId = pointerIdentity?.draftId;
+  const pointerMaterial = pointerIdentity?.material;
   const [editor, setEditor] = React.useState<MonacoCodeEditor | null>(null);
   const cursorRef = React.useRef<ReturnType<typeof attachRemoteCursor> | null>(
     null,
@@ -64,9 +68,11 @@ export function LiveEditor({
   // a lifetime is built and torn down below.
   React.useEffect(() => {
     if (!editor) return;
-    const binding = bindYTextToMonaco(text, editor);
+    const binding = bindYTextToMonaco(text, editor, {
+      pointerIdentity: pointerDraftId && pointerMaterial ? { draftId: pointerDraftId, material: pointerMaterial } : undefined,
+    });
     return () => binding.destroy();
-  }, [editor, text]);
+  }, [editor, text, pointerDraftId, pointerMaterial]);
 
   React.useEffect(() => {
     if (!editor) return;

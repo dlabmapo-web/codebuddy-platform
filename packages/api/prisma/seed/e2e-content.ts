@@ -34,9 +34,23 @@ export const e2eContent = {
   echoMaterialId: "e0000000-0000-4000-8000-000000000030",
   sumMaterialId: "e0000000-0000-4000-8000-000000000031",
   hiddenMaterialId: "e0000000-0000-4000-8000-000000000032",
+  crlfMaterialId: "e0000000-0000-4000-8000-000000000034",
   courseTitle: "E2E Python Basics",
   echoTitle: "Echo the input",
   sumTitle: "Sum two numbers",
+  /**
+   * A problem whose starter code is stored with CRLF, as several exercises
+   * migrated from v1 are.
+   *
+   * Monaco derives a model's line ending from the text it is given, and a CRLF
+   * model counts offsets nobody else counts — which is how a student's typing
+   * reached their teacher several lines below where they put it. The fixture
+   * exists so the live-monitoring suite can exercise that at the moment a
+   * watch is handed over, rather than by injecting line endings afterwards.
+   */
+  crlfTitle: "Windows line endings",
+  crlfStarterCode:
+    "beat1 = 'thump'\r\nbeat2 = 'clap'\r\nhello\r\n\r\n\r\n\r\n# merge\r\n",
   /** Printed on the guided lecture card the course outline now renders. */
   lectureOneDescription: "Read a line of input and print it back out.",
   hiddenExerciseTitle: "Never visible to students",
@@ -225,6 +239,21 @@ export async function seedE2eContent(prisma: PrismaClient) {
       ],
     },
     {
+      materialId: e2eContent.crlfMaterialId,
+      lectureId: e2eContent.lectureTwoId,
+      title: e2eContent.crlfTitle,
+      position: 4,
+      isVisible: true,
+      externalKey: "e2e-crlf",
+      // Stored exactly as v1 left it. Everything that reads it is expected to
+      // make it canonical; nothing is expected to be surprised by it.
+      starterCode: e2eContent.crlfStarterCode,
+      difficulty: "EASY" as const,
+      cases: [
+        { position: 1, input: "\n", expectedOutput: "hello", visibility: "SAMPLE" as const },
+      ],
+    },
+    {
       materialId: e2eContent.hiddenMaterialId,
       lectureId: e2eContent.lectureOneId,
       title: e2eContent.hiddenExerciseTitle,
@@ -240,6 +269,9 @@ export async function seedE2eContent(prisma: PrismaClient) {
   ];
 
   for (const exercise of exercises) {
+    const description = exercise.materialId === e2eContent.crlfMaterialId
+      ? Array.from({ length: 40 }, (_, index) => `<p>Reading anchor ${index + 1}: Read this problem carefully before writing code. Thinking without moving the mouse is part of solving.</p>`).join("")
+      : `<p>${exercise.title}</p>`;
     await prisma.material.upsert({
       where: { id: exercise.materialId },
       create: {
@@ -259,13 +291,13 @@ export async function seedE2eContent(prisma: PrismaClient) {
         materialId: exercise.materialId,
         externalKey: exercise.externalKey,
         difficulty: exercise.difficulty,
-        description: `<p>${exercise.title}</p>`,
+        description,
         inputFormat: "Standard input",
         outputFormat: "Standard output",
         constraints: "",
         starterCode: exercise.starterCode,
       },
-      update: { starterCode: exercise.starterCode, difficulty: exercise.difficulty },
+      update: { starterCode: exercise.starterCode, difficulty: exercise.difficulty, description },
     });
 
     await prisma.exerciseTestCase.deleteMany({

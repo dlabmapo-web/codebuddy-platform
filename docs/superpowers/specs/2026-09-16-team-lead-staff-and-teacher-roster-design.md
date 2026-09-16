@@ -1,26 +1,27 @@
 # Team Lead rosters, the teacher's student roster, and shared detail pages
 
 Date: 2026-09-16
-Status: Designed. Not implemented.
+Status: **Implemented.** Revised during implementation — see §11 for every
+decision that changed and why.
 
 ## 1. Purpose and scope
 
 Three groups of change, all of them about letting a role read people it cannot
 read today.
 
-**Part A — Team Lead rosters.** A Team Lead can open both the Staff page and the
-Students page. Both pages, their tables, and every column already exist; what
-does not exist is their permission to load them, and the rule for which columns
-they are answered with.
+**Part A — Team Lead rosters.** A Team Lead can open both the Students page and
+the Teachers page. Both pages, their tables, and every column already exist;
+what does not exist is their permission to load them, and the rule for which
+columns they are answered with.
 
-**Part B — the teacher's student roster.** A teacher gets a Roster view of their
-students — identity and standing — beside the Student analytics table they have
-now. Name, ID, joined, points, class position, grouped by class.
+**Part B — the teacher's student roster.** A teacher gets their own Students
+page — identity and standing for the students in their classes — beside the
+Student analytics table they have now.
 
 **Part C — two detail pages.** One student detail page and one staff detail
 page, each serving several roles with sections built from the viewer's
-authority. These are new: the only per-member page today is the manager's
-editor, which none of these roles may use.
+authority. These are new: the only per-member page before this was the
+manager's editor, which none of these roles may use.
 
 Related designs, whose decisions this extends rather than revisits:
 
@@ -49,21 +50,18 @@ identity, assignment, and standing — never of guardian or emergency contact.
 - No editing anywhere outside the manager's existing editor. Nothing here
   awards or adjusts points, changes a role, or issues a password.
 - No change to `requireManager`. See §3.1.
-- Date of birth stays manager-only. It appears on no roster today, and nothing
-  in Parts A–C needs it.
 
 ## 2. Findings from the current code
 
 ### Rosters
 
-- `staff-roster.tsx` already renders avatar, name, ID, roles, academy title,
-  classes (homeroom and assistant, separately), phone, status, employee number,
-  joined, and a row action. `student-roster.tsx` already renders avatar, name,
-  ID, student number, classes, school/grade, guardian, status, joined, and a row
-  action.
-- Both pages gate on `canManageAcademy(roles)` — `roles.includes('MANAGER')`,
+- `staff-roster.tsx` renders avatar, name, ID, roles, academy title, classes
+  (homeroom and assistant, separately), phone, status, employee number, joined,
+  and a row action. `student-roster.tsx` renders avatar, name, ID, classes,
+  points, guardian, status, joined, and a row action.
+- Both pages gated on `canManageAcademy(roles)` — `roles.includes('MANAGER')`,
   a role test rather than a permission test.
-- `PeopleRosterService.listStudents` and `.listStaff` both call
+- `PeopleRosterService.listStudents` and `.listStaff` both called
   `scopes.requireManager(identity, academyId, "academy.members.manage")`.
 - `ManagerScopeService.requireManager` checks the permission **and then**
   rejects any actor whose role is not `MANAGER`, with a comment stating the
@@ -73,53 +71,51 @@ identity, assignment, and standing — never of guardian or emergency contact.
 - `teamLeadPermissions` holds `academy.members.read`. It does not hold
   `academy.members.manage`, grouped under "administration of the academy itself,
   which a Team Lead does not get".
-- Both row actions link to `routes.academyPerson(...)` — `/people/[membershipId]` —
+- **`TEACHER` also holds `academy.members.read`** — it is what lets a teacher
+  see the names of the students they teach. This is the single most
+  consequential finding in this document; §3.5 is built around it.
+- Both row actions linked to `routes.academyPerson(...)` — `/people/[membershipId]` —
   which is itself `canManageAcademy`-gated.
-- `studio-sidebar.tsx` builds the whole `people` group inside one
+- `studio-sidebar.tsx` built the whole `people` group inside one
   `if (canManageAcademy)`.
 
 ### The existing per-member page
 
-- `/people/[membershipId]` is an **editor**: `MemberProfileEditor` (academy
-  fields, student details, student expression read-only, staff fields),
+- `/people/[membershipId]` is an **editor**: `MemberProfileEditor`,
   `MemberRolesPanel`, and `StudentPasswordPanel`. It is served by
   `academyProfile.getForManager` → `resolveManaged`.
-- There is no read-only member view anywhere, and no per-student page on the
-  teacher side. A teacher's student link today goes to
-  `/teach/classes/[classId]/progress?student=…` — a class progress view filtered
-  to one student.
-- `studentAcademyProfileSchema` holds `dateOfBirth`, `schoolName`,
-  `schoolGrade`, guardian and emergency fields, `codingInterests`,
-  `learningGoal`, `studentNumber`.
+- There was no read-only member view anywhere, and no per-student page on the
+  teacher side.
 
 ### Teacher students and points
 
-- `/teach/students` is the Student analytics table, served by
+- `/teach/students` was the Student analytics table, served by
   `academyTeacherStudents.list` → `TeacherStudentsService.list`.
-- `TeacherStudentRow` carries `order`, `displayName`, `classes`, `courseScope`,
-  `averageScore`, `attemptedProblems`, `solvedProblems`, `submissions`,
-  `activeSeconds`, `activeDays`, `lastActivityAt`, `reasons`, `primaryClassId`.
-  It has **no** `username`, no `joinedAt`, no points.
-- `order` renders with `data-testid="student-current-rank"` but is an ordinal
-  over the filtered result in the current sort — not a standing. The two must
-  stay visibly distinct.
 - `TeacherOverviewAccessService.requireScope` bounds a teacher to assigned
   classes and is the single authorization unit for that page.
-- `parseStudentsQuery` puts the page's whole state in the URL and parses
-  totally, dropping anything unrecognised rather than refusing.
+- `taughtByWhere` is the predicate for "a class taught by this membership" and
+  covers **both** the homeroom column and `assistantTeachers`. Its own comment
+  warns that a caller remembering only `assignedTeacher` will go on refusing
+  assistants after the other is fixed.
 - `rankEntries` assigns competition positions (ties share, next skips) ordering
   on points, then solved problems, then active days.
 - A board is **period-scoped**. `PointsService` returns
   `eligible: false, reason: "NO_ACTIVITY_YET"` when nobody in the class earned
-  anything in the period. `TOO_FEW_STUDENTS` exists in
-  `leaderboardIneligibleReasons` but no code path emits it today; this design
-  does not add one.
-- Points are per-academy: `STUDENT_POINTS`, read as `academyPointsEnabled(...)`
-  or from the membership's `features`.
+  anything in the period.
+- `StudentPointBalance` holds one row per membership with `earnedTotal` — a
+  lifetime, academy-wide total, already read by the platform participation
+  surface.
+- `TeacherOverviewRepository.workByStudent` defines what "solved" means for
+  every teaching surface: a distinct problem with at least one counted passing
+  attempt, against the live material relation, at the current grading revision.
+- `StudentExerciseProgress` is keyed on user and material and has **no academy
+  column**. Counting it directly is therefore cross-academy, and its notion of
+  solved is not `workByStudent`'s.
+- Points are per-academy: `STUDENT_POINTS`.
 - `/points/students/[membershipId]` already serves "their teacher, team lead, or
   manager".
 
-## 3. Part A — Team Lead rosters
+## 3. Part A — the two academy rosters
 
 ### 3.1 Authorization
 
@@ -127,16 +123,23 @@ Both roster reads move from a role test to a permission test, with the row
 shaped by the caller's authority.
 
 - `listStudents` and `listStaff` require **`academy.members.read`**.
-- Both obtain their actor through a new `ManagerScopeService.requireMemberReader`,
-  a sibling of `requireManager` with the same shape: check the permission, then
+- Both obtain their actor through `ManagerScopeService.requireMemberReader`, a
+  sibling of `requireManager` with the same shape: check the permission, then
   assert the role is one of an **explicit list** — `MANAGER` or `TEAM_LEAD`.
   Reproducing the conjunction is the point; dropping it is what the original
   comment warns against.
+- The role test reads the **effective role set** (`actor.roles`), not the
+  membership's own `role` column. `academy.members.read` was itself decided on
+  that set, as is `canManageMembers` below and the web gate in §3.5; asking the
+  column here would admit and refuse people by a different rule than the three
+  around it. A Teacher carrying Team Lead as an extra role is a Team Lead.
+- `canManageMembers` is answered from the roles already in hand
+  (`rolesHavePermission`), not by a second `requirePermission` — that would be a
+  second user read and a second membership read to learn what the first call
+  resolved.
 - `requireManager` is not modified. Every other manager surface keeps its valve.
-- Authority to manage members is resolved once, in the service, and returned as
-  `viewer.canManageMembers`.
 
-A Student or Teacher calling either procedure is refused exactly as today.
+A Student or Teacher calling either procedure is refused exactly as before.
 
 ### 3.2 Contract changes
 
@@ -157,6 +160,26 @@ and the table can tell the two apart.
 `viewer` sits on the page, not the row: it describes the reader, and repeating
 it per row would invite a row-level reading it does not have.
 
+The student roster also gains **points**:
+
+```ts
+// on the row
+points: z.number().int().nonnegative().optional(),
+// on the page
+pointsEnabled: z.boolean(),
+```
+
+`points` is `StudentPointBalance.earnedTotal` — lifetime, academy-wide. A column
+is read downwards, so a number meaning something different row to row could not
+be. Absent, never zero, when the academy keeps no score: zero is a real total a
+child can have. `pointsEnabled` sits on the page rather than being inferred from
+the rows, because a filter matching nobody returns no rows and a table deciding
+from them would drop the column on an empty search and restore it on the next.
+
+The School column was removed from the student roster. Where a child goes to
+school is an admissions record; it is written and read on the manager's editor,
+and it answered nothing an office opens this table for.
+
 ### 3.3 Service
 
 Both list methods narrow their Prisma `select` when `canManageMembers` is false,
@@ -164,282 +187,327 @@ so withheld columns are never read out of the database. Suppressing them during
 serialisation would be enough for correctness and not enough for the property
 worth having: data a reader may not see should not travel.
 
-Facets, paging, sorting and search are unchanged. A sort on a withheld field is
-accepted and produces a stable order the caller cannot see; refusing it would be
-a second authorization rule to keep in step with the first.
+`email` is the one exception, and it is selected for every reader because
+`displayNameOf` falls back to it when a member has no name and no username. It
+is emitted only to a reader who may manage members.
+
+Point totals are one grouped read of the balance table per page, not a sum over
+the ledger per row.
+
+Facets, paging, sorting and search are unchanged.
 
 ### 3.4 Tables
 
 Both tables build their column list from `page.viewer.canManageMembers`. When
 false:
 
-- Staff drops `phone` and `employeeNumber`.
+- Teachers drops `phone` and `employeeNumber`.
 - Students drops `guardian`.
 
-Neither drops `actions` — see §5.1, which gives both row actions a destination
-every reader may open. Column visibility state derives from the columns actually
-built, so a withheld column cannot be restored from a stale preference.
+Points is built only when `page.pointsEnabled`. Neither table drops `actions` —
+see §5.1. Column visibility state derives from the columns actually built, so a
+withheld column cannot be restored from a stale preference.
 
 ### 3.5 Web gate and sidebar
 
-New helper in `academy-access-state.ts`, matching the permission-derived shape
-of `canManageClasses` and `canReviewApplications`:
-
 ```ts
 export function canReadAcademyMembers(roles: readonly AcademyRole[]): boolean {
-  return rolesHavePermission(roles, 'academy.members.read');
+  return (
+    rolesHavePermission(roles, 'academy.members.read') &&
+    (roles.includes('MANAGER') || roles.includes('TEAM_LEAD'))
+  );
 }
 ```
+
+**The role half is not optional, and this is the correction that matters most in
+this document.** The original design specified a permission test alone, on the
+belief that only Managers and Team Leads hold `academy.members.read`. A Teacher
+holds it too (§2). A gate testing only the permission therefore drew both links
+in a teacher's rail and sent them to a page whose service then answered "You are
+not an active manager of this academy."
+
+The gate restates `requireMemberReader`'s rule deliberately, twice. The two
+lists are short enough to compare by eye, and a gate that quietly admits more
+than the read behind it is the failure this shape exists to prevent.
 
 `canManageAcademy` stays the role test it is, for surfaces that genuinely mean
 Manager. `students/page.tsx` and `staff/page.tsx` gate on the new helper.
 
-In `studio-sidebar.tsx`, Students and Staff move out of the
-`if (canManageAcademy)` block into `if (canReadAcademyMembers)`. Members and
-Invitations stay Manager-only, so a Team Lead's People group holds Students,
-Staff, and — where they already qualify — Applications.
+In the rail, Students and Teachers sit in the People group for a Manager or a
+Team Lead; Members and Invitations stay Manager-only. A **Teacher** gets one
+People entry instead — their own Students page (§4).
 
-### 3.6 Scope decision
+### 3.6 Scope decision — *reversed*
 
-**All staff, not only teachers.** The Staff page lists managers, team leads and
-teachers, and its role facet narrows to Teacher in one click. A teachers-only
-route would be a second table of the same memberships.
+**Teachers only, not all staff.** The original design argued for one all-staff
+page narrowed by a role facet, on the grounds that a teachers-only route would
+be a second table of the same memberships. That was overruled during
+implementation: the page is about teaching.
 
-## 4. Part B — the teacher's Roster view
+`teachersOnly(query)` pins `roles: ['TEACHER']` at the **fetch**, not in the
+address — a hand-edited `?role=MANAGER` is overridden rather than honoured,
+because the heading says Teachers and a list that disagreed with its own heading
+would be the more confusing answer. The role facet is gone: a filter over one
+value filters nothing. The Roles column stays, so a director who also teaches is
+listed here for the teaching they do, wearing every role they hold.
 
-### 4.1 Route and URL state
+The contract is untouched. `academyPeople.staff` still reads all staff, and the
+Members directory still uses it — what narrowed is the page, not the read. A
+Manager who needs the full picture of who holds what reads Members, which was
+always the surface about roles.
 
-A parameter on the existing route, not a new route:
+## 4. Part B — the teacher's Students page
+
+### 4.1 Two routes, not two views — *revised*
+
+The original design put both tables on `/teach/students` behind a `view`
+parameter. That is reversed. They are separate routes:
 
 ```
-/academy/[slug]/teach/students?view=roster
+/teach/students    the teacher's Students list
+/teach/analytics   Student analytics
 ```
 
-`StudentsQuery` gains `view: 'analytics' | 'roster'`, default `'analytics'`, so
-existing links keep their meaning. Parsing stays total: an unknown value falls
-back to `analytics`.
+Two reasons, and the second is decisive. They ask different questions — "who do
+I teach and where do they stand" against "who needs me this week", measured over
+a period and narrowed by a lecture — and they carry different controls. And a
+nav highlight is decided on the **path**: one path cannot be two rail entries,
+so under the original design neither could ever be marked current.
 
-`classId` and `search` are shared and survive the switch. The analytics-only
-scope parameters (`courseId`, `moduleId`, `lectureId`, `problemId`, `range`,
-`attention`) are preserved in the URL while in Roster view but not applied, so
-switching back restores the teacher's work.
+There is no view switch. Each route is reached from its own rail entry. The
+analytics components did not move; a route is a URL and a read.
 
-`sort`/`direction` are **not** shared — the views offer different columns, and
-`sort=score` in a table with no score column is a dead parameter. Roster view
-reads `rosterSort`/`rosterDirection`, defaulting to position ascending.
+`parseStudentsQuery` no longer carries `view`. `studentsPath` takes the
+caller's own `pathname` rather than naming a route, because both pages share
+that state hook and a base spelled out in the shared file rewrote one page's
+address into the other's the moment a filter changed.
 
-### 4.2 Contract (new `packages/shared/src/content/teacher-roster.ts`)
+### 4.2 Contract (`packages/shared/src/content/teacher-roster.ts`)
 
 ```ts
 teacherRosterStudentSchema = {
-  membershipId: uuid,
-  displayName: label,
-  username: string | null,        // "ID", as the manager roster means it
-  joinedAt: iso datetime | null,
-  avatar: memberAvatarUrlsSchema, // reused, not redeclared
-  points?: number,                // absent when the academy has no points
-  position?: number,              // absent when the class has no board
-  solvedProblems: number,
+  membershipId, displayName, username, joinedAt, avatar,
+  points?,          // absent when the academy runs no points
+  position?,        // absent when the class has no ranked board
+  solvedProblems,
 }
 
 teacherRosterClassSchema = {
-  classId: uuid,
-  name: label,
+  classId, name,
   students: teacherRosterStudentSchema[],
-  board: { ranked: true } | { ranked: false, reason: LeaderboardIneligibleReason },
+  board?: { ranked: true } | { ranked: false, reason: LeaderboardIneligibleReason },
 }
 
 teacherRosterSchema = {
-  classes: teacherRosterClassSchema[],
-  pointsEnabled: boolean,
-  truncated: boolean,             // see §4.6
-  generatedAt: iso datetime,
+  classes, classOptions, pointsEnabled, truncated, generatedAt,
 }
 ```
 
 `points` and `position` are optional for the reason §3.2 gives: a student with
 no rank is not a student ranked last, and `0` would say the second thing.
 
-`solvedProblems` is always present, and comes from `student-facts` — the same
-unit the analytics view measures with — not from the board. The board's copy of
-it exists only as a tiebreak and only when points run, so sourcing it there
-would make the column vanish in exactly the case it covers. Taking it from
-`student-facts` also means a solved count in Roster view and the same count in
-Analytics view cannot disagree.
+`board` is **optional**, absent when the academy runs no points at all. Every
+reason the union carries is a statement about a board, and an academy that keeps
+no score has none for `NO_ACTIVITY_YET` to be false about — sending it would be
+a claim about the students rather than about a feature nobody switched on.
+
+`solvedProblems` comes from `TeacherOverviewRepository.workByStudent` at a
+period with no start — the unit `student-facts` measures with, so the count
+beside a name here and the same name in Analytics cannot disagree. Counting
+`StudentExerciseProgress` directly was the first implementation and was wrong
+twice: no academy column, and a different definition of solved.
 
 ### 4.3 API
 
-A new `academyTeacherStudents.roster` procedure beside `.list`, served by a new
-`TeacherRosterService`, resolving its scope through the **same**
-`TeacherOverviewAccessService.requireScope`. "Which students may this teacher
-see" is one question and stays one unit; two resolutions would eventually be two
-answers.
+`academyTeacherStudents.roster` beside `.list`, served by `TeacherRosterService`,
+resolving its scope through the **same** `TeacherOverviewAccessService.requireScope`.
+"Which students may this teacher see" is one question and stays one unit.
 
 Standing comes from the existing leaderboard computation, per class, at the
 **all-time** period. All-time is the only period for which "total score" is a
-true description; a weekly board answers a different question, and the ledger
-the detail page links to can be read at any period.
+true description.
 
-`improved` is deliberately not requested: no rising marker is computed for
-all-time, because there is no period before everything.
+Every class's board is read in one `Promise.all`, not serially in a loop — ten
+classes was thirty round trips to draw one page.
 
-### 4.4 Grouping and order
+### 4.4 Grouping, order and the table — *revised*
 
-One section per class, classes by name ascending. Within a class, default order
-is `position` ascending — points descending, with `rankEntries`' tie rule.
-Students with no standing sort last, in name order.
+The contract groups by class, because a board is per class and a standing
+belongs to the cohort it was won in.
 
-A teacher with one class still sees a section heading, carrying the class name
-and student count; it is where "which class is this" lives once the table is
-sorted by name.
+The **table flattens those groups into one row per seat**. A student in two of
+this teacher's classes is two rows, because they have two standings; a single
+row would have to pick one or invent a third. The Class column carries which is
+which, and sorting or filtering by it is how a teacher with several classes
+reads the table one class at a time.
 
-Name, ID and joined are sortable. Sorting replaces the within-class order and
-never the grouping.
+It is the studio's `DataTable`, in client mode: the same search box, sortable
+headers, column menu, faceted filters, pagination and page-size control as every
+other table in the product. The roster arrives whole, so there is no page to
+turn on the server and no order the server has to agree with. The original
+design's `rosterSort`/`rosterDirection` URL parameters and its
+`compareRosterStudents` helper were therefore never needed and have been
+removed.
+
+None of the analytics scope controls appear here.
 
 ### 4.5 When there is no standing
 
 | State | Contract | Table |
 |---|---|---|
-| Academy has no points | `pointsEnabled: false` | Points and Position columns not built. Solved remains. |
-| Class board not ranked | `board.ranked: false` with a reason | Columns exist for other classes; this section shows students without positions and a short line naming the reason (`NO_ACTIVITY_YET` → "nobody has earned points yet"). |
+| Academy has no points | `pointsEnabled: false`, `board` absent | Points and Position columns not built. Solved remains. |
+| Class board not ranked | `board.ranked: false` with a reason | Students carry no position; the reason names why. |
+| Board read failed | `board.ranked: false, reason: "UNAVAILABLE"` | The roster renders; that one class loses its standing. |
 | Student has no standing | `points`/`position` absent | An em dash — not a zero, not last place. |
 
-A failing board read is `board.ranked: false, reason: "UNAVAILABLE"`, so it costs
-the teacher two columns in one class rather than the page.
+The `UNAVAILABLE` branch is reached by a `catch` around each class's board read.
+Without it the throw escaped and cost the teacher the page rather than two
+columns in one class.
 
 ### 4.6 Paging
 
-Roster view does not page. It returns every student in the teacher's assigned
-classes, grouped, up to a hard cap of **500**; past the cap the response sets
-`truncated: true` and the table asks the teacher to narrow by class.
+The read returns every student in the teacher's assigned classes up to a hard
+cap of **500**; past the cap the response sets `truncated: true`.
 
-This follows the scope the service already reasons about — its own comment says
-assigned classes hold "hundreds of students, not millions" — and it is what lets
-a class section carry a complete, honest ranking. Paging inside per-class
-sections would serve a case teachers do not have, and a page-at-a-time ranking
-would renumber itself as the teacher turned pages.
+`truncated` is true only when a student was actually **dropped**. Reaching
+exactly the cap drops nobody, and a roster of precisely 500 is complete. A class
+the cap never reached is left out of the response rather than returned empty: the
+section heading carries a student count, and "0 students" is a claim about the
+class, where the true claim is that the roster stopped before reaching it.
 
-The cap bounds the response, not the product. If a real teacher trips it, that
-is the signal to page per class, and `truncated` makes the trip visible rather
-than silent.
-
-Analytics view keeps its existing paging.
+The browser pages the flattened rows.
 
 ### 4.7 Row links
 
-- The **name** links to `solutionStatusPath(...)` — the student's work in that
-  class — matching the analytics view, so the same click means the same thing in
-  both views.
-- The **button** opens the student detail page, §5.2. This is the "visit student
-  page" action; the points ledger is reached from there rather than being a
-  third destination on the row.
+The row's button opens the student detail page (§5.2). The name is not a second
+link; one row, one destination.
 
 ## 5. Part C — the detail pages
 
-Two new routes. Each serves several roles from one contract, with sections built
-from the viewer's authority — so the fields a role may see are stated once.
-
 ### 5.1 Where the row actions go
 
-Every roster's row action — Students, Staff, and the teacher's Roster — points
-at one of these two pages, for every role. The manager's existing action
-destination therefore **changes**: it opens the detail page, which carries an
-Edit link to `/people/[membershipId]` for those who may edit.
+Every roster's row action — Students, Teachers, and the teacher's own Students —
+points at one of these two pages, for **every** role, through one
+`ProfileLinkCell`. The manager's action destination therefore changed: it opens
+the detail page, which carries an Edit link to `/people/[membershipId]` for those
+who may edit.
 
-This is a deliberate change to manager behaviour. The alternative — managers
-keep going straight to the editor — leaves the new page's manager mode
-unreachable and gives the academy two student pages, which is the drift this
-design is shaped to avoid. The editor itself is untouched and one click further
-away.
+The cell is a brand-tinted square that fills on hover, and its glyph is an arrow
+out rather than a pencil: every one of these opens a read-only page, and a
+pencil promised an edit the destination does not offer. The icon is not a
+parameter — every roster in the studio means the same thing by this cell.
 
 ### 5.2 Student detail — `/academy/[slug]/students/[membershipId]`
 
-**Authorization.** A new `academyPeople.student` read:
+**Authorization.** `academyPeople.student`:
 
 - `MANAGER` and `TEAM_LEAD` through `requireMemberReader` (§3.1).
-- `TEACHER` through the assigned-class scope, so a teacher may open a student
-  they teach and no other. Denial and absence are the same answer.
+- `TEACHER` through `taughtByWhere` — homeroom **and** assistant, with the same
+  active-membership and `TEACHER`-role predicates `assignedClassWhere` applies.
+  An assistant sees these students on their roster, so a detail page that turned
+  them away would be a row action that leads nowhere. Denial and absence are the
+  same answer.
 
 **Response.**
 
 ```ts
 {
-  identity: { membershipId, userId, displayName, username, studentNumber,
-              status, joinedAt, avatar },
-  school?:   { schoolName, schoolGrade },
-  guardian?: { guardianName, guardianRelationship, guardianPhone,
-               emergencyContactName, emergencyContactPhone },
-  expression: { codingInterests, learningGoal },
-  classes:   { classId, name, teacherName }[],
-  standing?: { points, position, className }[],   // per class, all-time
-  work?:     { solvedProblems, submissions, activeSeconds, lastActivityAt },
-  viewer:    { canManageMembers },
-}
-```
-
-`viewer` carries only `canManageMembers`, because that is the only authority any
-section on this page turns on. A flag per section would invite a reader to
-consult it instead of checking whether the section arrived, and the absent
-section is already the answer.
-
-| Section | Manager | Team Lead | Teacher |
-|---|---|---|---|
-| identity | ✅ | ✅ | ✅ |
-| school | ✅ | ✅ | ✅ |
-| guardian | ✅ | ✗ | ✗ |
-| expression | ✅ | ✅ | ✅ |
-| classes | ✅ all | ✅ all | ✅ theirs only |
-| standing | ✅ | ✅ | ✅ |
-| work | ✅ | ✅ | ✅ |
-| Edit link | ✅ | ✗ | ✗ |
-
-`guardian` is **absent**, not nulled, for the two roles that may not read it —
-§1.1, and the same optional-vs-null rule as §3.2. The Prisma select omits it.
-
-`expression` (the student's coding interests and learning goal) is shown to all
-three. It is the student's own statement about what they want to learn, it is
-named in no privacy rule, and it is the one field on this page that helps a
-teacher teach. It is read-only everywhere, including for managers, exactly as
-the existing editor already treats it.
-
-Links out: the points ledger (`routes.academyPointsStudent`) when points run,
-the class progress view for each class, and Edit for managers.
-
-### 5.3 Staff detail — `/academy/[slug]/staff/[membershipId]`
-
-**Authorization.** A new `academyPeople.staffMember` read, `MANAGER` and
-`TEAM_LEAD` through `requireMemberReader`. Teachers have no access; nothing in
-Parts A–C gives a teacher a colleague's page.
-
-**Response.**
-
-```ts
-{
-  identity: { membershipId, userId, displayName, username, roles, status,
-              joinedAt, avatar, academyTitle },
-  contact?: { email, contactPhone, employeeNumber },
-  classes:  { homeroom: RosterClassRef[], assistant: RosterClassRef[] },
+  identity: { membershipId, userId, displayName, username, status, joinedAt, avatar },
+  courses:  { courseId, title, classNames[], activeSeconds }[],
+  classes:  { id, name, teacherName, studentCount, courses[] }[],
+  standing?: { classId, className, points, position? }[],
+  work:     { solvedProblems, submissions, activeSeconds, lastActivityAt },
+  guardian?: { …five fields },
   viewer:   { canManageMembers },
 }
 ```
 
-| Section | Manager | Team Lead |
-|---|---|---|
-| identity | ✅ | ✅ |
-| contact | ✅ | ✗ |
-| classes | ✅ | ✅ |
-| Edit link | ✅ | ✗ |
+| Section | Manager | Team Lead | Teacher |
+|---|---|---|---|
+| identity | ✅ | ✅ | ✅ |
+| courses | ✅ | ✅ | ✅ |
+| classes | ✅ all | ✅ all | ✅ theirs only |
+| standing | ✅ | ✅ | ✅ |
+| work | ✅ | ✅ | ✅ |
+| guardian | ✅ | ✗ | ✗ |
+| Edit link | ✅ | ✗ | ✗ |
+
+`guardian` is **absent**, not nulled, for the two roles that may not read it.
+The guardian pair is now the only thing this page reads off `student_profiles`,
+so for those readers the relation is not selected at all — an empty `select` is
+not a narrower query, it is one Prisma refuses.
+
+`work` is measured through `workByStudent` over an academy-wide aggregate scope
+narrowed to this one student's seats, at a period with no start. `activeSeconds`
+keeps its own already-academy-scoped projection.
+
+`courses` are the visible courses assigned to the student's classes,
+de-duplicated — two classes teaching Python is one course being studied — each
+carrying the class names it is taught in and this student's counted time on it.
+Learning time is the one measurement that is genuinely per course.
+
+**Removed from the original design**: `school`, `studentNumber`, and
+`expression` (coding interests and learning goal). All three are written and
+read on the manager's editor, none answered a question these three readers open
+this page with, and each rendered as a labelled em dash for most students.
+
+**Links out.** The points ledger when points run; the class progress view; Edit
+for managers.
+
+The class progress link is drawn **only for a teacher**. Solution status is a
+teaching surface bounded by assignment — a Manager or Team Lead may read every
+class on this page and open none of them. The page knows which reader it has
+because a reader who did not come from the academy roster was admitted by
+teaching this student, and their class list is already filtered to their own.
+A Manager who also teaches loses a link they could technically have followed;
+that trade is deliberate, and the honest fix if it ever matters is a per-class
+flag from the server.
+
+### 5.3 Staff detail — `/academy/[slug]/staff/[membershipId]`
+
+**Authorization.** `academyPeople.staffMember`, `MANAGER` and `TEAM_LEAD`
+through `requireMemberReader`. Teachers have no access.
+
+```ts
+{
+  identity, roles, academyTitle,
+  classes: { homeroom: MemberClassRef[], assistant: MemberClassRef[] },
+  contact?: { email, contactPhone, employeeNumber },
+  viewer:  { canManageMembers },
+}
+```
 
 `contact` is absent for a Team Lead, consistent with §3.4 — a field withheld in
 the list is not recovered by opening the row.
 
+`MemberClassRef` is shared with the student page: name, `studentCount`, and the
+courses the class teaches. One shape, so the two pages cannot come to describe a
+class differently. The page's eyebrow is the member's **highest role**, not the
+word "Teacher": the list that links here is Teachers, but this page still
+answers for a manager opened by link.
+
 ### 5.4 Presentation
 
-Both pages are read-only views built from `SectionCard`, the primitive the
-existing profile surfaces already use. Neither embeds `MemberProfileEditor`,
-`MemberRolesPanel`, or `StudentPasswordPanel`: those are editors, and mixing an
-editor with a viewer in one component is what option C of the design discussion
-was rejected for.
+Both pages are read-only, one column, in reading order. A rail down the right
+split short blocks across two reading paths and left whichever ran shorter
+trailing white space beside the other.
+
+Colour carries facts or is not used:
+
+- The hero band takes the member's own tone — a teacher is `peer` purple
+  wherever the studio draws one, a student is `brand`.
+- Section icons are solid plates in the section's subject tone.
+- A class or course chip takes its identity from `courseAccent`, so the same
+  class is the same colour here, on the other detail page, and on its course
+  card.
+- A standing takes gold, silver or bronze **only when it has been won** —
+  `rankMarker`'s vocabulary, already used on the points surfaces. A student with
+  no position gets no medal and no colour, because not being placed is a
+  different fact from placing last.
+
+Record cards are a three-up grid. The card's action is a sibling of its text
+column, not inside it, so a long class name cannot push the button onto a second
+line and leave three cards with their buttons at three different heights.
 
 A section the viewer may not see renders nothing at all — no heading, no
 placeholder, no lock icon. A page that advertises what it is withholding tells a
@@ -447,15 +515,15 @@ Team Lead which children have a guardian on file.
 
 ## 6. Internationalisation
 
-- Part A adds no keys; withheld columns keep their existing `staff.column.*`
-  and `students.column.*` keys for managers.
-- Part B adds to the `teaching` namespace: view switch labels, roster column
-  headers, the class-section heading with its count, board-unavailable lines
-  keyed by `LeaderboardIneligibleReason`, the truncation notice, and the row
-  button's accessible label.
-- Part C adds a `member-detail` namespace: section headings, field labels, the
-  link labels, and the empty states. It is mounted by the two detail routes
-  only, so no other studio page pays for it in its RSC payload.
+- Part A renames the Staff page's copy to Teachers in both locales and drops the
+  role-facet and student-number strings.
+- Part B adds roster table strings to `teaching` and drops the view-switch and
+  bespoke sort-control strings.
+- Part C adds a `member-detail` namespace, mounted by the two detail routes
+  only.
+- The page-size control's label moved to `common`, which the studio layout
+  always mounts. It previously read from `manager`, so on a teaching page it
+  rendered as the literal key `people.page_size`.
 - Both locales ship together. Dates and numbers use the existing formatters.
 
 ## 7. Error handling
@@ -463,85 +531,136 @@ Team Lead which children have a guardian on file.
 | Failure | Answer |
 |---|---|
 | Team Lead loads a roster or detail page they may not | The route's existing refusal path. Denial and absence stay indistinguishable. |
-| Roster read fails | Existing `RosterFailure` with retry. Unchanged. |
-| Teacher roster read fails | Client retries and says what happened. An empty roster and an unreachable one must not look alike. |
+| Roster read fails | Existing `RosterFailure` with retry. |
+| Teacher roster read fails | Client retries and says what happened. |
 | One class's board read fails | `board.ranked: false, reason: "UNAVAILABLE"`. The roster renders. |
-| Detail page read fails | The route error boundary, not an empty profile. |
+| Detail page read fails | The route's not-found answer, not an empty profile. |
 | Teacher opens a student they do not teach | Not found. |
-| `view=roster` without points | Renders, without points columns. |
-| Teacher with no assigned classes | The existing not-found answer. Unchanged. |
+| Teacher with no assigned classes | The existing not-found answer. |
 
 ## 8. Testing
 
 **Unit (shared).** Optional-vs-null on both roster rows and both detail
-responses; absent `points`/`position` surviving a round trip; the roster
-ordering rule including ties sharing a position and no-standing sorting last.
+responses; absent `points`/`position` surviving a round trip; a position of zero
+refused.
 
 **Unit (API).**
 
-- `requireMemberReader` admits `MANAGER` and `TEAM_LEAD`, refuses `TEACHER` and
-  `STUDENT`, and refuses a member holding `academy.members.read` without one of
-  those roles — the conjunction tested as a rule, not as a consequence.
+- `requireMemberReader` admits `MANAGER` and `TEAM_LEAD`, admits a `TEACHER`
+  carrying Team Lead as an extra role, refuses a plain `TEACHER`, refuses a role
+  holding the permission but not on the list, and asks the permission map once.
 - `listStudents` omits guardian fields for a Team Lead, and the Prisma select
-  does not request them.
-- `listStaff` omits contact fields for a Team Lead; returns them for a Manager.
-- `academyPeople.student` omits `guardian` for Team Lead and Teacher.
-- A teacher may read a student they teach and not one they do not.
-- `academyPeople.staffMember` refuses a teacher outright.
-- `TeacherRosterService` scopes to assigned classes; another teacher's class
-  never appears.
-- The board is read at the all-time period.
-- A class with no activity yields `board.ranked: false` and students without
-  positions, not students at position 1.
-- With `STUDENT_POINTS` off, every student and `solvedProblems` are still
-  returned, and no `points` or `position`.
+  does not request them; `listStaff` the same for contact fields.
+- The points column carries a lifetime total when the academy keeps score, and
+  is absent when it does not.
+- `academyPeople.student` omits `guardian` for a Team Lead, and does not select
+  `studentProfile` at all for them.
+- An assistant teacher is admitted, not only the homeroom teacher.
+- Work is measured over this academy through the analytics unit, at no start.
+- Courses are de-duplicated across classes; classes carry their seat count.
+- `TeacherRosterService`: a failing board costs one class its standing and not
+  the page; the board is absent when the academy runs no points; a roster of
+  exactly the cap is not truncated; past the cap the untouched classes are left
+  out; solved problems are measured through the analytics unit.
 
-**Component (web).** Both roster tables build no withheld column when
-`canManageMembers` is false, and the hideable set matches. Both detail pages
-render no heading for a withheld section.
+**Unit (web).** `activeNavHref` matches a link carrying a query string, lets an
+entry own a path it does not link to, and keeps the two teaching routes apart.
+The rail gives a Team Lead the two academy rosters, a Teacher only their own
+Students, and a Manager the directory as well. `routes` covers the four new
+paths.
 
-**E2E.** Extend `e2e/specs/manager-people-rosters.spec.ts`: a Team Lead opens
-Students and Staff, sees rows, finds no guardian and no phone column, opens a
-row into the detail page, and finds no guardian section and no Edit link. Add a
-teacher case: switch to Roster view, assert class sections, assert a tie shares
-a position, follow the row button into the student page, and confirm the
-guardian section is absent. Needs a seeded Team Lead and a class with points.
+**Not covered.** `packages/web/vitest.config.ts` deliberately runs without a DOM
+environment, so `DataTable`'s rendered paging — including the controlled
+client-pagination path added for the page-size control — has no test. Adding
+jsdom for it was judged out of scope; the behaviour was verified by hand.
+
+**E2E.** Not yet written. The intended cases: a Team Lead opens Students and
+Teachers, sees rows, finds no guardian and no phone column, opens a row into the
+detail page, and finds no guardian section and no Edit link; a teacher opens
+their Students page, asserts the Class column and a tie sharing a position, and
+follows the row button into the student page.
 
 ## 9. Acceptance
 
 1. A Team Lead opens `/staff` and `/students` and sees every member with avatar,
-   name, ID, classes, status and joined.
-2. A Team Lead sees no guardian columns, no staff phone, email or employee
-   number, in lists or on detail pages.
-3. A Manager's lists are unchanged in every column.
-4. A Teacher or Student calling either roster procedure is refused.
+   name, ID, classes, status and joined. ✅
+2. A Team Lead sees no guardian columns, no teacher phone, email or employee
+   number, in lists or on detail pages. ✅
+3. A Manager's lists are unchanged except where §3.6 and §3.2 changed them for
+   everybody. ✅
+4. A Teacher or Student calling either roster procedure is refused — **and is
+   not shown the link**. ✅
 5. Every manager surface other than the two rosters still runs through
-   `requireManager` unchanged.
-6. A teacher opens `?view=roster` and sees their students grouped by class with
-   name, ID, joined, points, position and solved.
-7. Equal standings share a position and the next position skips.
-8. A student with no standing shows an em dash, not zero and not last place.
-9. An academy without `STUDENT_POINTS` gets the roster with no points columns.
-10. Switching to Roster and back preserves the teacher's analytics scope.
-11. Every roster row action opens a detail page its reader may view.
-12. A teacher opens a student they teach and is refused one they do not.
-13. A withheld section renders nothing — no heading, no placeholder.
-14. A Manager reaches the editor from the student detail page's Edit link.
+   `requireManager` unchanged. ✅
+6. A teacher opens their Students page and sees their students with name, ID,
+   class, joined, solved, points and position. ✅
+7. Equal standings share a position and the next position skips. ✅
+8. A student with no standing shows an em dash, not zero and not last place. ✅
+9. An academy without `STUDENT_POINTS` gets the roster with no points columns. ✅
+10. Every roster row action opens a detail page its reader may view. ✅
+11. A teacher opens a student they teach — including one they only assist — and
+    is refused one they do not. ✅
+12. A withheld section renders nothing — no heading, no placeholder. ✅
+13. A Manager reaches the editor from the detail page's Edit link. ✅
+14. Each teaching route marks its own rail entry current, and the member detail
+    page marks the list that opened it. ✅
 
 ## 10. Delivery
 
-The order is **A → C → B**, and it is forced rather than preferred. Part C reuses
-`requireMemberReader` from Part A, and Part B's row button opens a page Part C
-builds. Landing B first would mean shipping a button with nowhere to go.
+Shipped as A → C → B, as designed: Part C reuses `requireMemberReader` from Part
+A, and Part B's row button opens a page Part C builds.
 
-**Part A**: shared contracts → `requireMemberReader` → both list services →
-web gate and helper → both tables → sidebar → tests.
+## 11. What changed during implementation, and why
 
-**Part C**: detail contracts → the two reads → the two routes and their
-sections → row actions repointed → tests.
+Each of these reverses or corrects something stated above. They are listed
+because a design document that quietly agrees with whatever was built is worth
+less than one that says where it was wrong.
 
-**Part B**: roster contract → `TeacherRosterService` and the `roster`
-procedure → `view` in `StudentsQuery` → the view switch → the roster table with
-class sections → empty and unranked states → tests.
+1. **§3.5 — the web gate needed the role test too.** The design specified a
+   permission test alone. `TEACHER` holds `academy.members.read`, so that gate
+   showed a teacher two links into a page the service refused. The gate now
+   restates `requireMemberReader`'s full rule.
 
-Each part is one pull request into `feat/cove-studio-v2`.
+2. **§3.1 — decide on effective roles, not the `role` column.** Reading the
+   membership's own column would have admitted and refused people by a different
+   rule than the permission check beside it and the web gate above it.
+
+3. **§3.6 — reversed to teachers only.** The design argued for one all-staff
+   page with a role facet. The product owner overruled it. Managers keep the
+   full picture through Members.
+
+4. **§4.1 — two routes, not one route with a `view` parameter.** A rail
+   highlight is decided on the path, so one path could not be two entries.
+   Sharing the route also meant the shared state hook rewrote the analytics
+   page's address into the roster's.
+
+5. **§4.4 — a flat `DataTable`, not bespoke class sections.** Asked for
+   consistency with every other table in the product. This removed the
+   `rosterSort`/`rosterDirection` URL state and `compareRosterStudents` entirely.
+
+6. **§4.2 — `solvedProblems` and detail-page `work` had to come from
+   `workByStudent`.** The first implementation counted `StudentExerciseProgress`,
+   which has no academy column and a different definition of solved.
+
+7. **§4.5 — `board` became optional, and `UNAVAILABLE` became reachable.** The
+   first implementation claimed `NO_ACTIVITY_YET` for academies with no points,
+   and let a failing board read escape and take the page down.
+
+8. **§4.6 — `truncated` was off by one** and trailing classes were returned
+   empty, which read as classes with no students.
+
+9. **§5.2 — the teacher path had to use `taughtByWhere`.** The first
+   implementation matched only the homeroom column, so an assistant teacher saw
+   students on their roster and got a not-found opening one.
+
+10. **§5.2 — `school`, `studentNumber` and `expression` removed; `courses`
+    added.** Each of the three rendered as a labelled em dash for most students
+    and answered nothing the page is opened for.
+
+11. **§5.2 — the class progress link is teacher-only.** It is a teaching surface
+    bounded by assignment; drawn for a Manager or Team Lead it was a button that
+    answered with a not-found.
+
+12. **Throughout — one visual vocabulary for "open this".** Row actions, record
+    cards and page-level links were grey outlines indistinguishable from the
+    furniture around them.

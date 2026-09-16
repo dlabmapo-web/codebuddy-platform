@@ -177,7 +177,7 @@ describe('studentAnalyticsPath', () => {
         sort: 'score',
       }),
     ).toBe(
-      `/academy/${academyId}/teach/students` +
+      `/academy/${academyId}/teach/analytics` +
         `?class=${classA}&course=${courseOne}&range=30d&sort=score`,
     );
   });
@@ -185,7 +185,7 @@ describe('studentAnalyticsPath', () => {
   it('leaves the default period out of the address', () => {
     expect(
       studentAnalyticsPath({ academySlug: academyId, query: defaultOverviewQuery }),
-    ).toBe(`/academy/${academyId}/teach/students`);
+    ).toBe(`/academy/${academyId}/teach/analytics`);
   });
 
   it('encodes which end of the activity list was on screen', () => {

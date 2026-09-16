@@ -34,6 +34,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DataTable } from '@/components/studio/data-table';
+import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { FacetedFilter } from '@/components/studio/faceted-filter';
 import {
@@ -48,7 +49,6 @@ import {
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { cn } from '@/lib/utils';
 
-import { PageSizePicker } from '../../_components/page-size-picker';
 import { StatusBadge, UsernameCell } from '../../_components/people-cells';
 import { useDebouncedSearch } from '../../_hooks/use-url-table-query';
 import { compactDate } from '../../_lib/compact-date';

@@ -44,6 +44,16 @@ export function createManageRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.peopleRosterService.listStaff(context.identity, input),
         ),
+      student: os.academyPeople.student
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.memberDetailService.student(context.identity, input),
+        ),
+      staffMember: os.academyPeople.staffMember
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.memberDetailService.staffMember(context.identity, input),
+        ),
     },
     academyPeopleImport: {
       get: os.academyPeopleImport.get

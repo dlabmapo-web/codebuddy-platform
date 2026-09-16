@@ -151,7 +151,11 @@ export function studentAnalyticsPath(input: {
   if (input.sort) search.set('sort', input.sort);
   if (input.direction) search.set('direction', input.direction);
   for (const kind of input.attention ?? []) search.append('attention', kind);
-  const base = `${routes.academy(input.academySlug)}/teach/students`;
+  // Student analytics, not the students list. Every parameter assembled above
+  // — a course, a lecture, a range, an attention reason — is an analytics
+  // scope, and the roster next door reads none of them: a drill-down that
+  // landed there would silently drop what the reader clicked on.
+  const base = routes.academyTeachAnalytics(input.academySlug);
   const query = search.toString();
   return query ? `${base}?${query}` : base;
 }

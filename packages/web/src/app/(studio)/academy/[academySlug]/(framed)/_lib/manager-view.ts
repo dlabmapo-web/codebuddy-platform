@@ -5,6 +5,7 @@ import type {
   MembershipStatus,
   OverviewRange,
 } from '@cove/shared';
+import { academyRoles } from '@cove/shared';
 import {
   BookOpenCheck,
   GraduationCap,
@@ -46,6 +47,26 @@ export const roleTones: Record<AcademyRole, PanelTone> = {
   TEAM_LEAD: 'teal',
   MANAGER: 'primary',
 };
+
+/**
+ * The tone a person wears when only one hue is available for all of them.
+ *
+ * The highest role held, because that is the one the roster already sorts and
+ * chips them by — a director who also teaches is a director everywhere else on
+ * the page, and a band that called them violet would be the only place in the
+ * studio that disagreed. Falls back to the student blue for a member holding
+ * nothing, which no real membership is.
+ */
+export function highestRole(roles: readonly AcademyRole[]): AcademyRole {
+  return (
+    [...academyRoles].reverse().find((role) => roles.includes(role)) ??
+    'STUDENT'
+  );
+}
+
+export function highestRoleTone(roles: readonly AcademyRole[]): PanelTone {
+  return roleTones[highestRole(roles)];
+}
 
 export const roleIcons: Record<AcademyRole, LucideIcon> = {
   STUDENT: GraduationCap,

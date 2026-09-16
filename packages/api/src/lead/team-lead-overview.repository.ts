@@ -562,7 +562,38 @@ export class TeamLeadOverviewRepository {
    * building it here rather than branching inside the teach module is what
    * stops either reach from widening by an edit to the other's predicate.
    */
-  async aggregateScope(academyId: string): Promise<OverviewAggregateScope> {
+  async aggregateScope(
+    academyId: string,
+    options?: {
+      /**
+       * Narrow the whole scope to one student's seats.
+       *
+       * For a page that measures one member rather than a cohort. The academy
+       * is still what bounds the measurement — the same classes, the same
+       * visible curriculum, the same definition of a counted attempt — so a
+       * number on a member's page and the same number on an academy page are
+       * the same number, read over fewer rows.
+       */
+      membershipId?: string;
+    },
+  ): Promise<OverviewAggregateScope> {
+    const seat = options?.membershipId
+      ? Prisma.sql`AND am.id = ${options.membershipId}::uuid`
+      : Prisma.empty;
+    // The material side is narrowed through the same seat, so a one-student
+    // scope carries the curriculum of that student's classes and not the
+    // academy's. Without it the VALUES list would be the whole catalogue to
+    // authorize a handful of pairs.
+    const taught = options?.membershipId
+      ? Prisma.sql`
+          AND EXISTS (
+            SELECT 1 FROM class_enrollments en
+            WHERE en.class_id = cls.id
+              AND en.membership_id = ${options.membershipId}::uuid
+          )
+        `
+      : Prisma.empty;
+
     const [studentClasses, materialClasses] = await Promise.all([
       this.prisma.$queryRaw<
         { classId: string; userId: string; membershipId: string }[]
@@ -571,6 +602,7 @@ export class TeamLeadOverviewRepository {
         FROM classes cls
         ${ACTIVE_SEAT}
         WHERE cls.academy_id = ${academyId}::uuid AND cls.status = 'ACTIVE'
+        ${seat}
       `,
       this.prisma.$queryRaw<
         { classId: string; courseId: string; materialId: string }[]
@@ -586,6 +618,7 @@ export class TeamLeadOverviewRepository {
         WHERE cls.academy_id = ${academyId}::uuid
           AND cls.status = 'ACTIVE'
           AND ${EFFECTIVE_VISIBILITY}
+        ${taught}
       `,
     ]);
     return { studentClasses, materialClasses };

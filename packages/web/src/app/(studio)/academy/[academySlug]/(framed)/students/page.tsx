@@ -12,7 +12,7 @@ import { initTranslations } from '@/i18n/init-translations';
 import { peopleRosterNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { canManageAcademy } from '@/lib/academy-access-state';
+import { canReadAcademyMembers } from '@/lib/academy-access-state';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
@@ -36,7 +36,7 @@ export default async function StudentsPage({
 }) {
   const { academySlug } = await params;
   const { academyId, roles } = await requireAcademyRoute(academySlug);
-  if (!canManageAcademy(roles)) notFound();
+  if (!canReadAcademyMembers(roles)) notFound();
 
   const locale = await getLocale();
   const [{ t }, { resources }] = await Promise.all([

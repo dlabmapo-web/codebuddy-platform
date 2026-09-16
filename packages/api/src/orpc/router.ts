@@ -45,6 +45,7 @@ import { PeopleBulkService } from "../manage/people-bulk.service.js";
 import { PeopleImportService } from "../manage/people-import.service.js";
 import { ManagerOverviewService } from "../manage/manager-overview.service.js";
 import { PeopleDirectoryService } from "../manage/people-directory.service.js";
+import { MemberDetailService } from "../manage/member-detail.service.js";
 import { PeopleRosterService } from "../manage/people-roster.service.js";
 import { createManageRouters } from "../manage/manage.router.js";
 import { MonitoringService } from "../monitoring/monitoring.service.js";
@@ -84,6 +85,7 @@ import { TeamLeadOverviewService } from "../lead/team-lead-overview.service.js";
 import { createAcademyCurriculumOverviewRouter } from "../lead/lead.router.js";
 import { TeacherOverviewService } from "../teach/teacher-overview.service.js";
 import { createAcademyTeacherOverviewRouter } from "../teach/teacher-overview.router.js";
+import { TeacherRosterService } from "../teach/teacher-roster.service.js";
 import { TeacherStudentsService } from "../teach/teacher-students.service.js";
 import { createAcademyTeacherStudentsRouter } from "../teach/teacher-students.router.js";
 import { TeacherProgressService } from "../teach/teacher-progress.service.js";
@@ -137,6 +139,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
     teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
     teamLeadOverviewService: app.get(TeamLeadOverviewService, { strict: false }),
+    teacherRosterService: app.get(TeacherRosterService, { strict: false }),
     teacherStudentsService: app.get(TeacherStudentsService, { strict: false }),
     managerOverviewService: app.get(ManagerOverviewService, { strict: false }),
     academyFeaturesService: app.get(AcademyFeaturesService, { strict: false }),
@@ -146,6 +149,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     }),
     peopleDirectoryService: app.get(PeopleDirectoryService, { strict: false }),
     peopleRosterService: app.get(PeopleRosterService, { strict: false }),
+    memberDetailService: app.get(MemberDetailService, { strict: false }),
     peopleImportService: app.get(PeopleImportService, { strict: false }),
     peopleBulkService: app.get(PeopleBulkService, { strict: false }),
     invitationDeliveryService: app.get(InvitationDeliveryService, {

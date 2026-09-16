@@ -13,9 +13,8 @@
     "column": {
       "student": "Student",
       "id": "ID",
-      "number": "Student no.",
       "classes": "Classes",
-      "school": "School · Grade",
+      "points": "Points",
       "guardian": "Guardian",
       "status": "Status",
       "joined": "Joined"
@@ -26,14 +25,13 @@
     "empty_title": "No students match",
     "empty_body": "Try a different search or clear a filter."
   },
-  "staff": {
-    "title": "Staff",
-    "description": "Every teacher, team lead, and manager in this academy. Someone with several roles appears under each of them.",
+  "teachers": {
+    "title": "Teachers",
+    "description": "Everyone who teaches in this academy. Someone who also leads or manages is listed once, wearing every role they hold.",
     "search_placeholder": "Name, ID, email, or employee no.",
-    "filter_role": "Role",
     "filter_status": "Status",
     "column": {
-      "staff": "Staff",
+      "teacher": "Teacher",
       "id": "ID",
       "roles": "Roles",
       "title": "Title",
@@ -45,10 +43,10 @@
     },
     "assistant_suffix": "(assistant)",
     "no_class": "None",
-    "multi_role_note": "People with several roles are counted under each role filter.",
-    "empty_academy_title": "No staff yet",
-    "empty_academy_body": "Invite teachers and team leads from the Members page.",
-    "empty_title": "No staff match",
+    "multi_role_note": "Someone who teaches and also leads or manages is listed here once, with every role they hold.",
+    "empty_academy_title": "No teachers yet",
+    "empty_academy_body": "Invite teachers from the Members page.",
+    "empty_title": "No teachers match",
     "empty_body": "Try a different search or clear a filter."
   }
 }

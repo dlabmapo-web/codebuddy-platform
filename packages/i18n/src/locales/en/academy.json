@@ -36,5 +36,7 @@
         "body": "A named ranking of the class, by points. Replaces class standing where both are on."
       }
     }
-  }
+  },
+  "roster_title": "Students",
+  "roster_description": "Every student in your classes, with where they stand in each one."
 }

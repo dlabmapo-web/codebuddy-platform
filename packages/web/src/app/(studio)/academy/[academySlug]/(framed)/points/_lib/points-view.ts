@@ -53,24 +53,43 @@ export const reasonTones: Record<PointReasonName, PanelTone> = {
 
 /** What marks one of the first three positions, and what marks the rest. */
 export type RankMarker =
-  | { kind: 'medal'; icon: LucideIcon; text: string; chip: string }
+  | {
+      kind: 'medal';
+      icon: LucideIcon;
+      text: string;
+      chip: string;
+      /**
+       * The same hue as a fill, for a rule or a spine beside the number.
+       *
+       * Spelled out rather than derived from `text`: Tailwind scans source
+       * text, so a class built by rewriting `text-` to `bg-` at runtime
+       * compiles to nothing and the mark renders transparent.
+       */
+      spine: string;
+    }
   | { kind: 'plain' };
 
-const medals: Record<number, { icon: LucideIcon; text: string; chip: string }> = {
+const medals: Record<
+  number,
+  { icon: LucideIcon; text: string; chip: string; spine: string }
+> = {
   1: {
     icon: Crown,
     text: 'text-rank-gold',
     chip: 'bg-rank-gold-soft text-rank-gold',
+    spine: 'bg-rank-gold',
   },
   2: {
     icon: Medal,
     text: 'text-rank-silver',
     chip: 'bg-rank-silver-soft text-rank-silver',
+    spine: 'bg-rank-silver',
   },
   3: {
     icon: Medal,
     text: 'text-rank-bronze',
     chip: 'bg-rank-bronze-soft text-rank-bronze',
+    spine: 'bg-rank-bronze',
   },
 };
 

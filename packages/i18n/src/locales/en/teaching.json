@@ -191,7 +191,6 @@
     },
     "search": "Search students",
     "empty": "No student matches these filters.",
-    "page_size": "Rows per page",
     "rows_per_page": "{{count}} per page",
     "seconds_one": "{{count}} second of counted activity",
     "seconds_other": "{{count}} seconds of counted activity",
@@ -204,5 +203,36 @@
     "no_classes_action": "My classes",
     "no_students_title": "No students are enrolled yet",
     "no_students_body": "There is nobody enrolled in this scope, so there is nothing to measure. This is an empty roster, not a class that did nothing."
+  },
+  "roster": {
+    "search": "Search by name or ID",
+    "column": {
+      "student": "Student",
+      "id": "ID",
+      "joined": "Joined",
+      "solved": "Solved",
+      "points": "Points",
+      "actions": "Actions",
+      "position": "#",
+      "class": "Class"
+    },
+    "student_count_one": "{{count}} student",
+    "student_count_other": "{{count}} students",
+    "board": {
+      "NO_ACTIVITY_YET": "Nobody has earned points yet",
+      "TOO_FEW_STUDENTS": "Too few students to rank",
+      "NOT_ENROLLED": "Not ranked",
+      "UNAVAILABLE": "Ranking could not be loaded"
+    },
+    "open": "Open student",
+    "empty": "You are not running any class.",
+    "no_match": "No students match.",
+    "truncated": "Too many students to show at once. Narrow it down by class.",
+    "failed": "The roster could not be loaded.",
+    "retry": "Try again",
+    "class": "Class",
+    "title": "Students",
+    "loading": "Loading…",
+    "open_student": "Open {{name}}'s page"
   }
 }

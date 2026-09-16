@@ -173,7 +173,6 @@
     },
     "search": "학생 검색",
     "empty": "이 필터에 해당하는 학생이 없습니다.",
-    "page_size": "페이지당 행 수",
     "rows_per_page": "페이지당 {{count}}행",
     "seconds_other": "집계된 활동 {{count}}초",
     "scoped_problems_other": "범위 내 문제 {{count}}개"
@@ -184,5 +183,35 @@
     "no_classes_action": "내 학급",
     "no_students_title": "등록된 학생이 없습니다",
     "no_students_body": "이 범위에 등록된 학생이 없어 측정할 내용이 없습니다. 비어 있는 명단이지 아무것도 하지 않은 학급이 아닙니다."
+  },
+  "roster": {
+    "search": "이름 또는 아이디 검색",
+    "column": {
+      "student": "학생",
+      "id": "아이디",
+      "joined": "합류일",
+      "solved": "푼 문제",
+      "points": "포인트",
+      "actions": "작업",
+      "position": "#",
+      "class": "반"
+    },
+    "student_count_other": "학생 {{count}}명",
+    "board": {
+      "NO_ACTIVITY_YET": "아직 포인트를 받은 학생이 없습니다",
+      "TOO_FEW_STUDENTS": "순위를 매기기에 학생이 적습니다",
+      "NOT_ENROLLED": "순위 대상이 아닙니다",
+      "UNAVAILABLE": "순위를 불러오지 못했습니다"
+    },
+    "open": "학생 보기",
+    "empty": "맡은 반이 없습니다.",
+    "no_match": "조건에 맞는 학생이 없습니다.",
+    "truncated": "학생이 너무 많아 일부만 표시했습니다. 반을 선택해 좁혀 보세요.",
+    "failed": "명단을 불러오지 못했습니다.",
+    "retry": "다시 시도",
+    "class": "반",
+    "title": "학생",
+    "loading": "불러오는 중…",
+    "open_student": "{{name}} 학생 페이지 열기"
   }
 }

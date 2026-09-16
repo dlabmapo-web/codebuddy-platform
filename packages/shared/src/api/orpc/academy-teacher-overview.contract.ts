@@ -5,6 +5,10 @@ import {
   getAcademyTeacherOverviewInputSchema,
 } from "../../content/teacher-overview.js";
 import {
+  teacherRosterInputSchema,
+  teacherRosterSchema,
+} from "../../content/teacher-roster.js";
+import {
   listAcademyStudentsInputSchema,
   teacherStudentListSchema,
 } from "../../content/teacher-students.js";
@@ -34,4 +38,12 @@ export const academyTeacherStudentsContract = {
   list: oc
     .input(listAcademyStudentsInputSchema)
     .output(teacherStudentListSchema),
+  /**
+   * The same students, as a roster rather than as a measurement.
+   *
+   * Beside `list` rather than a mode of it, because the two answer different
+   * questions and carry different rows — but served from one authorization
+   * unit, so they can never disagree about which students exist.
+   */
+  roster: oc.input(teacherRosterInputSchema).output(teacherRosterSchema),
 };

@@ -21,6 +21,7 @@ import type learn from '@cove/i18n/locales/en/learn.json';
 import type learning from '@cove/i18n/locales/en/learning.json';
 import type lobby from '@cove/i18n/locales/en/lobby.json';
 import type manager from '@cove/i18n/locales/en/manager.json';
+import type memberDetail from '@cove/i18n/locales/en/member-detail.json';
 import type members from '@cove/i18n/locales/en/members.json';
 import type monitoring from '@cove/i18n/locales/en/monitoring.json';
 import type nav from '@cove/i18n/locales/en/nav.json';
@@ -68,6 +69,7 @@ declare module 'i18next' {
       learning: typeof learning;
       lobby: typeof lobby;
       manager: typeof manager;
+      'member-detail': typeof memberDetail;
       members: typeof members;
       monitoring: typeof monitoring;
       nav: typeof nav;

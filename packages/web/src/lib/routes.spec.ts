@@ -33,6 +33,12 @@ describe('canonical Cove Studio routes', () => {
     expect(routes.academyTeachStudents(slug)).toBe('/academy/cove-seoul/teach/students');
     expect(routes.academyPeople(slug)).toBe('/academy/cove-seoul/people');
     expect(routes.academyPerson(slug, 'member-1')).toBe('/academy/cove-seoul/people/member-1');
+    // Distinct from `academyPerson` above, which is the Manager's editor.
+    // These two are the read every roster row opens, for every reader.
+    expect(routes.academyStudents(slug)).toBe('/academy/cove-seoul/students');
+    expect(routes.academyStudent(slug, 'member-1')).toBe('/academy/cove-seoul/students/member-1');
+    expect(routes.academyStaff(slug)).toBe('/academy/cove-seoul/staff');
+    expect(routes.academyStaffMember(slug, 'member-1')).toBe('/academy/cove-seoul/staff/member-1');
     expect(routes.academyApplications(slug)).toBe('/academy/cove-seoul/applications');
     expect(routes.academyInvitations(slug)).toBe('/academy/cove-seoul/invitations');
     expect(routes.academyPoints(slug)).toBe('/academy/cove-seoul/points');

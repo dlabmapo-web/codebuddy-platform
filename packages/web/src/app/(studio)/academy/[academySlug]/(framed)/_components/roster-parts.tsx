@@ -1,6 +1,6 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
+import { ArrowUpRight, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { EmptyState, Panel } from './overview-ui/panel';
@@ -83,25 +83,38 @@ export function RosterFooter({
   );
 }
 
-/** The row's way into the member profile, as one labelled glyph. */
+/**
+ * The row's way into the member's page.
+ *
+ * Coloured, because in a table of forty grey rows a grey glyph is furniture:
+ * it was the one thing on the row a reader could act on and the only thing
+ * that looked like it could not. The brand tint says "this is a control" at a
+ * glance, and filling on hover confirms it before the click.
+ *
+ * The glyph is an arrow out, not a pencil. Every one of these opens a
+ * read-only page — a Manager reaches the editor from a link *on* that page —
+ * and a pencil in the row promised an edit the destination does not offer.
+ *
+ * One mark for one action: the icon is not a parameter, because every roster
+ * in the studio means exactly the same thing by this cell, and a caller free
+ * to choose is a caller free to make two tables disagree.
+ */
 export function ProfileLinkCell({
   href,
-  icon: Icon,
   label,
 }: {
   href: string;
-  icon: LucideIcon;
   label: string;
 }) {
   return (
     <div className="flex justify-end">
       <Link
         aria-label={label}
-        className="grid size-8 place-items-center rounded-md text-sub transition-colors hover:bg-accent hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="inline-grid size-8 place-items-center rounded-lg bg-brand/10 text-brand transition-colors hover:bg-brand hover:text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         href={href}
         title={label}
       >
-        <Icon className="size-4" />
+        <ArrowUpRight className="size-4" strokeWidth={2.5} />
       </Link>
     </div>
   );

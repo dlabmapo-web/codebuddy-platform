@@ -263,6 +263,20 @@ export const notificationNamespaces = ["notifications"] as const;
 export const profileNamespaces = ["profile", "errors"] as const;
 
 /**
+ * The two member detail pages.
+ *
+ * Mounted by those two routes and nowhere else. `manager` rides along for the
+ * role and status labels, so a status on a member's page reads exactly as it
+ * does in the roster row that opened it — the same reason
+ * `peopleRosterNamespaces` carries it.
+ */
+export const memberDetailNamespaces = [
+  "manager",
+  "member-detail",
+  "errors",
+] as const;
+
+/**
  * The student's points page.
  *
  * Its own list for the same reason `learning` has one: a Student's catalog
@@ -304,6 +318,7 @@ export type PageNamespace =
   | (typeof leadNamespaces)[number]
   | (typeof peopleOpsNamespaces)[number]
   | (typeof peopleRosterNamespaces)[number]
+  | (typeof memberDetailNamespaces)[number]
   | (typeof destructiveNamespaces)[number]
   | (typeof platformNamespaces)[number]
   | (typeof operationsNamespaces)[number]

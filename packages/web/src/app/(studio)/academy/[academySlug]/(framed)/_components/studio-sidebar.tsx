@@ -71,6 +71,14 @@ type NavLink = {
    * the count is a live value that would make it untestable.
    */
   showPendingApplications?: boolean;
+  /**
+   * Extra paths this row owns, beyond the one it links to.
+   *
+   * For a page reached from this row that does not sit beneath it — a shared
+   * detail page under another prefix. Matched the same way `href` is, so a
+   * nested path under one of these keeps the row current too.
+   */
+  alsoCurrentOn?: readonly string[];
 };
 type NavGroup = {
   id: string;
@@ -92,6 +100,7 @@ export function StudioSidebar({
   canManageClasses,
   canManageContent,
   canRunMaintenance,
+  canReadAcademyMembers,
   canReviewApplications,
   canMonitor,
   hasPoints,
@@ -123,6 +132,8 @@ export function StudioSidebar({
   canManageClasses: boolean;
   canManageContent: boolean;
   canRunMaintenance: boolean;
+  /** §3.5 — a Team Lead looks members up, and changes none of them. */
+  canReadAcademyMembers: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
   hasPoints: boolean;
@@ -138,6 +149,7 @@ export function StudioSidebar({
     canManageClasses,
     canManageContent,
     canRunMaintenance,
+    canReadAcademyMembers,
     canReviewApplications,
     canMonitor,
     hasPoints,
@@ -149,7 +161,12 @@ export function StudioSidebar({
   // although it is in no group — it is a page of this academy, and left out
   // the overview's prefix would claim its path.
   const activeHref = activeNavHref(pathname, [
-    ...groups.flatMap((group) => group.items.map((item) => item.href)),
+    ...groups.flatMap((group) =>
+      group.items.map((item) => ({
+        href: item.href,
+        paths: item.alsoCurrentOn,
+      })),
+    ),
     myPageHref,
   ]);
   // Asked once for the whole sidebar rather than by the badge itself: the
@@ -392,6 +409,7 @@ export function studioNavGroups({
   canManageClasses,
   canManageContent,
   canRunMaintenance,
+  canReadAcademyMembers,
   canReviewApplications,
   canMonitor,
   hasPoints,
@@ -403,6 +421,8 @@ export function studioNavGroups({
   canManageClasses: boolean;
   canManageContent: boolean;
   canRunMaintenance: boolean;
+  /** §3.5 — a Team Lead looks members up, and changes none of them. */
+  canReadAcademyMembers: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
   /** §5 — the academy switched points on. Off means the link is not there. */
@@ -516,7 +536,7 @@ export function studioNavGroups({
     // to assigned classes, exactly as My classes is, and a teacher looking for
     // "my students" looks where "my classes" already is.
     teaching.push({
-      href: `${base}/teach/students`,
+      href: routes.academyTeachAnalytics(academySlug),
       labelKey: 'link.student_analytics',
       icon: BarChart3,
     });
@@ -528,9 +548,13 @@ export function studioNavGroups({
   const people: NavLink[] = [];
   if (canManageAcademy) {
     people.push({ href: `${base}/people`, labelKey: 'link.members', icon: Users });
-    // Two read-only views of the same memberships, beside the directory that
-    // changes them: the students an office looks up by class and guardian,
-    // and the staff it looks up by role. Manager-only, as the directory is.
+  }
+  // Two read-only views of the same memberships: the students an office looks
+  // up by class, and the staff it looks up by role. Wider than the directory
+  // beside them, because looking somebody up and changing them are different
+  // authorities — a Team Lead holds the first and not the second, and gets
+  // these two links without the directory that edits.
+  if (canReadAcademyMembers) {
     people.push({
       href: routes.academyStudents(academySlug),
       labelKey: 'link.students',
@@ -540,6 +564,28 @@ export function studioNavGroups({
       href: routes.academyStaff(academySlug),
       labelKey: 'link.staff',
       icon: BriefcaseBusiness,
+    });
+  } else if (canMonitor) {
+    /*
+     * A teacher's own Students, which is a different list from the two above
+     * and not a narrower view of them. Theirs is bounded by assignment and
+     * grouped by class, and it lives here because "People → Students" is where
+     * a teacher looks for the children they teach — the analytics table under
+     * Teaching answers "who needs me this week", which is another question.
+     *
+     * Not offered to a Manager or Team Lead: they hold the academy-wide
+     * rosters above, and a second Students link meaning a subset would be two
+     * entries with one name.
+     */
+    people.push({
+      href: routes.academyTeachStudents(academySlug),
+      labelKey: 'link.students',
+      icon: GraduationCap,
+      // One member page serves all three roles, and it does not sit under any
+      // of their lists. A manager's Students link prefixes it and lights up on
+      // its own; a teacher's list lives under `/teach`, so it has to claim the
+      // path or the academy index wins by prefix and marks Overview current.
+      alsoCurrentOn: [routes.academyStudents(academySlug)],
     });
   }
   if (canReviewApplications) {

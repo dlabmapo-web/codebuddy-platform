@@ -48,7 +48,9 @@
     "first": "First page",
     "last": "Last page",
     "rows_one": "{{count}} row",
-    "rows_other": "{{count}} rows"
+    "rows_other": "{{count}} rows",
+    "page_size": "Rows per page",
+    "per_page": "per page"
   },
   "language": {
     "label": "Language",

@@ -13,6 +13,7 @@ import {
 import {
   canLearn,
   canManageAcademy,
+  canReadAcademyMembers,
   canManageClasses,
   canMonitorClasses,
   canReviewApplications,
@@ -209,6 +210,13 @@ export async function StudioChrome({
         canManageClasses={canManageClasses(shown) && writable}
         canManageContent={canReviewContent(shown)}
         canRunMaintenance={canRegrade(shown)}
+        /*
+         * No `writable` conjunction, unlike the links above. Both roster pages
+         * are reads and ask only for `academy.members.read`, so a read-only
+         * support grant can open them — and is answered with the same narrowed
+         * row a Team Lead gets, because it may not manage members either.
+         */
+        canReadAcademyMembers={canReadAcademyMembers(shown)}
         canReviewApplications={canReviewApplications(shown) && writable}
         /*
          * This gates the *classes* link, not the live watch. A platform

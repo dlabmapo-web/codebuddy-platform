@@ -20,6 +20,9 @@ import { ManagerScopeService } from "./manager-scope.service.js";
 import { PeopleBulkService } from "./people-bulk.service.js";
 import { PointPolicyService } from "./point-policy.service.js";
 import { PeopleDirectoryService } from "./people-directory.service.js";
+import { LeadModule } from "../lead/lead.module.js";
+import { PointsModule } from "../points/points.module.js";
+import { MemberDetailService } from "./member-detail.service.js";
 import { PeopleRosterService } from "./people-roster.service.js";
 import { PeopleImportController } from "./people-import.controller.js";
 import { PeopleImportService } from "./people-import.service.js";
@@ -50,6 +53,14 @@ import { PeopleImportService } from "./people-import.service.js";
     MonitoringRevocationModule,
     MediaModule,
     TeachModule,
+    // For `TeamLeadOverviewRepository` only, and for the same §7.4 reason
+    // `TeachModule` is here: the member detail pages measure one student's
+    // work through the repository that already defines what a counted attempt
+    // and a solved problem are, rather than counting rows their own way.
+    LeadModule,
+    // For `LeaderboardRepository` only — the member detail pages rank a
+    // student within their class through the same repository the board uses.
+    PointsModule,
   ],
   controllers: [AcademyMediaController, PeopleImportController, DeliveryWebhookController],
   providers: [
@@ -62,6 +73,7 @@ import { PeopleImportService } from "./people-import.service.js";
     AcademyMediaService,
     PeopleDirectoryService,
     PeopleRosterService,
+    MemberDetailService,
     PeopleImportService,
     PeopleBulkService,
     InvitationDeliveryService,
@@ -78,6 +90,7 @@ import { PeopleImportService } from "./people-import.service.js";
     AcademyOperationsProfileService,
     PeopleDirectoryService,
     PeopleRosterService,
+    MemberDetailService,
     PeopleImportService,
     PeopleBulkService,
     InvitationDeliveryService,

@@ -5,6 +5,7 @@ import {
   peoplePageSizeSchema,
   peoplePageSizes,
   peopleSortDirectionSchema,
+  rosterViewerSchema,
   type PeopleSortDirection,
 } from "./people-directory.js";
 import {
@@ -99,9 +100,35 @@ export const studentRosterRowSchema = z
     studentNumber: z.string().nullable(),
     schoolName: z.string().nullable(),
     schoolGrade: z.string().nullable(),
-    guardianName: z.string().nullable(),
-    /** Canonical international form; the browser formats it for the reader. */
-    guardianPhone: z.string().nullable(),
+    /**
+     * Everything this student has ever earned in this academy.
+     *
+     * Absent when the academy runs no points — never zero in that case. Zero
+     * is a real score a child can have, and printing it for an academy that
+     * keeps no score would state a fact about every one of them. The same
+     * optional-vs-null rule the guardian pair follows, for the same reason.
+     *
+     * Lifetime earned rather than a balance, and academy-wide rather than per
+     * class: a roster column is read down, and a number that meant something
+     * different from row to row could not be.
+     */
+    points: z.number().int().nonnegative().optional(),
+    /**
+     * Academy-private, and withheld from a reader who may not manage members.
+     * `studentAcademyProfileSchema` states the rule: guardian and emergency
+     * details are for the student and active managers, and nobody else.
+     *
+     * Optional rather than nulled, for the reason `staffRosterRowSchema` gives
+     * about `email`: `null` means the academy holds no guardian name, and a
+     * Team Lead told that about a child whose guardian is simply not theirs to
+     * read would be told something false.
+     */
+    guardianName: z.string().nullable().optional(),
+    /**
+     * Canonical international form; the browser formats it for the reader.
+     * Withheld like `guardianName`.
+     */
+    guardianPhone: z.string().nullable().optional(),
     /** Active classes only, by name. */
     classes: z.array(rosterClassRefSchema),
     academyImageUrl: z.string().nullable(),
@@ -152,6 +179,15 @@ export const studentRosterPageSchema = z
     sort: studentRosterSortFieldSchema,
     direction: peopleSortDirectionSchema,
     facets: studentRosterFacetsSchema,
+    viewer: rosterViewerSchema,
+    /**
+     * The academy keeps score at all.
+     *
+     * On the page rather than inferred from the rows: a filter that matched
+     * nobody returns no rows, and a table that decided from them would drop
+     * the column on an empty search and put it back on the next one.
+     */
+    pointsEnabled: z.boolean(),
   })
   .strict();
 export type StudentRosterPage = z.infer<typeof studentRosterPageSchema>;

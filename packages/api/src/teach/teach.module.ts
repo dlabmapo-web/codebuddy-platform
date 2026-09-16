@@ -3,10 +3,12 @@ import { Module } from "@nestjs/common";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { PointsModule } from "../points/points.module.js";
+import { MediaModule } from "../profile/media.module.js";
 import { LearningActivityAccumulator } from "./learning-activity.accumulator.js";
 import { TeacherOverviewAccessService } from "./teacher-overview-access.service.js";
 import { TeacherOverviewRepository } from "./teacher-overview.repository.js";
 import { TeacherOverviewService } from "./teacher-overview.service.js";
+import { TeacherRosterService } from "./teacher-roster.service.js";
 import { TeacherStudentsService } from "./teacher-students.service.js";
 import { TeacherProgressAccessService } from "./teacher-progress-access.service.js";
 import { TeacherProgressRepository } from "./teacher-progress.repository.js";
@@ -36,7 +38,14 @@ import { TeacherProgressService } from "./teacher-progress.service.js";
  * authorization of its own.
  */
 @Module({
-  imports: [AuthorizationModule, MonitoringRevocationModule, PointsModule],
+  // `MediaModule` for the roster's avatars: it signs a batch of photographs
+  // and is deliberately the whole of what this module needs from profiles.
+  imports: [
+    AuthorizationModule,
+    MediaModule,
+    MonitoringRevocationModule,
+    PointsModule,
+  ],
   providers: [
     LearningActivityAccumulator,
     TeacherProgressAccessService,
@@ -45,11 +54,13 @@ import { TeacherProgressService } from "./teacher-progress.service.js";
     TeacherOverviewAccessService,
     TeacherOverviewRepository,
     TeacherOverviewService,
+    TeacherRosterService,
     TeacherStudentsService,
   ],
   exports: [
     TeacherProgressService,
     TeacherOverviewService,
+    TeacherRosterService,
     TeacherStudentsService,
     LearningActivityAccumulator,
     // §7.4 of the manager control tower design: the manager surfaces are a

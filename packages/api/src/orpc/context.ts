@@ -36,6 +36,7 @@ import type { PeopleBulkService } from "../manage/people-bulk.service.js";
 import type { PeopleImportService } from "../manage/people-import.service.js";
 import type { ManagerOverviewService } from "../manage/manager-overview.service.js";
 import type { PeopleDirectoryService } from "../manage/people-directory.service.js";
+import type { MemberDetailService } from "../manage/member-detail.service.js";
 import type { PeopleRosterService } from "../manage/people-roster.service.js";
 import type { MonitoringService } from "../monitoring/monitoring.service.js";
 import type { PlatformAcademyService } from "../platform/platform-academy.service.js";
@@ -57,6 +58,7 @@ import type { AcademyProfileService } from "../profile/academy-profile.service.j
 import type { ProfileService } from "../profile/profile.service.js";
 import type { TeamLeadOverviewService } from "../lead/team-lead-overview.service.js";
 import type { TeacherOverviewService } from "../teach/teacher-overview.service.js";
+import type { TeacherRosterService } from "../teach/teacher-roster.service.js";
 import type { TeacherStudentsService } from "../teach/teacher-students.service.js";
 import type { TeacherProgressService } from "../teach/teacher-progress.service.js";
 
@@ -96,6 +98,7 @@ export type ORPCDeps = {
   teacherProgressService: TeacherProgressService;
   teacherOverviewService: TeacherOverviewService;
   teamLeadOverviewService: TeamLeadOverviewService;
+  teacherRosterService: TeacherRosterService;
   teacherStudentsService: TeacherStudentsService;
   managerOverviewService: ManagerOverviewService;
   academyFeaturesService: AcademyFeaturesService;
@@ -103,6 +106,7 @@ export type ORPCDeps = {
   academyOperationsProfileService: AcademyOperationsProfileService;
   peopleDirectoryService: PeopleDirectoryService;
   peopleRosterService: PeopleRosterService;
+  memberDetailService: MemberDetailService;
   peopleImportService: PeopleImportService;
   peopleBulkService: PeopleBulkService;
   invitationDeliveryService: InvitationDeliveryService;

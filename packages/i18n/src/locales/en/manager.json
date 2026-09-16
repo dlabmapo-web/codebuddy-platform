@@ -261,7 +261,6 @@
     "not_joined": "Not yet",
     "no_username": "None",
     "sort_by": "Sort by {{column}}",
-    "page_size": "Rows per page",
     "showing": "{{from}}–{{to}} of {{total}}",
     "showing_empty": "No people match",
     "page_of": "Page {{page}} of {{pageCount}}",

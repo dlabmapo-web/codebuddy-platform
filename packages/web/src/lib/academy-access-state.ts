@@ -204,6 +204,35 @@ export function canManageAcademy(roles: readonly AcademyRole[]): boolean {
   return roles.includes('MANAGER');
 }
 
+/**
+ * Who may read the academy's rosters and member pages.
+ *
+ * The permission **and** an explicit role, which is `requireMemberReader`'s
+ * rule restated — and it has to be restated rather than reduced to one half of
+ * itself. `academy.members.read` is held by a Teacher too: it is what lets them
+ * see the names of the students they teach. The academy-wide rosters are not
+ * that, and the service has always refused a Teacher; a gate testing only the
+ * permission showed them two links into a page that then told them they were
+ * not a manager.
+ *
+ * Kept in step with the service by saying the same thing, deliberately twice.
+ * A gate that quietly admitted more than the read behind it is the failure
+ * this shape exists to prevent, and the two lists are short enough to compare
+ * by eye.
+ *
+ * This only keeps a reader off a page that would refuse them. The rosters and
+ * both detail reads decide for themselves, and they decide again on every
+ * request.
+ */
+export function canReadAcademyMembers(
+  roles: readonly AcademyRole[],
+): boolean {
+  return (
+    rolesHavePermission(roles, 'academy.members.read') &&
+    (roles.includes('MANAGER') || roles.includes('TEAM_LEAD'))
+  );
+}
+
 export function canReviewApplications(
   roles: readonly AcademyRole[],
 ): boolean {

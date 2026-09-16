@@ -43,9 +43,10 @@ function membership(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function build(rows: unknown[]) {
+function build(rows: unknown[], canManageMembers = true, pointsOn = false) {
   const count = vi.fn(async () => rows.length);
-  const findMany = vi.fn(async () => rows);
+  // Typed with the argument so a test can read the select it was given.
+  const findMany = vi.fn(async (_args: { select: Record<string, any> }) => rows);
   const prisma = {
     academyMembership: {
       count,
@@ -63,9 +64,27 @@ function build(rows: unknown[]) {
     classEnrollment: {
       groupBy: vi.fn(async () => [{ classId, _count: { _all: 3 } }]),
     },
+    academyFeatureFlag: {
+      findFirst: vi.fn(async () => (pointsOn ? { academyId } : null)),
+    },
+    studentPointBalance: {
+      findMany: vi.fn(async () =>
+        rows.map((row, index) => ({
+          membershipId: (row as { id: string }).id,
+          earnedTotal: (index + 1) * 10,
+        })),
+      ),
+    },
   } as unknown as PrismaService;
   const scopes = {
-    requireManager: vi.fn(async () => ({ academyId, userId: "actor" })),
+    // A manager, unless a test says otherwise. `canManageMembers` is what
+    // decides which columns the rows carry, so the narrowed shape is asserted
+    // by overriding this rather than by a second harness.
+    requireMemberReader: vi.fn(async () => ({
+      academyId,
+      userId: "actor",
+      canManageMembers,
+    })),
   } as unknown as ManagerScopeService;
   const media = {
     signMany: vi.fn(async () => []),
@@ -212,5 +231,194 @@ describe("PeopleRosterService.listStudents", () => {
         ],
       }),
     );
+  });
+});
+
+const studentRow = () =>
+  membership({
+    role: "STUDENT",
+    extraRoles: [],
+    staffProfile: null,
+    studentProfile: { studentNumber: "S-01" },
+  });
+
+describe("the points column", () => {
+  it("carries a lifetime total for an academy that keeps score", async () => {
+    const { service } = build([studentRow()], true, true);
+
+    const page = await service.listStudents(
+      identity,
+      listStudentRosterInputSchema.parse({ academyId }),
+    );
+
+    expect(page.pointsEnabled).toBe(true);
+    expect(page.rows[0]!.points).toBe(10);
+  });
+
+  it("omits points entirely for an academy that does not", async () => {
+    // Absent, never zero. A column of zeroes would state a score for every
+    // child in an academy that keeps none.
+    const { service } = build([studentRow()], true, false);
+
+    const page = await service.listStudents(
+      identity,
+      listStudentRosterInputSchema.parse({ academyId }),
+    );
+
+    expect(page.pointsEnabled).toBe(false);
+    expect(page.rows[0]).not.toHaveProperty("points");
+  });
+});
+
+describe("what a reader who may not manage members is answered with", () => {
+  /**
+   * The rule `studentAcademyProfileSchema` states, enforced where it is read.
+   *
+   * Both assertions matter and they are not the same one. The row must not
+   * carry the field — `toHaveProperty` rather than a null check, because null
+   * is a different claim and the table draws it differently. And the select
+   * must not have asked for it, because a value a reader may not have should
+   * not be read out of the database on their behalf.
+   */
+  it("withholds a student's guardian, in the row and in the query", async () => {
+    const { service, findMany } = build(
+      [
+        membership({
+          role: "STUDENT",
+          extraRoles: [],
+          staffProfile: null,
+          studentProfile: {
+            studentNumber: "S-01",
+            schoolName: "마포중",
+            schoolGrade: "2",
+            guardianName: "김보호",
+            guardianPhone: "+821012345678",
+          },
+        }),
+      ],
+      false,
+    );
+
+    const page = await service.listStudents(
+      identity,
+      listStudentRosterInputSchema.parse({ academyId }),
+    );
+
+    expect(page.viewer).toEqual({ canManageMembers: false });
+    expect(page.rows[0]).toMatchObject({ schoolName: "마포중" });
+    expect(page.rows[0]).not.toHaveProperty("guardianName");
+    expect(page.rows[0]).not.toHaveProperty("guardianPhone");
+
+    const select = findMany.mock.calls[0]![0] as {
+      select: { studentProfile: { select: Record<string, unknown> } };
+    };
+    expect(select.select.studentProfile.select).not.toHaveProperty(
+      "guardianName",
+    );
+    expect(select.select.studentProfile.select).not.toHaveProperty(
+      "guardianPhone",
+    );
+  });
+
+  it("hands a manager the guardian it withholds from everyone else", async () => {
+    const { service } = build([
+      membership({
+        role: "STUDENT",
+        extraRoles: [],
+        staffProfile: null,
+        studentProfile: {
+          studentNumber: "S-01",
+          schoolName: "마포중",
+          schoolGrade: "2",
+          guardianName: "김보호",
+          guardianPhone: "+821012345678",
+        },
+      }),
+    ]);
+
+    const page = await service.listStudents(
+      identity,
+      listStudentRosterInputSchema.parse({ academyId }),
+    );
+
+    expect(page.viewer).toEqual({ canManageMembers: true });
+    expect(page.rows[0]).toMatchObject({
+      guardianName: "김보호",
+      guardianPhone: "+821012345678",
+    });
+  });
+
+  it("withholds staff contact details, in the row and in the query", async () => {
+    const { service, findMany } = build(
+      [
+        membership({
+          memberProfile: {
+            academyDisplayName: null,
+            contactPhone: "+821022223333",
+          },
+        }),
+      ],
+      false,
+    );
+
+    const page = await service.listStaff(
+      identity,
+      listStaffRosterInputSchema.parse({ academyId }),
+    );
+
+    // Still nameable, and still placed in the academy.
+    expect(page.rows[0]).toMatchObject({
+      displayName: "김원장",
+      academyTitle: "원장",
+    });
+    expect(page.rows[0]).not.toHaveProperty("contactPhone");
+    expect(page.rows[0]).not.toHaveProperty("employeeNumber");
+    expect(page.rows[0]).not.toHaveProperty("email");
+
+    const select = findMany.mock.calls[0]![0] as {
+      select: {
+        memberProfile: { select: Record<string, unknown> };
+        staffProfile: { select: Record<string, unknown> };
+      };
+    };
+    expect(select.select.memberProfile.select).not.toHaveProperty(
+      "contactPhone",
+    );
+    expect(select.select.staffProfile.select).not.toHaveProperty(
+      "employeeNumber",
+    );
+  });
+
+  it("still reads the address it will not emit, because the name falls back to it", async () => {
+    // The one field the narrowing cannot cover. A member with no name and no
+    // username is named by their address, so the roster has to read it to
+    // render a row at all — it simply does not send it on.
+    const { service, findMany } = build(
+      [
+        membership({
+          user: {
+            displayName: null,
+            username: null,
+            email: "teacher@example.com",
+            avatarUrl: null,
+            avatarAsset: null,
+          },
+        }),
+      ],
+      false,
+    );
+
+    const page = await service.listStaff(
+      identity,
+      listStaffRosterInputSchema.parse({ academyId }),
+    );
+
+    expect(page.rows[0]?.displayName).toBe("teacher@example.com");
+    expect(page.rows[0]).not.toHaveProperty("email");
+
+    const select = findMany.mock.calls[0]![0] as {
+      select: { user: { select: Record<string, unknown> } };
+    };
+    expect(select.select.user.select).toHaveProperty("email", true);
   });
 });

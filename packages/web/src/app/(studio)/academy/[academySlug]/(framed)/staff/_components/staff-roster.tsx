@@ -2,7 +2,6 @@
 
 import type {
   MembershipStatus,
-  StaffRole,
   StaffRosterPage,
   StaffRosterRow,
   StaffRosterSortField,
@@ -10,11 +9,10 @@ import type {
 import {
   formatPhoneForDisplay,
   membershipStatuses,
-  staffRoles,
   staffRosterSortFields,
 } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
-import { BriefcaseBusiness, UserPen } from 'lucide-react';
+import { BriefcaseBusiness } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,11 +20,11 @@ import { useTranslation } from 'react-i18next';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { DataTable } from '@/components/studio/data-table';
 import { FacetedFilter } from '@/components/studio/faceted-filter';
+import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { routes } from '@/lib/routes';
 
-import { PageSizePicker } from '../../_components/page-size-picker';
 import {
   ClassChips,
   RoleChips,
@@ -43,14 +41,13 @@ import { compactDate } from '../../_lib/compact-date';
 import { useStaffRosterQuery, useStaffRosterState } from '../_hooks/use-staff-roster';
 
 /**
- * Every teacher, team lead, and manager, one server page at a time.
+ * Everyone who teaches here, one server page at a time.
  *
- * Built around people who hold several roles. The Role filter asks "holds this
- * role", so the director who also teaches is found under Teacher; the role
- * sort orders by the highest role held, so they sit once, with the managers;
- * and the Roles column shows every chip rather than the highest and a `+1`,
- * because "what else does this person do here" is the question the page is
- * opened to answer.
+ * Built around people who hold several roles. The fetch asks "holds TEACHER",
+ * so the director who also teaches is listed; the role sort orders by the
+ * highest role held, so they sit with the managers; and the Roles column shows
+ * every chip rather than the highest and a `+1`, because "what else does this
+ * person do here" is the question the page is opened to answer.
  *
  * Read-only, like the Students roster: role changes stay on Members and on the
  * profile, which own the confirmation and the audit trail for them.
@@ -84,17 +81,19 @@ export function StaffRoster({
   const rows = React.useMemo(() => data?.rows ?? [], [data?.rows]);
   const total = data?.total ?? 0;
   const anyMultiRole = rows.some((row) => row.roles.length > 1);
+  /** Withheld until the server says otherwise — see the Students roster. */
+  const canManageMembers = data?.viewer.canManageMembers ?? false;
 
   const columns = React.useMemo<ColumnDef<StaffRosterRow>[]>(
     () => [
       {
         id: 'displayName',
         accessorFn: (row) => row.displayName,
-        header: t('staff.column.staff'),
+        header: t('teachers.column.teacher'),
         cell: ({ row }) => (
           <Link
             className="flex min-w-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            href={routes.academyPerson(academySlug, row.original.membershipId)}
+            href={routes.academyStaffMember(academySlug, row.original.membershipId)}
           >
             <ProfileAvatar
               academyImageUrl={row.original.academyImageUrl}
@@ -119,7 +118,7 @@ export function StaffRoster({
       {
         id: 'username',
         accessorFn: (row) => row.username,
-        header: t('staff.column.id'),
+        header: t('teachers.column.id'),
         size: 128,
         enableHiding: false,
         cell: ({ row }) => <UsernameCell username={row.original.username} />,
@@ -128,7 +127,7 @@ export function StaffRoster({
         // Sorts by the highest role held; shows all of them.
         id: 'role',
         accessorFn: (row) => row.role,
-        header: t('staff.column.roles'),
+        header: t('teachers.column.roles'),
         size: 188,
         enableHiding: false,
         cell: ({ row }) => <RoleChips roles={row.original.roles} />,
@@ -136,7 +135,7 @@ export function StaffRoster({
       {
         id: 'title',
         accessorFn: (row) => row.academyTitle,
-        header: t('staff.column.title'),
+        header: t('teachers.column.title'),
         enableSorting: false,
         size: 132,
         meta: { hideable: true },
@@ -155,7 +154,7 @@ export function StaffRoster({
         id: 'classes',
         accessorFn: (row) =>
           row.homeroomClasses.length + row.assistantClasses.length,
-        header: t('staff.column.classes'),
+        header: t('teachers.column.classes'),
         enableSorting: false,
         size: 180,
         meta: { hideable: true },
@@ -165,52 +164,63 @@ export function StaffRoster({
               ...row.original.homeroomClasses,
               ...row.original.assistantClasses.map((entry) => ({
                 ...entry,
-                suffix: t('staff.assistant_suffix'),
+                suffix: t('teachers.assistant_suffix'),
               })),
             ]}
-            emptyLabel={t('staff.no_class')}
+            emptyLabel={t('teachers.no_class')}
           />
         ),
       },
-      {
-        id: 'phone',
-        accessorFn: (row) => row.contactPhone,
-        header: t('staff.column.phone'),
-        enableSorting: false,
-        size: 136,
-        meta: { hideable: true },
-        cell: ({ row }) =>
-          row.original.contactPhone ? (
-            <span className="block truncate font-mono text-[12.5px] tabular-nums text-ink">
-              {formatPhoneForDisplay(row.original.contactPhone)}
-            </span>
-          ) : (
-            <span className="text-sub">{t('not_set')}</span>
-          ),
-      },
+      /* Withheld from a reader who may not manage members. See the Students
+         roster's guardian column for why these are not built rather than
+         hidden. */
+      ...(canManageMembers
+        ? ([
+            {
+              id: 'phone',
+              accessorFn: (row) => row.contactPhone,
+              header: t('teachers.column.phone'),
+              enableSorting: false,
+              size: 136,
+              meta: { hideable: true },
+              cell: ({ row }) =>
+                row.original.contactPhone ? (
+                  <span className="block truncate font-mono text-[12.5px] tabular-nums text-ink">
+                    {formatPhoneForDisplay(row.original.contactPhone)}
+                  </span>
+                ) : (
+                  <span className="text-sub">{t('not_set')}</span>
+                ),
+            },
+          ] satisfies ColumnDef<StaffRosterRow>[])
+        : []),
       {
         id: 'status',
         accessorFn: (row) => row.status,
-        header: t('staff.column.status'),
+        header: t('teachers.column.status'),
         size: 104,
         enableHiding: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
-      {
-        id: 'employeeNumber',
-        accessorFn: (row) => row.employeeNumber,
-        header: t('staff.column.employee_number'),
-        size: 104,
-        cell: ({ row }) => (
-          <span className="block truncate font-mono text-[12.5px] tabular-nums text-sub">
-            {row.original.employeeNumber ?? t('not_set')}
-          </span>
-        ),
-      },
+      ...(canManageMembers
+        ? ([
+            {
+              id: 'employeeNumber',
+              accessorFn: (row) => row.employeeNumber,
+              header: t('teachers.column.employee_number'),
+              size: 104,
+              cell: ({ row }) => (
+                <span className="block truncate font-mono text-[12.5px] tabular-nums text-sub">
+                  {row.original.employeeNumber ?? t('not_set')}
+                </span>
+              ),
+            },
+          ] satisfies ColumnDef<StaffRosterRow>[])
+        : []),
       {
         id: 'joinedAt',
         accessorFn: (row) => row.joinedAt,
-        header: t('staff.column.joined'),
+        header: t('teachers.column.joined'),
         size: 112,
         meta: { align: 'right' },
         cell: ({ row }) =>
@@ -230,16 +240,19 @@ export function StaffRoster({
         enableSorting: false,
         enableHiding: false,
         size: 56,
+        // §5.1 — the detail page, for every reader. See the Students roster.
         cell: ({ row }) => (
           <ProfileLinkCell
-            href={routes.academyPerson(academySlug, row.original.membershipId)}
-            icon={UserPen}
+            href={routes.academyStaffMember(
+              academySlug,
+              row.original.membershipId,
+            )}
             label={t('view_profile', { name: row.original.displayName })}
           />
         ),
       },
     ],
-    [academySlug, i18n.language, t, tManager],
+    [academySlug, canManageMembers, i18n.language, t, tManager],
   );
 
   if (page.isError && !data) {
@@ -248,13 +261,14 @@ export function StaffRoster({
         message={errorText(page.error, t('failed'))}
         onRetry={() => void page.refetch()}
         retryLabel={tManager('retry')}
-        title={t('staff.title')}
+        title={t('teachers.title')}
       />
     );
   }
 
-  const unfiltered =
-    query.search === '' && query.roles.length === 0 && query.statuses.length === 0;
+  // `roles` is pinned by the page, not chosen by the reader, so it is not one
+  // of the filters an empty table should offer to clear.
+  const unfiltered = query.search === '' && query.statuses.length === 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -262,7 +276,7 @@ export function StaffRoster({
         columns={columns}
         data={rows}
         emptyMessage={
-          unfiltered ? t('staff.empty_academy_title') : t('staff.empty_title')
+          unfiltered ? t('teachers.empty_academy_title') : t('teachers.empty_title')
         }
         initialColumnVisibility={{ employeeNumber: false, joinedAt: false }}
         layout="fixed"
@@ -289,28 +303,12 @@ export function StaffRoster({
           onColumnFiltersChange: () => {},
         }}
         pageSize={query.pageSize}
-        searchPlaceholder={t('staff.search_placeholder')}
+        searchPlaceholder={t('teachers.search_placeholder')}
         toolbarFilters={
           <>
-            <FacetedFilter
-              onSelectedChange={(values) =>
-                change({
-                  roles: staffRoles.filter((role) =>
-                    values.includes(role),
-                  ) as StaffRole[],
-                })
-              }
-              options={staffRoles.map((role) => ({
-                label: tManager(`role.${role}`),
-                value: role,
-                count:
-                  data?.facets.roles.find((facet) => facet.value === role)
-                    ?.count ?? 0,
-              }))}
-              selected={query.roles}
-              showCounts
-              title={t('staff.filter_role')}
-            />
+            {/* No role facet. The page is about teaching, so every row holds
+                TEACHER and a filter over one value filters nothing — the
+                chips in the Roles column still say what else a person is. */}
             <FacetedFilter
               onSelectedChange={(values) =>
                 change({
@@ -328,7 +326,7 @@ export function StaffRoster({
               }))}
               selected={query.statuses}
               showCounts
-              title={t('staff.filter_status')}
+              title={t('teachers.filter_status')}
             />
           </>
         }
@@ -342,22 +340,22 @@ export function StaffRoster({
 
       <RosterFooter
         emptyBody={
-          unfiltered ? t('staff.empty_academy_body') : t('staff.empty_body')
+          unfiltered ? t('teachers.empty_academy_body') : t('teachers.empty_body')
         }
         emptyIcon={BriefcaseBusiness}
         emptyTitle={
-          unfiltered ? t('staff.empty_academy_title') : t('staff.empty_title')
+          unfiltered ? t('teachers.empty_academy_title') : t('teachers.empty_title')
         }
         page={data ?? null}
         rowCount={rows.length}
         showingLabel={(from, to) => t('showing', { from, to, total })}
-        title={t('staff.title')}
+        title={t('teachers.title')}
       />
 
       {/* Said once, and only when it applies: the role counts add up to more
           than the total because someone on screen holds two roles. */}
       {anyMultiRole ? (
-        <p className="text-[12px] text-sub">{t('staff.multi_role_note')}</p>
+        <p className="text-[12px] text-sub">{t('teachers.multi_role_note')}</p>
       ) : null}
     </div>
   );

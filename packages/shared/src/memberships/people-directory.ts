@@ -81,6 +81,24 @@ export type PeopleSortDirection = z.infer<typeof peopleSortDirectionSchema>;
 export const DEFAULT_PEOPLE_SORT: PeopleSortField = "updatedAt";
 export const DEFAULT_PEOPLE_DIRECTION: PeopleSortDirection = "desc";
 
+/* ---------------------------------------------------------------- viewer */
+
+/**
+ * What the reader of a roster may do, as opposed to what it says.
+ *
+ * Carried once on a page rather than on each of its rows. It describes the
+ * person reading, not the people read, and a copy per row would invite exactly
+ * the row-level interpretation it does not have — "may I manage *this* member"
+ * is not a question any roster answers.
+ *
+ * It exists so a table can tell a withheld column from an empty one. The rows
+ * already say which fields arrived; this says why some did not.
+ */
+export const rosterViewerSchema = z
+  .object({ canManageMembers: z.boolean() })
+  .strict();
+export type RosterViewer = z.infer<typeof rosterViewerSchema>;
+
 /* --------------------------------------------------------------- filters */
 
 /**

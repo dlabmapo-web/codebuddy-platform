@@ -1,13 +1,17 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   displayableEmail,
+  rolesHavePermission,
   ACADEMY_TIME_ZONE,
   MANAGER_MAX_CLASS_ROWS,
   type AcademyPermission,
 } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
-import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import {
+  AcademyAccessService,
+  type AcademyAccess,
+} from "../authorization/academy-access.service.js";
 import { membershipHoldsRole } from "../authorization/membership-roles.js";
 import {
   classStudentWhere,
@@ -123,6 +127,80 @@ export class ManagerScopeService {
       // written before the migration. Nothing else in a request may consult a
       // zone: one response describes one set of local days.
       timeZone: academy?.timeZone || ACADEMY_TIME_ZONE,
+    };
+  }
+
+  /**
+   * The acting reader of a roster, which is a wider set than its manager.
+   *
+   * A sibling of `requireManager` rather than a parameter on it, and the
+   * duplication is deliberate. `requireManager` names one role and refuses
+   * every other, and that refusal is load-bearing for a dozen surfaces; this
+   * one names two. Expressing both through a shared role-list argument would
+   * turn each of those refusals into a caller's argument, which is exactly the
+   * shape the comment in `requireManager` warns about.
+   *
+   * The explicit conjunction is reproduced, not inherited. Holding
+   * `academy.members.read` is not enough on its own — a role added later that
+   * holds it does not thereby get the roster, and admitting it becomes a
+   * deliberate edit to this list.
+   *
+   * `canManageMembers` rides back because every caller needs it to shape its
+   * response, and resolving it here means one permission read rather than one
+   * per roster.
+   */
+  async requireMemberReader(
+    identity: SupabaseIdentity,
+    academyId: string,
+  ): Promise<ManagerActor & { canManageMembers: boolean }> {
+    let actor: AcademyAccess;
+    try {
+      actor = await this.access.requirePermission(
+        identity.authUserId,
+        academyId,
+        "academy.members.read",
+      );
+    } catch {
+      throw new AppException(
+        "MANAGER_OPERATIONS_ACCESS_DENIED",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    // Read from `roles`, the effective set, and not from `role`, the
+    // membership's own column. A Manager who also teaches, or a Teacher given
+    // Team Lead as an extra role, holds the wider authority in the set and not
+    // in the column — and `academy.members.read` itself was decided on the
+    // set, as is `canManageMembers` below and `canReadAcademyMembers` in the
+    // web gate. Asking the column here would admit and refuse people by a
+    // different rule than the three around it.
+    if (
+      !actor.roles.includes("MANAGER") &&
+      !actor.roles.includes("TEAM_LEAD")
+    ) {
+      throw new AppException(
+        "MANAGER_OPERATIONS_ACCESS_DENIED",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const academy = await this.prisma.academy.findUnique({
+      where: { id: academyId },
+      select: { timeZone: true },
+    });
+
+    return {
+      userId: actor.userId,
+      academyId,
+      timeZone: academy?.timeZone || ACADEMY_TIME_ZONE,
+      // Asked of the permission map rather than inferred from the role, so a
+      // later change to what a Team Lead holds moves this answer with it.
+      // Answered from the roles already in hand: a second `requirePermission`
+      // would be a second user and membership read to learn what the first
+      // one had resolved.
+      canManageMembers: rolesHavePermission(
+        actor.roles,
+        "academy.members.manage",
+      ),
     };
   }
 

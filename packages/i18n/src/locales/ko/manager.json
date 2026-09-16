@@ -261,7 +261,6 @@
     "not_joined": "아직 없음",
     "no_username": "없음",
     "sort_by": "{{column}} 기준 정렬",
-    "page_size": "페이지당 행",
     "showing": "{{total}}명 중 {{from}}–{{to}}",
     "showing_empty": "조건에 맞는 구성원 없음",
     "page_of": "{{pageCount}} 중 {{page}}쪽",

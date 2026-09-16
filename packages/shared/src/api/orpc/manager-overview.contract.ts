@@ -7,6 +7,11 @@ import {
   updateAcademyProfileInputSchema,
 } from "../../content/manager-overview.js";
 import {
+  memberDetailInputSchema,
+  staffDetailSchema,
+  studentDetailSchema,
+} from "../../memberships/member-detail.js";
+import {
   listPeopleInputSchema,
   peoplePageSchema,
 } from "../../memberships/people-directory.js";
@@ -62,4 +67,13 @@ export const academyPeopleContract = {
     .input(listStudentRosterInputSchema)
     .output(studentRosterPageSchema),
   staff: oc.input(listStaffRosterInputSchema).output(staffRosterPageSchema),
+  /**
+   * One member, for whoever may look them up.
+   *
+   * Beside the rosters rather than under a module of their own: the reader,
+   * the refusal, and the withholding rule are the same ones the lists use, and
+   * a separate contract would be a second place to keep them in step.
+   */
+  student: oc.input(memberDetailInputSchema).output(studentDetailSchema),
+  staffMember: oc.input(memberDetailInputSchema).output(staffDetailSchema),
 };

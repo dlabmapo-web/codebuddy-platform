@@ -22,5 +22,10 @@ export function createAcademyTeacherStudentsRouter(
       .handler(({ context, input }) =>
         deps.teacherStudentsService.list(context.identity, input)
       ),
+    roster: os.academyTeacherStudents.roster
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.teacherRosterService.list(context.identity, input)
+      ),
   };
 }

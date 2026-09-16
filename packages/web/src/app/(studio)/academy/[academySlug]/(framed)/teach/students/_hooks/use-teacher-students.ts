@@ -1,11 +1,10 @@
 'use client';
 
-import type { TeacherStudentList } from '@cove/shared';
+import type { TeacherRoster, TeacherStudentList } from '@cove/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { orpc } from '@/lib/orpc';
 
 import {
@@ -24,8 +23,10 @@ import {
  * history entry per keystroke, and adopts a real navigation — Back, or a link
  * a colleague sent — when one happens.
  */
-export function useStudentsState(academyId: string) {
-  const academySlug = useAcademySlug();
+export function useStudentsState() {
+  // The route this hook is running on, not one it names. Both teaching pages
+  // use this state, and a hard-coded base would move a reader between them.
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
 
@@ -41,7 +42,7 @@ export function useStudentsState(academyId: string) {
     setQuery(urlQuery);
   }
 
-  const path = studentsPath(academySlug, query);
+  const path = studentsPath(pathname, query);
   React.useEffect(() => {
     if (path !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', path);
@@ -117,4 +118,38 @@ export function useDebounced<T>(value: T, delayMs: number): T {
     return () => window.clearTimeout(timer);
   }, [value, delayMs]);
   return settled;
+}
+
+/**
+ * The roster, for the other view of the same students.
+ *
+ * Its own query rather than a mode of the one above, because it asks the
+ * server a different question and carries different rows. It shares the state
+ * hook and therefore the class filter and the search box, which is the point:
+ * a teacher who narrowed to one class keeps that class when they switch views.
+ *
+ * `keepPreviousData` for the same reason as the analytics table — the roster
+ * in hand stays on screen, dimmed, while a narrower one loads.
+ */
+export function useTeacherRosterQuery(
+  academyId: string,
+  query: StudentsQuery,
+  initialData: TeacherRoster | null,
+  initialKey: string,
+) {
+  const key = serializeStudentsQuery(query);
+
+  return useQuery({
+    queryKey: ['academy-teacher-roster', academyId, key],
+    queryFn: () =>
+      orpc.academyTeacherStudents.roster({
+        academyId,
+        ...(query.classId ? { classId: query.classId } : {}),
+        ...(query.search.trim() ? { search: query.search.trim() } : {}),
+      }),
+    initialData: key === initialKey ? (initialData ?? undefined) : undefined,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    retry: false,
+  });
 }

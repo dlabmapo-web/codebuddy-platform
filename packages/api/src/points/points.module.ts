@@ -25,6 +25,10 @@ import { PointsService } from "./points.service.js";
     PointsAccessService,
     PointsService,
   ],
-  exports: [PointAwardService, PointsService],
+  // `LeaderboardRepository` is exported for the member detail pages, which
+  // report one student's standing per class. They rank through the same
+  // repository the board does, so a position on a student's page and the same
+  // position on the class board cannot disagree.
+  exports: [LeaderboardRepository, PointAwardService, PointsService],
 })
 export class PointsModule {}

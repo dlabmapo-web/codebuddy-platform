@@ -85,6 +85,16 @@ export type DataTableProps<TData, TValue> = {
   emptyMessage?: string;
   /** Row count per page. Omit to render every row without pagination. */
   pageSize?: number;
+  /**
+   * Whether `pageSize` may change while the table is on screen.
+   *
+   * Only for a client-paged table whose caller offers a page-size control. It
+   * moves pagination from the table's own state into this component's, which
+   * is what lets a later `pageSize` take effect — and is deliberately opt-in,
+   * because every other client-paged table has always been uncontrolled and
+   * has no reason to change.
+   */
+  resizable?: boolean;
   /** Per-column multi-select filters, rendered as chips in the toolbar. */
   facets?: TableFacet[];
   /**
@@ -158,6 +168,7 @@ export function DataTable<TData, TValue>({
   searchPlaceholder,
   emptyMessage,
   pageSize,
+  resizable = false,
   facets,
   toolbarFilters,
   toolbarActions,
@@ -173,6 +184,7 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const { t } = useLayoutTranslation('common');
   const [clientSorting, setClientSorting] = React.useState<SortingState>([]);
+  const [clientPageIndex, setClientPageIndex] = React.useState(0);
   const [clientGlobalFilter, setClientGlobalFilter] = React.useState('');
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(
     () => initialColumnVisibility ?? {},
@@ -231,12 +243,46 @@ export function DataTable<TData, TValue>({
     options.rowCount = manual.rowCount;
     options.onPaginationChange = (updater) =>
       manual.onPageIndexChange(applyUpdater(updater, pagination).pageIndex);
+  } else if (pageSize && resizable) {
+    // Controlled, because this caller lets a reader change the page size.
+    // `initialState` is read once, so a seeded size would leave that control
+    // doing nothing after the first render.
+    options.getPaginationRowModel = getPaginationRowModel();
+    options.state = {
+      ...options.state,
+      pagination: { pageIndex: clientPageIndex, pageSize },
+    };
+    options.onPaginationChange = (updater) => {
+      const next = applyUpdater(updater, {
+        pageIndex: clientPageIndex,
+        pageSize,
+      });
+      setClientPageIndex(next.pageIndex);
+    };
   } else if (pageSize) {
+    // Seeded, and left to the table from there. Every caller that pages on the
+    // client with a fixed size has always worked this way.
     options.getPaginationRowModel = getPaginationRowModel();
     options.initialState = { pagination: { pageSize } };
   }
 
   const table = useReactTable(options);
+
+  /**
+   * Keep a client-paged table on a page that exists.
+   *
+   * Searching from page 7 down to two pages of results would otherwise leave
+   * the reader looking at an empty table with working paging buttons, which
+   * reads as "no matches" rather than as "you are past the end". Only for the
+   * client-paged case — a server-paged table's index belongs to its caller.
+   */
+  const clientPageCount = manual || !resizable ? 0 : table.getPageCount();
+  React.useEffect(() => {
+    if (clientPageCount === 0) return;
+    if (clientPageIndex > clientPageCount - 1) {
+      setClientPageIndex(clientPageCount - 1);
+    }
+  }, [clientPageCount, clientPageIndex]);
 
   const rows = table.getRowModel().rows;
   const hideableColumns = hideableColumnsOf(table.getAllLeafColumns());

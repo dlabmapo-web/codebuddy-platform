@@ -32,6 +32,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DataTable } from '@/components/studio/data-table';
+import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { FacetedFilter } from '@/components/studio/faceted-filter';
 import {
   Popover,
@@ -89,7 +90,7 @@ export function StudentAnalytics({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('teaching');
-  const { query, change } = useStudentsState(academyId);
+  const { query, change } = useStudentsState();
 
   // The box is local and the query is debounced, so typing feels immediate
   // while the server sees one request for a name rather than one per letter.
@@ -204,8 +205,9 @@ export function StudentAnalytics({
           />
         }
         toolbarActions={
-          <PageSizeControl
+          <PageSizePicker
             onChange={(pageSize) => change({ pageSize })}
+            sizes={STUDENT_PAGE_SIZES}
             value={query.pageSize}
           />
         }
@@ -652,28 +654,3 @@ function StudentFilters({
   );
 }
 
-function PageSizeControl({
-  onChange,
-  value,
-}: {
-  onChange: (value: number) => void;
-  value: number;
-}) {
-  const { t } = useTranslation('teaching');
-  return (
-    <label className="flex items-center gap-2">
-      <span className="sr-only">{t('table.page_size')}</span>
-      <select
-        className="h-10 rounded-lg border border-border bg-card px-2.5 text-[13.5px] font-semibold text-sub transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        onChange={(event) => onChange(Number(event.target.value))}
-        value={value}
-      >
-        {STUDENT_PAGE_SIZES.map((size) => (
-          <option key={size} value={size}>
-            {t('table.rows_per_page', { count: size })}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}

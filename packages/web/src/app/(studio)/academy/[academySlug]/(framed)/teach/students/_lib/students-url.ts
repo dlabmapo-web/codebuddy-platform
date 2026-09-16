@@ -1,4 +1,3 @@
-import { routes } from '@/lib/routes';
 import {
   DEFAULT_STUDENT_PAGE_SIZE,
   STUDENT_PAGE_SIZES,
@@ -177,10 +176,22 @@ export function serializeStudentsQuery(query: StudentsQuery): string {
   return search.toString();
 }
 
-export function studentsPath(academySlug: string, query: StudentsQuery): string {
+/**
+ * This state as an address, on whatever route is asking.
+ *
+ * The base is the caller's own pathname rather than a route named here, and
+ * that is the whole point: two pages share this state — the students list and
+ * Student analytics — and a base spelled out in this file would rewrite one of
+ * them into the other the moment a filter changed. The reader would find
+ * themselves on a different page, with a different rail entry marked current,
+ * having only typed in a search box.
+ *
+ * It only ever changes the query string. Moving between routes is navigation,
+ * and navigation is never something a filter does.
+ */
+export function studentsPath(pathname: string, query: StudentsQuery): string {
   const search = serializeStudentsQuery(query);
-  const base = `${routes.academy(academySlug)}/teach/students`;
-  return search ? `${base}?${search}` : base;
+  return search ? `${pathname}?${search}` : pathname;
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   studentRosterSortFields,
 } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
-import { GraduationCap, UserPen } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,11 +20,11 @@ import { useTranslation } from 'react-i18next';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { DataTable } from '@/components/studio/data-table';
 import { FacetedFilter } from '@/components/studio/faceted-filter';
+import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { routes } from '@/lib/routes';
 
-import { PageSizePicker } from '../../_components/page-size-picker';
 import {
   ClassChips,
   StatusBadge,
@@ -79,6 +79,20 @@ export function StudentRoster({
   const data = page.data;
   const rows = React.useMemo(() => data?.rows ?? [], [data?.rows]);
   const total = data?.total ?? 0;
+  /**
+   * Withheld until the server says otherwise.
+   *
+   * False while the first read is in flight, which in practice it never is —
+   * the page is server-rendered for the query in the address. Defaulting the
+   * other way would flash a guardian column at a reader who is about to be
+   * told they may not have one.
+   */
+  const canManageMembers = data?.viewer.canManageMembers ?? false;
+  const pointsEnabled = data?.pointsEnabled ?? false;
+  const numbers = React.useMemo(
+    () => new Intl.NumberFormat(i18n.language),
+    [i18n.language],
+  );
 
   const columns = React.useMemo<ColumnDef<StudentRosterRow>[]>(
     () => [
@@ -91,7 +105,7 @@ export function StudentRoster({
         cell: ({ row }) => (
           <Link
             className="flex min-w-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            href={routes.academyPerson(academySlug, row.original.membershipId)}
+            href={routes.academyStudent(academySlug, row.original.membershipId)}
           >
             <ProfileAvatar
               academyImageUrl={row.original.academyImageUrl}
@@ -115,17 +129,6 @@ export function StudentRoster({
         cell: ({ row }) => <UsernameCell username={row.original.username} />,
       },
       {
-        id: 'studentNumber',
-        accessorFn: (row) => row.studentNumber,
-        header: t('students.column.number'),
-        size: 104,
-        cell: ({ row }) => (
-          <span className="block truncate font-mono text-[12.5px] tabular-nums text-sub">
-            {row.original.studentNumber ?? t('not_set')}
-          </span>
-        ),
-      },
-      {
         id: 'classes',
         accessorFn: (row) => row.classes.length,
         header: t('students.column.classes'),
@@ -139,52 +142,64 @@ export function StudentRoster({
           />
         ),
       },
-      {
-        // Sorted by grade, which is what "school · grade" is looked up by;
-        // the school name rides along as context.
-        id: 'schoolGrade',
-        accessorFn: (row) => row.schoolGrade,
-        header: t('students.column.school'),
-        size: 160,
-        cell: ({ row }) => {
-          const parts = [row.original.schoolName, row.original.schoolGrade]
-            .map((part) => part?.trim())
-            .filter(Boolean);
-          return (
-            <span
-              className="block truncate text-[13px] text-ink"
-              title={parts.join(' · ')}
-            >
-              {parts.length > 0 ? parts.join(' · ') : (
-                <span className="text-sub">{t('not_set')}</span>
-              )}
-            </span>
-          );
-        },
-      },
-      {
-        id: 'guardian',
-        accessorFn: (row) => row.guardianName,
-        header: t('students.column.guardian'),
-        enableSorting: false,
-        size: 160,
-        meta: { hideable: true },
-        cell: ({ row }) =>
-          row.original.guardianName || row.original.guardianPhone ? (
-            <span className="block min-w-0">
-              <span className="block truncate text-[13px] text-ink">
-                {row.original.guardianName ?? t('not_set')}
-              </span>
-              {row.original.guardianPhone ? (
-                <span className="block truncate font-mono text-[12px] tabular-nums text-sub">
-                  {formatPhoneForDisplay(row.original.guardianPhone)}
+      /*
+       * Built only when the academy keeps score. An academy that runs no
+       * points has no column here rather than a column of zeroes, which would
+       * state a score for every child in it.
+       */
+      ...(pointsEnabled
+        ? ([
+            {
+              id: 'points',
+              accessorFn: (row) => row.points,
+              header: t('students.column.points'),
+              enableSorting: false,
+              size: 104,
+              meta: { align: 'right' },
+              cell: ({ row }) => (
+                <span className="block font-mono text-[13px] font-bold tabular-nums text-ink">
+                  {row.original.points === undefined
+                    ? t('not_set')
+                    : numbers.format(row.original.points)}
                 </span>
-              ) : null}
-            </span>
-          ) : (
-            <span className="text-sub">{t('not_set')}</span>
-          ),
-      },
+              ),
+            },
+          ] satisfies ColumnDef<StudentRosterRow>[])
+        : []),
+      /*
+       * Academy-private. Not built at all for a reader who may not manage
+       * members, rather than built and hidden: a hidden column is one the
+       * column menu offers to restore, and this one has no data behind it to
+       * restore. Its absence is also the honest shape — the rows arrived
+       * without the field, not with an empty one.
+       */
+      ...(canManageMembers
+        ? ([
+            {
+              id: 'guardian',
+              accessorFn: (row) => row.guardianName,
+              header: t('students.column.guardian'),
+              enableSorting: false,
+              size: 160,
+              meta: { hideable: true },
+              cell: ({ row }) =>
+                row.original.guardianName || row.original.guardianPhone ? (
+                  <span className="block min-w-0">
+                    <span className="block truncate text-[13px] text-ink">
+                      {row.original.guardianName ?? t('not_set')}
+                    </span>
+                    {row.original.guardianPhone ? (
+                      <span className="block truncate font-mono text-[12px] tabular-nums text-sub">
+                        {formatPhoneForDisplay(row.original.guardianPhone)}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-sub">{t('not_set')}</span>
+                ),
+            },
+          ] satisfies ColumnDef<StudentRosterRow>[])
+        : []),
       {
         id: 'status',
         accessorFn: (row) => row.status,
@@ -216,16 +231,19 @@ export function StudentRoster({
         enableSorting: false,
         enableHiding: false,
         size: 56,
+        // §5.1 — the detail page, for every reader, including the Manager.
+        // The editor is one click further on, behind the Edit link there. A
+        // row action that opened the editor was a link a Team Lead could see
+        // and not follow.
         cell: ({ row }) => (
           <ProfileLinkCell
-            href={routes.academyPerson(academySlug, row.original.membershipId)}
+            href={routes.academyStudent(academySlug, row.original.membershipId)}
             label={t('view_profile', { name: row.original.displayName })}
-            icon={UserPen}
           />
         ),
       },
     ],
-    [academySlug, i18n.language, t, tManager],
+    [academySlug, canManageMembers, i18n.language, numbers, pointsEnabled, t, tManager],
   );
 
   if (page.isError && !data) {

@@ -48,7 +48,9 @@
     "first": "첫 페이지",
     "last": "마지막 페이지",
     "rows_one": "{{count}}개",
-    "rows_other": "{{count}}개"
+    "rows_other": "{{count}}개",
+    "page_size": "페이지당 행",
+    "per_page": "행씩"
   },
   "language": {
     "label": "언어",

@@ -51,12 +51,12 @@ export class PeopleRosterService {
     identity: SupabaseIdentity,
     input: ListStudentRosterInput,
   ): Promise<StudentRosterPage> {
-    const actor = await this.scopes.requireManager(
+    const actor = await this.scopes.requireMemberReader(
       identity,
       input.academyId,
-      "academy.members.manage",
     );
     const academyId = actor.academyId;
+    const { canManageMembers } = actor;
 
     const filter: PeopleWhereInput = {
       search: input.search,
@@ -129,8 +129,12 @@ export class PeopleRosterService {
             studentNumber: true,
             schoolName: true,
             schoolGrade: true,
-            guardianName: true,
-            guardianPhone: true,
+            // Narrowed rather than dropped on the way out. A reader who may
+            // not see a guardian's number should not have it travel to the
+            // process that serialises their page.
+            ...(canManageMembers
+              ? { guardianName: true, guardianPhone: true }
+              : {}),
           },
         },
         classEnrollments: {
@@ -144,27 +148,49 @@ export class PeopleRosterService {
       take: input.pageSize,
     });
 
-    const avatars = await resolveMemberAvatars(
-      this.media,
-      memberships.map((membership) => ({ ...membership, key: membership.id })),
-    );
+    const [avatars, points] = await Promise.all([
+      resolveMemberAvatars(
+        this.media,
+        memberships.map((membership) => ({ ...membership, key: membership.id })),
+      ),
+      this.pointTotals(
+        academyId,
+        memberships.map((membership) => membership.id),
+      ),
+    ]);
 
-    const rows: StudentRosterRow[] = memberships.map((membership) => ({
-      membershipId: membership.id,
-      userId: membership.userId,
-      displayName: displayNameOf(membership),
-      username: membership.user.username,
-      status: membership.status,
-      joinedAt: membership.joinedAt?.toISOString() ?? null,
-      updatedAt: membership.updatedAt.toISOString(),
-      studentNumber: membership.studentProfile?.studentNumber ?? null,
-      schoolName: membership.studentProfile?.schoolName ?? null,
-      schoolGrade: membership.studentProfile?.schoolGrade ?? null,
-      guardianName: membership.studentProfile?.guardianName ?? null,
-      guardianPhone: membership.studentProfile?.guardianPhone ?? null,
-      classes: membership.classEnrollments.map((entry) => entry.class),
-      ...(avatars.get(membership.id) ?? noMemberAvatar),
-    }));
+    const rows: StudentRosterRow[] = memberships.map((membership) => {
+      // One narrowing at the boundary. The select above is conditional, so
+      // Prisma describes `studentProfile` as the union of both shapes; the
+      // guardian keys are present exactly when `canManageMembers` asked for
+      // them, which is the same condition that emits them below.
+      const profile = membership.studentProfile as ReadableStudentProfile | null;
+      return {
+        membershipId: membership.id,
+        userId: membership.userId,
+        displayName: displayNameOf(membership),
+        username: membership.user.username,
+        status: membership.status,
+        joinedAt: membership.joinedAt?.toISOString() ?? null,
+        updatedAt: membership.updatedAt.toISOString(),
+        studentNumber: profile?.studentNumber ?? null,
+        schoolName: profile?.schoolName ?? null,
+        schoolGrade: profile?.schoolGrade ?? null,
+        // Absent, not null, for a reader who may not have them. See
+        // `studentRosterRowSchema`.
+        ...(canManageMembers
+          ? {
+              guardianName: profile?.guardianName ?? null,
+              guardianPhone: profile?.guardianPhone ?? null,
+            }
+          : {}),
+        // Absent, not zero, when this academy keeps no score. See the row
+        // schema.
+        ...(points ? { points: points.get(membership.id) ?? 0 } : {}),
+        classes: membership.classEnrollments.map((entry) => entry.class),
+        ...(avatars.get(membership.id) ?? noMemberAvatar),
+      };
+    });
 
     return {
       rows,
@@ -188,19 +214,49 @@ export class PeopleRosterService {
             0,
         })),
       },
+      viewer: { canManageMembers },
+      pointsEnabled: points !== null,
     };
+  }
+
+  /**
+   * Lifetime earned, per student, or null when the academy keeps no score.
+   *
+   * One read of the balance table the award service already maintains, rather
+   * than a sum over the ledger: the roster prints this number beside up to a
+   * hundred names, and recomputing it per row is the query this table exists
+   * to avoid.
+   */
+  private async pointTotals(
+    academyId: string,
+    membershipIds: readonly string[],
+  ): Promise<Map<string, number> | null> {
+    const enabled = await this.prisma.academyFeatureFlag.findFirst({
+      where: { academyId, feature: "STUDENT_POINTS", isEnabled: true },
+      select: { academyId: true },
+    });
+    if (!enabled) return null;
+    if (membershipIds.length === 0) return new Map();
+
+    const balances = await this.prisma.studentPointBalance.findMany({
+      where: { academyId, membershipId: { in: [...membershipIds] } },
+      select: { membershipId: true, earnedTotal: true },
+    });
+    return new Map(
+      balances.map((row) => [row.membershipId, row.earnedTotal]),
+    );
   }
 
   async listStaff(
     identity: SupabaseIdentity,
     input: ListStaffRosterInput,
   ): Promise<StaffRosterPage> {
-    const actor = await this.scopes.requireManager(
+    const actor = await this.scopes.requireMemberReader(
       identity,
       input.academyId,
-      "academy.members.manage",
     );
     const academyId = actor.academyId;
+    const { canManageMembers } = actor;
 
     const filter: PeopleWhereInput = {
       search: input.search,
@@ -265,12 +321,15 @@ export class PeopleRosterService {
         memberProfile: {
           select: {
             academyDisplayName: true,
-            contactPhone: true,
+            ...(canManageMembers ? { contactPhone: true } : {}),
             ...memberAvatarSelect.memberProfile.select,
           },
         },
         staffProfile: {
-          select: { academyTitle: true, employeeNumber: true },
+          select: {
+            academyTitle: true,
+            ...(canManageMembers ? { employeeNumber: true } : {}),
+          },
         },
         assignedClasses: {
           where: { academyId, status: "ACTIVE" },
@@ -293,12 +352,23 @@ export class PeopleRosterService {
       memberships.map((membership) => ({ ...membership, key: membership.id })),
     );
 
-    const rows: StaffRosterRow[] = memberships.map((membership) => ({
+    const rows: StaffRosterRow[] = memberships.map((membership) => {
+      // `contactPhone` and `employeeNumber` are narrowed out of the select
+      // above, so Prisma describes them as the union of both shapes.
+      const memberProfile = membership.memberProfile as ReadableMemberProfile | null;
+      const staffProfile = membership.staffProfile as ReadableStaffProfile | null;
+      return {
       membershipId: membership.id,
       userId: membership.userId,
       displayName: displayNameOf(membership),
       username: membership.user.username,
-      email: displayableEmail(membership.user.email),
+      // Selected for every reader because `displayNameOf` falls back to it
+      // when a member has no name and no username, and emitted only to one
+      // who may manage members. This is the single field the narrowing
+      // above cannot cover: the roster cannot name people without reading it.
+      ...(canManageMembers
+        ? { email: displayableEmail(membership.user.email) }
+        : {}),
       role: membership.role,
       roles: [
         ...effectiveAcademyRoles(
@@ -309,13 +379,18 @@ export class PeopleRosterService {
       status: membership.status,
       joinedAt: membership.joinedAt?.toISOString() ?? null,
       updatedAt: membership.updatedAt.toISOString(),
-      academyTitle: membership.staffProfile?.academyTitle ?? null,
-      employeeNumber: membership.staffProfile?.employeeNumber ?? null,
-      contactPhone: membership.memberProfile?.contactPhone ?? null,
+      academyTitle: staffProfile?.academyTitle ?? null,
+      ...(canManageMembers
+        ? {
+            employeeNumber: staffProfile?.employeeNumber ?? null,
+            contactPhone: memberProfile?.contactPhone ?? null,
+          }
+        : {}),
       homeroomClasses: membership.assignedClasses,
       assistantClasses: membership.assistedClasses.map((entry) => entry.class),
       ...(avatars.get(membership.id) ?? noMemberAvatar),
-    }));
+      };
+    });
 
     return {
       rows,
@@ -336,6 +411,7 @@ export class PeopleRosterService {
             statusFacets.find((row) => row.status === value)?._count._all ?? 0,
         })),
       },
+      viewer: { canManageMembers },
     };
   }
 }
@@ -353,6 +429,33 @@ function displayNameOf(membership: {
     "—"
   );
 }
+
+/**
+ * A student profile as this service selected it.
+ *
+ * The guardian pair is optional because the select that produced it is: they
+ * are read only for a caller who may manage members. Everything above them is
+ * read for every caller a roster admits.
+ */
+type ReadableStudentProfile = {
+  studentNumber: string | null;
+  schoolName: string | null;
+  schoolGrade: string | null;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+};
+
+/** A member profile as this service selected it. See `ReadableStudentProfile`. */
+type ReadableMemberProfile = {
+  academyDisplayName: string | null;
+  contactPhone?: string | null;
+};
+
+/** A staff profile as this service selected it. See `ReadableStudentProfile`. */
+type ReadableStaffProfile = {
+  academyTitle: string | null;
+  employeeNumber?: string | null;
+};
 
 type MembershipOrder = Prisma.AcademyMembershipOrderByWithRelationInput;
 

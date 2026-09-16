@@ -192,6 +192,17 @@ export const routes = {
     membershipId: string,
     submissionId: string,
   ) => `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/students/${segment(membershipId)}/submissions/${segment(submissionId)}`,
+  /**
+   * Student analytics — "who needs me this week", measured over a period.
+   *
+   * Its own route, and deliberately not a view of the students list. The two
+   * ask different questions, carry different controls, and are reached from
+   * different places in the rail; sharing a path meant neither could be
+   * marked current, because a nav highlight is decided on the path alone.
+   */
+  academyTeachAnalytics: (academySlug: string) =>
+    `${academyRoot(academySlug)}/teach/analytics`,
+  /** The teacher's own students: who they teach, and where each one stands. */
   academyTeachStudents: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/students`,
   academyPeople: (academySlug: string) =>
@@ -200,7 +211,19 @@ export const routes = {
     `${academyRoot(academySlug)}/people/${segment(membershipId)}`,
   academyStudents: (academySlug: string) =>
     `${academyRoot(academySlug)}/students`,
+  /**
+   * One student, for whoever may look them up.
+   *
+   * Distinct from `academyPerson`, which is the Manager's *editor*. This one
+   * is the read every roster row opens — a Manager, a Team Lead and a Teacher
+   * all land here, and the editor is a link away for the one who may use it.
+   */
+  academyStudent: (academySlug: string, membershipId: string) =>
+    `${academyRoot(academySlug)}/students/${segment(membershipId)}`,
   academyStaff: (academySlug: string) => `${academyRoot(academySlug)}/staff`,
+  /** One staff member. See `academyStudent`. */
+  academyStaffMember: (academySlug: string, membershipId: string) =>
+    `${academyRoot(academySlug)}/staff/${segment(membershipId)}`,
   academyApplications: (academySlug: string) =>
     `${academyRoot(academySlug)}/applications`,
   academyInvitations: (academySlug: string) =>

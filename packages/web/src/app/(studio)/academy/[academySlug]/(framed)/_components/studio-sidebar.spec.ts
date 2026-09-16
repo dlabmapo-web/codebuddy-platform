@@ -24,7 +24,9 @@ const common = {
 
 function peopleLinks(options: {
   canManageAcademy: boolean;
+  canReadAcademyMembers: boolean;
   canReviewApplications: boolean;
+  canMonitor?: boolean;
 }) {
   const group = studioNavGroups({ ...common, ...options })
     .find(({ id }) => id === 'people');
@@ -38,6 +40,7 @@ function curriculumLinks(options: {
   const group = studioNavGroups({
     ...common,
     canManageAcademy: false,
+    canReadAcademyMembers: false,
     canReviewApplications: false,
     ...options,
   })
@@ -73,6 +76,7 @@ describe('studio application navigation', () => {
   it('shows all people links to a manager', () => {
     expect(peopleLinks({
       canManageAcademy: true,
+      canReadAcademyMembers: true,
       canReviewApplications: true,
     })).toEqual([
       '/academy/cove-development/people',
@@ -83,17 +87,81 @@ describe('studio application navigation', () => {
     ]);
   });
 
-  it('shows only applications to a team lead', () => {
+  it('shows the rosters but not the directory to a team lead', () => {
+    // Looking somebody up and changing them are different authorities. The
+    // directory edits, so it stays behind the Manager's role; the two rosters
+    // only read, and a Team Lead holds `academy.members.read`.
     expect(peopleLinks({
       canManageAcademy: false,
+      canReadAcademyMembers: true,
+      canReviewApplications: true,
+    })).toEqual([
+      '/academy/cove-development/students',
+      '/academy/cove-development/staff',
+      '/academy/cove-development/applications',
+    ]);
+  });
+
+  it('shows only applications to a reviewer who may not read members', () => {
+    expect(peopleLinks({
+      canManageAcademy: false,
+      canReadAcademyMembers: false,
       canReviewApplications: true,
     })).toEqual(['/academy/cove-development/applications']);
   });
 
-  it('shows no people group without either permission', () => {
+  it('shows no people group without any of the three', () => {
     expect(peopleLinks({
       canManageAcademy: false,
+      canReadAcademyMembers: false,
       canReviewApplications: false,
     })).toEqual([]);
+  });
+});
+
+describe("whose Students link a rail draws", () => {
+  it("gives a team lead the academy's two rosters", () => {
+    expect(
+      peopleLinks({
+        canManageAcademy: false,
+        canReadAcademyMembers: true,
+        canReviewApplications: false,
+      }),
+    ).toEqual([
+      '/academy/cove-development/students',
+      '/academy/cove-development/staff',
+    ]);
+  });
+
+  it("gives a teacher their own students, and neither academy roster", () => {
+    // A teacher holds `academy.members.read` — it is what lets them see the
+    // names of the children they teach — but the academy-wide rosters refuse
+    // them, so a rail that offered those two links was offering a refusal.
+    // What they get instead is the list bounded by their own assignment.
+    expect(
+      peopleLinks({
+        canManageAcademy: false,
+        canReadAcademyMembers: false,
+        canReviewApplications: false,
+        canMonitor: true,
+      }),
+    ).toEqual(['/academy/cove-development/teach/students']);
+  });
+
+  it("gives a manager the directory as well as the rosters", () => {
+    expect(
+      peopleLinks({
+        canManageAcademy: true,
+        canReadAcademyMembers: true,
+        canReviewApplications: false,
+        canMonitor: true,
+      }),
+    ).toEqual([
+      '/academy/cove-development/people',
+      '/academy/cove-development/students',
+      '/academy/cove-development/staff',
+      // The directory's own companion, unrelated to the rosters.
+      '/academy/cove-development/invitations',
+    ]);
   });
 });

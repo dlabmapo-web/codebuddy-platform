@@ -28,6 +28,11 @@ import { TeamLeadOverviewService } from "./team-lead-overview.service.js";
     TeamLeadOverviewRepository,
     TeamLeadOverviewService,
   ],
-  exports: [TeamLeadOverviewService],
+  // `TeamLeadOverviewRepository` is exported for the member detail pages,
+  // which measure one student's work over the academy. It is scope-driven and
+  // holds no authorization of its own — the same property that makes the
+  // teach repositories safe to export — and reusing it is what keeps a solved
+  // count on a member's page equal to the same count on every other.
+  exports: [TeamLeadOverviewService, TeamLeadOverviewRepository],
 })
 export class LeadModule {}

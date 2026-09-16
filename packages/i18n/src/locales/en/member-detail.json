@@ -1,0 +1,86 @@
+{
+  "not_set": "—",
+  "back_to_students": "Students",
+  "back_to_my_students": "My students",
+  "back_to_staff": "Teachers",
+  "edit_profile": "Edit profile",
+  "student": {
+    "title": "Student",
+    "id": "ID",
+    "joined": "Joined",
+    "not_joined": "Not joined yet",
+    "section": {
+      "classes": "Classes",
+      "work": "Learning record",
+      "guardian": "Guardian and emergency contact"
+    },
+    "classes": {
+      "teacher": "Teacher",
+      "no_teacher": "No teacher assigned",
+      "empty": "Not in any class yet.",
+      "view_progress": "View progress",
+      "students": "Students",
+      "courses": "Courses"
+    },
+    "work": {
+      "solved": "Problems solved",
+      "submissions": "Submissions",
+      "active_time": "Active time",
+      "last_active": "Last active",
+      "never": "No activity yet"
+    },
+    "standing": {
+      "points": "Points",
+      "position": "Class rank",
+      "unranked": "Not ranked",
+      "in_class": "{{className}}",
+      "ledger": "View points ledger"
+    },
+    "guardian": {
+      "name": "Guardian",
+      "relationship": "Relationship",
+      "phone": "Guardian phone",
+      "emergency_name": "Emergency contact",
+      "emergency_phone": "Emergency phone"
+    },
+    "eyebrow": "Student",
+    "section_standing": "Standing",
+    "standing_none": "No standing yet.",
+    "unranked_hint": "Not placed",
+    "section_courses": "Courses",
+    "courses_none": "No course assigned yet.",
+    "courses_time": "Active time",
+    "courses_taught_in_one": "Taught in {{count}} of their classes",
+    "courses_taught_in_other": "Taught in {{count}} of their classes"
+  },
+  "staff": {
+    "title": "Staff",
+    "id": "ID",
+    "joined": "Joined",
+    "not_joined": "Not joined yet",
+    "section": {
+      "classes": "Classes",
+      "contact": "Contact"
+    },
+    "classes": {
+      "homeroom": "Homeroom",
+      "assistant": "Assisting",
+      "empty": "Not running any class."
+    },
+    "contact": {
+      "email": "Email",
+      "phone": "Phone",
+      "employee_number": "Employee number"
+    },
+    "section_teaching": "Teaching",
+    "teaching_none": "Not running any class yet.",
+    "homeroom": "Homeroom",
+    "homeroom_hint": "Answerable for the class",
+    "assistant": "Assisting",
+    "assistant_hint": "Teaches alongside the homeroom teacher",
+    "class_count_one": "{{count}} class",
+    "class_count_other": "{{count}} classes",
+    "class_students": "Students",
+    "class_courses": "Courses"
+  }
+}

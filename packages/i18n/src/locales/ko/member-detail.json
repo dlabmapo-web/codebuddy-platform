@@ -1,0 +1,84 @@
+{
+  "not_set": "—",
+  "back_to_students": "학생 목록",
+  "back_to_my_students": "내 학생",
+  "back_to_staff": "강사",
+  "edit_profile": "프로필 수정",
+  "student": {
+    "title": "학생",
+    "id": "아이디",
+    "joined": "합류일",
+    "not_joined": "아직 합류 전",
+    "section": {
+      "classes": "반",
+      "work": "학습 기록",
+      "guardian": "보호자 · 비상 연락처"
+    },
+    "classes": {
+      "teacher": "담당 선생님",
+      "no_teacher": "담당 선생님 미배정",
+      "empty": "아직 배정된 반이 없습니다.",
+      "view_progress": "진도 보기",
+      "students": "학생",
+      "courses": "과목"
+    },
+    "work": {
+      "solved": "푼 문제",
+      "submissions": "제출",
+      "active_time": "학습 시간",
+      "last_active": "마지막 활동",
+      "never": "기록 없음"
+    },
+    "standing": {
+      "points": "포인트",
+      "position": "반 순위",
+      "unranked": "순위 없음",
+      "in_class": "{{className}}",
+      "ledger": "포인트 내역 보기"
+    },
+    "guardian": {
+      "name": "보호자",
+      "relationship": "관계",
+      "phone": "보호자 연락처",
+      "emergency_name": "비상 연락처",
+      "emergency_phone": "비상 전화번호"
+    },
+    "eyebrow": "학생",
+    "section_standing": "순위",
+    "standing_none": "아직 순위가 없습니다.",
+    "unranked_hint": "순위 없음",
+    "section_courses": "수강 과목",
+    "courses_none": "아직 배정된 과목이 없습니다.",
+    "courses_time": "학습 시간",
+    "courses_taught_in_other": "수강 중인 반 {{count}}곳에서 진행"
+  },
+  "staff": {
+    "title": "교직원",
+    "id": "아이디",
+    "joined": "합류일",
+    "not_joined": "아직 합류 전",
+    "section": {
+      "classes": "담당 반",
+      "contact": "연락처"
+    },
+    "classes": {
+      "homeroom": "담임",
+      "assistant": "보조",
+      "empty": "맡은 반이 없습니다."
+    },
+    "contact": {
+      "email": "이메일",
+      "phone": "전화번호",
+      "employee_number": "사번"
+    },
+    "section_teaching": "담당 수업",
+    "teaching_none": "아직 맡은 반이 없습니다.",
+    "homeroom": "담임",
+    "homeroom_hint": "반을 책임지는 선생님",
+    "assistant": "보조",
+    "assistant_hint": "담임 선생님과 함께 가르칩니다",
+    "class_count_other": "{{count}}개 반",
+    "class_students": "학생",
+    "class_courses": "과목"
+  }
+}

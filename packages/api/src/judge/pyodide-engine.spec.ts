@@ -52,4 +52,41 @@ describe("PyodideExecutionEngine", () => {
 
     expect(result.stdout.trim()).toBe("False");
   });
+  describe("stdin", () => {
+    const runWith = (code: string, stdin = "3\n4\n") =>
+      engine.run({ code, stdin, timeLimitMs: 2_000, memoryLimitMb: 256 });
+
+    it.each([
+      ["input()", "print(int(input()) + int(input()))"],
+      ["sys.stdin.readline", "import sys\ninput = sys.stdin.readline\nprint(int(input()) + int(input()))"],
+      ["sys.stdin.read()", "import sys\nprint(sum(map(int, sys.stdin.read().split())))"],
+      ["open(0)", "print(sum(map(int, open(0).read().split())))"],
+    ])("gives %s the case input", async (_name, code) => {
+      const result = await runWith(code);
+
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("7\n");
+    });
+
+    it("raises EOFError when the program reads past the case input", async () => {
+      const result = await runWith("input(); input(); input()");
+
+      expect(result.outcome).toBe("RUNTIME_ERROR");
+      expect(result.stderr).toContain("EOFError");
+    });
+
+    it("keeps Korean input intact", async () => {
+      const result = await runWith("a, b = input().split()\nprint(b, a)", "윷 모\n");
+
+      expect(result.stdout).toBe("모 윷\n");
+    });
+
+    it("gives the next run its own input after a run closed fd 0", async () => {
+      await runWith("print(open(0).read())");
+      const result = await runWith("print(int(input()) + int(input()))", "5\n6\n");
+
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("11\n");
+    });
+  });
 });

@@ -9,8 +9,20 @@ import type { ExecutionRequest, ExecutionResult } from "./execution-engine.js";
 const MAX_OUTPUT_BYTES = 256 * 1024;
 const interrupt = workerData.interrupt as Uint8Array;
 
+// The case input is served from Pyodide's stdin device (see `serveCaseInput`),
+// so it sits behind file descriptor 0 itself and not only behind `sys.stdin`:
+// `open(0).read()` bypasses `sys.stdin`. Each run reads through a fresh text
+// wrapper so read-ahead cannot carry one case's input into the next, and a fd 0
+// closed by user code (`open(0)` closes it when collected) is reopened before
+// and after every run.
 const HARNESS = `
-import sys, io, json, traceback
+import sys, io, json, os, traceback
+
+def _cove_ensure_stdin_fd():
+    try:
+        os.fstat(0)
+    except OSError:
+        os.open('/dev/stdin', os.O_RDONLY)
 
 class _CoveOutput(io.TextIOBase):
     def __init__(self, max_bytes):
@@ -30,10 +42,13 @@ class _CoveOutput(io.TextIOBase):
     def getvalue(self):
         return ''.join(self.parts)
 
-def _cove_run(user_code, stdin_text, max_bytes):
+def _cove_run(user_code, max_bytes):
     saved_stdout, saved_stderr, saved_stdin = sys.stdout, sys.stderr, sys.stdin
     out, err = _CoveOutput(max_bytes), _CoveOutput(max_bytes)
-    sys.stdout, sys.stderr, sys.stdin = out, err, io.StringIO(stdin_text)
+    _cove_ensure_stdin_fd()
+    sys.stdout, sys.stderr = out, err
+    case_stdin = open(0, 'r', encoding='utf-8', closefd=False)
+    sys.stdin = case_stdin
     error = None
     try:
         exec(compile(user_code, 'solution.py', 'exec'), {'__name__': '__main__'})
@@ -47,6 +62,8 @@ def _cove_run(user_code, stdin_text, max_bytes):
         }
     finally:
         sys.stdout, sys.stderr, sys.stdin = saved_stdout, saved_stderr, saved_stdin
+        case_stdin.close()
+        _cove_ensure_stdin_fd()
     return json.dumps({
         'stdout': out.getvalue(),
         'stderr': err.getvalue(),
@@ -56,11 +73,29 @@ def _cove_run(user_code, stdin_text, max_bytes):
 
 let pyodide: PyodideInterface;
 
+const utf8 = new TextEncoder();
+let caseInput = new Uint8Array(0);
+let caseOffset = 0;
+
+/** What fd 0 holds for the next run: exactly this text, then EOF. */
+function serveCaseInput(stdin: string): void {
+  caseInput = utf8.encode(stdin);
+  caseOffset = 0;
+}
+
 async function initialize(): Promise<void> {
   const require = createRequire(import.meta.url);
   const indexURL = `${dirname(require.resolve("pyodide/package.json"))}${sep}`;
   pyodide = await loadPyodide({ indexURL });
   pyodide.setInterruptBuffer(interrupt);
+  pyodide.setStdin({
+    read: (buffer) => {
+      const size = Math.min(buffer.length, caseInput.length - caseOffset);
+      buffer.set(caseInput.subarray(caseOffset, caseOffset + size));
+      caseOffset += size;
+      return size;
+    },
+  });
   await pyodide.runPythonAsync(HARNESS);
   parentPort?.postMessage({ type: "ready" });
 }
@@ -72,8 +107,9 @@ async function run(
   const startedAt = Date.now();
   let result: ExecutionResult;
   try {
+    serveCaseInput(request.stdin);
     const raw = (await pyodide.runPythonAsync(
-      `_cove_run(${JSON.stringify(request.code)}, ${JSON.stringify(request.stdin)}, ${MAX_OUTPUT_BYTES})`,
+      `_cove_run(${JSON.stringify(request.code)}, ${MAX_OUTPUT_BYTES})`,
     )) as string;
     const parsed = JSON.parse(raw) as {
       stdout: string;
@@ -106,6 +142,7 @@ async function run(
     };
   } finally {
     Atomics.store(interrupt, 0, 0);
+    serveCaseInput("");
     await pyodide
       .runPythonAsync("globals().clear()\n" + HARNESS)
       .catch(() => undefined);

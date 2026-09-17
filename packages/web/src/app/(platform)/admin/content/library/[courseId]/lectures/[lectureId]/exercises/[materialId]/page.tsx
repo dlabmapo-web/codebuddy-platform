@@ -5,6 +5,7 @@ import { PlatformShell } from '@/app/(platform)/admin/_components/platform-shell
 import { ExerciseWorkspace } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/exercise-workspace';
 import { BackLink } from '@/components/studio/back-link';
 import { createContentPaths } from '@/components/studio/content-paths';
+import { redirectIfExerciseMoved } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/moved-exercise';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 
 import { requireLibraryAcademyId } from '../../../../../_lib/require-library';
@@ -69,7 +70,16 @@ export default async function LibraryExercisePage({
   } else {
     context = await client.academyCourses
       .getExercise({ academyId, courseId, lectureId, materialId })
-      .catch(() => notFound());
+      .catch(async () => {
+        await redirectIfExerciseMoved({
+          exercisePath: (currentLectureId) =>
+            createContentPaths('', 'library').exercise(courseId, currentLectureId, materialId),
+          lectureId,
+          loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+          materialId,
+        });
+        return notFound();
+      });
     solutionCode = await client.academyCourses
       .getExerciseSolution({ academyId, courseId, lectureId, materialId })
       .then((solution) => solution.solutionCode ?? '')

@@ -58,5 +58,6 @@
       "MEDIUM": "보통",
       "HARD": "어려움"
     }
-  }
+  },
+  "visibility_action": "“{{title}}” 학생에게 공개"
 }

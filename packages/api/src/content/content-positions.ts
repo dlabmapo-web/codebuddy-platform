@@ -128,6 +128,66 @@ export async function rewritePositions(
 }
 
 /**
+ * The ordering of a destination parent once `itemId` is placed at `toIndex`.
+ *
+ * `currentIds` is the destination's children in position order. The item is
+ * removed first if it is already among them (a move within one parent), and an
+ * index past the end means last, so an index computed from a slightly older
+ * tree still yields every id exactly once.
+ */
+export function orderingWithItemAt(
+  currentIds: readonly string[],
+  itemId: string,
+  toIndex: number,
+): string[] {
+  const without = currentIds.filter((id) => id !== itemId);
+  const index = Math.max(0, Math.min(toIndex, without.length));
+  return [...without.slice(0, index), itemId, ...without.slice(index)];
+}
+
+/**
+ * Give a lecture or material a new parent without breaking either parent's
+ * unique position constraint.
+ *
+ * The row is parked one past the destination's highest position, which no
+ * sibling there can hold, and its parent id changes in the same update. Both
+ * parents are then rewritten densely by `rewritePositions`, which parks its
+ * own rows above that range before assigning `1..n`.
+ */
+export async function reparentAbovePositions(
+  tx: Prisma.TransactionClient,
+  kind: "lecture" | "material",
+  itemId: string,
+  destinationParentId: string,
+) {
+  if (kind === "lecture") {
+    const result = await tx.lecture.aggregate({
+      where: { courseModuleId: destinationParentId },
+      _max: { position: true },
+    });
+    await tx.lecture.update({
+      where: { id: itemId },
+      data: {
+        courseModuleId: destinationParentId,
+        position: (result._max.position ?? 0) + 1,
+      },
+    });
+    return;
+  }
+  const result = await tx.material.aggregate({
+    where: { lectureId: destinationParentId },
+    _max: { position: true },
+  });
+  await tx.material.update({
+    where: { id: itemId },
+    data: {
+      lectureId: destinationParentId,
+      position: (result._max.position ?? 0) + 1,
+    },
+  });
+}
+
+/**
  * Merge explicit workbook positions with siblings whose order was left blank.
  *
  * Blank existing entities keep their relative order, blank new entities have

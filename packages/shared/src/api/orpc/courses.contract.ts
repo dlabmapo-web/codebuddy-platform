@@ -13,6 +13,8 @@ import {
   exerciseAuthoringContextSchema,
   exerciseMaterialInputSchema,
   exerciseSolutionSchema,
+  moveExerciseSchema,
+  moveLectureSchema,
   deleteCourseSchema,
   deleteCourseModuleSchema,
   deleteLectureSchema,
@@ -75,6 +77,11 @@ export const academyCoursesContract = {
   reorderLectures: oc
     .input(reorderLecturesSchema)
     .output(courseTreeSchema),
+  /**
+   * Move a lecture to any chapter of the same course, contents included.
+   * Submissions and progress belong to the problems and move with them.
+   */
+  moveLecture: oc.input(moveLectureSchema).output(courseTreeSchema),
   getExercise: oc
     .input(exerciseMaterialInputSchema)
     .output(exerciseAuthoringContextSchema),
@@ -93,6 +100,8 @@ export const academyCoursesContract = {
   reorderExercises: oc
     .input(reorderProgrammingExercisesSchema)
     .output(courseTreeSchema),
+  /** Move a problem to any lecture of the same course. */
+  moveExercise: oc.input(moveExerciseSchema).output(courseTreeSchema),
   setExerciseVisibility: oc
     .input(setExerciseVisibilitySchema)
     .output(courseTreeSchema),

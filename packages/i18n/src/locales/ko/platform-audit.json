@@ -120,6 +120,7 @@
       "lecture": {
         "created": "강의 생성",
         "deleted": "강의 삭제",
+        "moved": "강의 이동",
         "reordered": "강의 순서 변경",
         "updated": "강의 수정",
         "visibility_changed": "강의 공개 여부 변경"
@@ -137,6 +138,7 @@
       "programming_exercise": {
         "created": "문제 생성",
         "deleted": "문제 삭제",
+        "moved": "문제 이동",
         "reordered": "문제 순서 변경",
         "updated": "문제 수정",
         "visibility_changed": "문제 공개 여부 변경"

@@ -469,6 +469,20 @@ h1, h2, h3, h4 {
 }
 .cove-hint-in { animation: cove-hint-in 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 
+/* A curriculum row the author just moved: a brand wash and edge that fade, so
+   the eye lands on where it went without the row staying marked. */
+@keyframes cove-move-flash {
+  0%, 35% { background-color: var(--brand-soft); box-shadow: inset 3px 0 0 var(--brand); }
+  100% { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
+.cove-move-flash { animation: cove-move-flash 1600ms ease-out; }
+/* Reduced motion: the same mark, held and then removed in one step, so it
+   still ends (and `animationend` still clears the class) without a fade. */
+@keyframes cove-move-hold {
+  from { background-color: var(--brand-soft); box-shadow: inset 3px 0 0 var(--brand); }
+  to { background-color: transparent; box-shadow: none; }
+}
+
 /*
  * Loading placeholders.
  *
@@ -617,6 +631,7 @@ h1, h2, h3, h4 {
 
 @media (prefers-reduced-motion: reduce) {
   .cove-overlay, .cove-sheet-left, .cove-sheet-right, .cove-pop, .cove-collapse, .cove-hint-in { animation: none !important; }
+  .cove-move-flash { animation: cove-move-hold 1600ms steps(1, end) !important; }
   /* More than `animation: none`: without the sweep the field still has to be
      visible, and `opacity: 0` is the resting state the fade-in undoes. */
   .cove-skeleton {

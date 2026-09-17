@@ -111,11 +111,13 @@
       "content.lecture.visibility_changed": "lecture shown or hidden",
       "content.lecture.deleted": "lecture deleted",
       "content.lecture.reordered": "lectures reordered",
+      "content.lecture.moved": "lecture moved",
       "content.programming_exercise.created": "exercise added",
       "content.programming_exercise.updated": "exercise edited",
       "content.programming_exercise.visibility_changed": "exercise shown or hidden",
       "content.programming_exercise.deleted": "exercise deleted",
-      "content.programming_exercise.reordered": "exercises reordered"
+      "content.programming_exercise.reordered": "exercises reordered",
+      "content.programming_exercise.moved": "exercise moved"
     }
   },
   "period": {

@@ -9,7 +9,8 @@ import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseModule } from '../_lib/course-tree';
-import { VisibilityIndicator } from './builder-controls';
+import { RowVisibility } from './builder-controls';
+import { DragHandle, DropIndicator, useOutlineRowDnd } from './builder-dnd';
 import { DeleteModal } from './delete-modal';
 import { MoveModal } from './move-modal';
 import { LectureRow } from './lecture-row';
@@ -46,6 +47,17 @@ export function ModuleCard({
   );
 
   const open = !builder.isCollapsed(courseModule.id);
+  // A chapter header takes a dragged chapter beside it and a dragged lecture
+  // into its list, which is how a lecture reaches a collapsed or empty chapter.
+  const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
+    canDrag: builder.editable && !builder.movePending && siblings.length > 1,
+    canDrop: builder.editable && !builder.movePending,
+    item: { kind: 'module', id: courseModule.id, title: courseModule.title },
+    target: {
+      row: { kind: 'module', id: courseModule.id },
+      container: { accepts: 'lecture', parentId: courseModule.id },
+    },
+  });
 
   return (
     <Collapsible.Root
@@ -53,10 +65,19 @@ export function ModuleCard({
       onOpenChange={() => builder.toggleCollapsed(courseModule.id)}
       open={open}
     >
-    <article className="overflow-hidden rounded-card border border-border bg-card">
+    <article
+      className={`overflow-hidden rounded-card border border-border bg-card ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+    >
       {/* The module header is tinted so it reads as the group it owns, never as
           a sibling of the lecture rows beneath it. */}
-      <header className="flex items-center gap-2.5 border-b border-border bg-canvas px-4 py-3.5">
+      <header
+        className="relative flex items-center gap-2.5 border-b border-border bg-canvas px-4 py-3.5"
+        ref={setNodeRef}
+      >
+        <DropIndicator edge={dropEdge} />
+        <DragHandle className="-ml-2 -mr-1.5" handle={handle} />
         <Collapsible.Trigger asChild>
           <button
             aria-label={t('outline.toggle', { title: courseModule.title })}
@@ -94,30 +115,28 @@ export function ModuleCard({
           </p>
         </div>
         {visibilityIsReal ? (
-          <VisibilityIndicator
+          <RowVisibility
+            busy={builder.visibilityPending(courseModule.id)}
+            editable={builder.editable}
             effectivelyVisible={effectivelyVisible}
             isVisible={courseModule.isVisible}
+            onChange={(next) => {
+              if (!next) {
+                setHiding(true);
+                return;
+              }
+              builder.setModuleVisible(courseModule.id, true);
+            }}
+            title={courseModule.title}
           />
         ) : null}
         {builder.editable ? (
           <RowMenu
-            isVisible={courseModule.isVisible}
             kindLabel={t('row.kind_module')}
             label={courseModule.title}
             onDelete={() => setDeleting(true)}
             onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
             onRename={() => setRenaming(true)}
-            onToggleVisible={
-              visibilityIsReal
-                ? (next) => {
-                    if (!next) {
-                      setHiding(true);
-                      return;
-                    }
-                    builder.setModuleVisible(courseModule.id, next);
-                  }
-                : undefined
-            }
             tone="strong"
           />
         ) : null}

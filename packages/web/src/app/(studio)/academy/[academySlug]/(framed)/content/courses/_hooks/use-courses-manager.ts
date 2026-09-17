@@ -72,7 +72,25 @@ export function useCoursesManager({
   const visibilityMutation = useMutation({
     mutationFn: ({ courseId, isVisible }: { courseId: string; isVisible: boolean }) =>
       orpc.academyCourses.setVisibility({ academyId, courseId, isVisible }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    // Flipped in the list at once and reconciled by the refetch: the eye is one
+    // bit the page already knows, and waiting on the round trip read as lag.
+    onMutate: async ({ courseId, isVisible }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<{ courses: CourseSummary[] }>(queryKey);
+      if (previous) {
+        queryClient.setQueryData(queryKey, {
+          ...previous,
+          courses: previous.courses.map((course) =>
+            course.id === courseId ? { ...course, isVisible } : course,
+          ),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
   });
 
   const closeForm = () => {
@@ -125,6 +143,10 @@ export function useCoursesManager({
     setVisible: (courseId: string, isVisible: boolean) =>
       visibilityMutation.mutate({ courseId, isVisible }),
     visibilityError: visibilityMutation.error,
+    /** The course whose toggle is mid-request, so only that one spins. */
+    visibilityPendingId: visibilityMutation.isPending
+      ? visibilityMutation.variables.courseId
+      : null,
     deleteCourse: (courseId: string, confirmTitle: string) =>
       deleteMutation.mutateAsync({ courseId, confirmTitle }),
     deletePending: deleteMutation.isPending,

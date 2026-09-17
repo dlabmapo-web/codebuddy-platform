@@ -59,5 +59,6 @@
       "MEDIUM": "Medium",
       "HARD": "Hard"
     }
-  }
+  },
+  "visibility_action": "Show “{{title}}” to students"
 }

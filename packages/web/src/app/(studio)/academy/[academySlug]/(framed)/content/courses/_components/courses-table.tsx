@@ -36,6 +36,7 @@ import {
 import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 import { useContentDate } from '../../_components/content-date';
 import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
+import { VisibilityToggle } from '../../_components/visibility-toggle';
 
 function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
   const { t } = useLayoutTranslation('courses');
@@ -147,7 +148,28 @@ export function CoursesTable({
         filterFn: 'arrIncludesSome',
         cell: ({ row }) => (
           <div className="flex flex-wrap items-center gap-1.5">
-            <VisibilityIndicator isVisible={row.original.isVisible} />
+            {canEdit ? (
+              <VisibilityToggle
+                isVisible={row.original.isVisible}
+                labels={{
+                  action: t('visibility_action', { title: row.original.title }),
+                  visible: t('visible'),
+                  hidden: t('hidden'),
+                }}
+                variant="label"
+                onChange={(next) => {
+                  // Shown flipped already; a second press would race the first.
+                  if (manager.visibilityPendingId === row.original.id) return;
+                  if (!next) {
+                    setCourseToHide(row.original);
+                    return;
+                  }
+                  manager.setVisible(row.original.id, true);
+                }}
+              />
+            ) : (
+              <VisibilityIndicator isVisible={row.original.isVisible} />
+            )}
             {courseHasNoVisibleContent(row.original) ? <NoContentChip /> : null}
           </div>
         ),
@@ -218,23 +240,6 @@ export function CoursesTable({
                     <DropdownMenuItem onSelect={() => manager.openEdit(course)}>
                       <Pencil className="text-sub" />
                       {t('edit')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        const next = !course.isVisible;
-                        if (!next) {
-                          setCourseToHide(course);
-                          return;
-                        }
-                        manager.setVisible(course.id, next);
-                      }}
-                    >
-                      {course.isVisible ? (
-                        <EyeOff className="text-sub" />
-                      ) : (
-                        <Eye className="text-sub" />
-                      )}
-                      {course.isVisible ? t('hide') : t('show')}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {/* Hiding is the reversible answer for a course that should

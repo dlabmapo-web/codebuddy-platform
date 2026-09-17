@@ -6,6 +6,8 @@ import {
   canManageExercises,
 } from '@/lib/academy-access-state';
 import { createServerORPCClient } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
+import { redirectIfExerciseMoved } from '../../../../_lib/moved-exercise';
 import { ExerciseWorkspace } from '../_components/exercise-workspace';
 
 export default async function ExercisePage({
@@ -34,6 +36,16 @@ export default async function ExercisePage({
       materialId,
     });
   } catch {
+    context = null;
+  }
+  if (!context) {
+    await redirectIfExerciseMoved({
+      exercisePath: (currentLectureId) =>
+        `${routes.academyCourse(academySlug, courseId)}/lectures/${encodeURIComponent(currentLectureId)}/exercises/${encodeURIComponent(materialId)}`,
+      lectureId,
+      loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+      materialId,
+    });
     notFound();
   }
   const canEdit = canManageExercises(roles);

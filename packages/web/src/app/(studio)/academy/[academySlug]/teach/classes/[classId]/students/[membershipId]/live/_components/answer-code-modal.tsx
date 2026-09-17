@@ -11,7 +11,7 @@ import {
   ModalTrigger,
 } from '@/components/studio/primitives';
 import { orpc } from '@/lib/orpc';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -151,7 +151,7 @@ export function AnswerCodeModal({
                 language="python"
                 options={{
                   automaticLayout: true,
-                  fontFamily: "'Fira Code', Consolas, monospace",
+                  fontFamily: EDITOR_FONT_FAMILY,
                   fontSize,
                   lineNumbers: 'on',
                   minimap: { enabled: false },

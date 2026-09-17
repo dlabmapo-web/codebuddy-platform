@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/i18n';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { cn } from '@/lib/utils';
 
 import { durationDisplay } from '../../../../../progress/_lib/progress-view';
@@ -134,7 +134,7 @@ export function SubmissionReview({
                 domReadOnly: true,
                 readOnly: true,
                 ariaLabel: t('progress.review.editor_label'),
-                fontFamily: "'Fira Code', Consolas, monospace",
+                fontFamily: EDITOR_FONT_FAMILY,
                 fontSize: 13,
                 lineNumbers: 'on',
                 minimap: { enabled: false },

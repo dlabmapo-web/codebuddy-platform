@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -44,7 +44,7 @@ export function PreviewEditor({
         options={{
           automaticLayout: true,
           domReadOnly: true,
-          fontFamily: "'Fira Code', Consolas, monospace",
+          fontFamily: EDITOR_FONT_FAMILY,
           fontSize,
           lineNumbers: 'on',
           minimap: { enabled: false },

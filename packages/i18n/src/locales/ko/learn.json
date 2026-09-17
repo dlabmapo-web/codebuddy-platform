@@ -103,6 +103,8 @@
     "stdin_prompt": "프로그램 입력",
     "interactive_unsupported": "이 브라우저에서는 대화식 입력을 사용할 수 없습니다. 코드는 실행되지만 input()이 입력을 요청하지 않습니다.",
     "editor_loading": "에디터 로딩 중…",
+    "editor_load_failed": "에디터를 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 새로고침해 주세요.",
+    "editor_reload": "새로고침",
     "run": "실행",
     "stop": "중지",
     "preparing": "준비 중…",

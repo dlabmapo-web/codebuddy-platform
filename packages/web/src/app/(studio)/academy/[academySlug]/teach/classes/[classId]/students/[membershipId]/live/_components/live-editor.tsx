@@ -6,7 +6,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import {
   attachRemoteCursor,
   readCursor,
@@ -118,7 +118,7 @@ export function LiveEditor({
         onMount={setEditor}
         options={{
           automaticLayout: true,
-          fontFamily: "'Fira Code', Consolas, monospace",
+          fontFamily: EDITOR_FONT_FAMILY,
           fontSize,
           lineNumbers: 'on',
           minimap: { enabled: false },

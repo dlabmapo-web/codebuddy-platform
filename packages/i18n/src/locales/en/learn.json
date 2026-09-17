@@ -114,6 +114,8 @@
     "stdin_prompt": "Program input",
     "interactive_unsupported": "This browser cannot run interactive input. Your code still runs, but input() will not prompt.",
     "editor_loading": "Loading editor…",
+    "editor_load_failed": "The editor could not be loaded. Check your network connection and reload.",
+    "editor_reload": "Reload",
     "run": "Run",
     "stop": "Stop",
     "preparing": "Preparing…",

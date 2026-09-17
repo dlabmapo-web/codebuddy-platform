@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
-import { registerPaircodeTheme } from '@/lib/monaco/theme';
+import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 import { Field, SectionCard } from './authoring-fields';
 
@@ -49,7 +49,7 @@ export function SolutionCodeEditor({
             onChange={(next) => onChange(next ?? '')}
             options={{
               automaticLayout: true,
-              fontFamily: "'Fira Code', Consolas, monospace",
+              fontFamily: EDITOR_FONT_FAMILY,
               fontSize: 13,
               lineNumbers: 'on',
               minimap: { enabled: false },

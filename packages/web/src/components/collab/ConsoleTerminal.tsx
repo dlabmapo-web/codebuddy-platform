@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
+import { EDITOR_FONT_FAMILY } from '@/lib/monaco/theme';
+
 export type TerminalKind = 'out' | 'err' | 'in' | 'meta' | 'info';
 export type TerminalLine = { text: string; kind: TerminalKind };
 
@@ -77,7 +79,7 @@ export function ConsoleTerminal({
       <div
         ref={scrollRef}
         className="flex-1 overflow-auto px-4 py-3"
-        style={{ fontFamily: "'Fira Code', Consolas, monospace", fontSize: '12.5px', lineHeight: 1.65 }}
+        style={{ fontFamily: EDITOR_FONT_FAMILY, fontSize: '12.5px', lineHeight: 1.65 }}
         onClick={() => { if (awaitingInput && mode === 'interactive') inputRef.current?.focus(); }}
       >
         {lines.length === 0 && !awaitingInput ? (
@@ -104,7 +106,7 @@ export function ConsoleTerminal({
                     background: 'transparent',
                     border: 'none',
                     color: '#9CDCFE',
-                    fontFamily: "'Fira Code', Consolas, monospace",
+                    fontFamily: EDITOR_FONT_FAMILY,
                     fontSize: '12.5px',
                     caretColor: '#9CDCFE',
                     minWidth: 240,

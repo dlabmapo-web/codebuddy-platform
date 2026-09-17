@@ -118,6 +118,8 @@
     "editor_reload": "Reload",
     "end_input": "End input",
     "end_input_hint": "Press when there is no more input to send (Ctrl+D)",
+    "browser_outdated": "This browser is out of date, so pages may not display correctly. Please update to Chrome 111, Edge 111, Safari 16.4, Firefox 128, or later.",
+    "browser_outdated_dismiss": "Dismiss",
     "run": "Run",
     "stop": "Stop",
     "preparing": "Preparing…",

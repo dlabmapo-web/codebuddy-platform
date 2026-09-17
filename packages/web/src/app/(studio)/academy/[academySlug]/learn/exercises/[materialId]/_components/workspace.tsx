@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 import { RemotePointer } from '@/components/monitoring/remote-pointer';
+import { BrowserBaselineNotice } from '@/components/workspace/browser-baseline-notice';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
@@ -421,6 +422,8 @@ export function Workspace({
     // absolutely positioned descendants that have no nearer positioned
     // ancestor. Remote pointers are `fixed` in a portal and are unaffected.
     <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas">
+      <BrowserBaselineNotice />
+
       {/* Every watching teacher's mouse, drawn over whichever pane each of
           them is pointing at. One arrow per peer rather than one in total:
           two teachers reading the same exercise point at two different

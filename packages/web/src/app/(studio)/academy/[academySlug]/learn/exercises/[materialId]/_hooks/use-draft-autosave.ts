@@ -8,6 +8,7 @@ import { orpc } from '@/lib/orpc';
 import { registerDraftFlush } from '@/lib/session/draft-flush';
 
 import {
+  isPageLeaving,
   localDraftKey,
   promotesReviewBuffer,
   readLocalDraft,
@@ -461,27 +462,34 @@ export function useDraftAutosave({
    */
   React.useEffect(() => registerDraftFlush(flushNow), [flushNow]);
 
+  /** The buffer last handed to a beacon, so one departure sends it once. */
+  const beaconedRef = React.useRef<{ key: string; code: string } | null>(null);
+
   /**
    * A closing tab never runs an async handler to completion, so the last edit
    * is handed to `sendBeacon`, which the browser delivers after teardown.
    */
   React.useEffect(() => {
-    const onHide = () => {
-      if (document.visibilityState !== 'hidden') return;
+    const onHide = (event: Event) => {
+      if (!isPageLeaving(event.type, document.visibilityState)) return;
       // Closing the tab on a submission nobody edited saves nothing: the
       // student's own draft is still what belongs on the server.
       const current = codeRef.current;
       const session = sessionRef.current;
-      const revision = queue.revisionOf(localDraftKey(session));
+      const key = localDraftKey(session);
+      const revision = queue.revisionOf(key);
       if (
         !shouldPersistOnHide({
           reviewing: reviewingUntouchedRef.current,
           code: current,
           lastSyncedCode: revision.lastSynced,
+          beaconedCode:
+            beaconedRef.current?.key === key ? beaconedRef.current.code : null,
         })
       ) {
         return;
       }
+      beaconedRef.current = { key, code: current };
       const payload = JSON.stringify({
         academyId: session.academyId,
         materialId: session.materialId,
@@ -498,8 +506,10 @@ export function useDraftAutosave({
     };
 
     document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onHide);
     return () => {
       document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onHide);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [queue, sync]);

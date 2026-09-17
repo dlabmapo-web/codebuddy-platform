@@ -191,14 +191,36 @@ export function resolveReviewBuffer(input: {
  *
  * An untouched reviewed submission must not: the student's own draft is still
  * what belongs there, and closing a tab is not a decision to replace it.
+ *
+ * Nor should a buffer this page has already beaconed. `visibilitychange` and
+ * `pagehide` both announce one departure, and the second copy would only be
+ * refused as stale.
  */
 export function shouldPersistOnHide(input: {
   reviewing: boolean;
   code: string;
   lastSyncedCode: string | null;
+  /** The code last handed to a beacon for this same draft, if any. */
+  beaconedCode?: string | null;
 }): boolean {
   if (input.reviewing) return false;
+  if (input.beaconedCode === input.code) return false;
   return shouldSyncDraft(input);
+}
+
+/**
+ * Whether a page event means the student may be leaving.
+ *
+ * Safari, and iOS Safari above all, does not reliably fire `visibilitychange`
+ * when a tab closes; `pagehide` is the event it does fire. Either counts, but
+ * a `visibilitychange` back to visible does not.
+ */
+export function isPageLeaving(
+  eventType: string,
+  visibilityState: DocumentVisibilityState,
+): boolean {
+  if (eventType === 'pagehide') return true;
+  return eventType === 'visibilitychange' && visibilityState === 'hidden';
 }
 
 /**

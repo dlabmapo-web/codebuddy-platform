@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canSeedCollaboration,
+  isPageLeaving,
   localDraftKey,
   promotesReviewBuffer,
   resolveReviewBuffer,
@@ -243,5 +244,21 @@ describe('canSeedCollaboration', () => {
     for (const action of ['open', 'navigate', 'collaborate'] as const) {
       expect(promotesReviewBuffer(action)).toBe(false);
     }
+  });
+});
+
+describe('leaving the page', () => {
+  it('beacons a buffer once, however many hide events announce it', () => {
+    const draft = { reviewing: false, code: 'print(2)', lastSyncedCode: 'print(1)' };
+
+    expect(shouldPersistOnHide({ ...draft, beaconedCode: null })).toBe(true);
+    expect(shouldPersistOnHide({ ...draft, beaconedCode: 'print(2)' })).toBe(false);
+    expect(shouldPersistOnHide({ ...draft, beaconedCode: 'print(1)' })).toBe(true);
+  });
+
+  it('treats pagehide and a hidden visibilitychange as leaving', () => {
+    expect(isPageLeaving('pagehide', 'visible')).toBe(true);
+    expect(isPageLeaving('visibilitychange', 'hidden')).toBe(true);
+    expect(isPageLeaving('visibilitychange', 'visible')).toBe(false);
   });
 });

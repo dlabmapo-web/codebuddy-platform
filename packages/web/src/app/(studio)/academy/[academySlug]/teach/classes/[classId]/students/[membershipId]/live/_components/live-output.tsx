@@ -13,10 +13,12 @@ import type { TerminalTranscript } from '@/lib/workspace/terminal-transcript';
 import type { PythonRunnerState } from '@/lib/workspace/use-python-runner';
 
 import { StudentRunPanel } from './student-run-panel';
+import { StudentResultPanel } from './student-result-panel';
+import type { LiveSubmissionResult } from '../_hooks/use-live-submission-result';
 
-export type LiveOutputTab = 'you' | 'student';
+export type LiveOutputTab = 'you' | 'student' | 'result';
 
-const tabs: LiveOutputTab[] = ['you', 'student'];
+const tabs: LiveOutputTab[] = ['you', 'student', 'result'];
 
 /**
  * Two terminals, side by side in time.
@@ -28,8 +30,11 @@ const tabs: LiveOutputTab[] = ['you', 'student'];
  * in the editor above.
  */
 export function LiveOutput({
+  academySlug,
   activeSample,
   canRun,
+  classId,
+  membershipId,
   onRun,
   onRunSample,
   onTabChange,
@@ -38,10 +43,16 @@ export function LiveOutput({
   runner,
   sampleTestCases,
   studentName,
+  submission,
   tab,
   terminal,
   unreadStudentRun,
 }: {
+  academySlug: string;
+  classId: string;
+  membershipId: string;
+  /** The student's latest verdict on this exercise, for the result tab. */
+  submission: LiveSubmissionResult;
   activeSample: number | null;
   /**
    * False while the teacher is reading another exercise.
@@ -67,7 +78,15 @@ export function LiveOutput({
   const { t } = useTranslation('monitoring');
 
   const label = (name: LiveOutputTab) =>
-    name === 'you' ? t('workspace.tab_you') : t('workspace.tab_student', { name: studentName });
+    name === 'you'
+      ? t('workspace.tab_you')
+      : name === 'result'
+        ? t('workspace.result.tab')
+        : t('workspace.tab_student', { name: studentName });
+  const unread = (name: LiveOutputTab) =>
+    tab !== name &&
+    ((name === 'student' && unreadStudentRun) ||
+      (name === 'result' && submission.unread));
 
   const selectRelativeTab = (current: LiveOutputTab, direction: -1 | 1) => {
     const index = tabs.indexOf(current);
@@ -104,7 +123,7 @@ export function LiveOutput({
               type="button"
             >
               {label(name)}
-              {name === 'student' && unreadStudentRun && tab !== 'student' ? (
+              {unread(name) ? (
                 <span className="absolute right-0.5 top-1 size-1.5 rounded-full bg-peer" />
               ) : null}
               {tab === name ? (
@@ -139,7 +158,16 @@ export function LiveOutput({
         id={`live-${tab}-panel`}
         role="tabpanel"
       >
-        {tab === 'you' ? (
+        {tab === 'result' ? (
+          <div className="min-h-0 flex-1 overflow-y-auto" data-testid="live-result-tab">
+            <StudentResultPanel
+              academySlug={academySlug}
+              classId={classId}
+              membershipId={membershipId}
+              submission={submission}
+            />
+          </div>
+        ) : tab === 'you' ? (
           <>
             <p className="shrink-0 border-b border-white/10 px-3 py-1.5 font-mono text-[11.5px] text-[#8C8C8C]">
               {t('workspace.run_private')}
@@ -160,7 +188,13 @@ export function LiveOutput({
           // and deliberately does not restate the output underneath it.
           <>
             <div className="shrink-0">
-              <StudentRunPanel result={result} run={run} />
+              <StudentRunPanel
+                onOpenResult={
+                  submission.submissionId ? () => onTabChange('result') : undefined
+                }
+                result={result}
+                run={run}
+              />
             </div>
             <div className="min-h-0 flex-1">
               <TerminalPanel

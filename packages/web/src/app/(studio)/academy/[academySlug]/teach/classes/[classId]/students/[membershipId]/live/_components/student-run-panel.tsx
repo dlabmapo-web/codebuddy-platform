@@ -23,9 +23,12 @@ const lifecycleStyles = {
  * which of them is current.
  */
 export function StudentRunPanel({
+  onOpenResult,
   result,
   run,
 }: {
+  /** Opens the result tab; absent while there is no submission to show. */
+  onOpenResult?: () => void;
   result: ResultChangedEvent | null;
   run: RunActivityPayload | null;
 }) {
@@ -81,6 +84,18 @@ export function StudentRunPanel({
             passed: result.passedCount,
             total: result.totalCount,
           })}
+          {onOpenResult ? (
+            <>
+              {' '}
+              <button
+                className="font-sans font-bold text-[#60a5fa] hover:underline"
+                onClick={onOpenResult}
+                type="button"
+              >
+                {t('workspace.result.open')} →
+              </button>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>

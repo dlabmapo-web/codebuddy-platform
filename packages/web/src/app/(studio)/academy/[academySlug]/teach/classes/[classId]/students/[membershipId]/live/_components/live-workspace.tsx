@@ -41,6 +41,7 @@ import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { FeedbackDock } from './live-feedback';
 import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
+import { useLiveSubmissionResult } from '../_hooks/use-live-submission-result';
 import { PreviewBanner } from './preview-banner';
 import { PreviewEditor } from './preview-editor';
 import { AnswerCodeModal } from './answer-code-modal';
@@ -123,6 +124,45 @@ export function LiveWorkspace({
     retry: false,
   });
   const liveExercise = exerciseQuery.data?.exercise ?? null;
+
+  const submissionResult = useLiveSubmissionResult({
+    academyId,
+    classId,
+    event: live.result,
+    // Only the snapshot for the exercise the student is on; a context still
+    // loaded from the previous exercise describes a different problem.
+    latest:
+      liveExercise && liveExercise.exercise.materialId === materialId
+        ? liveExercise.latestSubmission
+        : null,
+    materialId: materialId ?? null,
+    membershipId,
+    viewing: outputTab === 'result',
+  });
+
+  /**
+   * A new submission brings the result tab forward the moment the student
+   * submits, from whichever output tab is open: the teacher is watching this
+   * student, and a submission is the most important thing they can do. The
+   * one exception is the teacher's own run in progress, whose output would be
+   * pulled out from under them; then the tab is only marked unread.
+   *
+   * Keyed on the submission, so each submission moves the tab once and a
+   * teacher who switches away while it is grading is not pulled back when the
+   * verdict lands. A submission that was already there when the teacher
+   * arrived is not news (`unread` is false) and moves nothing.
+   */
+  const newSubmissionKey =
+    submissionResult.unread && submissionResult.view !== 'empty'
+      ? submissionResult.submissionId
+      : null;
+  // Adjusted during render rather than in an effect, so the tab and the
+  // submission that moved it arrive in the same paint.
+  const [shownSubmission, setShownSubmission] = React.useState<string | null>(null);
+  if (newSubmissionKey && newSubmissionKey !== shownSubmission) {
+    setShownSubmission(newSubmissionKey);
+    if (outputTab !== 'result' && !runner.running) setOutputTab('result');
+  }
 
   /**
    * Where the student is, derived once per exercise rather than per render.
@@ -546,8 +586,12 @@ export function LiveWorkspace({
                   canRun={display.isLive}
                   onRun={handleRun}
                   onRunSample={(index) => void handleRunSample(index)}
+                  academySlug={academySlug}
+                  classId={classId}
+                  membershipId={membershipId}
                   onTabChange={handleTabChange}
                   result={live.result}
+                  submission={submissionResult}
                   run={live.run}
                   runner={runner}
                   sampleTestCases={sampleTestCases}

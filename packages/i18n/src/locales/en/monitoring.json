@@ -108,7 +108,22 @@
     "pending_blocked": "Your unsynced edits are retained. They could not be safely restored to this watch.",
     "pending_download": "Download retained code",
     "pending_discard": "Discard retained edits",
-    "pending_discard_confirm": "Discard your unsynced edits and load the current live document? Download a copy first if you need to keep them."
+    "pending_discard_confirm": "Discard your unsynced edits and load the current live document? Download a copy first if you need to keep them.",
+    "result": {
+      "tab": "Submission result",
+      "open": "View result",
+      "empty": "No submission yet for this problem.",
+      "grading": "Grading…",
+      "grading_body": "The student submitted. The result appears here when grading finishes.",
+      "loading": "Loading the detailed result…",
+      "submitted_at": "Submitted {{time}}",
+      "fault": "Grading failed on our side, so there is no verdict. Ask the student to submit again.",
+      "cancelled": "The submission was cancelled.",
+      "load_failed": "Couldn't load the detailed result.",
+      "retry": "Try again",
+      "open_review": "Open full review",
+      "hidden_note": "Hidden test inputs and outputs aren't shown to teachers either."
+    }
   },
   "feedback": {
     "title": "Feedback",

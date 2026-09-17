@@ -343,6 +343,17 @@ export function Workspace({
     void submission.submit(draft.code);
   }, [draft, submission]);
 
+  /**
+   * A watching teacher hears about a submission twice: when it is accepted,
+   * so their result tab says it is being graded, and again when the verdict
+   * is in. Only an id either time; the server reads the status itself.
+   */
+  const pendingSubmissionId = submission.submitting ? submission.submissionId : null;
+  const { publishResult } = monitoring;
+  React.useEffect(() => {
+    if (pendingSubmissionId) publishResult(pendingSubmissionId);
+  }, [pendingSubmissionId, publishResult]);
+
   const resultId = submission.result?.submissionId ?? null;
   const { refreshProgress } = navigation;
   React.useEffect(() => {

@@ -414,6 +414,11 @@ export type TeacherReviewCase = z.infer<typeof teacherReviewCaseSchema>;
 export const teacherSubmissionReviewSchema = z
   .object({
     submissionId: z.uuid(),
+    /**
+     * The exercise attempted. The live view reads a review for a student who
+     * may have moved on, and shows it only for the exercise on screen.
+     */
+    materialId: z.uuid(),
     membershipId: z.uuid(),
     studentName: labelSchema,
     /** Frozen at submission time: history stays readable after a rename. */

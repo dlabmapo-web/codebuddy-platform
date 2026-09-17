@@ -741,6 +741,19 @@ export const monitoringExerciseContextSchema =
     draftId: z.uuid().nullable(),
     /** Availability only. The correct answer is fetched through a live visit. */
     hasSolution: z.boolean(),
+    /**
+     * The student's most recent submission on this exercise, if any.
+     *
+     * An id and a status, nothing graded: a teacher who opens the live view
+     * after the student submitted reads the verdict through the authorized
+     * review, exactly as they would for one that arrives while watching.
+     */
+    latestSubmission: z
+      .object({
+        submissionId: z.uuid(),
+        status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
+      })
+      .nullable(),
   });
 export type MonitoringExerciseContext = z.infer<
   typeof monitoringExerciseContextSchema

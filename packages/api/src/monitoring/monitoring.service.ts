@@ -591,7 +591,7 @@ export class MonitoringService {
     const preview = await this.loadPublicExercise(claim, materialId);
     if (!preview) return null;
 
-    const [draft, answer] = await Promise.all([
+    const [draft, answer, latest] = await Promise.all([
       this.prisma.exerciseDraft.findUnique({
         where: {
           userId_materialId: { userId: studentUserId, materialId },
@@ -602,6 +602,11 @@ export class MonitoringService {
         where: { materialId },
         select: { solutionCode: true },
       }),
+      this.prisma.submission.findFirst({
+        where: { userId: studentUserId, materialId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true },
+      }),
     ]);
 
     return {
@@ -611,6 +616,9 @@ export class MonitoringService {
       // not exist is how a client ends up inventing one.
       draftId: draft?.id ?? null,
       hasSolution: Boolean(answer?.solutionCode?.trim()),
+      latestSubmission: latest
+        ? { submissionId: latest.id, status: latest.status }
+        : null,
     };
   }
 

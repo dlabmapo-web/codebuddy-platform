@@ -436,6 +436,12 @@ export const runChangedEventSchema = runActivityPayloadSchema;
 export const resultChangedEventSchema = z.object({
   draftId: z.uuid(),
   submissionId: z.uuid(),
+  /**
+   * The exercise the verdict belongs to. The teacher's result tab describes
+   * the exercise the student is on, and this is how it tells a verdict for
+   * that exercise from one that arrived just as the student moved on.
+   */
+  materialId: z.uuid(),
   status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
   score: z.number().int().min(0).max(100),
   passedCount: z.number().int().nonnegative(),

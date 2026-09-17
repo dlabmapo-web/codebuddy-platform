@@ -257,6 +257,7 @@ describe("output schemas", () => {
   it("keeps hidden case data out of a review case", () => {
     const parsed = teacherSubmissionReviewSchema.safeParse({
       submissionId: "22222222-2222-4222-8222-222222222222",
+      materialId: "e0000000-0000-4000-8000-000000000030",
       membershipId: "33333333-3333-4333-8333-333333333333",
       studentName: "Student One",
       problemTitle: "Sum two numbers",

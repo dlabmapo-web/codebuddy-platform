@@ -207,6 +207,7 @@ function createService(options?: {
     lecture: { courseModule: { courseId: string } };
   }[];
   visit?: { id: string; material: { programmingExercise: { solutionCode: string | null } | null } | null } | null;
+  latestSubmission?: { id: string; status: string } | null;
 }) {
   const prisma = {
     class: {
@@ -235,6 +236,9 @@ function createService(options?: {
     },
     programmingExercise: {
       findUnique: vi.fn().mockResolvedValue({ solutionCode: "print('answer')\n" }),
+    },
+    submission: {
+      findFirst: vi.fn().mockResolvedValue(options?.latestSubmission ?? null),
     },
     teacherMonitoringVisit: {
       findFirst: vi.fn().mockResolvedValue(
@@ -351,6 +355,7 @@ function createService(options?: {
       };
       material: { findFirst: ReturnType<typeof vi.fn> };
       exerciseDraft: { findUnique: ReturnType<typeof vi.fn> };
+      submission: { findFirst: ReturnType<typeof vi.fn> };
       teacherMonitoringVisit: { findFirst: ReturnType<typeof vi.fn> };
       teacherFeedback: {
         findMany: ReturnType<typeof vi.fn>;
@@ -511,6 +516,27 @@ describe("getStudentContext", () => {
     expect(context.exercise?.exercise.hiddenTestCaseCount).toBe(1);
     expect(JSON.stringify(context)).not.toContain("999 1");
     expect(context.exercise?.hasSolution).toBe(true);
+  });
+
+  it("names the student's latest submission on the exercise, by id and status only", async () => {
+    const submissionId = "a0000000-0000-4000-8000-00000000000a";
+    const { service, prisma } = createService({
+      latestSubmission: { id: submissionId, status: "FAILED" },
+    });
+    const context = await service.getStudentContext(identity, {
+      academyId,
+      classId,
+      membershipId: studentMembershipId,
+      materialId,
+    });
+
+    expect(context.exercise?.latestSubmission).toEqual({ submissionId, status: "FAILED" });
+    expect(prisma.submission.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: studentUserId, materialId },
+        select: { id: true, status: true },
+      }),
+    );
   });
 
   it("names the draft room only once the student has a draft", async () => {

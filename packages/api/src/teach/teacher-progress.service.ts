@@ -588,6 +588,8 @@ export class TeacherProgressService {
 
     return {
       submissionId: submission.id,
+      // Checked equal to the live relation above, and never null.
+      materialId: submission.sourceMaterialId,
       membershipId: student.membershipId,
       studentName: student.displayName,
       problemTitle: submission.problemTitle,

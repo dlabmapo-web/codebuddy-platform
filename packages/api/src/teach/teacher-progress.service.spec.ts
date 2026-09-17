@@ -421,6 +421,8 @@ describe("getSubmissionReview", () => {
       actualOutput: null,
     });
     expect(review).toMatchObject({ hiddenPassed: 0, hiddenTotal: 1 });
+    // The live view matches a review to the exercise on screen by this.
+    expect(review.materialId).toBe(required);
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 

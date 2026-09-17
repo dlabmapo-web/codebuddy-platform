@@ -334,6 +334,7 @@ describe("resultChangedEventSchema", () => {
     const parsed = resultChangedEventSchema.parse({
       draftId,
       submissionId: eventId,
+      materialId: classId,
       status: "FAILED",
       score: 50,
       passedCount: 1,

@@ -1459,6 +1459,7 @@ export class MonitoringGateway
       },
       select: {
         id: true,
+        materialId: true,
         status: true,
         score: true,
         passedCount: true,
@@ -1467,7 +1468,10 @@ export class MonitoringGateway
         gradedAt: true,
       },
     });
-    if (!submission) return;
+    // A submission whose exercise has since been deleted has nothing on the
+    // teacher's screen to belong to.
+    if (!submission?.materialId) return;
+    const { materialId } = submission;
 
     for (const entry of student.classes) {
       await this.presence.recordSubmission(
@@ -1482,6 +1486,7 @@ export class MonitoringGateway
       .emit(monitoringServerEvents.resultChanged, {
         draftId: parsed.data.draftId,
         submissionId: submission.id,
+        materialId,
         status: submission.status,
         score: submission.score,
         passedCount: submission.passedCount,

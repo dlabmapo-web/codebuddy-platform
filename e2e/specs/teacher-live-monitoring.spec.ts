@@ -447,7 +447,7 @@ test('code arrows use the same code boundary at unequal viewport sizes', async (
       await expect.poll(async () => {
         const expected = await codePoint(receiver!, 2, 3);
         const arrow = await receiver!.getByTestId('peer-pointer').boundingBox();
-        return arrow ? Math.max(Math.abs(arrow.x + 4.5 - expected.x), Math.abs(arrow.y + 2.5 - expected.y)) : Infinity;
+        return arrow ? Math.max(Math.abs(arrow.x + 4.5 * (20 / 24) - (expected.x + 1)), Math.abs(arrow.y + 2.5 * (20 / 24) - (expected.y + expected.height / 2))) : Infinity;
       }).toBeLessThanOrEqual(2);
     }
   } finally {

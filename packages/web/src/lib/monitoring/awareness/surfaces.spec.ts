@@ -73,3 +73,14 @@ describe('isBoxVisible', () => {
     expect(isBoxVisible({ ...box, height: 0 }, viewport)).toBe(false);
   });
 });
+
+describe('fromAnchorPosition', () => {
+  it('places a position at the same spot inside the row on this screen', async () => {
+    const { fromAnchorPosition } = await import('./surfaces');
+
+    expect(fromAnchorPosition({ x: 0.25, y: 0.5 }, { left: 40, top: 300, width: 200, height: 32 })).toEqual({
+      left: 90,
+      top: 316,
+    });
+  });
+});

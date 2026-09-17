@@ -543,6 +543,39 @@ describe("collaborationPointerSchema", () => {
   });
 });
 
+describe("collaborationPointerSchema anchors", () => {
+  const base = { surface: "curriculum", x: 0.4, y: 0.7 } as const;
+
+  it("carries the row a pointer is over, with the position inside it", () => {
+    const parsed = collaborationPointerSchema.parse({
+      ...base,
+      anchor: { key: "exercise:e0000000-0000-4000-8000-000000000030", x: 0.2, y: 0.5 },
+    });
+
+    expect(parsed.anchor).toEqual({
+      key: "exercise:e0000000-0000-4000-8000-000000000030",
+      x: 0.2,
+      y: 0.5,
+    });
+  });
+
+  it("stays optional, so clients that predate anchors still parse", () => {
+    expect(collaborationPointerSchema.parse(base).anchor).toBeUndefined();
+  });
+
+  it("rejects keys that are not a plain kind and id", () => {
+    for (const key of ['exercise:"]', "Exercise:1", "exercise", "a:" + "x".repeat(81), "line:1 2"]) {
+      expect(collaborationPointerSchema.safeParse({ ...base, anchor: { key, x: 0, y: 0 } }).success).toBe(false);
+    }
+  });
+
+  it("rejects an in-row position outside the row", () => {
+    expect(
+      collaborationPointerSchema.safeParse({ ...base, anchor: { key: "terminal-line:3", x: 1.2, y: 0 } }).success,
+    ).toBe(false);
+  });
+});
+
 describe("normalizePointerPosition", () => {
   it("clamps a position that left its surface mid-drag", () => {
     expect(normalizePointerPosition({ x: -0.4, y: 1.8 })).toEqual({ x: 0, y: 1 });

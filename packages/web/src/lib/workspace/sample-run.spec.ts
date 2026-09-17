@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  answerStdinRequest,
+  createRunId,
   createSampleInputQueue,
   isSampleOutputMatch,
   normalizeSampleOutput,
@@ -88,5 +90,36 @@ describe('resolveSampleVerdict', () => {
     expect(
       resolveSampleVerdict({ ...base, stopped: true, failed: true }),
     ).toEqual({ kind: 'skipped', reason: 'stopped' });
+  });
+});
+
+describe('answerStdinRequest', () => {
+  it('prompts the student when the run was given no stdin', () => {
+    expect(answerStdinRequest(null)).toEqual({ kind: 'prompt' });
+  });
+
+  it('serves queued lines, then EOF like the judge', () => {
+    const queue = createSampleInputQueue('3\n4\n');
+
+    expect(answerStdinRequest(queue)).toEqual({ kind: 'line', line: '3' });
+    expect(answerStdinRequest(queue)).toEqual({ kind: 'line', line: '4' });
+    expect(answerStdinRequest(queue)).toEqual({ kind: 'eof' });
+    expect(answerStdinRequest(queue)).toEqual({ kind: 'eof' });
+  });
+
+  it('treats an empty sample input as immediate EOF, not a prompt', () => {
+    expect(answerStdinRequest(createSampleInputQueue(''))).toEqual({ kind: 'eof' });
+  });
+});
+
+describe('createRunId', () => {
+  it('still produces distinct ids without crypto.randomUUID', () => {
+    const original = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: {}, configurable: true });
+    try {
+      expect(createRunId()).not.toBe(createRunId());
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true });
+    }
   });
 });

@@ -8,7 +8,11 @@ import {
 } from '@/lib/pyodide/interactiveRunner';
 import type { PythonExecutionError } from '@/lib/pyodide/pythonError';
 
-import { createSampleInputQueue } from './sample-run';
+import {
+  answerStdinRequest,
+  createRunId,
+  createSampleInputQueue,
+} from './sample-run';
 import {
   appendToTranscript,
   emptyTranscript,
@@ -100,7 +104,14 @@ export function usePythonRunner(options?: {
   const stdoutRef = React.useRef('');
   const failedRef = React.useRef(false);
   const errorRef = React.useRef<PythonExecutionError | null>(null);
-  const queueRef = React.useRef<string[]>([]);
+  /** The run's own stdin, or `null` when the student is to be prompted. */
+  const queueRef = React.useRef<string[] | null>(null);
+  /**
+   * End of input the student asked for while the program was not yet waiting —
+   * Ctrl+D right after a partial line. Delivered on the next read: an EOF
+   * written before the worker asks is overwritten by the ask itself.
+   */
+  const eofPendingRef = React.useRef(false);
   const bufferRef = React.useRef<TerminalLine[]>([]);
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // The transcript as the last commit left it. Socket handlers and worker
@@ -197,7 +208,7 @@ export function usePythonRunner(options?: {
     }
     runnerRef.current?.dispose();
     setReady(false);
-    const runner = new InteractiveRunner();
+    const runner = new InteractiveRunner({ interactive: supported });
     runnerRef.current = runner;
 
     runner.on((event) => {
@@ -228,17 +239,28 @@ export function usePythonRunner(options?: {
           break;
         }
         case 'stdin': {
-          // A queued sample answers automatically; otherwise the student is
-          // prompted, exactly as a terminal would.
-          const next = queueRef.current.shift();
-          if (next !== undefined) {
-            append(`${next}\n`, 'in');
-            runner.provideInput(next);
+          // A queued sample answers automatically and ends in EOF, as the
+          // judge's stdin does; a plain run prompts the student, exactly as a
+          // terminal would.
+          if (eofPendingRef.current) {
+            eofPendingRef.current = false;
+            runner.sendEOF();
+            break;
+          }
+          const answer = answerStdinRequest(queueRef.current);
+          if (answer.kind === 'line') {
+            append(`${answer.line}\n`, 'in');
+            runner.provideInput(answer.line);
+          } else if (answer.kind === 'eof') {
+            runner.sendEOF();
           } else {
             setWaiting(true);
           }
           break;
         }
+        case 'stdinServed':
+          append(`${event.text}\n`, 'in');
+          break;
         case 'fatal':
           failedRef.current = true;
           append(event.text, 'err');
@@ -267,15 +289,18 @@ export function usePythonRunner(options?: {
     });
 
     return runner;
-  }, [append, finishRun, flush, setWaiting]);
+  }, [append, finishRun, flush, setWaiting, supported]);
 
   /**
    * Pyodide is ~13 MB. v1 began loading it on the first Run click, leaving the
    * student watching a spinner; starting on mount uses the time they spend
    * reading the problem instead.
+   *
+   * Preloaded whether or not the page is cross-origin isolated: without it the
+   * runner works in buffered mode, and a Run button left on "Preparing…"
+   * forever would be worse than the one capability that mode lacks.
    */
   React.useEffect(() => {
-    if (!supported) return;
     const runner = ensureRunner();
     void runner.whenReady().then(() => setReady(!runner.isFailed));
     return () => {
@@ -283,7 +308,7 @@ export function usePythonRunner(options?: {
       runnerRef.current = null;
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
-  }, [ensureRunner, supported]);
+  }, [ensureRunner]);
 
   const run = React.useCallback(
     (
@@ -303,12 +328,16 @@ export function usePythonRunner(options?: {
       failedRef.current = false;
       errorRef.current = null;
       bufferRef.current = [];
-      queueRef.current = options?.stdin
-        ? createSampleInputQueue(options.stdin)
-        : [];
+      // Supplied stdin — an empty sample input included — is all the program
+      // gets; only a run without any is interactive.
+      eofPendingRef.current = false;
+      queueRef.current =
+        options?.stdin === undefined
+          ? null
+          : createSampleInputQueue(options.stdin);
       ranCodeRef.current = code;
       setLastError(null);
-      const clientRunId = options?.clientRunId ?? crypto.randomUUID();
+      const clientRunId = options?.clientRunId ?? createRunId();
       const sampleCount = options?.sampleCount ?? 0;
       const banner = options?.banner ?? [];
       runRef.current = { clientRunId, sampleCount, lifecycle: null };
@@ -333,7 +362,7 @@ export function usePythonRunner(options?: {
       const runner = ensureRunner();
       return new Promise<RunOutcome>((resolve) => {
         finishRef.current = resolve;
-        void runner.run(code);
+        void runner.run(code, options?.stdin);
       });
     },
     [commit, ensureRunner, publish],
@@ -378,6 +407,25 @@ export function usePythonRunner(options?: {
     },
     [append, commit, publish],
   );
+
+  /**
+   * Ctrl+D: the student has nothing more to type.
+   *
+   * Without it a program reading to EOF — `sys.stdin.read()`,
+   * `for line in sys.stdin` — could never finish a plain run.
+   */
+  const endInput = React.useCallback(() => {
+    const waiting = transcriptRef.current.awaitingInput;
+    append('^D\n', 'in');
+    if (!waiting) {
+      eofPendingRef.current = true;
+      return;
+    }
+    setAwaitingInput(false);
+    commit({ ...transcriptRef.current, awaitingInput: false });
+    publish({ type: 'waiting', awaitingInput: false });
+    runnerRef.current?.sendEOF();
+  }, [append, commit, publish]);
 
   const appendLine = React.useCallback(
     (text: string, kind: TerminalKind) => {
@@ -464,6 +512,7 @@ export function usePythonRunner(options?: {
     run,
     stop,
     submitInput,
+    endInput,
     appendLine,
     settleRun,
     subscribeTerminal,

@@ -19,6 +19,7 @@ import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { markErrorLine } from '@/lib/workspace/error-line-decoration';
+import { createRunId } from '@/lib/workspace/sample-run';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
@@ -219,7 +220,7 @@ export function Workspace({
       if (!sample) return;
       setOutputTab('terminal');
       setActiveSample(index);
-      const clientRunId = crypto.randomUUID();
+      const clientRunId = createRunId();
       monitoring.publishRun({
         clientRunId,
         lifecycle: 'STARTED',
@@ -270,7 +271,7 @@ export function Workspace({
    */
   const handleRun = React.useCallback(async () => {
     setOutputTab('terminal');
-    const clientRunId = crypto.randomUUID();
+    const clientRunId = createRunId();
     monitoring.publishRun({
       clientRunId,
       lifecycle: 'STARTED',

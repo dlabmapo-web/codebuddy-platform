@@ -10,6 +10,9 @@ let pyodide = null;
 // control[0]: state (0=대기, 1=입력준비됨), control[1]: 입력 바이트 길이, control[2]: EOF 플래그
 let control = null;
 let dataBuf = null;
+// Buffered mode: without cross-origin isolation there is no SharedArrayBuffer
+// to block on, so a run brings all of its stdin with it and reads end in EOF.
+let bufferedLines = null;
 const decoder = new TextDecoder();
 const stdoutDecoder = new TextDecoder();
 const stderrDecoder = new TextDecoder();
@@ -26,6 +29,14 @@ function flushOutput(type, outputDecoder) {
 }
 
 function readStdin() {
+  if (!control) {
+    const line = bufferedLines ? bufferedLines.shift() : undefined;
+    if (line === undefined) return undefined;
+    // Echoed so the transcript shows what the program read, as interactive
+    // mode does when it answers from a sample queue.
+    self.postMessage({ type: 'stdinServed', text: line });
+    return line;
+  }
   // 메인 스레드에 입력을 요청하고, 값이 채워질 때까지 워커 스레드를 블로킹
   Atomics.store(control, 0, 0);
   Atomics.store(control, 2, 0);
@@ -39,6 +50,16 @@ function readStdin() {
   // autoEOF:true 모드에서는 한 번의 호출이 곧 한 줄(EOF 자동 삽입)이므로
   // 끝의 개행은 제거해 라인이 정확히 한 줄로 처리되게 한다.
   return decoder.decode(bytes).replace(/\r?\n$/, '');
+}
+
+/** Sample stdin as the lines \`input()\` consumes; mirrors \`createSampleInputQueue\`. */
+function splitStdin(stdin) {
+  if (typeof stdin !== 'string') return null;
+  const normalized = stdin.replace(/\r\n?/g, '\n');
+  if (normalized === '') return [];
+  const lines = normalized.split('\n');
+  if (normalized.endsWith('\n')) lines.pop();
+  return lines;
 }
 
 async function initPyodide() {
@@ -57,8 +78,10 @@ self.onmessage = async (e) => {
   const msg = e.data;
 
   if (msg.type === 'init') {
-    control = new Int32Array(msg.control);
-    dataBuf = new Uint8Array(msg.data);
+    if (msg.control && msg.data) {
+      control = new Int32Array(msg.control);
+      dataBuf = new Uint8Array(msg.data);
+    }
     try {
       await initPyodide();
     } catch (err) {
@@ -73,6 +96,7 @@ self.onmessage = async (e) => {
       self.postMessage({ type: 'done' });
       return;
     }
+    bufferedLines = splitStdin(msg.stdin);
     try {
       pyodide.globals.set('_paircode_source', msg.code);
       const errorJson = await pyodide.runPythonAsync(`
@@ -133,6 +157,19 @@ finally:
             _paircode_stream.flush()
         except Exception:
             pass
+    # \`open(0)\` closes file descriptor 0 when its file object is collected,
+    # and this interpreter serves every later run: without a descriptor 0,
+    # each following \`input()\` fails with OSError until the page reloads.
+    # Reopening takes the lowest free descriptor, which is 0. Collected first:
+    # a file object caught in a reference cycle would otherwise close the
+    # descriptor later, in the middle of the next run.
+    import gc as _paircode_gc
+    import os as _paircode_os
+    _paircode_gc.collect()
+    try:
+        _paircode_os.fstat(0)
+    except OSError:
+        _paircode_os.open('/dev/stdin', _paircode_os.O_RDONLY)
 
 _paircode_error
 `);

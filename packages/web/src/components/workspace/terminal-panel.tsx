@@ -5,6 +5,7 @@ import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 
+import { isEndOfInputKey, isSubmitLineKey } from '@/lib/workspace/terminal-keys';
 import type { TerminalKind, TerminalLine } from '@/lib/workspace/use-python-runner';
 
 const kindClass: Record<TerminalKind, string> = {
@@ -30,6 +31,7 @@ export function TerminalPanel({
   emptyHint,
   lines,
   mode = 'interactive',
+  onEndInput,
   onSubmitInput,
   supported,
   synchronizing,
@@ -40,6 +42,8 @@ export function TerminalPanel({
   awaitingInput: boolean;
   /** Absent in mirror mode: there is no process on this side to feed. */
   onSubmitInput?: (value: string) => void;
+  /** Ctrl+D. Absent where the process cannot be told its input has ended. */
+  onEndInput?: () => void;
   supported: boolean;
   mode?: 'interactive' | 'mirror';
   /** What an empty terminal says. Whose terminal it is decides the wording. */
@@ -72,6 +76,13 @@ export function TerminalPanel({
   const submit = () => {
     onSubmitInput?.(value);
     setValue('');
+  };
+
+  // Whatever is still in the field is sent first, as a terminal sends a
+  // partial line before end of input.
+  const endInput = () => {
+    if (value !== '') submit();
+    onEndInput?.();
   };
 
   return (
@@ -123,11 +134,27 @@ export function TerminalPanel({
               className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-[#9CDCFE] outline-none"
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') submit();
+                if (isSubmitLineKey(event.nativeEvent)) {
+                  event.preventDefault();
+                  submit();
+                } else if (onEndInput && isEndOfInputKey(event.nativeEvent)) {
+                  event.preventDefault();
+                  endInput();
+                }
               }}
               ref={inputRef}
               value={value}
             />
+            {onEndInput ? (
+              <button
+                className="shrink-0 rounded border border-white/15 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-[#a5a5a5] transition-colors hover:bg-white/10 hover:text-white"
+                onClick={endInput}
+                title={t('workspace.end_input_hint')}
+                type="button"
+              >
+                {t('workspace.end_input')}
+              </button>
+            ) : null}
           </div>
         ) : null}
 

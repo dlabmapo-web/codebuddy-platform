@@ -6,6 +6,8 @@ export type RunnerEvent =
   | { type: 'stderr'; text: string }
   | { type: 'pythonError'; error: PythonExecutionError }
   | { type: 'stdin' }
+  /** Buffered mode only: a line the program read from the stdin it was given. */
+  | { type: 'stdinServed'; text: string }
   | { type: 'done' }
   | { type: 'fatal'; text: string };
 
@@ -26,13 +28,20 @@ export function isInteractiveSupported(): boolean {
 /**
  * Pyodide 워커를 관리하며, input() 호출 시 SharedArrayBuffer 로 워커를 블로킹했다가
  * 메인 스레드가 제공한 입력으로 재개시킨다.
+ *
+ * Where the page is not cross-origin isolated there is no SharedArrayBuffer to
+ * block on. The runner then works in buffered mode: each run carries all of its
+ * stdin, reads past it end in EOF, and nobody is ever prompted. Sample runs
+ * behave exactly as they do interactively; only typing into a live `input()`
+ * is lost.
  */
 export class InteractiveRunner {
   private worker: Worker | null = null;
-  private readonly controlSab: SharedArrayBuffer;
-  private readonly dataSab: SharedArrayBuffer;
-  private readonly control: Int32Array;
-  private readonly dataBuf: Uint8Array;
+  readonly interactive: boolean;
+  private readonly controlSab: SharedArrayBuffer | null;
+  private readonly dataSab: SharedArrayBuffer | null;
+  private readonly control: Int32Array | null;
+  private readonly dataBuf: Uint8Array | null;
   private readonly encoder = new TextEncoder();
   private readonly listeners = new Set<Listener>();
 
@@ -42,11 +51,14 @@ export class InteractiveRunner {
   private resolveReady!: () => void;
   private running = false;
 
-  constructor() {
-    this.controlSab = new SharedArrayBuffer(3 * Int32Array.BYTES_PER_ELEMENT);
-    this.dataSab = new SharedArrayBuffer(DATA_BYTES);
-    this.control = new Int32Array(this.controlSab);
-    this.dataBuf = new Uint8Array(this.dataSab);
+  constructor({ interactive = isInteractiveSupported() }: { interactive?: boolean } = {}) {
+    this.interactive = interactive;
+    this.controlSab = interactive
+      ? new SharedArrayBuffer(3 * Int32Array.BYTES_PER_ELEMENT)
+      : null;
+    this.dataSab = interactive ? new SharedArrayBuffer(DATA_BYTES) : null;
+    this.control = this.controlSab ? new Int32Array(this.controlSab) : null;
+    this.dataBuf = this.dataSab ? new Uint8Array(this.dataSab) : null;
     this.spawn();
   }
 
@@ -55,10 +67,12 @@ export class InteractiveRunner {
     this.ready = false;
     this.failed = false;
     this.running = false;
-    Atomics.store(this.control, 0, 0);
-    Atomics.store(this.control, 1, 0);
-    Atomics.store(this.control, 2, 0);
-    this.worker = new Worker('/pyodide-worker.js?v=7');
+    if (this.control) {
+      Atomics.store(this.control, 0, 0);
+      Atomics.store(this.control, 1, 0);
+      Atomics.store(this.control, 2, 0);
+    }
+    this.worker = new Worker('/pyodide-worker.js?v=8');
     this.worker.onmessage = (e: MessageEvent<RunnerEvent>) => this.handle(e.data);
     this.worker.onerror = (e) => {
       const detail = e.message || (e.filename ? `${e.filename}:${e.lineno}` : '워커를 시작할 수 없습니다');
@@ -98,15 +112,24 @@ export class InteractiveRunner {
   /** 워커가 로드될 때까지 대기 */
   whenReady(): Promise<void> { return this.readyPromise; }
 
-  async run(code: string): Promise<void> {
+  /**
+   * `stdin` is used only in buffered mode, where it is everything the program
+   * can read; interactive mode asks for each line as it is needed.
+   */
+  async run(code: string, stdin?: string): Promise<void> {
     await this.readyPromise;
     if (!this.worker) return;
     this.running = true;
-    this.worker.postMessage({ type: 'run', code });
+    this.worker.postMessage({
+      type: 'run',
+      code,
+      stdin: this.interactive ? undefined : (stdin ?? ''),
+    });
   }
 
   /** 워커가 stdin 을 기다리는 동안 한 줄을 제공하여 실행을 재개 */
   provideInput(line: string): void {
+    if (!this.control || !this.dataBuf) return;
     const withNewline = line.endsWith('\n') ? line : line + '\n';
     const bytes = this.encoder.encode(withNewline);
     const len = Math.min(bytes.length, this.dataBuf.length);
@@ -119,6 +142,7 @@ export class InteractiveRunner {
 
   /** EOF(입력 종료) 신호 → Python 은 EOFError 를 받는다 */
   sendEOF(): void {
+    if (!this.control) return;
     Atomics.store(this.control, 2, 1);
     Atomics.store(this.control, 0, 1);
     Atomics.notify(this.control, 0);

@@ -63,3 +63,37 @@ export function resolveSampleVerdict(input: {
     actual: normalizeSampleOutput(input.stdout),
   };
 }
+
+/** What a running program gets when it asks for a line of stdin. */
+export type StdinAnswer =
+  | { kind: 'line'; line: string }
+  | { kind: 'eof' }
+  | { kind: 'prompt' };
+
+/**
+ * Answers one stdin request, consuming the queue.
+ *
+ * `queue` is `null` when the run was given no stdin at all — a plain Run, where
+ * the student types answers. Any supplied stdin, the empty string included,
+ * ends in EOF exactly as the judge's does: a sample run of
+ * `sys.stdin.read()` must finish rather than wait for a student who was never
+ * asked, and an extra `input()` raises `EOFError` in both places.
+ */
+export function answerStdinRequest(queue: string[] | null): StdinAnswer {
+  if (queue === null) return { kind: 'prompt' };
+  const line = queue.shift();
+  return line === undefined ? { kind: 'eof' } : { kind: 'line', line };
+}
+
+/**
+ * An identifier for a run, including where `crypto.randomUUID` is missing.
+ *
+ * It exists only in secure contexts; a page opened over plain http on a LAN
+ * address must still be able to run code.
+ */
+export function createRunId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  );
+}

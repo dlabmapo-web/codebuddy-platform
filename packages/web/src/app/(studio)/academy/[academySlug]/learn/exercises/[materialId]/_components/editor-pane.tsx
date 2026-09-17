@@ -222,6 +222,7 @@ export function EditorPane({
             <TerminalPanel
               awaitingInput={runner.awaitingInput}
               lines={runner.lines}
+              onEndInput={runner.endInput}
               onSubmitInput={runner.submitInput}
               supported={runner.supported}
             />

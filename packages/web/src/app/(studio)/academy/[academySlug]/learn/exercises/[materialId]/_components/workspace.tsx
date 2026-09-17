@@ -413,7 +413,13 @@ export function Workspace({
   }, [outputTab, submission.result]);
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas">
+    // Exactly one viewport, and a clip for anything that escapes its own
+    // scroller: a document even one pixel taller than `h-dvh` scrolls the whole
+    // page, sliding the header off the top and leaving a band of background
+    // under the workspace. `relative` is what lets `overflow-hidden` clip
+    // absolutely positioned descendants that have no nearer positioned
+    // ancestor. Remote pointers are `fixed` in a portal and are unaffected.
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas">
       {/* Every watching teacher's mouse, drawn over whichever pane each of
           them is pointing at. One arrow per peer rather than one in total:
           two teachers reading the same exercise point at two different

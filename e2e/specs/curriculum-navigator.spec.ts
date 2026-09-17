@@ -125,11 +125,40 @@ test('is still a column at two-pane widths below the desktop breakpoint', async 
   const panelBox = (await panel(page).boundingBox())!;
   const statementBox = (await statement(page).boundingBox())!;
 
+  // Docked is `relative`, not `static`: in flow like a column, but still its
+  // own containing block, so an absolutely positioned descendant — every row
+  // carries an `sr-only` status word, and `sr-only` is `position: absolute` —
+  // is clipped by the panel instead of escaping to the workspace row and
+  // growing the document past the fullscreen workspace. The contrast that
+  // matters here is with `absolute`, which is the overlay mode below.
   expect(
     await panel(page).evaluate((node) => getComputedStyle(node).position),
-  ).toBe('static');
+  ).toBe('relative');
   expect(Math.round(statementBox.x)).toBe(Math.round(panelBox.width));
   await expectStatementContentContained(page);
+});
+
+/**
+ * The workspace is exactly one viewport tall, so nothing it contains may make
+ * the *page* scroll. Anything that escapes the outline's scroll box and lands
+ * in the workspace row does: the header slides off the top and a band of page
+ * background appears below the workspace, which is what students saw. The
+ * escapee was every row's `sr-only` status word — `sr-only` is
+ * `position: absolute`, and an unpositioned scroller does not clip those.
+ */
+test('never lets a long outline scroll the page behind the workspace', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await openWorkspace(page);
+  await expect(panel(page)).toBeVisible();
+
+  const metrics = await page.evaluate(() => ({
+    document: document.documentElement.scrollHeight,
+    viewport: window.innerHeight,
+  }));
+
+  expect(metrics.document).toBe(metrics.viewport);
 });
 
 test('keeps sample blocks inside the resized statement on Safari', async ({

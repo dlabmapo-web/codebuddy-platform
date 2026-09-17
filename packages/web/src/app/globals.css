@@ -666,7 +666,13 @@ h1, h2, h3, h4 {
    the student's at `md`, which is the only thing the two modes differ in. */
 @media (min-width: 48rem) {
   .cove-navigator[data-dock="md"] {
-    position: static;
+    /* `relative`, not `static`: docking must not change what the panel
+       contains. Absolutely positioned descendants — every row's `sr-only`
+       status word is one — resolve against the nearest positioned ancestor,
+       and a `static` panel handed them to the workspace row instead, where
+       `overflow: hidden` here could no longer clip them and a long outline
+       pushed the document taller than the `h-dvh` workspace. */
+    position: relative;
     z-index: auto;
     width: var(--cove-navigator-width);
     max-width: none;
@@ -677,7 +683,8 @@ h1, h2, h3, h4 {
 
 @media (min-width: 64rem) {
   .cove-navigator[data-dock="lg"] {
-    position: static;
+    /* Same reason as the `md` dock above. */
+    position: relative;
     z-index: auto;
     width: var(--cove-navigator-width);
     max-width: none;

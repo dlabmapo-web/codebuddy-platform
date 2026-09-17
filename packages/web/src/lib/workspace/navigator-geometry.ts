@@ -67,6 +67,16 @@ export const navigatorRow = 'relative flex min-h-0 flex-1';
  * so reaching the end of the outline does not start scrolling the editor
  * behind it, and the scrollbar gutter is stable so expanding a module does not
  * shift every title by the scrollbar's width.
+ *
+ * `relative` is what makes the clipping real, and it is not decoration. Every
+ * row carries an `sr-only` status word, and `sr-only` is `position: absolute`.
+ * A scroller that is not itself positioned is not their containing block, and
+ * `overflow` on an unpositioned ancestor does not clip an absolutely
+ * positioned descendant — so each of those spans sat at its static position,
+ * hundreds of pixels below the fold of a long outline, and grew the *document*
+ * instead of the tree. The fullscreen workspace is exactly `h-dvh`, so that
+ * surplus turned into page scroll: the header slid off the top and a band of
+ * page background appeared under the workspace.
  */
 export const navigatorScroll =
-  'min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]';
+  'relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]';

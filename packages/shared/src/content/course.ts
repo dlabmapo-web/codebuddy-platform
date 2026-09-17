@@ -230,6 +230,21 @@ export const reorderLecturesSchema = courseIdInputSchema.extend({
   orderedLectureIds: z.array(z.uuid()).min(1),
 });
 
+/**
+ * Move one lecture to any chapter of its course, at a position there.
+ *
+ * `fromModuleId` is where the author's tree showed it. A move built from a
+ * stale tree is refused rather than moving the lecture from wherever it has
+ * since gone.
+ */
+export const moveLectureSchema = courseIdInputSchema.extend({
+  lectureId: z.uuid(),
+  fromModuleId: z.uuid(),
+  toModuleId: z.uuid(),
+  /** 0-based index among the destination's lectures after the move. */
+  toIndex: z.number().int().min(0),
+});
+
 export const exerciseTestCaseDraftSchema = z.object({
   input: z.string().max(100_000),
   expectedOutput: z.string().max(100_000),
@@ -327,6 +342,15 @@ export const reorderProgrammingExercisesSchema =
   exerciseParentInputSchema.extend({
     orderedMaterialIds: z.array(z.uuid()).min(1),
   });
+
+/** Move one problem to any lecture of its course; see `moveLectureSchema`. */
+export const moveExerciseSchema = courseIdInputSchema.extend({
+  materialId: z.uuid(),
+  fromLectureId: z.uuid(),
+  toLectureId: z.uuid(),
+  /** 0-based index among the destination's problems after the move. */
+  toIndex: z.number().int().min(0),
+});
 
 export const exerciseAuthoringContextSchema = z.object({
   course: z.object({ id: z.uuid(), title: titleSchema }),

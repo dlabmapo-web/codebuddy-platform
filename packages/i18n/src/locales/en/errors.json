@@ -35,6 +35,7 @@
   "COURSE_TITLE_CONFLICT": "A course already uses this title.",
   "CONTENT_PARENT_MISMATCH": "The content does not belong to the selected parent.",
   "CONTENT_POSITION_CONFLICT": "Two content items cannot use the same position.",
+  "CONTENT_MOVE_STALE": "Someone else changed this course. Choose again from the latest version.",
   "CONTENT_VALIDATION_FAILED": "Fix the content validation issues and try again.",
   "EXERCISE_NOT_FOUND": "The selected programming problem was not found.",
   "EXERCISE_VALIDATION_FAILED": "Complete the required problem fields and try again.",

@@ -22,6 +22,8 @@ import {
   nextLecturePosition,
   nextMaterialPosition,
   nextModulePosition,
+  orderingWithItemAt,
+  reparentAbovePositions,
   rewritePositions,
 } from "./content-positions.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
@@ -740,6 +742,241 @@ export class CourseService {
       await bumpContentRevision(tx, input.courseId);
     });
     return this.currentTree(input);
+  }
+
+  /**
+   * Move a lecture to any chapter of the same course, at a position there.
+   *
+   * Its problems come with it, and everything students did on them is keyed by
+   * the problem, so nothing of theirs changes. The course row is locked for the
+   * whole move: two authors moving at once must queue, not interleave position
+   * rewrites. `fromModuleId` must still be where the lecture is, so a move built
+   * from a stale tree is refused instead of moving it from wherever it went.
+   */
+  async moveLecture(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      lectureId: string;
+      fromModuleId: string;
+      toModuleId: string;
+      toIndex: number;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireCurriculumManager(identity, input.academyId);
+    await this.requireCourse(input.academyId, input.courseId);
+    const hidden = await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      const lecture = await tx.lecture.findUnique({
+        where: { id: input.lectureId },
+        include: {
+          courseModule: {
+            select: {
+              courseId: true,
+              isVisible: true,
+              course: { select: { isVisible: true } },
+            },
+          },
+        },
+      });
+      if (!lecture) {
+        throw new AppException("CONTENT_MOVE_STALE", HttpStatus.CONFLICT);
+      }
+      if (lecture.courseModule.courseId !== input.courseId) {
+        throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
+      }
+      if (lecture.courseModuleId !== input.fromModuleId) {
+        throw new AppException("CONTENT_MOVE_STALE", HttpStatus.CONFLICT);
+      }
+      const destination = await tx.courseModule.findFirst({
+        where: { id: input.toModuleId, courseId: input.courseId },
+        select: {
+          id: true,
+          isVisible: true,
+          lectures: { orderBy: { position: "asc" }, select: { id: true } },
+        },
+      });
+      if (!destination) {
+        throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
+      }
+
+      const currentIds = destination.lectures.map((item) => item.id);
+      const ordering = orderingWithItemAt(currentIds, lecture.id, input.toIndex);
+      const reparenting = lecture.courseModuleId !== destination.id;
+      const beforeIndex = reparenting
+        ? await this.lectureIndex(tx, lecture.courseModuleId, lecture.id)
+        : currentIds.indexOf(lecture.id);
+      if (!reparenting && sameOrder(currentIds, ordering)) return false;
+
+      if (reparenting) {
+        await reparentAbovePositions(tx, "lecture", lecture.id, destination.id);
+        const remaining = await tx.lecture.findMany({
+          where: { courseModuleId: lecture.courseModuleId },
+          orderBy: { position: "asc" },
+          select: { id: true },
+        });
+        await rewritePositions(tx, "lecture", remaining.map((item) => item.id));
+      }
+      await rewritePositions(tx, "lecture", ordering);
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.lecture.moved",
+        targetType: "Lecture",
+        targetId: lecture.id,
+        requestId: context.requestId,
+        before: { moduleId: lecture.courseModuleId, index: beforeIndex },
+        after: { moduleId: destination.id, index: ordering.indexOf(lecture.id) },
+      });
+      // §9.2 — the course's content moved, so any import preview taken
+      // against the old revision is now stale and will be refused.
+      await bumpContentRevision(tx, input.courseId);
+
+      const course = lecture.courseModule.course.isVisible;
+      const wasReachable = course && lecture.courseModule.isVisible && lecture.isVisible;
+      const isReachable = course && destination.isVisible && lecture.isVisible;
+      return wasReachable && !isReachable;
+    });
+    if (hidden) await this.revokeCourseMonitoring(input.courseId);
+    return this.currentTree(input);
+  }
+
+  /**
+   * Move a problem to any lecture of the same course; see `moveLecture`.
+   *
+   * `exercises.manage`, like reordering problems: the permission follows the
+   * thing being moved, not how far it travels.
+   */
+  async moveExercise(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      courseId: string;
+      materialId: string;
+      fromLectureId: string;
+      toLectureId: string;
+      toIndex: number;
+    },
+    context: ContentRequestContext = {},
+  ) {
+    const actor = await this.requireExerciseManager(identity, input.academyId);
+    await this.requireCourse(input.academyId, input.courseId);
+    const hidden = await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      const material = await tx.material.findFirst({
+        where: { id: input.materialId, type: "PROGRAMMING_EXERCISE" },
+        include: {
+          lecture: {
+            select: {
+              isVisible: true,
+              courseModule: {
+                select: {
+                  courseId: true,
+                  isVisible: true,
+                  course: { select: { isVisible: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!material) {
+        throw new AppException("CONTENT_MOVE_STALE", HttpStatus.CONFLICT);
+      }
+      if (material.lecture.courseModule.courseId !== input.courseId) {
+        throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
+      }
+      if (material.lectureId !== input.fromLectureId) {
+        throw new AppException("CONTENT_MOVE_STALE", HttpStatus.CONFLICT);
+      }
+      const destination = await tx.lecture.findFirst({
+        where: { id: input.toLectureId, courseModule: { courseId: input.courseId } },
+        select: {
+          id: true,
+          isVisible: true,
+          courseModule: { select: { isVisible: true } },
+          materials: {
+            where: { type: "PROGRAMMING_EXERCISE" },
+            orderBy: { position: "asc" },
+            select: { id: true },
+          },
+        },
+      });
+      if (!destination) {
+        throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.NOT_FOUND);
+      }
+
+      const currentIds = destination.materials.map((item) => item.id);
+      const ordering = orderingWithItemAt(currentIds, material.id, input.toIndex);
+      const reparenting = material.lectureId !== destination.id;
+      const beforeIndex = reparenting
+        ? await this.materialIndex(tx, material.lectureId, material.id)
+        : currentIds.indexOf(material.id);
+      if (!reparenting && sameOrder(currentIds, ordering)) return false;
+
+      if (reparenting) {
+        await reparentAbovePositions(tx, "material", material.id, destination.id);
+        const remaining = await tx.material.findMany({
+          where: { lectureId: material.lectureId },
+          orderBy: { position: "asc" },
+          select: { id: true },
+        });
+        await rewritePositions(tx, "material", remaining.map((item) => item.id));
+      }
+      await rewritePositions(tx, "material", ordering);
+      await this.audit.write(tx, {
+        actorUserId: actor.userId,
+        academyId: input.academyId,
+        action: "content.programming_exercise.moved",
+        targetType: "Material",
+        targetId: material.id,
+        requestId: context.requestId,
+        before: { lectureId: material.lectureId, index: beforeIndex },
+        after: { lectureId: destination.id, index: ordering.indexOf(material.id) },
+      });
+      await bumpContentRevision(tx, input.courseId);
+
+      const source = material.lecture;
+      const course = source.courseModule.course.isVisible;
+      const wasReachable =
+        course && source.courseModule.isVisible && source.isVisible && material.isVisible;
+      const isReachable =
+        course &&
+        destination.courseModule.isVisible &&
+        destination.isVisible &&
+        material.isVisible;
+      return wasReachable && !isReachable;
+    });
+    if (hidden) await this.revokeCourseMonitoring(input.courseId);
+    return this.currentTree(input);
+  }
+
+  private async lectureIndex(
+    tx: Prisma.TransactionClient,
+    moduleId: string,
+    lectureId: string,
+  ) {
+    const siblings = await tx.lecture.findMany({
+      where: { courseModuleId: moduleId },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+    return siblings.findIndex((item) => item.id === lectureId);
+  }
+
+  private async materialIndex(
+    tx: Prisma.TransactionClient,
+    lectureId: string,
+    materialId: string,
+  ) {
+    const siblings = await tx.material.findMany({
+      where: { lectureId, type: "PROGRAMMING_EXERCISE" },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+    return siblings.findIndex((item) => item.id === materialId);
   }
 
   async getExercise(
@@ -1492,4 +1729,19 @@ function toExerciseAuthoringContext(record: ExerciseRecord) {
       programmingExercise: serializeExercise(record.programmingExercise!),
     },
   };
+}
+
+/**
+ * Serialize structural writes to one course.
+ *
+ * The same row lock the workbook importer takes, so a move cannot interleave
+ * with an import or another move and leave two siblings contending for one
+ * position.
+ */
+async function lockCourse(tx: Prisma.TransactionClient, courseId: string) {
+  await tx.$queryRaw`SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+}
+
+function sameOrder(left: readonly string[], right: readonly string[]) {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
 }

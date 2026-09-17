@@ -120,6 +120,7 @@
       "lecture": {
         "created": "Lecture created",
         "deleted": "Lecture deleted",
+        "moved": "Lecture moved",
         "reordered": "Lectures reordered",
         "updated": "Lecture updated",
         "visibility_changed": "Lecture shown or hidden"
@@ -137,6 +138,7 @@
       "programming_exercise": {
         "created": "Problem created",
         "deleted": "Problem deleted",
+        "moved": "Problem moved",
         "reordered": "Problems reordered",
         "updated": "Problem updated",
         "visibility_changed": "Problem shown or hidden"

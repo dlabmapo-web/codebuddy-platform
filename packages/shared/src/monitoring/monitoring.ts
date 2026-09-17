@@ -233,6 +233,25 @@ export const collaborationPointerSchema = z.object({
    * that predate the field, which are handled as unverifiable.
    */
   material: z.string().max(64).nullable().default(null),
+  /**
+   * The piece of content the pointer is over, when the pane marks one.
+   *
+   * A `surface` fraction is a fraction of the pane's box, and two people's
+   * panes are different heights: the same fraction is a different outline row
+   * or terminal line on each screen. An anchor names the row itself — a key
+   * both screens render, like `exercise:<id>` or `terminal-line:12` — and the
+   * position inside that row's own box, so the receiver lands on the same
+   * content whatever its layout. `x`/`y` above stay the pane fraction, which
+   * is what a receiver that does not have the row (or predates this field)
+   * still falls back to.
+   */
+  anchor: z
+    .object({
+      key: z.string().regex(/^[a-z][a-z-]{0,31}:[A-Za-z0-9_-]{1,80}$/),
+      x: normalizedCoordinateSchema,
+      y: normalizedCoordinateSchema,
+    })
+    .optional(),
   /** Code anchors travel in the separate editorPointer wire field. */
   code: z.object({
     kind: z.literal("yjs"),
@@ -240,6 +259,11 @@ export const collaborationPointerSchema = z.object({
     line: z.number().int().min(1).max(10_000_000),
     column: z.number().int().min(1).max(10_000_000),
     relative: z.array(z.number().int().min(0).max(255)).min(1).max(256),
+    /** Mouse displacement from the code anchor, in line-height units. */
+    offset: z.object({
+      x: z.number().min(-100_000).max(100_000),
+      y: z.number().min(-100_000).max(100_000),
+    }).optional(),
   }).optional(),
 });
 export type CollaborationPointer = z.infer<typeof collaborationPointerSchema>;

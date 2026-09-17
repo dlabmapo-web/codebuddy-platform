@@ -8,13 +8,16 @@ import { useTranslation } from 'react-i18next';
 import { codeGeometryEvent, projectCodePointer } from '@/lib/monitoring/awareness/code-pointer';
 import {
   canvasLayoutReady,
+  findAnchorElement,
   findCanvasElement,
   findSurfaceElement,
+  fromAnchorPosition,
   fromCanvasPosition,
   isBoxVisible,
   localPointerSpace,
   pointDirection,
   toViewportPoint,
+  visibleBoxWithin,
 } from '@/lib/monitoring/awareness/surfaces';
 
 /**
@@ -36,7 +39,7 @@ type Placement = {
 };
 
 const placementKey = (pointer: CollaborationPointer) =>
-  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}:${JSON.stringify(pointer.code)}`;
+  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}:${JSON.stringify(pointer.code)}:${JSON.stringify(pointer.anchor)}`;
 
 const noStore = () => () => undefined;
 
@@ -105,6 +108,12 @@ export function RemotePointer({
       observer?.observe(element);
       mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
       element = element.parentElement;
+    }
+    // An anchored row moves with things inside the pane — a chapter expanding
+    // above it, a terminal line arriving — which no ancestor observer sees.
+    const anchorSurface = pointer.anchor ? findSurfaceElement(pointer.surface) : null;
+    if (anchorSurface) {
+      mutations?.observe(anchorSurface, { attributes: true, attributeFilter: ['class', 'style', 'data-state'], childList: true, subtree: true });
     }
     window.addEventListener('resize', place);
     // Capture: the panes scroll, not the window, and a listener on the window
@@ -175,7 +184,7 @@ export function RemotePointer({
       data-peer-surface={pointer.surface}
       data-testid="peer-pointer"
       className="pointer-events-none fixed z-[95] block motion-safe:transition-[left,top] motion-safe:duration-100 motion-safe:ease-linear"
-      style={{ left: left - 4.5, top: top - 2.5 }}
+      style={{ left: left - 4.5 * (20 / 24), top: top - 2.5 * (20 / 24) }}
     >
       <svg
         className="block drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
@@ -240,6 +249,25 @@ function measure(pointer: CollaborationPointer): Placement['view'] {
   if (canvas && !canvasLayoutReady(canvas)) return { kind: 'elsewhere' };
   const box = canvas ? canvas.getBoundingClientRect() : surfaceBox;
   if (box.width <= 0 || box.height <= 0) return { kind: 'elsewhere' };
+
+  // The anchored row wins when the sender named one: a pane fraction is a
+  // different row on a pane of a different height. A named row this screen
+  // is not showing (a collapsed chapter, a line not yet received) has no
+  // truthful placement, so the pane is named instead.
+  if (!canvas && pointer.anchor) {
+    const anchorElement = findAnchorElement(surfaceElement, pointer.anchor.key);
+    if (!anchorElement) return { kind: 'elsewhere' };
+    const anchorBox = anchorElement.getBoundingClientRect();
+    if (anchorBox.width <= 0 || anchorBox.height <= 0) return { kind: 'elsewhere' };
+    const anchored = fromAnchorPosition(pointer.anchor, anchorBox);
+    const anchoredDirection = pointDirection(
+      anchored,
+      visibleBoxWithin(anchorElement, surfaceElement),
+    );
+    return anchoredDirection
+      ? { kind: 'direction', direction: anchoredDirection }
+      : { kind: 'arrow', ...anchored };
+  }
 
   const point = canvas
     ? fromCanvasPosition(pointer, box)

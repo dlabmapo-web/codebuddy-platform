@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronRight, LoaderCircle } from 'lucide-react';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
+import { anchorProps } from '@/lib/monitoring/awareness/surfaces';
 
 import { isEndOfInputKey, isSubmitLineKey } from '@/lib/workspace/terminal-keys';
 import type { TerminalKind, TerminalLine } from '@/lib/workspace/use-python-runner';
@@ -108,7 +109,14 @@ export function TerminalPanel({
           </p>
         ) : (
           lines.map((line, index) => (
-            <span className={`whitespace-pre-wrap ${kindClass[line.kind]}`} key={index}>
+            <span
+              className={`whitespace-pre-wrap ${kindClass[line.kind]}`}
+              key={index}
+              // The student's terminal and the teacher's mirror fold the same
+              // events into the same lines, so an index names the same output
+              // on both screens even when their panes are different heights.
+              {...anchorProps(`terminal-line:${index}`)}
+            >
               {line.text}
             </span>
           ))

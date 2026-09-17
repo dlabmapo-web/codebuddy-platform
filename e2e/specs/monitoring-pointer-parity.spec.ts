@@ -81,6 +81,12 @@ test('the teacher opens a live watch on the hinted exercise', async () => {
 
   await studentPage.getByText(HINTED_TITLE).first().click();
   await studentPage.waitForURL(/\/learn\/exercises\//, { timeout: 30_000 });
+  // A student enrolled in more than one class that teaches this course is
+  // asked which class the work counts toward; the watch is on the cohort.
+  const classChoice = studentPage.getByRole('link', { name: new RegExp(CLASS_NAME) });
+  if (await classChoice.waitFor({ timeout: 5_000 }).then(() => true, () => false)) {
+    await classChoice.click();
+  }
   await expect(statementSurface(studentPage)).toBeVisible({ timeout: 30_000 });
 
   const row = teacherPage.getByRole('row').filter({ has: teacherPage.getByText('Cove Student', { exact: true }) });
@@ -157,6 +163,40 @@ test('the arrow lands on the same content at different scroll offsets', async ()
   expect(arrow.x).toBeLessThanOrEqual(fresh.x + fresh.width + 4);
   expect(arrow.y).toBeGreaterThanOrEqual(fresh.y - 4);
   expect(arrow.y).toBeLessThanOrEqual(fresh.y + fresh.height + 4);
+});
+
+/**
+ * The outline is a pane fraction's worst case: the two panels are different
+ * heights, so "40% down the outline" is a different row on each screen. The
+ * pointer names the row it is over, and the arrow has to land in that row.
+ */
+test('the arrow lands on the same outline row on panels of different heights', async () => {
+  const row = (page: Page) =>
+    page
+      .locator('[data-collab-surface="curriculum"]')
+      .getByText(HINTED_TITLE, { exact: true })
+      .first();
+  const teacherRow = (await row(teacherPage).boundingBox())!;
+  const studentPanel = (await studentPage.locator('[data-collab-surface="curriculum"]').boundingBox())!;
+  const teacherPanel = (await teacherPage.locator('[data-collab-surface="curriculum"]').boundingBox())!;
+  // The premise: the panels really are different heights.
+  expect(Math.abs(studentPanel.height - teacherPanel.height)).toBeGreaterThan(40);
+
+  const peer = studentPage.locator('[data-testid="peer-pointer"][data-peer-surface="curriculum"]');
+  await expect
+    .poll(
+      async () => {
+        await teacherPage.mouse.move(teacherRow.x + 10, teacherRow.y + teacherRow.height / 2);
+        return peer.count();
+      },
+      { timeout: 30_000, intervals: [250] },
+    )
+    .toBeGreaterThan(0);
+
+  const arrow = (await peer.boundingBox())!;
+  const studentRow = (await row(studentPage).boundingBox())!;
+  expect(arrow.y + 2.5).toBeGreaterThanOrEqual(studentRow.y - 4);
+  expect(arrow.y + 2.5).toBeLessThanOrEqual(studentRow.y + studentRow.height + 4);
 });
 
 test('a pointer over the hints dialog is not drawn on the statement', async () => {

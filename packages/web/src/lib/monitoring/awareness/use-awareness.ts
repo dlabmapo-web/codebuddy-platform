@@ -33,6 +33,7 @@ import {
 import {
   canvasLayoutReady,
   pointerBoxFor,
+  resolvePointerAnchor,
   resolvePointerSurface,
   toCanvasPosition,
   toSurfaceFraction,
@@ -330,6 +331,8 @@ export function useAwareness({
     const publishPoint = (
       point: PointerViewportPoint,
       resolved: PointerCaptureSurface | null,
+      /** The element under the pointer, when the event has one. */
+      target: EventTarget | null = null,
     ) => {
       if (!resolved) {
         // There is no shared coordinate for browser chrome, a modal, or a gap
@@ -355,11 +358,24 @@ export function useAwareness({
           ? toCanvasPosition(point, box)
           : toSurfaceFraction(point, box);
       if (!position) return;
-      publishPointer({ surface: resolved.surface, space, material, ...position });
+      // In pane space, the row or line under the pointer travels with the pane
+      // fraction. The fraction alone lands on different content when the two
+      // panes are different heights; the anchor lands on the same content.
+      const anchor =
+        space === 'surface'
+          ? resolvePointerAnchor(target, resolved.element, point)
+          : null;
+      publishPointer({
+        surface: resolved.surface,
+        space,
+        material,
+        ...position,
+        ...(anchor ? { anchor } : {}),
+      });
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      publishPoint(event, resolvePointerSurface(event.target));
+      publishPoint(event, resolvePointerSurface(event.target), event.target);
     };
 
     // Capture phase: Monaco and the terminal stop propagation of their own

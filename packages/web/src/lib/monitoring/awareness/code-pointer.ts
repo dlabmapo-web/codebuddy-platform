@@ -45,8 +45,18 @@ export function captureCodePointer(
   const model = consistent(binding);
   if (!model) return null;
   const target = binding.editor.getTargetAtClientPoint(point.clientX, point.clientY);
-  // Monaco MouseTargetType.CONTENT_TEXT. Whitespace/gutter/minimap are not code.
-  if (target?.type !== 6 || !target.position) return null;
+  // Monaco CONTENT_TEXT and CONTENT_EMPTY both supply a nearby code position.
+  // Keep the displacement too, including whitespace after/below the code.
+  if (!target || (target.type !== 6 && target.type !== 7) || !target.position) return null;
+  const pixel = binding.editor.getScrolledVisiblePosition(target.position);
+  const box = binding.editor.getDomNode()?.getBoundingClientRect();
+  if (!pixel || !box || pixel.height <= 0) return null;
+  const offset = {
+    x: (point.clientX - box.left - pixel.left) / pixel.height,
+    y: (point.clientY - box.top - pixel.top) / pixel.height,
+  };
+  if (!Number.isFinite(offset.x) || !Number.isFinite(offset.y) ||
+      Math.abs(offset.x) > 100_000 || Math.abs(offset.y) > 100_000) return null;
   const relative = Array.from(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(
     binding.text, model.getOffsetAt(target.position),
   )));
@@ -54,7 +64,7 @@ export function captureCodePointer(
   return {
     surface: 'editor', space: 'surface', material: binding.material, x: 0, y: 0,
     code: { kind: 'yjs', draftId, line: target.position.lineNumber,
-      column: target.position.column, relative },
+      column: target.position.column, relative, offset },
   };
 }
 
@@ -78,9 +88,12 @@ export function projectCodePointer(pointer: CollaborationPointer): { left: numbe
     const box = binding.editor.getDomNode()?.getBoundingClientRect();
     if (!pixel || !box) return null;
     const layout = binding.editor.getLayoutInfo();
-    if (pixel.left < layout.contentLeft || pixel.left >= layout.contentLeft + layout.contentWidth ||
-        pixel.top < 0 || pixel.top >= layout.height) return null;
-    return { left: box.left + pixel.left, top: box.top + pixel.top };
+    const left = pixel.left + (anchor.offset?.x ?? 0) * pixel.height;
+    const top = pixel.top + (anchor.offset?.y ?? 0) * pixel.height;
+    if (!Number.isFinite(left) || !Number.isFinite(top) ||
+        left < layout.contentLeft || left >= layout.contentLeft + layout.contentWidth ||
+        top < 0 || top >= layout.height) return null;
+    return { left: box.left + left, top: box.top + top };
   } catch {
     return null;
   }

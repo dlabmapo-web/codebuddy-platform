@@ -15,12 +15,19 @@ describe('code awareness extension', () => {
     expect(legacy.pointer).toBeNull();
     expect(legacy).not.toHaveProperty('editorPointer');
   });
+  it('preserves mouse offsets through wire validation', () => {
+    const withOffset = { ...editorPointer, code: { ...editorPointer.code, offset: { x: 5.25, y: -0.2 } } };
+    expect(awarenessUpdatePayloadSchema.parse({ ...packet, editorPointer: withOffset }).editorPointer)
+      .toEqual(withOffset);
+  });
   it('rejects anchors in the legacy channel and invalid or oversized payloads', () => {
     expect(awarenessUpdatePayloadSchema.safeParse({ ...packet, pointer: editorPointer }).success).toBe(false);
     for (const code of [
       { ...editorPointer.code, relative: Array(257).fill(0) },
       { ...editorPointer.code, relative: [-1] },
       { ...editorPointer.code, line: 0 },
+      { ...editorPointer.code, offset: { x: Infinity, y: 0 } },
+      { ...editorPointer.code, offset: { x: 0, y: 100_001 } },
       { ...editorPointer.code, kind: 'pixels' },
     ]) {
       expect(awarenessUpdatePayloadSchema.safeParse({ ...packet, editorPointer: { ...editorPointer, code } }).success).toBe(false);

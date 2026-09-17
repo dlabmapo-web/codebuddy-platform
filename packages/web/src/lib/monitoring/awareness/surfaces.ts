@@ -266,3 +266,93 @@ export function canvasLayoutReady(canvas: HTMLElement): boolean {
   }
   return canvas.ownerDocument.fonts?.status !== 'loading';
 }
+
+/**
+ * Marks one piece of content inside a surface that both screens render: an
+ * outline row, a terminal line.
+ *
+ * A pane fraction lands on different content when the two panes are different
+ * heights, which they almost always are. An anchor lets a position name the
+ * content instead, and the receiver find that same content on its own layout.
+ */
+export const collaborationAnchorAttribute = 'data-collab-anchor';
+
+/** Spread onto the element that is one anchorable piece of content. */
+export function anchorProps(key: string): Record<string, string> {
+  return { [collaborationAnchorAttribute]: key };
+}
+
+/**
+ * The anchor a point is over, and where inside it, or null.
+ *
+ * Only anchors inside the resolved surface count, so a row from another pane
+ * that happens to overlap can never be claimed.
+ */
+export function resolvePointerAnchor(
+  target: EventTarget | null,
+  surface: HTMLElement,
+  point: { clientX: number; clientY: number },
+): { key: string; x: number; y: number } | null {
+  if (typeof Element === 'undefined' || !(target instanceof Element)) return null;
+  const element = target.closest<HTMLElement>(`[${collaborationAnchorAttribute}]`);
+  if (!element || !surface.contains(element)) return null;
+  const key = element.getAttribute(collaborationAnchorAttribute);
+  if (!key) return null;
+  const position = toSurfaceFraction(point, element.getBoundingClientRect());
+  return position ? { key, ...position } : null;
+}
+
+/** The element on this screen carrying an anchor, inside one surface. */
+export function findAnchorElement(
+  surface: HTMLElement,
+  key: string,
+): HTMLElement | null {
+  for (const element of surface.querySelectorAll<HTMLElement>(
+    `[${collaborationAnchorAttribute}]`,
+  )) {
+    if (element.getAttribute(collaborationAnchorAttribute) === key) return element;
+  }
+  return null;
+}
+
+/** An anchor position back on this screen, in viewport pixels. */
+export function fromAnchorPosition(
+  anchor: { x: number; y: number },
+  box: Box,
+): { left: number; top: number } {
+  return {
+    left: box.left + anchor.x * box.width,
+    top: box.top + anchor.y * box.height,
+  };
+}
+
+/**
+ * The part of a surface an anchor can actually be seen in.
+ *
+ * An outline row scrolls inside a list below the outline's own header, so a
+ * row scrolled up out of the list is still inside the surface's box — just
+ * hidden. Every clipping ancestor between the anchor and the surface narrows
+ * the box, and a position outside what is left is off screen.
+ */
+export function visibleBoxWithin(anchor: HTMLElement, surface: HTMLElement): Box {
+  const surfaceBox = surface.getBoundingClientRect();
+  let top = surfaceBox.top;
+  let bottom = surfaceBox.top + surfaceBox.height;
+  for (
+    let element = anchor.parentElement;
+    element && element !== surface && surface.contains(element);
+    element = element.parentElement
+  ) {
+    const overflowY = getComputedStyle(element).overflowY;
+    if (overflowY === 'visible') continue;
+    const box = element.getBoundingClientRect();
+    top = Math.max(top, box.top);
+    bottom = Math.min(bottom, box.top + box.height);
+  }
+  return {
+    left: surfaceBox.left,
+    top,
+    width: surfaceBox.width,
+    height: Math.max(0, bottom - top),
+  };
+}

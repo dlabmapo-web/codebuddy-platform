@@ -19,7 +19,7 @@ import Link from 'next/link';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
-import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { anchorProps, surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import {
   navigatorPanelProps,
   navigatorScroll,
@@ -141,7 +141,12 @@ export function WorkspaceCurriculumNavigator({
       // wrapped in something that has no box to measure.
       {...surfaceProps('curriculum')}
     >
-      <header className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5">
+      <header
+        className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5"
+        // Anchored like every row: the panel's header and footer sit at the
+        // pane's edges, which a pane fraction only reaches on equal heights.
+        {...anchorProps('outline:header')}
+      >
         <div className="min-w-0 flex-1">
           <p className="text-[10.5px] font-bold uppercase tracking-wide text-sub">
             {t('navigator.title')}
@@ -209,7 +214,7 @@ export function WorkspaceCurriculumNavigator({
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-border px-3 py-2">
+      <footer className="shrink-0 border-t border-border px-3 py-2" {...anchorProps('outline:footer')}>
         <Link
           className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
           href={footer.href}
@@ -249,6 +254,7 @@ function ModuleBranch({
   return (
     <li className="mb-1">
       <Branch
+        anchorKey={`module:${courseModule.id}`}
         label={t('outline.module_label', { position: courseModule.position })}
         onToggle={() => onToggle(courseModule.id)}
         open={open}
@@ -261,6 +267,7 @@ function ModuleBranch({
             return (
               <li className="mb-0.5" key={lecture.id}>
                 <Branch
+                  anchorKey={`lecture:${lecture.id}`}
                   label={t('outline.lecture_label', { position: lecture.position })}
                   onToggle={() => onToggle(lecture.id)}
                   open={lectureOpen}
@@ -298,12 +305,18 @@ function ModuleBranch({
 }
 
 function Branch({
+  anchorKey,
   label,
   onToggle,
   open,
   small,
   title,
 }: {
+  /**
+   * Names this row to a watching peer, so a pointer over it lands on the same
+   * row on a screen whose outline is a different height.
+   */
+  anchorKey: string;
   label: string;
   onToggle: () => void;
   open: boolean;
@@ -313,6 +326,7 @@ function Branch({
   const Icon = open ? ChevronDown : ChevronRight;
   return (
     <button
+      {...anchorProps(anchorKey)}
       aria-expanded={open}
       className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
         small ? 'text-[12.5px]' : 'text-[13px]'
@@ -357,6 +371,7 @@ function ExerciseRow({
   return (
     <li>
       <button
+        {...anchorProps(`exercise:${exercise.materialId}`)}
         // The row the workspace is currently rendering, which on a teacher's
         // screen is not necessarily the one the student is on.
         aria-current={selected ? 'true' : undefined}

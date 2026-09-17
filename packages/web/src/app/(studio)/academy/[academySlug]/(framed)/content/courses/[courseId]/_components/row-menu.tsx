@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUpDown, Eye, EyeOff, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -14,21 +14,21 @@ import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 /**
- * Rename, show/hide, delete — behind one dots trigger. The menu names what it
- * acts on in its own header, so a menu opened on a lecture can never be
- * mistaken for one opened on a problem inside it.
+ * Rename, move, delete — behind one dots trigger. Showing and hiding lives
+ * on the row itself, as a toggle, because it is the setting authors change
+ * most and it should not cost a menu.
+ *
+ * The menu names what it acts on in its own header, so a menu opened on a
+ * lecture can never be mistaken for one opened on a problem inside it.
  */
 export function RowMenu({
-  isVisible,
   kindLabel,
   label,
   onDelete,
   onMove,
   onRename,
-  onToggleVisible,
   tone = 'default',
 }: {
-  isVisible: boolean;
   /** "Lecture", "Problem" — shown above the actions. */
   kindLabel: string;
   label: string;
@@ -39,13 +39,6 @@ export function RowMenu({
    */
   onMove?: () => void;
   onRename: () => void;
-  /**
-   * Absent on the library surface, where the flag is inert: a `LIBRARY` academy
-   * has no students for a row to be hidden from, and `adopt` lands every copied
-   * row visible regardless. Offering the control there would let head office
-   * believe they had excluded a module from every future copy.
-   */
-  onToggleVisible?: (next: boolean) => void;
   /** `strong` marks the group-level menu so it reads apart from child rows. */
   tone?: 'default' | 'strong';
 }) {
@@ -80,16 +73,6 @@ export function RowMenu({
           <DropdownMenuItem onSelect={onMove}>
             <ArrowUpDown className="text-sub" />
             {t('row.move')}
-          </DropdownMenuItem>
-        ) : null}
-        {onToggleVisible ? (
-          <DropdownMenuItem onSelect={() => onToggleVisible(!isVisible)}>
-            {isVisible ? (
-              <EyeOff className="text-sub" />
-            ) : (
-              <Eye className="text-sub" />
-            )}
-            {isVisible ? t('row.hide') : t('row.show')}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

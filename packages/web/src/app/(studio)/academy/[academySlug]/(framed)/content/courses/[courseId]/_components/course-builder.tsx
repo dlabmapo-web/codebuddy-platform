@@ -12,7 +12,9 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import { useCourseBuilder } from '../_hooks/use-course-builder';
 import { BuilderHeader } from './builder-header';
 import { ContentReadinessNotice } from './content-readiness';
+import { BuilderDndProvider } from './builder-dnd';
 import { ModuleCard } from './module-card';
+import { MoveToast } from './move-toast';
 
 export function CourseBuilder({
   academyId,
@@ -61,14 +63,16 @@ export function CourseBuilder({
               </p>
             </div>
           ) : (
-            builder.tree.modules.map((courseModule) => (
-              <ModuleCard
-                builder={builder}
-                courseModule={courseModule}
-                exercisePath={exercisePath}
-                key={courseModule.id}
-              />
-            ))
+            <BuilderDndProvider builder={builder}>
+              {builder.tree.modules.map((courseModule) => (
+                <ModuleCard
+                  builder={builder}
+                  courseModule={courseModule}
+                  exercisePath={exercisePath}
+                  key={courseModule.id}
+                />
+              ))}
+            </BuilderDndProvider>
           )}
 
           {builder.editable ? (
@@ -111,6 +115,8 @@ export function CourseBuilder({
           ) : null}
         </section>
       </div>
+
+      <MoveToast builder={builder} />
     </div>
   );
 }

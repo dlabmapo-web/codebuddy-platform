@@ -6,6 +6,7 @@ import { ExerciseWorkspace } from '@/app/(studio)/academy/[academySlug]/(framed)
 import { consoleBackTarget } from '@/app/(platform)/admin/_lib/back-target';
 import { BackLink } from '@/components/studio/back-link';
 import { createContentPaths } from '@/components/studio/content-paths';
+import { redirectIfExerciseMoved } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/moved-exercise';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { requirePlatformAcademyRoute } from '@/lib/academy-route';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
@@ -53,7 +54,16 @@ export default async function PlatformExercisePage({
   } else {
     context = await client.academyCourses
       .getExercise({ academyId, courseId, lectureId, materialId })
-      .catch(() => notFound());
+      .catch(async () => {
+        await redirectIfExerciseMoved({
+          exercisePath: (currentLectureId) =>
+            createContentPaths(academySlug, 'console').exercise(courseId, currentLectureId, materialId),
+          lectureId,
+          loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+          materialId,
+        });
+        return notFound();
+      });
     solutionCode = await client.academyCourses
       .getExerciseSolution({ academyId, courseId, lectureId, materialId })
       .then((solution) => solution.solutionCode ?? '')

@@ -2,7 +2,7 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { ChevronRight, Plus, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useTranslation } from 'react-i18next';
@@ -11,13 +11,52 @@ import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseLecture } from '../_lib/course-tree';
-import { VisibilityIndicator } from './builder-controls';
+import { RowVisibility } from './builder-controls';
+import { DragHandle, DropIndicator, useOutlineRowDnd } from './builder-dnd';
 import { DeleteModal } from './delete-modal';
-import { MoveModal } from './move-modal';
+import { MoveAnywhereModal } from './move-anywhere-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
 
 type CourseMaterial = CourseLecture['materials'][number];
+
+/**
+ * Bring a row the author just moved into view and flash it once.
+ *
+ * The flash is a CSS animation removed when it ends, so the row keeps no
+ * trace of it, and the reveal is consumed as soon as it is honoured so a later
+ * re-render cannot scroll the page back to it.
+ */
+export function useRevealAfterMove<T extends HTMLElement>(
+  builder: CourseBuilderState,
+  id: string,
+) {
+  const ref = useRef<T>(null);
+  const { revealId, clearReveal } = builder;
+  useEffect(() => {
+    if (revealId !== id) return;
+    const node = ref.current;
+    if (!node) return;
+    // Scrolled to only when it is off screen: a row dropped in view is where
+    // the author is already looking, and moving the page would lose them.
+    const rect = node.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      node.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+    }
+    node.classList.remove('cove-move-flash');
+    // Restart the animation even if the class was still present.
+    void node.offsetWidth;
+    node.classList.add('cove-move-flash');
+    node.addEventListener(
+      'animationend',
+      () => node.classList.remove('cove-move-flash'),
+      { once: true },
+    );
+    clearReveal();
+  }, [clearReveal, id, revealId]);
+  return ref;
+}
 
 /** Difficulty reads as a scale, so the tokens climb green → amber → red. */
 const difficultyStyles = {
@@ -72,13 +111,37 @@ function ExerciseRow({
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [moving, setMoving] = useState(false);
-  const materialIndex = siblings.findIndex((item) => item.id === material.id);
+  const rowRef = useRevealAfterMove<HTMLLIElement>(builder, material.id);
+  const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
+    canDrag: builder.exerciseEditable && !builder.movePending,
+    item: { kind: 'exercise', id: material.id, title: material.title },
+    target: { row: { kind: 'exercise', id: material.id } },
+  });
+  const setRowNode = useCallback(
+    (node: HTMLLIElement | null) => {
+      rowRef.current = node;
+      setNodeRef(node);
+    },
+    [rowRef, setNodeRef],
+  );
+  // Anywhere else in the course counts: a lecture's only problem can still
+  // move to another lecture.
+  const canMove =
+    siblings.length > 1 ||
+    builder.tree.modules.reduce((total, item) => total + item.lectures.length, 0) > 1;
   const href = exercisePath(lectureId, material.id);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
 
   return (
-    <li className="flex items-center gap-2.5 px-3 py-2">
+    <li
+      className={`relative flex items-center gap-2.5 px-3 py-2 ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+      ref={setRowNode}
+    >
+      <DropIndicator edge={dropEdge} />
+      <DragHandle className="-ml-1.5 -mr-1" handle={handle} />
       <OutlineNumber>{outlineNumber}</OutlineNumber>
       <Link
         className={`min-w-0 flex-1 truncate text-[14.5px] font-semibold text-brand hover:text-brand-deep hover:underline ${
@@ -90,9 +153,15 @@ function ExerciseRow({
       </Link>
       <div className="flex shrink-0 items-center gap-1">
         {visibilityIsReal ? (
-          <VisibilityIndicator
+          <RowVisibility
+            busy={builder.visibilityPending(material.id)}
+            editable={builder.exerciseEditable}
             effectivelyVisible={effectivelyVisible}
             isVisible={material.isVisible}
+            onChange={(next) =>
+              builder.setExerciseVisible(lectureId, material.id, next)
+            }
+            title={material.title}
           />
         ) : null}
         {exercise?.aiFeedbackEnabled ? (
@@ -113,37 +182,24 @@ function ExerciseRow({
       </div>
       {builder.exerciseEditable ? (
         <RowMenu
-          isVisible={material.isVisible}
           kindLabel={t('row.kind_exercise')}
           label={material.title}
           onDelete={() => setDeleting(true)}
-          onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
+          onMove={canMove ? () => setMoving(true) : undefined}
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() => router.push(href)}
-          onToggleVisible={
-            visibilityIsReal
-              ? (next) =>
-                  builder.setExerciseVisible(lectureId, material.id, next)
-              : undefined
-          }
         />
       ) : null}
-      <MoveModal
-        currentIndex={materialIndex}
-        kind="exercise"
-        onCancel={() => setMoving(false)}
-        onMove={(toIndex) => {
-          setMoving(false);
-          builder.moveExercise(lectureId, material.id, toIndex);
-        }}
-        open={moving}
-        siblings={siblings.map((item) => ({
-          id: item.id,
-          isVisible: item.isVisible,
-          title: item.title,
-        }))}
-      />
+      {moving ? (
+        <MoveAnywhereModal
+          builder={builder}
+          itemId={material.id}
+          kind="exercise"
+          onClose={() => setMoving(false)}
+          visibilityIsReal={visibilityIsReal}
+        />
+      ) : null}
       <DeleteModal
         itemTitle={material.title}
         kind="exercise"
@@ -179,9 +235,29 @@ export function LectureRow({
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
   const [moving, setMoving] = useState(false);
+  const rowRef = useRevealAfterMove<HTMLLIElement>(builder, lecture.id);
+  // The header is the lecture's handle and target. It takes a dragged lecture
+  // beside it, and a dragged problem into its list — the only way to reach a
+  // lecture that is collapsed or has no problems yet.
+  const {
+    dropEdge,
+    handle,
+    isDragging,
+    setNodeRef,
+  } = useOutlineRowDnd({
+    canDrag: builder.editable && !builder.movePending,
+    canDrop: (builder.editable || builder.exerciseEditable) && !builder.movePending,
+    item: { kind: 'lecture', id: lecture.id, title: lecture.title },
+    target: {
+      row: builder.editable ? { kind: 'lecture', id: lecture.id } : undefined,
+      container: builder.exerciseEditable
+        ? { accepts: 'exercise', parentId: lecture.id }
+        : undefined,
+    },
+  });
   const siblings =
     builder.tree.modules.find((item) => item.id === moduleId)?.lectures ?? [];
-  const lectureIndex = siblings.findIndex((item) => item.id === lecture.id);
+  const canMove = siblings.length > 1 || builder.tree.modules.length > 1;
   const effectivelyVisible = parentEffectivelyVisible && lecture.isVisible;
   const lectureNumber = `${moduleNumber}-${lecture.position}`;
   const open = !builder.isCollapsed(lecture.id);
@@ -193,8 +269,16 @@ export function LectureRow({
       onOpenChange={() => builder.toggleCollapsed(lecture.id)}
       open={open}
     >
-      <li className="px-4 py-3">
-        <div className="flex items-center gap-2.5">
+      <li
+        className={`px-4 py-3 ${isDragging ? 'opacity-40' : ''}`}
+        ref={rowRef}
+      >
+        <div
+          className="relative -mx-2 flex items-center gap-2.5 rounded-lg px-2 py-0.5"
+          ref={setNodeRef}
+        >
+          <DropIndicator edge={dropEdge} />
+          <DragHandle className="-ml-1.5 -mr-1.5" handle={handle} />
           <Collapsible.Trigger asChild>
             <button
               aria-label={t('outline.toggle', { title: lecture.title })}
@@ -230,30 +314,28 @@ export function LectureRow({
             </span>
           </div>
           {visibilityIsReal ? (
-            <VisibilityIndicator
+            <RowVisibility
+              busy={builder.visibilityPending(lecture.id)}
+              editable={builder.editable}
               effectivelyVisible={effectivelyVisible}
               isVisible={lecture.isVisible}
+              onChange={(next) => {
+                if (!next) {
+                  setHiding(true);
+                  return;
+                }
+                builder.setLectureVisible(lecture.id, true);
+              }}
+              title={lecture.title}
             />
           ) : null}
           {builder.editable ? (
             <RowMenu
-              isVisible={lecture.isVisible}
               kindLabel={t('row.kind_lecture')}
               label={lecture.title}
               onDelete={() => setDeleting(true)}
-              onMove={siblings.length > 1 ? () => setMoving(true) : undefined}
+              onMove={canMove ? () => setMoving(true) : undefined}
               onRename={() => setRenaming(true)}
-              onToggleVisible={
-                visibilityIsReal
-                  ? (next) => {
-                      if (!next) {
-                        setHiding(true);
-                        return;
-                      }
-                      builder.setLectureVisible(lecture.id, next);
-                    }
-                  : undefined
-              }
             />
           ) : null}
         </div>
@@ -301,21 +383,15 @@ export function LectureRow({
             value={lecture.title}
           />
         ) : null}
-        <MoveModal
-          currentIndex={lectureIndex}
-          kind="lecture"
-          onCancel={() => setMoving(false)}
-          onMove={(toIndex) => {
-            setMoving(false);
-            builder.moveLecture(moduleId, lecture.id, toIndex);
-          }}
-          open={moving}
-          siblings={siblings.map((item) => ({
-            id: item.id,
-            isVisible: item.isVisible,
-            title: item.title,
-          }))}
-        />
+        {moving ? (
+          <MoveAnywhereModal
+            builder={builder}
+            itemId={lecture.id}
+            kind="lecture"
+            onClose={() => setMoving(false)}
+            visibilityIsReal={visibilityIsReal}
+          />
+        ) : null}
         <DeleteModal
           cascade={{ exercises: lecture.materials.length }}
           itemTitle={lecture.title}

@@ -5,6 +5,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import {
   useContentBasePath,
@@ -14,7 +15,8 @@ import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
-import { VisibilityIndicator } from './builder-controls';
+import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
+import { RowVisibility } from './builder-controls';
 import { ContentVisibilityControl } from './content-readiness';
 
 export function BuilderHeader({
@@ -31,8 +33,11 @@ export function BuilderHeader({
   // knows something this one cannot: which list the operator actually arrived
   // from. Two back arrows forty pixels apart, pointing at different places, is
   // a choice nobody asked to make — so under the console the shell's wins.
-  const shellOwnsBack = useContentSurface() === 'console';
+  const surface = useContentSurface();
+  const shellOwnsBack = surface === 'console';
   const { t } = useTranslation('content');
+  const [hiding, setHiding] = useState(false);
+  const course = builder.tree.course;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,9 +72,21 @@ export function BuilderHeader({
             {t('builder.import_excel')}
           </Link>
         ) : null}
-        <VisibilityIndicator
-          effectivelyVisible={builder.tree.course.isVisible}
-          isVisible={builder.tree.course.isVisible}
+        {/* A library course has no students to be hidden from; its flag is
+            shown read-only, as it was. */}
+        <RowVisibility
+          busy={builder.visibilityPending(course.id)}
+          editable={builder.editable && surface !== 'library'}
+          effectivelyVisible={course.isVisible}
+          isVisible={course.isVisible}
+          onChange={(next) => {
+            if (!next) {
+              setHiding(true);
+              return;
+            }
+            builder.setCourseVisible(true);
+          }}
+          title={course.title}
         />
         {builder.editable && builder.tree.course.content.exercises > 0 ? (
           <ContentVisibilityControl builder={builder} />
@@ -91,6 +108,20 @@ export function BuilderHeader({
           </button>
         ) : null}
       </div>
+      <VisibilityConfirmModal
+        affected={[
+          { label: t('visibility_confirm.lectures'), value: course.content.lectures },
+          { label: t('visibility_confirm.problems'), value: course.content.exercises },
+        ]}
+        itemTitle={course.title}
+        kindLabel={t('row.kind_course')}
+        onCancel={() => setHiding(false)}
+        onConfirm={() => {
+          setHiding(false);
+          builder.setCourseVisible(false);
+        }}
+        open={hiding}
+      />
     </div>
   );
 }

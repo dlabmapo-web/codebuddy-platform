@@ -177,6 +177,23 @@
         "empty_negative_rule": "빈 문자열에 대한 '포함되지 않음' 또는 '일치하지 않음' 규칙은 통과할 수 없습니다.",
         "answer": "정답 {{number}}"
       }
+    },
+    "controls": {
+      "decrease": "{{label}} 줄이기",
+      "increase": "{{label}} 늘리기",
+      "unset": "설정 안 함",
+      "range": "{{min}}–{{max}}",
+      "invalid": "{{min}}–{{max}} 범위에서 소수점 {{precision}}자리 이하로 입력하세요.",
+      "points": "점",
+      "seconds": "초",
+      "proportional": "비례 점수",
+      "absolute": "상한 적용 점수",
+      "rule_STDOUT": "전체 출력을 정확한 출력 비교 규칙으로 비교합니다.",
+      "rule_STDOUT_MATCH": "출력에 지정한 텍스트가 포함되면 통과합니다.",
+      "rule_STDOUT_NOMATCH": "출력에 지정한 텍스트가 없으면 통과합니다.",
+      "rule_STDOUT_REGEX": "Python 정규 표현식과 일치하는 부분이 있으면 통과합니다.",
+      "rule_STDOUT_REGEX_NOMATCH": "Python 정규 표현식과 일치하는 부분이 없으면 통과합니다.",
+      "fix_fields": "저장하기 전에 표시된 입력값을 수정하세요."
     }
   },
   "rename": {

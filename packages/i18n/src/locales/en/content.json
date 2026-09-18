@@ -179,6 +179,23 @@
         "empty_negative_rule": "A 'does not contain' or 'does not match' rule on empty text can never pass.",
         "answer": "Answer {{number}}"
       }
+    },
+    "controls": {
+      "decrease": "Decrease {{label}}",
+      "increase": "Increase {{label}}",
+      "unset": "Not set",
+      "range": "{{min}}–{{max}}",
+      "invalid": "Enter {{min}}–{{max}}, with at most {{precision}} decimal places.",
+      "points": "pts",
+      "seconds": "s",
+      "proportional": "Proportional score",
+      "absolute": "Capped points",
+      "rule_STDOUT": "Compare the complete output using the exact-output rule.",
+      "rule_STDOUT_MATCH": "Pass when the output contains the specified text.",
+      "rule_STDOUT_NOMATCH": "Pass when the specified text is absent from the output.",
+      "rule_STDOUT_REGEX": "Pass when a Python regular expression finds a match.",
+      "rule_STDOUT_REGEX_NOMATCH": "Pass when a Python regular expression finds no match.",
+      "fix_fields": "Correct the highlighted fields before saving."
     }
   },
   "rename": {

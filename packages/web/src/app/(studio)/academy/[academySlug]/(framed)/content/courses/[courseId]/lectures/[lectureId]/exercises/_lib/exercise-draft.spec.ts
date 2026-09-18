@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultEliceGradingProfile, legacyGradingProfile } from '@cove/shared';
+import { defaultEliceGradingProfile, exerciseDraftFieldsSchema, legacyGradingProfile } from '@cove/shared';
 
 import {
   contextToDraft,
@@ -254,5 +254,26 @@ describe('exercise draft helpers', () => {
         }),
       ).map((issue) => issue.code),
     ).toEqual(['no_points']);
+  });
+});
+
+// The save guard must reject invalid numeric drafts before JSON can turn NaN
+// into null (which means “unset” for optional grading settings).
+describe('grading control save validation', () => {
+  it.each(['weight', 'timeLimitMsOverride', 'softTimeLimitMs', 'softPenalty'] as const)(
+    'rejects an invalid %s instead of silently saving it as unset', (field) => {
+      const value = draft({ grading: defaultEliceGradingProfile });
+      value.testCases[0][field] = Number.NaN;
+      expect(exerciseDraftFieldsSchema.safeParse(draftToPayload(value)).success).toBe(false);
+    },
+  );
+
+  it('preserves hundredths and milliseconds through the save payload', () => {
+    const value = draft({ grading: { ...defaultEliceGradingProfile, materialMaximumHundredths: 10125 } });
+    value.testCases[0].timeLimitMsOverride = 1101;
+    const payload = exerciseDraftFieldsSchema.parse(draftToPayload(value));
+    expect(payload.grading.materialMaximumHundredths).toBe(10125);
+    expect(payload.testCases[0].timeLimitMsOverride).toBe(1101);
+    expect(payload.testCases[0].softTimeLimitMs).toBeNull();
   });
 });

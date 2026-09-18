@@ -233,6 +233,33 @@ async function main(): Promise<void> {
     },
   });
 
+  // Separate globals keep the entry point out of the student's __main__.
+  // Capture builtins before execution: rebinding SystemExit or int must not
+  // turn an ordinary crash into a successful process exit.
+  const entryGlobals = pyodide.runPython("dict()");
+  pyodide.runPython(`
+def run_script(source, namespace):
+    import builtins
+    compile_script = builtins.compile
+    execute = builtins.exec
+    exit_type = builtins.SystemExit
+    exit_code = exit_type.code.__get__
+    is_instance = builtins.isinstance
+    integer = builtins.int
+    integer_equal = integer.__eq__
+    namespace["__name__"] = "__main__"
+    namespace["__file__"] = "main.py"
+    program = compile_script(source, "main.py", "exec", flags=0, dont_inherit=True)
+    try:
+        execute(program, namespace, namespace)
+    except exit_type as error:
+        code = exit_code(error)
+        if code is None or (is_instance(code, integer) and integer_equal(code, 0)):
+            return
+        raise
+`, { globals: entryGlobals });
+  const runScript = entryGlobals.get("run_script");
+
   writeSync(CONTROL_FD, "READY\n");
 
   const job = await readJob();
@@ -242,9 +269,9 @@ async function main(): Promise<void> {
   lockDownHost();
 
   try {
-    // Awaited here rather than inside Python: the exception surfaces to this
+    // Unhandled script exceptions surface to this
     // host frame, so the exit status below is decided outside the interpreter.
-    await pyodide.runPythonAsync(job.code);
+    runScript(job.code, pyodide.globals);
   } catch (error) {
     hostStderrWrite(formatPythonError(error));
     await flush();

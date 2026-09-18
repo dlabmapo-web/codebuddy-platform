@@ -1,7 +1,7 @@
 import { Logger } from "@nestjs/common";
 import { sampleCheckDisplayLimit, type SampleCheckStatus } from "@cove/shared";
 
-import { evaluateEnhancedCase } from "./case-evaluator.js";
+import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionCapacity } from "./execution-capacity.js";
 import type { ExecutionEngine } from "./execution-engine.js";
@@ -28,8 +28,8 @@ export const SAMPLE_QUEUE_WAIT_MS = 10_000;
  *    take at most `SAMPLE_QUEUE_WAIT_MS` from acceptance, else `TIMED_OUT`.
  * 2. The recorded runtimes must be the ones running, before any student code
  *    runs, else `UNAVAILABLE`.
- * 3. The case runs against the profile's total budget from dispatch; a result
- *    after that deadline is `TIMED_OUT`, never a verdict.
+ * 3. Student execution is capped by the profile budget. Infrastructure gets
+ *    a bounded overhead allowance; later results are `TIMED_OUT`.
  * 4. A cancel that arrived while running makes the ending `CANCELLED` — the
  *    result is discarded, and the slot was held until the run was over.
  */
@@ -98,7 +98,7 @@ export class SampleCheckRunner {
       return;
     }
 
-    const deadlineAt = dispatchedAt + snapshot.totalTimeLimitMs;
+    const deadlineAt = dispatchedAt + snapshot.totalTimeLimitMs + GRADING_OVERHEAD_MS;
     let evaluation;
     try {
       evaluation = await evaluateEnhancedCase(
@@ -108,6 +108,7 @@ export class SampleCheckRunner {
           memoryLimitMb: snapshot.memoryLimitMb,
           comparatorTimeLimitMs: snapshot.comparatorTimeLimitMs,
           deadlineAt,
+          executionBudgetMs: snapshot.totalTimeLimitMs,
           testCase: snapshot.testCase,
         },
       );

@@ -43,11 +43,11 @@ export function ExerciseActions({
       {/* A disabled button is a dead end without this: it names what is left. */}
       {blocked ? (
         <p className="mb-4 text-[14px] leading-6 text-sub">
-          {t('exercise.still_needed', {
+          {missing.length ? t('exercise.still_needed', {
             fields: missing
               .map((field) => t(`exercise.required.${field}`))
               .join(', '),
-          })}
+          }) : t('exercise.controls.fix_fields')}
         </p>
       ) : null}
 

@@ -481,45 +481,38 @@ describe("GradingService.grade — weighted profiles", () => {
     },
   );
 
-  it("aborts at the total deadline and marks what never ran", async () => {
+  it("grades cumulative execution-budget exhaustion and skips remaining cases", async () => {
     const { service, tx, engine } = createService({
       profile: { ...eliceProfile, totalTimeLimitMs: 1_000 },
       cases: weightedCases(),
-      run: async (stdin, timeLimitMs) => {
-        if (stdin === "case-1") {
-          await new Promise((resolve) => setTimeout(resolve, 600));
-          return answers([1])(stdin);
-        }
-        // Case 2 is given only what is left of the run, and uses all of it.
-        await new Promise((resolve) => setTimeout(resolve, timeLimitMs));
-        return { stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: timeLimitMs };
-      },
+      run: async (stdin, timeLimitMs) => stdin === "case-1"
+        ? { stdout: "answer-1", stderr: "", outcome: "PASSED", runtimeMs: 600 }
+        : { stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: timeLimitMs + 100 },
     });
-
     await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+    expect((engine.run as ReturnType<typeof vi.fn>).mock.calls[1]![0].timeLimitMs).toBe(400);
+    expect(engine.run).toHaveBeenCalledTimes(2);
+    expect(tx.submission.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "FAILED", score: 30, earnedWeight: 30, possibleWeight: 100 }),
+    }));
+    expect(tx.submissionCase.createMany).toHaveBeenCalledWith({ data: [
+      expect.objectContaining({ position: 1, outcome: "PASSED", executionState: "EXECUTED" }),
+      expect.objectContaining({ position: 2, outcome: "TIME_LIMIT", executionState: "EXECUTED" }),
+      expect.objectContaining({ position: 3, outcome: "SKIPPED" }),
+    ] });
+    expect(tx.studentExerciseProgress.upsert).toHaveBeenCalled();
+  });
 
-    expect((engine.run as ReturnType<typeof vi.fn>).mock.calls[1]![0].timeLimitMs)
-      .toBeLessThan(1_000);
-    expect(tx.submission.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: "ERRORED",
-          failureReason: "TOTAL_DEADLINE",
-          gradingAborted: true,
-          gradingAbortReason: "TOTAL_DEADLINE",
-          earnedWeight: 30,
-          possibleWeight: 100,
-        }),
-      }),
-    );
-    expect(tx.submissionCase.createMany).toHaveBeenCalledWith({
-      data: [
-        expect.objectContaining({ position: 1, outcome: "PASSED", executionState: "EXECUTED" }),
-        expect.objectContaining({ position: 2, executionState: "NOT_RUN" }),
-        expect.objectContaining({ position: 3, executionState: "NOT_RUN" }),
-      ],
+  it("counts an equal case/total timeout as a normal failed attempt", async () => {
+    const { service, tx, engine } = createService({
+      profile: { ...eliceProfile, totalTimeLimitMs: 1_000 },
+      cases: weightedCases().slice(0, 1),
+      run: async (_stdin, timeLimitMs) => ({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: timeLimitMs + 100 }),
     });
-    expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 1_000 }));
+    expect(tx.submission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "FAILED", score: 0 }) }));
+    expect(tx.studentExerciseProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ attemptCount: 1 }) }));
   });
 
   it("aborts on an engine fault rather than blaming the student", async () => {
@@ -593,8 +586,8 @@ describe("GradingService.grade — the total deadline covers every wait", () => 
 
     const request = comparator.compare.mock.calls[0]![0] as unknown as { deadlineAt: number };
     // Claimed just after `before`, and the budget is the profile's 60 s.
-    expect(request.deadlineAt).toBeGreaterThanOrEqual(before + 60_000);
-    expect(request.deadlineAt).toBeLessThanOrEqual(Date.now() + 60_000);
+    expect(request.deadlineAt).toBeGreaterThanOrEqual(before + 65_000);
+    expect(request.deadlineAt).toBeLessThanOrEqual(Date.now() + 65_000);
   });
 
   it("aborts when the deadline passes while a comparison is queued", async () => {
@@ -619,11 +612,11 @@ describe("GradingService.grade — the total deadline covers every wait", () => 
     // result can arrive late. It is not a grade.
     const { service, tx } = createService({
       // The shortest total a profile may have. Each case "waits for a runner"
-      // 550 ms, so the second comes back past the deadline.
+      // beyond the student budget plus five seconds of infrastructure overhead.
       profile: { ...eliceProfile, totalTimeLimitMs: 1_000 },
       cases: weightedCases(),
       run: async (stdin) => {
-        await new Promise((resolve) => setTimeout(resolve, 550));
+        await new Promise((resolve) => setTimeout(resolve, 6_100));
         return answers([1, 2, 3])(stdin);
       },
     });
@@ -632,7 +625,7 @@ describe("GradingService.grade — the total deadline covers every wait", () => 
 
     expect(tx.submission.updateMany).toHaveBeenCalledWith(aborted);
     expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it("checks the deadline once more before finalizing", async () => {
     // Every case judged in time, but the run overran afterwards — here while
@@ -644,14 +637,14 @@ describe("GradingService.grade — the total deadline covers every wait", () => 
       run: answers([1, 2, 3]),
     });
     const report = vi.fn(async (progress: { position: number }) => {
-      if (progress.position === 3) await new Promise((resolve) => setTimeout(resolve, 1_100));
+      if (progress.position === 3) await new Promise((resolve) => setTimeout(resolve, 6_100));
     });
 
     await service.grade(submissionId, report);
 
     expect(tx.submission.updateMany).toHaveBeenCalledWith(aborted);
     expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 });
 
 describe("GradingService.grade — recorded runtimes", () => {

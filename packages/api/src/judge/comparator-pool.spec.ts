@@ -129,6 +129,14 @@ describe("ComparatorPool", () => {
     }
   });
 
+  it("compares literals without waiting behind a busy Python worker", async () => {
+    const busy = pool.compare({ comparator: "STDOUT_REGEX", actual: "a".repeat(40) + "b", expected: "(a+)+$", budgetMs: 200 });
+    const results = await Promise.all(Array.from({ length: 100 }, () => pool.compare({ comparator: "STDOUT_MATCH", actual: "한글 answer", expected: "answer", deadlineAt: Date.now() + 100 })));
+    expect(results.every((result) => result.kind === "match")).toBe(true);
+    expect((await busy).kind).toBe("timeout");
+    expect((await pool.compare({ comparator: "STDOUT_NOMATCH", actual: "answer", expected: "missing", deadlineAt: Date.now() - 1 })).kind).toBe("deadline");
+  }, 30_000);
+
   describe("STDOUT_MATCH — contains", () => {
     it("matches a substring anywhere", async () => {
       expect(await compare("STDOUT_MATCH", "Welcome! Hello Alice", "Hello")).toBe("match");

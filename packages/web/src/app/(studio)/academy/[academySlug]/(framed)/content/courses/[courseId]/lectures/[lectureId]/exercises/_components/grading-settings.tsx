@@ -7,11 +7,11 @@ import {
   legacyGradingProfile,
   type ExerciseGradingProfile,
   type GradingIssue,
-  type MaterialScorePolicy,
 } from '@cove/shared';
 
 import type { TestCaseDraft } from '../_lib/exercise-draft';
-import { Field, inputClass } from './authoring-fields';
+import { ChoiceField } from '@/components/studio/choice-field';
+import { NumberField } from '@/components/studio/number-field';
 
 /**
  * The problem-level half of grading: which method, and — for weighted grading —
@@ -112,74 +112,31 @@ export function GradingSettings({
 
       {weighted ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label={t('exercise.grading.material_points')}>
-              <input
-                className={inputClass}
-                disabled={!editable}
-                min={0.01}
-                onChange={(event) =>
-                  onChange(
-                    {
-                      ...grading,
-                      materialMaximumHundredths: parseHundredths(event.target.value),
-                    },
-                    testCases,
-                  )
-                }
-                step={0.01}
-                type="number"
-                value={
-                  grading.materialMaximumHundredths === null
-                    ? ''
-                    : grading.materialMaximumHundredths / 100
-                }
-              />
-            </Field>
-            <Field label={t('exercise.grading.score_policy')}>
-              <select
-                className={inputClass}
-                disabled={!editable}
-                onChange={(event) =>
-                  onChange(
-                    {
-                      ...grading,
-                      materialScorePolicy: event.target.value as MaterialScorePolicy,
-                    },
-                    testCases,
-                  )
-                }
-                value={grading.materialScorePolicy ?? 'PROPORTIONAL'}
-              >
-                <option value="PROPORTIONAL">
-                  {t('exercise.grading.policy_proportional')}
-                </option>
-                <option value="ABSOLUTE_CAP">
-                  {t('exercise.grading.policy_absolute')}
-                </option>
-              </select>
-            </Field>
-            <Field label={t('exercise.grading.total_time')}>
-              <input
-                className={inputClass}
-                disabled={!editable}
-                min={1}
-                onChange={(event) =>
-                  onChange(
-                    { ...grading, totalTimeLimitMs: parseSeconds(event.target.value) },
-                    testCases,
-                  )
-                }
-                step={1}
-                type="number"
-                value={
-                  grading.totalTimeLimitMs === null ? '' : grading.totalTimeLimitMs / 1000
-                }
-              />
-            </Field>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <NumberField
+              label={t('exercise.grading.material_points')} disabled={!editable}
+              min={0.01} max={1000} precision={2} unit={t('exercise.controls.points')}
+              value={grading.materialMaximumHundredths === null ? null : grading.materialMaximumHundredths / 100}
+              onChange={(value) => onChange({ ...grading, materialMaximumHundredths: value === null ? null : Math.round(value * 100) }, testCases)}
+            />
+            <ChoiceField
+              label={t('exercise.grading.score_policy')} disabled={!editable}
+              value={grading.materialScorePolicy ?? 'PROPORTIONAL'}
+              options={([
+                { value: 'PROPORTIONAL', label: t('exercise.controls.proportional'), description: t('exercise.grading.policy_proportional') },
+                { value: 'ABSOLUTE_CAP', label: t('exercise.controls.absolute'), description: t('exercise.grading.policy_absolute') },
+              ] as const)}
+              onChange={(value) => onChange({ ...grading, materialScorePolicy: value }, testCases)}
+            />
+            <NumberField
+              label={t('exercise.grading.total_time')} disabled={!editable}
+              min={1} max={300} precision={3} unit={t('exercise.controls.seconds')}
+              value={grading.totalTimeLimitMs === null ? null : grading.totalTimeLimitMs / 1000}
+              onChange={(value) => onChange({ ...grading, totalTimeLimitMs: value === null ? null : Math.round(value * 1000) }, testCases)}
+            />
           </div>
           <p className="text-[13.5px] font-semibold text-sub">
-            {t('exercise.grading.total_points', { total: totalPoints })}
+            {t('exercise.grading.total_points', { total: Number.isFinite(totalPoints) ? totalPoints : '—' })}
           </p>
         </>
       ) : null}
@@ -219,10 +176,4 @@ export function parseSeconds(value: string): number | null {
   if (value.trim() === '') return null;
   const seconds = Number(value);
   return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;
-}
-
-function parseHundredths(value: string): number | null {
-  if (value.trim() === '') return null;
-  const points = Number(value);
-  return Number.isFinite(points) ? Math.round(points * 100) : null;
 }

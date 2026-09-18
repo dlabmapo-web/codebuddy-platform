@@ -5,11 +5,13 @@ import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { eliceCaseDecisionFor, type GraderFault } from "./grading.js";
 
 /**
- * How long past the remaining total budget an engine call may take to settle.
+ * How long past the allocated student budget an engine call may take to settle.
  * The run itself is capped at the remaining budget; this covers the forced
  * termination and pipe drain after it, not more student time.
  */
 const ENGINE_SETTLE_GRACE_MS = 2_500;
+/** Bounded scheduling, comparison, reporting and cleanup time, not student time. */
+export const GRADING_OVERHEAD_MS = 5_000;
 
 /** One case of an enhanced profile, as frozen in a snapshot. */
 export type EnhancedCase = {
@@ -70,6 +72,7 @@ export async function evaluateEnhancedCase(
     memoryLimitMb: number;
     comparatorTimeLimitMs: number;
     deadlineAt: number;
+    executionBudgetMs?: number;
     testCase: EnhancedCase;
   },
 ): Promise<EnhancedCaseEvaluation> {
@@ -77,10 +80,10 @@ export async function evaluateEnhancedCase(
   const remaining = deadlineAt - Date.now();
   if (remaining <= 0) return { kind: "deadline" };
 
-  // The lesser of the case's own limit and what is left of the run's. A case
-  // cut short by the second is the run's deadline, not the student's time
-  // limit on that case.
-  const limit = Math.min(testCase.caseLimitMs, remaining);
+  // Case and cumulative execution limits produce student verdicts. Only a
+  // shorter infrastructure deadline makes a forced stop a judge failure.
+  const studentLimit = Math.min(testCase.caseLimitMs, input.executionBudgetMs ?? testCase.caseLimitMs);
+  const limit = Math.min(studentLimit, remaining);
   const executionStartedAt = Date.now();
   const execution = deps.engine.run({
     code: input.code,
@@ -88,7 +91,7 @@ export async function evaluateEnhancedCase(
     timeLimitMs: limit,
     memoryLimitMb: input.memoryLimitMb,
   });
-  const run = await settleWithin(execution, remaining + ENGINE_SETTLE_GRACE_MS);
+  const run = await settleWithin(execution, Math.min(remaining, limit + ENGINE_SETTLE_GRACE_MS));
   const executionMs = Date.now() - executionStartedAt;
   if (run === "expired") {
     // Giving up on the answer is not the same as the program having stopped.
@@ -96,7 +99,7 @@ export async function evaluateEnhancedCase(
     // until the runner is actually free.
     return { kind: "deadline", pendingExecution: settlementOf(execution) };
   }
-  if (run.outcome === "TIME_LIMIT" && limit < testCase.caseLimitMs) {
+  if (run.outcome === "TIME_LIMIT" && limit < studentLimit) {
     return { kind: "deadline" };
   }
   // Waiting for a runner is not bounded by the case's limit, so a run can come

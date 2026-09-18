@@ -75,6 +75,7 @@ class DeadlineExpired extends Error {}
 
 type ThreadReply =
   | { type: "ready"; version: string }
+  | { type: "started"; id: number }
   | { type: "result"; id: number; result: string }
   | { type: "fatal"; message: string };
 
@@ -102,6 +103,7 @@ class ComparatorThread implements ComparatorWorker {
     deadline: NodeJS.Timeout;
     grace: NodeJS.Timeout | null;
     interrupted: boolean;
+    start: () => void;
   } | null = null;
   private dead = false;
   private reportedVersion: string | null = null;
@@ -148,6 +150,10 @@ class ComparatorThread implements ComparatorWorker {
       const pending = this.pending;
       // A late reply to an abandoned request. Dropping it is the point.
       if (!pending || pending.id !== reply.id) return;
+      if (reply.type === "started") {
+        pending.start();
+        return;
+      }
       this.finish(JSON.parse(reply.result) as ComparisonResult);
     });
     this.worker.on("error", (error) => {
@@ -209,27 +215,40 @@ class ComparatorThread implements ComparatorWorker {
     const id = this.nextId++;
 
     return new Promise<ComparisonResult>((resolve) => {
+      let started = false;
+      const start = () => {
+        if (started || this.pending?.id !== id) return;
+        started = true;
+        clearTimeout(this.pending.deadline);
+        const left = request.deadlineAt === undefined ? Infinity : request.deadlineAt - Date.now();
+        const allowed = Math.max(0, Math.min(budgetMs, left));
+        const deadline = setTimeout(() => {
+          const pending = this.pending;
+          if (!pending || pending.id !== id) return;
+          Atomics.store(this.interrupt, 0, 2);
+          pending.interrupted = true;
+          this.dead = true;
+          const grace = setTimeout(() => {
+            if (this.pending?.id !== id) return;
+            void this.worker.terminate();
+            this.finish(left <= budgetMs ? { kind: "deadline" } : { kind: "timeout" });
+          }, TERMINATE_GRACE_MS);
+          grace.unref();
+          pending.grace = grace;
+        }, allowed);
+        deadline.unref();
+        this.pending.deadline = deadline;
+      };
+      const dispatchRemaining = request.deadlineAt === undefined ? Infinity : request.deadlineAt - Date.now();
       const deadline = setTimeout(() => {
-        const pending = this.pending;
-        if (!pending || pending.id !== id) return;
-        // Interrupt first; a regex engine that never services it gets the
-        // thread destroyed, because cooperation is not a guarantee.
-        Atomics.store(this.interrupt, 0, 2);
-        pending.interrupted = true;
-        // An interpreter that has taken an interrupt into its event loop is not
-        // trustworthy as idle, whether or not it answers in time.
         this.dead = true;
-        const grace = setTimeout(() => {
-          if (this.pending?.id !== id) return;
-          void this.worker.terminate();
-          this.finish({ kind: "timeout" });
-        }, TERMINATE_GRACE_MS);
-        grace.unref();
-        pending.grace = grace;
-      }, budgetMs);
+        void this.worker.terminate();
+        this.finish(dispatchRemaining <= 5_000
+          ? { kind: "deadline" }
+          : { kind: "error", detail: "comparator dispatch timed out" });
+      }, Math.max(0, Math.min(5_000, dispatchRemaining)));
       deadline.unref();
-
-      this.pending = { id, settle: resolve, deadline, grace: null, interrupted: false };
+      this.pending = { id, settle: resolve, deadline, grace: null, interrupted: false, start };
       this.worker.postMessage({
         type: "compare",
         id,
@@ -341,6 +360,15 @@ export class ComparatorPool implements OutputComparator {
 
   async compare(request: ComparisonRequest): Promise<ComparisonResult> {
     if (this.disposed) return { kind: "error", detail: "pool disposed" };
+    if (request.deadlineAt !== undefined && Date.now() >= request.deadlineAt) return { kind: "deadline" };
+    // Literal substring rules have no regex backtracking or Python semantics
+    // to initialize. Keep ordinary grading off the interpreter's dispatch path.
+    if (request.comparator === "STDOUT_MATCH" || request.comparator === "STDOUT_NOMATCH") {
+      const contains = request.actual.includes(request.expected);
+      const matched = request.comparator === "STDOUT_MATCH" ? contains : !contains;
+      if (request.deadlineAt !== undefined && Date.now() > request.deadlineAt) return { kind: "deadline" };
+      return { kind: matched ? "match" : "no-match" };
+    }
     let thread: ComparatorWorker;
     try {
       thread = await this.acquire(request.deadlineAt);

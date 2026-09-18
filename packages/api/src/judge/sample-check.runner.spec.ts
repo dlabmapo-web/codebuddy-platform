@@ -125,6 +125,27 @@ function setup(options: {
 }
 
 describe("SampleCheckRunner", () => {
+  it("completes a student timeout when case and total budgets are equal", async () => {
+    const { runner, store, engine, checkId } = setup({
+      record: {
+        snapshot: {
+          ...record().snapshot,
+          totalTimeLimitMs: 1_000,
+          testCase: { ...record().snapshot.testCase, caseLimitMs: 1_000 },
+        },
+      },
+      run: async () => ({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: 1_100 }),
+    });
+
+    await runner.run(checkId);
+
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 1_000 }));
+    expect(store.records.get(checkId)).toEqual(expect.objectContaining({
+      status: "COMPLETED",
+      result: expect.objectContaining({ outcome: "TIME_LIMIT" }),
+    }));
+  });
+
   it("judges the one public case with the shared evaluator", async () => {
     const { runner, store, engine, comparator, checkId } = setup();
 
@@ -266,7 +287,7 @@ describe("SampleCheckRunner", () => {
         snapshot: { ...record().snapshot, totalTimeLimitMs: 50 },
       },
       run: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 80));
+        await new Promise((resolve) => setTimeout(resolve, 5_100));
         return { stdout: "hello\n", stderr: "", outcome: "PASSED", runtimeMs: 5 };
       },
     });
@@ -276,7 +297,7 @@ describe("SampleCheckRunner", () => {
     expect(store.records.get(checkId)!).toEqual(
       expect.objectContaining({ status: "TIMED_OUT", failure: "DEADLINE", result: null }),
     );
-  });
+  }, 10_000);
 
   it("records an engine failure as ours", async () => {
     const { runner, store, checkId } = setup({
@@ -396,4 +417,3 @@ describe("SampleCheckRunner", () => {
     });
   });
 });
-

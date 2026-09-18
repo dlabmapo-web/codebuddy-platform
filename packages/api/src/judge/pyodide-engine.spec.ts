@@ -89,6 +89,33 @@ describe("PyodideExecutionEngine", () => {
     });
   });
 
+  describe("ordinary Python script semantics", () => {
+    it.each(["0", "None", "False"])("preserves output on sys.exit(%s)", async (code) => {
+      const result = await engine.run({ ...limits, code: `import sys\nprint('answer', end='')\nsys.exit(${code})` });
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("answer");
+    });
+    it.each(["1", "'0'", "'error'"])("rejects unsuccessful sys.exit(%s)", async (code) => {
+      const result = await engine.run({ ...limits, code: `import sys\nprint('answer')\nsys.exit(${code})` });
+      expect(result.outcome).toBe("RUNTIME_ERROR");
+    });
+    it("does not trust an exception's name or rebound builtins", async () => {
+      const result = await engine.run({ ...limits, code: "import builtins\nbuiltins.SystemExit = ValueError\nclass SystemExit(Exception): pass\nraise SystemExit(0)" });
+      expect(result.outcome).toBe("RUNTIME_ERROR");
+    });
+    it("exposes script globals through __main__", async () => {
+      const result = await engine.run({ ...limits, code: "x = 42\nimport __main__\nprint(__main__.x, __name__, __file__)" });
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("42 __main__ main.py\n");
+    });
+    it("rejects top-level await as a syntax error", async () => {
+      const result = await engine.run({ ...limits, code: "import asyncio\nawait asyncio.sleep(0)\nprint('not a script')" });
+      expect(result.outcome).toBe("RUNTIME_ERROR");
+      expect(result.stderr).toContain("SyntaxError");
+      expect(result.stdout).toBe("");
+    });
+  });
+
   describe("isolation between executions", () => {
     it("does not carry a poisoned module into the next execution", async () => {
       await engine.run({
@@ -413,14 +440,21 @@ describe("PyodideExecutionEngine", () => {
     it("ends a case that exceeds its memory limit", async () => {
       // `memoryLimitMb` was accepted and ignored while student code ran in the
       // judge's own threads. A process has memory of its own to measure.
+      // Fill retained blocks with seeded, nonuniform data: zero-filled WASM
+      // allocations are not a reliable resident-memory workload (especially
+      // on hosts with memory compression). Keep them alive across polls even
+      // when the test host is busy running other suites.
       const result = await engine.run({
         ...limits,
         code: [
-          "import asyncio",
+          "import time",
+          "import random",
+          "rng = random.Random(0)",
           "blocks = []",
           "for _ in range(40):",
-          "    blocks.append(bytearray(16 * 1024 * 1024))",
-          "    await asyncio.sleep(0.02)",
+          "    blocks.append(bytearray(rng.randbytes(16 * 1024 * 1024)))",
+          "    time.sleep(0.02)",
+          "time.sleep(2)",
         ].join(String.fromCharCode(10)),
         memoryLimitMb: 128,
         timeLimitMs: 20_000,
@@ -451,9 +485,9 @@ describe("PyodideExecutionEngine", () => {
         const result = await pool.run({
           ...limits,
           code: [
-            "import js, asyncio",
+            "import js, time",
             "js.process.on('SIGTERM', js.Function('return () => {}')())",
-            "await asyncio.sleep(60)",
+            "time.sleep(60)",
           ].join(String.fromCharCode(10)),
           timeLimitMs: 700,
         });
@@ -486,6 +520,15 @@ describe("PyodideExecutionEngine", () => {
       }
     }, 60_000);
 
+    it.each([null, 0, Number.NaN, -1])("rejects an invalid initial baseline %s even if later samples work", async (first) => {
+      let reads = 0;
+      const invalid = new PyodideExecutionEngine("0.27.5", 1, 0, () => reads++ === 0 ? first : 100);
+      await invalid.warmUp();
+      try {
+        await expect(invalid.run({ ...limits, code: "print('must not run')" })).rejects.toThrow(/could not be measured/);
+      } finally { await invalid.dispose(); }
+    }, 60_000);
+
     it("enforces the limit from the injected reader", async () => {
       let sample = 100;
       const climbing = new PyodideExecutionEngine("0.27.5", 1, 0, () => {
@@ -496,7 +539,7 @@ describe("PyodideExecutionEngine", () => {
       try {
         const result = await climbing.run({
           ...limits,
-          code: "import asyncio" + String.fromCharCode(10) + "await asyncio.sleep(5)",
+          code: "import time" + String.fromCharCode(10) + "time.sleep(5)",
           memoryLimitMb: 128,
         });
         expect(result.outcome).toBe("MEMORY_LIMIT");

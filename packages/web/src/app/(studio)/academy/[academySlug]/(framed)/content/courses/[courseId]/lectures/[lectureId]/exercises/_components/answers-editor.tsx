@@ -23,7 +23,9 @@ import {
   SectionCard,
   TextAreaField,
 } from './authoring-fields';
-import { GradingSettings, parseSeconds } from './grading-settings';
+import { GradingSettings } from './grading-settings';
+import { ChoiceField } from '@/components/studio/choice-field';
+import { NumberField } from '@/components/studio/number-field';
 
 /** Mirrors the 50-case ceiling enforced by exerciseDraftFieldsSchema. */
 const MAX_TEST_CASES = 50;
@@ -221,46 +223,26 @@ function CaseGrading({
   onChange: (testCase: TestCaseDraft) => void;
 }) {
   const { t } = useTranslation('content');
-  const seconds = (ms: number | null) => (ms === null ? '' : ms / 1000);
-  const whole = (value: string) => {
-    if (value.trim() === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
-  };
+  const seconds = (ms: number | null) => ms === null ? null : ms / 1000;
+  const milliseconds = (value: number | null) => value === null ? null : Math.round(value * 1000);
   const usesPattern =
     testCase.comparator === 'STDOUT_REGEX' ||
     testCase.comparator === 'STDOUT_REGEX_NOMATCH';
 
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4">
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr]">
-        <Field label={t('exercise.grading.comparator')}>
-          <select
-            className={inputClass}
-            disabled={!editable}
-            onChange={(event) =>
-              onChange({ ...testCase, comparator: event.target.value as CaseComparator })
-            }
-            value={testCase.comparator}
-          >
-            {caseComparators.map((comparator) => (
-              <option key={comparator} value={comparator}>
-                {t(`exercise.grading.comparator_${comparator}`)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t('exercise.grading.points')}>
-          <input
-            className={inputClass}
-            disabled={!editable}
-            min={0}
-            onChange={(event) => onChange({ ...testCase, weight: whole(event.target.value) ?? 0 })}
-            step={1}
-            type="number"
-            value={testCase.weight}
-          />
-        </Field>
+      <div className="grid items-start gap-3 lg:grid-cols-[2fr_1fr_2fr]">
+        <ChoiceField
+          label={t('exercise.grading.comparator')} disabled={!editable}
+          value={testCase.comparator}
+          options={caseComparators.map((value) => ({ value, label: t(`exercise.grading.comparator_${value}`), description: t(`exercise.controls.rule_${value}`) }))}
+          onChange={(comparator) => onChange({ ...testCase, comparator })}
+        />
+        <NumberField
+          label={t('exercise.grading.points')} disabled={!editable}
+          min={0} max={10000} unit={t('exercise.controls.points')}
+          value={testCase.weight} onChange={(weight) => onChange({ ...testCase, weight: weight ?? Number.NaN })}
+        />
         <Field label={t('exercise.grading.case_label')}>
           <input
             className={inputClass}
@@ -271,49 +253,26 @@ function CaseGrading({
           />
         </Field>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label={t('exercise.grading.time_limit')}>
-          <input
-            className={inputClass}
-            disabled={!editable}
-            min={0.1}
-            onChange={(event) =>
-              onChange({ ...testCase, timeLimitMsOverride: parseSeconds(event.target.value) })
-            }
-            placeholder={t('exercise.grading.time_limit_placeholder', {
-              seconds: defaultExerciseTimeLimitMs / 1000,
-            })}
-            step={0.1}
-            type="number"
-            value={seconds(testCase.timeLimitMsOverride)}
-          />
-        </Field>
-        <Field label={t('exercise.grading.soft_limit')}>
-          <input
-            className={inputClass}
-            disabled={!editable}
-            min={0.001}
-            onChange={(event) =>
-              onChange({ ...testCase, softTimeLimitMs: parseSeconds(event.target.value) })
-            }
-            step={0.1}
-            type="number"
-            value={seconds(testCase.softTimeLimitMs)}
-          />
-        </Field>
-        <Field label={t('exercise.grading.soft_penalty')}>
-          <input
-            className={inputClass}
-            disabled={!editable}
-            min={0}
-            onChange={(event) =>
-              onChange({ ...testCase, softPenalty: whole(event.target.value) })
-            }
-            step={1}
-            type="number"
-            value={testCase.softPenalty ?? ''}
-          />
-        </Field>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <NumberField
+          label={t('exercise.grading.time_limit')} disabled={!editable}
+          min={0.1} max={60} step={0.1} precision={3} optional unit={t('exercise.controls.seconds')}
+          placeholder={t('exercise.grading.time_limit_placeholder', { seconds: defaultExerciseTimeLimitMs / 1000 })}
+          value={seconds(testCase.timeLimitMsOverride)}
+          onChange={(value) => onChange({ ...testCase, timeLimitMsOverride: milliseconds(value) })}
+        />
+        <NumberField
+          label={t('exercise.grading.soft_limit')} disabled={!editable}
+          min={0.001} max={60} step={0.1} precision={3} optional unit={t('exercise.controls.seconds')}
+          value={seconds(testCase.softTimeLimitMs)}
+          onChange={(value) => onChange({ ...testCase, softTimeLimitMs: milliseconds(value) })}
+        />
+        <NumberField
+          label={t('exercise.grading.soft_penalty')} disabled={!editable}
+          min={0} max={10000} optional unit={t('exercise.controls.points')}
+          value={testCase.softPenalty}
+          onChange={(softPenalty) => onChange({ ...testCase, softPenalty })}
+        />
       </div>
       {usesPattern ? (
         <p className="text-[13px] leading-[1.5] text-sub">

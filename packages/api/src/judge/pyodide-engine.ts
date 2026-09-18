@@ -29,7 +29,6 @@ const MEMORY_POLL_MS = 100;
 const DRAIN_GRACE_MS = 2_000;
 /** Consecutive unreadable samples before a case is abandoned as unmeasurable. */
 const BLIND_SAMPLES_ALLOWED = 5;
-const PAGE_BYTES = 4096;
 
 /** An OS identity one runner executes as, and nothing else does meanwhile. */
 export type RunnerIdentity = { uid: number; gid: number };
@@ -313,7 +312,7 @@ class RunnerProcess {
       // warm Pyodide is already ~170MB before the student's first statement, so
       // comparing the total against an exercise's limit would fail every
       // program on a 128MB budget and pass every one on a generous limit.
-      const baselineMb = this.rssMb() ?? 0;
+      const baselineMb = this.rssMb();
       let blindSamples = 0;
       const memory = setInterval(() => {
         const rss = this.rssMb();
@@ -332,7 +331,7 @@ class RunnerProcess {
           return;
         }
         blindSamples = 0;
-        if (rss - baselineMb > request.memoryLimitMb) {
+        if (rss - (baselineMb ?? 0) > request.memoryLimitMb) {
           exceededMemory = true;
           this.kill();
           settle();
@@ -357,7 +356,7 @@ class RunnerProcess {
       // program that finishes in twenty milliseconds would otherwise settle
       // long before the blind-sample threshold and be graded with no ceiling
       // at all, which is exactly the silent hole this is meant to close.
-      if (this.rssMb() === null) {
+      if (baselineMb === null) {
         unmeasurable = true;
         this.kill();
         settle();
@@ -465,7 +464,8 @@ class RunnerProcess {
   private rssMb(): number | null {
     const pid = this.child.pid;
     if (pid === undefined || this.exited !== null) return null;
-    return this.readRssMb(pid);
+    const value = this.readRssMb(pid);
+    return value !== null && Number.isFinite(value) && value > 0 ? value : null;
   }
 
   async dispose(): Promise<void> {
@@ -500,17 +500,18 @@ class RunnerProcess {
  *
  * `/proc` first, because it needs nothing installed: the production image is
  * built on a slim base and `ps` comes from `procps`, which it does not
- * install. Reading a pid's own `statm` is a plain file read on Linux, so the
+ * install. Reading a pid's own `status` is a plain file read on Linux, so the
  * limit is enforced by the same code path in development and production. The
  * `ps` branch is macOS, where `/proc` does not exist.
  */
 export function readProcessRssMb(pid: number): number | null {
   try {
-    // statm field 2 is resident pages.
-    const pages = Number(
-      readFileSync(`/proc/${pid}/statm`, "utf8").split(" ")[1],
+    // VmRSS is expressed in KiB, independent of the kernel's page size.
+    const match = /^VmRSS:\s+(\d+)\s+kB$/m.exec(
+      readFileSync(`/proc/${pid}/status`, "utf8"),
     );
-    if (Number.isFinite(pages)) return (pages * PAGE_BYTES) / (1024 * 1024);
+    const kb = match ? Number(match[1]) : Number.NaN;
+    if (Number.isFinite(kb) && kb > 0) return kb / 1024;
   } catch {
     // Not Linux, or the process is already gone.
   }
@@ -520,7 +521,7 @@ export function readProcessRssMb(pid: number): number | null {
         encoding: "utf8",
       }).trim(),
     );
-    return Number.isFinite(kb) ? kb / 1024 : null;
+    return Number.isFinite(kb) && kb > 0 ? kb / 1024 : null;
   } catch {
     return null;
   }

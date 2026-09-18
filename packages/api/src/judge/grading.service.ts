@@ -5,7 +5,7 @@ import { PointAwardService } from "../points/point-award.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
-import { evaluateEnhancedCase } from "./case-evaluator.js";
+import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import {
   awardedWeightFor,
   caseOutcomeFor,
@@ -231,7 +231,7 @@ export class GradingService {
    *
    * Continues past a wrong answer, a crash and an individual timeout, each
    * case in its own fresh runner, while the total budget lasts. What ends it
-   * early is never the student's verdict: the total deadline, or a fault of
+   * with an aborted run is an infrastructure deadline or a fault of
    * ours — the runner, or a comparator that could not judge the output. Such a
    * run is recorded as aborted, keeps its partial weights as diagnostics, and
    * touches no best score, completion or reward.
@@ -243,7 +243,8 @@ export class GradingService {
     report: (progress: GradingProgress) => Promise<void>,
   ): Promise<void> {
     const submissionId = submission.id;
-    const deadline = claimedAt + profile.totalTimeLimitMs;
+    const deadline = claimedAt + profile.totalTimeLimitMs + GRADING_OVERHEAD_MS;
+    let executionBudgetMs = profile.totalTimeLimitMs;
     const results: CaseRow[] = [];
     const cases = submission.gradingCases;
 
@@ -251,7 +252,7 @@ export class GradingService {
       let stopped = false;
       for (const testCase of cases) {
         const { position, isSample } = testCase;
-        if (stopped) {
+        if (stopped || executionBudgetMs <= 0) {
           results.push({ ...skipped(position, isSample), awardedWeight: 0 });
           continue;
         }
@@ -263,6 +264,7 @@ export class GradingService {
             memoryLimitMb: submission.memoryLimitMb,
             comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
             deadlineAt: deadline,
+            executionBudgetMs,
             testCase: {
               input: testCase.input,
               expectedOutput: testCase.expectedOutput,
@@ -290,6 +292,11 @@ export class GradingService {
         }
         const run = evaluation.run;
         const outcome = evaluation.outcome;
+        executionBudgetMs -= Math.min(
+          executionBudgetMs,
+          testCase.effectiveTimeLimitMs ?? submission.timeLimitMs,
+          Math.max(0, run.runtimeMs),
+        );
         results.push({
           position,
           isSample,

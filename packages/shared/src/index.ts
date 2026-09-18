@@ -10,3 +10,5 @@ export * from "./notifications/index.js";
 export * from "./platform/index.js";
 export * from "./points/index.js";
 export * from "./profile/index.js";
+
+export * from "./monitoring/help-requests.js";

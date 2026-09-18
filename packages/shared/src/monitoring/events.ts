@@ -548,6 +548,7 @@ export const monitoringClientEvents = {
 } as const;
 
 export const monitoringServerEvents = {
+  helpRequestChanged: "help.request.changed",
   classSnapshot: "class.snapshot",
   presenceChanged: "presence.changed",
   watchStarted: "watch.started",

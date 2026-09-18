@@ -1,3 +1,4 @@
+import { changeHelpRequestInputSchema, helpClassInputSchema, helpMutationResultSchema, helpQueueSchema, listHelpRequestsInputSchema, myHelpRequestSchema, requestHelpInputSchema } from "../../monitoring/help-requests.js";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
@@ -34,6 +35,13 @@ import {
  * assigned teacher and to nobody else.
  */
 export const monitoringContract = {
+  getMyActiveHelpRequest: oc.input(helpClassInputSchema).output(myHelpRequestSchema),
+  requestHelp: oc.input(requestHelpInputSchema).output(helpMutationResultSchema),
+  cancelMyHelpRequest: oc.input(changeHelpRequestInputSchema).output(helpMutationResultSchema),
+  listClassHelpRequests: oc.input(listHelpRequestsInputSchema).output(helpQueueSchema),
+  claimHelpRequest: oc.input(changeHelpRequestInputSchema).output(helpMutationResultSchema),
+  returnHelpRequest: oc.input(changeHelpRequestInputSchema).output(helpMutationResultSchema),
+  resolveHelpRequest: oc.input(changeHelpRequestInputSchema).output(helpMutationResultSchema),
   /**
    * Returns the flag rather than an error so the teacher's own page can
    * explain that monitoring is not enabled yet instead of rendering a denial

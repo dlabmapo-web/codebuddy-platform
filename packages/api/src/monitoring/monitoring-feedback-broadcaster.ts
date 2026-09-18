@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { HelpRequestBroadcaster } from "./help-request-broadcaster.js";
+import { Injectable, Optional } from "@nestjs/common";
 import { monitoringRooms, monitoringServerEvents } from "@cove/shared";
 import type { Server } from "socket.io";
 
@@ -20,10 +21,11 @@ import { PrismaService } from "../database/prisma.service.js";
 export class MonitoringFeedbackBroadcaster {
   private server: Server | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly help?: HelpRequestBroadcaster) {}
 
   attach(server: Server): void {
     this.server = server;
+    this.help?.attach(server);
   }
 
   /**

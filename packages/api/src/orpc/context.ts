@@ -1,3 +1,4 @@
+import type { HelpRequestService } from "../monitoring/help-request.service.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import type { implement } from "@orpc/server";
@@ -92,6 +93,7 @@ export type ORPCDeps = {
   submissionService: SubmissionService;
   lobbyService: LobbyService;
   notificationsService: NotificationsService;
+  helpRequestService: HelpRequestService;
   monitoringService: MonitoringService;
   profileService: ProfileService;
   academyProfileService: AcademyProfileService;

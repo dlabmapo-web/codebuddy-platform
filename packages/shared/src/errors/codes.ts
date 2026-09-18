@@ -69,6 +69,7 @@ export const appErrorCodes = [
   "SUBMISSION_NOT_FOUND",
   "SOLVE_SESSION_INVALID",
   "GRADING_UNAVAILABLE",
+  "MONITORING_HELP_KEY_REUSED",
   "MONITORING_DISABLED",
   "MONITORING_ACCESS_DENIED",
   "MONITORING_STUDENT_UNAVAILABLE",
@@ -247,6 +248,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   SOLVE_SESSION_INVALID:
     "This problem session expired. Please submit again.",
   GRADING_UNAVAILABLE: "Grading is temporarily unavailable. Your code is saved.",
+  MONITORING_HELP_KEY_REUSED: "This request key was already used for another action. Refresh and try again.",
   MONITORING_DISABLED: "Live monitoring is not enabled for this academy.",
   // One message for every access failure — not assigned, wrong academy,
   // archived class, suspended membership — so a caller cannot learn which

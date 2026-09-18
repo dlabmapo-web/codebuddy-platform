@@ -1,3 +1,6 @@
+import { HelpRequestService } from "./help-request.service.js";
+import { HelpRequestRepository } from "./help-request.repository.js";
+import { HelpRequestBroadcaster } from "./help-request-broadcaster.js";
 import { Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module.js";
@@ -43,7 +46,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
     // teaching module owns what they durably become.
     TeachModule,
   ],
-  providers: [
+  providers: [HelpRequestService, HelpRequestRepository, HelpRequestBroadcaster,
     MonitoringAccessService,
     MonitoringService,
     PresenceRegistry,
@@ -52,6 +55,6 @@ import { AcademiesModule } from "../academies/academies.module.js";
     MonitoringFeedbackBroadcaster,
     MonitoringGateway,
   ],
-  exports: [MonitoringAccessService, MonitoringService, MonitoringRevocationModule],
+  exports: [HelpRequestService, MonitoringAccessService, MonitoringService, MonitoringRevocationModule],
 })
 export class MonitoringModule {}

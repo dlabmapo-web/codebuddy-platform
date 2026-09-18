@@ -136,5 +136,6 @@
   "OPERATION_PLAN_EMPTY": "이 문제에는 재채점할 항목이 남아 있지 않습니다.",
   "OPERATION_RUN_NOT_PENDING": "이 실행은 이미 시작되었습니다. 열어서 진행 상황을 확인하세요.",
   "OPERATION_PLAN_TOO_LARGE": "이 재채점은 한 번에 실행하기에 너무 큽니다. 엔지니어링팀에 문의하세요.",
-  "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요."
+  "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요.",
+  "MONITORING_HELP_KEY_REUSED": "이미 다른 작업에 사용된 요청입니다. 새로고침 후 다시 시도해 주세요."
 }

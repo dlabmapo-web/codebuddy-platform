@@ -37,6 +37,9 @@ export class MonitoringRevocationService {
     private readonly watchSessions: WatchSessionRegistry,
   ) {}
 
+  private helpScopeChanged: ((scope: { academyId?: string; classId?: string; teacherMembershipRef?: string; studentMembershipRef?: string }) => Promise<void>) | null = null;
+  onHelpScopeChanged(callback: NonNullable<MonitoringRevocationService['helpScopeChanged']>) { this.helpScopeChanged = callback; }
+
   private cleanupWatch: ((visitId: string, reason: MonitoringVisitEndReason) => Promise<void>) | null = null;
   attach(server: Server, cleanupWatch?: (visitId: string, reason: MonitoringVisitEndReason) => Promise<void>): void {
     this.server = server;
@@ -125,6 +128,8 @@ export class MonitoringRevocationService {
     },
     reason: MonitoringVisitEndReason,
   ): Promise<void> {
+    try { await this.helpScopeChanged?.(scope); }
+    catch { this.logger.warn("Help queue reconciliation failed; next authorized read will retry."); }
     const started = Date.now();
     const ended = await this.visits.endOpenVisits(scope, reason);
 

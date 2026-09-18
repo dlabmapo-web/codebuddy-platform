@@ -136,5 +136,6 @@
   "OPERATION_PLAN_EMPTY": "There is nothing left to re-grade for this problem.",
   "OPERATION_RUN_NOT_PENDING": "This run has already been started. Open it to see how far it got.",
   "OPERATION_PLAN_TOO_LARGE": "This re-grade is too large to run in one go. Contact engineering.",
-  "UNKNOWN": "Something went wrong. Try again."
+  "UNKNOWN": "Something went wrong. Try again.",
+  "MONITORING_HELP_KEY_REUSED": "This request key was already used for another action. Refresh and try again."
 }

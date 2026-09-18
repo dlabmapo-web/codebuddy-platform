@@ -40,6 +40,7 @@ export function HelpModeToggle({
     <button
       // The pressed state is the server's answer, so a screen reader is told
       // what is true rather than what was requested.
+      title={t('help.edit_explanation')}
       aria-pressed={helping}
       className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         helping
@@ -51,7 +52,7 @@ export function HelpModeToggle({
       type="button"
     >
       <Icon className="size-3.5" />
-      {helping ? t('workspace.editing_on') : t('workspace.editing_off')}
+      {t(helping ? 'help.edit_on' : 'help.edit_off')}
     </button>
   );
 }

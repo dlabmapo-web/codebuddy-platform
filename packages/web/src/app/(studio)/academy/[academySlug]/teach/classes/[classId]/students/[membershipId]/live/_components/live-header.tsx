@@ -40,6 +40,7 @@ export function LiveHeader({
   unsaved,
   answer,
   helpMode,
+  helpQueue,
 }: {
   studentSwitcher: React.ReactNode;
   classId: string;
@@ -66,6 +67,7 @@ export function LiveHeader({
    * agreed to.
    */
   helpMode?: React.ReactNode;
+  helpQueue?: React.ReactNode;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -114,6 +116,7 @@ export function LiveHeader({
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        {helpQueue}
         {helpMode}
         {answer}
         <span

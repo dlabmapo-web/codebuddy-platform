@@ -9,6 +9,32 @@ export function createMonitoringRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    getMyActiveHelpRequest: os.monitoring.getMyActiveHelpRequest.use(access.authenticated).handler(({ context, input }) => {
+      return deps.helpRequestService.getMyActiveHelpRequest(context.identity, input);
+    }),
+    requestHelp: os.monitoring.requestHelp.use(access.authenticated).handler(({ context, input }) => {
+      deps.rateLimitService.assert(`help:${context.identity.authUserId}`, 60, 60_000);
+      return deps.helpRequestService.requestHelp(context.identity, input);
+    }),
+    listClassHelpRequests: os.monitoring.listClassHelpRequests.use(access.authenticated).handler(({ context, input }) => {
+      return deps.helpRequestService.listClassHelpRequests(context.identity, input);
+    }),
+    cancelMyHelpRequest: os.monitoring.cancelMyHelpRequest.use(access.authenticated).handler(({ context, input }) => {
+      deps.rateLimitService.assert(`help:${context.identity.authUserId}`, 60, 60_000);
+      return deps.helpRequestService.change(context.identity, input, "cancel");
+    }),
+    claimHelpRequest: os.monitoring.claimHelpRequest.use(access.authenticated).handler(({ context, input }) => {
+      deps.rateLimitService.assert(`help:${context.identity.authUserId}`, 60, 60_000);
+      return deps.helpRequestService.change(context.identity, input, "claim");
+    }),
+    returnHelpRequest: os.monitoring.returnHelpRequest.use(access.authenticated).handler(({ context, input }) => {
+      deps.rateLimitService.assert(`help:${context.identity.authUserId}`, 60, 60_000);
+      return deps.helpRequestService.change(context.identity, input, "return");
+    }),
+    resolveHelpRequest: os.monitoring.resolveHelpRequest.use(access.authenticated).handler(({ context, input }) => {
+      deps.rateLimitService.assert(`help:${context.identity.authUserId}`, 60, 60_000);
+      return deps.helpRequestService.change(context.identity, input, "resolve");
+    }),
     listAssignedClasses: os.monitoring.listAssignedClasses
       .use(access.authenticated)
       .handler(({ context, input }) =>

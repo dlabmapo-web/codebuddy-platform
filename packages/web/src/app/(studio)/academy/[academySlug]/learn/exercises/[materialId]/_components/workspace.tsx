@@ -46,6 +46,7 @@ import {
 import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
 import { MonitoringIndicator } from './monitoring-indicator';
+import { RequestHelp } from '@/components/monitoring/request-help';
 import { WorkspaceHeader } from './workspace-header';
 
 export function Workspace({
@@ -460,6 +461,7 @@ export function Workspace({
               unreadCount={feedback.unreadCount}
             />
           }
+          helpRequest={<RequestHelp key={`${userId}:${academyId}:${classId}`} userId={userId} academyId={academyId} classId={classId} materialId={exercise.materialId} socket={monitoring.socket} onNavigate={handleNavigate} />}
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
           navigationDisabled={busy}
           curriculum={

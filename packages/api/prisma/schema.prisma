@@ -498,6 +498,8 @@ model Organization {
 }
 
 model Academy {
+  helpRequests StudentHelpRequest[]
+
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid
   name           String
@@ -653,6 +655,9 @@ model AcademySlugHistory {
 }
 
 model AcademyMembership {
+  helpRequestsAsStudent StudentHelpRequest[] @relation("HelpRequestStudent")
+  helpRequestsAsTeacher StudentHelpRequest[] @relation("HelpRequestTeacher")
+
   id               String           @id @default(uuid()) @db.Uuid
   academyId        String           @map("academy_id") @db.Uuid
   userId           String           @map("user_id") @db.Uuid
@@ -1292,6 +1297,8 @@ model Course {
 /// Names are intentionally not unique — an academy reuses "Level 1" every
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
+  helpRequests StudentHelpRequest[]
+
   id                  String      @id @default(uuid()) @db.Uuid
   academyId           String      @map("academy_id") @db.Uuid
   name                String
@@ -1470,6 +1477,8 @@ model Lecture {
 }
 
 model Material {
+  helpRequests StudentHelpRequest[]
+
   id         String       @id @default(uuid()) @db.Uuid
   lectureId  String       @map("lecture_id") @db.Uuid
   type       MaterialType
@@ -2124,4 +2133,51 @@ model AcademyPointPolicy {
   academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
 
   @@map("academy_point_policies")
+}
+
+
+enum HelpRequestStatus {
+  WAITING
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+model StudentHelpRequest {
+  id String @id @default(uuid()) @db.Uuid
+  academyId String @map("academy_id") @db.Uuid
+  classId String @map("class_id") @db.Uuid
+  studentMembershipRef String @map("student_membership_ref") @db.Uuid
+  studentMembershipId String? @map("student_membership_id") @db.Uuid
+  materialRef String @map("material_ref") @db.Uuid
+  materialId String? @map("material_id") @db.Uuid
+  teacherMembershipRef String? @map("teacher_membership_ref") @db.Uuid
+  teacherMembershipId String? @map("teacher_membership_id") @db.Uuid
+  status HelpRequestStatus @default(WAITING)
+  requestedAt DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
+  claimedAt DateTime? @map("claimed_at") @db.Timestamptz(6)
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version Int @default(1)
+  closedByRef String? @map("closed_by_ref") @db.Uuid
+  closeReason String? @map("close_reason")
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  class Class @relation(fields: [classId], references: [id], onDelete: Restrict)
+  studentMembership AcademyMembership? @relation("HelpRequestStudent", fields: [studentMembershipId], references: [id], onDelete: SetNull)
+  teacherMembership AcademyMembership? @relation("HelpRequestTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  material Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  @@index([academyId, classId, status, requestedAt, id], map: "help_requests_class_queue_idx")
+  @@index([studentMembershipRef, classId, status], map: "help_requests_student_active_idx")
+  @@map("student_help_requests")
+}
+
+// Durable operation receipts prevent a delayed create retry reopening a closed request.
+model HelpRequestReceipt {
+  actorRef String @map("actor_ref") @db.Uuid
+  key String @db.Uuid
+  fingerprint String
+  result Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@id([actorRef, key])
+  @@map("help_request_receipts")
 }

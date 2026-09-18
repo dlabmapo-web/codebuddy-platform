@@ -49,10 +49,10 @@ async function matches(page: Page, value: string) {
 }
 async function ready(page: Page) {
   await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByRole('button', { name: /Read-only|읽기 전용/i })).toBeEnabled({ timeout: 45_000 });
+  await expect(page.getByRole('button', { name: /Edit code · Off|코드 수정 · 꺼짐/i })).toBeEnabled({ timeout: 45_000 });
 }
 async function help(page: Page) {
-  await page.getByRole('button', { name: /Read-only|읽기 전용/i }).click();
+  await page.getByRole('button', { name: /Edit code · Off|코드 수정 · 꺼짐/i }).click();
   await expect(page.locator('button[aria-pressed="true"]').filter({ hasText: /Help|편집/i })).toBeVisible();
 }
 
@@ -259,7 +259,7 @@ test('revoking one student leaves the other watches receiving changes', async ({
   try {
     const removed = await invoke('removeStudent', { ...scope, membershipId: membership(4) });
     expect(removed.status(), await removed.text()).toBe(200);
-    await expect(watches[4]!.getByRole('button', { name: /Read-only|읽기 전용/i })).toBeDisabled();
+    await expect(watches[4]!.getByRole('button', { name: /Edit code · Off|코드 수정 · 꺼짐/i })).toBeDisabled();
     await edit(students[1]!, '# unaffected-by-revocation\n');
     await matches(watches[1]!, '# unaffected-by-revocation\n');
   } finally {
@@ -280,7 +280,7 @@ test('duplicate help permissions and aggregate indicator change independently', 
     await matches(duplicate, canonical);
     await matches(students[0]!, canonical);
     await help(duplicate);
-    await page.getByRole('button', { name: /Help \/ Edit code|편집/i }).click();
+    await page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/i }).click();
     await expect(students[0]!.getByText(/Teacher is helping|도와주고/)).toBeVisible();
     await duplicate.close();
     await expect(students[0]!.getByText(/Teacher is monitoring|모니터링 중/)).toBeVisible();

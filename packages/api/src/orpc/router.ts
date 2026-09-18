@@ -1,3 +1,4 @@
+import { HelpRequestService } from "../monitoring/help-request.service.js";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { implement } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/node";
@@ -133,6 +134,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     submissionService: app.get(SubmissionService, { strict: false }),
     lobbyService: app.get(LobbyService, { strict: false }),
     notificationsService: app.get(NotificationsService, { strict: false }),
+    helpRequestService: app.get(HelpRequestService, { strict: false }),
     monitoringService: app.get(MonitoringService, { strict: false }),
     profileService: app.get(ProfileService, { strict: false }),
     academyProfileService: app.get(AcademyProfileService, { strict: false }),

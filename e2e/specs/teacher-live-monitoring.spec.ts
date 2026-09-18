@@ -51,9 +51,9 @@ async function signIn(page: Page, email: string): Promise<string> {
  */
 async function typeIntoEditor(page: Page, code: string) {
   if (page.url().includes('/teach/')) {
-    const toggle = page.getByRole('button', { name: /^Read-only$|읽기 전용/i });
+    const toggle = page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i });
     if (await toggle.count()) await toggle.click();
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|코드 편집/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/i })).toHaveAttribute('aria-pressed', 'true');
   }
   await expect(page.locator('.monaco-editor').first()).toBeVisible({
     timeout: 30_000,

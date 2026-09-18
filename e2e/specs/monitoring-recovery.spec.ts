@@ -16,7 +16,7 @@ let original: string;
 
 const text = (page: Page) => page.evaluate(() => (window as any).monaco?.editor.getModels()[0]?.getValue());
 const edit = (page: Page, code: string) => page.evaluate(code => (window as any).monaco.editor.getModels()[0].setValue(code), code);
-const toggle = (page: Page) => page.getByRole('button', { name: /^Read-only$|읽기 전용/i });
+const toggle = (page: Page) => page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i });
 
 test.describe.configure({ mode: 'serial', timeout: 90_000 });
 test.beforeAll(async ({ browser }) => {

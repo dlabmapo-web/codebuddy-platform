@@ -1,7 +1,7 @@
 # Student help requests and teacher queue
 
 Date: 2026-09-18
-Status: Design for review; implementation deferred.
+Status: Implemented on the feature branch; database migration applied; deployment pending.
 Branch: `feat/student-help-request-queue`
 
 ## 1. Purpose and scope
@@ -382,3 +382,160 @@ rollout or rewrite presence states.
 The user requested this specification based on the reviewed plan and explicitly
 deferred implementation. Review the written behavior before producing an
 implementation plan or changing application code.
+
+
+## 11. Implementation and validation (2026-09-18)
+
+The user authorized implementation after the design review. The implementation
+adds `StudentHelpRequest` and durable `HelpRequestReceipt` records, a partial
+unique active-request index, class-scoped transaction locks, operation receipts,
+and the seven oRPC operations described above. A focused repository batches
+eligibility reconciliation and display projections rather than querying each
+queue member independently on every refresh. Existing audit records identify
+who performed each transition.
+
+The revocation service invokes queue reconciliation after access changes, with
+read-time reconciliation as recovery. Notification failures do not roll back a
+committed request; existing Socket.IO rooms carry only invalidation hints after
+teacher assignment is checked again. The student's existing presence socket is
+reused. The teacher's live queue has its own class subscription, independent of
+the collaboration watch. HTTP remains authoritative, with a visible-only
+30-second refresh and a local 15-second wait clock.
+
+The student control lives beside feedback. The class roster contains the full
+queue, and the live header contains a count and popover. Claiming, returning,
+resolving, and cancelling are independent of Edit code. The new control also
+preserves the existing student navigation guard. Teacher queue navigation waits
+for the existing pending-edit guard before claiming another student's request.
+Korean and English copy includes loading, empty, stale, conflict, rate-limit,
+unassigned-teacher, and denied states.
+
+Small contract details resolved during implementation:
+
+- The self read also returns the latest closed request so a resolution can be
+  shown after refetch. This is a single status notice, not request history.
+- Conflicting transitions return `conflict: true` with the current authorized
+  request, rather than throwing away the state needed to reconcile the UI.
+- Receipts store immutable operation snapshots; replay cannot create a new
+  request after resolution. Display names and problem titles are re-projected,
+  and scope invalidation removes inaccessible details from replay responses.
+- Teacher caches include the authenticated actor; student caches include the
+  server-provided student user ID. Denied reads replace protected queue data
+  with empty unavailable results rather than presenting stale records.
+- The existing edit-mode protocol remains unchanged. Its button now explicitly
+  says Edit code · Off/On; existing browser selectors were updated accordingly.
+
+Validation performed:
+
+- Applied all migrations, including the new migration, to a disposable local
+  PostgreSQL 17 database. Prisma schema comparison then reported an empty diff.
+- **14 focused API tests passed:** 13 real-PostgreSQL lifecycle tests and one
+  broadcaster authorization test. Cases include concurrent creates/claims,
+  direct database uniqueness, delayed and duplicate retries, key reuse,
+  cross-class access denial, teacher/student revocation, hidden problems,
+  colleague handoff, feature disablement, notification failure, and 52-row
+  pagination with tied timestamps.
+- Shared suite: **826 tests passed**. Web suite: **1,103 tests passed**.
+- Existing monitoring API suite: **259 tests passed**; Redis-dependent tests and
+  opt-in database tests were skipped in that invocation. The new database suite
+  was run separately with its database explicitly configured.
+- Broad API run: **1,106 passed**, with 10 Python execution tests timing out under
+  concurrent test load and 34 opt-in tests skipped. The unchanged Python test
+  file then passed **10/10** in an isolated rerun. The broad run is not reported
+  as an entirely green invocation.
+- New browser lifecycle passed in **Chromium and WebKit**. It covers request,
+  refresh, claim, return, resolve, cancellation, uncertain-response retry with
+  the same key, read-only edit state, Escape/focus return, and a narrow queue
+  panel. Screenshots were inspected; a follow-up header layout adjustment
+  preserved the student problem title and passed a Chromium rerun.
+- Browser help endpoints use controlled responses to avoid modifying the remote
+  development database; real authorization and persistence are tested separately
+  in PostgreSQL. This is not a claim of a deployed end-to-end queue test.
+- The existing Chromium student-switcher regression passed, covering scoped
+  notes, independent tabs, read-only visits, and browser history. Its initial
+  attempt failed in fixture cleanup with a stale autosave revision; cleanup now
+  restores fixture code through a fresh authenticated context and normal autosave.
+- API, web, and e2e typechecks; changed-web-file ESLint; i18n catalog validation
+  (115 tests); canonical routes; theme token checks; and whitespace checks passed.
+
+Migration `20260918000000_student_help_requests` was applied to the configured
+Supabase database on 2026-09-18; Prisma confirmed the schema is up to date.
+No deployment was performed. There is no existing-data backfill.
+
+
+### Queue visibility refinement (2026-09-18)
+
+The teacher queue remains click-to-open; requests never automatically open a popup.
+The header shows both waiting and helping counts, with a solid amber treatment
+when requests are waiting and blue when only claimed requests remain. Empty,
+loading, and unavailable states use a neutral treatment. Waiting cards use amber
+borders and tinted surfaces; claimed cards use blue. Student names and elapsed
+wait badges are emphasized. Start helping is a filled blue action, Mark resolved
+is a filled green action, and navigation/return controls remain outlined.
+The new-tab action includes a visible label. Colors use the existing semantic
+theme tokens and their contrasting foreground tokens in both light and dark mode.
+Request lifecycle, editing permission, and quiet-reading behavior are unchanged.
+
+Refinement checks: web typecheck, changed-component ESLint, theme checks, and
+i18n validation (115 tests) passed. The Chromium workflow attempt stopped at
+a disabled sign-in button before reaching the queue; visual verification of
+this refinement remains pending.
+
+
+### Compact queue revision (2026-09-18)
+
+Per user review, remove the standalone help-request panel from the class overview.
+Keep the queue accessible from the live workspace header. Restore the original
+compact popup: plain rows, thin dividers, original name size and spacing, and
+an icon-only new-tab link with an accessible label and tooltip. Use amber waiting
+labels and blue in-progress labels/wait times without large tinted section bars
+or boxed request cards. Retain the colored header counts and filled primary
+actions. This supersedes the card layout and visible new-tab text above.
+
+
+### Loading latency correction (2026-09-18)
+
+The live-workspace student switcher now starts its workspace-scoped authorized
+roster read and presence subscription when the header mounts, retaining them
+across popup opens. Popup content still mounts only when opened to preserve
+keyboard focus behavior. Roster reads recover every 30 seconds; existing
+revocation and freshness gates remain in place.
+
+Student help mutations apply the server-confirmed response to the actor-scoped
+self query after cancelling older reads. Successful operations no longer wait
+for background queue/self refetches to finish. This is confirmed-state rendering,
+not optimistic creation; uncertain failures retain the same idempotency key.
+These remove code-level extra waits; no end-to-end latency benchmark was taken.
+
+
+### Fifteen-student concurrency validation (2026-09-18)
+
+Added a PostgreSQL integration test with 15 distinct enrolled student identities
+requesting help concurrently across two problems. It verifies unique requests,
+correct names/problems, chronological queue order, idempotent retries alongside
+four teacher queue reads, 15 student reads, 15 claims, and simultaneous closure
+(seven resolutions, eight cancellations). Final queue counts are zero and no
+monitoring visits are created.
+
+All 15 tests in the help integration/broadcaster suite passed; the focused
+15-student scenario also passed two repeat runs. API typecheck passed.
+An isolated local PostgreSQL 17 database was used; the broadcaster is mocked,
+so these are service/database timings, not HTTP, WebSocket delivery, browser,
+or remote Supabase measurements. Latest run, median / maximum milliseconds:
+creation 181 / 265; retry 87 / 150; teacher queue reads 179 / 187; student reads
+90 / 156; claims 95 / 158; closure 78 / 141. This validates correctness under
+15-student concurrency but does not establish production latency.
+
+
+### Final pre-deployment checks
+
+API and web production builds passed. In the signed-in teacher browser, an
+existing request was claimed and returned to Waiting successfully; the original
+request time was preserved and Edit code remained Off. The switcher opened with
+the roster already loaded. The request's original problem and the student's
+different current problem were both displayed correctly.
+
+The student URL redirected to teacher content review in the connected Chrome
+profile. The separate student browser was not accessible, so sending, cancelling,
+and student-side updates have not been manually verified against the final UI.
+No deployment was performed.

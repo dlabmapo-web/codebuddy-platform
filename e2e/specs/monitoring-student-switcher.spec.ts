@@ -13,7 +13,7 @@ const edit = (page: Page, code: string) => page.evaluate(code => {
   editor.executeEdits('e2e', [{ range: editor.getModel().getFullModelRange(), text: code }]);
 }, code);
 const ready = async (page: Page) => {
-  await expect(page.getByRole('button', { name: /^Read-only$|읽기 전용/i })).toBeEnabled({ timeout: 45_000 });
+  await expect(page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i })).toBeEnabled({ timeout: 45_000 });
   // Document sync can finish before the lazy Monaco bundle mounts.
   await expect(page.locator('.monaco-editor').first()).toBeVisible();
   await expect.poll(() => text(page)).not.toBeUndefined();
@@ -43,14 +43,25 @@ test.beforeAll(async ({ browser }) => {
   await signInAs({ page, identifier: 'teacher@cove.test', password: 'CoveDev123!' });
   await page.close();
 });
-test.afterAll(async () => {
+test.afterAll(async ({ browser }) => {
   await teacherContext?.close();
   for (let i = 0; i < students.length; i++) {
-    if (originals[i] !== undefined) {
-      await edit(students[i]!, originals[i]!);
-      await expect(students[i]!.getByText(/^Saved$|^저장됨$/).first()).toBeVisible();
-    }
     await contexts[i]?.close();
+    if (originals[i] === undefined) continue;
+    // A watch may have saved a newer revision than this student's autosave
+    // baseline. Restore the dedicated fixture from a fresh authenticated
+    // context, using normal autosave and its current server revision.
+    const cleanup = await browser.newContext();
+    try {
+      const page = await cleanup.newPage();
+      await signInAs({ page, identifier: `student${i + 2}@cove.test`, password: 'CoveDev123!', initialPath: routes.academyLearnExercise(slug, materialId, { classId }) });
+      await expect(page.locator('.monaco-editor').first()).toBeVisible();
+      await expect.poll(() => text(page)).not.toBeUndefined();
+      if (await text(page) !== originals[i]) {
+        await edit(page, originals[i]!);
+        await expect(page.getByText(/^Saved$|^저장됨$/).first()).toBeVisible();
+      }
+    } finally { await cleanup.close(); }
   }
 });
 
@@ -79,8 +90,8 @@ test('switcher keeps scoped notes, independent tabs, readonly visits and browser
   try {
     await page.goto(url(0)); await ready(page);
     await other.goto(url(0)); await ready(other);
-    await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toBeVisible();
+    await page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i }).click();
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ })).toBeVisible();
     const input = page.locator('textarea').last();
     await input.fill('Unsent note for A');
     page.once('dialog', dialog => dialog.dismiss());
@@ -99,7 +110,7 @@ test('switcher keeps scoped notes, independent tabs, readonly visits and browser
     await expect(panel(page)).toBeVisible();
     await expect(input).toHaveValue('Unsent note for A');
     expect(originalStarts).toBe(startsBeforePopup);
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ })).toBeVisible();
     await popup.close();
     await panel(page).locator(`a[href="${url(1)}"]:not([target])`).click();
     await ready(page);
@@ -180,8 +191,8 @@ test('lost teacher update acknowledgement preserves code and retry switches only
   });
   try {
     await page.goto(url(0)); await ready(page);
-    await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toBeVisible();
+    await page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i }).click();
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ })).toBeVisible();
     block = true;
     const code = '# pending teacher edit\nprint(987)\n';
     await edit(page, code);
@@ -227,8 +238,8 @@ for (const switching of [false, true]) {
       await page.goto(url(0)); await ready(page);
       const baseline = await text(page);
       const code = baseline + `\n# retained through reconnect ${switching}\n`;
-      await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
-      await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toHaveAttribute('aria-pressed', 'true');
+      await page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i }).click();
+      await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ })).toHaveAttribute('aria-pressed', 'true');
       block = true;
       await edit(page, code);
       await expect.poll(() => dropped).toBeGreaterThan(0);
@@ -324,8 +335,8 @@ test('Stay cancels a pending switch even when its acknowledgement arrives later'
   });
   try {
     await page.goto(url(0)); await ready(page);
-    await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ })).toBeVisible();
+    await page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i }).click();
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ })).toBeVisible();
     hold = true;
     await edit(page, '# cancelled switch\nprint(777)\n');
     await expect.poll(() => held.length).toBeGreaterThan(0);
@@ -406,8 +417,8 @@ test('a rejected pending edit stays visible and cannot silently unlock when choo
   });
   try {
     await page.goto(url(0)); await ready(page);
-    await page.getByRole('button', { name: /^Read-only$|읽기 전용/i }).click();
-    await expect(page.getByRole('button', { name: /Help \/ Edit code|도움/ }), JSON.stringify(protocol)).toBeVisible();
+    await page.getByRole('button', { name: /^Edit code · Off$|코드 수정 · 꺼짐/i }).click();
+    await expect(page.getByRole('button', { name: /Edit code · On|코드 수정 · 켜짐/ }), JSON.stringify(protocol)).toBeVisible();
     block = true;
     const code = '# retained rejected update\nprint(998)\n';
     await edit(page, code);

@@ -27,6 +27,7 @@ type Props = {
 export function StudentSwitcher(props: Props) {
   const { t } = useTranslation('monitoring');
   const router = useRouter();
+  const participants = useParticipants(props.academyId, props.classId);
   const [open, setOpen] = React.useState(false);
   const [destination, setDestination] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<'idle' | 'waiting' | 'failed'>('idle');
@@ -71,13 +72,13 @@ export function StudentSwitcher(props: Props) {
             <button className={`rounded text-sub ${focusStyle}`} onClick={stay} type="button">{t('switcher.stay')}</button>
           </div>
         </div> : null}
-        {open ? <Participants {...props} onSelect={(href) => void select(href)} onCurrent={() => { stay(); setOpen(false); }} /> : null}
+        {open ? <Participants {...props} data={participants} onSelect={(href) => void select(href)} onCurrent={() => { stay(); setOpen(false); }} /> : null}
       </Popover.Content>
     </Popover.Portal>
   </Popover.Root>;
 }
 
-function Participants({ academyId, classId, membershipId, onSelect, onCurrent }: Props & { onSelect: (href: string) => void; onCurrent: () => void }) {
+function Participants({ academyId, classId, membershipId, onSelect, onCurrent, data }: Props & { data: ReturnType<typeof useParticipants>; onSelect: (href: string) => void; onCurrent: () => void }) {
   const { t } = useTranslation('monitoring');
   const locale = useLocale();
   const slug = useAcademySlug();
@@ -87,20 +88,16 @@ function Participants({ academyId, classId, membershipId, onSelect, onCurrent }:
       <Search aria-hidden className="size-4 text-sub" />
       <input autoFocus aria-label={t('roster.search_placeholder')} placeholder={t('roster.search_placeholder')} className="min-w-0 flex-1 bg-transparent text-sm outline-none" value={search} onChange={(event) => setSearch(event.target.value)} />
     </label>
-    <ParticipantRows academyId={academyId} classId={classId} membershipId={membershipId} search={search} locale={locale} slug={slug} onSelect={onSelect} onCurrent={onCurrent} />
+    <ParticipantRows data={data} academyId={academyId} classId={classId} membershipId={membershipId} search={search} locale={locale} slug={slug} onSelect={onSelect} onCurrent={onCurrent} />
   </>;
 }
 
-function ParticipantRows({ academyId, classId, membershipId, search, locale, slug, onSelect, onCurrent }: {
-  academyId: string; classId: string; membershipId: string; search: string; locale: string; slug: string;
-  onSelect: (href: string) => void; onCurrent: () => void;
-}) {
-  const { t } = useTranslation('monitoring');
+function useParticipants(academyId: string, classId: string) {
   const presence = useClassPresence({ academyId, classId });
-  // A mount-specific key requires a fresh authorized roster even if another
-  // teacher surface populated the shared cache earlier.
+  // Keep this workspace-scoped authorized roster and presence subscription alive
+  // across popover opens, without borrowing another workspace or actor cache.
   const [requestId] = React.useState(() => crypto.randomUUID());
-  const query = useQuery({ queryKey: ['academy', academyId, 'switcher-roster', classId, requestId], queryFn: () => orpc.monitoring.getClassRoster({ academyId, classId }), retry: false, gcTime: 0 });
+  const query = useQuery({ queryKey: ['academy', academyId, 'switcher-roster', classId, requestId], queryFn: () => orpc.monitoring.getClassRoster({ academyId, classId }), retry: false, gcTime: 0, refetchInterval: 30_000 });
   const refetch = query.refetch;
   const retry = () => { presence.refresh(); void refetch(); };
   const [revoked, setRevoked] = React.useState<Set<string>>(() => new Set());
@@ -114,6 +111,16 @@ function ParticipantRows({ academyId, classId, membershipId, search, locale, slu
     return () => { presence.socket?.off(monitoringServerEvents.accessRevoked, onRevoked); };
   }, [classId, presence.socket, refetch]);
   const rows = query.data ? mergeRoster(query.data.students.filter((row) => !revoked.has(row.membershipId)), presence.entries, query.data.exercises) : [];
+  return { presence, query, retry, rows };
+}
+
+function ParticipantRows({ classId, membershipId, search, locale, slug, onSelect, onCurrent, data }: {
+  data: ReturnType<typeof useParticipants>;
+  academyId: string; classId: string; membershipId: string; search: string; locale: string; slug: string;
+  onSelect: (href: string) => void; onCurrent: () => void;
+}) {
+  const { t } = useTranslation('monitoring');
+  const { presence, query, retry, rows } = data;
   const [order, setOrder] = React.useState<string[]>([]);
   if (presence.snapshotReady && query.isSuccess) {
     const next = switcherOrder(rows, membershipId, locale, order);

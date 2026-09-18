@@ -36,6 +36,7 @@ import { useTeacherDisplay } from '../_hooks/use-teacher-display';
 import { LiveEditor } from './live-editor';
 import { feedbackScope } from '@/lib/monitoring/feedback-draft-store';
 import { useFeedbackDraft } from '@/lib/monitoring/feedback-draft-provider';
+import { LiveHelpQueue } from '@/components/monitoring/help-queue';
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 
 import { FeedbackDock } from './live-feedback';
@@ -340,6 +341,7 @@ export function LiveWorkspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
+          helpQueue={<LiveHelpQueue academyId={academyId} classId={classId} currentMembershipId={membershipId} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           answer={
             display.isLive && live.session && liveExercise ? (

@@ -48,6 +48,7 @@ export function WorkspaceHeader({
   submitting,
   indicator,
   feedback,
+  helpRequest,
 }: {
   /**
    * The curriculum trigger, owned by the page so focus can return to it.
@@ -64,6 +65,7 @@ export function WorkspaceHeader({
    * unwatched student's header is exactly the header it always was.
    */
   feedback?: React.ReactNode;
+  helpRequest?: React.ReactNode;
   saveState: DraftSaveState;
   onNavigate: (materialId: string) => void;
   /** Running, submitting, or changing exercise owns navigation exclusively. */
@@ -106,7 +108,7 @@ export function WorkspaceHeader({
 
       {curriculum}
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-40 flex-1">
         <div className="flex items-center gap-2">
           <h1 className="truncate text-[15px] font-bold leading-tight">
             {exercise.title}
@@ -136,6 +138,7 @@ export function WorkspaceHeader({
           sit together rather than at opposite ends of the bar. */}
       {indicator}
       {feedback}
+      {helpRequest}
 
       <ExerciseTimer startedAt={solveStartedAt} />
 
@@ -170,7 +173,7 @@ export function WorkspaceHeader({
         />
       </nav>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {/* A light success treatment reads as the final/done action without
             competing with the terminal's blue Run control. */}
         <button

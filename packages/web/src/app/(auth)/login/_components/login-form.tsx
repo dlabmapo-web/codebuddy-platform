@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleCheck, User } from 'lucide-react';
+import { CircleCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,8 @@ export function LoginForm({
 }) {
   const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(loginAction, initialState);
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [challengeKey, setChallengeKey] = useState(0);
   // A correct sign-in ends in a redirect, so this form is never re-rendered
@@ -42,6 +44,10 @@ export function LoginForm({
 
   function submit(formData: FormData) {
     if (!submission.begin()) return;
+    // Capture autofill too: password managers may update the DOM without an
+    // input event. Keep credentials only in this mounted client component.
+    setIdentifier(String(formData.get('identifier') ?? ''));
+    setPassword(String(formData.get('password') ?? ''));
     setCaptchaToken(null);
     setChallengeKey((current) => current + 1);
     action(formData);
@@ -66,48 +72,29 @@ export function LoginForm({
         </div>
       ) : null}
 
-      <SocialLoginButtons />
-      {/*
-       * Before anybody presses one, not after. Signing in with a provider
-       * without having signed up leaves the visitor authenticated by Google
-       * and unknown to Cove, and a sentence here is cheaper than the panel on
-       * `/signup` that has to explain it afterwards.
-       */}
-      <p className="mt-3 text-center text-[13px] leading-5 text-sub">
-        {t('social.first_time_hint')}
-      </p>
-
-      <AuthDivider label={t('divider.or_with_username')} />
-
       <form action={submit} className="space-y-5">
         <TextField
           autoComplete="username"
-          icon={User}
           label={t('field.username')}
           name="identifier"
-          placeholder={t('field.username_placeholder')}
+          placeholder={t('field.username')}
+          hint={t('login.username_forgot_hint')}
+          value={identifier}
+          onValueChange={setIdentifier}
           required
         />
 
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[15px] font-semibold text-ink">
-              {t('field.password')}
-            </span>
-            <Link className="text-[14px] font-semibold text-brand hover:text-brand-deep" href="/forgot-password">
-              {t('login.forgot_password')}
-            </Link>
-          </div>
-          <PasswordField label="" minLength={8} />
-          {/*
-           * Where a child goes instead. `/forgot-password` needs an email and
-           * a student has none, so sending them there would be a round trip to
-           * a page that cannot help them. No lookup happens for this to be
-           * shown, so it reveals nothing about any account.
-           */}
-          <p className="mt-2 text-[13px] leading-5 text-sub">
-            {t('login.student_forgot_hint')}
-          </p>
+          <PasswordField
+            label={t('field.password')}
+            placeholder={t('field.password')}
+            showIcon={false}
+            value={password}
+            onValueChange={setPassword}
+          />
+          <Link className="mt-2 inline-block text-[14px] font-semibold text-brand hover:text-brand-deep" href="/forgot-password">
+            {t('login.forgot_password')}
+          </Link>
         </div>
 
         {publicConfig.turnstileSiteKey ? (
@@ -147,6 +134,9 @@ export function LoginForm({
           </p>
         ) : null}
       </form>
+
+      <AuthDivider label={t('divider.or')} />
+      <SocialLoginButtons />
 
       <p className="mt-7 text-center text-[15px] text-sub">
         {t('login.no_account')}{' '}

@@ -19,11 +19,9 @@ import { ProfileMediaService } from "../profile/profile-media.service.js";
 import { SupabaseAuthService } from "./supabase-auth.service.js";
 
 /**
- * Returned for a username nobody holds. `.invalid` is reserved by RFC 2606 and
- * can never belong to a real account, so the sign-in that follows fails with
- * the same rejection a wrong password produces. That symmetry is what lets
- * `resolveSignInEmail` stay unauthenticated without becoming a way to discover
- * which usernames exist.
+ * Reserved address for an unknown username. Authentication still runs through
+ * Supabase's CAPTCHA and rate limits. The login action distinguishes this
+ * sentinel from a known user's bad password only on invalid_credentials.
  */
 const unresolvedEmailDomain = "unresolved.invalid";
 

@@ -63,9 +63,12 @@ test('the console offers a way back to the operator’s own account', async ({
   await page.getByRole('link', { name: /back|스튜디오/i }).first().click();
   await expect(page).toHaveURL(/\/admin$/);
 
-  // And the sidebar carries the sign-out every other Cove surface has.
-  await expect(page.getByRole('button', { name: /sign out|로그아웃/i }))
-    .toBeVisible();
+  // Sign-out lives in the profile menu and does not require confirmation.
+  await expect(page.getByRole('button', { name: /sign out|로그아웃/i })).toHaveCount(0);
+  await page.getByRole('button', { name: /my page|마이 페이지/i }).click();
+  await page.getByRole('menuitem', { name: /sign out|로그아웃/i }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('creating an academy invites its first manager', async ({ page }) => {

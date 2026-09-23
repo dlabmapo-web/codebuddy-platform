@@ -25,7 +25,6 @@ export default async function LoginPage({
       : undefined;
   return (
     <AuthCard
-      description={t('login.description')}
       title={t('login.title')}
     >
       <LoginForm

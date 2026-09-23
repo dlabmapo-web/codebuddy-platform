@@ -5,7 +5,6 @@ import {
   Inbox,
   KeyRound,
   Library,
-  LogOut,
   Mail,
   School,
   type LucideIcon,
@@ -20,12 +19,10 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
-import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
 import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -35,7 +32,6 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from '@/components/studio/sidebar';
-import { useLayoutTranslation } from '@/i18n';
 import { activeNavHref } from '@/lib/nav-active';
 import { routes } from '@/lib/routes';
 import {
@@ -75,7 +71,6 @@ type NavGroup = { id: string; label: string; items: NavLink[] };
  */
 export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
   const { t } = useTranslation('platform');
-  const { t: common } = useLayoutTranslation('common');
   const pathname = usePathname();
   const from = useSearchParams().get('from');
 
@@ -309,20 +304,6 @@ export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
           viewer={viewer}
         />
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarSeparator className="mx-0" />
-        <SignOutControl
-          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[14px] font-semibold text-sub outline-none transition-colors hover:bg-sidebar-accent hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-          label={
-            <>
-              <LogOut className="size-[1.05rem] shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">
-                {common('action.sign_out')}
-              </span>
-            </>
-          }
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

@@ -20,7 +20,6 @@ import { useSignupAcademies } from '../_hooks/use-signup-academies';
 import { AcademySelectorField } from './academy-selector-field';
 import { AccountKindField } from './account-kind-field';
 import { SignupNotice } from './signup-notice';
-import { SocialNoAccountNotice } from './social-no-account-notice';
 
 const initialState: AuthFormState = {};
 
@@ -28,21 +27,18 @@ export function SignupForm({
   invitedAcademy,
   invitedAcademyId,
   socialError,
-  socialProvider,
-  noAccount,
+  initialKind = 'STUDENT',
 }: {
   /** As the invitation names it, whatever state the academy is in. */
   invitedAcademy?: { id: string; name: string } | null;
   invitedAcademyId?: string;
   socialError?: string;
-  /** Named in the "you have no account yet" panel, when one is shown. */
-  socialProvider?: string;
-  noAccount?: boolean;
+  initialKind?: SignupKind;
 }) {
   const { t } = useTranslation('auth');
   const [state, action, pending] = useActionState(signupAction, initialState);
   const academies = useSignupAcademies(invitedAcademyId, invitedAcademy);
-  const [kind, setKind] = useState<SignupKind>('STUDENT');
+  const [kind, setKind] = useState<SignupKind>(initialKind);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -86,10 +82,6 @@ export function SignupForm({
 
   return (
     <div>
-      {noAccount ? (
-        <SocialNoAccountNotice provider={socialProvider} />
-      ) : null}
-
       <AcademySelectorField
         academies={academies}
         socialError={socialError}

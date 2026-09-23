@@ -9,7 +9,7 @@ export async function AuthCard({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   children: React.ReactNode;
 }) {
   const { t } = await getServerTranslation(['auth', 'common']);
@@ -82,7 +82,7 @@ export async function AuthCard({
         <div className="flex flex-1 flex-col justify-center py-6">
           <div className="mx-auto w-full max-w-[30rem]">
             <h1 className="text-[1.75rem] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[2rem]">{title}</h1>
-            <p className="mt-2 text-[15px] leading-6 text-sub sm:text-[16px]">{description}</p>
+            {description ? <p className="mt-2 text-[15px] leading-6 text-sub sm:text-[16px]">{description}</p> : null}
             <div className="mt-6">{children}</div>
           </div>
         </div>

@@ -60,7 +60,7 @@ function captchaInput(formData: FormData): CaptchaInput {
  */
 const credentialsSchema = z.object({
   identifier: z.string().trim().min(1).max(320),
-  password: z.string().min(8),
+  password: z.string().min(1),
 });
 
 /**
@@ -112,10 +112,8 @@ export async function loginAction(
   const captcha = captchaInput(formData);
   if (!captcha.valid) return { message: t('error.captcha_failed') };
 
-  // Supabase authenticates a password against an address, never a name, so the
-  // username is exchanged for one first. An unknown name resolves to an address
-  // that cannot exist, which is what makes the rejection below identical
-  // whether the name was wrong or the password was.
+  // Resolve the username on the server; Supabase still verifies CAPTCHA and
+  // rate limits before we distinguish an unknown username from a bad password.
   let email: string;
   try {
     ({ email } = await createServerORPCClient(undefined, await clientAddress())
@@ -139,7 +137,16 @@ export async function loginAction(
     password: input.data.password,
     ...(captcha.token ? { options: { captchaToken: captcha.token } } : {}),
   });
-  if (error) return { message: t(signInErrorKey(error.code)) };
+  if (error) {
+    if (error.code === 'invalid_credentials' && !input.data.identifier.includes('@')) {
+      return {
+        message: t(email.endsWith('@unresolved.invalid')
+          ? 'error.username_not_found'
+          : 'error.password_incorrect'),
+      };
+    }
+    return { message: t(signInErrorKey(error.code)) };
+  }
 
   if (!data.session) {
     await supabase.auth.signOut();
@@ -158,20 +165,7 @@ export async function loginAction(
   redirect('/welcome', RedirectType.replace);
 }
 
-/**
- * One Supabase auth code, one sentence — the sign-in half of `signupErrorKey`.
- *
- * The uniform "username or password is incorrect" is deliberate for anything
- * that would reveal whether an account exists, and stays. These four do not
- * reveal that. A rate limit is a fact about the caller, not the account; the
- * other three are reached only by presenting correct credentials, so whoever
- * reads them already knows the account is there.
- *
- * Keeping them uniform was the expensive part. Somebody Supabase had briefly
- * rate-limited was told their password was wrong, so they typed it again —
- * which is the one action that extends the limit. A suspended member was told
- * the same thing, and went to reset a password that was never the problem.
- */
+/** Provider failures retain their own messages, including CAPTCHA and limits. */
 function signInErrorKey(
   code: string | undefined,
 ):
@@ -544,8 +538,9 @@ export async function setUsernameAction(
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect('/login');
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+  redirect('/login', RedirectType.replace);
 }
 
 

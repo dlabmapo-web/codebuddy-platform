@@ -14,10 +14,9 @@ export const authContract = {
     .input(z.object({ username: usernameSchema }))
     .output(z.object({ available: z.boolean() })),
   /**
-   * Public by necessity — it runs before a session exists. It answers with a
-   * syntactically valid address for a username it has never seen, so a wrong
-   * username and a wrong password fail identically downstream and this route
-   * cannot be walked to discover who holds an account.
+   * Public and rate-limited because it runs before a session exists. Unknown
+   * usernames resolve to a reserved @unresolved.invalid address so the login
+   * action can verify CAPTCHA before showing its username-specific error.
    */
   resolveSignInEmail: oc
     .input(z.object({ identifier: z.string().min(1).max(320) }))

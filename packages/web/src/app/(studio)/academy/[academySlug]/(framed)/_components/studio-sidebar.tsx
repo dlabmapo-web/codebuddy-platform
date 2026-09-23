@@ -10,7 +10,6 @@ import {
   Coins,
   GraduationCap,
   LayoutDashboard,
-  LogOut,
   Mail,
   MonitorPlay,
   Presentation,
@@ -26,7 +25,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import {
   ResponsiveSelector,
@@ -36,7 +34,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -139,7 +136,6 @@ export function StudioSidebar({
   hasPoints: boolean;
   isStudent: boolean;
 }) {
-  const { t } = useLayoutTranslation('common');
   const pathname = usePathname();
   const academySlug = useAcademySlug();
   const groups = studioNavGroups({
@@ -218,22 +214,6 @@ export function StudioSidebar({
           viewer={viewer}
         />
       </SidebarContent>
-      <SidebarFooter>
-        {/* Theme and language moved to the header's top right; the footer keeps
-            only the action that ends the session. */}
-        <SidebarSeparator className="mx-0" />
-        <SignOutControl
-          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[14px] font-semibold text-sub outline-none transition-colors hover:bg-sidebar-accent hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-          label={
-            <>
-              <LogOut className="size-[1.05rem] shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">
-                {t('action.sign_out')}
-              </span>
-            </>
-          }
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

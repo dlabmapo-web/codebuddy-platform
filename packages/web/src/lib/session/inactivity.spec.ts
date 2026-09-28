@@ -139,6 +139,9 @@ describe('safeReturnPath', () => {
   });
 
   it('refuses anything that could leave the origin', () => {
+    expect(safeReturnPath('/\\evil.example.com/phish')).toBeNull();
+    expect(safeReturnPath('/\n/evil.example.com/phish')).toBeNull();
+    expect(safeReturnPath('/\t/evil.example.com/phish')).toBeNull();
     expect(safeReturnPath('//evil.example.com/phish')).toBeNull();
     expect(safeReturnPath('https://evil.example.com')).toBeNull();
     expect(safeReturnPath('javascript:alert(1)')).toBeNull();

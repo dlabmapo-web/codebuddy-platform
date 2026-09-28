@@ -29,6 +29,7 @@ import { INACTIVITY_RETURN_KEY, safeReturnPath } from './inactivity';
 export function ResumePrompt() {
   const { t } = useTranslation('session');
   const pathname = usePathname();
+  const [offeredOn, setOfferedOn] = React.useState(pathname);
   const [target, setTarget] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -57,7 +58,14 @@ export function ResumePrompt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!target) return null;
+  if (pathname !== offeredOn) {
+    // The academy shell persists across navigation. Leaving the landing page
+    // declines the offer, including if the student later navigates back.
+    setOfferedOn(pathname);
+    setTarget(null);
+  }
+
+  if (!target || pathname !== offeredOn) return null;
 
   return (
     <div role="status" className="relative flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-2 border-b border-border bg-brand-soft px-10 py-3 text-center text-[13px]">

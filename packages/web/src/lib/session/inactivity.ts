@@ -164,6 +164,9 @@ export function shouldAnnounce(input: {
  */
 export function safeReturnPath(path: string): string | null {
   if (!path.startsWith('/') || path.startsWith('//')) return null;
+  // Browsers normalize backslashes to slashes and strip URL control
+  // characters, which could turn an apparently local path into an origin.
+  if (/[\\\u0000-\u0020\u007f]/.test(path)) return null;
   const [pathname] = path.split(/[?#]/);
   return pathname && pathname.length <= 512 ? pathname : null;
 }

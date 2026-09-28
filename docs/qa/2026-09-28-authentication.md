@@ -88,3 +88,21 @@ A read-only query of the database configured for the local API confirmed that on
 Localhost displays the corrected login layout and the distinct unknown-username / incorrect-password messages. The deployed site still displays the earlier layout, Naver button, sidebar logout and logout confirmation dialog. Production account checks therefore do not verify deployment of this branch's fixes. No additional sheet rows were marked complete based on these account attempts.
 
 All five supplied accounts successfully signed in on the deployed site: the administrator reached `/admin/academies`; manager, team leader, teacher and student reached `/academy/dlab-mapo` with their expected role shown. Each production session was signed out after its check. This was a login/landing/logout smoke test, not a complete permissions, OAuth or idle-expiration test.
+
+## Blank-priority login rows
+
+Re-read login rows A1:J41 after the user requested the remaining feedback without a priority. All 20 populated rows with a blank priority have an empty feedback cell; they describe regression expectations rather than additional requested designs. Scope remains authentication only.
+
+| Rows / references | Review result |
+| --- | --- |
+| 9 / LOGIN-001-E-008 | Username autocomplete remains enabled. |
+| 11 / LOGIN-001-E-010 | Social provider labels remain hidden at narrow widths with accessible button names retained. |
+| 20 / LOGIN-004-E-002 | Kakao remains hidden by default; provider availability tests cover the flag. Naver is also disabled by default per the separate approved feedback. |
+| 21–26, 28 / LOGIN-005 landing | Existing destination tests cover active memberships, admin fallback, pending applications, and no-academy welcome. Production role smoke checks are recorded above; local live checks remain blocked by account data. |
+| 27 / LOGIN-005-S-002 | Fixed: missing usernames now route to welcome/username claim before active academy membership, pending application, or platform role can bypass setup. Added regression cases for all academy roles, admin and pending applicants, including normal landing after claiming a username. |
+| 29–33 / LOGIN-006-S-001–005 | Existing timer tests cover 30-minute expiry and 15/5/2-minute display thresholds. Fixed the guard incorrectly logging out on temporary STUDENT_SESSION_UNAVAILABLE errors by reusing the existing tested expiry predicate. The actual deadline still expires normally. |
+| 34 / LOGIN-006-S-006 | Fixed: return prompt is dismissed when navigating away within the persistent academy shell. Hardened return-path validation against backslashes and control characters that browsers normalize into external URLs; regression tests cover these inputs. |
+| 35 / LOGIN-006-S-007 | Existing deadline tests cover adopting the later activity time; BroadcastChannel and storage-event listeners are present. Live multi-tab synchronization remains unverified. |
+| 37, 39 / LOGIN-007-E-002/004 | Obsolete modal descriptions: the approved P2 change removed this dialog and confirmation buttons. They must not be restored. |
+
+Validation: 182 tests passed across 17 web authentication/session/landing files; web TypeScript and targeted lint passed. No live 30-minute or multi-tab test is claimed. Completion boxes for these rows remain unchanged pending the corresponding live checks; priority values were not changed.

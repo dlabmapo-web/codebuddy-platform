@@ -6,11 +6,11 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { logoutAction } from '@/app/(auth)/actions';
-import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 import { cn } from '@/lib/utils';
 
 import { flushDrafts } from './draft-flush';
+import { isSessionEnded } from './expired-session';
 import {
   INACTIVITY_CHANNEL,
   INACTIVITY_RETURN_KEY,
@@ -137,13 +137,7 @@ export function InactivityGuard() {
       deadlineRef.current = deadline;
       setObserved({ now: Date.now(), deadline });
     } catch (error) {
-      const code = toApiError(error).code;
-      if (
-        code === 'STUDENT_SESSION_EXPIRED' ||
-        code === 'STUDENT_SESSION_UNAVAILABLE' ||
-        code === 'AUTHENTICATION_REQUIRED' ||
-        code === 'TOKEN_INVALID'
-      ) {
+      if (isSessionEnded(error)) {
         void signOutRef.current();
       }
     } finally {

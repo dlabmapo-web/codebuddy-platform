@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 
 import { HeaderControls } from '@/components/studio/header-controls';
@@ -33,9 +34,9 @@ export async function AuthCard({
           style={{ background: 'radial-gradient(120% 80% at 15% 0%, rgba(255,255,255,0.16), transparent 60%)' }}
         />
 
-        <p className="relative text-xl font-extrabold tracking-[-0.01em]">
+        <Link href="/login" className="relative w-fit text-xl font-extrabold tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-4">
           {t('common:brand.name')}
-        </p>
+        </Link>
 
         <div className="relative mt-40">
           {/*

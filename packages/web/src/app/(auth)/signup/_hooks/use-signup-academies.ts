@@ -34,7 +34,7 @@ export function useSignupAcademies(
   return {
     academyId,
     selectAcademy: setAcademyId,
-    academies,
+    academies: [...academies].sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     loading: academiesQuery.isPending,
     error: academiesQuery.error,
     locked: Boolean(invitedAcademyId),

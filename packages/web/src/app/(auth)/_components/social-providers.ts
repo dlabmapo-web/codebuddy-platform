@@ -36,7 +36,9 @@ export const socialProviders: readonly SocialProviderPresentation[] = [
 export function isSocialProviderAvailable(
   provider: SocialAuthProvider,
 ): boolean {
-  return provider === 'kakao' ? publicConfig.kakaoAuthEnabled : true;
+  if (provider === 'kakao') return publicConfig.kakaoAuthEnabled;
+  if (provider === 'custom:naver') return publicConfig.naverAuthEnabled;
+  return true;
 }
 
 /**

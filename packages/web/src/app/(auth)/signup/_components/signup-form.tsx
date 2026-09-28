@@ -1,11 +1,11 @@
 'use client';
 
-import { AtSign, Mail, User } from 'lucide-react';
 import Link from 'next/link';
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { SignupKind } from '@cove/shared';
+import { usernameSchema, type SignupKind } from '@cove/shared';
 
+import { orpc } from '@/lib/orpc';
 import { publicConfig } from '@/lib/config';
 
 import { signupAction, type AuthFormState } from '../../actions';
@@ -19,7 +19,6 @@ import { useAuthSubmission } from '../../_lib/use-auth-submission';
 import { useSignupAcademies } from '../_hooks/use-signup-academies';
 import { AcademySelectorField } from './academy-selector-field';
 import { AccountKindField } from './account-kind-field';
-import { SignupNotice } from './signup-notice';
 
 const initialState: AuthFormState = {};
 
@@ -39,6 +38,13 @@ export function SignupForm({
   const [state, action, pending] = useActionState(signupAction, initialState);
   const academies = useSignupAcademies(invitedAcademyId, invitedAcademy);
   const [kind, setKind] = useState<SignupKind>(initialKind);
+  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [checkedUsername, setCheckedUsername] = useState<string | null>(null);
+  const [usernameMessage, setUsernameMessage] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const usernameCheckRequest = useRef(0);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -73,7 +79,50 @@ export function SignupForm({
       ? t('captcha.pending')
       : null;
 
+  function changeUsername(value: string) {
+    usernameCheckRequest.current += 1;
+    setUsername(value);
+    setCheckedUsername(null);
+    setUsernameMessage('');
+    setCheckingUsername(false);
+  }
+
+  async function checkUsername() {
+    const parsed = usernameSchema.safeParse(username);
+    setCheckedUsername(null);
+    if (!parsed.success) {
+      setUsernameMessage(t('field.username_hint'));
+      return;
+    }
+    const request = ++usernameCheckRequest.current;
+    setCheckingUsername(true);
+    setUsernameMessage('');
+    try {
+      const { available } = await orpc.auth.checkUsernameAvailable({ username: parsed.data });
+      if (request !== usernameCheckRequest.current) return;
+      setCheckedUsername(available ? parsed.data : null);
+      setUsernameMessage(t(available ? 'signup.username_available' : 'error.username_taken'));
+    } catch {
+      if (request === usernameCheckRequest.current) setUsernameMessage(t('signup.username_check_failed'));
+    } finally {
+      if (request === usernameCheckRequest.current) setCheckingUsername(false);
+    }
+  }
+
   function submit(formData: FormData) {
+    // Capture DOM values too, including password-manager autofill. React resets
+    // uncontrolled fields when a form action returns, even on validation errors.
+    const submittedUsername = String(formData.get('username') ?? '');
+    setDisplayName(String(formData.get('displayName') ?? ''));
+    setUsername(submittedUsername);
+    setEmail(String(formData.get('email') ?? ''));
+    setPassword(String(formData.get('password') ?? ''));
+    setPasswordConfirm(String(formData.get('passwordConfirm') ?? ''));
+    if (usernameSchema.safeParse(submittedUsername).data !== checkedUsername) {
+      setCheckedUsername(null);
+      setUsernameMessage(t('signup.check_username_first'));
+      return;
+    }
     if (!submission.begin()) return;
     setCaptchaToken(null);
     setChallengeKey((current) => current + 1);
@@ -102,21 +151,40 @@ export function SignupForm({
 
         <TextField
           autoComplete="name"
-          icon={User}
+          value={displayName}
+          onValueChange={setDisplayName}
           label={t('field.name')}
           name="displayName"
           placeholder={t('field.name_placeholder')}
           required
         />
-        <TextField
-          autoComplete="username"
-          hint={t('field.username_hint')}
-          icon={AtSign}
-          label={t('field.username')}
-          name="username"
-          placeholder={t('field.username_placeholder')}
-          required
-        />
+        <div>
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <TextField
+                autoComplete="username"
+                hint={t('field.username_hint')}
+                value={username}
+                onValueChange={changeUsername}
+                label={t('field.username')}
+                name="username"
+                placeholder={t('field.username_placeholder')}
+                required
+              />
+            </div>
+            <button
+              type="button"
+              disabled={checkingUsername || submission.busy || Boolean(state.success) || !username.trim()}
+              onClick={() => void checkUsername()}
+              className="mt-[27px] min-h-12 max-w-28 shrink-0 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+            >
+              {t(checkingUsername ? 'signup.checking_username' : 'signup.check_username')}
+            </button>
+          </div>
+          <p role="status" className={`mt-2 text-[13px] ${checkedUsername ? 'text-success' : 'text-sub'}`}>
+            {usernameMessage || t('signup.check_username_first')}
+          </p>
+        </div>
         {/*
          * Only for staff, and unmounted rather than hidden for the rest. A
          * `display: none` input still submits, so a student who had toggled to
@@ -127,7 +195,8 @@ export function SignupForm({
         {kind === 'STAFF' ? (
           <TextField
             autoComplete="email"
-            icon={Mail}
+            value={email}
+            onValueChange={setEmail}
             label={t('field.email')}
             name="email"
             placeholder={t('field.email_placeholder')}
@@ -135,18 +204,14 @@ export function SignupForm({
             type="email"
           />
         ) : null}
-        {/*
-         * Side by side from `sm` up, and the one place on this form where two
-         * columns encode something true rather than just saving a row: the
-         * pair is one value typed twice, and seeing both at once is how a
-         * person checks it. Stacked on a phone, where 240px columns would not
-         * hold a password.
-         */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4">
           <PasswordField
             autoComplete="new-password"
             minLength={8}
             onValueChange={setPassword}
+            value={password}
+            showIcon={false}
+            placeholder={t('field.password')}
           />
           <PasswordField
             autoComplete="new-password"
@@ -154,6 +219,9 @@ export function SignupForm({
             minLength={8}
             name="passwordConfirm"
             onValueChange={setPasswordConfirm}
+            value={passwordConfirm}
+            showIcon={false}
+            placeholder={t('field.password_confirm')}
           />
         </div>
         {/*
@@ -191,6 +259,7 @@ export function SignupForm({
 
         {state.message ? (
           <p
+            role={state.success ? 'status' : 'alert'}
             className={
               state.success
                 ? 'text-[14px] text-success'
@@ -204,7 +273,7 @@ export function SignupForm({
         <AuthSubmitButton
           busy={submission.busy}
           busyLabel={t('signup.submitting')}
-          disabled={block !== null || mismatch}
+          disabled={block !== null || mismatch || checkedUsername === null || checkingUsername}
         >
           {t('signup.submit')}
         </AuthSubmitButton>
@@ -223,15 +292,13 @@ export function SignupForm({
        */}
       {kind === 'STAFF' ? (
         <>
-          <AuthDivider label={t('divider.or_continue_with')} />
+          <AuthDivider label={t('divider.or')} />
           <SocialLoginButtons
             academyRequired
             requestedAcademyId={academies.academyId}
           />
         </>
       ) : null}
-
-      <SignupNotice />
 
       <p className="mt-5 text-center text-[14px] text-sub">
         {t('signup.have_account')}{' '}

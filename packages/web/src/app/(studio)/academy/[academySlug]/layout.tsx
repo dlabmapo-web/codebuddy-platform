@@ -8,7 +8,6 @@ import { getLocale } from '@/i18n/server/get-locale';
 import { StudentPresenceProvider } from '@/lib/monitoring/student-presence';
 import { getAccount } from '@/lib/orpc-server';
 import { InactivityGuard } from '@/lib/session/inactivity-guard';
-import { ResumePrompt } from '@/lib/session/resume-prompt';
 
 /**
  * Everything that lasts longer than one page inside an academy, and that both
@@ -103,7 +102,6 @@ export default async function AcademyLayout({
         resources={resources}
       >
         <InactivityGuard />
-        <ResumePrompt />
       </PageTranslationsProvider>
       {scoped}
     </>

@@ -87,10 +87,6 @@ const staffSignupSchema = z.object({
   email: z.email(),
 });
 
-const studentSignupSchema = z.object({
-  kind: z.literal('STUDENT'),
-});
-
 const socialAuthSchema = z.object({
   provider: socialAuthProviderSchema,
   academyId: z.uuid().optional(),
@@ -388,13 +384,12 @@ async function signUpStudent(
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: input.password,
-  });
-  // The account exists either way. Sending them to the login page to type the
-  // name and password they just chose is a worse outcome than a failed
-  // redirect, and far better than reporting a failure for something that
-  // worked — which would have them try again and be told the name is taken.
+  }).catch(() => ({ data: { session: null }, error: true }));
+  // The account exists even if automatic sign-in fails. Send the student to
+  // login with a success notice instead of leaving a completed signup form
+  // on screen, where retrying would report their own username as taken.
   if (error || !data.session) {
-    return { success: true, message: t('error.signup_student_sign_in') };
+    return redirect('/login?signup=success', RedirectType.replace);
   }
 
   await beginStudentSession(data.session.access_token);

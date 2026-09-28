@@ -427,6 +427,13 @@ describe('signupAction failure reporting', () => {
 });
 
 describe('social authentication history', () => {
+  it('refuses disabled Naver before creating an intent or contacting the provider', async () => {
+    await expect(startSocialAuthAction({ provider: 'custom:naver', academyId: signupFields.academyId }))
+      .resolves.toEqual({ message: 'error.social_unavailable' });
+    expect(mocks.signInWithOAuth).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
   it('replaces the login or signup entry when leaving for the provider', async () => {
     mocks.signInWithOAuth.mockResolvedValue({
       data: { url: 'https://accounts.example.test/authorize' },
@@ -507,6 +514,16 @@ describe('signupAction for a student', () => {
     expect(mocks.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it('sends a created student to login when automatic sign-in loses the network', async () => {
+    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
+    mocks.signInWithPassword.mockRejectedValueOnce(new Error('Network unavailable'));
+
+    await signupAction({}, formData(studentFields));
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
+    expect(mocks.beginStudentSession).not.toHaveBeenCalled();
+  });
+
   it('treats a failed sign-in as success, because the account exists', async () => {
     // Reporting a failure here would send somebody to try again and be told
     // the name is taken — by their own account.
@@ -516,10 +533,8 @@ describe('signupAction for a student', () => {
       error: null,
     });
 
-    await expect(signupAction({}, formData(studentFields))).resolves.toEqual({
-      success: true,
-      message: 'error.signup_student_sign_in',
-    });
+    await signupAction({}, formData(studentFields));
+    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
   });
 });
 

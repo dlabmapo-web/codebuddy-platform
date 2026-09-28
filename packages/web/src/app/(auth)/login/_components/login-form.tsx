@@ -21,8 +21,10 @@ const initialState: AuthFormState = {};
 export function LoginForm({
   initialError,
   passwordReset = false,
+  signupComplete = false,
 }: {
   initialError?: string;
+  signupComplete?: boolean;
   /** Arrived here from a completed password reset, which requires a fresh sign-in. */
   passwordReset?: boolean;
 }) {
@@ -55,6 +57,11 @@ export function LoginForm({
 
   return (
     <div>
+      {signupComplete ? (
+        <p role="status" className="mb-6 rounded-xl border border-success/25 bg-success/10 p-4 text-sm text-success">
+          {t('error.signup_student_sign_in')}
+        </p>
+      ) : null}
       {passwordReset ? (
         <div
           className="mb-6 flex gap-3.5 rounded-2xl border border-success/25 bg-success/10 p-5"

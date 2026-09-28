@@ -24,7 +24,8 @@ import {
 import { SupportBanner } from '@/components/studio/support-banner';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
-import { supportNamespaces } from '@/i18n/namespaces';
+import { ResumePrompt } from '@/lib/session/resume-prompt';
+import { sessionNamespaces, supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
 import { heldRoles, resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
@@ -231,6 +232,7 @@ export async function StudioChrome({
         isStudent={isStudent(shown)}
       />
       <SidebarInset>
+        <SessionResumeNotice />
         {/* Above the sticky header and inside the content column: as a sibling
             of the shell it rendered behind a full-height fixed layout, which
             is the one place a warning must never be. */}
@@ -335,6 +337,17 @@ async function SupportGrantNotice({
         grant={grant}
         viewRole={viewRole}
       />
+    </PageTranslationsProvider>
+  );
+}
+
+/** Render inside the sidebar inset so fixed navigation cannot cover the offer. */
+async function SessionResumeNotice() {
+  const locale = await getLocale();
+  const { resources } = await initTranslations(locale, sessionNamespaces);
+  return (
+    <PageTranslationsProvider locale={locale} namespaces={sessionNamespaces} resources={resources}>
+      <ResumePrompt />
     </PageTranslationsProvider>
   );
 }

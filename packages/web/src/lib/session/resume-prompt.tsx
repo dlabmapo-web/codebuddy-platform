@@ -60,7 +60,7 @@ export function ResumePrompt() {
   if (!target) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-brand-soft px-4 py-2 text-[13px]">
+    <div role="status" className="relative flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-2 border-b border-border bg-brand-soft px-10 py-3 text-center text-[13px]">
       <span className="font-semibold text-ink">{t('resume.body')}</span>
       <Link
         className="inline-flex items-center gap-1 font-bold text-brand underline-offset-2 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -72,7 +72,7 @@ export function ResumePrompt() {
       </Link>
       <button
         aria-label={t('resume.dismiss')}
-        className="ml-auto rounded-md p-1 text-sub transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-sub transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         onClick={() => setTarget(null)}
         type="button"
       >

@@ -126,7 +126,6 @@ export function PasswordField({
           aria-pressed={visible}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-sub transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
           onClick={() => setVisible((v) => !v)}
-          tabIndex={-1}
           type="button"
         >
           {visible ? <EyeOff size={20} strokeWidth={1.75} /> : <Eye size={20} strokeWidth={1.75} />}

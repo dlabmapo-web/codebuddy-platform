@@ -1,6 +1,5 @@
 'use client';
 
-import { AtSign } from 'lucide-react';
 import { useActionState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -44,7 +43,6 @@ export function UsernameClaim() {
         <TextField
           autoComplete="username"
           hint={t('field.username_hint')}
-          icon={AtSign}
           label={t('field.username')}
           name="username"
           placeholder={t('field.username_placeholder')}

@@ -79,7 +79,6 @@ export default async function SignupPage({
       : undefined;
   return (
     <AuthCard
-      description={t('signup.description')}
       title={t('signup.title')}
     >
       <SignupForm

@@ -106,3 +106,17 @@ Re-read login rows A1:J41 after the user requested the remaining feedback withou
 | 37, 39 / LOGIN-007-E-002/004 | Obsolete modal descriptions: the approved P2 change removed this dialog and confirmation buttons. They must not be restored. |
 
 Validation: 182 tests passed across 17 web authentication/session/landing files; web TypeScript and targeted lint passed. No live 30-minute or multi-tab test is claimed. Completion boxes for these rows remain unchanged pending the corresponding live checks; priority values were not changed.
+
+## Remaining student-session corrections
+
+Implemented three additional faults found while exercising rows 29–35:
+
+- A draft-save callback that throws synchronously or never settles could prevent automatic logout. All callbacks now run independently, and logout proceeds after a bounded two-second save attempt if a save stalls.
+- Captured pointer/keyboard activity on the expiry dialog could extend the session and remove the dialog before its sign-out button received its click. Dialog controls now handle their own explicit actions.
+- Input arriving after the deadline but before the next timer tick could optimistically revive the local timer. Expired/signing-out guards now refuse that reset and request logout once.
+
+Added DOM component regression tests using Happy DOM, a virtual clock and mocked session API. They cover 15/5/2-minute UI thresholds, expiration, continue/sign-out controls, both BroadcastChannel and storage event reception, activity publishing, temporary API failure, return-path recording, one-time resume rendering under Strict Mode, dismissal/navigation, and unsafe return URLs. These are deterministic component tests, not a substitute claim for an actual 30-minute browser session.
+
+Verification: **197 web auth/session/landing tests and 4 server-session tests passed**; web TypeScript, targeted lint and diff checks passed. Existing `cove-student` development credentials successfully signed in on localhost, resolving the local-account blocker for future manual testing. No account or password changes were needed. The separate Chromium end-to-end attempt stopped before sign-in because its Cloudflare check kept the submit button disabled; no session assertions ran in that attempt.
+
+Sheet reconciliation: the earlier requested checkbox update checked G9, G11 and G20:G28. Rows G29:G35 remain unchecked with notes explaining completed code/component verification and pending end-to-end acceptance. I37 and I39 now say N/A because the approved change removed the confirmation modal. Native Sheets readback and visual inspection confirmed those labels.

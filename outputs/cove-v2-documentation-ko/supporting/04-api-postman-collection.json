@@ -1,0 +1,4877 @@
+{
+  "info": {
+    "name": "Cove Studio v2 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "소스 기반 oRPC 요청 200개입니다. 비공개 환경에서 유효 테스트 ID와 비밀값을 설정하십시오. 데이터 변경 요청이 포함되므로 전체 컬렉션을 운영 환경에 실행하지 마십시오."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "academyId",
+      "value": ""
+    },
+    {
+      "key": "classId",
+      "value": ""
+    },
+    {
+      "key": "materialId",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "auth.bootstrap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/bootstrap",
+            "description": "auth.bootstrap. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "auth.checkUsernameAvailable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/checkUsernameAvailable",
+            "description": "auth.checkUsernameAvailable. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"username\": \"{{username}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "auth.resolveSignInEmail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/resolveSignInEmail",
+            "description": "auth.resolveSignInEmail. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"identifier\": \"{{identifier}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "auth.requestPasswordRecovery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Cove-Bff-Secret",
+                "value": "{{bffSecret}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/requestPasswordRecovery",
+            "description": "auth.requestPasswordRecovery. 권한: Trusted BFF. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"username\": \"{{username}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "auth.signUpStudent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/signUpStudent",
+            "description": "auth.signUpStudent. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"username\": \"{{username}}\",\n    \"displayName\": \"{{displayName}}\",\n    \"password\": \"{{password}}\",\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "auth.forgetIssuedPassword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/forgetIssuedPassword",
+            "description": "auth.forgetIssuedPassword. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "auth.setUsername",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/setUsername",
+            "description": "auth.setUsername. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"username\": \"{{username}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "auth.createOAuthOnboardingIntent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/createOAuthOnboardingIntent",
+            "description": "auth.createOAuthOnboardingIntent. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"provider\": \"google\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "auth.completeOAuthOnboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/completeOAuthOnboarding",
+            "description": "auth.completeOAuthOnboarding. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "auth.me",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/auth/me",
+            "description": "auth.me. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academies",
+      "item": [
+        {
+          "name": "academies.listForSignup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academies/listForSignup",
+            "description": "academies.listForSignup. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "joinRequests",
+      "item": [
+        {
+          "name": "joinRequests.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/joinRequests/create",
+            "description": "joinRequests.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "joinRequests.cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/joinRequests/cancel",
+            "description": "joinRequests.cancel. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"requestId\": \"{{requestId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyJoinRequests",
+      "item": [
+        {
+          "name": "academyJoinRequests.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyJoinRequests/list",
+            "description": "academyJoinRequests.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyJoinRequests.pendingCount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyJoinRequests/pendingCount",
+            "description": "academyJoinRequests.pendingCount. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyJoinRequests.review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyJoinRequests/review",
+            "description": "academyJoinRequests.review. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"requestId\": \"{{requestId}}\",\n    \"decision\": \"APPROVE\",\n    \"role\": \"STUDENT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyInvitations",
+      "item": [
+        {
+          "name": "academyInvitations.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitations/create",
+            "description": "academyInvitations.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"email\": \"{{email}}\",\n    \"role\": \"STUDENT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyInvitations.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitations/list",
+            "description": "academyInvitations.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyInvitations.revoke",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitations/revoke",
+            "description": "academyInvitations.revoke. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"invitationId\": \"{{invitationId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyInvitations.accept",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitations/accept",
+            "description": "academyInvitations.accept. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"token\": \"{{token}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyInvitations.preview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitations/preview",
+            "description": "academyInvitations.preview. 권한: 공개 또는 서비스 권한 검사. 연결된 라우터를 확인하십시오. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"token\": \"{{token}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyMembers",
+      "item": [
+        {
+          "name": "academyMembers.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/list",
+            "description": "academyMembers.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyMembers.changeRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/changeRole",
+            "description": "academyMembers.changeRole. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"role\": \"STUDENT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyMembers.grantRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/grantRole",
+            "description": "academyMembers.grantRole. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"role\": \"STUDENT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyMembers.revokeRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/revokeRole",
+            "description": "academyMembers.revokeRole. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"role\": \"STUDENT\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyMembers.suspend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/suspend",
+            "description": "academyMembers.suspend. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyMembers.restore",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyMembers/restore",
+            "description": "academyMembers.restore. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyStudentCredentials",
+      "item": [
+        {
+          "name": "academyStudentCredentials.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyStudentCredentials/get",
+            "description": "academyStudentCredentials.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyStudentCredentials.issue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyStudentCredentials/issue",
+            "description": "academyStudentCredentials.issue. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyStudentCredentials.reveal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyStudentCredentials/reveal",
+            "description": "academyStudentCredentials.reveal. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "item": [
+        {
+          "name": "profile.getMe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/profile/getMe",
+            "description": "profile.getMe. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "profile.updateGlobalProfile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/profile/updateGlobalProfile",
+            "description": "profile.updateGlobalProfile. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"displayName\": \"{{displayName}}\",\n    \"contactPhone\": \"{{contactPhone}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "profile.updatePreferences",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/profile/updatePreferences",
+            "description": "profile.updatePreferences. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"preferredLocale\": \"en\",\n    \"timezone\": \"{{timezone}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "profile.removeImage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/profile/removeImage",
+            "description": "profile.removeImage. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyFeatures",
+      "item": [
+        {
+          "name": "academyFeatures.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyFeatures/list",
+            "description": "academyFeatures.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyFeatures.setEnabled",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyFeatures/setEnabled",
+            "description": "academyFeatures.setEnabled. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"feature\": \"TEACHER_LIVE_MONITORING\",\n    \"isEnabled\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyProfile",
+      "item": [
+        {
+          "name": "academyProfile.getMine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/getMine",
+            "description": "academyProfile.getMine. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.updateMine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/updateMine",
+            "description": "academyProfile.updateMine. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"academyDisplayName\": \"{{academyDisplayName}}\",\n    \"contactPhone\": \"{{contactPhone}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.updateStudentDetails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/updateStudentDetails",
+            "description": "academyProfile.updateStudentDetails. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"dateOfBirth\": \"\",\n    \"schoolName\": \"{{schoolName}}\",\n    \"schoolGrade\": \"{{schoolGrade}}\",\n    \"guardianName\": \"{{guardianName}}\",\n    \"guardianRelationship\": \"MOTHER\",\n    \"guardianPhone\": \"{{guardianPhone}}\",\n    \"emergencyContactName\": \"{{emergencyContactName}}\",\n    \"emergencyContactPhone\": \"{{emergencyContactPhone}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.updateStudentSelfExpression",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/updateStudentSelfExpression",
+            "description": "academyProfile.updateStudentSelfExpression. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"codingInterests\": [],\n    \"learningGoal\": \"{{learningGoal}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.updateStaffProfile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/updateStaffProfile",
+            "description": "academyProfile.updateStaffProfile. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"bio\": \"{{bio}}\",\n    \"specialties\": [],\n    \"teachingLanguages\": [],\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.removeImage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/removeImage",
+            "description": "academyProfile.removeImage. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.getForManager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/getForManager",
+            "description": "academyProfile.getForManager. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyProfile.updateForManager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyProfile/updateForManager",
+            "description": "academyProfile.updateForManager. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"common\": {\n      \"academyDisplayName\": \"{{academyDisplayName}}\",\n      \"contactPhone\": \"{{contactPhone}}\"\n    },\n    \"commonUpdatedAt\": \"{{commonUpdatedAt}}\",\n    \"student\": {\n      \"dateOfBirth\": \"\",\n      \"schoolName\": \"{{schoolName}}\",\n      \"schoolGrade\": \"{{schoolGrade}}\",\n      \"guardianName\": \"{{guardianName}}\",\n      \"guardianRelationship\": \"MOTHER\",\n      \"guardianPhone\": \"{{guardianPhone}}\",\n      \"emergencyContactName\": \"{{emergencyContactName}}\",\n      \"emergencyContactPhone\": \"{{emergencyContactPhone}}\",\n      \"studentNumber\": \"{{studentNumber}}\"\n    },\n    \"studentUpdatedAt\": \"{{studentUpdatedAt}}\",\n    \"staff\": {\n      \"bio\": \"{{bio}}\",\n      \"specialties\": [],\n      \"teachingLanguages\": [],\n      \"academyTitle\": \"{{academyTitle}}\",\n      \"employeeNumber\": \"{{employeeNumber}}\"\n    },\n    \"staffUpdatedAt\": \"{{staffUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyCourses",
+      "item": [
+        {
+          "name": "academyCourses.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/list",
+            "description": "academyCourses.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/create",
+            "description": "academyCourses.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"title\": \"{{title}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/update",
+            "description": "academyCourses.update. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/delete",
+            "description": "academyCourses.delete. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"confirmTitle\": \"{{confirmTitle}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.setVisibility",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/setVisibility",
+            "description": "academyCourses.setVisibility. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"isVisible\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.setContentVisibility",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/setContentVisibility",
+            "description": "academyCourses.setContentVisibility. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"isVisible\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.getTree",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/getTree",
+            "description": "academyCourses.getTree. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.createModule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/createModule",
+            "description": "academyCourses.createModule. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"title\": \"{{title}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.updateModule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/updateModule",
+            "description": "academyCourses.updateModule. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"moduleId\": \"{{moduleId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.deleteModule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/deleteModule",
+            "description": "academyCourses.deleteModule. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"moduleId\": \"{{moduleId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.reorderModules",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/reorderModules",
+            "description": "academyCourses.reorderModules. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"orderedModuleIds\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.createLecture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/createLecture",
+            "description": "academyCourses.createLecture. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"moduleId\": \"{{moduleId}}\",\n    \"title\": \"{{title}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.updateLecture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/updateLecture",
+            "description": "academyCourses.updateLecture. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.deleteLecture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/deleteLecture",
+            "description": "academyCourses.deleteLecture. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.reorderLectures",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/reorderLectures",
+            "description": "academyCourses.reorderLectures. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"moduleId\": \"{{moduleId}}\",\n    \"orderedLectureIds\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.moveLecture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/moveLecture",
+            "description": "academyCourses.moveLecture. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"fromModuleId\": \"{{fromModuleId}}\",\n    \"toModuleId\": \"{{toModuleId}}\",\n    \"toIndex\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.getExercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/getExercise",
+            "description": "academyCourses.getExercise. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.getExerciseSolution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/getExerciseSolution",
+            "description": "academyCourses.getExerciseSolution. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.createExercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/createExercise",
+            "description": "academyCourses.createExercise. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"title\": \"{{title}}\",\n    \"difficulty\": \"EASY\",\n    \"description\": \"{{description}}\",\n    \"inputFormat\": \"{{inputFormat}}\",\n    \"outputFormat\": \"{{outputFormat}}\",\n    \"constraints\": \"{{constraints}}\",\n    \"starterCode\": \"{{starterCode}}\",\n    \"solutionCode\": \"{{solutionCode}}\",\n    \"aiFeedbackEnabled\": false,\n    \"isVisible\": false,\n    \"testCases\": [],\n    \"hints\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.updateExercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/updateExercise",
+            "description": "academyCourses.updateExercise. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"title\": \"{{title}}\",\n    \"difficulty\": \"EASY\",\n    \"description\": \"{{description}}\",\n    \"inputFormat\": \"{{inputFormat}}\",\n    \"outputFormat\": \"{{outputFormat}}\",\n    \"constraints\": \"{{constraints}}\",\n    \"starterCode\": \"{{starterCode}}\",\n    \"solutionCode\": \"{{solutionCode}}\",\n    \"aiFeedbackEnabled\": false,\n    \"isVisible\": false,\n    \"testCases\": [],\n    \"hints\": [],\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.deleteExercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/deleteExercise",
+            "description": "academyCourses.deleteExercise. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.reorderExercises",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/reorderExercises",
+            "description": "academyCourses.reorderExercises. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"orderedMaterialIds\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.moveExercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/moveExercise",
+            "description": "academyCourses.moveExercise. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"fromLectureId\": \"{{fromLectureId}}\",\n    \"toLectureId\": \"{{toLectureId}}\",\n    \"toIndex\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyCourses.setExerciseVisibility",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCourses/setExerciseVisibility",
+            "description": "academyCourses.setExerciseVisibility. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"lectureId\": \"{{lectureId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"isVisible\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyContentImports",
+      "item": [
+        {
+          "name": "academyContentImports.getPreview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyContentImports/getPreview",
+            "description": "academyContentImports.getPreview. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"sessionId\": \"{{sessionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyContentImports.commit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyContentImports/commit",
+            "description": "academyContentImports.commit. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"sessionId\": \"{{sessionId}}\",\n    \"contentRevision\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyContentImports.getResult",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyContentImports/getResult",
+            "description": "academyContentImports.getResult. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\",\n    \"sessionId\": \"{{sessionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyLibrary",
+      "item": [
+        {
+          "name": "academyLibrary.available",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyLibrary/available",
+            "description": "academyLibrary.available. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyLibrary.preview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyLibrary/preview",
+            "description": "academyLibrary.preview. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"libraryCourseId\": \"{{libraryCourseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyLibrary.adopt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyLibrary/adopt",
+            "description": "academyLibrary.adopt. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"libraryCourseId\": \"{{libraryCourseId}}\",\n    \"title\": \"{{title}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyClasses",
+      "item": [
+        {
+          "name": "academyClasses.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/list",
+            "description": "academyClasses.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/get",
+            "description": "academyClasses.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/create",
+            "description": "academyClasses.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"name\": \"{{name}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/update",
+            "description": "academyClasses.update. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"name\": \"{{name}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.setStatus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/setStatus",
+            "description": "academyClasses.setStatus. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"status\": \"ACTIVE\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/delete",
+            "description": "academyClasses.delete. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"confirmName\": \"{{confirmName}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.setCourses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/setCourses",
+            "description": "academyClasses.setCourses. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"courseIds\": [],\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.setSchedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/setSchedule",
+            "description": "academyClasses.setSchedule. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"slots\": [],\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.listEligibleStudents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/listEligibleStudents",
+            "description": "academyClasses.listEligibleStudents. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.addStudents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/addStudents",
+            "description": "academyClasses.addStudents. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipIds\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.removeStudent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/removeStudent",
+            "description": "academyClasses.removeStudent. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.listEligibleTeachers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/listEligibleTeachers",
+            "description": "academyClasses.listEligibleTeachers. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.setTeacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/setTeacher",
+            "description": "academyClasses.setTeacher. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"teacherMembershipId\": \"{{teacherMembershipId}}\",\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyClasses.setAssistantTeachers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyClasses/setAssistantTeachers",
+            "description": "academyClasses.setAssistantTeachers. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"teacherMembershipIds\": [],\n    \"expectedUpdatedAt\": \"{{expectedUpdatedAt}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "learn",
+      "item": [
+        {
+          "name": "learn.getOverview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getOverview",
+            "description": "learn.getOverview. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.listCourses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/listCourses",
+            "description": "learn.listCourses. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.getCourseOutline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getCourseOutline",
+            "description": "learn.getCourseOutline. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"courseId\": \"{{courseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.listClasses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/listClasses",
+            "description": "learn.listClasses. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.getClass",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getClass",
+            "description": "learn.getClass. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.getExerciseWorkspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getExerciseWorkspace",
+            "description": "learn.getExerciseWorkspace. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.getExerciseBootstrap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getExerciseBootstrap",
+            "description": "learn.getExerciseBootstrap. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.startSolveSession",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/startSolveSession",
+            "description": "learn.startSolveSession. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.listAnswerRecords",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/listAnswerRecords",
+            "description": "learn.listAnswerRecords. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.listDrafts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/listDrafts",
+            "description": "learn.listDrafts. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.saveDraft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/saveDraft",
+            "description": "learn.saveDraft. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"code\": \"{{code}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.discardDraft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/discardDraft",
+            "description": "learn.discardDraft. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/submit",
+            "description": "learn.submit. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"classId\": \"{{classId}}\",\n    \"code\": \"{{code}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.getSubmission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/getSubmission",
+            "description": "learn.getSubmission. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"submissionId\": \"{{submissionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "learn.listSubmissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/learn/listSubmissions",
+            "description": "learn.listSubmissions. 권한: Bearer plus student inactivity lease when applicable. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "lobby",
+      "item": [
+        {
+          "name": "lobby.academy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/lobby/academy",
+            "description": "lobby.academy. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academySlug\": \"{{academySlug}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "monitoring",
+      "item": [
+        {
+          "name": "monitoring.getMyActiveHelpRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getMyActiveHelpRequest",
+            "description": "monitoring.getMyActiveHelpRequest. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.requestHelp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/requestHelp",
+            "description": "monitoring.requestHelp. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.cancelMyHelpRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/cancelMyHelpRequest",
+            "description": "monitoring.cancelMyHelpRequest. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"requestId\": \"{{requestId}}\",\n    \"expectedVersion\": 1,\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.listClassHelpRequests",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/listClassHelpRequests",
+            "description": "monitoring.listClassHelpRequests. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"status\": \"WAITING\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.claimHelpRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/claimHelpRequest",
+            "description": "monitoring.claimHelpRequest. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"requestId\": \"{{requestId}}\",\n    \"expectedVersion\": 1,\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.returnHelpRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/returnHelpRequest",
+            "description": "monitoring.returnHelpRequest. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"requestId\": \"{{requestId}}\",\n    \"expectedVersion\": 1,\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.resolveHelpRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/resolveHelpRequest",
+            "description": "monitoring.resolveHelpRequest. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"requestId\": \"{{requestId}}\",\n    \"expectedVersion\": 1,\n    \"idempotencyKey\": \"{{idempotencyKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.listAssignedClasses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/listAssignedClasses",
+            "description": "monitoring.listAssignedClasses. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.getClassRoster",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getClassRoster",
+            "description": "monitoring.getClassRoster. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.getStudentContext",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getStudentContext",
+            "description": "monitoring.getStudentContext. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.getStudentCurriculum",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getStudentCurriculum",
+            "description": "monitoring.getStudentCurriculum. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.getExercisePreview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getExercisePreview",
+            "description": "monitoring.getExercisePreview. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.getExerciseSolution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/getExerciseSolution",
+            "description": "monitoring.getExerciseSolution. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"materialId\": \"{{materialId}}\",\n    \"visitId\": \"{{visitId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.listFeedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/listFeedback",
+            "description": "monitoring.listFeedback. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.listMyFeedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/listMyFeedback",
+            "description": "monitoring.listMyFeedback. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "monitoring.markMyFeedbackRead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/monitoring/markMyFeedbackRead",
+            "description": "monitoring.markMyFeedbackRead. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "item": [
+        {
+          "name": "notifications.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/notifications/list",
+            "description": "notifications.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "notifications.acknowledge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/notifications/acknowledge",
+            "description": "notifications.acknowledge. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{id}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformAcademies",
+      "item": [
+        {
+          "name": "platformAcademies.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/list",
+            "description": "platformAcademies.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/get",
+            "description": "platformAcademies.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.getBySlug",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/getBySlug",
+            "description": "platformAcademies.getBySlug. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academySlug\": \"{{academySlug}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/create",
+            "description": "platformAcademies.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"name\": \"{{name}}\",\n    \"slug\": \"{{slug}}\",\n    \"timeZone\": \"{{timeZone}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/update",
+            "description": "platformAcademies.update. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"name\": \"{{name}}\",\n    \"slug\": \"{{slug}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.resolveSlug",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/resolveSlug",
+            "description": "platformAcademies.resolveSlug. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"slug\": \"{{slug}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.setStatus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/setStatus",
+            "description": "platformAcademies.setStatus. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"status\": \"ACTIVE\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/delete",
+            "description": "platformAcademies.delete. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"confirmSlug\": \"{{confirmSlug}}\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAcademies.resendFirstManagerInvitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAcademies/resendFirstManagerInvitation",
+            "description": "platformAcademies.resendFirstManagerInvitation. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformSettings",
+      "item": [
+        {
+          "name": "platformSettings.features",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSettings/features",
+            "description": "platformSettings.features. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformSettings.pointPolicies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSettings/pointPolicies",
+            "description": "platformSettings.pointPolicies. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformOperations",
+      "item": [
+        {
+          "name": "platformOperations.staleProblems",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/staleProblems",
+            "description": "platformOperations.staleProblems. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformOperations.planRegrade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/planRegrade",
+            "description": "platformOperations.planRegrade. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformOperations.startRegrade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/startRegrade",
+            "description": "platformOperations.startRegrade. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"runId\": \"{{runId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformOperations.cancelPlan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/cancelPlan",
+            "description": "platformOperations.cancelPlan. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"runId\": \"{{runId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformOperations.run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/run",
+            "description": "platformOperations.run. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"runId\": \"{{runId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformOperations.runs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformOperations/runs",
+            "description": "platformOperations.runs. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformApplications",
+      "item": [
+        {
+          "name": "platformApplications.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformApplications/list",
+            "description": "platformApplications.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformApplications.pendingCount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformApplications/pendingCount",
+            "description": "platformApplications.pendingCount. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformAudit",
+      "item": [
+        {
+          "name": "platformAudit.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAudit/list",
+            "description": "platformAudit.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformAudit.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformAudit/get",
+            "description": "platformAudit.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"entryId\": \"{{entryId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformContent",
+      "item": [
+        {
+          "name": "platformContent.summary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformContent/summary",
+            "description": "platformContent.summary. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformContent.courses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformContent/courses",
+            "description": "platformContent.courses. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformContent.classes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformContent/classes",
+            "description": "platformContent.classes. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformLibrary",
+      "item": [
+        {
+          "name": "platformLibrary.academy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformLibrary/academy",
+            "description": "platformLibrary.academy. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformLibrary.courses",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformLibrary/courses",
+            "description": "platformLibrary.courses. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformLibrary.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformLibrary/create",
+            "description": "platformLibrary.create. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"title\": \"{{title}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformLibrary.retire",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformLibrary/retire",
+            "description": "platformLibrary.retire. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"courseId\": \"{{courseId}}\",\n    \"retired\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformLibrary.copies",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformLibrary/copies",
+            "description": "platformLibrary.copies. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"courseId\": \"{{courseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformInvitations",
+      "item": [
+        {
+          "name": "platformInvitations.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformInvitations/list",
+            "description": "platformInvitations.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformRanking",
+      "item": [
+        {
+          "name": "platformRanking.classes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformRanking/classes",
+            "description": "platformRanking.classes. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformUsers",
+      "item": [
+        {
+          "name": "platformUsers.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/list",
+            "description": "platformUsers.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformUsers.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/get",
+            "description": "platformUsers.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"userId\": \"{{userId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformUsers.setStatus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/setStatus",
+            "description": "platformUsers.setStatus. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"userId\": \"{{userId}}\",\n    \"status\": \"ACTIVE\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformUsers.participation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/participation",
+            "description": "platformUsers.participation. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"userId\": \"{{userId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformUsers.setMembershipRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/setMembershipRole",
+            "description": "platformUsers.setMembershipRole. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"userId\": \"{{userId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"role\": \"STUDENT\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformUsers.setPlatformRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformUsers/setPlatformRole",
+            "description": "platformUsers.setPlatformRole. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"userId\": \"{{userId}}\",\n    \"platformRole\": \"USER\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "platformSupport",
+      "item": [
+        {
+          "name": "platformSupport.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSupport/list",
+            "description": "platformSupport.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformSupport.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSupport/get",
+            "description": "platformSupport.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"grantId\": \"{{grantId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformSupport.open",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSupport/open",
+            "description": "platformSupport.open. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"assumedRole\": \"MANAGER\",\n    \"reason\": \"{{reason}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformSupport.revoke",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSupport/revoke",
+            "description": "platformSupport.revoke. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"grantId\": \"{{grantId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "platformSupport.active",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/platformSupport/active",
+            "description": "platformSupport.active. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academySlug\": \"{{academySlug}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "points",
+      "item": [
+        {
+          "name": "points.getPage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/getPage",
+            "description": "points.getPage. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "points.listLedger",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/listLedger",
+            "description": "points.listLedger. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "points.getClassBoard",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/getClassBoard",
+            "description": "points.getClassBoard. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "points.getOverviewBoard",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/getOverviewBoard",
+            "description": "points.getOverviewBoard. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "points.policy",
+      "item": [
+        {
+          "name": "points.policy.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/policy/get",
+            "description": "points.policy.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "points.policy.update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/policy/update",
+            "description": "points.policy.update. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"policy\": {\n      \"solveEasy\": 0,\n      \"solveMedium\": 0,\n      \"solveHard\": 0,\n      \"lectureCompleted\": 0,\n      \"moduleCompleted\": 0,\n      \"courseCompleted\": 0,\n      \"attendance\": 0,\n      \"attendanceLate\": 0,\n      \"attendanceMinMinutes\": 1,\n      \"attendanceGraceMinutes\": 1,\n      \"learningTimeTier1Minutes\": 1,\n      \"learningTimeTier1Points\": 0,\n      \"learningTimeTier2Minutes\": 1,\n      \"learningTimeTier2Points\": 0,\n      \"learningTimeTier3Minutes\": 1,\n      \"learningTimeTier3Points\": 0,\n      \"studentDailyCap\": 1\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "points.policy.reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/points/policy/reset",
+            "description": "points.policy.reset. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "studentSession",
+      "item": [
+        {
+          "name": "studentSession.begin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Cove-Bff-Secret",
+                "value": "{{bffSecret}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/studentSession/begin",
+            "description": "studentSession.begin. 권한: Trusted BFF. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "studentSession.current",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/studentSession/current",
+            "description": "studentSession.current. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "studentSession.extend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/studentSession/extend",
+            "description": "studentSession.extend. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "teacherProgress",
+      "item": [
+        {
+          "name": "teacherProgress.listStudents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listStudents",
+            "description": "teacherProgress.listStudents. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.getStudentDetail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/getStudentDetail",
+            "description": "teacherProgress.getStudentDetail. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.listAttempts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listAttempts",
+            "description": "teacherProgress.listAttempts. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.listCurriculum",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listCurriculum",
+            "description": "teacherProgress.listCurriculum. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.listCourseOutline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listCourseOutline",
+            "description": "teacherProgress.listCourseOutline. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"courseId\": \"{{courseId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.listLectureProblems",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listLectureProblems",
+            "description": "teacherProgress.listLectureProblems. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"lectureId\": \"{{lectureId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.listProblemStudents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/listProblemStudents",
+            "description": "teacherProgress.listProblemStudents. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"materialId\": \"{{materialId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "teacherProgress.getSubmissionReview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/teacherProgress/getSubmissionReview",
+            "description": "teacherProgress.getSubmissionReview. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"classId\": \"{{classId}}\",\n    \"membershipId\": \"{{membershipId}}\",\n    \"submissionId\": \"{{submissionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyOperationsOverview",
+      "item": [
+        {
+          "name": "academyOperationsOverview.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyOperationsOverview/get",
+            "description": "academyOperationsOverview.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyOperationsProfile",
+      "item": [
+        {
+          "name": "academyOperationsProfile.update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyOperationsProfile/update",
+            "description": "academyOperationsProfile.update. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"addressLine1\": \"{{addressLine1}}\",\n    \"addressLine2\": \"{{addressLine2}}\",\n    \"locality\": \"{{locality}}\",\n    \"region\": \"{{region}}\",\n    \"postalCode\": \"{{postalCode}}\",\n    \"countryCode\": \"{{countryCode}}\",\n    \"contactPhone\": \"{{contactPhone}}\",\n    \"contactEmail\": \"{{contactEmail}}\",\n    \"timeZone\": \"{{timeZone}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyPeople",
+      "item": [
+        {
+          "name": "academyPeople.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeople/list",
+            "description": "academyPeople.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeople.students",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeople/students",
+            "description": "academyPeople.students. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeople.staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeople/staff",
+            "description": "academyPeople.staff. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeople.student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeople/student",
+            "description": "academyPeople.student. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeople.staffMember",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeople/staffMember",
+            "description": "academyPeople.staffMember. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"membershipId\": \"{{membershipId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyPeopleImport",
+      "item": [
+        {
+          "name": "academyPeopleImport.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeopleImport/get",
+            "description": "academyPeopleImport.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"sessionId\": \"{{sessionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeopleImport.commit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeopleImport/commit",
+            "description": "academyPeopleImport.commit. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"sessionId\": \"{{sessionId}}\",\n    \"peopleRevision\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeopleImport.result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeopleImport/result",
+            "description": "academyPeopleImport.result. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"sessionId\": \"{{sessionId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyPeopleBulk",
+      "item": [
+        {
+          "name": "academyPeopleBulk.preview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeopleBulk/preview",
+            "description": "academyPeopleBulk.preview. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"selection\": {\n      \"mode\": \"ids\",\n      \"membershipIds\": []\n    },\n    \"options\": {\n      \"kind\": \"ENROLL\",\n      \"classId\": \"{{classId}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyPeopleBulk.run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyPeopleBulk/run",
+            "description": "academyPeopleBulk.run. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"selection\": {\n      \"mode\": \"ids\",\n      \"membershipIds\": []\n    },\n    \"options\": {\n      \"kind\": \"ENROLL\",\n      \"classId\": \"{{classId}}\"\n    },\n    \"idempotencyKey\": \"{{idempotencyKey}}\",\n    \"peopleRevision\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyInvitationDelivery",
+      "item": [
+        {
+          "name": "academyInvitationDelivery.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitationDelivery/list",
+            "description": "academyInvitationDelivery.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyInvitationDelivery.resend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyInvitationDelivery/resend",
+            "description": "academyInvitationDelivery.resend. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\",\n    \"invitationId\": \"{{invitationId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyCurriculumOverview",
+      "item": [
+        {
+          "name": "academyCurriculumOverview.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyCurriculumOverview/get",
+            "description": "academyCurriculumOverview.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyTeacherOverview",
+      "item": [
+        {
+          "name": "academyTeacherOverview.get",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyTeacherOverview/get",
+            "description": "academyTeacherOverview.get. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "academyTeacherStudents",
+      "item": [
+        {
+          "name": "academyTeacherStudents.list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyTeacherStudents/list",
+            "description": "academyTeacherStudents.list. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "academyTeacherStudents.roster",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/rpc/academyTeacherStudents/roster",
+            "description": "academyTeacherStudents.roster. 권한: Bearer 및 서비스 권한. 입력·출력은 packages/shared/src/api/orpc 계약에서 추출했습니다. 학원, 소유권, 역할, 배정, 공개 상태 및 수명주기 조건은 서비스 정책을 확인하십시오.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"academyId\": \"{{academyId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+sequenceDiagram
+    actor M as 학원 관리자
+    participant W as 구성원 가져오기 마법사
+    participant A as 구성원 가져오기 서비스
+    participant DB as PostgreSQL
+    participant D as 초대 전달 서비스
+    M->>W: CSV 또는 XLSX 업로드
+    W->>A: 한도 내 파일 업로드
+    A->>A: 파싱·권한·행 유효성 검사
+    A->>DB: 만료 및 확정 맥락과 미리보기 저장
+    A-->>W: 미리보기 및 행별 진단
+    M->>W: 검토한 미리보기 확정
+    W->>A: academyPeopleImport.commit
+    A->>DB: 세션 및 현재 상태 조회
+    alt 이미 완료됨
+      A-->>W: 기록된 결과
+    else 만료·처리 중·잘못된 상태
+      A-->>W: 상태별 오류
+    else 미리보기 준비 완료
+      A->>DB: PREVIEW_READY에서 COMMITTING으로 조건부 전이
+      A->>DB: 트랜잭션 내 학원 잠금 및 현재 데이터 재검증
+      alt 트랜잭션 성공
+        A->>DB: 초대 및 완료 결과 저장
+        A->>D: 트랜잭션 이후 적격 초대 전달
+        A-->>W: 행별 결과 및 별도 전달 상태
+      else 트랜잭션 실패
+        DB-->>A: 도메인 변경 롤백
+        A->>DB: 세션을 FAILED로 기록
+        A-->>W: 도메인 일부 확정 없이 실패
+      end
+    end

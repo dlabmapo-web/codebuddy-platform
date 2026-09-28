@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant E as 적격 서버 이벤트
+    participant P as 포인트 지급 서비스
+    participant DB as 호출자 트랜잭션
+    E->>P: 멤버십·반 맥락으로 지급 요청
+    P->>P: 기능 및 학원 정책 확인
+    alt 기능 비활성 또는 부적격 이벤트
+      P-->>E: 지급 없음
+    else 적격 이벤트
+      P->>DB: 멤버십·반·현지 날짜별 유효 지급 합계
+      DB-->>P: 적립 금액
+      P->>P: 일일 한도 적용
+      alt 잔여 금액 0
+        P-->>E: 원장 행 생성 없음
+      else 양수 금액
+        P->>DB: dedupeKey·skipDuplicates로 PointAward 삽입
+        alt 중복 키
+          DB-->>P: 기록 건수 0
+          P-->>E: 잔액 변경 없음
+        else 새 원장 항목
+          DB-->>P: 기록 건수 1
+          P->>DB: StudentPointBalance upsert 및 증가
+          P-->>E: 호출자 트랜잭션 내 지급 기록
+        end
+      end
+    end

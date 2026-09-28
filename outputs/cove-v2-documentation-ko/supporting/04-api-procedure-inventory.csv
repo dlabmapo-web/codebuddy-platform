@@ -1,0 +1,201 @@
+﻿프로시저,POST 경로,미들웨어,필수 입력 필드
+auth.bootstrap,/api/rpc/auth/bootstrap,Bearer plus service authorization,
+auth.checkUsernameAvailable,/api/rpc/auth/checkUsernameAvailable,Public or service-level gate; inspect linked router,username
+auth.resolveSignInEmail,/api/rpc/auth/resolveSignInEmail,Public or service-level gate; inspect linked router,identifier
+auth.requestPasswordRecovery,/api/rpc/auth/requestPasswordRecovery,Trusted BFF,username
+auth.signUpStudent,/api/rpc/auth/signUpStudent,Public or service-level gate; inspect linked router,"username, displayName, password, academyId"
+auth.forgetIssuedPassword,/api/rpc/auth/forgetIssuedPassword,Bearer plus service authorization,
+auth.setUsername,/api/rpc/auth/setUsername,Bearer plus service authorization,username
+auth.createOAuthOnboardingIntent,/api/rpc/auth/createOAuthOnboardingIntent,Public or service-level gate; inspect linked router,"academyId, provider"
+auth.completeOAuthOnboarding,/api/rpc/auth/completeOAuthOnboarding,Bearer plus service authorization,
+auth.me,/api/rpc/auth/me,Bearer plus service authorization,
+academies.listForSignup,/api/rpc/academies/listForSignup,Public or service-level gate; inspect linked router,
+joinRequests.create,/api/rpc/joinRequests/create,Bearer plus service authorization,academyId
+joinRequests.cancel,/api/rpc/joinRequests/cancel,Bearer plus service authorization,requestId
+academyJoinRequests.list,/api/rpc/academyJoinRequests/list,Bearer plus service authorization,academyId
+academyJoinRequests.pendingCount,/api/rpc/academyJoinRequests/pendingCount,Bearer plus service authorization,academyId
+academyJoinRequests.review,/api/rpc/academyJoinRequests/review,Bearer plus service authorization,
+academyInvitations.create,/api/rpc/academyInvitations/create,Bearer plus service authorization,"academyId, email, role"
+academyInvitations.list,/api/rpc/academyInvitations/list,Bearer plus service authorization,academyId
+academyInvitations.revoke,/api/rpc/academyInvitations/revoke,Bearer plus service authorization,"academyId, invitationId"
+academyInvitations.accept,/api/rpc/academyInvitations/accept,Bearer plus service authorization,token
+academyInvitations.preview,/api/rpc/academyInvitations/preview,Public or service-level gate; inspect linked router,token
+academyMembers.list,/api/rpc/academyMembers/list,Bearer plus service authorization,academyId
+academyMembers.changeRole,/api/rpc/academyMembers/changeRole,Bearer plus service authorization,"academyId, membershipId, role"
+academyMembers.grantRole,/api/rpc/academyMembers/grantRole,Bearer plus service authorization,"academyId, membershipId, role"
+academyMembers.revokeRole,/api/rpc/academyMembers/revokeRole,Bearer plus service authorization,"academyId, membershipId, role"
+academyMembers.suspend,/api/rpc/academyMembers/suspend,Bearer plus service authorization,"academyId, membershipId"
+academyMembers.restore,/api/rpc/academyMembers/restore,Bearer plus service authorization,"academyId, membershipId"
+academyStudentCredentials.get,/api/rpc/academyStudentCredentials/get,Bearer plus service authorization,"academyId, membershipId"
+academyStudentCredentials.issue,/api/rpc/academyStudentCredentials/issue,Bearer plus service authorization,"academyId, membershipId"
+academyStudentCredentials.reveal,/api/rpc/academyStudentCredentials/reveal,Bearer plus service authorization,"academyId, membershipId"
+profile.getMe,/api/rpc/profile/getMe,Bearer plus service authorization,
+profile.updateGlobalProfile,/api/rpc/profile/updateGlobalProfile,Bearer plus service authorization,"displayName, contactPhone, expectedUpdatedAt"
+profile.updatePreferences,/api/rpc/profile/updatePreferences,Bearer plus service authorization,"preferredLocale, timezone, expectedUpdatedAt"
+profile.removeImage,/api/rpc/profile/removeImage,Bearer plus service authorization,
+academyFeatures.list,/api/rpc/academyFeatures/list,Bearer plus service authorization,academyId
+academyFeatures.setEnabled,/api/rpc/academyFeatures/setEnabled,Bearer plus service authorization,"academyId, feature, isEnabled"
+academyProfile.getMine,/api/rpc/academyProfile/getMine,Bearer plus service authorization,academyId
+academyProfile.updateMine,/api/rpc/academyProfile/updateMine,Bearer plus service authorization,"academyId, academyDisplayName, contactPhone, expectedUpdatedAt"
+academyProfile.updateStudentDetails,/api/rpc/academyProfile/updateStudentDetails,Bearer plus service authorization,"academyId, dateOfBirth, schoolName, schoolGrade, guardianName, guardianRelationship, guardianPhone, emergencyContactName, emergencyContactPhone, expectedUpdatedAt"
+academyProfile.updateStudentSelfExpression,/api/rpc/academyProfile/updateStudentSelfExpression,Bearer plus service authorization,"academyId, codingInterests, learningGoal, expectedUpdatedAt"
+academyProfile.updateStaffProfile,/api/rpc/academyProfile/updateStaffProfile,Bearer plus service authorization,"academyId, bio, specialties, teachingLanguages, expectedUpdatedAt"
+academyProfile.removeImage,/api/rpc/academyProfile/removeImage,Bearer plus service authorization,academyId
+academyProfile.getForManager,/api/rpc/academyProfile/getForManager,Bearer plus service authorization,"academyId, membershipId"
+academyProfile.updateForManager,/api/rpc/academyProfile/updateForManager,Bearer plus service authorization,"academyId, membershipId, common, commonUpdatedAt, student, studentUpdatedAt, staff, staffUpdatedAt"
+academyCourses.list,/api/rpc/academyCourses/list,Bearer plus service authorization,academyId
+academyCourses.create,/api/rpc/academyCourses/create,Bearer plus service authorization,"academyId, title"
+academyCourses.update,/api/rpc/academyCourses/update,Bearer plus service authorization,"academyId, courseId"
+academyCourses.delete,/api/rpc/academyCourses/delete,Bearer plus service authorization,"academyId, courseId, confirmTitle"
+academyCourses.setVisibility,/api/rpc/academyCourses/setVisibility,Bearer plus service authorization,"academyId, courseId, isVisible"
+academyCourses.setContentVisibility,/api/rpc/academyCourses/setContentVisibility,Bearer plus service authorization,"academyId, courseId, isVisible"
+academyCourses.getTree,/api/rpc/academyCourses/getTree,Bearer plus service authorization,"academyId, courseId"
+academyCourses.createModule,/api/rpc/academyCourses/createModule,Bearer plus service authorization,"academyId, courseId, title"
+academyCourses.updateModule,/api/rpc/academyCourses/updateModule,Bearer plus service authorization,"academyId, courseId, moduleId"
+academyCourses.deleteModule,/api/rpc/academyCourses/deleteModule,Bearer plus service authorization,"academyId, courseId, moduleId"
+academyCourses.reorderModules,/api/rpc/academyCourses/reorderModules,Bearer plus service authorization,"academyId, courseId, orderedModuleIds"
+academyCourses.createLecture,/api/rpc/academyCourses/createLecture,Bearer plus service authorization,"academyId, courseId, moduleId, title"
+academyCourses.updateLecture,/api/rpc/academyCourses/updateLecture,Bearer plus service authorization,"academyId, courseId, lectureId"
+academyCourses.deleteLecture,/api/rpc/academyCourses/deleteLecture,Bearer plus service authorization,"academyId, courseId, lectureId"
+academyCourses.reorderLectures,/api/rpc/academyCourses/reorderLectures,Bearer plus service authorization,"academyId, courseId, moduleId, orderedLectureIds"
+academyCourses.moveLecture,/api/rpc/academyCourses/moveLecture,Bearer plus service authorization,"academyId, courseId, lectureId, fromModuleId, toModuleId, toIndex"
+academyCourses.getExercise,/api/rpc/academyCourses/getExercise,Bearer plus service authorization,"academyId, courseId, lectureId, materialId"
+academyCourses.getExerciseSolution,/api/rpc/academyCourses/getExerciseSolution,Bearer plus service authorization,"academyId, courseId, lectureId, materialId"
+academyCourses.createExercise,/api/rpc/academyCourses/createExercise,Bearer plus service authorization,"academyId, courseId, lectureId, title, difficulty, description, inputFormat, outputFormat, constraints, starterCode, solutionCode, aiFeedbackEnabled, isVisible, testCases, hints"
+academyCourses.updateExercise,/api/rpc/academyCourses/updateExercise,Bearer plus service authorization,"academyId, courseId, lectureId, materialId, title, difficulty, description, inputFormat, outputFormat, constraints, starterCode, solutionCode, aiFeedbackEnabled, isVisible, testCases, hints, expectedUpdatedAt"
+academyCourses.deleteExercise,/api/rpc/academyCourses/deleteExercise,Bearer plus service authorization,"academyId, courseId, lectureId, materialId"
+academyCourses.reorderExercises,/api/rpc/academyCourses/reorderExercises,Bearer plus service authorization,"academyId, courseId, lectureId, orderedMaterialIds"
+academyCourses.moveExercise,/api/rpc/academyCourses/moveExercise,Bearer plus service authorization,"academyId, courseId, materialId, fromLectureId, toLectureId, toIndex"
+academyCourses.setExerciseVisibility,/api/rpc/academyCourses/setExerciseVisibility,Bearer plus service authorization,"academyId, courseId, lectureId, materialId, isVisible"
+academyContentImports.getPreview,/api/rpc/academyContentImports/getPreview,Bearer plus service authorization,"academyId, courseId, sessionId"
+academyContentImports.commit,/api/rpc/academyContentImports/commit,Bearer plus service authorization,"academyId, courseId, sessionId, contentRevision"
+academyContentImports.getResult,/api/rpc/academyContentImports/getResult,Bearer plus service authorization,"academyId, courseId, sessionId"
+academyLibrary.available,/api/rpc/academyLibrary/available,Bearer plus service authorization,academyId
+academyLibrary.preview,/api/rpc/academyLibrary/preview,Bearer plus service authorization,"academyId, libraryCourseId"
+academyLibrary.adopt,/api/rpc/academyLibrary/adopt,Bearer plus service authorization,"academyId, libraryCourseId, title"
+academyClasses.list,/api/rpc/academyClasses/list,Bearer plus service authorization,academyId
+academyClasses.get,/api/rpc/academyClasses/get,Bearer plus service authorization,"academyId, classId"
+academyClasses.create,/api/rpc/academyClasses/create,Bearer plus service authorization,"academyId, name"
+academyClasses.update,/api/rpc/academyClasses/update,Bearer plus service authorization,"academyId, classId, name, expectedUpdatedAt"
+academyClasses.setStatus,/api/rpc/academyClasses/setStatus,Bearer plus service authorization,"academyId, classId, status"
+academyClasses.delete,/api/rpc/academyClasses/delete,Bearer plus service authorization,"academyId, classId, confirmName"
+academyClasses.setCourses,/api/rpc/academyClasses/setCourses,Bearer plus service authorization,"academyId, classId, courseIds, expectedUpdatedAt"
+academyClasses.setSchedule,/api/rpc/academyClasses/setSchedule,Bearer plus service authorization,"academyId, classId, slots, expectedUpdatedAt"
+academyClasses.listEligibleStudents,/api/rpc/academyClasses/listEligibleStudents,Bearer plus service authorization,"academyId, classId"
+academyClasses.addStudents,/api/rpc/academyClasses/addStudents,Bearer plus service authorization,"academyId, classId, membershipIds"
+academyClasses.removeStudent,/api/rpc/academyClasses/removeStudent,Bearer plus service authorization,"academyId, classId, membershipId"
+academyClasses.listEligibleTeachers,/api/rpc/academyClasses/listEligibleTeachers,Bearer plus service authorization,"academyId, classId"
+academyClasses.setTeacher,/api/rpc/academyClasses/setTeacher,Bearer plus service authorization,"academyId, classId, teacherMembershipId, expectedUpdatedAt"
+academyClasses.setAssistantTeachers,/api/rpc/academyClasses/setAssistantTeachers,Bearer plus service authorization,"academyId, classId, teacherMembershipIds, expectedUpdatedAt"
+learn.getOverview,/api/rpc/learn/getOverview,Bearer plus student inactivity lease when applicable,academyId
+learn.listCourses,/api/rpc/learn/listCourses,Bearer plus student inactivity lease when applicable,academyId
+learn.getCourseOutline,/api/rpc/learn/getCourseOutline,Bearer plus student inactivity lease when applicable,"academyId, courseId"
+learn.listClasses,/api/rpc/learn/listClasses,Bearer plus student inactivity lease when applicable,academyId
+learn.getClass,/api/rpc/learn/getClass,Bearer plus student inactivity lease when applicable,"academyId, classId"
+learn.getExerciseWorkspace,/api/rpc/learn/getExerciseWorkspace,Bearer plus student inactivity lease when applicable,"academyId, materialId, classId"
+learn.getExerciseBootstrap,/api/rpc/learn/getExerciseBootstrap,Bearer plus student inactivity lease when applicable,"academyId, materialId"
+learn.startSolveSession,/api/rpc/learn/startSolveSession,Bearer plus student inactivity lease when applicable,"academyId, materialId, classId"
+learn.listAnswerRecords,/api/rpc/learn/listAnswerRecords,Bearer plus student inactivity lease when applicable,academyId
+learn.listDrafts,/api/rpc/learn/listDrafts,Bearer plus student inactivity lease when applicable,academyId
+learn.saveDraft,/api/rpc/learn/saveDraft,Bearer plus student inactivity lease when applicable,"academyId, materialId, code"
+learn.discardDraft,/api/rpc/learn/discardDraft,Bearer plus student inactivity lease when applicable,"academyId, materialId"
+learn.submit,/api/rpc/learn/submit,Bearer plus student inactivity lease when applicable,"academyId, materialId, classId, code"
+learn.getSubmission,/api/rpc/learn/getSubmission,Bearer plus student inactivity lease when applicable,"academyId, submissionId"
+learn.listSubmissions,/api/rpc/learn/listSubmissions,Bearer plus student inactivity lease when applicable,"academyId, materialId"
+lobby.academy,/api/rpc/lobby/academy,Bearer plus service authorization,academySlug
+monitoring.getMyActiveHelpRequest,/api/rpc/monitoring/getMyActiveHelpRequest,Bearer plus service authorization,"academyId, classId"
+monitoring.requestHelp,/api/rpc/monitoring/requestHelp,Bearer plus service authorization,"academyId, classId, materialId, idempotencyKey"
+monitoring.cancelMyHelpRequest,/api/rpc/monitoring/cancelMyHelpRequest,Bearer plus service authorization,"academyId, requestId, expectedVersion, idempotencyKey"
+monitoring.listClassHelpRequests,/api/rpc/monitoring/listClassHelpRequests,Bearer plus service authorization,"academyId, classId, status"
+monitoring.claimHelpRequest,/api/rpc/monitoring/claimHelpRequest,Bearer plus service authorization,"academyId, requestId, expectedVersion, idempotencyKey"
+monitoring.returnHelpRequest,/api/rpc/monitoring/returnHelpRequest,Bearer plus service authorization,"academyId, requestId, expectedVersion, idempotencyKey"
+monitoring.resolveHelpRequest,/api/rpc/monitoring/resolveHelpRequest,Bearer plus service authorization,"academyId, requestId, expectedVersion, idempotencyKey"
+monitoring.listAssignedClasses,/api/rpc/monitoring/listAssignedClasses,Bearer plus service authorization,academyId
+monitoring.getClassRoster,/api/rpc/monitoring/getClassRoster,Bearer plus service authorization,"academyId, classId"
+monitoring.getStudentContext,/api/rpc/monitoring/getStudentContext,Bearer plus service authorization,"academyId, classId, membershipId"
+monitoring.getStudentCurriculum,/api/rpc/monitoring/getStudentCurriculum,Bearer plus service authorization,"academyId, classId, membershipId, materialId"
+monitoring.getExercisePreview,/api/rpc/monitoring/getExercisePreview,Bearer plus service authorization,"academyId, classId, membershipId, materialId"
+monitoring.getExerciseSolution,/api/rpc/monitoring/getExerciseSolution,Bearer plus service authorization,"academyId, classId, membershipId, materialId, visitId"
+monitoring.listFeedback,/api/rpc/monitoring/listFeedback,Bearer plus service authorization,"academyId, classId, membershipId"
+monitoring.listMyFeedback,/api/rpc/monitoring/listMyFeedback,Bearer plus service authorization,academyId
+monitoring.markMyFeedbackRead,/api/rpc/monitoring/markMyFeedbackRead,Bearer plus service authorization,"academyId, materialId"
+notifications.list,/api/rpc/notifications/list,Bearer plus service authorization,
+notifications.acknowledge,/api/rpc/notifications/acknowledge,Bearer plus service authorization,id
+platformAcademies.list,/api/rpc/platformAcademies/list,Bearer plus service authorization,
+platformAcademies.get,/api/rpc/platformAcademies/get,Bearer plus service authorization,academyId
+platformAcademies.getBySlug,/api/rpc/platformAcademies/getBySlug,Bearer plus service authorization,academySlug
+platformAcademies.create,/api/rpc/platformAcademies/create,Bearer plus service authorization,"name, slug, timeZone"
+platformAcademies.update,/api/rpc/platformAcademies/update,Bearer plus service authorization,"academyId, name, slug"
+platformAcademies.resolveSlug,/api/rpc/platformAcademies/resolveSlug,Bearer plus service authorization,slug
+platformAcademies.setStatus,/api/rpc/platformAcademies/setStatus,Bearer plus service authorization,"academyId, status, reason"
+platformAcademies.delete,/api/rpc/platformAcademies/delete,Bearer plus service authorization,"academyId, confirmSlug, reason"
+platformAcademies.resendFirstManagerInvitation,/api/rpc/platformAcademies/resendFirstManagerInvitation,Bearer plus service authorization,academyId
+platformSettings.features,/api/rpc/platformSettings/features,Bearer plus service authorization,
+platformSettings.pointPolicies,/api/rpc/platformSettings/pointPolicies,Bearer plus service authorization,
+platformOperations.staleProblems,/api/rpc/platformOperations/staleProblems,Bearer plus service authorization,academyId
+platformOperations.planRegrade,/api/rpc/platformOperations/planRegrade,Bearer plus service authorization,"academyId, materialId"
+platformOperations.startRegrade,/api/rpc/platformOperations/startRegrade,Bearer plus service authorization,runId
+platformOperations.cancelPlan,/api/rpc/platformOperations/cancelPlan,Bearer plus service authorization,runId
+platformOperations.run,/api/rpc/platformOperations/run,Bearer plus service authorization,runId
+platformOperations.runs,/api/rpc/platformOperations/runs,Bearer plus service authorization,
+platformApplications.list,/api/rpc/platformApplications/list,Bearer plus service authorization,
+platformApplications.pendingCount,/api/rpc/platformApplications/pendingCount,Bearer plus service authorization,
+platformAudit.list,/api/rpc/platformAudit/list,Bearer plus service authorization,
+platformAudit.get,/api/rpc/platformAudit/get,Bearer plus service authorization,entryId
+platformContent.summary,/api/rpc/platformContent/summary,Bearer plus service authorization,
+platformContent.courses,/api/rpc/platformContent/courses,Bearer plus service authorization,
+platformContent.classes,/api/rpc/platformContent/classes,Bearer plus service authorization,
+platformLibrary.academy,/api/rpc/platformLibrary/academy,Bearer plus service authorization,
+platformLibrary.courses,/api/rpc/platformLibrary/courses,Bearer plus service authorization,
+platformLibrary.create,/api/rpc/platformLibrary/create,Bearer plus service authorization,title
+platformLibrary.retire,/api/rpc/platformLibrary/retire,Bearer plus service authorization,"courseId, retired"
+platformLibrary.copies,/api/rpc/platformLibrary/copies,Bearer plus service authorization,courseId
+platformInvitations.list,/api/rpc/platformInvitations/list,Bearer plus service authorization,
+platformRanking.classes,/api/rpc/platformRanking/classes,Bearer plus service authorization,
+platformUsers.list,/api/rpc/platformUsers/list,Bearer plus service authorization,
+platformUsers.get,/api/rpc/platformUsers/get,Bearer plus service authorization,userId
+platformUsers.setStatus,/api/rpc/platformUsers/setStatus,Bearer plus service authorization,"userId, status, reason"
+platformUsers.participation,/api/rpc/platformUsers/participation,Bearer plus service authorization,"userId, membershipId"
+platformUsers.setMembershipRole,/api/rpc/platformUsers/setMembershipRole,Bearer plus service authorization,"userId, membershipId, role, reason"
+platformUsers.setPlatformRole,/api/rpc/platformUsers/setPlatformRole,Bearer plus service authorization,"userId, platformRole, reason"
+platformSupport.list,/api/rpc/platformSupport/list,Bearer plus service authorization,
+platformSupport.get,/api/rpc/platformSupport/get,Bearer plus service authorization,grantId
+platformSupport.open,/api/rpc/platformSupport/open,Bearer plus service authorization,"academyId, assumedRole, reason"
+platformSupport.revoke,/api/rpc/platformSupport/revoke,Bearer plus service authorization,grantId
+platformSupport.active,/api/rpc/platformSupport/active,Bearer plus service authorization,academySlug
+points.getPage,/api/rpc/points/getPage,Bearer plus service authorization,academyId
+points.listLedger,/api/rpc/points/listLedger,Bearer plus service authorization,academyId
+points.getClassBoard,/api/rpc/points/getClassBoard,Bearer plus service authorization,academyId
+points.getOverviewBoard,/api/rpc/points/getOverviewBoard,Bearer plus service authorization,academyId
+points.policy.get,/api/rpc/points/policy/get,Bearer plus service authorization,academyId
+points.policy.update,/api/rpc/points/policy/update,Bearer plus service authorization,"academyId, policy"
+points.policy.reset,/api/rpc/points/policy/reset,Bearer plus service authorization,academyId
+studentSession.begin,/api/rpc/studentSession/begin,Trusted BFF,
+studentSession.current,/api/rpc/studentSession/current,Bearer plus service authorization,
+studentSession.extend,/api/rpc/studentSession/extend,Bearer plus service authorization,
+teacherProgress.listStudents,/api/rpc/teacherProgress/listStudents,Bearer plus service authorization,"academyId, classId"
+teacherProgress.getStudentDetail,/api/rpc/teacherProgress/getStudentDetail,Bearer plus service authorization,"academyId, classId, membershipId"
+teacherProgress.listAttempts,/api/rpc/teacherProgress/listAttempts,Bearer plus service authorization,"academyId, classId, membershipId, materialId"
+teacherProgress.listCurriculum,/api/rpc/teacherProgress/listCurriculum,Bearer plus service authorization,"academyId, classId"
+teacherProgress.listCourseOutline,/api/rpc/teacherProgress/listCourseOutline,Bearer plus service authorization,"academyId, classId, courseId"
+teacherProgress.listLectureProblems,/api/rpc/teacherProgress/listLectureProblems,Bearer plus service authorization,"academyId, classId, lectureId"
+teacherProgress.listProblemStudents,/api/rpc/teacherProgress/listProblemStudents,Bearer plus service authorization,"academyId, classId, materialId"
+teacherProgress.getSubmissionReview,/api/rpc/teacherProgress/getSubmissionReview,Bearer plus service authorization,"academyId, classId, membershipId, submissionId"
+academyOperationsOverview.get,/api/rpc/academyOperationsOverview/get,Bearer plus service authorization,academyId
+academyOperationsProfile.update,/api/rpc/academyOperationsProfile/update,Bearer plus service authorization,"academyId, addressLine1, addressLine2, locality, region, postalCode, countryCode, contactPhone, contactEmail, timeZone"
+academyPeople.list,/api/rpc/academyPeople/list,Bearer plus service authorization,academyId
+academyPeople.students,/api/rpc/academyPeople/students,Bearer plus service authorization,academyId
+academyPeople.staff,/api/rpc/academyPeople/staff,Bearer plus service authorization,academyId
+academyPeople.student,/api/rpc/academyPeople/student,Bearer plus service authorization,"academyId, membershipId"
+academyPeople.staffMember,/api/rpc/academyPeople/staffMember,Bearer plus service authorization,"academyId, membershipId"
+academyPeopleImport.get,/api/rpc/academyPeopleImport/get,Bearer plus service authorization,"academyId, sessionId"
+academyPeopleImport.commit,/api/rpc/academyPeopleImport/commit,Bearer plus service authorization,"academyId, sessionId, peopleRevision"
+academyPeopleImport.result,/api/rpc/academyPeopleImport/result,Bearer plus service authorization,"academyId, sessionId"
+academyPeopleBulk.preview,/api/rpc/academyPeopleBulk/preview,Bearer plus service authorization,"academyId, selection, options"
+academyPeopleBulk.run,/api/rpc/academyPeopleBulk/run,Bearer plus service authorization,"academyId, selection, options, idempotencyKey, peopleRevision"
+academyInvitationDelivery.list,/api/rpc/academyInvitationDelivery/list,Bearer plus service authorization,academyId
+academyInvitationDelivery.resend,/api/rpc/academyInvitationDelivery/resend,Bearer plus service authorization,"academyId, invitationId"
+academyCurriculumOverview.get,/api/rpc/academyCurriculumOverview/get,Bearer plus service authorization,academyId
+academyTeacherOverview.get,/api/rpc/academyTeacherOverview/get,Bearer plus service authorization,academyId
+academyTeacherStudents.list,/api/rpc/academyTeacherStudents/list,Bearer plus service authorization,academyId
+academyTeacherStudents.roster,/api/rpc/academyTeacherStudents/roster,Bearer plus service authorization,academyId

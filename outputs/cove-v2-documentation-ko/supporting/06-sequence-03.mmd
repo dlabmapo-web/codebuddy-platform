@@ -1,0 +1,29 @@
+sequenceDiagram
+    actor S as 학생
+    participant W as 문제 작업 공간
+    participant A as 제출 API
+    participant DB as PostgreSQL
+    participant Q as 채점 큐 및 워커
+    participant P as 웹 SSE 프록시
+    S->>W: 선택한 반에서 현재 코드 제출
+    W->>A: learn.submit(academyId, classId, materialId, code)
+    A->>A: 사용자, 임대, 역할, 요청 제한 및 접근 경로 검사
+    A->>DB: 코드·테스트·표시 이름·리비전을 트랜잭션으로 고정
+    alt 진행 중 시도 또는 잘못된 범위
+      DB-->>A: 충돌 또는 유효성 검사 실패
+      A-->>W: 도메인 오류
+    else 접수 완료
+      DB-->>A: submissionId
+      A->>Q: submissionId 큐 등록
+      A-->>W: submissionId 및 totalCount
+      W->>P: 본인 제출 스트림 열기
+      P->>A: Bearer 및 학원 맥락 전달
+      A->>A: 스트림 연결 전에 소유권 확인
+      Q->>DB: 불변 채점 스냅샷 조회
+      Q->>Q: 실행 제한 내 테스트 실행
+      Q->>DB: 판정 및 진도 저장
+      Q-->>A: 큐 진행·완료 이벤트
+      A-->>P: SSE progress/result
+      P-->>W: 이벤트 전달
+      W-->>S: 판정 및 안전한 테스트 상세
+    end

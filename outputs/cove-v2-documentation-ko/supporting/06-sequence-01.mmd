@@ -1,0 +1,18 @@
+sequenceDiagram
+    actor U as 계정 소유자
+    participant W as Next.js 인증 액션
+    participant A as Cove API
+    participant S as Supabase Auth
+    U->>W: ID, 비밀번호 및 보안 확인
+    W->>A: auth.resolveSignInEmail(identifier)
+    A-->>W: 확인된 주소 또는 존재 여부를 숨긴 주소
+    W->>S: 비밀번호 로그인
+    alt 잘못된 자격 증명
+      S-->>W: 인증 실패
+      W-->>U: 일반 로그인 오류
+    else 유효한 자격 증명
+      S-->>W: 세션
+      W->>A: 인증 계정·bootstrap 요청
+      A-->>W: 계정 및 학원 멤버십
+      W-->>U: 권한 있는 시작 화면과 보유 역할 탐색
+    end

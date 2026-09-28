@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor L as 커리큘럼 작성자
+    participant W as 가져오기 마법사
+    participant A as 가져오기 API
+    participant DB as PostgreSQL
+    L->>W: 통합 문서 선택
+    W->>A: academyId·courseId와 원시 바이트 POST
+    A->>A: 인증·권한·파일 한도·유효성 검사
+    A->>DB: 미리보기와 콘텐츠 리비전 저장
+    A-->>W: 미리보기 및 행별 진단
+    alt 잘못된 통합 문서
+      W-->>L: 확정 전 오류 수정
+    else 유효한 미리보기
+      L->>W: 검토한 가져오기 확정
+      W->>A: 멱등 맥락으로 세션 확정
+      A->>DB: 강좌 잠금 및 리비전 비교
+      alt 미리보기 이후 강좌 변경
+        A-->>W: 오래된 미리보기 충돌
+      else 현재 리비전 일치
+        A->>DB: 키 기반 변경을 트랜잭션 적용하고 리비전 증가
+        A-->>W: 확정 결과
+        W-->>L: 가져오기 결과
+      end
+    end

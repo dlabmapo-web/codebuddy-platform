@@ -1,0 +1,32 @@
+sequenceDiagram
+    actor T as 배정 강사
+    participant TW as 강사 브라우저
+    participant G as 모니터링 게이트웨이
+    participant A as 모니터링 권한 검사
+    participant SW as 학생 브라우저
+    participant DB as 영속 저장소
+    T->>TW: 권한 있는 학생 맥락 열기
+    TW->>G: student.watch.start
+    G->>A: 기능·강사 역할·배정·실시간 관찰 검사
+    alt 권한 없음 또는 플랫폼 권한만 보유
+      A-->>G: 접근 거절
+      G-->>TW: 실패 확인 응답
+    else 권한 확인 완료
+      G->>DB: 모니터링 방문 기록
+      G-->>TW: watch.started 및 현재 맥락
+      SW->>G: document.update / presence.publish
+      G-->>TW: 허용된 문서·접속 상태 변경
+      opt 협업 모드 허용 시
+        TW->>G: student.watch.mode 후 document.update
+        G-->>SW: 허용된 협업 변경
+      end
+      G->>DB: 확인된 문서 상태 저장
+      G-->>TW: document.persisted
+      alt 배정·역할·수강 등록·기능 권한 철회
+        G->>A: 접근 재검증
+        G-->>TW: watch.ended / 접근 철회
+      else 강사 퇴장
+        TW->>G: student.watch.stop
+        G->>DB: 방문 종료
+      end
+    end

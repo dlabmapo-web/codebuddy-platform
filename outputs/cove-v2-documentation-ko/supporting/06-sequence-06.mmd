@@ -1,0 +1,27 @@
+sequenceDiagram
+    actor S as 학생
+    actor T as 배정 강사
+    participant A as 도움 요청 API
+    participant DB as PostgreSQL
+    participant N as 실시간 알림
+    S->>A: monitoring.requestHelp(반·자료)
+    A->>A: 본인 학생 및 반 맥락 확인
+    A->>DB: WAITING 요청 생성 및 처리 기록 저장
+    A->>N: help.request.changed
+    N-->>T: 갱신된 반 대기열
+    T->>A: monitoring.claimHelpRequest
+    A->>A: 강사 배정 검사
+    A->>DB: 원자적 상태·버전 전이
+    alt 동시 담당 또는 오래된 버전
+      A-->>T: 충돌
+    else 담당 성공
+      DB-->>A: 강사 소유자와 IN_PROGRESS
+      A->>N: 갱신된 요청
+      T->>A: 요청 해결 또는 반환
+      A->>DB: RESOLVED 또는 WAITING
+      A->>N: 갱신된 요청
+    end
+    opt 학생이 적격 본인 요청 취소 시
+      S->>A: monitoring.cancelMyHelpRequest
+      A->>DB: 소유권·상태 검사 후 CANCELLED
+    end

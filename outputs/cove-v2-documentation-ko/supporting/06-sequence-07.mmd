@@ -1,0 +1,17 @@
+sequenceDiagram
+    actor M as 학원 커리큘럼 담당
+    participant W as 라이브러리 화면
+    participant A as 라이브러리 서비스
+    participant DB as PostgreSQL
+    M->>W: 도입할 라이브러리 강좌 선택
+    W->>A: 학원 라이브러리 도입 명령
+    A->>A: 대상 학원 권한 및 원본 이용 가능 여부 검사
+    alt 사용 중단 또는 이용 불가 원본
+      A-->>W: 도입 거절
+    else 이용 가능
+      A->>DB: 트랜잭션으로 커리큘럼 계층 복사
+      A->>DB: sourceCourseId 및 원본·기준 리비전 저장
+      DB-->>A: 학원 복사본
+      A-->>W: 새 강좌 참조
+      W-->>M: 도입한 강좌 열기
+    end

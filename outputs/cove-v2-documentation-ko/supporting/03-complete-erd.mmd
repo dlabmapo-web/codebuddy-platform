@@ -1,0 +1,385 @@
+erDiagram
+  User {
+    String id
+    String authUserId
+    String avatarAssetId
+    String legacyUserId
+  }
+  MediaAsset |o--o{ User : "avatarAsset"
+  MediaAsset {
+    String id
+    String uploaderUserId
+  }
+  User ||--o{ MediaAsset : "uploader"
+  AcademyMemberProfile {
+    String membershipId
+    String avatarAssetId
+  }
+  AcademyMembership ||--o| AcademyMemberProfile : "membership"
+  MediaAsset |o--o{ AcademyMemberProfile : "avatarAsset"
+  StudentAcademyProfile {
+    String membershipId
+    String academyId
+  }
+  AcademyMembership ||--o| StudentAcademyProfile : "membership"
+  StaffAcademyProfile {
+    String membershipId
+    String academyId
+  }
+  AcademyMembership ||--o| StaffAcademyProfile : "membership"
+  Organization {
+    String id
+  }
+  Academy {
+    String id
+    String organizationId
+    String createdByUserId
+  }
+  Organization ||--o{ Academy : "organization"
+  User |o--o{ Academy : "createdBy"
+  AcademyFeatureFlag {
+    String academyId
+  }
+  Academy ||--o{ AcademyFeatureFlag : "academy"
+  OAuthOnboardingIntent {
+    String id
+    String academyId
+    String consumedByAuthUserId
+  }
+  Academy ||--o{ OAuthOnboardingIntent : "academy"
+  AcademySlugHistory {
+    String slug
+    String academyId
+  }
+  Academy ||--o{ AcademySlugHistory : "academy"
+  AcademyMembership {
+    String id
+    String academyId
+    String userId
+    String invitedByUserId
+    String approvedByUserId
+  }
+  Academy ||--o{ AcademyMembership : "academy"
+  User ||--o{ AcademyMembership : "user"
+  User |o--o{ AcademyMembership : "invitedBy"
+  User |o--o{ AcademyMembership : "approvedBy"
+  AcademyMembershipRole {
+    String id
+    String membershipId
+    String grantedByUserId
+  }
+  AcademyMembership ||--o{ AcademyMembershipRole : "membership"
+  User |o--o{ AcademyMembershipRole : "grantedBy"
+  StudentIssuedCredential {
+    String id
+    String userId
+    String academyId
+    String issuedByUserId
+  }
+  User ||--o| StudentIssuedCredential : "user"
+  Academy ||--o{ StudentIssuedCredential : "academy"
+  User ||--o{ StudentIssuedCredential : "issuedBy"
+  AcademyInvitation {
+    String id
+    String academyId
+    String invitedByUserId
+    String acceptedByUserId
+  }
+  Academy ||--o{ AcademyInvitation : "academy"
+  User ||--o{ AcademyInvitation : "invitedBy"
+  User |o--o{ AcademyInvitation : "acceptedBy"
+  AcademyMedia {
+    String id
+    String academyId
+    String assetId
+  }
+  Academy ||--o{ AcademyMedia : "academy"
+  MediaAsset ||--o{ AcademyMedia : "asset"
+  PeopleImportSession {
+    String id
+    String academyId
+    String actorUserId
+  }
+  Academy ||--o{ PeopleImportSession : "academy"
+  User ||--o{ PeopleImportSession : "actor"
+  ContentImportSession {
+    String id
+    String academyId
+    String courseId
+    String actorUserId
+  }
+  Academy ||--o{ ContentImportSession : "academy"
+  Course ||--o{ ContentImportSession : "course"
+  User ||--o{ ContentImportSession : "actor"
+  PeopleBulkOperation {
+    String id
+    String academyId
+    String actorUserId
+  }
+  Academy ||--o{ PeopleBulkOperation : "academy"
+  User ||--o{ PeopleBulkOperation : "actor"
+  InvitationDeliveryAttempt {
+    String id
+    String invitationId
+    String providerMessageId
+  }
+  AcademyInvitation ||--o{ InvitationDeliveryAttempt : "invitation"
+  AcademyJoinRequest {
+    String id
+    String academyId
+    String userId
+    String reviewedByUserId
+  }
+  Academy ||--o{ AcademyJoinRequest : "academy"
+  User ||--o{ AcademyJoinRequest : "user"
+  User |o--o{ AcademyJoinRequest : "reviewedBy"
+  AuditLog {
+    String id
+    String actorUserId
+    String academyId
+    String targetId
+    String requestId
+    String supportGrantId
+  }
+  User |o--o{ AuditLog : "actor"
+  Academy |o--o{ AuditLog : "academy"
+  PlatformSupportGrant |o--o{ AuditLog : "supportGrant"
+  PlatformSupportGrant {
+    String id
+    String academyId
+    String adminUserId
+    String revokedByUserId
+  }
+  Academy ||--o{ PlatformSupportGrant : "academy"
+  User ||--o{ PlatformSupportGrant : "admin"
+  User |o--o{ PlatformSupportGrant : "revokedBy"
+  PlatformOperationRun {
+    String id
+    String academyId
+    String targetId
+    String actorUserId
+    String requestId
+    String supportGrantId
+  }
+  Academy ||--o{ PlatformOperationRun : "academy"
+  User ||--o{ PlatformOperationRun : "actor"
+  Course {
+    String id
+    String academyId
+    String sourceCourseId
+    String createdByUserId
+  }
+  Academy ||--o{ Course : "academy"
+  User ||--o{ Course : "createdBy"
+  Course |o--o{ Course : "sourceCourse"
+  "Class" {
+    String id
+    String academyId
+    String createdByUserId
+    String teacherMembershipId
+  }
+  Academy ||--o{ "Class" : "academy"
+  User ||--o{ "Class" : "createdBy"
+  AcademyMembership |o--o{ "Class" : "assignedTeacher"
+  ClassAssistantTeacher {
+    String id
+    String classId
+    String membershipId
+  }
+  "Class" ||--o{ ClassAssistantTeacher : "class"
+  AcademyMembership ||--o{ ClassAssistantTeacher : "teacher"
+  ClassCourse {
+    String classId
+    String courseId
+    String assignedByUserId
+  }
+  "Class" ||--o{ ClassCourse : "class"
+  Course ||--o{ ClassCourse : "course"
+  User ||--o{ ClassCourse : "assignedBy"
+  ClassEnrollment {
+    String classId
+    String membershipId
+    String enrolledByUserId
+  }
+  "Class" ||--o{ ClassEnrollment : "class"
+  AcademyMembership ||--o{ ClassEnrollment : "membership"
+  User ||--o{ ClassEnrollment : "enrolledBy"
+  CourseModule {
+    String id
+    String courseId
+  }
+  Course ||--o{ CourseModule : "course"
+  Lecture {
+    String id
+    String courseModuleId
+  }
+  CourseModule ||--o{ Lecture : "courseModule"
+  Material {
+    String id
+    String lectureId
+  }
+  Lecture ||--o{ Material : "lecture"
+  ProgrammingExercise {
+    String materialId
+  }
+  Material ||--o| ProgrammingExercise : "material"
+  ExerciseTestCase {
+    String id
+    String exerciseMaterialId
+  }
+  ProgrammingExercise ||--o{ ExerciseTestCase : "exercise"
+  ExerciseDraft {
+    String id
+    String userId
+    String materialId
+    String sourceMaterialId
+    String courseId
+  }
+  User ||--o{ ExerciseDraft : "user"
+  Material |o--o{ ExerciseDraft : "material"
+  Course ||--o{ ExerciseDraft : "course"
+  ExerciseCollaborationDocument {
+    String draftId
+  }
+  ExerciseDraft ||--o| ExerciseCollaborationDocument : "draft"
+  Submission {
+    String id
+    String userId
+    String materialId
+    String sourceMaterialId
+    String courseId
+    String classId
+    String regradeRunId
+    String solveSessionId
+  }
+  User ||--o{ Submission : "user"
+  Material |o--o{ Submission : "material"
+  Course ||--o{ Submission : "course"
+  "Class" |o--o{ Submission : "class"
+  ExerciseSolveSession |o--o{ Submission : "solveSession"
+  PlatformOperationRun |o--o{ Submission : "regradeRun"
+  ExerciseSolveSession {
+    String id
+    String userId
+    String materialId
+    String classId
+  }
+  User ||--o{ ExerciseSolveSession : "user"
+  Material ||--o{ ExerciseSolveSession : "material"
+  "Class" |o--o{ ExerciseSolveSession : "class"
+  SubmissionGradingCase {
+    String id
+    String submissionId
+  }
+  Submission ||--o{ SubmissionGradingCase : "submission"
+  SubmissionCase {
+    String id
+    String submissionId
+  }
+  Submission ||--o{ SubmissionCase : "submission"
+  StudentExerciseProgress {
+    String id
+    String userId
+    String materialId
+  }
+  User ||--o{ StudentExerciseProgress : "user"
+  Material ||--o{ StudentExerciseProgress : "material"
+  TeacherMonitoringVisit {
+    String id
+    String academyId
+    String classId
+    String teacherMembershipId
+    String studentMembershipId
+    String materialId
+  }
+  Academy ||--o{ TeacherMonitoringVisit : "academy"
+  "Class" ||--o{ TeacherMonitoringVisit : "class"
+  AcademyMembership |o--o{ TeacherMonitoringVisit : "teacherMembership"
+  AcademyMembership |o--o{ TeacherMonitoringVisit : "studentMembership"
+  Material |o--o{ TeacherMonitoringVisit : "material"
+  TeacherFeedback {
+    String id
+    String academyId
+    String classId
+    String teacherMembershipId
+    String studentMembershipId
+    String materialId
+    String monitoringVisitId
+  }
+  Academy ||--o{ TeacherFeedback : "academy"
+  "Class" ||--o{ TeacherFeedback : "class"
+  AcademyMembership |o--o{ TeacherFeedback : "teacherMembership"
+  AcademyMembership |o--o{ TeacherFeedback : "studentMembership"
+  Material |o--o{ TeacherFeedback : "material"
+  TeacherMonitoringVisit |o--o{ TeacherFeedback : "monitoringVisit"
+  ExerciseHint {
+    String id
+    String exerciseMaterialId
+  }
+  ProgrammingExercise ||--o{ ExerciseHint : "exercise"
+  StudentCourseLearningDay {
+    String academyId
+    String membershipId
+    String courseId
+  }
+  Academy ||--o{ StudentCourseLearningDay : "academy"
+  AcademyMembership ||--o{ StudentCourseLearningDay : "membership"
+  Course ||--o{ StudentCourseLearningDay : "course"
+  StudentClassCourseLearningDay {
+    String academyId
+    String membershipId
+    String classId
+    String courseId
+  }
+  Academy ||--o{ StudentClassCourseLearningDay : "academy"
+  AcademyMembership ||--o{ StudentClassCourseLearningDay : "membership"
+  "Class" ||--o{ StudentClassCourseLearningDay : "class"
+  Course ||--o{ StudentClassCourseLearningDay : "course"
+  LearningActivityFlush {
+    String id
+    String academyId
+    String membershipId
+  }
+  ClassScheduleSlot {
+    String id
+    String classId
+  }
+  "Class" ||--o{ ClassScheduleSlot : "class"
+  PointAward {
+    String id
+    String academyId
+    String membershipId
+    String materialId
+    String lectureId
+    String moduleId
+    String courseId
+    String classId
+    String voidedByMembershipId
+  }
+  Academy ||--o{ PointAward : "academy"
+  AcademyMembership ||--o{ PointAward : "membership"
+  "Class" |o--o{ PointAward : "class"
+  StudentPointBalance {
+    String membershipId
+    String academyId
+  }
+  AcademyMembership ||--o| StudentPointBalance : "membership"
+  AcademyPointPolicy {
+    String academyId
+  }
+  Academy ||--o| AcademyPointPolicy : "academy"
+  StudentHelpRequest {
+    String id
+    String academyId
+    String classId
+    String studentMembershipId
+    String materialId
+    String teacherMembershipId
+  }
+  Academy ||--o{ StudentHelpRequest : "academy"
+  "Class" ||--o{ StudentHelpRequest : "class"
+  AcademyMembership |o--o{ StudentHelpRequest : "studentMembership"
+  AcademyMembership |o--o{ StudentHelpRequest : "teacherMembership"
+  Material |o--o{ StudentHelpRequest : "material"
+  HelpRequestReceipt {
+  }

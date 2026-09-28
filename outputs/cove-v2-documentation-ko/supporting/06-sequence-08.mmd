@@ -1,0 +1,26 @@
+sequenceDiagram
+    actor S as 학생
+    participant W as 학습 작업 공간
+    participant A as 학습 API
+    participant C as 반 맥락 결정 서비스
+    participant DB as PostgreSQL
+    S->>W: 배정 강좌 문제 열기
+    W->>A: 문제 bootstrap 조회
+    A->>C: 학원·사용자·강좌·선택 반 결정
+    C->>DB: 활성 학생 멤버십 및 해당 강좌의 활성 등록 반 조회
+    alt 적격 반 없음 또는 요청 반 부적격
+      C-->>A: COURSE_NOT_FOUND
+      A-->>W: 이용 불가
+    else 적격 반 한 개 또는 유효한 요청 반
+      C-->>A: 선택 classId 및 membershipId
+      A-->>W: 허용된 문제 및 반 맥락
+    else 선택 없이 적격 반 여러 개
+      C-->>A: 반 목록 및 null classId
+      A-->>W: 적격 선택지
+      W-->>S: 반 선택 안내
+      S->>W: 반 선택
+      W->>A: 선택 classId로 재조회
+      A->>C: 현재 자격 재검증
+      C-->>A: 유효한 반 맥락
+      A-->>W: 문제 맥락
+    end

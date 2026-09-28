@@ -53,11 +53,11 @@ Targeted lint used `eslint --no-ignore` with the changed source paths because th
 - Live Google consent, OAuth provider configuration, email delivery and recovery-link round trips were not exercised. Their application-side routes and error handling passed unit tests.
 - The full 30-minute idle expiration and multi-tab flow were not replayed in a live student browser. Session logic passed automated tests; the resume-banner placement was checked in code, not after a live idle expiration.
 - The sheet's request to create 31 named campuses is an academy-data operation, not an authentication code correction. No academy records were created or renamed. Sorting applies to campuses that actually exist.
-- Account administration, profile editing, classes, courses and exercise functionality are outside this authentication-only pass. No QA-sheet completion cells or slide completion labels were changed, and nothing was deployed during the QA pass.
+- Account administration, profile editing, classes, courses and exercise functionality are outside this authentication-only pass. Nothing was deployed during the QA pass. Login-sheet completion cells were subsequently updated as recorded below; slide completion labels were not changed.
 
 ## Follow-up source review and publication
 
-Re-read the live Google Sheet login rows A1:J41 and account-management rows A1:J51, and the Slides presentation after the user requested commits and a push. The authentication completion cells remain unchecked; slide 3 already has a development-complete label. Source completion markers were not changed during this review.
+Re-read the live Google Sheet login rows A1:J41 and account-management rows A1:J51, and the Slides presentation after the user requested commits and a push. At that review, the authentication completion cells were unchecked; slide 3 already had a development-complete label. After the user explicitly requested checking completed feedback, 18 login-sheet checkboxes in column G were set to true and verified by API readback and browser inspection: rows 2–8, 10, 12–18, 36, 38 and 40. Other rows and tabs were left unchanged.
 
 Implementation commit: `b1489a2` (`fix(auth): complete signup and session QA corrections`). This report is committed separately, and both commits are published on `fix/login-auth-qa`.
 
@@ -69,4 +69,22 @@ The feedback is **not entirely complete**:
 - Live OAuth consent and email/recovery delivery remain unverified. Passing application-side unit tests is not a claim that external provider configuration or delivery works.
 - Feedback about account administration and non-authentication features remains outside this branch's QA scope.
 
-The previously reported 369 passing tests and browser checks apply to the committed implementation; the follow-up review changed only this report.
+The previously reported 369 passing tests and browser checks apply to the committed implementation; subsequent source reviews and supplied-account retesting changed only this report.
+
+## Supplied-account browser retest
+
+Tested the supplied accounts against the deployed site and localhost with the normal CAPTCHA configuration. The user completed the initial localhost Cloudflare challenge; subsequent local challenges passed automatically.
+
+| Account | Localhost result |
+| --- | --- |
+| `cove-admin` | Password rejected. The same supplied password worked on the deployed site. |
+| `mapo-manager` | Username does not exist. |
+| `mapo-teamleader1` | Username does not exist. |
+| `mapo-teacher1` | Username does not exist. |
+| `john10` | Username does not exist. |
+
+A read-only query of the database configured for the local API confirmed that only `cove-admin` exists among these five usernames. No accounts were created and no passwords were changed. These results block successful local role-landing, session and logout verification using the supplied accounts; they do not establish a regression in the login code. Matching local test accounts or the intended QA backend configuration are required.
+
+Localhost displays the corrected login layout and the distinct unknown-username / incorrect-password messages. The deployed site still displays the earlier layout, Naver button, sidebar logout and logout confirmation dialog. Production account checks therefore do not verify deployment of this branch's fixes. No additional sheet rows were marked complete based on these account attempts.
+
+All five supplied accounts successfully signed in on the deployed site: the administrator reached `/admin/academies`; manager, team leader, teacher and student reached `/academy/dlab-mapo` with their expected role shown. Each production session was signed out after its check. This was a login/landing/logout smoke test, not a complete permissions, OAuth or idle-expiration test.

@@ -354,6 +354,7 @@ export function ApplicationsTable({
       </Panel>
 
       <ReviewModal
+        key={reviewing?.id ?? 'closed'}
         approveBlockedReason={(role, reason) =>
           // §5.4 of the onboarding design, and enforced here rather than in the
           // shared `review` procedure because it is a property of *this*

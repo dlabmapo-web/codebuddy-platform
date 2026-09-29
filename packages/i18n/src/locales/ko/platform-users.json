@@ -106,7 +106,9 @@
     "confirm_grant_title": "{{name}}을(를) 플랫폼 운영자로 지정할까요?",
     "confirm_grant_body": "Cove Studio의 모든 권한을 갖게 됩니다. 모든 아카데미와 모든 계정을 보고, 정지하거나 삭제할 수 있습니다. 동료에게만 부여하고 고객에게는 부여하지 마세요.",
     "confirm_revoke_title": "{{name}}의 플랫폼 접근 권한을 해제할까요?",
-    "confirm_revoke_body": "콘솔 접근이 즉시 사라집니다. 아카데미 소속과 역할은 그대로 유지됩니다."
+    "confirm_revoke_body": "콘솔 접근이 즉시 사라집니다. 아카데미 소속과 역할은 그대로 유지됩니다.",
+    "grant": "운영자 권한 부여",
+    "revoke": "운영자 권한 회수"
   },
   "delete": {
     "title": "{{name}}을(를) 삭제할까요?",

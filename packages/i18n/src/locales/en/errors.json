@@ -137,5 +137,7 @@
   "OPERATION_RUN_NOT_PENDING": "This run has already been started. Open it to see how far it got.",
   "OPERATION_PLAN_TOO_LARGE": "This re-grade is too large to run in one go. Contact engineering.",
   "UNKNOWN": "Something went wrong. Try again.",
-  "MONITORING_HELP_KEY_REUSED": "This request key was already used for another action. Refresh and try again."
+  "MONITORING_HELP_KEY_REUSED": "This request key was already used for another action. Refresh and try again.",
+  "PROFILE_SECURITY_CHANGE_FAILED": "The account security change could not be completed. Please try again.",
+  "PROFILE_LAST_IDENTITY_REQUIRED": "Keep at least one sign-in method connected to your account."
 }

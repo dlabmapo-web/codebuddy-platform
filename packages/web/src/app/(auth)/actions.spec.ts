@@ -487,20 +487,12 @@ describe('signupAction for a student', () => {
     expect(mocks.signUpStudent.mock.calls[0]![0]).not.toHaveProperty('email');
   });
 
-  it('signs the student in with the address the API generated', async () => {
+  it('sends a created student to login with a success notice and no automatic session', async () => {
     mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
-    mocks.signInWithPassword.mockResolvedValue({
-      data: { session: { access_token: 'token' } },
-      error: null,
-    });
-
     await signupAction({}, formData(studentFields));
-
-    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
-      email: 's-abc@no-email.cove.invalid',
-      password: 'a-valid-password',
-    });
-    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+    expect(mocks.beginStudentSession).not.toHaveBeenCalled();
+    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
   });
 
   it('reports a taken username without creating anything', async () => {
@@ -514,28 +506,7 @@ describe('signupAction for a student', () => {
     expect(mocks.signInWithPassword).not.toHaveBeenCalled();
   });
 
-  it('sends a created student to login when automatic sign-in loses the network', async () => {
-    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
-    mocks.signInWithPassword.mockRejectedValueOnce(new Error('Network unavailable'));
 
-    await signupAction({}, formData(studentFields));
-
-    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
-    expect(mocks.beginStudentSession).not.toHaveBeenCalled();
-  });
-
-  it('treats a failed sign-in as success, because the account exists', async () => {
-    // Reporting a failure here would send somebody to try again and be told
-    // the name is taken — by their own account.
-    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
-    mocks.signInWithPassword.mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
-
-    await signupAction({}, formData(studentFields));
-    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
-  });
 });
 
 describe('signupAction password confirmation', () => {

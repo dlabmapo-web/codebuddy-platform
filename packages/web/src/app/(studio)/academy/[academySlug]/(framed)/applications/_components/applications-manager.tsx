@@ -41,6 +41,7 @@ export function ApplicationsManager({
       <ApplicationsTable manager={manager} onReview={setReviewing} />
 
       <ReviewModal
+        key={reviewing?.id ?? 'closed'}
         disabled={manager.reviewPending}
         onApprove={(role, reason) => {
           if (!reviewing) return;

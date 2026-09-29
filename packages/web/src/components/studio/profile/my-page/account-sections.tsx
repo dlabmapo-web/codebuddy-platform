@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useErrorText } from '@/i18n/client/use-error-text';
 import { Info, KeyRound, Mail } from 'lucide-react';
 import { locales, type Locale } from '@cove/i18n/settings';
 import { formatDateTime } from '@cove/i18n/format';
 import {
   formatPhoneForDisplay,
   profileLocales,
+  requestEmailChangeSchema,
   type MyProfileResponse,
   type ProfileLocale,
 } from '@cove/shared';
@@ -45,7 +47,9 @@ export function AccountSections({
   profile,
   onSaved,
   globalImage,
+  onDirtyChange,
 }: {
+  onDirtyChange: (dirty: boolean) => void;
   profile: MyProfileResponse;
   onSaved: (response: MyProfileResponse) => void;
   globalImage: {
@@ -55,14 +59,17 @@ export function AccountSections({
     onRemove: () => void;
   } | null;
 }) {
+  const [accountDirty, setAccountDirty] = useState(false);
+  const [preferencesDirty, setPreferencesDirty] = useState(false);
+  useEffect(() => onDirtyChange(accountDirty || preferencesDirty), [accountDirty, preferencesDirty, onDirtyChange]);
   return (
     <>
       {globalImage ? (
         <GlobalPhotoSection image={globalImage} profile={profile} />
       ) : null}
-      <AccountSection onSaved={onSaved} profile={profile} />
-      <PreferencesSection onSaved={onSaved} profile={profile} />
-      <SecuritySection profile={profile} />
+      <AccountSection onDirtyChange={setAccountDirty} onSaved={onSaved} profile={profile} />
+      <PreferencesSection onDirtyChange={setPreferencesDirty} onSaved={onSaved} profile={profile} />
+      <SecuritySection onSaved={onSaved} profile={profile} />
     </>
   );
 }
@@ -117,7 +124,9 @@ function GlobalPhotoSection({
 function AccountSection({
   profile,
   onSaved,
+  onDirtyChange,
 }: {
+  onDirtyChange: (dirty: boolean) => void;
   profile: MyProfileResponse;
   onSaved: (response: MyProfileResponse) => void;
 }) {
@@ -140,6 +149,8 @@ function AccountSection({
       [onSaved],
     ),
   );
+
+  useEffect(() => onDirtyChange(section.dirty), [section.dirty, onDirtyChange]);
 
   return (
     <SectionCard
@@ -195,7 +206,9 @@ function AccountSection({
 function PreferencesSection({
   profile,
   onSaved,
+  onDirtyChange,
 }: {
+  onDirtyChange: (dirty: boolean) => void;
   profile: MyProfileResponse;
   onSaved: (response: MyProfileResponse) => void;
 }) {
@@ -230,6 +243,8 @@ function PreferencesSection({
 
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+  useEffect(() => onDirtyChange(section.dirty), [section.dirty, onDirtyChange]);
+
   return (
     <SectionCard
       description={t('section.preferences.description')}
@@ -257,7 +272,7 @@ function PreferencesSection({
               ))}
           </select>
         </Field>
-        <Field htmlFor="profile-theme" label={t('field.theme')}>
+        <Field htmlFor="profile-theme" label={t('field.theme')} help={t('field.theme_help')}>
           {/* Applied immediately and not part of the save: a theme you have to
               confirm is a theme you evaluate in the wrong colours. */}
           <select
@@ -305,12 +320,12 @@ const selectClass =
 /**
  * Credentials, and only what Cove can genuinely do about them today.
  *
- * Password and email changes go straight to Supabase Auth, which owns the
- * identity: a Cove endpoint in front of them would add a hop and no authority.
+ * Supabase owns credentials. Email and identity changes pass through Cove
+ * to validate and audit the request before contacting the provider.
  * Session revocation and phone verification are not built yet, so they are
  * stated as facts rather than rendered as controls that do nothing.
  */
-function SecuritySection({ profile }: { profile: MyProfileResponse }) {
+function SecuritySection({ profile, onSaved }: { profile: MyProfileResponse; onSaved: (response: MyProfileResponse) => void }) {
   const { t } = useTranslation('profile');
   const locale = useLocale();
   const { security } = profile;
@@ -334,15 +349,7 @@ function SecuritySection({ profile }: { profile: MyProfileResponse }) {
         </p>
       )}
 
-      <ReadOnlyField
-        emptyLabel={t('security.providers_none')}
-        label={t('security.providers')}
-        value={
-          security.connectedProviders.length > 0
-            ? security.connectedProviders.join(', ')
-            : null
-        }
-      />
+      <SocialConnections profile={profile} onSaved={onSaved} />
 
       <div className="space-y-2 rounded-lg border border-border bg-muted/60 px-4 py-3">
         <p className="flex gap-2.5 text-[13.5px] leading-[1.6] text-sub">
@@ -366,6 +373,33 @@ function SecuritySection({ profile }: { profile: MyProfileResponse }) {
   );
 }
 
+function SocialConnections({ profile, onSaved }: { profile: MyProfileResponse; onSaved: (response: MyProfileResponse) => void }) {
+  const { t } = useTranslation('profile');
+  const errorText = useErrorText();
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const providers = profile.security.connectedProviders;
+  const canUnlink = profile.security.hasPasswordIdentity || providers.length > 1;
+  return <div className="space-y-2">
+    <p className="text-[13px] font-bold">{t('security.providers')}</p>
+    {providers.length === 0 ? <p className="text-sub">{t('security.providers_none')}</p> : providers.map(provider => (
+      <div key={provider} className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+        <span>{provider}</span>
+        <Button size="sm" variant="outline" disabled={pending !== null || !canUnlink} onClick={async () => {
+          if (pending !== null || !canUnlink) return;
+          setPending(provider);
+          setError(null);
+          try { onSaved(await orpc.profile.unlinkProvider({ provider })); }
+          catch (cause) { setError(cause); }
+          finally { setPending(null); }
+        }}>{t('security.unlink_provider', { provider })}</Button>
+      </div>
+    ))}
+    {providers.length > 0 && !canUnlink ? <p className="text-[13px] text-sub">{t('security.keep_identity')}</p> : null}
+    {error ? <p role="alert" className="text-danger">{errorText(error)}</p> : null}
+  </div>;
+}
+
 function EmailControl({
   email,
   verified,
@@ -380,19 +414,25 @@ function EmailControl({
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
 
+  const normalizedEmail = next.trim().toLowerCase();
+  const valid = requestEmailChangeSchema.safeParse({ email: normalizedEmail }).success && normalizedEmail !== email?.toLowerCase();
+
   async function submit() {
+    if (pending || !valid) return;
     setPending(true);
     setFailed(false);
-    const { error } = await createClient().auth.updateUser({ email: next });
-    setPending(false);
-    if (error) {
+    setMessage(null);
+    try {
+      await orpc.profile.requestEmailChange({ email: normalizedEmail });
+      setMessage(t('security.email_sent', { email: normalizedEmail }));
+      setOpen(false);
+      setNext('');
+    } catch {
       setFailed(true);
       setMessage(t('security.email_failed'));
-      return;
+    } finally {
+      setPending(false);
     }
-    setMessage(t('security.email_sent', { email: next }));
-    setOpen(false);
-    setNext('');
   }
 
   return (
@@ -445,7 +485,7 @@ function EmailControl({
             </Field>
           </div>
           <Button
-            disabled={pending || next.length < 5}
+            disabled={pending || !valid}
             onClick={() => void submit()}
             size="sm"
             type="button"
@@ -560,7 +600,7 @@ function PasswordControl() {
               value={currentPassword}
             />
           </Field>
-          <FieldRow>
+          <div className="grid gap-3">
             <Field
               htmlFor="profile-new-password"
               label={t('security.new_password')}
@@ -587,7 +627,7 @@ function PasswordControl() {
                 value={confirmation}
               />
             </Field>
-          </FieldRow>
+          </div>
           <Button
             disabled={
               pending ||

@@ -273,7 +273,7 @@ function OperatorDialog({
               type="submit"
               variant={granting ? 'default' : 'danger'}
             >
-              {pending ? t('role_change.working') : t('role_change.confirm')}
+              {pending ? t('role_change.working') : t(granting ? 'operator.grant' : 'operator.revoke')}
             </Button>
           </div>
         </form>

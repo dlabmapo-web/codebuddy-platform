@@ -6,6 +6,8 @@ export const appErrorCodes = [
   "STUDENT_SESSION_EXPIRED",
   "STUDENT_SESSION_UNAVAILABLE",
   "PROFILE_INCOMPLETE",
+  "PROFILE_SECURITY_CHANGE_FAILED",
+  "PROFILE_LAST_IDENTITY_REQUIRED",
   "USER_SUSPENDED",
   "EMAIL_VERIFICATION_REQUIRED",
   "ACADEMY_NOT_FOUND",
@@ -189,6 +191,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",
   STUDENT_SESSION_UNAVAILABLE:
     "Student sessions are temporarily unavailable. Sign in again shortly.",
+  PROFILE_SECURITY_CHANGE_FAILED: "The account security change could not be completed. Please try again.",
+  PROFILE_LAST_IDENTITY_REQUIRED: "Keep at least one sign-in method connected to your account.",
   PROFILE_INCOMPLETE: "Complete your profile to continue.",
   USER_SUSPENDED: "This account is suspended.",
   EMAIL_VERIFICATION_REQUIRED: "Verify your email to continue.",

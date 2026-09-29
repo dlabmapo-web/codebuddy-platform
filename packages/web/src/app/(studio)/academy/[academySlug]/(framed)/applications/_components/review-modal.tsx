@@ -1,7 +1,7 @@
 'use client';
 
 import type { AcademyRole, JoinRequestKind } from '@cove/shared';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { RequestedKindBadge } from '@/components/studio/role-badge';
@@ -63,6 +63,7 @@ export function ReviewModal({
   const { t } = useLayoutTranslation(['applications', 'common']);
   const [role, setRole] = useState<AcademyRole>('STUDENT');
   const [reason, setReason] = useState('');
+  const reasonHintId = useId();
 
   if (!request) return null;
   if (!roles.includes(role)) {
@@ -158,6 +159,7 @@ export function ReviewModal({
               </span>
             </span>
             <textarea
+              aria-describedby={reasonHintId}
               className="min-h-20 w-full resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-[15px] leading-6 outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20"
               maxLength={2000}
               onChange={(event) => setReason(event.target.value)}
@@ -165,6 +167,9 @@ export function ReviewModal({
               value={reason}
             />
           </label>
+          <p id={reasonHintId} className="text-[13px] text-sub">
+            {t('reject_needs_reason')}
+          </p>
         </div>
 
         {blocked ? (
@@ -188,7 +193,7 @@ export function ReviewModal({
             className="h-11 rounded-lg border border-danger/40 bg-card px-4 text-[14.5px] font-bold text-danger transition-colors hover:bg-danger/5 disabled:opacity-40"
             disabled={disabled || !reason.trim()}
             onClick={() => onReject(reason)}
-            title={reason.trim() ? undefined : t('reject_needs_reason')}
+            aria-describedby={reasonHintId}
             type="button"
           >
             {t('reject')}

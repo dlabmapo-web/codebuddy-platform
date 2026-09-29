@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { oc } from "@orpc/contract";
 
 import {
@@ -5,6 +6,7 @@ import {
   getAcademyProfileSchema,
   getManagedAcademyProfileSchema,
   myProfileResponseSchema,
+  requestEmailChangeSchema,
   removeAcademyImageSchema,
   removeGlobalImageSchema,
   updateGlobalProfileSchema,
@@ -24,6 +26,8 @@ import { emptyInputSchema } from "./common.contract.js";
  * everywhere.
  */
 export const profileContract = {
+  requestEmailChange: oc.input(requestEmailChangeSchema).output(z.object({ requested: z.literal(true) })),
+  unlinkProvider: oc.input(z.object({ provider: z.string().min(1).max(64).regex(/^[a-z0-9_]+$/) })).output(myProfileResponseSchema),
   getMe: oc.input(emptyInputSchema).output(myProfileResponseSchema),
   updateGlobalProfile: oc
     .input(updateGlobalProfileSchema)

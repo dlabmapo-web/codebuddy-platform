@@ -338,8 +338,7 @@ function signupInvalidMessage(
  * The account is made by the API rather than by this session's Supabase
  * client, because Supabase requires an address and the one Cove generates must
  * not be something the browser chooses. What comes back is that generated
- * address, used here for one thing only: signing the student in immediately,
- * so a child never sees a form that succeeded and left them on it.
+ * address. After creation, the student signs in using their chosen username.
  *
  * There is no "check your email" branch. There is no email.
  */
@@ -353,9 +352,8 @@ async function signUpStudent(
   captchaToken: string | undefined,
   t: SignupTranslate,
 ): Promise<AuthFormState> {
-  let email: string;
   try {
-    ({ email } = await createServerORPCClient(
+    await createServerORPCClient(
       undefined,
       await clientAddress(),
     ).auth.signUpStudent({
@@ -364,7 +362,7 @@ async function signUpStudent(
       password: input.password,
       academyId: input.academyId,
       ...(captchaToken ? { captchaToken } : {}),
-    }));
+    });
   } catch (error) {
     const { code } = toApiError(error);
     return {
@@ -380,23 +378,8 @@ async function signUpStudent(
     };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password: input.password,
-  }).catch(() => ({ data: { session: null }, error: true }));
-  // The account exists even if automatic sign-in fails. Send the student to
-  // login with a success notice instead of leaving a completed signup form
-  // on screen, where retrying would report their own username as taken.
-  if (error || !data.session) {
-    return redirect('/login?signup=success', RedirectType.replace);
-  }
-
-  await beginStudentSession(data.session.access_token);
-  redirect(
-    (await cookies()).has('cove_invitation') ? '/invite' : '/welcome',
-    RedirectType.replace,
-  );
+  // No email confirmation is needed. Keep any invitation cookie for login.
+  redirect('/login?signup=success', RedirectType.replace);
 }
 
 /**

@@ -196,6 +196,16 @@
       "exercise_solution": {
         "viewed": "Model solution viewed"
       }
+    },
+    "profile": {
+      "email": {
+        "change_requested": "Email change requested",
+        "change_sent": "Email change confirmation sent"
+      },
+      "identity": {
+        "unlink_requested": "Social account disconnect requested",
+        "unlinked": "Social account disconnected"
+      }
     }
   }
 }

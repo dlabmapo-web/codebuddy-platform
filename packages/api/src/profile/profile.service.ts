@@ -6,6 +6,7 @@ import {
   type ProfileLocale,
 } from "@cove/shared";
 
+import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { AppException } from "../common/app-exception.js";
@@ -37,7 +38,38 @@ export class ProfileService {
     private readonly prisma: PrismaService,
     private readonly media: ProfileMediaService,
     private readonly supabaseAuth: SupabaseAuthService,
+    private readonly audit: AuditService,
   ) {}
+
+  async requestEmailChange(identity: SupabaseIdentity, token: string, email: string) {
+    const user = await this.requireUser(identity);
+    await this.audit.write(this.prisma, {
+      actorUserId: user.id, academyId: null, targetType: "User", targetId: user.id,
+      action: "profile.email.change_requested",
+    });
+    await this.supabaseAuth.requestEmailChange(token, email);
+    // This records dispatch, not verification. The old address stays in Cove
+    // until a verified identity is observed by the existing bootstrap flow.
+    await this.audit.write(this.prisma, {
+      actorUserId: user.id, academyId: null, targetType: "User", targetId: user.id,
+      action: "profile.email.change_sent",
+    });
+    return { requested: true as const };
+  }
+
+  async unlinkProvider(identity: SupabaseIdentity, token: string, provider: string) {
+    const user = await this.requireUser(identity);
+    await this.audit.write(this.prisma, {
+      actorUserId: user.id, academyId: null, targetType: "User", targetId: user.id,
+      action: "profile.identity.unlink_requested", after: { provider },
+    });
+    await this.supabaseAuth.unlinkProvider(token, identity.authUserId, provider);
+    await this.audit.write(this.prisma, {
+      actorUserId: user.id, academyId: null, targetType: "User", targetId: user.id,
+      action: "profile.identity.unlinked", after: { provider },
+    });
+    return this.getMe(identity);
+  }
 
   async getMe(identity: SupabaseIdentity): Promise<MyProfileResponse> {
     const user = await this.requireUser(identity);

@@ -30,15 +30,38 @@ Branch: `fix/login-auth-qa`. Development verification only; no production deploy
 - Final web regression subsets: 83 authentication/draft/collaboration checks and 10 live-result checks passed. API, web and judge-worker typechecks passed. Targeted web lint has no errors (three existing auth-file ignore warnings).
 - i18n: 122 passed; catalog extraction reported no stale keys or copy markers.
 
-## Browser acceptance still required
+## Browser follow-up: September 30, 2026
 
-Chrome repeatedly timed out or displayed a blank renderer; an independent Safari session also stalled at the loading screen. The user was asked to reconnect Chrome and complete any login security check. Do not equate the service-level checks with completed paired-browser acceptance.
+The user signed in as `cove-student` in Chrome and `cove-teacher` in Safari. The following checks were performed through browser UI against localhost and the development database, after the implementation commits were pushed.
 
-- **19 and 27:** existing presence recovery and cursor regressions pass; paired teacher/student browser acceptance remains pending.
-- **43:** authoring and real grading/progress verified; complete native learner interaction/reload/history acceptance remains pending.
-- **44:** Elice grading reference inspected and the integrated grading tests pass; final localhost authoring/run/result browser comparison remains pending.
+### Slide 43 — learner acceptance passed
 
-No new deck completion markers were added for these pending browser checks.
+- Empty selection disables submission; only one radio choice can be selected.
+- Submitted the first (wrong) choice: Incorrect, 0/100, correct choice 2 and the explanation displayed; choices lock after grading.
+- Retried, selected the second choice, then reloaded: that draft choice was restored.
+- Submitted the correct choice: Correct, 100/100.
+- Navigated Previous into the Python workspace and Next back into the quiz; the saved quiz choice survived and the course outline showed the quiz as Solved.
+- Answer records listed both new attempts. Opening the earlier wrong attempt showed its original selected first choice and 0 score, rather than the later correct answer.
+- Browser attempts: wrong `02302db9-56b7-4802-b98e-c17fb80cf810`; correct `cbfe636d-448e-4615-a594-5b84094cbba3`.
+
+### Slide 44 — learner grading comparison passed; authoring acceptance pending
+
+- Inspected the signed-in Elice CH04 problem 5 grader UI and its five methods: exact, contains, does-not-contain, regex match and regex non-match. It showed two 50-point cases, inputs/expectations 42 and 29, with contains and does-not-contain respectively, and 60-second per-case limits. No Elice Save was clicked.
+- Opened matching localhost material `f7312054-4ebf-4e6d-9cbe-2f817bfd2afd` in Manual Testing Class.
+- Test run of the correct solution printed 42 for the public sample. The browser clearly deferred rule-based grading to submission.
+- Correct conditional solution: Accepted, 100/100, 2/2 cases.
+- `print(input())`: Not accepted, 50/100, 1/2 cases.
+- `print(29)`: Not accepted, 0/100, 0/2 cases; public expected/actual output was visible, while the hidden case showed a verdict only.
+- Re-entered the original correct solution in the test account's editor after testing; post-restart persistence was not rechecked because the browser debugger disconnected.
+- This is a browser check of the contains/non-contains reference fixture, not a new browser parity run of all five comparators. The automated comparator coverage is listed above.
+
+### Remaining teacher-session blocker
+
+Safari initially showed the authenticated teacher overview, but its My classes route then stalled on Loading or a blank renderer. Refreshing, opening a fresh tab, restarting the local web server, and restarting Safari/restoring its previous tabs did not produce a usable teacher page. The restarted web server logged a successful 200 response for the teacher classes route. A separate Chrome teacher login at 127.0.0.1 remained disabled behind its security check; it was not bypassed. The user was asked to check the visible Safari page.
+
+- **19 and 27:** paired teacher/student presence recovery and cursor acceptance remain pending. No pass is inferred from single-session behavior or automated regressions.
+- **44:** final teacher authoring-control acceptance remains pending; learner sample/run/result behavior passed as described above.
+- No new deck completion markers were added for these pending teacher-browser checks. No application code was changed during this browser follow-up, and no production deployment occurred.
 
 ## Runtime note
 

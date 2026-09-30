@@ -85,6 +85,7 @@ export function Workspace({
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [sampleResults, setSampleResults] = React.useState<SampleRun[]>([]);
   const [testingSamples, setTestingSamples] = React.useState(false);
+  const [sampleRunFailed, setSampleRunFailed] = React.useState(false);
   const sampleBatchRef = React.useRef(false);
   React.useEffect(() => () => { sampleBatchRef.current = false; }, []);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
@@ -111,7 +112,7 @@ export function Workspace({
   const formatError = usePythonErrorLines();
   const headline = usePythonErrorHeadline();
   const runner = usePythonRunner({ formatError });
-  const runSample = useSampleRunner(runner);
+  const { runSample, serverCheck } = useSampleRunner(runner);
   const navigation = useExerciseNavigation({
     academyId,
     bootstrap,
@@ -217,6 +218,15 @@ export function Workspace({
     minPx: monitoring.collaborating ? STATEMENT_CANVAS_MIN_WIDTH : undefined,
     max: STATEMENT_PANE.maxPercent,
   });
+  /**
+   * The editor's code now. A server check snapshots the code at the click,
+   * and a result that comes back after the student kept typing says so.
+   */
+  const latestCodeRef = React.useRef(draft.code);
+  React.useEffect(() => {
+    latestCodeRef.current = draft.code;
+  }, [draft.code]);
+
   const handleRunSample = React.useCallback(
     async (index: number) => {
       const sample = exercise.sampleTestCases[index];
@@ -235,12 +245,38 @@ export function Workspace({
       // One id for both halves of the report: the presence summary and the
       // mirrored terminal describe the same execution, so a teacher cannot see
       // a transcript from one run beside a verdict from another.
-      const { outcome, verdict } = await runSample(draft.code, sample, index, {
+      const { outcome, verdict, report } = await runSample(draft.code, sample, index, {
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
+        gradingMode: exercise.gradingMode,
+        // Judged on the server, by Submit's rules, where the academy has it
+        // on. Otherwise the browser runs it and says nothing it cannot back.
+        server: exercise.serverSampleChecks
+          ? {
+              academyId,
+              classId,
+              materialId: exercise.materialId,
+              workspaceRevision: exercise.gradingRevision,
+              currentCode: () => latestCodeRef.current,
+            }
+          : undefined,
       });
       setActiveSample(null);
+      // A server check that ended without judging the program — stopped,
+      // timed out, unavailable — reports as cancelled, never as a wrong answer.
+      if (report && (report.lifecycle === 'CANCELLED' || !outcome)) {
+        setSampleRunFailed(true);
+        monitoring.publishRun({
+          clientRunId,
+          lifecycle: 'CANCELLED',
+          sampleCount: exercise.sampleTestCases.length,
+          passedCount: 0,
+          output: outcome?.stdout ?? '',
+        });
+        return;
+      }
       if (!outcome || !verdict) {
+        setSampleRunFailed(true);
         monitoring.publishRun({
           clientRunId,
           lifecycle: 'CANCELLED',
@@ -255,14 +291,30 @@ export function Workspace({
       // field here a hidden case could travel in.
       monitoring.publishRun({
         clientRunId,
-        lifecycle: verdict.kind === 'match' ? 'COMPLETED' : 'FAILED',
+        // A run whose verdict is left to Submit completed; it did not fail.
+        lifecycle:
+          report?.lifecycle ??
+          (verdict.kind === 'match' || verdict.kind === 'unchecked'
+            ? 'COMPLETED'
+            : 'FAILED'),
         sampleCount: exercise.sampleTestCases.length,
-        passedCount: verdict.kind === 'match' ? 1 : 0,
+        passedCount: report?.passedCount ?? (verdict.kind === 'match' ? 1 : 0),
         output: outcome.stdout,
       });
       return { outcome, verdict };
     },
-    [draft.code, exercise.sampleTestCases, monitoring, runSample],
+    [
+      academyId,
+      classId,
+      draft.code,
+      exercise.gradingMode,
+      exercise.gradingRevision,
+      exercise.materialId,
+      exercise.sampleTestCases,
+      exercise.serverSampleChecks,
+      monitoring,
+      runSample,
+    ],
   );
 
   const handleRunAll = async () => {
@@ -270,6 +322,7 @@ export function Workspace({
     sampleBatchRef.current = true;
     setTestingSamples(true);
     setSampleResults([]);
+    setSampleRunFailed(false);
     try {
       await runSampleSequence(
         exercise.sampleTestCases.length,
@@ -293,6 +346,7 @@ export function Workspace({
    */
   const handleRun = React.useCallback(async () => {
     setSampleResults([]);
+    setSampleRunFailed(false);
     setOutputTab('terminal');
     const clientRunId = createRunId();
     monitoring.publishRun({
@@ -414,19 +468,21 @@ export function Workspace({
         // replace what is in the editor.
         void draft.flushWithoutPromoting();
         monitoring.retire();
+        serverCheck.abandon();
         runner.stop();
         runner.clear();
         submission.reset();
         setActiveSample(null);
         setRevealedHints(0);
         setSampleResults([]);
+    setSampleRunFailed(false);
         setOutputTab('terminal');
       },
     };
     return () => {
       beforeTransitionRef.current = null;
     };
-  }, [busy, draft, monitoring, runner, submission]);
+  }, [busy, draft, monitoring, runner, serverCheck, submission]);
 
   const handleNavigate = navigation.navigate;
 
@@ -602,6 +658,7 @@ export function Workspace({
                 if (draft.code === starter) return;
                 if (!window.confirm(t('workspace.reset_confirm'))) return;
                 setSampleResults([]);
+    setSampleRunFailed(false);
                 runner.clear();
                 submission.reset();
                 setOutputTab('terminal');
@@ -614,10 +671,11 @@ export function Workspace({
                 draft.resetTo(starter);
                 monitoring.replaceDocument(starter);
               }}
+              sampleRunFailed={sampleRunFailed}
               testingSamples={testingSamples}
               sampleResults={sampleResults}
               onRunAll={() => void handleRunAll()}
-              onStop={() => { sampleBatchRef.current = false; runner.stop(); }}
+              onStop={() => { sampleBatchRef.current = false; if (serverCheck.active) serverCheck.stop(); else runner.stop(); }}
               onSubmit={handleSubmit}
               activeSample={activeSample}
               code={draft.code}
@@ -633,6 +691,7 @@ export function Workspace({
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
+              serverCheck={serverCheck}
               runner={runner}
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}

@@ -33,7 +33,8 @@
     "bootstrap:dlab-mapo-staff": "tsx src/migrations/dlab-mapo-bootstrap/cli.ts",
     "bootstrap:dlab-mapo-students": "tsx src/migrations/dlab-mapo-students/cli.ts",
     "db:backfill:features": "tsx prisma/seed/backfill-academy-features.ts",
-    "db:seed:regrade": "tsx prisma/seed/regrade-fixture.ts"
+    "db:seed:regrade": "tsx prisma/seed/regrade-fixture.ts",
+    "judge:try": "tsx scripts/judge-try.mts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

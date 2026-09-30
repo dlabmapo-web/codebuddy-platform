@@ -18,6 +18,10 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import {
+  gradingSnapshotFor,
+  resolveGradingProfile,
+} from "../judge/grading-profile.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
@@ -123,6 +127,21 @@ export class SubmissionService {
             HttpStatus.NOT_FOUND,
           );
         }
+        // Admitted only if a grader exists for it. Refusing here, before an
+        // attempt is recorded, beats a submission that can only ever fail as
+        // a judge error.
+        const profile = resolveGradingProfile(exercise, exercise.testCases);
+        if (profile.kind === "unsupported") {
+          this.logger.error(
+            `material ${material.id} has an ungradable profile: ${profile.reason}`,
+          );
+          throw new AppException(
+            "GRADING_UNAVAILABLE",
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
+        const snapshot = gradingSnapshotFor(exercise, { engineVersion });
 
         await this.classContext.resolveWith(tx, {
           academyId: input.academyId,
@@ -155,9 +174,11 @@ export class SubmissionService {
             language: exercise.language,
             timeLimitMs: exercise.timeLimitMs,
             memoryLimitMb: exercise.memoryLimitMb,
+            // The whole profile, frozen: grading never reads the exercise.
+            ...snapshot.submission,
             code: input.code,
             totalCount: exercise.testCases.length,
-            engineVersion: this.config.get("PYODIDE_VERSION", { infer: true }),
+            engineVersion,
             solveSessionId: solveSession?.id ?? null,
             solveElapsedSec: solveSession
               ? solveElapsedSeconds(solveSession.startedAt, new Date())
@@ -172,14 +193,7 @@ export class SubmissionService {
             modulePosition: courseModule.position,
             lecturePosition: material.lecture.position,
             problemPosition: material.position,
-            gradingCases: {
-              create: exercise.testCases.map((testCase, index) => ({
-                position: index + 1,
-                input: testCase.input,
-                expectedOutput: testCase.expectedOutput,
-                isSample: testCase.visibility === "SAMPLE",
-              })),
-            },
+            gradingCases: { create: snapshot.cases },
           },
           select: { id: true },
         });
@@ -285,6 +299,10 @@ export class SubmissionService {
         .filter((testCase) => testCase.isSample)
         .map((testCase) => [testCase.position, testCase]),
     );
+    const weighted = submission.gradingMode !== "LEGACY_STDIO";
+    const weightByPosition = new Map(
+      submission.gradingCases.map((testCase) => [testCase.position, testCase.weight]),
+    );
 
     return {
       submissionId: submission.id,
@@ -293,6 +311,10 @@ export class SubmissionService {
       passedCount: submission.passedCount,
       totalCount: submission.totalCount,
       score: submission.score,
+      // An aborted run's partial weights are diagnostics, not a grade: shown
+      // beside a judge error they would read as a score the student earned.
+      earnedWeight: submission.gradingAborted ? null : submission.earnedWeight,
+      possibleWeight: submission.gradingAborted ? null : submission.possibleWeight,
       runtimeMs: submission.runtimeMs,
       failureReason: submission.failureReason,
       elapsedSec: Math.max(
@@ -320,6 +342,8 @@ export class SubmissionService {
           input: sample?.input ?? null,
           expectedOutput: sample?.expectedOutput ?? null,
           actualOutput: item.isSample ? item.actualOutput : null,
+          weight: weighted ? (weightByPosition.get(item.position) ?? null) : null,
+          awardedWeight: weighted ? item.awardedWeight : null,
         };
       }),
     };

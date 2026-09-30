@@ -4,7 +4,7 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 timeout_seconds="${HEALTH_TIMEOUT_SECONDS:-300}"
 deadline=$((SECONDS + timeout_seconds))
-services=(redis api judge-worker home studio mvp caddy prometheus alertmanager grafana node-exporter cadvisor)
+services=(redis api judge-sandbox judge-worker home studio mvp caddy prometheus alertmanager grafana node-exporter cadvisor)
 
 while (( SECONDS < deadline )); do
   pending=()

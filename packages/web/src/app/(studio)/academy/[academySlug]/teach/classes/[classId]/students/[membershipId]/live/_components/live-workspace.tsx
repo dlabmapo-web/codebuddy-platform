@@ -85,7 +85,8 @@ export function LiveWorkspace({
     studentMembershipId: membershipId,
   });
   const runner = usePythonRunner();
-  const runSample = useSampleRunner(runner);
+  // Local runs only: the teacher's copy never claims a server verdict.
+  const { runSample } = useSampleRunner(runner);
   const preferences = useEditorPreferences();
 
   const [outputTab, setOutputTab] = React.useState<LiveOutputTab>('you');
@@ -312,10 +313,12 @@ export function LiveWorkspace({
       if (!sample) return;
       setOutputTab('you');
       setActiveSample(index);
-      await runSample(getCode(), sample, index);
+      await runSample(getCode(), sample, index, {
+        gradingMode: liveExercise?.exercise.gradingMode,
+      });
       setActiveSample(null);
     },
-    [getCode, runSample, sampleTestCases],
+    [getCode, liveExercise, runSample, sampleTestCases],
   );
 
   // A run the teacher has not looked at is worth a dot; one they are watching

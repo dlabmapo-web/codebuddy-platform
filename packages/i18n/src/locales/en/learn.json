@@ -157,7 +157,13 @@
     "hints_description": "Open them one at a time — try the earlier ones first.",
     "hints_none_yet": "No hints opened yet.",
     "run_tests": "Test run",
-    "actual": "Actual output"
+    "actual": "Actual output",
+    "sample_rule": {
+      "STDOUT_MATCH": "Output must contain this text",
+      "STDOUT_NOMATCH": "Output must not contain this text",
+      "STDOUT_REGEX": "Output must match this pattern",
+      "STDOUT_REGEX_NOMATCH": "Output must not match this pattern"
+    }
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",
@@ -169,6 +175,7 @@
     "score": "{{score}} / 100",
     "metric_score": "Score",
     "metric_passed": "Passed",
+    "metric_points": "Points",
     "metric_runtime": "Runtime",
     "test_results": "Test results",
     "sample_case": "Sample",
@@ -232,6 +239,7 @@
     "outcome_detail": {
       "PENDING": "Waiting for the judge.",
       "PASSED": "Your output matched.",
+      "PASSED_WITH_WARNING": "Your output matched, but the program was slower than this case's time bonus threshold, so it earned reduced points.",
       "WRONG_OUTPUT": "Your output did not match the expected result.",
       "RUNTIME_ERROR": "Your program stopped with an error.",
       "TIME_LIMIT": "Your program did not finish in time.",
@@ -240,6 +248,7 @@
     },
     "outcome": {
       "PASSED": "Passed",
+      "PASSED_WITH_WARNING": "Passed with warning",
       "WRONG_OUTPUT": "Wrong output",
       "RUNTIME_ERROR": "Runtime error",
       "TIME_LIMIT": "Time limit exceeded",

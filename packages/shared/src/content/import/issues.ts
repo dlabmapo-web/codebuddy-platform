@@ -82,6 +82,12 @@ export const contentImportErrorCodes = [
   "too_many_hints",
   "tests_missing",
   "sample_test_missing",
+  /**
+   * The workbook has no columns for comparators, weights or limits, so its
+   * tests would replace a weighted problem's cases with equal, exact-output
+   * ones. Refused rather than applied: the author edits those in the editor.
+   */
+  "weighted_tests_not_importable",
 ] as const;
 export const contentImportErrorCodeSchema = z.enum(contentImportErrorCodes);
 export type ContentImportErrorCode = z.infer<

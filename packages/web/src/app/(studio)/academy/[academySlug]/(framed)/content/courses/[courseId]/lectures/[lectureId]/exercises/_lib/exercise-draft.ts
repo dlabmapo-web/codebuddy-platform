@@ -1,16 +1,51 @@
 import {
+  gradingProfileIssues,
   hasSampleTestCase,
+  legacyCaseGrading,
+  legacyGradingProfile,
+  type CaseComparator,
   type ExerciseAuthoringContext,
   type ExerciseDifficulty,
+  type ExerciseGradingProfile,
+  type GradingIssue,
   type TestCaseVisibility,
 } from '@cove/shared';
 
+/**
+ * One answer as the editor holds it.
+ *
+ * Every grading field the server stores is here, and is written back on save.
+ * An editor that only knew input, output and visibility would save a weighted
+ * problem's cases at weight 1 with the default comparator — the silent reset
+ * the contract now refuses.
+ */
 export type TestCaseDraft = {
   key: string;
   input: string;
   expectedOutput: string;
   visibility: TestCaseVisibility;
+  comparator: CaseComparator;
+  weight: number;
+  timeLimitMsOverride: number | null;
+  softTimeLimitMs: number | null;
+  softPenalty: number | null;
+  label: string;
 };
+
+/** A fresh answer, graded the way the problem's mode grades a new one. */
+export function newTestCaseDraft(
+  key: string,
+  visibility: TestCaseVisibility,
+): TestCaseDraft {
+  return {
+    key,
+    input: '',
+    expectedOutput: '',
+    visibility,
+    ...legacyCaseGrading,
+    label: '',
+  };
+}
 
 export type HintDraft = {
   key: string;
@@ -30,6 +65,7 @@ export type ExerciseDraft = {
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
   testCases: TestCaseDraft[];
+  grading: ExerciseGradingProfile;
   hints: HintDraft[];
 };
 
@@ -56,14 +92,8 @@ export function contextToDraft(
       solutionCode,
       aiFeedbackEnabled: false,
       isVisible: false,
-      testCases: [
-        {
-          key: 'new-sample',
-          input: '',
-          expectedOutput: '',
-          visibility: 'SAMPLE',
-        },
-      ],
+      testCases: [newTestCaseDraft('new-sample', 'SAMPLE')],
+      grading: legacyGradingProfile,
       hints: [],
     };
   }
@@ -84,7 +114,20 @@ export function contextToDraft(
       input: testCase.input,
       expectedOutput: testCase.expectedOutput,
       visibility: testCase.visibility,
+      comparator: testCase.comparator,
+      weight: testCase.weight,
+      timeLimitMsOverride: testCase.timeLimitMsOverride,
+      softTimeLimitMs: testCase.softTimeLimitMs,
+      softPenalty: testCase.softPenalty,
+      label: testCase.label ?? '',
     })),
+    grading: {
+      mode: exercise.grading.mode,
+      totalTimeLimitMs: exercise.grading.totalTimeLimitMs,
+      comparatorTimeLimitMs: exercise.grading.comparatorTimeLimitMs,
+      materialMaximumHundredths: exercise.grading.materialMaximumHundredths,
+      materialScorePolicy: exercise.grading.materialScorePolicy,
+    },
     hints: exercise.hints.map((hint) => ({
       key: hint.id,
       content: hint.content,
@@ -111,7 +154,14 @@ export function draftToPayload(draft: ExerciseDraft) {
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
         visibility: testCase.visibility,
+        comparator: testCase.comparator,
+        weight: testCase.weight,
+        timeLimitMsOverride: testCase.timeLimitMsOverride,
+        softTimeLimitMs: testCase.softTimeLimitMs,
+        softPenalty: testCase.softPenalty,
+        label: testCase.label.trim() || null,
       })),
+    grading: draft.grading,
     hints: draft.hints
       .filter((hint) => hint.content.trim().length > 0)
       .map((hint) => ({
@@ -150,6 +200,18 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
       optional: true,
     },
   ] as const;
+}
+
+/**
+ * What the grading settings may not say together, as the server will judge
+ * them — shown in the editor so the author fixes it before pressing Save.
+ */
+export function draftGradingIssues(draft: ExerciseDraft): GradingIssue[] {
+  const payload = draftToPayload(draft);
+  return gradingProfileIssues({
+    grading: payload.grading,
+    testCases: payload.testCases,
+  });
 }
 
 export function serializeDraft(draft: ExerciseDraft) {

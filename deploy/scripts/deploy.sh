@@ -42,7 +42,7 @@ trap rollback_on_error ERR
 "$script_dir/render-monitoring-config.sh"
 "$script_dir/preflight.sh"
 
-compose pull home studio api judge-worker migrate mvp caddy redis \
+compose pull home studio api judge-worker judge-sandbox migrate mvp caddy redis \
   prometheus alertmanager grafana node-exporter cadvisor
 compose --profile operations run --rm migrate
 compose up -d --remove-orphans

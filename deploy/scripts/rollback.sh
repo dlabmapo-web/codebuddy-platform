@@ -9,7 +9,7 @@ current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"
 install -m 600 "$previous" "$deployment_env"
 
-compose pull home studio api judge-worker mvp
+compose pull home studio api judge-worker judge-sandbox mvp
 compose up -d --remove-orphans
 "$script_dir/wait-healthy.sh"
 "$script_dir/smoke.sh"

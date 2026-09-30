@@ -18,6 +18,8 @@ function result(overrides: Partial<SubmissionResult> = {}): SubmissionResult {
     passedCount: 1,
     totalCount: 5,
     score: 20,
+    earnedWeight: null,
+    possibleWeight: null,
     runtimeMs: 4,
     failureReason: null,
     elapsedSec: 12,
@@ -37,6 +39,8 @@ const sampleCase = (over = {}) => ({
   input: '9',
   expectedOutput: 'FIZZ',
   actualOutput: 'FIZZ',
+  weight: null,
+  awardedWeight: null,
   ...over,
 });
 
@@ -156,5 +160,19 @@ describe('skippedCount and hiddenResultCount', () => {
 
   it('counts every hidden result for the results-only note', () => {
     expect(hiddenResultCount(result({ cases }))).toBe(3);
+  });
+});
+
+describe('weighted results', () => {
+  it('does not mistake a slow correct answer for the case that failed', () => {
+    // A soft-limit warning is output-correct; only its points differ. Picking
+    // it as "the failure" headed a wrong-output run with the wrong reason.
+    const cases = [
+      sampleCase({ outcome: 'PASSED_WITH_WARNING' as const }),
+      sampleCase({ position: 2, outcome: 'WRONG_OUTPUT' as const, actualOutput: 'BUZZ' }),
+    ];
+
+    expect(resultPresentation(result({ cases }), false)).toBe('wrong_output');
+    expect(firstFailedSample(result({ cases }))?.position).toBe(2);
   });
 });

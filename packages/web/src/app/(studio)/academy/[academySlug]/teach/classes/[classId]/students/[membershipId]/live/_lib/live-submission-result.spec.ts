@@ -94,6 +94,8 @@ describe('reviewAsSubmissionResult', () => {
       submissionId: S1,
       materialId: M1,
       score: 50,
+      earnedWeight: 30,
+      possibleWeight: 60,
       passedCount: 1,
       totalCount: 2,
       runtimeMs: 12,
@@ -108,7 +110,7 @@ describe('reviewAsSubmissionResult', () => {
 
     const result = reviewAsSubmissionResult(review, 'FAILED');
 
-    expect(result).toMatchObject({ submissionId: S1, materialId: M1, status: 'FAILED', score: 50, passedCount: 1, totalCount: 2 });
+    expect(result).toMatchObject({ submissionId: S1, materialId: M1, status: 'FAILED', score: 50, earnedWeight: 30, possibleWeight: 60, passedCount: 1, totalCount: 2 });
     expect(result.cases[0]).toMatchObject({ input: 'a b', expectedOutput: 'b a', actualOutput: 'a b' });
     expect(result.cases[1]).toMatchObject({ input: null, expectedOutput: null, actualOutput: null });
     expect(JSON.stringify(result)).not.toContain('SECRET');

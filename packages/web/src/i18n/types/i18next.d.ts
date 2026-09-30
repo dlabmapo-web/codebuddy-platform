@@ -1,3 +1,5 @@
+import type grading from "@cove/i18n/locales/en/grading.json";
+import type sampleCheck from "@cove/i18n/locales/en/sample-check.json";
 /**
  * Makes `t()` key-checked. English is the source of truth for the key shape,
  * so `t('nav.link.membrs')` fails `pnpm typecheck` instead of rendering the
@@ -52,6 +54,8 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common';
     resources: {
+      grading: typeof grading;
+      "sample-check": typeof sampleCheck;
       academy: typeof academy;
       applications: typeof applications;
       audit: typeof audit;

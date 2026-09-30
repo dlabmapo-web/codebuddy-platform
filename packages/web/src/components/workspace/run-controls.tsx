@@ -3,6 +3,8 @@
 import type { LearnSampleTestCase } from '@cove/shared';
 import { LoaderCircle, Play, Square } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
+
 import { useLayoutTranslation } from '@/i18n';
 
 /** Shared run controls. Students run the complete sample set; teachers can
@@ -16,8 +18,14 @@ export function RunControls({
   onRunSample,
   onRunAll,
   onStop,
+  stopping = false,
 }: {
   running: boolean;
+  /**
+   * A server check asked to stop, whose program is still finishing its
+   * bounded run. Shown rather than hidden: the slot is not free yet.
+   */
+  stopping?: boolean;
   ready: boolean;
   sampleTestCases: LearnSampleTestCase[];
   activeSample: number | null;
@@ -27,16 +35,22 @@ export function RunControls({
   onStop: () => void;
 }) {
   const { t } = useLayoutTranslation('learn');
+  const { t: tc } = useTranslation('sample-check');
 
   if (running) {
     return (
       <button
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger disabled:opacity-60"
+        disabled={stopping}
         onClick={onStop}
         type="button"
       >
-        <Square className="size-3" />
-        {t('workspace.stop')}
+        {stopping ? (
+          <LoaderCircle className="size-3 animate-spin" />
+        ) : (
+          <Square className="size-3" />
+        )}
+        {stopping ? tc('workspace.stopping') : t('workspace.stop')}
       </button>
     );
   }

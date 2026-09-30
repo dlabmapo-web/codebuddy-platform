@@ -3,6 +3,7 @@
 import type { LearnSampleTestCase } from '@cove/shared';
 import { RotateCcw, Send } from 'lucide-react';
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
@@ -28,6 +29,7 @@ export function EditorPane({
   onStop,
   sampleResults,
   testingSamples,
+  sampleRunFailed,
   onReset,
   onSubmit,
   code,
@@ -41,11 +43,13 @@ export function EditorPane({
   tab,
   onEditorMount,
   onFocusLine,
+  serverCheck,
 }: {
   onRunAll: () => void;
   onStop: () => void;
   sampleResults: SampleRun[];
   testingSamples: boolean;
+  sampleRunFailed: boolean;
   onReset: () => void;
   onSubmit: () => void;
   code: string;
@@ -62,8 +66,11 @@ export function EditorPane({
   tab: OutputTab;
   /** Puts the editor caret on the line the coach is pointing at. */
   onFocusLine?: (line: number, column: number) => void;
+  /** A sample check judged on the server, which Stop must reach too. */
+  serverCheck?: { active: boolean; stopping: boolean; stop: () => void };
 }) {
   const { t } = useLayoutTranslation('learn');
+  const { t: tc } = useTranslation('sample-check');
   const preferences = useEditorPreferences();
   const {
     size: outputHeight,
@@ -126,7 +133,8 @@ export function EditorPane({
             onRunAll={onRunAll}
             onStop={onStop}
             ready={runner.ready && !submission.submitting}
-            running={runner.running || testingSamples}
+            running={runner.running || testingSamples || Boolean(serverCheck?.active)}
+            stopping={Boolean(serverCheck?.stopping)}
             sampleTestCases={sampleTestCases}
           />
           <button type="button" disabled={testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button>
@@ -140,21 +148,28 @@ export function EditorPane({
         >
           {tab !== 'result' && (testingSamples || sampleResults.length > 0) ? (
             <div className="space-y-4 p-3 font-mono text-[12px] text-[#d4d4d4]" aria-live="polite">
-              {sampleResults.map((result, index) => (
+              {sampleResults.map((result, index) => {
+                const comparator = sampleTestCases[index]?.comparator;
+                return (
                 <section key={index} className="space-y-2 border-b border-white/10 pb-3">
                   <h3 className="font-bold">{t('workspace.sample_n', { number: index + 1 })}</h3>
                   <dl className="space-y-2">
                     <dt>{t('workspace.stdin')}</dt><dd><pre className="whitespace-pre-wrap">{sampleTestCases[index]?.input}</pre></dd>
-                    <dt>{t('workspace.expected')}</dt><dd><pre className="whitespace-pre-wrap">{sampleTestCases[index]?.expectedOutput}</pre></dd>
+                    <dt>{comparator && comparator !== 'STDOUT' ? t(`workspace.sample_rule.${comparator}`) : t('workspace.expected')}</dt><dd><pre className="whitespace-pre-wrap">{sampleTestCases[index]?.expectedOutput}</pre></dd>
                     <dt>{t('workspace.actual')}</dt><dd><pre className="whitespace-pre-wrap">{result.outcome?.stdout}</pre></dd>
                   </dl>
-                  <p className={result.verdict?.kind === 'match' ? 'text-green-400' : 'text-red-400'}>{t(result.verdict?.kind === 'match' ? 'workspace.sample_match' : result.verdict?.kind === 'mismatch' ? 'workspace.sample_mismatch' : 'workspace.sample_skipped', { number: index + 1 })}</p>
+                  <p className={result.verdict?.kind === 'match' ? 'text-green-400' : result.verdict?.kind === 'unchecked' || result.verdict?.kind === 'warning' ? 'text-amber-300' : 'text-red-400'}>
+                    {result.verdict?.kind === 'unchecked' ? tc('workspace.sample_checked_on_submit', { number: index + 1 }) : result.verdict?.kind === 'warning' ? tc('workspace.sample_check_warning', { number: index + 1 }) : t(result.verdict?.kind === 'match' ? 'workspace.sample_match' : result.verdict?.kind === 'mismatch' ? 'workspace.sample_mismatch' : 'workspace.sample_skipped', { number: index + 1 })}
+                  </p>
                   {result.outcome?.error ? (
                     <ErrorCoachPanel code={code} error={result.outcome.error} onFocusLine={onFocusLine} />
                   ) : null}
                 </section>
-              ))}
-              {testingSamples ? <p>{t('workspace.run_tests')}</p> : null}
+                );
+              })}
+              {testingSamples || sampleRunFailed ? (
+                <TerminalPanel awaitingInput={false} lines={runner.lines} onEndInput={runner.endInput} onSubmitInput={runner.submitInput} supported={runner.supported} />
+              ) : null}
             </div>
           ) : tab !== 'result' ? (<>
             <TerminalPanel

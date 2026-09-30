@@ -202,6 +202,11 @@ export type ExistingProblem = {
   starterCode: string;
   solutionCode?: string | null;
   aiFeedbackEnabled: boolean;
+  /**
+   * Absent means legacy. A weighted problem's tests carry settings the
+   * workbook has no columns for, so the plan refuses to replace them.
+   */
+  gradingMode?: "LEGACY_STDIO" | "ELICE_STDIO";
   testCases: Array<{
     position: number;
     input: string;
@@ -1101,6 +1106,11 @@ function planProblem(input: {
   const hintsChanged = current ? !sameHints(hints, current.problem.hints) : true;
 
   if (current && testsChanged) changedFields.push("test_cases");
+  if (current && testsChanged && current.problem.gradingMode === "ELICE_STDIO") {
+    issues.push(
+      error("weighted_tests_not_importable", problem.key, "Test Cases", row.rowNumber),
+    );
+  }
   if (current && hintsChanged) changedFields.push("hints");
 
   const action: ContentImportAction = !current

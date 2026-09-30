@@ -664,6 +664,8 @@ export class MonitoringService {
             starterCode: true,
             timeLimitMs: true,
             memoryLimitMb: true,
+            gradingMode: true,
+            gradingRevision: true,
             testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
             hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
           },
@@ -701,6 +703,10 @@ export class MonitoringService {
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
+        gradingMode: exercise.gradingMode,
+        gradingRevision: exercise.gradingRevision,
+        // The teacher's copy runs locally and never claims a server verdict.
+        serverSampleChecks: false,
         // Sample cases only, and hidden ones as a count. The teacher surface
         // reuses the student shape precisely so it cannot become the one place
         // a hidden expectation leaks.
@@ -710,6 +716,7 @@ export class MonitoringService {
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
+            comparator: testCase.comparator,
           })),
         hints: exercise.hints.map((hint) => ({
           position: hint.position,

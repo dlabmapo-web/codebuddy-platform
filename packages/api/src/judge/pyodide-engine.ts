@@ -1,4 +1,5 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { readProcessMemoryMb } from "./process-memory.js";
+import { spawn, type ChildProcess } from "node:child_process";
 import {
   mkdtempSync,
   readdirSync,
@@ -139,7 +140,7 @@ class RunnerProcess {
     runnerPath: string,
     pyodideDir: string,
     /** Injected so the fail-closed path is testable without breaking /proc. */
-    private readonly readRssMb: (pid: number) => number | null,
+    private readonly readMemoryMb: (pid: number) => number | null,
     /** In the sandbox, the uid this runner alone executes as. */
     private identity: RunnerIdentity | null = null,
     private readonly identities: RunnerIdentityPool | null = null,
@@ -153,7 +154,7 @@ class RunnerProcess {
         // `--permission` refuses unconditionally, so the interpreter never
         // boots. The runner removes those entry points itself instead; see
         // `lockDownHost`.
-        // A JS heap ceiling as a first bound; the parent's RSS check below is
+        // A JS heap ceiling as a first bound; the parent's memory check below is
         // what actually enforces the exercise's limit.
         "--max-old-space-size=512",
         runnerPath,
@@ -308,15 +309,15 @@ class RunnerProcess {
       // student code in its own threads, because a thread has no memory of its
       // own to measure. A process does.
       //
-      // Measured as growth from the idle interpreter, not as absolute RSS: a
+      // Measured as charged memory growth from the idle interpreter, including compressed/swapped pages, not as absolute memory: a
       // warm Pyodide is already ~170MB before the student's first statement, so
       // comparing the total against an exercise's limit would fail every
       // program on a 128MB budget and pass every one on a generous limit.
-      const baselineMb = this.rssMb();
+      const baselineMb = this.memoryMb();
       let blindSamples = 0;
       const memory = setInterval(() => {
-        const rss = this.rssMb();
-        if (rss === null) {
+        const chargedMb = this.memoryMb();
+        if (chargedMb === null) {
           // Fail closed. A measurement that cannot be taken is not a
           // measurement of zero, and continuing would run the case with no
           // ceiling at all. A process that has already exited settles through
@@ -331,7 +332,7 @@ class RunnerProcess {
           return;
         }
         blindSamples = 0;
-        if (rss - (baselineMb ?? 0) > request.memoryLimitMb) {
+        if (chargedMb - (baselineMb ?? 0) > request.memoryLimitMb) {
           exceededMemory = true;
           this.kill();
           settle();
@@ -460,11 +461,11 @@ class RunnerProcess {
     }
   }
 
-  /** Resident memory of the runner, or null when it cannot be read. */
-  private rssMb(): number | null {
+  /** Charged memory of the runner, or null when it cannot be read. */
+  private memoryMb(): number | null {
     const pid = this.child.pid;
     if (pid === undefined || this.exited !== null) return null;
-    const value = this.readRssMb(pid);
+    const value = this.readMemoryMb(pid);
     return value !== null && Number.isFinite(value) && value > 0 ? value : null;
   }
 
@@ -492,38 +493,6 @@ class RunnerProcess {
     const identity = this.identity;
     this.identity = null;
     this.identities.release(identity);
-  }
-}
-
-/**
- * Resident memory of one pid in MB, or null when it cannot be read.
- *
- * `/proc` first, because it needs nothing installed: the production image is
- * built on a slim base and `ps` comes from `procps`, which it does not
- * install. Reading a pid's own `status` is a plain file read on Linux, so the
- * limit is enforced by the same code path in development and production. The
- * `ps` branch is macOS, where `/proc` does not exist.
- */
-export function readProcessRssMb(pid: number): number | null {
-  try {
-    // VmRSS is expressed in KiB, independent of the kernel's page size.
-    const match = /^VmRSS:\s+(\d+)\s+kB$/m.exec(
-      readFileSync(`/proc/${pid}/status`, "utf8"),
-    );
-    const kb = match ? Number(match[1]) : Number.NaN;
-    if (Number.isFinite(kb) && kb > 0) return kb / 1024;
-  } catch {
-    // Not Linux, or the process is already gone.
-  }
-  try {
-    const kb = Number(
-      execFileSync("ps", ["-o", "rss=", "-p", String(pid)], {
-        encoding: "utf8",
-      }).trim(),
-    );
-    return Number.isFinite(kb) && kb > 0 ? kb / 1024 : null;
-  } catch {
-    return null;
   }
 }
 
@@ -570,7 +539,7 @@ export class PyodideExecutionEngine implements ExecutionEngine {
     version: string | undefined = process.env.PYODIDE_VERSION,
     concurrency = 1,
     spare = 1,
-    private readonly readRssMb: (pid: number) => number | null = readProcessRssMb,
+    private readonly readMemoryMb: (pid: number) => number | null = readProcessMemoryMb,
     /** Sandbox only: one uid per runner. Absent, runners share ours. */
     private readonly identities: RunnerIdentityPool | null = null,
   ) {
@@ -746,7 +715,7 @@ export class PyodideExecutionEngine implements ExecutionEngine {
     const runner = new RunnerProcess(
       this.runnerPath,
       this.pyodideDir,
-      this.readRssMb,
+      this.readMemoryMb,
       this.identities?.acquire() ?? null,
       this.identities,
     );

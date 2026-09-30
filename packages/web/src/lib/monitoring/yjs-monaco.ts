@@ -103,7 +103,11 @@ export function bindYTextToMonaco(
     // the model and the document describing different strings, which is the
     // fault this whole file is guarding against.
     repairSharedText(ytext, localOrigin);
-    model.setValue(ytext.toString());
+    // Rebinding an already synchronized editor must not reset its caret or
+    // undo history when a watch session reconnects.
+    if (model.getValue(lfPreference) !== ytext.toString()) {
+      model.setValue(ytext.toString());
+    }
     // `setValue` rebuilds the buffer and re-derives the EOL from the text it
     // was handed, so the pin belongs after it as well as before.
     model.setEOL(lfSequence);

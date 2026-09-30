@@ -1,3 +1,4 @@
+import { AppException } from "../common/app-exception.js";
 import {
   monitoringLimits,
   monitoringRooms,
@@ -186,6 +187,7 @@ function createGateway(overrides?: {
   gateway.server = server;
   return {
     gateway,
+    studentSessions,
     emissions,
     presence,
     documents,
@@ -1410,6 +1412,24 @@ describe("student movement", () => {
       });
     return { ...harness, socket, publish, prisma };
   }
+
+  it("retries presence after a temporary session-store failure without forcing a reload", async () => {
+    const { studentSessions, socket, publish, presence } = createStudent();
+    studentSessions.requireActive.mockRejectedValueOnce(new AppException("STUDENT_SESSION_UNAVAILABLE"));
+    await publish(materialId);
+    expect(socket.disconnected).toBe(false);
+    expect(presence.publish).not.toHaveBeenCalled();
+    await publish(materialId);
+    expect(presence.publish).toHaveBeenCalled();
+  });
+
+  it("still disconnects a genuinely expired student session", async () => {
+    const { studentSessions, socket, publish, presence } = createStudent();
+    studentSessions.requireActive.mockRejectedValueOnce(new AppException("STUDENT_SESSION_EXPIRED"));
+    await publish(materialId);
+    expect(socket.disconnected).toBe(true);
+    expect(presence.publish).not.toHaveBeenCalled();
+  });
 
   const movements = (emissions: Emission[]) =>
     emissions.filter(

@@ -1,3 +1,4 @@
+import { AppException } from "../common/app-exception.js";
 import { randomUUID } from "node:crypto";
 
 import { Logger } from "@nestjs/common";
@@ -915,9 +916,13 @@ export class MonitoringGateway
     if (!student) return;
     try {
       await this.studentSessions.requireActive(socket.data.identity);
-    } catch {
-      // The HTTP guard will preserve the draft and sign the page out. The
-      // socket must stop accepting learning signals immediately meanwhile.
+    } catch (error) {
+      // A failed session-store read is not an expired session. Keep the
+      // transport alive so the next heartbeat can retry; an explicit server
+      // disconnect disables Socket.IO reconnection until the page reloads.
+      if (error instanceof AppException && error.code === "STUDENT_SESSION_UNAVAILABLE") {
+        return;
+      }
       socket.disconnect(true);
       return;
     }

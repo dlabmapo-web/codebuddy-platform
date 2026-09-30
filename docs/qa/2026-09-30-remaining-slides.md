@@ -59,7 +59,8 @@ The user signed in as `cove-student` in Chrome and `cove-teacher` in Safari. The
 
 Safari initially showed the authenticated teacher overview, but its My classes route then stalled on Loading or a blank renderer. Refreshing, opening a fresh tab, restarting the local web server, and restarting Safari/restoring its previous tabs did not produce a usable teacher page. The restarted web server logged a successful 200 response for the teacher classes route. A separate Chrome teacher login at 127.0.0.1 remained disabled behind its security check; it was not bypassed. The user was asked to check the visible Safari page.
 
-- **19 and 27:** paired teacher/student presence recovery and cursor acceptance remain pending. No pass is inferred from single-session behavior or automated regressions.
+- **19:** subsequent paired-browser check passed the basic transition: Safari’s Manual Testing Class roster changed Cove Student from Reconnecting / Not in an exercise to Solving / CH04 problem 5 after Chrome opened that exercise. Online and Solving counts both became 1. Controlled disconnect/recovery acceptance is still pending.
+- **27:** cursor acceptance remains pending. The teacher live-editor route again showed Loading or a blank renderer, including after Reload Page From Origin. The student’s test help request displayed Waiting; teacher editing was not exercised. The user was asked to refresh the current live-editor tab. No cursor pass is inferred from the successful roster update.
 - **44:** final teacher authoring-control acceptance remains pending; learner sample/run/result behavior passed as described above.
 - No new deck completion markers were added for these pending teacher-browser checks. No application code was changed during this browser follow-up, and no production deployment occurred.
 

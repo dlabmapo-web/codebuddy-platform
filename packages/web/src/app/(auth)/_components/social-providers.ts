@@ -38,7 +38,7 @@ export function isSocialProviderAvailable(
 ): boolean {
   if (provider === 'kakao') return publicConfig.kakaoAuthEnabled;
   if (provider === 'custom:naver') return publicConfig.naverAuthEnabled;
-  return true;
+  return publicConfig.googleAuthEnabled;
 }
 
 /**

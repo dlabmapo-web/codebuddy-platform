@@ -393,3 +393,18 @@ describe("AcademyAccessService platform read", () => {
     }
   });
 });
+
+
+it("keeps roles scoped to each campus for a multi-campus account", async () => {
+  const { service, prisma } = serviceWith({ membership: null });
+  const other = "30000000-0000-4000-8000-000000000004";
+  Object.assign(prisma.academyMembership, { findUnique: vi.fn(async (input: { where: { academyId_userId: { academyId: string } } }) => {
+    const requested = input.where.academyId_userId!.academyId;
+    if (requested !== academyId && requested !== other) return null;
+    return { role: requested === academyId ? "MANAGER" : "TEACHER", status: "ACTIVE", academy: { status: "ACTIVE" }, extraRoles: [] } ;
+  }) });
+  await expect(service.requirePermission(authUserId, academyId, "academy.members.manage")).resolves.toMatchObject({ academyId, role: "MANAGER" });
+  await expect(service.requirePermission(authUserId, other, "academy.read")).resolves.toMatchObject({ academyId: other, role: "TEACHER" });
+  expect(await codeOf(service.requirePermission(authUserId, other, "academy.members.manage"))).not.toBe("NO_ERROR");
+  expect(await codeOf(service.requirePermission(authUserId, "30000000-0000-4000-8000-000000000005", "academy.read"))).not.toBe("NO_ERROR");
+});

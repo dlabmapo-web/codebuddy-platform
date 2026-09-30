@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   config: {
     siteUrl: 'http://localhost:3000',
+    googleAuthEnabled: true,
     turnstileSiteKey: 'test-site-key' as string | null,
   },
   resolveSignInEmail: vi.fn(),
@@ -427,6 +428,14 @@ describe('signupAction failure reporting', () => {
 });
 
 describe('social authentication history', () => {
+  it('refuses a direct Google action when the provider is disabled', async () => {
+    mocks.config.googleAuthEnabled = false;
+    try {
+      await expect(startSocialAuthAction({ provider: 'google' })).resolves.toEqual({ message: 'error.social_unavailable' });
+      expect(mocks.signInWithOAuth).not.toHaveBeenCalled();
+    } finally { mocks.config.googleAuthEnabled = true; }
+  });
+
   it('refuses disabled Naver before creating an intent or contacting the provider', async () => {
     await expect(startSocialAuthAction({ provider: 'custom:naver', academyId: signupFields.academyId }))
       .resolves.toEqual({ message: 'error.social_unavailable' });

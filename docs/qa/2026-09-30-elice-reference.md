@@ -35,3 +35,7 @@ Reference: [D.LAB Elice course](https://dlab.elice.io/courses/765886/lectures/al
 Chrome became unavailable to automation during the reference review. Reconnect it to verify the complete multiple-choice learner flow and the merged authoring/test controls in localhost. Slide 43 remains open. No new completion marker was added for slide 44 because the merged UI has not yet had a browser acceptance pass.
 
 This source merge is not a deployment. Its grading/sandbox deployment configuration must receive the release checks documented by the grading feature before production rollout. Memory enforcement measures sampled resident growth; the intermittent macOS test remains a limitation. The prior branch's historical Elice parity evidence is not a newly executed comparison in this pass.
+
+## Follow-up
+
+The single-answer quiz and memory-accounting follow-up are recorded in [2026-09-30-remaining-slides.md](2026-09-30-remaining-slides.md). This supersedes the implementation gaps above; the listed browser acceptance checks remain open.

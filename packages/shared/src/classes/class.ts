@@ -53,6 +53,7 @@ export type EnrolledStudentSummary = z.infer<
 >;
 
 export const eligibleStudentSummarySchema = z.object({
+  username: z.string().nullable().optional(),
   membershipId: z.uuid(),
   userId: z.uuid(),
   displayName: z.string().nullable(),

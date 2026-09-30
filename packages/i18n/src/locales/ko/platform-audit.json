@@ -79,6 +79,9 @@
       "point_policy": {
         "reset": "포인트 정책 초기화",
         "updated": "포인트 정책 변경"
+      },
+      "student": {
+        "renamed": "학생 학원 이름 변경"
       }
     },
     "class": {

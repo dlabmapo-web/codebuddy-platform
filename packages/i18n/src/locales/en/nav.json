@@ -29,7 +29,9 @@
     "class_ranking": "Class ranking",
     "settings": "Academy settings",
     "point_policy": "Points and rewards",
-    "maintenance": "Maintenance"
+    "maintenance": "Maintenance",
+    "resources": "Resources",
+    "lessons": "Lessons"
   },
   "academy_switcher": {
     "select": "Select academy",

@@ -253,15 +253,20 @@ export async function StudioChrome({
            * academies am I looking at — and it is something the layout knows,
            * so no page has to hand it up.
            */}
-          <span className="truncate text-[14px] font-semibold text-sub">
-            {academyName}
-          </span>
+          {viewRole !== 'STUDENT' ? (
+            <span className="truncate text-[14px] font-semibold text-sub">{academyName}</span>
+          ) : null}
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
           {/* The role switcher rides in this menu rather than beside the
               academy name: which role you are working as is a fact about the
               reader, and the bar is about the academy. */}
           <HeaderControls
+            identityLabel={viewRole === 'STUDENT' ? (
+              <span className="mx-2 max-w-48 truncate text-[12px] font-semibold text-sub" title={`${academyName} · ${viewer?.name ?? ''}`}>
+                {academyName} · {viewer?.name}
+              </span>
+            ) : undefined}
             account={
               viewer
                 ? {

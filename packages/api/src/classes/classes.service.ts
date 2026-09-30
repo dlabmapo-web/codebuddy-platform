@@ -616,6 +616,7 @@ export class ClassesService {
           select: {
             id: true,
             displayName: true,
+            username: true,
             email: true,
             ...memberAvatarSelect.user.select,
           },
@@ -633,6 +634,7 @@ export class ClassesService {
         membershipId: membership.id,
         userId: membership.user.id,
         displayName: membership.user.displayName,
+        username: membership.user.username,
         email: displayableEmail(membership.user.email),
         ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),

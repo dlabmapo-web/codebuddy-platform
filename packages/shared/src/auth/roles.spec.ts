@@ -96,7 +96,6 @@ describe("roleHasPermission", () => {
     for (const permission of [
       "academy.settings.manage",
       "academy.members.manage",
-      "class-enrollments.manage",
       "class-schedule.manage",
     ] as const) {
       expect(roleHasPermission("TEAM_LEAD", permission)).toBe(false);
@@ -119,9 +118,10 @@ describe("roleHasPermission", () => {
     expect(roleHasPermission("STUDENT", "classes.manage")).toBe(false);
   });
 
-  it("keeps student enrollment with managers alone", () => {
+  it("allows team leads and managers to enroll students", () => {
     expect(roleHasPermission("MANAGER", "class-enrollments.manage")).toBe(true);
-    for (const role of ["TEAM_LEAD", "TEACHER", "STUDENT"] as const) {
+    expect(roleHasPermission("TEAM_LEAD", "class-enrollments.manage")).toBe(true);
+    for (const role of ["TEACHER", "STUDENT"] as const) {
       expect(roleHasPermission(role, "class-enrollments.manage")).toBe(false);
     }
   });

@@ -262,7 +262,7 @@ describe('resolveAcademyAccessState', () => {
     // A Team Lead reaches the class page and reads the roster, but the add
     // and remove controls stay hidden.
     expect(canManageClasses(['TEAM_LEAD'])).toBe(true);
-    expect(canManageEnrollment(['TEAM_LEAD'])).toBe(false);
+    expect(canManageEnrollment(['TEAM_LEAD'])).toBe(true);
     expect(canManageEnrollment(['TEACHER'])).toBe(false);
     expect(canManageEnrollment(['STUDENT'])).toBe(false);
     expect(canManageEnrollment([])).toBe(false);

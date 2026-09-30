@@ -97,3 +97,19 @@ export function createRunId(): string {
     `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   );
 }
+
+/** Sequential public samples share one worker; stopping must cancel the queue. */
+export async function runSampleSequence<T extends { outcome: { stopped: boolean } | null }>(
+  count: number,
+  run: (index: number) => Promise<T | undefined>,
+  cancelled: () => boolean,
+  onResult: (result: T) => void,
+): Promise<void> {
+  for (let index = 0; index < count; index++) {
+    if (cancelled()) return;
+    const result = await run(index);
+    if (!result?.outcome) return;
+    onResult(result);
+    if (result.outcome.stopped) return;
+  }
+}

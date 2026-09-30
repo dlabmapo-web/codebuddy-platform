@@ -29,7 +29,9 @@
     "class_ranking": "반 랭킹",
     "settings": "학원 설정",
     "point_policy": "포인트 지급 기준",
-    "maintenance": "유지 보수"
+    "maintenance": "유지 보수",
+    "resources": "자료실",
+    "lessons": "수업"
   },
   "academy_switcher": {
     "select": "학원 선택",

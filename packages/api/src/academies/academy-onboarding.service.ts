@@ -27,6 +27,7 @@ export const requestInclude = {
       id: true,
       email: true,
       displayName: true,
+      username: true,
       ...memberAvatarSelect.user.select,
     },
   },

@@ -176,17 +176,18 @@ export function StudioSidebar({
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      {!isStudent ? <SidebarHeader>
         <AcademySwitcher
           academies={academies}
           academyId={academyId}
           viewRole={viewRole}
         />
-      </SidebarHeader>
+      </SidebarHeader> : null}
       <SidebarSeparator />
       <SidebarContent>
         {groups.map((group) => (
           <NavSection
+            teacherView={viewRole === 'TEACHER'}
             activeHref={activeHref}
             group={group}
             key={group.id}
@@ -208,11 +209,11 @@ export function StudioSidebar({
          * has three groups above it and a manager's has five, and this is the
          * row both of them find without counting.
          */}
-        <MyPageRow
+        {!isStudent ? <MyPageRow
           href={myPageHref}
           isActive={activeHref === myPageHref}
           viewer={viewer}
-        />
+        /> : null}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
@@ -220,10 +221,12 @@ export function StudioSidebar({
 }
 
 function NavSection({
+  teacherView,
   activeHref,
   group,
   pendingApplications,
 }: {
+  teacherView: boolean;
   activeHref: string | null;
   group: NavGroup;
   pendingApplications: number;
@@ -234,11 +237,11 @@ function NavSection({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel>
+      {!teacherView ? <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel> : null}
       <SidebarMenu>
         {group.items.map((item) => {
           const active = item.href === activeHref;
-          const label = t(item.labelKey);
+          const label = t(teacherView && item.labelKey === 'link.my_courses' ? 'link.resources' : teacherView && item.labelKey === 'link.courses' ? 'link.lessons' : item.labelKey);
           const waiting = item.showPendingApplications
             ? pendingApplications
             : 0;

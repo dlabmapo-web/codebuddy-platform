@@ -48,7 +48,7 @@ export function ExampleCard({
         </h4>
       </header>
 
-      <div className="grid min-w-0 gap-3 @md:grid-cols-2">
+      <div className="grid min-w-0 gap-3">
         <ValueBlock
           action={
             <button

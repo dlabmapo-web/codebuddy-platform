@@ -29,7 +29,7 @@ export function useCourseOutline({
   const requestedLectureId = searchParams.get('lecture');
   const [query, setQuery] = useState('');
   const [collapsedLectureIds, setCollapsedLectureIds] = useState<Set<string>>(
-    () => new Set(),
+    () => new Set(initialOutline.modules.flatMap((module) => module.lectures.map((lecture) => lecture.id))),
   );
 
   const outlineQuery = useQuery({

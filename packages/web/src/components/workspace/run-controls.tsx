@@ -5,23 +5,8 @@ import { LoaderCircle, Play, Square } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
-/**
- * The terminal header's controls: one chip per public sample, and Run.
- *
- * The header is one row tall and stays that way. Two earlier shapes were worse
- * than this: a single unwrapping row pushed the last chips and then Run itself
- * off the edge, taking away the only control that matters; letting the chips
- * wrap instead put Run on a second line and changed the height of the terminal
- * below it, which looked broken at the far more common case of one or two
- * samples.
- *
- * So the chips scroll. Run is pinned, the tabs are pinned, and only the strip
- * between them gives way — its height never changes, whether an author wrote
- * one sample or ten.
- *
- * Rendered as a fragment into the header's flex row so the three are siblings:
- * the strip has to be able to take the space the other two do not.
- */
+/** Shared run controls. Students run the complete sample set; teachers can
+ * still run individual samples while inspecting a student's program. */
 export function RunControls({
   running,
   ready,
@@ -29,6 +14,7 @@ export function RunControls({
   activeSample,
   onRun,
   onRunSample,
+  onRunAll,
   onStop,
 }: {
   running: boolean;
@@ -37,6 +23,7 @@ export function RunControls({
   activeSample: number | null;
   onRun: () => void;
   onRunSample: (index: number) => void;
+  onRunAll?: () => void;
   onStop: () => void;
 }) {
   const { t } = useLayoutTranslation('learn');
@@ -44,7 +31,7 @@ export function RunControls({
   if (running) {
     return (
       <button
-        className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-danger/90 px-2.5 py-1 text-[12px] font-bold text-on-danger transition-colors hover:bg-danger"
         onClick={onStop}
         type="button"
       >
@@ -62,7 +49,9 @@ export function RunControls({
 
   return (
     <>
-      {sampleTestCases.length > 0 ? (
+      {onRunAll ? (
+        <button type="button" disabled={!ready || sampleTestCases.length === 0} onClick={onRunAll} className="inline-flex shrink-0 items-center rounded-md bg-white/10 px-2 py-1 text-[12px] font-semibold text-white disabled:opacity-40">{t('workspace.run_tests')}</button>
+      ) : sampleTestCases.length > 0 ? (
         <div className="cove-scroll-x flex min-w-0 flex-1 overflow-x-auto py-1">
           {/* `ml-auto`, not the parent's `justify-end`: see `.cove-scroll-x`. */}
           <div className="ml-auto flex items-center gap-1">
@@ -98,7 +87,7 @@ export function RunControls({
         </div>
       ) : null}
       <button
-        className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[12px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-50"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[12px] font-bold text-on-brand transition-colors hover:bg-brand-deep disabled:opacity-50"
         disabled={!ready}
         onClick={onRun}
         type="button"

@@ -42,7 +42,6 @@ export default async function TeachingClassesPage({
   return (
     <StudioPage
       bleed
-      description={t('classes.description')}
       title={t('classes.title')}
     >
       {classes && featureEnabled ? (

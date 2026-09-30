@@ -13,11 +13,12 @@
     "message": "Message",
     "status": "Status",
     "applied": "Applied",
-    "actions": "Actions"
+    "actions": "Actions",
+    "username": "Username"
   },
   "search_placeholder": "Search by name or email",
   "no_message": "No message",
-  "review": "Review",
+  "review": "Approve",
   "requested_label": "They applied as",
   "requested_note_staff": "{{name}} asked to join as staff. Student is not a staff role — pick the one they should have.",
   "requested_note_student": "{{name}} asked to join as a student. You are about to grant a staff role.",

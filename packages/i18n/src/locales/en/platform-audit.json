@@ -79,6 +79,9 @@
       "point_policy": {
         "reset": "Point policy reset to defaults",
         "updated": "Point policy changed"
+      },
+      "student": {
+        "renamed": "Student academy name changed"
       }
     },
     "class": {

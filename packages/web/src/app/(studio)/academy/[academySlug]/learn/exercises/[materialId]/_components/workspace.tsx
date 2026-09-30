@@ -20,9 +20,9 @@ import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { markErrorLine } from '@/lib/workspace/error-line-decoration';
-import { createRunId } from '@/lib/workspace/sample-run';
+import { createRunId, runSampleSequence } from '@/lib/workspace/sample-run';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
-import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
+import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
   STATEMENT_PANE,
@@ -47,7 +47,7 @@ import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
 import { MonitoringIndicator } from './monitoring-indicator';
 import { RequestHelp } from '@/components/monitoring/request-help';
-import { WorkspaceHeader } from './workspace-header';
+import { WorkspaceHeader, NavButton } from './workspace-header';
 
 export function Workspace({
   academyId,
@@ -83,15 +83,16 @@ export function Workspace({
   // labels come from the same namespace.
   const { t: tm } = useTranslation('monitoring');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
+  const [sampleResults, setSampleResults] = React.useState<SampleRun[]>([]);
+  const [testingSamples, setTestingSamples] = React.useState(false);
+  const sampleBatchRef = React.useRef(false);
+  React.useEffect(() => () => { sampleBatchRef.current = false; }, []);
   const [mobileTab, setMobileTab] = React.useState<'problem' | 'code'>('problem');
   // Entering on a historical attempt opens on its verdict; ordinary entry
   // still opens on the terminal.
   const [outputTab, setOutputTab] = React.useState<OutputTab>(
     bootstrap.selectedSubmission ? 'result' : 'terminal',
   );
-  const [lastReadSubmissionId, setLastReadSubmissionId] = React.useState<
-    string | null
-  >(null);
   const [revealedHints, setRevealedHints] = React.useState(0);
   const beforeTransitionRef =
     React.useRef<ExerciseTransitionLifecycle | null>(null);
@@ -247,7 +248,7 @@ export function Workspace({
           passedCount: 0,
           output: '',
         });
-        return;
+        return { outcome, verdict };
       }
 
       // Counts and the output the student is already looking at. There is no
@@ -259,9 +260,28 @@ export function Workspace({
         passedCount: verdict.kind === 'match' ? 1 : 0,
         output: outcome.stdout,
       });
+      return { outcome, verdict };
     },
     [draft.code, exercise.sampleTestCases, monitoring, runSample],
   );
+
+  const handleRunAll = async () => {
+    if (sampleBatchRef.current || runner.running || submission.submitting) return;
+    sampleBatchRef.current = true;
+    setTestingSamples(true);
+    setSampleResults([]);
+    try {
+      await runSampleSequence(
+        exercise.sampleTestCases.length,
+        handleRunSample,
+        () => !sampleBatchRef.current,
+        (result) => setSampleResults((previous) => [...previous, result]),
+      );
+    } finally {
+      sampleBatchRef.current = false;
+      setTestingSamples(false);
+    }
+  };
 
   /**
    * A plain run, reported to whoever is watching.
@@ -272,6 +292,7 @@ export function Workspace({
    * the student's screen — stdout, and the error if the program raised one.
    */
   const handleRun = React.useCallback(async () => {
+    setSampleResults([]);
     setOutputTab('terminal');
     const clientRunId = createRunId();
     monitoring.publishRun({
@@ -340,7 +361,6 @@ export function Workspace({
     // starts rather than relying on the idle timer having fired.
     draft.flushNow();
     setOutputTab('result');
-    setLastReadSubmissionId(null);
     void submission.submit(draft.code);
   }, [draft, submission]);
 
@@ -374,6 +394,7 @@ export function Workspace({
    * still available — that control belongs to the terminal.
    */
   const busy =
+    testingSamples ||
     navigating ||
     submission.submitting ||
     runner.running ||
@@ -398,8 +419,8 @@ export function Workspace({
         submission.reset();
         setActiveSample(null);
         setRevealedHints(0);
+        setSampleResults([]);
         setOutputTab('terminal');
-        setLastReadSubmissionId(null);
       },
     };
     return () => {
@@ -415,16 +436,6 @@ export function Workspace({
   const handleRevealHint = React.useCallback(() => {
     setRevealedHints((current) => Math.min(hintCount, current + 1));
   }, [hintCount]);
-
-  const handleOutputTabChange = React.useCallback((tab: OutputTab) => {
-    if (outputTab === 'result' && submission.result) {
-      setLastReadSubmissionId(submission.result.submissionId);
-    }
-    setOutputTab(tab);
-    if (tab === 'result' && submission.result) {
-      setLastReadSubmissionId(submission.result.submissionId);
-    }
-  }, [outputTab, submission.result]);
 
   return (
     // Exactly one viewport, and a clip for anything that escapes its own
@@ -463,7 +474,6 @@ export function Workspace({
           }
           helpRequest={<RequestHelp key={`${userId}:${academyId}:${classId}`} userId={userId} academyId={academyId} classId={classId} materialId={exercise.materialId} socket={monitoring.socket} onNavigate={handleNavigate} />}
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
-          navigationDisabled={busy}
           curriculum={
             <CurriculumTrigger
               onToggle={togglePanel}
@@ -473,36 +483,9 @@ export function Workspace({
               ref={triggerRef}
             />
           }
-          onNavigate={handleNavigate}
-          onBack={() =>
-            navigation.exit(
-              returnTo ??
-                routes.academyLearnCourse(
-                  academySlug,
-                  workspace.breadcrumb.course.id,
-                  { lecture: workspace.breadcrumb.lecture.id },
-                ),
-            )
-          }
-          onReset={() => {
-            const starter = toSharedDocumentText(exercise.starterCode);
-            if (draft.code === starter) return;
-            if (!window.confirm(t('workspace.reset_confirm'))) return;
-            // The one whole-buffer replacement a bound editor is allowed. It
-            // goes through the shared document rather than around it, so a
-            // watching teacher's editor follows instead of diverging — and
-            // through the ordinary edit pipeline, so it is written locally and
-            // saved rather than relying on Monaco reporting back a change it
-            // was told to make.
-            draft.resetTo(starter);
-            monitoring.replaceDocument(starter);
-          }}
-          onSubmit={handleSubmit}
-          backToRecords={returnTo !== null}
           reviewing={selected ? { createdAt: selected.createdAt } : null}
           saveState={draft.saveState}
           solveStartedAt={solveSession.startedAt}
-          submitting={submission.submitting}
           workspace={workspace}
         />
       </div>
@@ -567,8 +550,8 @@ export function Workspace({
           displayedMaterialId={exercise.materialId}
           error={navigation.navigatorFailed}
           footer={{
-            href: `${routes.academy(academySlug)}/learn/courses/${workspace.breadcrumb.course.id}`,
-            label: t('navigator.footer_student'),
+            href: returnTo ?? `${routes.academy(academySlug)}/learn/courses/${workspace.breadcrumb.course.id}`,
+            label: returnTo ? t('workspace.back_to_records') : t('navigator.footer_student'),
           }}
           onClose={closePanel}
           onRetry={navigation.loadCourse}
@@ -614,6 +597,28 @@ export function Workspace({
             } md:flex`}
           >
             <EditorPane
+              onReset={() => {
+                const starter = toSharedDocumentText(exercise.starterCode);
+                if (draft.code === starter) return;
+                if (!window.confirm(t('workspace.reset_confirm'))) return;
+                setSampleResults([]);
+                runner.clear();
+                submission.reset();
+                setOutputTab('terminal');
+                // The one whole-buffer replacement a bound editor is allowed. It
+                // goes through the shared document rather than around it, so a
+                // watching teacher's editor follows instead of diverging — and
+                // through the ordinary edit pipeline, so it is written locally and
+                // saved rather than relying on Monaco reporting back a change it
+                // was told to make.
+                draft.resetTo(starter);
+                monitoring.replaceDocument(starter);
+              }}
+              testingSamples={testingSamples}
+              sampleResults={sampleResults}
+              onRunAll={() => void handleRunAll()}
+              onStop={() => { sampleBatchRef.current = false; runner.stop(); }}
+              onSubmit={handleSubmit}
               activeSample={activeSample}
               code={draft.code}
               onCodeChange={(value) => {
@@ -628,20 +633,18 @@ export function Workspace({
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
-              onTabChange={handleOutputTabChange}
               runner={runner}
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}
               tab={outputTab}
-              unreadResult={
-                outputTab !== 'result' &&
-                submission.result !== null &&
-                submission.result.submissionId !== lastReadSubmissionId
-              }
             />
           </section>
         </div>
       </div>
+      <nav aria-label={t('workspace.tab_problem')} className="flex shrink-0 justify-center gap-3 border-t border-border bg-card px-4 py-2">
+        <NavButton direction="previous" disabled={busy || !workspace.neighbors.previous} label={t('workspace.previous')} onClick={() => workspace.neighbors.previous && handleNavigate(workspace.neighbors.previous.materialId)} />
+        <NavButton direction="next" disabled={busy || !workspace.neighbors.next} label={t('workspace.next')} onClick={() => workspace.neighbors.next && handleNavigate(workspace.neighbors.next.materialId)} />
+      </nav>
     </div>
   );
 }

@@ -75,7 +75,6 @@ export default async function StudentAnalyticsPage({
   return (
     <StudioPage
       bleed
-      description={t('student_analytics_description')}
       title={t('student_analytics_title')}
     >
       <PageTranslationsProvider

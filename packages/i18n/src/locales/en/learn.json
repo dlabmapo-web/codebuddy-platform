@@ -155,7 +155,9 @@
     "submission_unavailable": "That submission could not be loaded. This is the current version of the problem.",
     "back_to_records": "Back to answer records",
     "hints_description": "Open them one at a time — try the earlier ones first.",
-    "hints_none_yet": "No hints opened yet."
+    "hints_none_yet": "No hints opened yet.",
+    "run_tests": "Test run",
+    "actual": "Actual output"
   },
   "submit": {
     "empty": "Submit your code to see the judge result here.",

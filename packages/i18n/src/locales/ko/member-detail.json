@@ -80,5 +80,8 @@
     "class_count_other": "{{count}}개 반",
     "class_students": "학생",
     "class_courses": "과목"
-  }
+  },
+  "rename_student": "학생 이름",
+  "save_name": "이름 저장",
+  "rename_failed": "이름을 저장하지 못했습니다. 다시 시도해 주세요."
 }

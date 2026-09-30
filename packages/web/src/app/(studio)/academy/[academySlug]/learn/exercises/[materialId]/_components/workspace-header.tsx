@@ -3,13 +3,9 @@
 import type { LearnExerciseWorkspace } from '@cove/shared';
 import { formatDateTime } from '@cove/i18n/format';
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   History,
-  LoaderCircle,
-  RotateCcw,
-  Send,
 } from 'lucide-react';
 
 import { useLayoutTranslation, useLocale } from '@/i18n';
@@ -37,15 +33,8 @@ export function WorkspaceHeader({
   curriculum,
   workspace,
   saveState,
-  onNavigate,
-  navigationDisabled,
-  onSubmit,
-  onReset,
   reviewing,
   solveStartedAt,
-  onBack,
-  backToRecords = false,
-  submitting,
   indicator,
   feedback,
   helpRequest,
@@ -67,11 +56,6 @@ export function WorkspaceHeader({
   feedback?: React.ReactNode;
   helpRequest?: React.ReactNode;
   saveState: DraftSaveState;
-  onNavigate: (materialId: string) => void;
-  /** Running, submitting, or changing exercise owns navigation exclusively. */
-  navigationDisabled: boolean;
-  onSubmit: () => void;
-  onReset: () => void;
   /**
    * The historical attempt this workspace was opened on, if any. Named in the
    * header so the reader knows which code they are looking at; everything
@@ -80,32 +64,14 @@ export function WorkspaceHeader({
   reviewing?: { createdAt: string } | null;
   /** The server-issued origin the visible clock counts from. */
   solveStartedAt: string | null;
-  /** Exit the complete exercise history segment to its trusted origin. */
-  onBack: () => void;
-  /** True when Back returns to Answer records, so the label says so. */
-  backToRecords?: boolean;
-  submitting: boolean;
+
 }) {
   const { t } = useLayoutTranslation(['learn', 'courses']);
   const locale = useLocale();
-  const { exercise, neighbors } = workspace;
+  const { exercise } = workspace;
 
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
-      <button
-        aria-label={
-          backToRecords
-            ? t('learn:workspace.back_to_records')
-            : t('learn:workspace.back')
-        }
-        className="grid size-8 shrink-0 place-items-center rounded-lg text-sub transition-colors hover:bg-canvas hover:text-ink"
-        disabled={navigationDisabled}
-        onClick={onBack}
-        type="button"
-      >
-        <ArrowLeft className="size-4" />
-      </button>
-
       {curriculum}
 
       <div className="min-w-40 flex-1">
@@ -151,71 +117,9 @@ export function WorkspaceHeader({
         </span>
       )}
 
-      {/* Quiet control: available, but never competing with Submit. Reset acts
-          on the workspace, so it belongs here; asking for a hint acts on the
-          problem, and lives in the statement beside the text it explains. */}
-      <QuietButton icon={RotateCcw} label={t('learn:workspace.reset')} onClick={onReset} />
-
-      <nav className="flex shrink-0 items-center gap-1">
-        <NavButton
-          direction="previous"
-          disabled={!neighbors.previous || navigationDisabled}
-          label={t('learn:workspace.previous')}
-          onClick={() =>
-            neighbors.previous && onNavigate(neighbors.previous.materialId)
-          }
-        />
-        <NavButton
-          direction="next"
-          disabled={!neighbors.next || navigationDisabled}
-          label={t('learn:workspace.next')}
-          onClick={() => neighbors.next && onNavigate(neighbors.next.materialId)}
-        />
-      </nav>
-
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        {/* A light success treatment reads as the final/done action without
-            competing with the terminal's blue Run control. */}
-        <button
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-3.5 text-[13px] font-bold text-success transition-colors hover:bg-success/20 disabled:opacity-50"
-          disabled={submitting}
-          onClick={onSubmit}
-          type="button"
-        >
-          {submitting ? (
-            <LoaderCircle className="size-3 animate-spin" />
-          ) : (
-            <Send className="size-3" />
-          )}
-          {t('learn:workspace.submit')}
-        </button>
-      </div>
     </header>
   );
 }
-
-function QuietButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof RotateCcw;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-label={label}
-      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-sub transition-colors hover:bg-canvas hover:text-ink md:px-2.5"
-      onClick={onClick}
-      type="button"
-    >
-      <Icon className="size-3.5" />
-      <span className="hidden md:inline">{label}</span>
-    </button>
-  );
-}
-
 /**
  * Labelled, not bare chevrons.
  *
@@ -223,7 +127,7 @@ function QuietButton({
  * position. The label collapses only below `sm`, where space genuinely forces
  * it, and the accessible name survives.
  */
-function NavButton({
+export function NavButton({
   direction,
   disabled,
   label,

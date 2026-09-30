@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { oc } from "@orpc/contract";
 
 import {
@@ -74,6 +75,7 @@ export const academyPeopleContract = {
    * the refusal, and the withholding rule are the same ones the lists use, and
    * a separate contract would be a second place to keep them in step.
    */
+  renameStudent: oc.input(z.object({ academyId: z.uuid(), membershipId: z.uuid(), name: z.string().trim().min(1).max(80) }).strict()).output(z.object({ saved: z.literal(true) })),
   student: oc.input(memberDetailInputSchema).output(studentDetailSchema),
   staffMember: oc.input(memberDetailInputSchema).output(staffDetailSchema),
 };

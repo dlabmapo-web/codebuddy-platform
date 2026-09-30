@@ -23,6 +23,11 @@ describe("locale formatting", () => {
     expect(formatShortDateTime(instant, "ko")).toBe("7월 24일 · 오후 3:40");
   });
 
+  it("includes seconds for application review timestamps when requested", () => {
+    expect(formatDateTime("2026-07-24T06:40:09.000Z", "en", true)).toBe("Jul 24, 2026 · 3:40:09 PM");
+    expect(formatDateTime("2026-07-24T06:40:09.000Z", "ko", true)).toBe("2026년 7월 24일 · 오후 3:40:09");
+  });
+
   it("formats numbers and percentages by locale", () => {
     expect(formatNumber(1204, "en")).toBe("1,204");
     expect(formatNumber(1204, "ko")).toBe("1,204");

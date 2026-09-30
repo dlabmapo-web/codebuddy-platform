@@ -1,3 +1,5 @@
+import { currentSupportGrantId } from "../common/request-context.js";
+import { bumpPeopleRevision } from "./people-revision.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   effectiveAcademyRoles,
@@ -53,6 +55,30 @@ export class MemberDetailService {
     private readonly lead: TeamLeadOverviewRepository,
     private readonly overview: TeacherOverviewRepository,
   ) {}
+
+  async renameStudent(identity: SupabaseIdentity, input: { academyId: string; membershipId: string; name: string }) {
+    const actor = await this.scopes.requireMemberReader(identity, input.academyId);
+    await this.prisma.$transaction(async (tx) => {
+      const member = await tx.academyMembership.findFirst({
+        where: { id: input.membershipId, academyId: input.academyId, status: "ACTIVE", role: "STUDENT", user: { status: "ACTIVE" } },
+        select: { id: true, memberProfile: { select: { academyDisplayName: true } } },
+      });
+      if (!member) throw new AppException("PROFILE_NOT_FOUND", HttpStatus.NOT_FOUND);
+      await tx.academyMemberProfile.upsert({
+        where: { membershipId: member.id },
+        create: { membershipId: member.id, academyDisplayName: input.name },
+        update: { academyDisplayName: input.name },
+      });
+      await tx.auditLog.create({ data: {
+        actorUserId: actor.userId, academyId: input.academyId,
+        action: "academy.student.renamed", targetType: "AcademyMembership", targetId: member.id,
+        before: { academyDisplayName: member.memberProfile?.academyDisplayName ?? null },
+        after: { academyDisplayName: input.name }, supportGrantId: currentSupportGrantId(),
+      } });
+      await bumpPeopleRevision(tx, input.academyId);
+    });
+    return { saved: true as const };
+  }
 
   /**
    * Who is asking, and what they may see of a student.

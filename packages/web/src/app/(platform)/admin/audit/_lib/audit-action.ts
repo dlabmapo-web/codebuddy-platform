@@ -155,6 +155,7 @@ export const auditActionLabels: Record<string, TranslationKey<'platform-audit'>>
   'profile.email.change_sent': 'action.profile.email.change_sent',
   'profile.identity.unlink_requested': 'action.profile.identity.unlink_requested',
   'profile.identity.unlinked': 'action.profile.identity.unlinked',
+  'academy.student.renamed': 'action.academy.student.renamed',
   'academy.member.password.issued': 'action.academy.member.password.issued',
   'academy.member.password.revealed': 'action.academy.member.password.revealed',
   'academy.member_profile.image_removed': 'action.academy.member_profile.image_removed',

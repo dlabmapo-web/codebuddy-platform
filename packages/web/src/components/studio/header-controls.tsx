@@ -354,10 +354,12 @@ export function ProfileControl({
 
 /** The set, in the order they appear at the top right of every page. */
 export function HeaderControls({
+  identityLabel,
   className,
   account,
   notifications,
 }: {
+  identityLabel?: React.ReactNode;
   className?: string;
   /**
    * The bell, rendered by whichever shell mounted this.
@@ -386,6 +388,7 @@ export function HeaderControls({
       <LanguageControl />
       <ThemeControl />
       {notifications}
+      {identityLabel}
       {account ? (
         <ProfileControl
           academyId={account.academyId}

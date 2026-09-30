@@ -1,3 +1,4 @@
+import { runSampleSequence } from './sample-run';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -121,5 +122,39 @@ describe('createRunId', () => {
     } finally {
       Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true });
     }
+  });
+});
+
+
+describe('public sample sequence', () => {
+  it('runs every sample sequentially and preserves result order', async () => {
+    const order: number[] = [];
+    const results: number[] = [];
+    await runSampleSequence(3, async (index) => {
+      order.push(index);
+      await Promise.resolve();
+      return { index, outcome: { stopped: false } };
+    }, () => false, (result) => results.push(result.index));
+    expect(order).toEqual([0, 1, 2]);
+    expect(results).toEqual(order);
+  });
+  it('never starts another worker after Stop', async () => {
+    const started: number[] = [];
+    await runSampleSequence(3, async (index) => {
+      started.push(index);
+      return { outcome: { stopped: true } };
+    }, () => false, () => undefined);
+    expect(started).toEqual([0]);
+  });
+  it('honours cancellation between samples and rejected busy runs', async () => {
+    let cancelled = false;
+    let started = 0;
+    await runSampleSequence(3, async () => {
+      started++;
+      return { outcome: { stopped: false } };
+    }, () => cancelled, () => { cancelled = true; });
+    expect(started).toBe(1);
+    await runSampleSequence(3, async () => { started++; return { outcome: null }; }, () => false, () => { throw new Error('No completed run'); });
+    expect(started).toBe(2);
   });
 });

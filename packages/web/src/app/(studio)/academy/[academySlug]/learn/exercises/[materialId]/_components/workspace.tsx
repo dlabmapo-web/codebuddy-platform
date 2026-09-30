@@ -1,5 +1,6 @@
 'use client';
 
+import { QuizWorkspace } from './quiz-workspace';
 import { routes } from '@/lib/routes';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -49,7 +50,13 @@ import { MonitoringIndicator } from './monitoring-indicator';
 import { RequestHelp } from '@/components/monitoring/request-help';
 import { WorkspaceHeader, NavButton } from './workspace-header';
 
-export function Workspace({
+export function Workspace(props: React.ComponentProps<typeof ProgrammingWorkspace>) {
+  return props.bootstrap.workspace.exercise.quiz
+    ? <QuizWorkspace key={props.bootstrap.workspace.exercise.materialId} {...props} />
+    : <ProgrammingWorkspace {...props} />;
+}
+
+function ProgrammingWorkspace({
   academyId,
   bootstrap,
   classId,

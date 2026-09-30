@@ -1,3 +1,4 @@
+import { quizDefinitionSchema, quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -121,17 +122,21 @@ export class SubmissionService {
           },
         });
         const exercise = material?.programmingExercise;
-        if (!material || !exercise || exercise.testCases.length === 0) {
+        if (!material || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
           throw new AppException(
             "EXERCISE_NOT_AVAILABLE",
             HttpStatus.NOT_FOUND,
           );
         }
+        const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
+        if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
+          throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
+        }
         // Admitted only if a grader exists for it. Refusing here, before an
         // attempt is recorded, beats a submission that can only ever fail as
         // a judge error.
         const profile = resolveGradingProfile(exercise, exercise.testCases);
-        if (profile.kind === "unsupported") {
+        if (!quiz && profile.kind === "unsupported") {
           this.logger.error(
             `material ${material.id} has an ungradable profile: ${profile.reason}`,
           );
@@ -176,8 +181,9 @@ export class SubmissionService {
             memoryLimitMb: exercise.memoryLimitMb,
             // The whole profile, frozen: grading never reads the exercise.
             ...snapshot.submission,
+            ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
-            totalCount: exercise.testCases.length,
+            totalCount: quiz ? 1 : exercise.testCases.length,
             engineVersion,
             solveSessionId: solveSession?.id ?? null,
             solveElapsedSec: solveSession
@@ -193,11 +199,11 @@ export class SubmissionService {
             modulePosition: courseModule.position,
             lecturePosition: material.lecture.position,
             problemPosition: material.position,
-            gradingCases: { create: snapshot.cases },
+            gradingCases: { create: quiz ? [] : snapshot.cases },
           },
           select: { id: true },
         });
-        return { id: created.id, totalCount: exercise.testCases.length };
+        return { id: created.id, totalCount: quiz ? 1 : exercise.testCases.length };
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -305,6 +311,7 @@ export class SubmissionService {
     );
 
     return {
+      quiz: quizFeedback(submission.quizSnapshot, submission.code, submission.status),
       submissionId: submission.id,
       materialId: submission.sourceMaterialId,
       status: submission.status,

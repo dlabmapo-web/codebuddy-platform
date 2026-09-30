@@ -1,3 +1,4 @@
+import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
 
 /**
@@ -85,6 +86,7 @@ export const submissionCaseSchema = z.object({
 export type SubmissionCaseResult = z.infer<typeof submissionCaseSchema>;
 
 export const submissionResultSchema = z.object({
+  quiz: quizFeedbackSchema.nullable().optional(),
   submissionId: z.uuid(),
   materialId: z.uuid(),
   status: submissionStatusSchema,

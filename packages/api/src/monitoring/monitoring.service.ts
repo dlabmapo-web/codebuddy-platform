@@ -1,3 +1,4 @@
+import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   displayableEmail,
@@ -655,6 +656,7 @@ export class MonitoringService {
         // answer has exactly one route out of this service, and it is audited.
         programmingExercise: {
           select: {
+            quiz: true,
             difficulty: true,
             language: true,
             description: true,
@@ -700,6 +702,7 @@ export class MonitoringService {
         inputFormat: exercise.inputFormat,
         outputFormat: exercise.outputFormat,
         constraints: exercise.constraints,
+        quiz: publicQuiz(exercise.quiz),
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,

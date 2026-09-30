@@ -1,3 +1,4 @@
+import { quizSnapshotSchema } from "@cove/shared";
 import { Injectable, Logger } from "@nestjs/common";
 
 import { PrismaService } from "../database/prisma.service.js";
@@ -119,6 +120,20 @@ export class GradingService {
       where: { id: submissionId },
       include: gradingInclude,
     });
+
+    if (submission?.quizSnapshot) {
+      const parsed = quizSnapshotSchema.safeParse(submission.quizSnapshot);
+      if (!parsed.success || !parsed.data.definition.choices.some((c) => c.id === submission.code)) {
+        await this.fail(submissionId, "INVALID_QUIZ_SNAPSHOT");
+        return;
+      }
+      const passed = submission.code === parsed.data.definition.correctChoiceId;
+      await this.finalize(submission, {
+        status: passed ? "PASSED" : "FAILED", passedCount: passed ? 1 : 0,
+        score: passed ? 100 : 0, runtimeMs: 0,
+      }, [], {});
+      return;
+    }
 
     if (!submission || submission.gradingCases.length === 0) {
       await this.fail(submissionId, "EXERCISE_UNAVAILABLE");

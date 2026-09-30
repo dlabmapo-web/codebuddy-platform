@@ -1,3 +1,4 @@
+import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import {
@@ -304,6 +305,7 @@ export class LearnService {
         lecture: { id: material.lecture.id, title: material.lecture.title },
       },
       exercise: {
+        quiz: publicQuiz(exercise.quiz),
         materialId: material.id,
         title: material.title,
         difficulty: exercise.difficulty,

@@ -14,3 +14,5 @@ export * from "./teacher-overview.js";
 export * from "./teacher-progress.js";
 export * from "./teacher-roster.js";
 export * from "./teacher-students.js";
+
+export * from "./quiz.js";

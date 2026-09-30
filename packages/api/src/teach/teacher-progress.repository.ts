@@ -403,6 +403,7 @@ export class TeacherProgressRepository {
         runtimeMs: true,
         solveElapsedSec: true,
         createdAt: true,
+        quizSnapshot: true,
         code: true,
         language: true,
         problemTitle: true,

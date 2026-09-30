@@ -39,7 +39,7 @@ export const authNamespaces = ["auth"] as const;
  * Mounted by the `(framed)/content` layout, and by the two platform-console
  * surfaces that render the same builder against the shared library.
  */
-export const contentNamespaces = ["content", "grading", "common", "courses"] as const;
+export const contentNamespaces = ["quiz", "content", "grading", "common", "courses"] as const;
 
 /**
  * The student exercise workspace.
@@ -53,6 +53,7 @@ export const contentNamespaces = ["content", "grading", "common", "courses"] as 
  * split rather than raise the cap.
  */
 export const exerciseNamespaces = [
+  "quiz",
   "sample-check",
   "monitoring",
   "python-errors",
@@ -67,6 +68,7 @@ export const exerciseNamespaces = [
  * the same list because a teacher moves between them through the class header.
  */
 export const teachNamespaces = [
+  "quiz",
   "sample-check",
   "monitoring",
   "teach",

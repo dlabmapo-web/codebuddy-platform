@@ -1,3 +1,4 @@
+import { quizDefinitionSchema } from "@cove/shared";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -683,6 +684,8 @@ export class RegradeService {
           position: true,
           programmingExercise: {
             select: {
+              quiz: true,
+              description: true,
               gradingRevision: true,
               language: true,
               timeLimitMs: true,
@@ -729,10 +732,12 @@ export class RegradeService {
         },
       });
       const exercise = material?.programmingExercise;
-      if (!material || !exercise || exercise.testCases.length === 0) continue;
+      if (!material || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) continue;
+      const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
+      if (quiz && !quiz.choices.some((c) => c.id === original.code)) continue;
       // Same admission rule as a student's submission: no repair for a
       // profile no grader can judge.
-      if (resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported") {
+      if (!quiz && resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported") {
         continue;
       }
       // The runtime that will actually judge it, exactly as
@@ -755,8 +760,9 @@ export class RegradeService {
           timeLimitMs: exercise.timeLimitMs,
           memoryLimitMb: exercise.memoryLimitMb,
           ...snapshot.submission,
+          ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
           code: original.code,
-          totalCount: exercise.testCases.length,
+          totalCount: quiz ? 1 : exercise.testCases.length,
           engineVersion,
           problemTitle: material.title,
           courseTitle: courseModule.course.title,
@@ -765,7 +771,7 @@ export class RegradeService {
           modulePosition: courseModule.position,
           lecturePosition: material.lecture.position,
           problemPosition: material.position,
-          gradingCases: { create: snapshot.cases },
+          gradingCases: { create: quiz ? [] : snapshot.cases },
         },
         select: { id: true },
       });

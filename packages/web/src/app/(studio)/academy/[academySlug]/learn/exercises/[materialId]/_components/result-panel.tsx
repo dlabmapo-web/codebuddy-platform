@@ -1,4 +1,5 @@
 'use client';
+import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { useLayoutTranslation } from '@/i18n';
@@ -45,7 +46,8 @@ export function ResultPanel({ submission }: { submission: SubmissionState }) {
         </p>
       ) : null}
 
-      {!suppressesResults ? (
+      {!suppressesResults && result?.quiz ? <QuizFeedback quiz={result.quiz} /> : null}
+      {!suppressesResults && !result?.quiz ? (
         <TestResultList cells={cells} result={result} />
       ) : null}
 

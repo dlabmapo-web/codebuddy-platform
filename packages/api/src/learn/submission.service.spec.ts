@@ -709,3 +709,22 @@ describe("SubmissionService.findSelected", () => {
     ).resolves.toBeNull();
   });
 });
+
+
+describe("quiz admission", () => {
+  const quiz = { choices: [{ id: "a", text: "A" }, { id: "b", text: "B" }], correctChoiceId: "b", explanation: "Because B" };
+  it("snapshots the quiz without requiring Python test cases", async () => {
+    const { service, prisma, queue } = createService({ material: materialWith({ quiz, description: "Question" }) });
+    await service.submit(identity, { academyId, classId, materialId, code: "a" });
+    expect(prisma.submission.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      totalCount: 1, code: "a", quizSnapshot: { version: 1, title: "Sum two numbers", description: "Question", definition: quiz }, gradingCases: { create: [] },
+    }) }));
+    expect(queue.enqueue).toHaveBeenCalled();
+  });
+  it("rejects a forged answer before persisting or queuing an attempt", async () => {
+    const { service, prisma, queue } = createService({ material: materialWith({ quiz }) });
+    await expect(service.submit(identity, { academyId, classId, materialId, code: "print('b')" })).rejects.toMatchObject({ code: "EXERCISE_NOT_AVAILABLE" });
+    expect(prisma.submission.create).not.toHaveBeenCalled();
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
+});

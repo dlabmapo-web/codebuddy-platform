@@ -1,3 +1,5 @@
+import { quizDefinitionSchema, sameQuizGrading, type QuizDefinition } from "@cove/shared";
+import { Prisma as PrismaValues } from "../generated/prisma/client.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
@@ -123,6 +125,7 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 }>;
 
 type ExerciseWriteInput = {
+  quiz?: QuizDefinition | null;
   academyId: string;
   courseId: string;
   lectureId: string;
@@ -1044,6 +1047,7 @@ export class CourseService {
               // §9.1 — the same canonical form imported keys use, so a
               // generated workbook round-trips a hand-made problem unchanged.
               externalKey: stableKeyFromUuid(randomUUID()),
+              quiz: input.quiz ?? PrismaValues.DbNull,
               difficulty: input.difficulty,
               description: input.description,
               inputFormat: input.inputFormat,
@@ -1090,6 +1094,11 @@ export class CourseService {
     const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
     const exercise = current.programmingExercise!;
+    // An old client or a forged request cannot reinterpret existing attempts
+    // as a different question type. Create another material to change type.
+    if (Boolean(exercise.quiz) !== Boolean(input.quiz)) {
+      throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
+    }
     if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
     }
@@ -1098,6 +1107,7 @@ export class CourseService {
     assertGradingSupported(input, exercise.timeLimitMs);
     const profileColumns = exerciseProfileColumns(input.grading);
     const gradingChanged =
+      !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
@@ -1105,6 +1115,7 @@ export class CourseService {
       const claimed = await tx.programmingExercise.updateMany({
         where: { materialId: current.id, updatedAt: atRevision(exercise.updatedAt) },
         data: {
+          quiz: input.quiz ?? PrismaValues.DbNull,
           difficulty: input.difficulty,
           description: input.description,
           inputFormat: input.inputFormat,
@@ -1767,6 +1778,7 @@ function serializeExercise(exercise: NonNullable<
   CourseRecord["modules"][number]["lectures"][number]["materials"][number]["programmingExercise"]
 >) {
   return {
+    quiz: exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz),
     materialId: exercise.materialId,
     externalKey: exercise.externalKey,
     legacyProblemNo: exercise.legacyProblemNo,

@@ -171,6 +171,7 @@ export function reviewAsSubmissionResult(
   status: SubmissionStatus,
 ): SubmissionResult {
   return {
+    ...(review.quiz ? { quiz: review.quiz } : {}),
     submissionId: review.submissionId,
     materialId: review.materialId,
     status,

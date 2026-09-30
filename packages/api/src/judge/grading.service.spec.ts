@@ -738,3 +738,26 @@ describe("GradingService.grade — a run given up on is still waited for", () =>
     expect(engineSettled).toBe(true);
   }, 15_000);
 });
+
+
+describe("native quiz grading", () => {
+  const quizSnapshot = { version: 1, title: "Question", description: "Choose", definition: {
+    choices: [{ id: "a", text: "A" }, { id: "b", text: "B" }], correctChoiceId: "b", explanation: "Because B",
+  } };
+  it.each([["a", "FAILED", 0], ["b", "PASSED", 100]])("grades choice %s without invoking Python", async (code, status, score) => {
+    const { service, tx, engine, comparator, points } = createService({ cases: [], profile: { quizSnapshot, code, classId: "class" } });
+    await service.grade(submissionId, async () => undefined);
+    expect(engine.run).not.toHaveBeenCalled();
+    expect(comparator.compare).not.toHaveBeenCalled();
+    expect(tx.submission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status, score }) }));
+    expect(tx.studentExerciseProgress.upsert).toHaveBeenCalled();
+    expect(points.awardSolve).toHaveBeenCalledTimes(score === 100 ? 1 : 0);
+  });
+  it("fails closed on an invalid snapshot without recording an attempt", async () => {
+    const { service, tx, engine, prisma } = createService({ cases: [], profile: { quizSnapshot: { ...quizSnapshot, version: 2 }, code: "b" } });
+    await service.grade(submissionId, async () => undefined);
+    expect(prisma.submission.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "ERRORED" }) }));
+    expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
+    expect(engine.run).not.toHaveBeenCalled();
+  });
+});

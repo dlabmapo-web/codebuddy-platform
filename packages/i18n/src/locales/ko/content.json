@@ -35,9 +35,9 @@
     "exercise_count_other": "실습 문제 {{count}}개"
   },
   "exercise": {
-    "add": "코딩 문제 추가",
+    "add": "문제 추가",
     "back": "코스 빌더로 돌아가기",
-    "create_title": "코딩 문제 만들기",
+    "create_title": "문제 만들기",
     "edit_title": "코딩 문제",
     "read_only": "읽기 전용 검토",
     "saving": "저장하는 중…",

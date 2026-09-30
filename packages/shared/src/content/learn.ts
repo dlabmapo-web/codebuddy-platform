@@ -1,3 +1,4 @@
+import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
 
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
@@ -215,6 +216,7 @@ export const learnExerciseRefSchema = z.object({
 export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
+  quiz: publicQuizSchema.nullable().optional(),
   materialId: z.uuid(),
   title: titleSchema,
   difficulty: exerciseDifficultySchema,

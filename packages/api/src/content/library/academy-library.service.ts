@@ -276,6 +276,7 @@ export class AcademyLibraryService {
             inputFormat: exercise.inputFormat,
             outputFormat: exercise.outputFormat,
             constraints: exercise.constraints,
+            ...(exercise.quiz ? { quiz: exercise.quiz } : {}),
             starterCode: exercise.starterCode,
             solutionCode: exercise.solutionCode,
             language: exercise.language,

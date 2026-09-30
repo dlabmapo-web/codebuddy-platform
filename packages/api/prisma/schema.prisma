@@ -1566,6 +1566,8 @@ model Material {
 }
 
 model ProgrammingExercise {
+  /// Native single-answer quiz. Null keeps the existing Python exercise path.
+  quiz Json?
   materialId        String             @id @map("material_id") @db.Uuid
   externalKey       String             @map("external_key")
   legacyProblemNo   Int?               @map("legacy_problem_no")
@@ -1706,6 +1708,8 @@ model ExerciseCollaborationDocument {
 
 /// One graded attempt at an exercise.
 model Submission {
+  /// Immutable quiz question, choices and answer key, never executed as code.
+  quizSnapshot Json? @map("quiz_snapshot")
   id               String           @id @default(uuid()) @db.Uuid
   userId           String           @map("user_id") @db.Uuid
   materialId       String?          @map("material_id") @db.Uuid

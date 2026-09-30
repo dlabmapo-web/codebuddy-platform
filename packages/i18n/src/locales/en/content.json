@@ -37,10 +37,10 @@
     "exercise_count_other": "{{count}} exercises"
   },
   "exercise": {
-    "add": "Add coding problem",
+    "add": "Add problem",
     "back": "Back to course builder",
-    "create_title": "Create coding problem",
-    "edit_title": "Coding problem",
+    "create_title": "Create problem",
+    "edit_title": "Problem",
     "read_only": "Read-only review",
     "saving": "Saving…",
     "save_failed": "Save failed",

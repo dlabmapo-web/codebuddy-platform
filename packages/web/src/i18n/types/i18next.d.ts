@@ -54,6 +54,7 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common';
     resources: {
+      quiz: typeof import("@cove/i18n/locales/en/quiz.json");
       grading: typeof grading;
       "sample-check": typeof sampleCheck;
       academy: typeof academy;

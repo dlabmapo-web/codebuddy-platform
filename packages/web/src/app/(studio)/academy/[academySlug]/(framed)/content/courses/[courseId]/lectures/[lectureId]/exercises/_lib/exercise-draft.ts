@@ -1,4 +1,6 @@
 import {
+  quizDefinitionSchema,
+  type QuizDefinition,
   gradingProfileIssues,
   hasSampleTestCase,
   legacyCaseGrading,
@@ -54,6 +56,7 @@ export type HintDraft = {
 };
 
 export type ExerciseDraft = {
+  quiz?: QuizDefinition | null;
   title: string;
   difficulty: ExerciseDifficulty;
   description: string;
@@ -99,6 +102,7 @@ export function contextToDraft(
   }
 
   return {
+    quiz: exercise.quiz ?? null,
     title: context.material!.title,
     difficulty: exercise.difficulty,
     description: exercise.description,
@@ -138,6 +142,7 @@ export function contextToDraft(
 
 export function draftToPayload(draft: ExerciseDraft) {
   return {
+    ...(draft.quiz ? { quiz: draft.quiz } : {}),
     title: draft.title.trim(),
     difficulty: draft.difficulty,
     description: draft.description,
@@ -148,7 +153,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     solutionCode: draft.solutionCode,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
-    testCases: draft.testCases
+    testCases: (draft.quiz ? [] : draft.testCases)
       .filter((testCase) => testCase.expectedOutput.trim().length > 0)
       .map((testCase) => ({
         input: testCase.input,
@@ -161,7 +166,7 @@ export function draftToPayload(draft: ExerciseDraft) {
         softPenalty: testCase.softPenalty,
         label: testCase.label.trim() || null,
       })),
-    grading: draft.grading,
+    grading: draft.quiz ? legacyGradingProfile : draft.grading,
     hints: draft.hints
       .filter((hint) => hint.content.trim().length > 0)
       .map((hint) => ({
@@ -191,12 +196,12 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
     },
     {
       id: 'solution',
-      complete: draft.solutionCode.trim().length > 0,
+      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.solutionCode.trim().length > 0,
       optional: false,
     },
     {
       id: 'test',
-      complete: hasSampleTestCase(draft.testCases),
+      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : hasSampleTestCase(draft.testCases),
       optional: true,
     },
   ] as const;

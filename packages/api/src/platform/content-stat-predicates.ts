@@ -1,4 +1,4 @@
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { tenantAcademies } from "./library-academy.js";
 
 /**
@@ -13,7 +13,7 @@ export const problemWithoutTests: Prisma.MaterialWhereInput = {
   type: "PROGRAMMING_EXERCISE",
   OR: [
     { programmingExercise: { is: null } },
-    { programmingExercise: { testCases: { none: {} } } },
+    { programmingExercise: { quiz: { equals: Prisma.DbNull }, testCases: { none: {} } } },
   ],
 };
 

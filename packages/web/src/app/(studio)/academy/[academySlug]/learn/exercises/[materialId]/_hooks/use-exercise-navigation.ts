@@ -177,6 +177,11 @@ export function useExerciseNavigation({
         // Cleanup belongs to a transition that is definitely committing, not
         // merely to an attempted destination.
         beforeTransitionRef.current?.beforeCommit();
+        if (Boolean(next.exercise.quiz) !== Boolean(workspace.exercise.quiz)) {
+          if (options.kind === 'push') router.push(exerciseUrl(materialId));
+          else router.replace(exerciseUrl(materialId));
+          return;
+        }
         setWorkspace(next);
         if (options.kind === 'push') {
           const current = historyEntryRef.current ?? {
@@ -228,7 +233,9 @@ export function useExerciseNavigation({
       fetchWorkspace,
       queryClient,
       restoreRenderedEntry,
+      router,
       workspace.exercise.materialId,
+      workspace.exercise.quiz,
     ],
   );
 

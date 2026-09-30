@@ -14,7 +14,7 @@ export function ExerciseActions({
 }: {
   authoring: ExerciseAuthoring;
 }) {
-  const { t } = useTranslation(['content', 'grading']);
+  const { t } = useTranslation(['content', 'grading', 'quiz']);
   const errorText = useErrorText();
   const {
     editable,
@@ -44,7 +44,7 @@ export function ExerciseActions({
         <p className="mb-4 text-[14px] leading-6 text-sub">
           {missing.length ? t('exercise.still_needed', {
             fields: missing
-              .map((field) => t(`exercise.required.${field}`))
+              .map((field) => field === 'solution' && authoring.draft.quiz ? t('quiz:choose_correct') : t(`exercise.required.${field}`))
               .join(', '),
           }) : t('grading:exercise.controls.fix_fields')}
         </p>

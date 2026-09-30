@@ -277,3 +277,24 @@ describe('grading control save validation', () => {
     expect(payload.testCases[0].softTimeLimitMs).toBeNull();
   });
 });
+
+describe('quiz authoring', () => {
+  const quiz = {
+    choices: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }],
+    correctChoiceId: 'b', explanation: 'Because B',
+  };
+  it('saves a complete quiz without Python code or inherited test cases', () => {
+    const value = draft({ quiz, solutionCode: '', grading: defaultEliceGradingProfile });
+    const payload = draftToPayload(value);
+    expect(payload.testCases).toEqual([]);
+    expect(payload.grading).toEqual(legacyGradingProfile);
+    expect(payload.quiz).toEqual(quiz);
+    expect(exerciseDraftFieldsSchema.safeParse(payload).success).toBe(true);
+    expect(exerciseCompleteness(value).filter(item => !item.optional).every(item => item.complete)).toBe(true);
+  });
+  it('blocks an incomplete quiz answer key', () => {
+    const value = draft({ quiz: { ...quiz, correctChoiceId: 'missing' } });
+    expect(exerciseCompleteness(value).find(item => item.id === 'solution')?.complete).toBe(false);
+    expect(exerciseDraftFieldsSchema.safeParse(draftToPayload(value)).success).toBe(false);
+  });
+});

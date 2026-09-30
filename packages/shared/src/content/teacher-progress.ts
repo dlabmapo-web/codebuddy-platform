@@ -1,3 +1,4 @@
+import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
 
 import { exerciseDifficultySchema } from "./course.js";
@@ -415,6 +416,7 @@ export type TeacherReviewCase = z.infer<typeof teacherReviewCaseSchema>;
 
 export const teacherSubmissionReviewSchema = z
   .object({
+    quiz: quizFeedbackSchema.nullable().optional(),
     submissionId: z.uuid(),
     /**
      * The exercise attempted. The live view reads a review for a student who

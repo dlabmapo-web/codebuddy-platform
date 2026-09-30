@@ -1,3 +1,4 @@
+import { quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   TEACHER_ATTEMPTS_PAGE_SIZE,
@@ -610,6 +611,7 @@ export class TeacherProgressService {
       runtimeMs: submission.runtimeMs,
       solveElapsedSec: submission.solveElapsedSec,
       createdAt: submission.createdAt.toISOString(),
+      quiz: quizFeedback(submission.quizSnapshot, submission.code, submission.status),
       code: submission.code,
       language: submission.language,
       // Context, not authorization: a statement that has since been deleted

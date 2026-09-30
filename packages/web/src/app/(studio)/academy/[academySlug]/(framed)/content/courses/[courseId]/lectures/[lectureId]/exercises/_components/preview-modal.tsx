@@ -4,7 +4,6 @@ import { EyeOff, Info, X } from 'lucide-react';
 import * as React from 'react';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 
 import { type ExerciseDraft } from '../_lib/exercise-draft';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
@@ -56,17 +55,17 @@ export function PreviewModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation(['content', 'courses']);
-  const sampleCases = draft.testCases.filter(
+  const sampleCases = (draft.quiz ? [] : draft.testCases).filter(
     (testCase) => testCase.visibility === 'SAMPLE',
   );
-  const hiddenCount = draft.testCases.length - sampleCases.length;
-  const visibleHints = draft.hints.filter((hint) => hint.content.trim());
-  const constraintLines = draft.constraints
+  const hiddenCount = draft.quiz ? 0 : draft.testCases.length - sampleCases.length;
+  const visibleHints = (draft.quiz ? [] : draft.hints).filter((hint) => hint.content.trim());
+  const constraintLines = (draft.quiz ? '' : draft.constraints)
     .split('\n')
     .map((line) => line.replace(/^[•·-]\s*/, '').trim())
     .filter(Boolean);
   const hasDescription = draft.description.trim().length > 0;
-  const hasFormat =
+  const hasFormat = !draft.quiz &&
     draft.inputFormat.trim().length > 0 || draft.outputFormat.trim().length > 0;
 
   React.useEffect(() => {
@@ -150,6 +149,9 @@ export function PreviewModal({
 
             {/* Format is prose describing the shape of the data. Examples are
                 literal values. Separating them is the whole point here. */}
+            {draft.quiz ? <fieldset className="space-y-3">{draft.quiz.choices.map((choice) => <label key={choice.id} className="flex gap-3 rounded-lg border border-border p-3">
+              <input type="radio" name="preview-choice" /><span className="whitespace-pre-wrap">{choice.text}</span>
+            </label>)}</fieldset> : null}
             {hasFormat ? (
               <Section title={t('exercise.preview_format')}>
                 <dl className="grid gap-4 sm:grid-cols-2">

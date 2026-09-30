@@ -1,3 +1,4 @@
+import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
 
 import { courseProvenanceSchema } from "../platform/library.js";
@@ -149,6 +150,7 @@ export const exerciseHintSchema = z.object({
 });
 
 export const programmingExerciseSchema = z.object({
+  quiz: quizDefinitionSchema.nullable().optional(),
   materialId: z.uuid(),
   externalKey: z.string().trim().min(1).max(200),
   legacyProblemNo: z.number().int().positive().nullable(),
@@ -583,6 +585,7 @@ export function gradingProfileIssues(input: {
 }
 
 export const exerciseDraftFieldsSchema = z.object({
+  quiz: quizDefinitionSchema.nullable().optional(),
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
   description: programmingExerciseDescriptionSchema,
@@ -592,10 +595,7 @@ export const exerciseDraftFieldsSchema = z.object({
   starterCode: z.string().max(100_000),
   solutionCode: z
     .string()
-    .max(programmingExerciseSolutionMaxLength)
-    .refine((value) => value.trim().length > 0, {
-      error: "A correct answer is required.",
-    }),
+    .max(programmingExerciseSolutionMaxLength),
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
   /**
@@ -616,9 +616,16 @@ export const exerciseDraftFieldsSchema = z.object({
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
 
 function refineGrading(
-  value: Pick<ExerciseDraftFields, "grading" | "testCases">,
+  value: ExerciseDraftFields,
   context: z.RefinementCtx,
 ) {
+  if (value.quiz) {
+    if (value.testCases.length || value.grading.mode !== "LEGACY_STDIO") {
+      context.addIssue({ code: "custom", path: ["quiz"], message: "Quiz grading cannot contain Python test cases." });
+    }
+    return;
+  }
+  if (!value.solutionCode.trim()) context.addIssue({ code: "custom", path: ["solutionCode"], message: "A correct answer is required." });
   for (const issue of gradingProfileIssues(value)) {
     context.addIssue({ code: "custom", message: issue.message, path: issue.path });
   }

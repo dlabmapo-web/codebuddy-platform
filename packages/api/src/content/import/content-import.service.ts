@@ -876,6 +876,11 @@ export class ContentImportService {
     },
   ): Promise<string> {
     const { planned, existing } = input;
+    // The programming workbook has no quiz columns. Never partially overwrite
+    // a quiz while leaving its answer key attached to a different question.
+    if (existing?.programmingExercise?.quiz) {
+      throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
+    }
     if (existing && planned.action === "UNCHANGED") return existing.id;
 
     const exerciseFields = {

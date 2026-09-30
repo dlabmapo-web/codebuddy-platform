@@ -1,4 +1,5 @@
 'use client';
+import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
 import type { TeacherReviewCase, TeacherSubmissionReview } from '@cove/shared';
 import type { TFunction } from 'i18next';
@@ -115,7 +116,7 @@ export function SubmissionReview({
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <section
+        {review.quiz ? <QuizFeedback quiz={review.quiz} /> : <section
           aria-label={t('progress.review.editor_label')}
           className="overflow-hidden rounded-card border border-border"
         >
@@ -147,7 +148,7 @@ export function SubmissionReview({
               value={review.code}
             />
           </div>
-        </section>
+        </section>}
 
         <div className="flex flex-col gap-4">
           <section className="rounded-card border border-border bg-card">

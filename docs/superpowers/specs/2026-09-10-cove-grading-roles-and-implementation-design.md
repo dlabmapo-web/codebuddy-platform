@@ -1,7 +1,7 @@
 # Cove grading: roles, pages, permissions, and implementation design
 
-Date: 2026-09-10  
-Status: Proposed implementation design; no application changes or deployment.  
+Date: 2026-09-10
+Status: Proposed implementation design; no application changes or deployment.
 Source baseline: local HEAD `68e12de`. No commit authorized.
 
 ## 1. Purpose and relationship to the research

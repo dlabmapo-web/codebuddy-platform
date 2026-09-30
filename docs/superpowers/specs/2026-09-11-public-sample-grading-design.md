@@ -1,6 +1,6 @@
 # Public sample checks with authoritative grading rules
 
-Date: 2026-09-11  
+Date: 2026-09-11
 Status: Implemented behind the `SERVER_SAMPLE_CHECKS` academy rollout flag (off by default); see "Implementation status" at the end. Capacity measurement and browser E2E remain before broad enablement.
 
 ## Goal
@@ -226,4 +226,3 @@ Not yet done, and required before broad enablement:
 - A browser E2E run.
 - Immediate cancellation of a running program; running work is bounded, not interrupted.
 - A staff sample-check entry point, which remains out of scope.
-

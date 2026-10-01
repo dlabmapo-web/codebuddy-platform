@@ -1,8 +1,8 @@
 'use client';
 
-import { Eye, KeyRound, RefreshCw } from 'lucide-react';
-import { useId, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Eye, EyeOff, KeyRound, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   generateIssuedPassword,
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation';
 
 /**
  * A student's password, for the manager who is their only way back in.
@@ -39,6 +40,11 @@ export function StudentPasswordPanel({
   academyId: string;
   membershipId: string;
 }) {
+  const pathname = usePathname();
+  return <ScopedStudentPasswordPanel key={`${pathname}:${academyId}:${membershipId}`} academyId={academyId} membershipId={membershipId} />;
+}
+
+function ScopedStudentPasswordPanel({ academyId, membershipId }: { academyId: string; membershipId: string }) {
   const { t } = useTranslation('profile');
   const errorText = useErrorText();
   const queryClient = useQueryClient();
@@ -53,34 +59,58 @@ export function StudentPasswordPanel({
       orpc.academyStudentCredentials.get({ academyId, membershipId }),
   });
 
-  function apply(next: StudentCredentialState, password: string) {
-    queryClient.setQueryData(queryKey, next);
-    setRevealed(password);
+  const [pending, setPending] = useState<'issue' | 'reveal' | null>(null);
+  const requestPending = useRef(false);
+  const visibilityEpoch = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hide = useCallback(() => {
+    visibilityEpoch.current += 1;
+    if (timer.current) clearTimeout(timer.current);
+    setRevealed(null);
+  }, []);
+
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') hide();
+    };
+    window.addEventListener('blur', hide);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      visibilityEpoch.current += 1;
+      if (timer.current) clearTimeout(timer.current);
+      window.removeEventListener('blur', hide);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [hide]);
+
+  // Keep plaintext out of both query data and mutation variables/results.
+  async function request(kind: 'issue' | 'reveal', password?: string) {
+    if (requestPending.current) return;
+    requestPending.current = true;
+    setPending(kind);
     setError(null);
+    const epoch = visibilityEpoch.current;
+    try {
+      const result = kind === 'issue'
+        ? await orpc.academyStudentCredentials.issue({ academyId, membershipId, password: password! })
+        : await orpc.academyStudentCredentials.reveal({ academyId, membershipId });
+      queryClient.setQueryData<StudentCredentialState>(queryKey, result.state);
+      if (kind === 'issue') setEditing(false);
+      if (epoch === visibilityEpoch.current && document.visibilityState !== 'hidden') {
+        setRevealed(result.password);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(hide, 30_000);
+      }
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      requestPending.current = false;
+      setPending(null);
+    }
   }
 
-  const set = useMutation({
-    mutationFn: (password: string) =>
-      orpc.academyStudentCredentials.issue({
-        academyId,
-        membershipId,
-        password,
-      }),
-    onSuccess: (result) => {
-      apply(result.state, result.password);
-      setEditing(false);
-    },
-    onError: (cause) => setError(errorText(cause)),
-  });
-
-  const reveal = useMutation({
-    mutationFn: () =>
-      orpc.academyStudentCredentials.reveal({ academyId, membershipId }),
-    onSuccess: (result) => apply(result.state, result.password),
-    onError: (cause) => setError(errorText(cause)),
-  });
-
-  const busy = set.isPending || reveal.isPending;
+  const busy = pending !== null;
   const credential = state.data?.credential ?? null;
 
   return (
@@ -114,7 +144,7 @@ export function StudentPasswordPanel({
               {credential && credential.revealable && !revealed ? (
                 <Button
                   disabled={busy}
-                  onClick={() => reveal.mutate()}
+                  onClick={() => void request('reveal')}
                   size="sm"
                   variant="outline"
                 >
@@ -122,10 +152,17 @@ export function StudentPasswordPanel({
                   {t('credentials.reveal')}
                 </Button>
               ) : null}
+              {revealed ? (
+                <Button onClick={hide} size="sm" variant="outline">
+                  <EyeOff className="size-4" />
+                  {t('credentials.hide')}
+                </Button>
+              ) : null}
               {editing ? null : (
                 <Button
                   disabled={busy}
                   onClick={() => {
+                    hide();
                     setEditing(true);
                     setError(null);
                   }}
@@ -152,20 +189,20 @@ export function StudentPasswordPanel({
               password should know the reading was recorded against them. */}
           {revealed ? (
             <p className="mt-2 text-[13px] leading-5 text-amber-700 dark:text-amber-400">
-              {t('credentials.reveal_audited')}
+              {t('credentials.reveal_audited')} {t('credentials.auto_hide')}
             </p>
           ) : null}
 
           {editing ? (
             <SetPasswordForm
-              busy={set.isPending}
+              busy={pending === 'issue'}
               onCancel={() => {
                 setEditing(false);
                 setError(null);
               }}
               onSubmit={(password) => {
                 setError(null);
-                set.mutate(password);
+                void request('issue', password);
               }}
             />
           ) : null}

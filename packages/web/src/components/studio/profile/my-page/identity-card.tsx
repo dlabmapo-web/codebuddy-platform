@@ -132,7 +132,7 @@ export function IdentityCard({
             </div>
           ) : (
             <p className="text-[14px] text-sub">
-              {t('identity.no_academy_title')}
+              {t(memberships.length === 0 ? 'identity.no_academy_title' : `platform_role.${profile.profile.platformRole}`)}
             </p>
           )}
 
@@ -155,7 +155,7 @@ export function IdentityCard({
       {/* One account, several academies, a different role in each — and each
           pill carries its own role's colour, which is the whole story in a
           strip four centimetres wide. */}
-      {memberships.length > 1 ? (
+      {(memberships.length > 1 || (!academy && memberships.length > 0)) ? (
         <div className="relative border-t border-border px-6 py-4">
           <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-sub">
             {t('identity.switch_label')}

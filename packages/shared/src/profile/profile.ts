@@ -206,3 +206,8 @@ export function resolveDisplayName(input: {
     input.fallback
   );
 }
+
+/** Same normalization and email syntax at the form and API boundary. */
+export const requestEmailChangeSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email()),
+});

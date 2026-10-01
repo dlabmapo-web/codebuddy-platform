@@ -1,3 +1,4 @@
+import { bearerToken } from "../orpc/context.js";
 import { createAccess } from "../orpc/access.js";
 import type { ORPCDeps, ORPCImplementer } from "../orpc/context.js";
 
@@ -12,6 +13,10 @@ export function createProfileRouters(os: ORPCImplementer, deps: ORPCDeps) {
 
   return {
     profile: {
+      requestEmailChange: os.profile.requestEmailChange.use(access.authenticated).handler(({ context, input }) =>
+        deps.profileService.requestEmailChange(context.identity, bearerToken(context.req)!, input.email)),
+      unlinkProvider: os.profile.unlinkProvider.use(access.authenticated).handler(({ context, input }) =>
+        deps.profileService.unlinkProvider(context.identity, bearerToken(context.req)!, input.provider)),
       getMe: os.profile.getMe
         .use(access.authenticated)
         .handler(({ context }) => deps.profileService.getMe(context.identity)),

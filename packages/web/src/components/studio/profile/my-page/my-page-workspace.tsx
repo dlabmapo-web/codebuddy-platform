@@ -65,14 +65,16 @@ export function MyPageWorkspace({
   // is the whole thing `useCallback` is there to prevent.
   const memberships = useMemo(() => profile?.memberships ?? [], [profile]);
   const [academyDirty, setAcademyDirty] = useState(false);
+  const [accountDirty, setAccountDirty] = useState(false);
+  const dirty = academyDirty || accountDirty;
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!academyDirty) return;
+    if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [academyDirty]);
+  }, [dirty]);
 
   /**
    * Moving to another academy is a navigation now, not a swap in place.
@@ -89,13 +91,13 @@ export function MyPageWorkspace({
       );
       if (!membership || nextAcademyId === academyId) return;
       const href = routes.academyMe(membership.academySlug);
-      if (academyDirty) {
+      if (dirty) {
         setPendingHref(href);
         return;
       }
       router.push(href);
     },
-    [academyDirty, academyId, memberships, router],
+    [dirty, academyId, memberships, router],
   );
 
   if (!profile) {
@@ -177,7 +179,8 @@ export function MyPageWorkspace({
       ) : null}
 
       <AccountSections
-        globalImage={academyId ? {
+        onDirtyChange={setAccountDirty}
+        globalImage={{
           pending: page.image.pending,
           error: page.image.error,
           onSelect: (file) => page.image.change({ scope: 'GLOBAL', file }),
@@ -186,7 +189,7 @@ export function MyPageWorkspace({
               .change({ scope: 'GLOBAL', file: null })
               .catch(() => undefined);
           },
-        } : null}
+        }}
         onSaved={page.applyProfile}
         profile={profile}
       />
@@ -199,7 +202,7 @@ export function MyPageWorkspace({
       >
         <ModalContent
           description={t('identity.unsaved_body', {
-            section: t('section.academy.title'),
+            section: t(accountDirty ? 'section.account.title' : 'section.academy.title'),
           })}
           title={t('identity.unsaved_title')}
         >
@@ -216,6 +219,7 @@ export function MyPageWorkspace({
                 const next = pendingHref;
                 setPendingHref(null);
                 setAcademyDirty(false);
+                setAccountDirty(false);
                 if (next) router.push(next);
               }}
               type="button"

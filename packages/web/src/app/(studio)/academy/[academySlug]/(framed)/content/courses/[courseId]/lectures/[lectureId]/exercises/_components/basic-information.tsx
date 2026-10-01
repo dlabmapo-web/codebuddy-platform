@@ -3,7 +3,6 @@ import { BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 
 import type { ExerciseAuthoring } from '../_hooks/use-exercise-authoring';
 import {
@@ -98,6 +97,7 @@ export function BasicInformation({
         )}
       </Field>
 
+      {!draft.quiz ? <>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label={t('exercise.field.input_format')}>
           <textarea
@@ -131,6 +131,7 @@ export function BasicInformation({
         />
       </Field>
 
+      </> : null}
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input
           checked={draft.isVisible}
@@ -149,6 +150,7 @@ export function BasicInformation({
         </span>
       </label>
 
+      {!draft.quiz ? (
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input
           checked={draft.aiFeedbackEnabled}
@@ -168,6 +170,7 @@ export function BasicInformation({
           </span>
         </span>
       </label>
+      ) : null}
     </SectionCard>
   );
 }

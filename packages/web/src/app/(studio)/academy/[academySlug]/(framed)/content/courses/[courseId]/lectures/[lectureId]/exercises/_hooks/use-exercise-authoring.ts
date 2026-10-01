@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import type { ExerciseAuthoringContext } from '@cove/shared';
+import { exerciseDraftFieldsSchema, type ExerciseAuthoringContext } from '@cove/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -17,6 +17,7 @@ import {
   contextToDraft,
   draftToPayload,
   exerciseCompleteness,
+  draftGradingIssues,
   serializeDraft,
   type ExerciseDraft,
 } from '../_lib/exercise-draft';
@@ -69,7 +70,14 @@ export function useExerciseAuthoring({
   const completeness = exerciseCompleteness(draft);
   const completeCount = completeness.filter((item) => item.complete).length;
   const required = completeness.filter((item) => !item.optional);
-  const saveReady = required.every((item) => item.complete);
+  /**
+   * What the server would refuse about the grading settings, shown beside them
+   * and holding Save shut, so an author never learns it from a failed request.
+   */
+  const gradingIssues = draftGradingIssues(draft);
+  const saveReady =
+    required.every((item) => item.complete) && gradingIssues.length === 0 &&
+    exerciseDraftFieldsSchema.safeParse(draftToPayload(draft)).success;
   const missing = required
     .filter((item) => !item.complete)
     .map((item) => item.id);
@@ -96,7 +104,7 @@ export function useExerciseAuthoring({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = draftToPayload(draft);
+      const payload = exerciseDraftFieldsSchema.parse(draftToPayload(draft));
       if (savedMaterialId && expectedUpdatedAt) {
         return orpc.academyCourses.updateExercise({
           ...target,
@@ -161,6 +169,7 @@ export function useExerciseAuthoring({
     completeness,
     completeCount,
     saveReady,
+    gradingIssues,
     notGradeable,
     missing,
     errorFor,

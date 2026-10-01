@@ -16,13 +16,56 @@ export type PasswordIdentityStatus = "present" | "absent" | "unavailable";
 @Injectable()
 export class SupabaseAuthService {
   private readonly client: SupabaseClient;
+  private readonly authUrl: string;
+  private readonly authKey: string;
 
   constructor(config: ConfigService<ApiEnvironment, true>) {
+    this.authUrl = config.get("SUPABASE_URL", { infer: true }).replace(/\/$/, "") + "/auth/v1";
+    this.authKey = config.get("SUPABASE_SECRET_KEY", { infer: true });
     this.client = createClient(
       config.get("SUPABASE_URL", { infer: true }),
       config.get("SUPABASE_SECRET_KEY", { infer: true }),
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
+  }
+
+  /** User-scoped provider requests: never use admin.updateUserById for email,
+   * which would skip ownership confirmation. Never share a mutable session. */
+  private async updateIdentity(token: string, path: string, method: string, body?: object) {
+    let response: Response;
+    try {
+      response = await fetch(`${this.authUrl}${path}`, {
+        method,
+        headers: { apikey: this.authKey, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new AppException("PROFILE_SECURITY_CHANGE_FAILED", HttpStatus.BAD_GATEWAY);
+    }
+    if (!response.ok) {
+      if (response.status === 429) throw new AppException("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
+      throw new AppException("PROFILE_SECURITY_CHANGE_FAILED", HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  async requestEmailChange(token: string, email: string): Promise<void> {
+    await this.updateIdentity(token, "/user", "PUT", { email });
+  }
+
+  async unlinkProvider(token: string, authUserId: string, provider: string): Promise<void> {
+    const { data, error } = await this.client.auth.getUser(token);
+    if (error || !data.user || data.user.id !== authUserId) {
+      throw new AppException("TOKEN_INVALID", HttpStatus.UNAUTHORIZED);
+    }
+    const identities = data.user.identities ?? [];
+    const identity = identities.find((item) => item.provider === provider && item.provider !== "email");
+    if (!identity || identities.length < 2) {
+      throw new AppException("PROFILE_LAST_IDENTITY_REQUIRED", HttpStatus.CONFLICT);
+    }
+    // Supabase independently enforces ownership and the last-identity guard,
+    // including concurrent unlink attempts from another browser tab.
+    await this.updateIdentity(token, `/user/identities/${encodeURIComponent(identity.identity_id)}`, "DELETE");
   }
 
   async verifyAccessToken(token: string): Promise<SupabaseIdentity> {

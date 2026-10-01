@@ -173,18 +173,20 @@ describe("PlatformAcademyService.create", () => {
    * created without them found monitoring and ranking dead and unrevivable.
    * A new academy gets the whole product; a manager may switch any of it off.
    */
-  it("switches every feature on for the new academy", async () => {
+  it("switches every feature on for the new academy, except those still in rollout", async () => {
     const { service, transaction } = createService();
 
     await service.create(identity, input);
 
     expect(transaction.academyFeatureFlag.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: academyFeatureNames.map((feature) => ({
-          academyId: "academy-1",
-          feature,
-          isEnabled: true,
-        })),
+        data: academyFeatureNames
+          .filter((feature) => feature !== "SERVER_SAMPLE_CHECKS")
+          .map((feature) => ({
+            academyId: "academy-1",
+            feature,
+            isEnabled: true,
+          })),
         skipDuplicates: true,
       }),
     );

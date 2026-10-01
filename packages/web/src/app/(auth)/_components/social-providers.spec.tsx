@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // `vi.mock` is hoisted above the file's own bindings, so the mutable flag the
 // tests flip has to be created inside the factory and read back afterwards.
-vi.mock('@/lib/config', () => ({ publicConfig: { kakaoAuthEnabled: false } }));
+vi.mock('@/lib/config', () => ({ publicConfig: { kakaoAuthEnabled: false, naverAuthEnabled: false, googleAuthEnabled: false } }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -35,13 +35,30 @@ import {
   socialProviders,
 } from './social-providers';
 
-const config = publicConfig as { kakaoAuthEnabled: boolean };
+const config = publicConfig as { kakaoAuthEnabled: boolean; naverAuthEnabled: boolean; googleAuthEnabled: boolean };
 
 beforeEach(() => {
   config.kakaoAuthEnabled = false;
+  config.naverAuthEnabled = true;
+  config.googleAuthEnabled = true;
 });
 
 describe('social provider availability', () => {
+  it('offers no social sign-in when all deployment gates are off', () => {
+    config.googleAuthEnabled = false;
+    config.naverAuthEnabled = false;
+    expect(availableSocialProviders()).toEqual([]);
+    expect(isSocialProviderAvailable('google')).toBe(false);
+  });
+  it('hides Naver and refuses direct starts while unavailable', () => {
+    config.naverAuthEnabled = false;
+    expect(isSocialProviderAvailable('custom:naver')).toBe(false);
+    expect(availableSocialProviders().map(({ id }) => id)).toEqual(['google']);
+    const html = renderToStaticMarkup(<SocialLoginButtons />);
+    expect(html).not.toContain('Naver');
+    expect(html).toContain('grid-cols-1');
+  });
+
   it('keeps Kakao in the registry whatever the flag says', () => {
     expect(socialProviders.map(({ id }) => id)).toEqual([
       'google',

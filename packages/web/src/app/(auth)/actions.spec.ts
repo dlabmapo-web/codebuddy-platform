@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   config: {
     siteUrl: 'http://localhost:3000',
+    googleAuthEnabled: true,
     turnstileSiteKey: 'test-site-key' as string | null,
   },
   resolveSignInEmail: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   beginStudentSession: vi.fn(),
   redirect: vi.fn(),
   signInWithPassword: vi.fn(),
+  signOut: vi.fn(),
   signInWithOAuth: vi.fn(),
   signUp: vi.fn(),
   signUpStudent: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: () => Promise.resolve({
     auth: {
       signInWithPassword: mocks.signInWithPassword,
+      signOut: mocks.signOut,
       signInWithOAuth: mocks.signInWithOAuth,
       signUp: mocks.signUp,
     },
@@ -63,6 +66,7 @@ import { ORPCError } from '@orpc/client';
 
 import {
   loginAction,
+  logoutAction,
   signupAction,
   startSocialAuthAction,
 } from './actions';
@@ -97,6 +101,7 @@ const signupFields = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.config.turnstileSiteKey = 'test-site-key';
+  mocks.signOut.mockResolvedValue({ error: null });
   mocks.resolveSignInEmail.mockResolvedValue({ email: 'minsu@example.com' });
   mocks.checkUsernameAvailable.mockResolvedValue({ available: true });
   mocks.beginStudentSession.mockResolvedValue({});
@@ -248,16 +253,50 @@ describe('loginAction failure reporting', () => {
     });
   });
 
-  // The uniform answer stays uniform. A wrong name and a wrong password must
-  // remain indistinguishable, or the form becomes a way to enumerate accounts.
-  it('keeps one answer for anything that would reveal whether an account exists', async () => {
+  it('reports a wrong password for a known username', async () => {
     mocks.signInWithPassword.mockResolvedValue({
-      data: { session: null },
-      error: { code: 'invalid_credentials' },
+      data: { session: null }, error: { code: 'invalid_credentials' },
     });
-
     await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.password_incorrect',
+    });
+  });
+
+  it('reports an unknown username after provider verification', async () => {
+    mocks.resolveSignInEmail.mockResolvedValue({ email: 'nobody@unresolved.invalid' });
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null }, error: { code: 'invalid_credentials' },
+    });
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.username_not_found',
+    });
+    expect(mocks.signInWithPassword).toHaveBeenCalledWith(expect.objectContaining({
+      options: { captchaToken: withCaptcha.captchaToken },
+    }));
+  });
+
+  it('does not replace CAPTCHA errors with unknown-username errors', async () => {
+    mocks.resolveSignInEmail.mockResolvedValue({ email: 'nobody@unresolved.invalid' });
+    await expect(loginAction({}, formData(withCaptcha))).resolves.toEqual({
+      message: 'error.captcha_failed',
+    });
+  });
+
+  it('keeps legacy email sign-in failures generic', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null }, error: { code: 'invalid_credentials' },
+    });
+    await expect(loginAction({}, formData({ ...withCaptcha, identifier: 'person@example.com' }))).resolves.toEqual({
       message: 'error.credentials_rejected',
+    });
+  });
+
+  it('lets the provider reject short login passwords instead of enforcing signup rules', async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { session: null }, error: { code: 'invalid_credentials' },
+    });
+    await expect(loginAction({}, formData({ ...withCaptcha, password: 'wrong' }))).resolves.toEqual({
+      message: 'error.password_incorrect',
     });
   });
 
@@ -389,6 +428,21 @@ describe('signupAction failure reporting', () => {
 });
 
 describe('social authentication history', () => {
+  it('refuses a direct Google action when the provider is disabled', async () => {
+    mocks.config.googleAuthEnabled = false;
+    try {
+      await expect(startSocialAuthAction({ provider: 'google' })).resolves.toEqual({ message: 'error.social_unavailable' });
+      expect(mocks.signInWithOAuth).not.toHaveBeenCalled();
+    } finally { mocks.config.googleAuthEnabled = true; }
+  });
+
+  it('refuses disabled Naver before creating an intent or contacting the provider', async () => {
+    await expect(startSocialAuthAction({ provider: 'custom:naver', academyId: signupFields.academyId }))
+      .resolves.toEqual({ message: 'error.social_unavailable' });
+    expect(mocks.signInWithOAuth).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
   it('replaces the login or signup entry when leaving for the provider', async () => {
     mocks.signInWithOAuth.mockResolvedValue({
       data: { url: 'https://accounts.example.test/authorize' },
@@ -442,20 +496,12 @@ describe('signupAction for a student', () => {
     expect(mocks.signUpStudent.mock.calls[0]![0]).not.toHaveProperty('email');
   });
 
-  it('signs the student in with the address the API generated', async () => {
+  it('sends a created student to login with a success notice and no automatic session', async () => {
     mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
-    mocks.signInWithPassword.mockResolvedValue({
-      data: { session: { access_token: 'token' } },
-      error: null,
-    });
-
     await signupAction({}, formData(studentFields));
-
-    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
-      email: 's-abc@no-email.cove.invalid',
-      password: 'a-valid-password',
-    });
-    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+    expect(mocks.beginStudentSession).not.toHaveBeenCalled();
+    expect(mocks.redirect).toHaveBeenCalledWith('/login?signup=success', 'replace');
   });
 
   it('reports a taken username without creating anything', async () => {
@@ -469,20 +515,7 @@ describe('signupAction for a student', () => {
     expect(mocks.signInWithPassword).not.toHaveBeenCalled();
   });
 
-  it('treats a failed sign-in as success, because the account exists', async () => {
-    // Reporting a failure here would send somebody to try again and be told
-    // the name is taken — by their own account.
-    mocks.signUpStudent.mockResolvedValue({ email: 's-abc@no-email.cove.invalid' });
-    mocks.signInWithPassword.mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
 
-    await expect(signupAction({}, formData(studentFields))).resolves.toEqual({
-      success: true,
-      message: 'error.signup_student_sign_in',
-    });
-  });
 });
 
 describe('signupAction password confirmation', () => {
@@ -501,5 +534,20 @@ describe('signupAction password confirmation', () => {
     ).resolves.toEqual({ message: 'validation:password_mismatch' });
     expect(mocks.signUp).not.toHaveBeenCalled();
     expect(mocks.signUpStudent).not.toHaveBeenCalled();
+  });
+});
+
+describe('logoutAction', () => {
+  it('signs out immediately and replaces the current history entry', async () => {
+    await logoutAction();
+    expect(mocks.signOut).toHaveBeenCalledOnce();
+    expect(mocks.redirect).toHaveBeenCalledWith('/login', 'replace');
+  });
+
+  it('does not report success or redirect when the provider rejects logout', async () => {
+    const error = new Error('Sign-out failed');
+    mocks.signOut.mockResolvedValue({ error });
+    await expect(logoutAction()).rejects.toBe(error);
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });

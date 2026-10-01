@@ -1,4 +1,4 @@
-import type { CaseOutcome, SubmissionResult } from '@cove/shared';
+import { isOutputCorrect, type CaseOutcome, type SubmissionResult } from '@cove/shared';
 
 /**
  * Display helpers for a verdict. The score itself is computed by the judge —
@@ -35,8 +35,9 @@ export function resultPresentation(
   }
   if (result.status === 'PASSED') return 'accepted';
 
+  // A soft-limit warning is a correct answer, not the case that failed.
   const failure = result.cases.find(
-    (item) => item.outcome !== 'PASSED' && item.outcome !== 'SKIPPED',
+    (item) => !isOutputCorrect(item.outcome) && item.outcome !== 'SKIPPED',
   );
   if (!failure) return 'not_accepted';
 
@@ -84,7 +85,9 @@ export function firstFailedSample(
   return (
     result.cases.find(
       (item) =>
-        item.isSample && item.outcome !== 'PASSED' && item.outcome !== 'SKIPPED',
+        item.isSample &&
+        !isOutputCorrect(item.outcome) &&
+        item.outcome !== 'SKIPPED',
     ) ?? null
   );
 }
@@ -102,6 +105,9 @@ export function hiddenResultCount(result: SubmissionResult | null): number {
 
 export const outcomeTone: Record<CaseOutcome, 'pass' | 'fail' | 'limit' | 'idle'> = {
   PASSED: 'pass',
+  // The answer was right, so it reads as a pass; the points it earned are a
+  // separate question, and the detail line is where the penalty is explained.
+  PASSED_WITH_WARNING: 'pass',
   WRONG_OUTPUT: 'fail',
   RUNTIME_ERROR: 'fail',
   TIME_LIMIT: 'limit',

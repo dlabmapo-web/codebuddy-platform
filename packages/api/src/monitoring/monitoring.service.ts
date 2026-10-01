@@ -1,3 +1,4 @@
+import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   displayableEmail,
@@ -655,6 +656,7 @@ export class MonitoringService {
         // answer has exactly one route out of this service, and it is audited.
         programmingExercise: {
           select: {
+            quiz: true,
             difficulty: true,
             language: true,
             description: true,
@@ -664,6 +666,8 @@ export class MonitoringService {
             starterCode: true,
             timeLimitMs: true,
             memoryLimitMb: true,
+            gradingMode: true,
+            gradingRevision: true,
             testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
             hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
           },
@@ -698,9 +702,14 @@ export class MonitoringService {
         inputFormat: exercise.inputFormat,
         outputFormat: exercise.outputFormat,
         constraints: exercise.constraints,
+        quiz: publicQuiz(exercise.quiz),
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
+        gradingMode: exercise.gradingMode,
+        gradingRevision: exercise.gradingRevision,
+        // The teacher's copy runs locally and never claims a server verdict.
+        serverSampleChecks: false,
         // Sample cases only, and hidden ones as a count. The teacher surface
         // reuses the student shape precisely so it cannot become the one place
         // a hidden expectation leaks.
@@ -710,6 +719,7 @@ export class MonitoringService {
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
+            comparator: testCase.comparator,
           })),
         hints: exercise.hints.map((hint) => ({
           position: hint.position,

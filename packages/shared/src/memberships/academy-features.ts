@@ -19,10 +19,24 @@ export const academyFeatureNames = [
   "STUDENT_CLASS_STANDING",
   "STUDENT_POINTS",
   "STUDENT_CLASS_LEADERBOARD",
+  "SERVER_SAMPLE_CHECKS",
 ] as const;
 
 export const academyFeatureNameSchema = z.enum(academyFeatureNames);
 export type AcademyFeatureName = z.infer<typeof academyFeatureNameSchema>;
+
+/**
+ * Features still being rolled out, which a new academy does *not* start with.
+ *
+ * Everything else is on for a new academy (see above). A rollout gate is the
+ * opposite on purpose: it is switched on academy by academy once the feature
+ * has shown it holds up there — server sample checks share the judge with
+ * official grading, so turning them on everywhere at once is exactly the
+ * capacity risk the gate exists to avoid.
+ */
+export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set([
+  "SERVER_SAMPLE_CHECKS",
+]);
 
 /**
  * The named class board is computed from the point ledger, so it cannot stand

@@ -25,9 +25,10 @@ export function StudentEnrollmentDialog({
   const list = manager.eligibleStudents.map((student) => ({
     id: student.membershipId,
     // Search matches on both, so a Manager can type either half.
-    name: [student.displayName, student.email].filter(Boolean).join(' · ') ||
+    name: [student.displayName, student.username, student.email].filter(Boolean).join(' · ') ||
       t('detail.students_panel.no_name'),
     email: student.email,
+    username: student.username,
     displayName: student.displayName,
     academyImageUrl: student.academyImageUrl,
     globalImageUrl: student.globalImageUrl,
@@ -84,7 +85,7 @@ export function StudentEnrollmentDialog({
                           t('detail.students_panel.no_name')}
                       </span>
                       <span className="truncate text-[12px] text-sub">
-                        {student.email ?? t('detail.students_panel.no_email')}
+                        {student.username ? `@${student.username}` : student.email ?? t('detail.students_panel.no_email')}
                       </span>
                     </span>
                   </span>

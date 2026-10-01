@@ -137,7 +137,8 @@
     "academy": "학원",
     "none": "설정 안 함",
     "optional": "선택",
-    "characters_left": "{{count}}자 남음"
+    "characters_left": "{{count}}자 남음",
+    "theme_help": "테마는 이 기기에 즉시 적용됩니다. 언어와 시간대는 변경 사항을 저장하면 적용됩니다."
   },
   "action": {
     "save": "변경 사항 저장",
@@ -184,7 +185,9 @@
     "sessions": "활성 세션",
     "sessions_unavailable": "아직 세션 목록은 지원하지 않습니다. 비밀번호를 변경하면 다른 기기에서 로그아웃됩니다.",
     "phone_unverified": "연락처를 저장만 하며 아직 인증하지는 않습니다.",
-    "last_sign_in": "마지막 로그인 {{date}}"
+    "last_sign_in": "마지막 로그인 {{date}}",
+    "unlink_provider": "{{provider}} 연결 해제",
+    "keep_identity": "계정에 로그인 수단을 하나 이상 유지해야 합니다."
   },
   "learning": {
     "class_meta": "코스 {{courses}}개 · 학생 {{students}}명",
@@ -301,7 +304,9 @@
     "changed_by_student": "학생이 직접 변경했습니다",
     "changed_by_student_hint": "코브는 이 비밀번호를 알 수 없습니다. 학생이 잊었다면 새 비밀번호를 설정하세요.",
     "reveal_audited": "이 열람은 기록되었습니다.",
-    "explanation": "학생 계정은 이메일이 없어 스스로 비밀번호를 재설정할 수 없습니다. 코브는 관리자가 설정한 비밀번호만 보관하며, 학생이 직접 바꾸는 즉시 삭제합니다."
+    "explanation": "학생 계정은 이메일이 없어 스스로 비밀번호를 재설정할 수 없습니다. 코브는 관리자가 설정한 비밀번호만 보관하며, 학생이 직접 바꾸는 즉시 삭제합니다.",
+    "hide": "숨기기",
+    "auto_hide": "30초 후 또는 이 화면을 벗어나면 자동으로 숨겨집니다."
   },
   "roles": {
     "title": "역할",

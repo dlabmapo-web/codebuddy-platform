@@ -85,5 +85,22 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.submissionService.list(context.identity, input)
       ),
+    // Practice runs of one public case. Every call is reauthorized; holding a
+    // check id grants nothing.
+    startSampleCheck: os.learn.startSampleCheck
+      .use(access.studentAuthenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.start(context.identity, input)
+      ),
+    getSampleCheck: os.learn.getSampleCheck
+      .use(access.studentAuthenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.get(context.identity, input)
+      ),
+    cancelSampleCheck: os.learn.cancelSampleCheck
+      .use(access.studentAuthenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.cancel(context.identity, input)
+      ),
   };
 }

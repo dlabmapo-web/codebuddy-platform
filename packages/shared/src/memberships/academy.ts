@@ -32,6 +32,7 @@ export const academyJoinRequestDetailSchema = z.object({
     id: z.uuid(),
     email: z.email().nullable(),
     displayName: z.string().nullable(),
+    username: z.string().nullable().optional(),
     ...memberAvatarUrlsShape,
   }),
   message: z.string().nullable(),

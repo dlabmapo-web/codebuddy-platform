@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type * as React from 'react';
 import { useState, useTransition } from 'react';
-import { Check, Moon, Sun, UserRound } from 'lucide-react';
+import { Check, LogOut, Moon, Sun, UserRound } from 'lucide-react';
 import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
 import type { AcademyRole } from '@cove/shared';
+
+import { useSignOut } from '@/app/(auth)/_components/sign-out-control';
 
 import {
   DropdownMenu,
@@ -177,6 +179,7 @@ export function ProfileControl({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const logout = useSignOut();
   const held = roles ?? [];
   const canSwitch = Boolean(academyId && role && held.length > 1);
 
@@ -214,133 +217,149 @@ export function ProfileControl({
   }
 
   return (
-    <DropdownMenu onOpenChange={setOpen} open={open}>
-      {/*
-        `rounded-full`, unlike every other control on this bar.
-        A focus ring follows the trigger's shape, and a rounded *square* ring
-        around a circular avatar reads as a stray border rather than as focus —
-        which is how it looked after closing the menu, when Radix returns focus
-        to the trigger and the browser treats that as keyboard focus. Made
-        concentric with the avatar, the same ring reads as the control being
-        focused, which is what it means.
-      */}
-      <DropdownMenuTrigger
-        aria-label={t('my_page')}
-        className={cn(trigger, 'w-9 rounded-full px-0', className)}
-        title={t('my_page')}
-      >
-      {/*
-        * The ring is the whole reason this is not a bare `ProfileAvatar`.
-        *
-        * The header sits on `--card`, which is pure white in the light theme,
-        * and so is the top of most photographs — a face on a white studio
-        * background, or the placeholder's own pale disc. Without an edge the
-        * avatar bleeds into the bar and the one control every reader reaches
-        * for is the hardest one to find.
-        *
-        * Drawn from `--sub` at low opacity rather than from `--border`: the
-        * border token is `#E5E8EC`, which is tuned for dividing two panels and
-        * disappears against white at this size. A muted-foreground ring reads
-        * as an edge in both themes, and inverts correctly — `--sub` is light on
-        * the dark theme's dark bar.
-        */}
-      <ProfileAvatar
-        academyImageUrl={academyImageUrl}
-        className="ring-1 ring-sub/35"
-        globalImageUrl={imageUrl}
-        externalAvatarUrl={avatarUrl}
-        name={name}
-        size="sm"
-      />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[13rem] p-1.5">
-        {/* Who this is, before what they can do. The name alone is ambiguous
-            in an academy where somebody wears three hats. */}
-        {name ? (
-          <div className="px-2 pb-1.5 pt-1">
-            <p className="truncate text-[13px] font-bold text-ink">{name}</p>
-            {held.length > 0 ? (
-              <span className="mt-1 flex flex-wrap gap-1">
-                {held.map((held_role) => (
-                  <RoleBadge key={held_role} role={held_role} />
-                ))}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-        {name ? <DropdownMenuSeparator /> : null}
-
+    <>
+      <DropdownMenu onOpenChange={setOpen} open={open}>
         {/*
-          Inside an academy this goes to that academy's My Page, which is where
-          the reader's profile *for this academy* is edited and where the rail
-          stays on screen. The bare `/account` is the answer only where there is
-          no academy to scope to — the console, and an applicant's lobby — and
-          it is still the page an account with no membership gets.
+          `rounded-full`, unlike every other control on this bar.
+          A focus ring follows the trigger's shape, and a rounded *square* ring
+          around a circular avatar reads as a stray border rather than as focus —
+          which is how it looked after closing the menu, when Radix returns focus
+          to the trigger and the browser treats that as keyboard focus. Made
+          concentric with the avatar, the same ring reads as the control being
+          focused, which is what it means.
         */}
-        <DropdownMenuItem asChild>
-          <Link
-            href={academySlug ? routes.academyMe(academySlug) : routes.account}
-          >
-            <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
-            {t('my_page')}
-          </Link>
-        </DropdownMenuItem>
+        <DropdownMenuTrigger
+          aria-label={t('my_page')}
+          className={cn(trigger, 'w-9 rounded-full px-0', className)}
+          title={t('my_page')}
+        >
+        {/*
+          * The ring is the whole reason this is not a bare `ProfileAvatar`.
+          *
+          * The header sits on `--card`, which is pure white in the light theme,
+          * and so is the top of most photographs — a face on a white studio
+          * background, or the placeholder's own pale disc. Without an edge the
+          * avatar bleeds into the bar and the one control every reader reaches
+          * for is the hardest one to find.
+          *
+          * Drawn from `--sub` at low opacity rather than from `--border`: the
+          * border token is `#E5E8EC`, which is tuned for dividing two panels and
+          * disappears against white at this size. A muted-foreground ring reads
+          * as an edge in both themes, and inverts correctly — `--sub` is light on
+          * the dark theme's dark bar.
+          */}
+        <ProfileAvatar
+          academyImageUrl={academyImageUrl}
+          className="ring-1 ring-sub/35"
+          globalImageUrl={imageUrl}
+          externalAvatarUrl={avatarUrl}
+          name={name}
+          size="sm"
+        />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[13rem] p-1.5">
+          {/* Who this is, before what they can do. The name alone is ambiguous
+              in an academy where somebody wears three hats. */}
+          {name ? (
+            <div className="px-2 pb-1.5 pt-1">
+              <p className="truncate text-[13px] font-bold text-ink">{name}</p>
+              {held.length > 0 ? (
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {held.map((held_role) => (
+                    <RoleBadge key={held_role} role={held_role} />
+                  ))}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {name ? <DropdownMenuSeparator /> : null}
 
-        {/* Only when there is a choice. A switcher offering one role is
-            furniture, and most members hold exactly one. */}
-        {canSwitch ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t('role_switcher.label')}</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              onValueChange={(next) => {
-                selectRole(next as AcademyRole);
-              }}
-              value={role ?? undefined}
+          {/*
+            Inside an academy this goes to that academy's My Page, which is where
+            the reader's profile *for this academy* is edited and where the rail
+            stays on screen. The bare `/account` is the answer only where there is
+            no academy to scope to — the console, and an applicant's lobby — and
+            it is still the page an account with no membership gets.
+          */}
+          <DropdownMenuItem asChild>
+            <Link
+              href={academySlug ? routes.academyMe(academySlug) : routes.account}
             >
-              {held.map((option) => (
-                /*
-                 * The role in play is coloured, not just bolder.
-                 *
-                 * This menu answers a question the reader asks in a glance —
-                 * "which hat am I wearing" — and weight alone made them read
-                 * all three labels to find it. Tinted in the role's own hue,
-                 * with the tick that hue too, the answer is the first thing
-                 * seen and it matches the badge beside their name above.
-                 */
-                <DropdownMenuRadioItem
-                  className={cn('gap-2', roleSelectedClass(option))}
-                  key={option}
-                  value={option}
-                >
-                  <span
-                    aria-hidden
-                    className={cn('size-2 rounded-full', roleDotClass(option))}
-                  />
-                  {t(`common:role.${option}`)}
-                  {option === role ? (
-                    <Check
+              <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
+              {t('my_page')}
+            </Link>
+          </DropdownMenuItem>
+
+          {/* Only when there is a choice. A switcher offering one role is
+              furniture, and most members hold exactly one. */}
+          {canSwitch ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('role_switcher.label')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                onValueChange={(next) => {
+                  selectRole(next as AcademyRole);
+                }}
+                value={role ?? undefined}
+              >
+                {held.map((option) => (
+                  /*
+                   * The role in play is coloured, not just bolder.
+                   *
+                   * This menu answers a question the reader asks in a glance —
+                   * "which hat am I wearing" — and weight alone made them read
+                   * all three labels to find it. Tinted in the role's own hue,
+                   * with the tick that hue too, the answer is the first thing
+                   * seen and it matches the badge beside their name above.
+                   */
+                  <DropdownMenuRadioItem
+                    className={cn('gap-2', roleSelectedClass(option))}
+                    key={option}
+                    value={option}
+                  >
+                    <span
                       aria-hidden
-                      className="ml-auto size-3.5"
-                      strokeWidth={2.5}
+                      className={cn('size-2 rounded-full', roleDotClass(option))}
                     />
-                  ) : null}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+                    {t(`common:role.${option}`)}
+                    {option === role ? (
+                      <Check
+                        aria-hidden
+                        className="ml-auto size-3.5"
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={logout.pending}
+            onSelect={() => {
+              setOpen(false);
+              logout.signOut();
+            }}
+          >
+            <LogOut aria-hidden className="size-4" strokeWidth={1.75} />
+            {t('common:action.sign_out')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {logout.feedback}
+    </>
   );
 }
 
 /** The set, in the order they appear at the top right of every page. */
 export function HeaderControls({
+  identityLabel,
   className,
   account,
   notifications,
 }: {
+  identityLabel?: React.ReactNode;
   className?: string;
   /**
    * The bell, rendered by whichever shell mounted this.
@@ -369,6 +388,7 @@ export function HeaderControls({
       <LanguageControl />
       <ThemeControl />
       {notifications}
+      {identityLabel}
       {account ? (
         <ProfileControl
           academyId={account.academyId}

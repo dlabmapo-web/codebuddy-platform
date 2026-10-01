@@ -79,6 +79,8 @@ export default async function StudentMemberPage({
         resources={resources}
       >
         <StudentDetailView
+          academyId={academyId}
+          canRename={fromRoster}
           academySlug={academySlug}
           /*
            * The same fact the back link turns on, read the other way. A

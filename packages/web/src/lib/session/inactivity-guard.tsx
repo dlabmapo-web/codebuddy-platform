@@ -6,11 +6,11 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { logoutAction } from '@/app/(auth)/actions';
-import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 import { cn } from '@/lib/utils';
 
 import { flushDrafts } from './draft-flush';
+import { isSessionEnded } from './expired-session';
 import {
   INACTIVITY_CHANNEL,
   INACTIVITY_RETURN_KEY,
@@ -137,13 +137,7 @@ export function InactivityGuard() {
       deadlineRef.current = deadline;
       setObserved({ now: Date.now(), deadline });
     } catch (error) {
-      const code = toApiError(error).code;
-      if (
-        code === 'STUDENT_SESSION_EXPIRED' ||
-        code === 'STUDENT_SESSION_UNAVAILABLE' ||
-        code === 'AUTHENTICATION_REQUIRED' ||
-        code === 'TOKEN_INVALID'
-      ) {
+      if (isSessionEnded(error)) {
         void signOutRef.current();
       }
     } finally {
@@ -159,6 +153,11 @@ export function InactivityGuard() {
   const reset = React.useCallback(
     ({ force = false, share = true }: { force?: boolean; share?: boolean } = {}) => {
       const now = Date.now();
+      if (signingOutRef.current) return deadlineRef.current ?? now;
+      if (deadlineRef.current !== null && deadlineRef.current <= now) {
+        void signOutRef.current();
+        return deadlineRef.current;
+      }
       const next = nextDeadline(now);
       adopt(next);
       if (!share) return next;
@@ -226,7 +225,12 @@ export function InactivityGuard() {
   /* ----------------------------------------------------------- activity */
 
   React.useEffect(() => {
-    const onActivity = () => reset();
+    const onActivity = (event: Event) => {
+      // Pointer/key capture runs before a button's click. Extending here can
+      // unmount the expiry dialog before its sign-out button gets that click.
+      if (event.target instanceof Element && event.target.closest('[data-session-controls]')) return;
+      reset();
+    };
     for (const type of SESSION_ACTIVITY_EVENTS) {
       // Passive and captured: the handler never calls `preventDefault`, and
       // capture means a component that stops propagation cannot make a student
@@ -427,6 +431,7 @@ function ExpiryDialog({
         aria-describedby="inactivity-dialog-body"
         aria-labelledby="inactivity-dialog-title"
         aria-modal="false"
+        data-session-controls
         className="w-full max-w-sm rounded-card border border-border bg-card p-5 shadow-[var(--shadow-modal)]"
         role="alertdialog"
       >

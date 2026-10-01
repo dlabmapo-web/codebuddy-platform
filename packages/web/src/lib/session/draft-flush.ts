@@ -15,6 +15,8 @@
 type Flush = () => Promise<unknown>;
 
 const flushes = new Set<Flush>();
+// A stalled editor must not hold an expired session open indefinitely.
+export const DRAFT_FLUSH_TIMEOUT_MS = 2_000;
 
 /**
  * Registers a draft flush for as long as its editor is mounted.
@@ -39,6 +41,16 @@ export function registerDraftFlush(flush: Flush): () => void {
  */
 export async function flushDrafts(): Promise<boolean> {
   if (flushes.size === 0) return true;
-  const results = await Promise.allSettled([...flushes].map((flush) => flush()));
-  return results.every((result) => result.status === 'fulfilled');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.allSettled([...flushes].map((flush) => Promise.resolve().then(flush)))
+        .then((results) => results.every((result) => result.status === 'fulfilled')),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), DRAFT_FLUSH_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

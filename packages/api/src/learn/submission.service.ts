@@ -1,3 +1,4 @@
+import { quizDefinitionSchema, quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -18,6 +19,10 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import {
+  gradingSnapshotFor,
+  resolveGradingProfile,
+} from "../judge/grading-profile.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
@@ -117,12 +122,31 @@ export class SubmissionService {
           },
         });
         const exercise = material?.programmingExercise;
-        if (!material || !exercise || exercise.testCases.length === 0) {
+        if (!material || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
           throw new AppException(
             "EXERCISE_NOT_AVAILABLE",
             HttpStatus.NOT_FOUND,
           );
         }
+        const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
+        if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
+          throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
+        }
+        // Admitted only if a grader exists for it. Refusing here, before an
+        // attempt is recorded, beats a submission that can only ever fail as
+        // a judge error.
+        const profile = resolveGradingProfile(exercise, exercise.testCases);
+        if (!quiz && profile.kind === "unsupported") {
+          this.logger.error(
+            `material ${material.id} has an ungradable profile: ${profile.reason}`,
+          );
+          throw new AppException(
+            "GRADING_UNAVAILABLE",
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
+        const snapshot = gradingSnapshotFor(exercise, { engineVersion });
 
         await this.classContext.resolveWith(tx, {
           academyId: input.academyId,
@@ -155,9 +179,12 @@ export class SubmissionService {
             language: exercise.language,
             timeLimitMs: exercise.timeLimitMs,
             memoryLimitMb: exercise.memoryLimitMb,
+            // The whole profile, frozen: grading never reads the exercise.
+            ...snapshot.submission,
+            ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
-            totalCount: exercise.testCases.length,
-            engineVersion: this.config.get("PYODIDE_VERSION", { infer: true }),
+            totalCount: quiz ? 1 : exercise.testCases.length,
+            engineVersion,
             solveSessionId: solveSession?.id ?? null,
             solveElapsedSec: solveSession
               ? solveElapsedSeconds(solveSession.startedAt, new Date())
@@ -172,18 +199,11 @@ export class SubmissionService {
             modulePosition: courseModule.position,
             lecturePosition: material.lecture.position,
             problemPosition: material.position,
-            gradingCases: {
-              create: exercise.testCases.map((testCase, index) => ({
-                position: index + 1,
-                input: testCase.input,
-                expectedOutput: testCase.expectedOutput,
-                isSample: testCase.visibility === "SAMPLE",
-              })),
-            },
+            gradingCases: { create: quiz ? [] : snapshot.cases },
           },
           select: { id: true },
         });
-        return { id: created.id, totalCount: exercise.testCases.length };
+        return { id: created.id, totalCount: quiz ? 1 : exercise.testCases.length };
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -285,14 +305,23 @@ export class SubmissionService {
         .filter((testCase) => testCase.isSample)
         .map((testCase) => [testCase.position, testCase]),
     );
+    const weighted = submission.gradingMode !== "LEGACY_STDIO";
+    const weightByPosition = new Map(
+      submission.gradingCases.map((testCase) => [testCase.position, testCase.weight]),
+    );
 
     return {
+      quiz: quizFeedback(submission.quizSnapshot, submission.code, submission.status),
       submissionId: submission.id,
       materialId: submission.sourceMaterialId,
       status: submission.status,
       passedCount: submission.passedCount,
       totalCount: submission.totalCount,
       score: submission.score,
+      // An aborted run's partial weights are diagnostics, not a grade: shown
+      // beside a judge error they would read as a score the student earned.
+      earnedWeight: submission.gradingAborted ? null : submission.earnedWeight,
+      possibleWeight: submission.gradingAborted ? null : submission.possibleWeight,
       runtimeMs: submission.runtimeMs,
       failureReason: submission.failureReason,
       elapsedSec: Math.max(
@@ -320,6 +349,8 @@ export class SubmissionService {
           input: sample?.input ?? null,
           expectedOutput: sample?.expectedOutput ?? null,
           actualOutput: item.isSample ? item.actualOutput : null,
+          weight: weighted ? (weightByPosition.get(item.position) ?? null) : null,
+          awardedWeight: weighted ? item.awardedWeight : null,
         };
       }),
     };

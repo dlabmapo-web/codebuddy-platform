@@ -79,6 +79,9 @@
       "point_policy": {
         "reset": "포인트 정책 초기화",
         "updated": "포인트 정책 변경"
+      },
+      "student": {
+        "renamed": "학생 학원 이름 변경"
       }
     },
     "class": {
@@ -195,6 +198,16 @@
     "monitoring": {
       "exercise_solution": {
         "viewed": "모범 답안 열람"
+      }
+    },
+    "profile": {
+      "email": {
+        "change_requested": "이메일 변경 요청",
+        "change_sent": "이메일 변경 확인 발송"
+      },
+      "identity": {
+        "unlink_requested": "소셜 계정 연결 해제 요청",
+        "unlinked": "소셜 계정 연결 해제"
       }
     }
   }

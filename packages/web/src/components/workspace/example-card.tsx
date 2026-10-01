@@ -48,7 +48,7 @@ export function ExampleCard({
         </h4>
       </header>
 
-      <div className="grid min-w-0 gap-3 @md:grid-cols-2">
+      <div className="grid min-w-0 gap-3">
         <ValueBlock
           action={
             <button
@@ -73,7 +73,13 @@ export function ExampleCard({
           value={testCase.input}
         />
         <ValueBlock
-          label={t('workspace.stdout')}
+          // For a contains or pattern rule this is not the output itself, and
+          // labelling it "output" would tell a student to print a regex.
+          label={
+            testCase.comparator === 'STDOUT'
+              ? t('workspace.stdout')
+              : t(`workspace.sample_rule.${testCase.comparator}`)
+          }
           value={testCase.expectedOutput}
         />
       </div>

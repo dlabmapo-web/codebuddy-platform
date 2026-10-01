@@ -7,7 +7,7 @@
     "placeholder": "과목 검색"
   },
   "state": {
-    "draft": "초안",
+    "draft": "배포 전",
     "published": "배포됨",
     "retired": "내림"
   },

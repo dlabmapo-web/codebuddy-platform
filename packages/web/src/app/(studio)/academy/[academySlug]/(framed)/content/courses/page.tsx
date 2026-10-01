@@ -63,7 +63,6 @@ export default async function CoursesPage({
     >
     <StudioPage
       bleed
-      description={t('description')}
       title={t('title')}
     >
       {courses ? (

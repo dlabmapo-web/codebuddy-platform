@@ -1,7 +1,6 @@
 import { AlertTriangle, Eye, Save } from 'lucide-react';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
 import type { ExerciseAuthoring } from '../_hooks/use-exercise-authoring';
@@ -15,7 +14,7 @@ export function ExerciseActions({
 }: {
   authoring: ExerciseAuthoring;
 }) {
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'grading', 'quiz']);
   const errorText = useErrorText();
   const {
     editable,
@@ -43,11 +42,11 @@ export function ExerciseActions({
       {/* A disabled button is a dead end without this: it names what is left. */}
       {blocked ? (
         <p className="mb-4 text-[14px] leading-6 text-sub">
-          {t('exercise.still_needed', {
+          {missing.length ? t('exercise.still_needed', {
             fields: missing
-              .map((field) => t(`exercise.required.${field}`))
+              .map((field) => field === 'solution' && authoring.draft.quiz ? t('quiz:choose_correct') : t(`exercise.required.${field}`))
               .join(', '),
-          })}
+          }) : t('grading:exercise.controls.fix_fields')}
         </p>
       ) : null}
 

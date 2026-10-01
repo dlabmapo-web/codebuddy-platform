@@ -56,6 +56,12 @@
   "SUBMISSION_NOT_FOUND": "제출 기록을 찾을 수 없습니다.",
   "SOLVE_SESSION_INVALID": "문제 풀이 세션이 만료되었습니다. 다시 제출해 주세요.",
   "GRADING_UNAVAILABLE": "현재 채점 서비스를 사용할 수 없습니다. 코드는 저장되었습니다.",
+  "SAMPLE_CHECK_NOT_FOUND": "이 예제는 사용할 수 없습니다.",
+  "SAMPLE_CHECK_STALE": "문제가 수정되었습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
+  "SAMPLE_CHECK_UNAVAILABLE": "예제를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+  "SAMPLE_CHECK_BUSY": "예제 확인이 이미 진행 중입니다. 끝날 때까지 기다려 주세요.",
+  "SAMPLE_CHECK_RATE_LIMITED": "예제 확인 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+  "SAMPLE_CHECK_CONFLICT": "같은 요청이 다른 코드로 이미 시작되었습니다. 다시 시도해 주세요.",
   "MONITORING_DISABLED": "이 학원에서는 실시간 모니터링이 활성화되어 있지 않습니다.",
   "MONITORING_ACCESS_DENIED": "이 반의 담당 강사가 아닙니다.",
   "MONITORING_STUDENT_UNAVAILABLE": "지금은 이 학생을 모니터링할 수 없습니다.",
@@ -137,5 +143,7 @@
   "OPERATION_RUN_NOT_PENDING": "이 실행은 이미 시작되었습니다. 열어서 진행 상황을 확인하세요.",
   "OPERATION_PLAN_TOO_LARGE": "이 재채점은 한 번에 실행하기에 너무 큽니다. 엔지니어링팀에 문의하세요.",
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요.",
-  "MONITORING_HELP_KEY_REUSED": "이미 다른 작업에 사용된 요청입니다. 새로고침 후 다시 시도해 주세요."
+  "MONITORING_HELP_KEY_REUSED": "이미 다른 작업에 사용된 요청입니다. 새로고침 후 다시 시도해 주세요.",
+  "PROFILE_SECURITY_CHANGE_FAILED": "계정 보안 설정을 변경하지 못했습니다. 다시 시도해주세요.",
+  "PROFILE_LAST_IDENTITY_REQUIRED": "계정에 로그인 수단을 하나 이상 유지해야 합니다."
 }

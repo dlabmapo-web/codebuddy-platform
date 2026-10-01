@@ -5,7 +5,6 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { AuthCard } from '../_components/auth-card';
-import { socialProviders } from '../_components/social-providers';
 import { clientAddress } from '../_lib/client-address';
 import { currentAccountDestination } from '../_lib/signed-out-only';
 import { SignupForm } from './_components/signup-form';
@@ -53,22 +52,6 @@ async function invitedAcademy(): Promise<
   }
 }
 
-/**
- * A provider's own name for itself, from the one list that holds them.
- *
- * Matched on the bare id as well as the contract id, because Supabase reports
- * a custom OIDC provider under its short name in `app_metadata` while Cove
- * addresses it as `custom:naver`. An id that matches neither yields nothing,
- * and the panel falls back to its provider-less sentence rather than printing
- * whatever was in the query string.
- */
-function socialProviderLabel(provider?: string): string | undefined {
-  if (!provider) return undefined;
-  return socialProviders.find(
-    ({ id }) => id === provider || id === `custom:${provider}`,
-  )?.label;
-}
-
 export default async function SignupPage({
   searchParams,
 }: {
@@ -76,7 +59,7 @@ export default async function SignupPage({
     invited?: string;
     academy?: string;
     error?: string;
-    provider?: string;
+    kind?: string;
   }>;
 }) {
   const destination = await currentAccountDestination();
@@ -89,28 +72,22 @@ export default async function SignupPage({
     getServerTranslation(['auth']),
     invitedAcademy(),
   ]);
-  // `no-account` is deliberately not one of these. It is not an error the
-  // academy picker should carry — the visitor did nothing wrong — so it gets
-  // its own panel above the form instead of red text beside a field.
   const socialError = query.error === 'academy-required'
     ? t('error.academy_required')
     : query.error === 'oauth'
       ? t('error.oauth_failed')
       : undefined;
-  const noAccount = query.error === 'no-account';
   return (
     <AuthCard
-      description={t('signup.description')}
       title={t('signup.title')}
     >
       <SignupForm
+        initialKind={query.kind === 'staff' || query.error === 'no-account' ? 'STAFF' : 'STUDENT'}
         invitedAcademy={invited}
         invitedAcademyId={
           invited?.id ?? (query.invited === '1' ? query.academy : undefined)
         }
-        noAccount={noAccount}
         socialError={socialError}
-        socialProvider={socialProviderLabel(query.provider)}
       />
     </AuthCard>
   );

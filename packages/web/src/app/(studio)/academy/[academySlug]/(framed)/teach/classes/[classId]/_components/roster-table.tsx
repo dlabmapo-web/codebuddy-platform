@@ -64,7 +64,7 @@ export function RosterTable({
         cell: ({ row }) => {
           const student = row.original;
           return (
-            <div className="flex min-w-0 max-w-xs items-center gap-2.5">
+            <Link href={routes.academyStudent(academySlug, student.membershipId)} className="flex min-w-0 max-w-xs items-center gap-2.5">
               {/* Empty `alt`: the name is written right beside it, and a
                   reader should not hear the same person twice. */}
               <ProfileAvatar
@@ -84,7 +84,7 @@ export function RosterTable({
                     : t('roster.membership_inactive')}
                 </p>
               </div>
-            </div>
+            </Link>
           );
         },
       },

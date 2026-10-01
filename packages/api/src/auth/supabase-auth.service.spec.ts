@@ -1,5 +1,5 @@
 import { ConfigService } from "@nestjs/config";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { SupabaseAuthService } from "./supabase-auth.service.js";
@@ -110,5 +110,44 @@ describe("SupabaseAuthService.setPassword", () => {
     await expect(
       service.setPassword("auth-user-id", "minji1234"),
     ).rejects.toMatchObject({ code: "STUDENT_CREDENTIAL_TARGET_INVALID" });
+  });
+});
+
+
+describe("user-scoped security changes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("requests confirmation with the user's bearer token, never an admin email update", async () => {
+    const { service } = createService();
+    const fetcher = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetcher);
+    await service.requestEmailChange("user-token", "new@example.com");
+    expect(fetcher).toHaveBeenCalledWith("https://example.supabase.co/auth/v1/user", expect.objectContaining({
+      method: "PUT", headers: expect.objectContaining({ Authorization: "Bearer user-token" }), body: JSON.stringify({ email: "new@example.com" }),
+    }));
+  });
+  it("reports provider rate limiting without claiming success", async () => {
+    const { service } = createService();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 429 })));
+    await expect(service.requestEmailChange("token", "new@example.com")).rejects.toMatchObject({ code: "RATE_LIMITED" });
+  });
+  it.each([
+    ["google", [{ provider: "google", identity_id: "one" }]],
+    ["email", [{ provider: "email", identity_id: "one" }, { provider: "google", identity_id: "two" }]],
+    ["naver", [{ provider: "email", identity_id: "one" }, { provider: "google", identity_id: "two" }]],
+  ])("refuses unlinking %s when it is last, not social, or not owned", async (provider, identities) => {
+    const { service } = createService();
+    Object.defineProperty(service, "client", { value: { auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "owner", identities } }, error: null }) } } });
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await expect(service.unlinkProvider("token", "owner", provider)).rejects.toMatchObject({ code: "PROFILE_LAST_IDENTITY_REQUIRED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("resolves the current identity id server-side and retains the other method", async () => {
+    const { service } = createService();
+    const getUser = vi.fn().mockResolvedValue({ data: { user: { id: "owner", identities: [{ provider: "email", identity_id: "email-id" }, { provider: "google", identity_id: "google-id" }] } }, error: null });
+    Object.defineProperty(service, "client", { value: { auth: { getUser } } });
+    const fetcher = vi.fn().mockResolvedValue(new Response("{}", { status: 200 })); vi.stubGlobal("fetch", fetcher);
+    await service.unlinkProvider("user-token", "owner", "google");
+    expect(getUser).toHaveBeenCalledWith("user-token");
+    expect(fetcher).toHaveBeenCalledWith("https://example.supabase.co/auth/v1/user/identities/google-id", expect.objectContaining({ method: "DELETE", headers: expect.objectContaining({ Authorization: "Bearer user-token" }) }));
   });
 });

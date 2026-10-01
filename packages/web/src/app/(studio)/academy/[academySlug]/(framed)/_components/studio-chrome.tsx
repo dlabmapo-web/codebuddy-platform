@@ -24,7 +24,8 @@ import {
 import { SupportBanner } from '@/components/studio/support-banner';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
-import { supportNamespaces } from '@/i18n/namespaces';
+import { ResumePrompt } from '@/lib/session/resume-prompt';
+import { sessionNamespaces, supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
 import { heldRoles, resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
@@ -231,6 +232,7 @@ export async function StudioChrome({
         isStudent={isStudent(shown)}
       />
       <SidebarInset>
+        <SessionResumeNotice />
         {/* Above the sticky header and inside the content column: as a sibling
             of the shell it rendered behind a full-height fixed layout, which
             is the one place a warning must never be. */}
@@ -251,15 +253,20 @@ export async function StudioChrome({
            * academies am I looking at — and it is something the layout knows,
            * so no page has to hand it up.
            */}
-          <span className="truncate text-[14px] font-semibold text-sub">
-            {academyName}
-          </span>
+          {viewRole !== 'STUDENT' ? (
+            <span className="truncate text-[14px] font-semibold text-sub">{academyName}</span>
+          ) : null}
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
           {/* The role switcher rides in this menu rather than beside the
               academy name: which role you are working as is a fact about the
               reader, and the bar is about the academy. */}
           <HeaderControls
+            identityLabel={viewRole === 'STUDENT' ? (
+              <span className="mx-2 max-w-48 truncate text-[12px] font-semibold text-sub" title={`${academyName} · ${viewer?.name ?? ''}`}>
+                {academyName} · {viewer?.name}
+              </span>
+            ) : undefined}
             account={
               viewer
                 ? {
@@ -335,6 +342,17 @@ async function SupportGrantNotice({
         grant={grant}
         viewRole={viewRole}
       />
+    </PageTranslationsProvider>
+  );
+}
+
+/** Render inside the sidebar inset so fixed navigation cannot cover the offer. */
+async function SessionResumeNotice() {
+  const locale = await getLocale();
+  const { resources } = await initTranslations(locale, sessionNamespaces);
+  return (
+    <PageTranslationsProvider locale={locale} namespaces={sessionNamespaces} resources={resources}>
+      <ResumePrompt />
     </PageTranslationsProvider>
   );
 }

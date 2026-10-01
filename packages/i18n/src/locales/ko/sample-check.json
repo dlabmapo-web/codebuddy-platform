@@ -1,0 +1,23 @@
+{
+  "workspace": {
+    "sample_checked_on_submit": "테스트 {{number}} 실행 완료. 이 문제의 채점 결과는 제출 후 확인할 수 있습니다.",
+    "sample_check_banner": "예제 확인 · 테스트 {{number}}",
+    "sample_check_queued": "채점 서버에서 대기 중…",
+    "sample_check_running": "채점 서버에서 실행 중…",
+    "sample_check_stopping": "중지 중… 실행 중인 작업이 끝나면 멈춥니다.",
+    "sample_check_passed": "예제 {{number}} 통과. 제출하면 모든 정답을 채점합니다.",
+    "sample_check_warning": "예제 {{number}}의 출력은 맞지만 시간 기준을 초과해 감점됩니다.",
+    "sample_check_mismatch": "예제 {{number}}의 출력이 일치하지 않습니다.",
+    "sample_check_runtime_error": "예제 {{number}}에서 오류가 발생했습니다.",
+    "sample_check_time_limit": "예제 {{number}}이(가) 시간 제한을 넘었습니다.",
+    "sample_check_memory_limit": "예제 {{number}}이(가) 메모리 제한을 넘었습니다.",
+    "sample_check_unavailable": "예제를 확인할 수 없습니다. 다시 시도하세요.",
+    "sample_check_timed_out": "예제 확인 시간이 초과되었습니다.",
+    "sample_check_cancelled": "예제 확인을 중지했습니다.",
+    "sample_check_expired": "이 예제 확인은 만료되었습니다. 다시 실행해 주세요.",
+    "sample_check_truncated": "(출력은 줄여 표시하며 전체 출력을 채점했습니다.)",
+    "sample_check_earlier_code": "테스트 {{number}} 실행 당시 코드의 결과입니다.",
+    "sample_check_refresh": "문제가 변경되었습니다. 새로고침하세요.",
+    "stopping": "중지하는 중…"
+  }
+}

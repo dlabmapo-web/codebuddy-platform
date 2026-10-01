@@ -79,6 +79,9 @@
       "point_policy": {
         "reset": "Point policy reset to defaults",
         "updated": "Point policy changed"
+      },
+      "student": {
+        "renamed": "Student academy name changed"
       }
     },
     "class": {
@@ -195,6 +198,16 @@
     "monitoring": {
       "exercise_solution": {
         "viewed": "Model solution viewed"
+      }
+    },
+    "profile": {
+      "email": {
+        "change_requested": "Email change requested",
+        "change_sent": "Email change confirmation sent"
+      },
+      "identity": {
+        "unlink_requested": "Social account disconnect requested",
+        "unlinked": "Social account disconnected"
       }
     }
   }

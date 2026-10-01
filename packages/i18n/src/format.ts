@@ -54,8 +54,8 @@ export function formatShortDate(value: Date | string, locale: Locale): string {
  * Node and browsers can choose different locale punctuation (`,` versus
  * `at`) for one combined Intl formatter, which breaks React hydration.
  */
-export function formatDateTime(value: Date | string, locale: Locale): string {
-  return `${formatDate(value, locale)} · ${formatTime(value, locale)}`;
+export function formatDateTime(value: Date | string, locale: Locale, seconds = false): string {
+  return `${formatDate(value, locale)} · ${formatTime(value, locale, seconds)}`;
 }
 
 /** Aug 25 · 2:54 PM · 8월 25일 · 오후 2:54 */
@@ -67,7 +67,7 @@ export function formatShortDateTime(
 }
 
 /** 3:40 PM · 오후 3:40 */
-export function formatTime(value: Date | string, locale: Locale): string {
+export function formatTime(value: Date | string, locale: Locale, seconds = false): string {
   // ICU 78 changed ko-KR's day-period text from 오전/오후 to AM/PM. Node and
   // browsers do not necessarily ship the same ICU release, so relying on that
   // localized token can also create a React hydration mismatch. Read only the
@@ -85,11 +85,12 @@ export function formatTime(value: Date | string, locale: Locale): string {
     throw new RangeError("Unable to format time");
   }
 
+  const secondSuffix = seconds ? `:${String(new Date(value).getUTCSeconds()).padStart(2, "0")}` : "";
   const hour12 = hour24 % 12 || 12;
   const isAfternoon = hour24 >= 12;
   return locale === "ko"
-    ? `${isAfternoon ? "오후" : "오전"} ${hour12}:${minute}`
-    : `${hour12}:${minute} ${isAfternoon ? "PM" : "AM"}`;
+    ? `${isAfternoon ? "오후" : "오전"} ${hour12}:${minute}${secondSuffix}`
+    : `${hour12}:${minute}${secondSuffix} ${isAfternoon ? "PM" : "AM"}`;
 }
 
 /** 1,204 in both locales, but via Intl so a third language stays correct. */

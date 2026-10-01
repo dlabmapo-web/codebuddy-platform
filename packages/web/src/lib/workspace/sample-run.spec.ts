@@ -1,10 +1,14 @@
+import { runSampleSequence } from './sample-run';
 import { describe, expect, it } from 'vitest';
 
 import {
   answerStdinRequest,
   createRunId,
+  comparesSampleLocally,
   createSampleInputQueue,
+  stdinActionFor,
   isSampleOutputMatch,
+  stopActionFor,
   normalizeSampleOutput,
   resolveSampleVerdict,
 } from './sample-run';
@@ -121,5 +125,126 @@ describe('createRunId', () => {
     } finally {
       Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true });
     }
+  });
+});
+
+
+describe('public sample sequence', () => {
+  it('runs every sample sequentially and preserves result order', async () => {
+    const order: number[] = [];
+    const results: number[] = [];
+    await runSampleSequence(3, async (index) => {
+      order.push(index);
+      await Promise.resolve();
+      return { index, outcome: { stopped: false } };
+    }, () => false, (result) => results.push(result.index));
+    expect(order).toEqual([0, 1, 2]);
+    expect(results).toEqual(order);
+  });
+  it('never starts another worker after Stop', async () => {
+    const started: number[] = [];
+    await runSampleSequence(3, async (index) => {
+      started.push(index);
+      return { outcome: { stopped: true } };
+    }, () => false, () => undefined);
+    expect(started).toEqual([0]);
+  });
+  it('honours cancellation between samples and rejected busy runs', async () => {
+    let cancelled = false;
+    let started = 0;
+    await runSampleSequence(3, async () => {
+      started++;
+      return { outcome: { stopped: false } };
+    }, () => cancelled, () => { cancelled = true; });
+    expect(started).toBe(1);
+    await runSampleSequence(3, async () => { started++; return { outcome: null }; }, () => false, () => { throw new Error('No completed run'); });
+    expect(started).toBe(2);
+  });
+});
+
+describe('stdinActionFor', () => {
+  it('feeds the next queued line while one remains', () => {
+    expect(stdinActionFor({ next: '9', hasFixedInput: true })).toEqual({
+      kind: 'line',
+      text: '9',
+    });
+  });
+
+  it('reports end of input once a sample run runs out', () => {
+    // `sys.stdin.read()` reads until EOF. Prompting instead left the run
+    // waiting on a student with nothing left to type, so a program that
+    // passed on Submit hung in the browser.
+    expect(stdinActionFor({ next: undefined, hasFixedInput: true })).toEqual({
+      kind: 'eof',
+    });
+  });
+
+  it('reports end of input for a sample whose input is empty', () => {
+    expect(
+      stdinActionFor({ next: undefined, hasFixedInput: true }),
+    ).toEqual({ kind: 'eof' });
+  });
+
+  it('still prompts a plain run, where a person is the input', () => {
+    expect(stdinActionFor({ next: undefined, hasFixedInput: false })).toEqual({
+      kind: 'prompt',
+    });
+  });
+});
+
+describe('samples on weighted problems', () => {
+  it('claims no verdict when the server grades by rules the browser does not reproduce', () => {
+    expect(
+      resolveSampleVerdict({
+        stdout: 'A  \nB',
+        expectedOutput: 'A\nB',
+        stopped: false,
+        failed: false,
+        comparesLocally: false,
+      }),
+    ).toEqual({ kind: 'unchecked' });
+  });
+
+  it('still reports a crash, which needs no comparison', () => {
+    expect(
+      resolveSampleVerdict({
+        stdout: '',
+        expectedOutput: 'x',
+        stopped: false,
+        failed: true,
+        comparesLocally: false,
+      }),
+    ).toEqual({ kind: 'skipped', reason: 'error' });
+  });
+
+  it('compares locally only for legacy grading', () => {
+    expect(comparesSampleLocally('LEGACY_STDIO')).toBe(true);
+    expect(comparesSampleLocally(undefined)).toBe(true);
+    expect(comparesSampleLocally('ELICE_STDIO')).toBe(false);
+  });
+});
+
+describe('stopping a server check', () => {
+  it('remembers a Stop pressed before the check has an id', () => {
+    // The reported issue: the press was dropped, so a student who hit Stop
+    // while the check was being accepted watched it run anyway.
+    expect(stopActionFor({ checkId: null, cancelInFlight: false })).toEqual({
+      kind: 'defer',
+    });
+  });
+
+  it('cancels by id once there is one', () => {
+    expect(stopActionFor({ checkId: 'c1', cancelInFlight: false })).toEqual({
+      kind: 'send',
+      checkId: 'c1',
+    });
+  });
+
+  it('does not send a second cancel while one is on its way', () => {
+    expect(stopActionFor({ checkId: 'c1', cancelInFlight: true })).toEqual({ kind: 'none' });
+  });
+
+  it('has nothing to stop when no check is in flight', () => {
+    expect(stopActionFor(null)).toEqual({ kind: 'none' });
   });
 });

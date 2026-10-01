@@ -1,3 +1,4 @@
+import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import {
@@ -260,7 +261,7 @@ export class LearnService {
     const exercise = material.programmingExercise;
     const { courseModule } = material.lecture;
     const course = courseModule.course;
-    const [draft, progress] = await Promise.all([
+    const [draft, progress, sampleChecks] = await Promise.all([
       this.prisma.exerciseDraft.findUnique({
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { code: true, updatedAt: true },
@@ -269,6 +270,18 @@ export class LearnService {
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { status: true, gradingRevision: true },
       }),
+      // Only enhanced problems have a server check; legacy samples stay local.
+      exercise.gradingMode === "ELICE_STDIO"
+        ? this.prisma.academyFeatureFlag.findUnique({
+            where: {
+              academyId_feature: {
+                academyId: course.academyId,
+                feature: "SERVER_SAMPLE_CHECKS",
+              },
+            },
+            select: { isEnabled: true },
+          })
+        : null,
     ]);
     const ordered = flattenOutlineExercises(
       nonemptyModules(course).map((module) => ({
@@ -292,6 +305,7 @@ export class LearnService {
         lecture: { id: material.lecture.id, title: material.lecture.title },
       },
       exercise: {
+        quiz: publicQuiz(exercise.quiz),
         materialId: material.id,
         title: material.title,
         difficulty: exercise.difficulty,
@@ -303,12 +317,16 @@ export class LearnService {
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
+        gradingMode: exercise.gradingMode,
+        gradingRevision: exercise.gradingRevision,
+        serverSampleChecks: sampleChecks?.isEnabled ?? false,
         sampleTestCases: exercise.testCases
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
+            comparator: testCase.comparator,
           })),
         hints: exercise.hints.map((hint) => ({
           position: hint.position,

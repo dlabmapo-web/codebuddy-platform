@@ -16,6 +16,7 @@ import { RemotePointer } from '@/components/monitoring/remote-pointer';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
+import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { useLayoutTranslation } from '@/i18n';
 import { orpc } from '@/lib/orpc';
@@ -85,7 +86,8 @@ export function LiveWorkspace({
     studentMembershipId: membershipId,
   });
   const runner = usePythonRunner();
-  const runSample = useSampleRunner(runner);
+  // Local runs only: the teacher's copy never claims a server verdict.
+  const { runSample } = useSampleRunner(runner);
   const preferences = useEditorPreferences();
 
   const [outputTab, setOutputTab] = React.useState<LiveOutputTab>('you');
@@ -312,10 +314,12 @@ export function LiveWorkspace({
       if (!sample) return;
       setOutputTab('you');
       setActiveSample(index);
-      await runSample(getCode(), sample, index);
+      await runSample(getCode(), sample, index, {
+        gradingMode: liveExercise?.exercise.gradingMode,
+      });
       setActiveSample(null);
     },
-    [getCode, runSample, sampleTestCases],
+    [getCode, liveExercise, runSample, sampleTestCases],
   );
 
   // A run the teacher has not looked at is worth a dot; one they are watching
@@ -532,7 +536,21 @@ export function LiveWorkspace({
           />
 
           <section className="flex min-w-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-1 flex-col" ref={editorContainerRef}>
+            {shown?.exercise.quiz ? (
+              <div className="min-h-0 flex-1 space-y-4 overflow-auto p-5">
+                {submissionResult.result?.quiz && display.isLive ? (
+                  <QuizFeedback quiz={submissionResult.result.quiz} />
+                ) : (
+                  <ol className="space-y-3">
+                    {shown.exercise.quiz.choices.map((choice, index) => (
+                      <li key={choice.id} className="whitespace-pre-wrap rounded-lg border border-border bg-card p-4">
+                        {index + 1}. {choice.text}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            ) : <div className="flex min-h-0 flex-1 flex-col" ref={editorContainerRef}>
               {/* theme-lint-ignore — editor chrome, dark in both themes */}
               <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
                 {/* theme-lint-ignore */}
@@ -605,7 +623,7 @@ export function LiveWorkspace({
                   }
                 />
               </div>
-            </div>
+            </div>}
 
             {!previewed ? (
               <div className="shrink-0" {...surfaceProps('feedback')}>

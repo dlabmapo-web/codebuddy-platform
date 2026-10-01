@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslation } from 'react-i18next';
+import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { useExerciseAuthoring } from '../_hooks/use-exercise-authoring';
@@ -27,6 +29,7 @@ export function ExerciseWorkspace({
   canEdit: boolean;
   initialSolutionCode: string;
 }) {
+  const { t: tq } = useTranslation('quiz');
   const authoring = useExerciseAuthoring({
     target: { academyId, courseId, lectureId },
     initialContext,
@@ -40,12 +43,22 @@ export function ExerciseWorkspace({
       <ExerciseHeader authoring={authoring} context={initialContext} />
 
       <main className="min-w-0 space-y-5">
+        <label className="block space-y-2">{tq('type')}
+          <select className="block rounded-lg border border-border bg-card p-3" value={draft.quiz ? 'quiz' : 'python'}
+            disabled={!editable || Boolean(initialContext.material)}
+            onChange={(event) => update('quiz', event.target.value === 'quiz'
+              ? { choices: Array.from({ length: 4 }, () => ({ id: crypto.randomUUID(), text: '' })), correctChoiceId: '', explanation: '' }
+              : null)}>
+            <option value="python">{tq('programming')}</option><option value="quiz">{tq('single_answer')}</option>
+          </select>
+        </label>
         <BasicInformation
           authoring={authoring}
           draft={draft}
           editable={editable}
           update={update}
         />
+        {draft.quiz ? <QuizEditor value={draft.quiz} disabled={!editable} onChange={(quiz) => update('quiz', quiz)} /> : <>
         <StarterCodeEditor
           editable={editable}
           onChange={(starterCode) => update('starterCode', starterCode)}
@@ -61,14 +74,21 @@ export function ExerciseWorkspace({
         <AnswersEditor
           editable={editable}
           error={authoring.errorFor('test')}
+          grading={draft.grading}
+          gradingIssues={authoring.gradingIssues}
           testCases={draft.testCases}
           update={(testCases) => update('testCases', testCases)}
+          updateGrading={(grading, testCases) => {
+            update('grading', grading);
+            update('testCases', testCases);
+          }}
         />
         <HintsEditor
           editable={editable}
           hints={draft.hints}
           update={(hints) => update('hints', hints)}
         />
+        </>}
         <ExerciseActions authoring={authoring} />
       </main>
 

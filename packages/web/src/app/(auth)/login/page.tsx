@@ -9,7 +9,7 @@ import { LoginForm } from './_components/login-form';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string; signup?: string }>;
 }) {
   const destination = await currentAccountDestination();
   if (destination) {
@@ -25,11 +25,11 @@ export default async function LoginPage({
       : undefined;
   return (
     <AuthCard
-      description={t('login.description')}
       title={t('login.title')}
     >
       <LoginForm
         initialError={initialError}
+        signupComplete={query.signup === 'success'}
         passwordReset={query.reset === 'success'}
       />
     </AuthCard>

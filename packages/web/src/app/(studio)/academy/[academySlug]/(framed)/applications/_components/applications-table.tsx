@@ -1,5 +1,5 @@
 import { joinRequestStatuses } from '@cove/shared';
-import { formatDate } from '@cove/i18n/format';
+import { formatDateTime } from '@cove/i18n/format';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
 
@@ -82,6 +82,12 @@ export function ApplicationsTable({
         },
       },
       {
+        id: 'username',
+        accessorFn: (request) => request.user.username ?? '',
+        header: t('column.username'),
+        cell: ({ row }) => row.original.user.username ?? '—',
+      },
+      {
         /*
          * Next to the name, because it is part of who is asking.
          *
@@ -123,7 +129,7 @@ export function ApplicationsTable({
         header: t('column.applied'),
         cell: ({ row }) => (
           <span className="whitespace-nowrap text-[13.5px] text-sub">
-            {formatDate(row.original.createdAt, locale)}
+            {formatDateTime(row.original.createdAt, locale, true)}
           </span>
         ),
       },

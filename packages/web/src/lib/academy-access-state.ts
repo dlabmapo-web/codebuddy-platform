@@ -91,6 +91,9 @@ export function resolveAcademyAccessState(
 }
 
 export function authDestination(account: AuthMeResponse): string {
+  // Legacy and first-time social accounts must choose a sign-in name before
+  // membership or platform access decides their landing page.
+  if (!account.user.username) return routes.welcome;
   const state = resolveAcademyAccessState(account);
   if (state.kind === 'active') {
     const { academy } = state.membership;

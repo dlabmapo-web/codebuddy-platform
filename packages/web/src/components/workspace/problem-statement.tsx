@@ -88,7 +88,7 @@ export function ProblemStatement({
 
         {hasFormat ? (
           <Section title={t('learn:workspace.format')}>
-            <dl className="grid min-w-0 gap-4 @md:grid-cols-2">
+            <dl className="grid min-w-0 gap-4">
               {exercise.inputFormat.trim() ? (
                 <div className="min-w-0 rounded-lg border border-border px-4 py-3">
                   <dt className="text-[12px] font-bold text-sub">

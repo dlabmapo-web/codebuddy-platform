@@ -51,7 +51,6 @@ export default async function ClassesPage({
     >
     <StudioPage
       bleed
-      description={t('description')}
       title={t('title')}
     >
       {classes ? (

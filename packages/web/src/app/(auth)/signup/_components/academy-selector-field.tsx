@@ -54,7 +54,7 @@ export function AcademySelectorField({
   const errorText = useErrorText();
 
   return (
-    <div className="mb-5">
+    <div className={`mb-5 ${!academies.academyId ? 'rounded-xl border border-brand/40 bg-brand/5 p-3' : ''}`}>
       <span className="mb-2 block text-[15px] font-semibold text-ink">
         {t('field.academy')}
       </span>
@@ -67,6 +67,11 @@ export function AcademySelectorField({
         selectedId={academies.academyId || null}
         TriggerComp={AcademyTrigger}
       />
+      {!academies.academyId && !academies.loading && !academies.error ? (
+        <p className="mt-2 text-[13px] font-semibold text-brand" role="status">
+          {t('signup.choose_academy_first')}
+        </p>
+      ) : null}
       {academies.error ? (
         <p className="mt-2 text-[14px] text-danger">
           {errorText(academies.error, t('error.academies_unavailable'))}

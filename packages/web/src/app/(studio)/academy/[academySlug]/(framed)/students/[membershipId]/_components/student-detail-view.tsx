@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { orpc } from '@/lib/orpc';
 import { routes } from '@/lib/routes';
 
 import { compactDate } from '../../../_lib/compact-date';
@@ -65,10 +68,14 @@ import { solutionStatusPath } from '../../../_lib/overview-url';
  * honest rendering.
  */
 export function StudentDetailView({
+  academyId,
+  canRename,
   academySlug,
   canOpenClassProgress,
   detail,
 }: {
+  academyId: string;
+  canRename: boolean;
   academySlug: string;
   /**
    * Whether this reader may open Solution status for the classes listed here.
@@ -85,6 +92,10 @@ export function StudentDetailView({
   const { t, i18n } = useTranslation('member-detail');
   const empty = t('not_set');
   const { identity, classes, guardian, standing, work } = detail;
+  const router = useRouter();
+  const [name, setName] = useState(identity.displayName);
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState(false);
   const numbers = new Intl.NumberFormat(i18n.language);
 
   return (
@@ -314,6 +325,20 @@ export function StudentDetailView({
         </DetailSection>
       ) : null}
 
+      {canRename ? (
+        <form className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4" onSubmit={async (event) => {
+          event.preventDefault();
+          if (savingName) return;
+          setSavingName(true); setNameError(false);
+          try { await orpc.academyPeople.renameStudent({ academyId, membershipId: identity.membershipId, name: name.trim() }); router.refresh(); }
+          catch { setNameError(true); }
+          finally { setSavingName(false); }
+        }}>
+          <label className="flex flex-col gap-2 text-sm font-semibold">{t('rename_student')}<input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} className="rounded border border-border bg-card px-3 py-2" /></label>
+          <button type="submit" disabled={savingName || !name.trim() || name.trim() === identity.displayName} className="rounded bg-brand px-4 py-2 text-on-brand disabled:opacity-50">{t('save_name')}</button>
+          {nameError ? <p role="alert" className="text-danger">{t('rename_failed')}</p> : null}
+        </form>
+      ) : null}
       {detail.viewer.canManageMembers ? (
         <DetailActions>
           <DetailLink

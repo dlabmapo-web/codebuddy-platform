@@ -1,9 +1,12 @@
+import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
 
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
+  caseComparatorSchema,
   exerciseDifficultySchema,
   exerciseLanguageSchema,
+  programmingExerciseGradingModeSchema,
 } from "./course.js";
 import { submissionResultSchema } from "./submission.js";
 
@@ -42,7 +45,13 @@ export type ExerciseProgressStatus = z.infer<
 export const learnSampleTestCaseSchema = z.object({
   position: positionSchema,
   input: z.string(),
+  /** For a pattern rule this is the pattern, which is why `comparator` rides along. */
   expectedOutput: z.string(),
+  /**
+   * How this sample is judged on submit. A sample is public by the author's
+   * choice, so its rule is too; a hidden case's never leaves the server.
+   */
+  comparator: caseComparatorSchema.default("STDOUT"),
 });
 export type LearnSampleTestCase = z.infer<typeof learnSampleTestCaseSchema>;
 
@@ -207,6 +216,7 @@ export const learnExerciseRefSchema = z.object({
 export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
+  quiz: publicQuizSchema.nullable().optional(),
   materialId: z.uuid(),
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
@@ -218,6 +228,24 @@ export const learnExerciseSchema = z.object({
   starterCode: z.string(),
   timeLimitMs: z.number().int().positive(),
   memoryLimitMb: z.number().int().positive(),
+  /**
+   * Which semantics the server grades under. Only legacy output comparison is
+   * reproduced in the browser; for anything else a sample run shows what the
+   * program printed and leaves the verdict to Submit, rather than judging it by
+   * rules that differ from the server's.
+   */
+  gradingMode: programmingExerciseGradingModeSchema.default("LEGACY_STDIO"),
+  /**
+   * The grading revision this workspace was loaded at. A sample check names
+   * it, and a mismatch means the case list may have moved: refresh first.
+   */
+  gradingRevision: z.number().int().positive().default(1),
+  /**
+   * Whether this academy judges public samples of enhanced problems on the
+   * server. Off, a sample run shows its output and leaves the verdict to
+   * Submit, as before.
+   */
+  serverSampleChecks: z.boolean().default(false),
   sampleTestCases: z.array(learnSampleTestCaseSchema),
   hints: z.array(learnHintSchema),
   /** A count. The cases themselves never cross this boundary. */

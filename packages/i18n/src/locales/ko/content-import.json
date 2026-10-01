@@ -134,6 +134,7 @@
     "too_many_hints": "한 문제의 힌트는 최대 20개입니다.",
     "tests_missing": "이 문제에는 테스트가 없습니다. 최소 한 개를 추가하세요.",
     "sample_test_missing": "이 문제에는 SAMPLE 테스트가 최소 한 개 필요합니다.",
+    "weighted_tests_not_importable": "이 문제는 가중치 채점을 사용하며, 워크북으로는 표현할 수 없습니다. 테스트는 문제 편집기에서 수정하세요.",
     "duplicate_key_in_workbook": "두 행이 같은 키를 사용합니다. 키는 코스 안에서 고유해야 합니다.",
     "parent_conflict": "이미 코스의 다른 위치에 있습니다. 가져오기로는 옮길 수 없습니다.",
     "title_conflict": "다른 키를 가진 항목이 이미 이 제목을 사용합니다.",

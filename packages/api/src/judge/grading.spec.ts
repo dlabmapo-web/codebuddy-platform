@@ -8,6 +8,10 @@ import {
   scoreRun,
   submissionStatusFor,
   summarizeRun,
+  awardedWeightFor,
+  scoreWeightedRun,
+  appliedScoreHundredthsFor,
+  shouldAbortEnhancedRun,
 } from "./grading.js";
 
 describe("normalizeOutput", () => {
@@ -298,5 +302,135 @@ describe("nextProgress scoring", () => {
         score: 0,
       }),
     ).toMatchObject({ bestScore: 100, attemptCount: 2 });
+  });
+});
+
+describe("weighted scoring", () => {
+  describe("awardedWeightFor", () => {
+    it("pays a correct case its full weight", () => {
+      expect(
+        awardedWeightFor({ outcome: "PASSED", weight: 40, softPenalty: 10 }),
+      ).toBe(40);
+    });
+
+    it("pays a warning its weight less the penalty", () => {
+      expect(
+        awardedWeightFor({
+          outcome: "PASSED_WITH_WARNING",
+          weight: 40,
+          softPenalty: 10,
+        }),
+      ).toBe(30);
+    });
+
+    it("pays nothing for any failure", () => {
+      for (const outcome of [
+        "WRONG_OUTPUT",
+        "RUNTIME_ERROR",
+        "TIME_LIMIT",
+        "MEMORY_LIMIT",
+        "SKIPPED",
+      ] as const) {
+        expect(awardedWeightFor({ outcome, weight: 40, softPenalty: 0 })).toBe(0);
+      }
+    });
+
+    it("never lets a penalty pay a correct answer less than a wrong one", () => {
+      expect(
+        awardedWeightFor({
+          outcome: "PASSED_WITH_WARNING",
+          weight: 10,
+          softPenalty: 999,
+        }),
+      ).toBe(0);
+    });
+  });
+
+  describe("scoreWeightedRun", () => {
+    it("reproduces the 30/30/40 fixture from the research spec", () => {
+      // Only the third case passing is 40 of 100, where equal weighting would
+      // have said 33 — this is the difference the whole milestone exists for.
+      expect(scoreWeightedRun({ earnedWeight: 40, possibleWeight: 100 })).toBe(40);
+      expect(scoreWeightedRun({ earnedWeight: 60, possibleWeight: 100 })).toBe(60);
+      expect(scoreWeightedRun({ earnedWeight: 100, possibleWeight: 100 })).toBe(100);
+    });
+
+    it("rounds half up, as the equal-weight path does", () => {
+      expect(scoreWeightedRun({ earnedWeight: 2, possibleWeight: 3 })).toBe(67);
+    });
+
+    it("is zero when nothing was at stake", () => {
+      expect(scoreWeightedRun({ earnedWeight: 0, possibleWeight: 0 })).toBe(0);
+    });
+  });
+
+  describe("appliedScoreHundredthsFor", () => {
+    it("scales proportionally to the material maximum", () => {
+      expect(
+        appliedScoreHundredthsFor({
+          earnedWeight: 60,
+          possibleWeight: 100,
+          materialMaximumHundredths: 2000,
+          policy: "PROPORTIONAL",
+        }),
+      ).toBe(1200);
+    });
+
+    it("caps at the material maximum in absolute mode", () => {
+      // Elice's observed absolute rule: min(material points, grader score).
+      expect(
+        appliedScoreHundredthsFor({
+          earnedWeight: 100,
+          possibleWeight: 100,
+          materialMaximumHundredths: 2000,
+          policy: "ABSOLUTE_CAP",
+        }),
+      ).toBe(2000);
+      expect(
+        appliedScoreHundredthsFor({
+          earnedWeight: 12,
+          possibleWeight: 100,
+          materialMaximumHundredths: 2000,
+          policy: "ABSOLUTE_CAP",
+        }),
+      ).toBe(1200);
+    });
+  });
+
+  describe("shouldAbortEnhancedRun", () => {
+    it("continues through every per-case failure", () => {
+      expect(
+        shouldAbortEnhancedRun({
+          deadlineExceeded: false,
+          infrastructureFailed: false,
+          policyRevoked: false,
+        }),
+      ).toBe(false);
+    });
+
+    it("aborts on a job-level condition", () => {
+      expect(
+        shouldAbortEnhancedRun({
+          deadlineExceeded: true,
+          infrastructureFailed: false,
+          policyRevoked: false,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("a run of warnings", () => {
+    it("is fully correct and still short of full marks", () => {
+      // The distinction §6 insists on: status and points diverge here, and
+      // nothing may infer one from the other.
+      const outcomes = ["PASSED_WITH_WARNING", "PASSED_WITH_WARNING"] as const;
+      expect(submissionStatusFor(outcomes)).toBe("PASSED");
+      const earned = outcomes.reduce(
+        (total, outcome) =>
+          total + awardedWeightFor({ outcome, weight: 50, softPenalty: 10 }),
+        0,
+      );
+      expect(scoreWeightedRun({ earnedWeight: earned, possibleWeight: 100 })).toBe(80);
+    });
   });
 });

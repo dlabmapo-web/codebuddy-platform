@@ -144,7 +144,15 @@
     "submission_unavailable": "해당 제출을 불러오지 못했습니다. 현재 버전의 문제를 보고 있습니다.",
     "back_to_records": "제출 기록으로 돌아가기",
     "hints_description": "하나씩 열어 보세요. 앞의 힌트부터 확인하는 편이 좋습니다.",
-    "hints_none_yet": "아직 공개한 힌트가 없습니다."
+    "hints_none_yet": "아직 공개한 힌트가 없습니다.",
+    "run_tests": "테스트 실행",
+    "actual": "실행 결과",
+    "sample_rule": {
+      "STDOUT_MATCH": "출력에 이 문자열이 포함되어야 합니다",
+      "STDOUT_NOMATCH": "출력에 이 문자열이 포함되면 안 됩니다",
+      "STDOUT_REGEX": "출력이 이 패턴과 일치해야 합니다",
+      "STDOUT_REGEX_NOMATCH": "출력이 이 패턴과 일치하면 안 됩니다"
+    }
   },
   "submit": {
     "empty": "코드를 제출하면 채점 결과가 여기에 표시됩니다.",
@@ -156,6 +164,7 @@
     "score": "{{score}} / 100",
     "metric_score": "점수",
     "metric_passed": "통과",
+    "metric_points": "배점",
     "metric_runtime": "실행 시간",
     "test_results": "테스트별 결과",
     "sample_case": "예제",
@@ -218,6 +227,7 @@
     "outcome_detail": {
       "PENDING": "채점을 기다리고 있어요.",
       "PASSED": "출력이 일치합니다.",
+      "PASSED_WITH_WARNING": "출력은 일치했지만 이 테스트의 권장 시간을 초과하여 점수가 일부 감점되었습니다.",
       "WRONG_OUTPUT": "출력이 예상 결과와 다릅니다.",
       "RUNTIME_ERROR": "프로그램 실행 중 오류가 발생했습니다.",
       "TIME_LIMIT": "제한 시간 안에 끝나지 않았습니다.",
@@ -226,6 +236,7 @@
     },
     "outcome": {
       "PASSED": "통과",
+      "PASSED_WITH_WARNING": "통과 (경고)",
       "WRONG_OUTPUT": "출력 불일치",
       "RUNTIME_ERROR": "런타임 오류",
       "TIME_LIMIT": "시간 초과",

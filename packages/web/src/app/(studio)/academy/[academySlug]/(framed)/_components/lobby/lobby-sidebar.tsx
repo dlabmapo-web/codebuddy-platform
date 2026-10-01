@@ -1,15 +1,12 @@
 'use client';
 
 import type { JoinRequestKind } from '@cove/shared';
-import { LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -19,7 +16,6 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@/components/studio/sidebar';
-import { useLayoutTranslation } from '@/i18n';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
@@ -47,7 +43,6 @@ export function LobbySidebar({
   hasPoints: boolean;
   requestedKind: JoinRequestKind;
 }) {
-  const { t } = useLayoutTranslation('common');
   const { t: lobby } = useTranslation('lobby');
   const searchParams = useSearchParams();
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -117,20 +112,6 @@ export function LobbySidebar({
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarSeparator className="mx-0" />
-        <SignOutControl
-          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[14px] font-semibold text-sub outline-none transition-colors hover:bg-sidebar-accent hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-          label={
-            <>
-              <LogOut className="size-[1.05rem] shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">
-                {t('action.sign_out')}
-              </span>
-            </>
-          }
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

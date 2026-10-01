@@ -118,7 +118,6 @@ export default async function AcademyPage({
     return (
       <StudioPage
         bleed
-        description={t('teaching_overview_description')}
         title={t('teaching_overview_title')}
       >
         <TeacherAcademyOverview

@@ -106,7 +106,9 @@
     "confirm_grant_title": "Make {{name}} a platform operator?",
     "confirm_grant_body": "They get every permission on Cove Studio: every academy, every account, and the ability to suspend and delete. Grant it to colleagues, never to customers.",
     "confirm_revoke_title": "Remove {{name}}'s platform access?",
-    "confirm_revoke_body": "They lose the console at once. Their academy memberships and roles are untouched."
+    "confirm_revoke_body": "They lose the console at once. Their academy memberships and roles are untouched.",
+    "grant": "Grant operator access",
+    "revoke": "Revoke operator access"
   },
   "delete": {
     "title": "Delete {{name}}?",

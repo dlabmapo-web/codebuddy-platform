@@ -53,9 +53,9 @@ export default async function WelcomePage() {
           />
         </p>
         {account.user.username ? null : <UsernameClaim />}
-        <p className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+        {account.user.username ? <p className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
           {t('welcome.no_academy')}
-        </p>
+        </p> : null}
         <SignOutControl />
       </div>
     </AuthCard>

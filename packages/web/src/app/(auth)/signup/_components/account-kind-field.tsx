@@ -56,15 +56,6 @@ export function AccountKindField({
           );
         })}
       </div>
-      {/*
-        Says what this control changes, and only that: whether an email is
-        asked for. It used to also say that a manager sets the real role —
-        which the notice at the foot of the form says too, two hundred pixels
-        below. One sentence, one job; the notice keeps the role message.
-      */}
-      <p className="mt-1.5 text-[13px] leading-5 text-sub">
-        {t('field.account_kind_hint')}
-      </p>
     </fieldset>
   );
 }

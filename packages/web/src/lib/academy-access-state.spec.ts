@@ -58,6 +58,27 @@ function application(status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') 
 }
 
 describe('resolveAcademyAccessState', () => {
+  it.each(['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER'] as const)(
+    'asks a legacy %s for a username before academy landing',
+    (role) => {
+      const input = account({
+        username: null,
+        memberships: [{ academy, role, roles: [role], status: 'ACTIVE', imageUrl: null }],
+      });
+      expect(authDestination(input)).toBe('/welcome');
+      input.user.username = 'claimed-user';
+      expect(authDestination(input)).toBe(`/academy/${academy.slug}`);
+    },
+  );
+
+  it('asks an operator or pending applicant for a missing username first', () => {
+    expect(authDestination(account({ username: null, platformRole: 'ADMIN' }))).toBe('/welcome');
+    expect(authDestination(account({
+      username: null,
+      applications: [application('PENDING')],
+    }))).toBe('/welcome');
+  });
+
   it('prioritizes an active membership over historical applications', () => {
     const result = resolveAcademyAccessState(account({
       memberships: [{ academy, role: 'TEACHER', roles: ['TEACHER'], status: 'ACTIVE', imageUrl: null }],
@@ -241,7 +262,7 @@ describe('resolveAcademyAccessState', () => {
     // A Team Lead reaches the class page and reads the roster, but the add
     // and remove controls stay hidden.
     expect(canManageClasses(['TEAM_LEAD'])).toBe(true);
-    expect(canManageEnrollment(['TEAM_LEAD'])).toBe(false);
+    expect(canManageEnrollment(['TEAM_LEAD'])).toBe(true);
     expect(canManageEnrollment(['TEACHER'])).toBe(false);
     expect(canManageEnrollment(['STUDENT'])).toBe(false);
     expect(canManageEnrollment([])).toBe(false);

@@ -1,5 +1,11 @@
 import type { CaseOutcome } from "@cove/shared";
 
+/**
+ * Program output kept per stream; anything past it is truncated, not a crash.
+ * Recorded in every enhanced submission's policy snapshot.
+ */
+export const MAX_OUTPUT_BYTES = 256 * 1024;
+
 export type ExecutionRequest = {
   code: string;
   stdin: string;

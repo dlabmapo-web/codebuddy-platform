@@ -21,6 +21,8 @@ export function TextField({
   hint,
   inputRef,
   describedBy,
+  value,
+  onValueChange,
 }: {
   label: string;
   name: string;
@@ -33,6 +35,8 @@ export function TextField({
   /** For moving focus to the first field a submission was rejected on. */
   inputRef?: RefObject<HTMLInputElement | null>;
   describedBy?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }) {
   const id = useId();
   return (
@@ -43,18 +47,20 @@ export function TextField({
       <div className="relative">
         {Icon ? <Icon className={iconClass} size={20} strokeWidth={1.75} /> : null}
         <input
-          aria-describedby={describedBy}
+          aria-describedby={[describedBy, hint ? `${id}-hint` : undefined].filter(Boolean).join(' ') || undefined}
           autoComplete={autoComplete}
           className={`${baseInput} ${Icon ? 'pl-12' : 'px-4'} pr-4`}
           id={id}
           name={name}
+          value={value}
+          onChange={onValueChange ? (event) => onValueChange(event.target.value) : undefined}
           placeholder={placeholder}
           ref={inputRef}
           required={required}
           type={type}
         />
       </div>
-      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub" id={`${id}-hint`}>{hint}</p> : null}
     </div>
   );
 }
@@ -63,12 +69,17 @@ export function PasswordField({
   label,
   name = 'password',
   autoComplete = 'current-password',
+  placeholder = '••••••••',
+  showIcon = true,
   hint,
   minLength,
   inputRef,
   onValueChange,
   describedBy,
+  value,
 }: {
+  placeholder?: string;
+  showIcon?: boolean;
   /** Pass '' to hide the label when the caller renders its own. */
   label?: string;
   name?: string;
@@ -80,6 +91,7 @@ export function PasswordField({
   /** Set by callers that show live requirements as the password is typed. */
   onValueChange?: (value: string) => void;
   describedBy?: string;
+  value?: string;
 }) {
   const { t } = useTranslation('auth');
   const id = useId();
@@ -93,17 +105,18 @@ export function PasswordField({
         </label>
       ) : null}
       <div className="relative">
-        <Lock className={iconClass} size={20} strokeWidth={1.75} />
+        {showIcon ? <Lock className={iconClass} size={20} strokeWidth={1.75} /> : null}
         <input
-          aria-describedby={describedBy}
+          aria-describedby={[describedBy, hint ? `${id}-hint` : undefined].filter(Boolean).join(' ') || undefined}
           aria-label={fieldLabel || t('field.password')}
           autoComplete={autoComplete}
-          className={`${baseInput} pl-12 pr-12`}
+          className={`${baseInput} ${showIcon ? 'pl-12' : 'pl-4'} pr-12`}
           id={id}
           minLength={minLength}
           name={name}
+          value={value}
           onChange={onValueChange ? (event) => onValueChange(event.target.value) : undefined}
-          placeholder="••••••••"
+          placeholder={placeholder}
           ref={inputRef}
           required
           type={visible ? 'text' : 'password'}
@@ -113,13 +126,12 @@ export function PasswordField({
           aria-pressed={visible}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-sub transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
           onClick={() => setVisible((v) => !v)}
-          tabIndex={-1}
           type="button"
         >
           {visible ? <EyeOff size={20} strokeWidth={1.75} /> : <Eye size={20} strokeWidth={1.75} />}
         </button>
       </div>
-      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[13px] leading-5 text-sub" id={`${id}-hint`}>{hint}</p> : null}
     </div>
   );
 }

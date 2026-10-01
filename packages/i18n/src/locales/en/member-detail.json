@@ -82,5 +82,8 @@
     "class_count_other": "{{count}} classes",
     "class_students": "Students",
     "class_courses": "Courses"
-  }
+  },
+  "rename_student": "Student name",
+  "save_name": "Save name",
+  "rename_failed": "Could not save the name. Please try again."
 }

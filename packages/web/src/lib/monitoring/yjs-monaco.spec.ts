@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 
 import { editorDouble, MonacoModelDouble } from './monaco-model-double';
@@ -460,5 +460,18 @@ describe('local input while a server CR repair is pending', () => {
     expect(doc.getText('code').toString()).toBe('af');
     expect(model.getValue()).toBe('af');
     binding.destroy();
+  });
+});
+
+ describe('watch-session rebinding', () => {
+  it('does not replace an already synchronized Monaco buffer', () => {
+    const doc = new Y.Doc();
+    doc.getText('code').insert(0, 'print(1)');
+    const model = new MonacoModelDouble('print(1)');
+    const replace = vi.spyOn(model, 'setValue');
+    const binding = bindYTextToMonaco(doc.getText('code'), asEditor(model));
+    expect(replace).not.toHaveBeenCalled();
+    binding.destroy();
+    doc.destroy();
   });
 });

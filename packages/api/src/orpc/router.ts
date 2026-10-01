@@ -31,6 +31,7 @@ import { AnswerRecordsService } from "../learn/answer-records.service.js";
 import { LearnClassService } from "../learn/learn-class.service.js";
 import { LearnService } from "../learn/learn.service.js";
 import { StudentOverviewService } from "../learn/student-overview.service.js";
+import { SampleCheckService } from "../learn/sample-check.service.js";
 import { SubmissionService } from "../learn/submission.service.js";
 import { createLearnRouter } from "../learn/learn.router.js";
 import { LobbyService } from "../lobby/lobby.service.js";
@@ -132,6 +133,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     learnService: app.get(LearnService, { strict: false }),
     studentOverviewService: app.get(StudentOverviewService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
+    sampleCheckService: app.get(SampleCheckService, { strict: false }),
     lobbyService: app.get(LobbyService, { strict: false }),
     notificationsService: app.get(NotificationsService, { strict: false }),
     helpRequestService: app.get(HelpRequestService, { strict: false }),

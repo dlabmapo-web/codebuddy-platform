@@ -1,7 +1,7 @@
 'use client';
 
 import type { NavigatorPath } from '@cove/shared';
-import { ListTree } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
@@ -38,29 +38,21 @@ export const CurriculumTrigger = React.forwardRef<
     : t('navigator.title');
 
   return (
-    <button
-      aria-controls={panelId}
-      aria-expanded={open}
-      // A ceiling that grows with the header rather than one fixed width.
-      // Without it this button's basis is the whole path, so on a narrow
-      // header it outbids the exercise title beside it — which is how the
-      // title ended up rendered as a single letter. The path is context; the
-      // title is the answer to "what am I solving", and it wins ties.
-      className={`flex h-8 min-w-0 max-w-[8rem] shrink items-center gap-1.5 rounded-lg border px-2 text-[12px] font-semibold transition-colors lg:max-w-[12rem] xl:max-w-[16rem] ${
-        open
-          ? 'border-brand/40 bg-brand-soft text-brand'
-          : 'border-border text-sub hover:border-brand/40 hover:text-brand'
-      }`}
-      onClick={onToggle}
-      ref={ref}
-      title={full}
-      type="button"
-    >
-      <ListTree aria-hidden className="size-3.5 shrink-0" />
-      <span className="sr-only">{t('navigator.toggle')}</span>
-      {/* Truncated rather than dropped: the complete path stays reachable at
-          every width through the tooltip and the accessible name. */}
-      <span className="min-w-0 truncate">{full}</span>
-    </button>
+    <div className="flex min-w-0 items-center gap-2">
+      <button
+        aria-controls={panelId}
+        aria-expanded={open}
+        aria-label={t('navigator.toggle')}
+        className="grid size-8 shrink-0 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink"
+        onClick={onToggle}
+        ref={ref}
+        type="button"
+      >
+        <Menu aria-hidden className="size-4" />
+      </button>
+      <span className="max-w-[8rem] truncate text-[12px] font-semibold text-sub lg:max-w-[12rem] xl:max-w-[16rem]" title={full}>
+        {full}
+      </span>
+    </div>
   );
 });

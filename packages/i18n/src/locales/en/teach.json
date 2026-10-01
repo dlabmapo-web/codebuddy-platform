@@ -178,6 +178,7 @@
       "runtime_value": "{{ms}} ms",
       "outcome": {
         "PASSED": "Passed",
+        "PASSED_WITH_WARNING": "Passed with warning",
         "WRONG_OUTPUT": "Wrong output",
         "RUNTIME_ERROR": "Runtime error",
         "TIME_LIMIT": "Time limit",

@@ -1,3 +1,4 @@
+import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
 
 import { exerciseDifficultySchema } from "./course.js";
@@ -240,6 +241,8 @@ export const teacherAttemptSummarySchema = z
     submissionId: z.uuid(),
     accepted: z.boolean(),
     score: percentSchema,
+    earnedWeight: countSchema.nullable().optional(),
+    possibleWeight: countSchema.nullable().optional(),
     passedCount: countSchema,
     totalCount: countSchema,
     runtimeMs: countSchema.nullable(),
@@ -413,6 +416,7 @@ export type TeacherReviewCase = z.infer<typeof teacherReviewCaseSchema>;
 
 export const teacherSubmissionReviewSchema = z
   .object({
+    quiz: quizFeedbackSchema.nullable().optional(),
     submissionId: z.uuid(),
     /**
      * The exercise attempted. The live view reads a review for a student who
@@ -429,6 +433,8 @@ export const teacherSubmissionReviewSchema = z
     outlineNumber: z.string().max(24).nullable(),
     accepted: z.boolean(),
     score: percentSchema,
+    earnedWeight: countSchema.nullable().optional(),
+    possibleWeight: countSchema.nullable().optional(),
     passedCount: countSchema,
     totalCount: countSchema,
     runtimeMs: countSchema.nullable(),

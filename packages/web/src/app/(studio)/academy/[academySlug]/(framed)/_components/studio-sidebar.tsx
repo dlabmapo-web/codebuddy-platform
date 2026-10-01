@@ -10,7 +10,6 @@ import {
   Coins,
   GraduationCap,
   LayoutDashboard,
-  LogOut,
   Mail,
   MonitorPlay,
   Presentation,
@@ -26,7 +25,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { SignOutControl } from '@/app/(auth)/_components/sign-out-control';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import {
   ResponsiveSelector,
@@ -36,7 +34,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -139,7 +136,6 @@ export function StudioSidebar({
   hasPoints: boolean;
   isStudent: boolean;
 }) {
-  const { t } = useLayoutTranslation('common');
   const pathname = usePathname();
   const academySlug = useAcademySlug();
   const groups = studioNavGroups({
@@ -180,17 +176,18 @@ export function StudioSidebar({
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      {!isStudent ? <SidebarHeader>
         <AcademySwitcher
           academies={academies}
           academyId={academyId}
           viewRole={viewRole}
         />
-      </SidebarHeader>
+      </SidebarHeader> : null}
       <SidebarSeparator />
       <SidebarContent>
         {groups.map((group) => (
           <NavSection
+            teacherView={viewRole === 'TEACHER'}
             activeHref={activeHref}
             group={group}
             key={group.id}
@@ -212,38 +209,24 @@ export function StudioSidebar({
          * has three groups above it and a manager's has five, and this is the
          * row both of them find without counting.
          */}
-        <MyPageRow
+        {!isStudent ? <MyPageRow
           href={myPageHref}
           isActive={activeHref === myPageHref}
           viewer={viewer}
-        />
+        /> : null}
       </SidebarContent>
-      <SidebarFooter>
-        {/* Theme and language moved to the header's top right; the footer keeps
-            only the action that ends the session. */}
-        <SidebarSeparator className="mx-0" />
-        <SignOutControl
-          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[14px] font-semibold text-sub outline-none transition-colors hover:bg-sidebar-accent hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-          label={
-            <>
-              <LogOut className="size-[1.05rem] shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">
-                {t('action.sign_out')}
-              </span>
-            </>
-          }
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
 
 function NavSection({
+  teacherView,
   activeHref,
   group,
   pendingApplications,
 }: {
+  teacherView: boolean;
   activeHref: string | null;
   group: NavGroup;
   pendingApplications: number;
@@ -254,11 +237,11 @@ function NavSection({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel>
+      {!teacherView ? <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel> : null}
       <SidebarMenu>
         {group.items.map((item) => {
           const active = item.href === activeHref;
-          const label = t(item.labelKey);
+          const label = t(teacherView && item.labelKey === 'link.my_courses' ? 'link.resources' : teacherView && item.labelKey === 'link.courses' ? 'link.lessons' : item.labelKey);
           const waiting = item.showPendingApplications
             ? pendingApplications
             : 0;

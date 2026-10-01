@@ -44,6 +44,7 @@ export function createManageRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.peopleRosterService.listStaff(context.identity, input),
         ),
+      renameStudent: os.academyPeople.renameStudent.use(access.authenticated).handler(({ context, input }) => deps.memberDetailService.renameStudent(context.identity, input)),
       student: os.academyPeople.student
         .use(access.authenticated)
         .handler(({ context, input }) =>

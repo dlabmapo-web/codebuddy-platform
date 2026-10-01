@@ -342,6 +342,7 @@ const teamLeadPermissions = [
   "ai-feedback-rules.manage",
   "classes.manage",
   "class-teachers.manage",
+  "class-enrollments.manage",
   /*
    * Inherited deliberately, and inert for both roles. The teaching surfaces
    * that read these also demand an exact active `TEACHER` — `roleCanMonitor`,
@@ -358,7 +359,7 @@ const teamLeadPermissions = [
  * Administration of the academy itself, which a Team Lead does not get.
  *
  * The boundary is ownership rather than seniority: who may change what the
- * academy *is* — its settings, who belongs to it, who is enrolled, and when
+ * academy *is* — its settings, who belongs to it, and when
  * classes meet — as opposed to what it teaches.
  */
 const managerOnlyPermissions = [
@@ -369,7 +370,6 @@ const managerOnlyPermissions = [
    * runs what the academy teaches; how a child signs in is not curriculum.
    */
   "academy.members.credentials.manage",
-  "class-enrollments.manage",
   "class-schedule.manage",
 ] as const satisfies readonly AcademyPermission[];
 

@@ -1,5 +1,6 @@
 import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
+import { gradingDataLimits } from "../grading-limits.js";
 
 import { courseProvenanceSchema } from "../platform/library.js";
 
@@ -338,7 +339,7 @@ export const defaultExerciseTimeLimitMs = 3_000;
  */
 export const gradingProfileBounds = {
   totalTimeLimitMs: { min: 1_000, max: 300_000, default: 60_000 },
-  comparatorTimeLimitMs: { min: 10, max: 2_000, default: 100 },
+  comparatorTimeLimitMs: { min: 10, max: 2_000, default: gradingDataLimits.comparatorBudgetMs },
   /** Material points in hundredths: 0.01 to 1,000.00. */
   materialMaximumHundredths: { min: 1, max: 100_000, default: 10_000 },
 } as const;
@@ -401,8 +402,10 @@ export const legacyCaseGrading = {
 
 export const exerciseTestCaseDraftSchema = z
   .object({
-    input: z.string().max(100_000),
-    expectedOutput: z.string().max(100_000),
+    input: z.string().max(gradingDataLimits.testTextChars, "Test input exceeds the 8 Mi character limit."),
+    expectedOutput: z.string().max(gradingDataLimits.testTextChars, "Expected output exceeds the 8 Mi character limit.")
+      .refine((text) => new TextEncoder().encode(text).byteLength <= gradingDataLimits.stdoutBytes,
+        "Expected output exceeds the 8 MiB output limit."),
     visibility: testCaseVisibilitySchema,
     /** Required for the same reason as the profile: never silently reset. */
     comparator: caseComparatorSchema,
@@ -619,6 +622,14 @@ function refineGrading(
   value: ExerciseDraftFields,
   context: z.RefinementCtx,
 ) {
+  if (value.testCases.reduce((total, testCase) => total + testCase.input.length + testCase.expectedOutput.length, 0) > gradingDataLimits.testSetChars) {
+    context.addIssue({ code: "custom", path: ["testCases"], message: "Combined test input and expected output exceed the 16 Mi character limit." });
+  }
+  if (new TextEncoder().encode(JSON.stringify(value)).byteLength > gradingDataLimits.authoringBodyBytes - 4_096) {
+    // Leave room for the RPC envelope and parent IDs. The existing edge cap
+    // applies to encoded bytes, including JSON escapes, rather than text length.
+    context.addIssue({ code: "custom", path: ["testCases"], message: "Encoded problem data exceed the 20 MB request limit." });
+  }
   if (value.quiz) {
     if (value.testCases.length || value.grading.mode !== "LEGACY_STDIO") {
       context.addIssue({ code: "custom", path: ["quiz"], message: "Quiz grading cannot contain Python test cases." });

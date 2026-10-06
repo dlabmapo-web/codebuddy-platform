@@ -565,6 +565,22 @@ describe("GradingService.grade — weighted profiles", () => {
 });
 
 describe("GradingService.grade — the total deadline covers every wait", () => {
+  it("passes an older submission's frozen output ceiling to the engine", async () => {
+    const {service, engine} = createService({profile: eliceProfile, cases: weightedCases(), run: answers([1, 2, 3])});
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({outputLimitBytes: 262_144}));
+  });
+  it("refuses a snapshot with an unsupported output ceiling before execution", async () => {
+    const profile = {...eliceProfile, gradingPolicySnapshot: {
+      ...eliceProfile.gradingPolicySnapshot, ceilings: {
+        ...eliceProfile.gradingPolicySnapshot.ceilings, outputBytes: 8 * 1024 * 1024 + 1,
+      },
+    }};
+    const {service, engine, tx} = createService({profile, cases: weightedCases()});
+    await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+    expect(engine.run).not.toHaveBeenCalled();
+    expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
+  });
   const aborted = expect.objectContaining({
     data: expect.objectContaining({
       status: "ERRORED",
@@ -726,7 +742,7 @@ describe("GradingService.grade — a run given up on is still waited for", () =>
           setTimeout(() => {
             engineSettled = true;
             resolve({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: 1_000 });
-          }, 3_700),
+          }, 6_300),
         ),
     });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gradingDataLimits } from "../../grading-limits.js";
 
 import type { ExerciseDifficulty, TestCaseVisibility } from "../course.js";
 import { normalizeComparableTitle } from "./keys.js";
@@ -1039,6 +1040,9 @@ function planProblem(input: {
   const testCases = buildTestCases(
     input.collections.testCases.get(problem.key) ?? [],
   );
+  if (testCases.reduce((total, testCase) => total + testCase.input.length + testCase.expectedOutput.length, 0) > gradingDataLimits.testSetChars) {
+    issues.push(error("test_data_too_large", problem.key, "Test Cases", row.rowNumber));
+  }
   const hints = buildHints(input.collections.hints.get(problem.key) ?? []);
 
   // §5.5 — every created or updated problem grades against something, and at

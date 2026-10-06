@@ -239,6 +239,13 @@ describe("the judge trusts only a well-formed answer to its own question", () =>
   const request = { code: "print(1)", stdin: "", timeLimitMs: 100, memoryLimitMb: 64 };
   const passing = { stdout: "1\n", stderr: "", outcome: "PASSED", runtimeMs: 5 };
 
+  it("refuses an older sandbox that cannot enforce the requested output ceiling", async () => {
+    const engine = await fake("old-protocol", (request) => ({type: "health", id: request.id,
+      protocol: 1, engineVersion: "pyodide-0.27.5", isolated: true}));
+    await expect(engine.warmUp()).rejects.toThrow("judge expects sandbox protocol 2");
+    await engine.dispose();
+  });
+
   it("rejects an answer to a different request", async () => {
     const engine = await fake("other-id", () => ({
       type: "result",

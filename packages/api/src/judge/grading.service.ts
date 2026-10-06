@@ -203,6 +203,7 @@ export class GradingService {
           engineOutcome: run.outcome,
           stdout: run.stdout,
           expectedOutput: testCase.expectedOutput,
+          outputTruncated: run.outputTruncated,
         });
 
         results.push({
@@ -277,6 +278,7 @@ export class GradingService {
           {
             code: submission.code,
             memoryLimitMb: submission.memoryLimitMb,
+            outputLimitBytes: profile.policy?.ceilings.outputBytes,
             comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
             deadlineAt: deadline,
             executionBudgetMs,

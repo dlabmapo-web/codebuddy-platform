@@ -338,9 +338,11 @@ describe("SampleCheckRunner", () => {
         run: () =>
           new Promise((resolve) =>
             setTimeout(() => {
+              expect(store.records.get(checkId)!.status).toBe("TIMED_OUT");
+              expect(capacity.stats().background).toBe(1);
               engineSettled = true;
               resolve({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: 50 });
-            }, 2_800),
+            }, 5_400),
           ),
       });
 
@@ -365,7 +367,7 @@ describe("SampleCheckRunner", () => {
             setTimeout(() => {
               engineSettled = true;
               resolve({ stdout: "", stderr: "", outcome: "TIME_LIMIT", runtimeMs: 50 });
-            }, 2_800),
+            }, 5_400),
           ),
       });
       const realFinish = store.finish.bind(store);

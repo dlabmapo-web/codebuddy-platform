@@ -64,7 +64,7 @@ export type ExerciseGradingSource = ProfileColumns & {
  * at. Never holds a secret.
  */
 export const gradingPolicySnapshotSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   semanticVersion: z.string(),
   runtime: z.object({
     engine: z.literal("pyodide"),
@@ -79,7 +79,7 @@ export const gradingPolicySnapshotSchema = z.object({
     totalTimeLimitMs: z.number().int().positive(),
     caseTimeLimitMs: z.number().int().positive(),
     memoryLimitMb: z.number().int().positive(),
-    outputBytes: z.number().int().positive(),
+    outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES),
   }),
 });
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
@@ -99,7 +99,9 @@ export function gradingSnapshotFor(
   const enhanced = exercise.gradingMode === "ELICE_STDIO";
   const policy: GradingPolicySnapshot | null = enhanced
     ? {
-        version: 1,
+        // Older workers only understand v1 and must refuse these submissions
+        // rather than grade them using their smaller, hardcoded output cap.
+        version: 2,
         semanticVersion: exercise.gradingSemanticVersion,
         runtime: { engine: "pyodide", engineVersion: runtime.engineVersion },
         comparator: {

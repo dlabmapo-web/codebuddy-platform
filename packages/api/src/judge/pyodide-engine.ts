@@ -1,4 +1,5 @@
 import { readProcessMemoryMb } from "./process-memory.js";
+import { gradingDataLimits } from "@cove/shared/grading-limits";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   mkdtempSync,
@@ -131,6 +132,7 @@ class RunnerProcess {
   private stdoutBytes = 0;
   private stderrBytes = 0;
   private outputCapped = false;
+  private outputLimitBytes: number = MAX_OUTPUT_BYTES;
   private exited: { code: number | null; signal: string | null } | null = null;
   private closed = false;
   private onClose: (() => void) | null = null;
@@ -177,7 +179,7 @@ class RunnerProcess {
 
     this.child.stdout?.on("data", (chunk: Buffer) => this.collect(chunk));
     this.child.stderr?.on("data", (chunk: Buffer) => {
-      const room = MAX_OUTPUT_BYTES - this.stderrBytes;
+      const room = gradingDataLimits.stderrBytes - this.stderrBytes;
       if (room <= 0) return;
       const kept = chunk.subarray(0, room);
       this.stderrChunks.push(kept);
@@ -214,7 +216,7 @@ class RunnerProcess {
    * actually correct.
    */
   private collect(chunk: Buffer): void {
-    const room = MAX_OUTPUT_BYTES - this.stdoutBytes;
+    const room = this.outputLimitBytes - this.stdoutBytes;
     if (chunk.byteLength > room) this.outputCapped = true;
     if (room <= 0) return;
     const kept = chunk.subarray(0, room);
@@ -278,6 +280,10 @@ class RunnerProcess {
    */
   async run(request: ExecutionRequest): Promise<ExecutionResult> {
     await this.ready;
+    this.outputLimitBytes = request.outputLimitBytes ?? MAX_OUTPUT_BYTES;
+    if (!Number.isInteger(this.outputLimitBytes) || this.outputLimitBytes < 1 || this.outputLimitBytes > MAX_OUTPUT_BYTES) {
+      throw new Error("unsupported output limit");
+    }
     const startedAt = Date.now();
 
     return new Promise<ExecutionResult>((resolve, reject) => {
@@ -405,11 +411,13 @@ class RunnerProcess {
       return { stdout: this.stdout, stderr: "", outcome: "TIME_LIMIT", runtimeMs };
     }
     if (this.outputCapped) {
-      // Truncation is not a crash; the comparison still runs on what was read.
+      // Execution completed, but the evaluator must reject an incomplete
+      // answer rather than accept a prefix that happens to match the fixture.
       return {
         stdout: this.stdout,
         stderr: this.stderr,
         outcome: exited?.code === 0 ? "PASSED" : "RUNTIME_ERROR",
+        outputTruncated: true,
         runtimeMs,
       };
     }

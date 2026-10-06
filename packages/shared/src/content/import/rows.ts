@@ -1,4 +1,5 @@
 import type { ExerciseDifficulty, TestCaseVisibility } from "../course.js";
+import { gradingDataLimits } from "../../grading-limits.js";
 import { parseStableKey } from "./keys.js";
 import {
   CONTENT_IMPORT_MAX_CODE_LENGTH,
@@ -563,10 +564,11 @@ function readCode(
   column: string,
   issues: ContentImportIssue[],
   entityKey: string | null,
+  limit: number = CONTENT_IMPORT_MAX_CODE_LENGTH,
 ): string {
   const text = normalizeCellText(raw);
-  if (text.length > CONTENT_IMPORT_MAX_CODE_LENGTH) {
-    issues.push(issue(location, "code_too_long", column, raw, entityKey));
+  if (text.length > limit) {
+    issues.push(issue(location, "code_too_long", column, column === "expected_output" ? null : raw, entityKey));
   }
   return text;
 }
@@ -645,7 +647,11 @@ export function readTestCasesSheet(grid: SheetGrid): {
       "expected_output",
       issues,
       problemKey,
+      gradingDataLimits.testTextChars,
     );
+    if (new TextEncoder().encode(expectedOutput).byteLength > gradingDataLimits.stdoutBytes) {
+      issues.push(issue(location, "code_too_long", "expected_output", null, problemKey));
+    }
     if (expectedOutput.length === 0) {
       issues.push(
         issue(
@@ -668,7 +674,7 @@ export function readTestCasesSheet(grid: SheetGrid): {
         issues,
         problemKey,
       ),
-      input: readCode(location, get("input"), "input", issues, problemKey),
+      input: readCode(location, get("input"), "input", issues, problemKey, gradingDataLimits.testTextChars),
       expectedOutput,
       visibility,
     });

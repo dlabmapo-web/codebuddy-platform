@@ -298,7 +298,7 @@ else:
         3_000, 3_000, 3_000,
       ]);
       expect(row.gradingPolicySnapshot).toEqual(
-        expect.objectContaining({ version: 1, semanticVersion: "elice-v1" }),
+        expect.objectContaining({ version: 2, semanticVersion: "elice-v1" }),
       );
     }
 

@@ -2,11 +2,12 @@ import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 
 import type { CaseComparator } from "@cove/shared";
+import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 import { COMPARATOR_HARNESS } from "./comparator-runner.js";
 
-/** Initial default from §3.1 of the implementation spec, recorded in policy. */
-export const DEFAULT_COMPARATOR_BUDGET_MS = 100;
+/** Bounded comparison budget, including large-output problems, frozen in policy. */
+export const DEFAULT_COMPARATOR_BUDGET_MS = gradingDataLimits.comparatorBudgetMs;
 /** A comparator that ignores its interrupt is replaced rather than waited on. */
 const TERMINATE_GRACE_MS = 100;
 const STARTUP_TIMEOUT_MS = 30_000;

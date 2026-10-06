@@ -1,7 +1,166 @@
 # Grading and recovery follow-up — 2026-10-06
 
 Branch: `fix/auth-google-login-password-recovery`. Code commit: `73aa8d2`.
-This report supersedes the configuration and cleanup status in the initial browser report. Production remains on v2.0.27 / 2ffa32a; the new code is not deployed.
+This report supersedes the configuration and cleanup status in the initial browser report. The initial follow-up below tested v2.0.27 / 2ffa32a. The new redeployment section records v2.0.28 / 3499829 containing 73aa8d2.
+
+
+## Deployment readiness — local Chrome completion, 2026-10-06, 11:39–11:44 UTC
+
+**The workspace narration and runner lifecycle fixes are ready for deployment.** This section supersedes the earlier local database blocker and pending disposable-fixture cleanup below. Branch remains `fix/auth-google-login-password-recovery`; application fixes are `39313c8` and `1d82f42`. No additional application or configuration change was needed: both development PostgreSQL endpoints became reachable again before testing. The earlier outage's underlying network cause has not been established.
+
+### Actual browser verification
+
+Used regular Chrome against the running local web/API/judge stack and the same isolated enhanced fixture. Both public samples completed each probe:
+
+- Correct output: explicit passed narration and matching stdout. Two complete batches passed; an initial editor-focus attempt left the correct code unchanged, so its second batch is correctly counted as another correct-output run, not a runtime test.
+- Explicit RuntimeError: “Sample N raised an error” plus `RuntimeError: local-qa-error` for each sample. No generic Skipped result.
+- Bounded four-second monotonic loop: “Sample N exceeded its time limit” for each sample, at the configured 3,000-ms server limit.
+- Wrong output: “Sample N did not match” for each sample, with wrong stdout displayed.
+- Sequential repeated runs completed. Queued/Stop and disabled Submit/reset/navigation were observed during execution; controls returned afterward.
+- Full refresh cleared ephemeral practice results, retained the saved test draft (`print("wrong")`) and displayed Saved. This draft belonged only to the disposable fixture.
+- Only the two public examples/results were rendered; the hidden case appeared only as a count. No hidden fixture contents appeared in the rendered evidence. This is UI privacy verification, not a network-payload audit.
+
+Together with the previous completed legacy checks, both grading modes now have real Chrome coverage for correct output, wrong output, runtime errors and bounded timeouts. No Submit clicks or official test submissions were made. Production tabs/session were not operated in this completion pass.
+
+### Backend and build evidence (separate from browser passes)
+
+Ten new Redis records from those browser clicks completed: PASSED ×4, RUNTIME_ERROR ×2, TIME_LIMIT ×2 and WRONG_OUTPUT ×2. All agreed with the browser; none was UNAVAILABLE or ENGINE_FAILURE. Representative records: runtime `db61e9a4-45c3-4930-acb9-4070e7779e43`, timeout `bf74511f-c1ec-4384-8249-3a85594df909`, wrong output `5661666f-ea85-4613-947e-9db907a7055d`.
+
+`pnpm --filter @cove/web build` passed optimized compilation, TypeScript and static-page generation. `pnpm --filter @cove/judge-worker build` passed Prisma generation and TypeScript compilation. Previously recorded focused regression tests remain applicable; no application code changed in this completion pass. Browser tests used the development server and real local Pyodide processes; production-build execution inside the Linux sandbox was not rerun locally. Production smoke verification remains required after release.
+
+### Cleanup and preserved state
+
+After leaving the exercise page, the guarded cleanup succeeded. Independent final reads confirmed zero remaining disposable materials, drafts or solve sessions for both fixture IDs, and zero SERVER_SAMPLE_CHECKS override rows for the development academy (restored to its original absent state). Existing student drafts and progress exactly matched the original snapshot, the official submission count was unchanged and there were zero fixture submissions. Ordinary learning activity/course content revisions are not rolled back. The production recovery account/mailbox and pending credential handoff were not part of this local grading completion and remain as documented below.
+
+### Release scope
+
+Deploy **studio web** and the **judge worker/sandbox pair** with a release containing `39313c8` and `1d82f42`; avoid interrupting active runs. No API redeployment, database migration, production feature-flag change or Tower fixture publication is required for these two fixes. After deployment, confirm artifact versions and repeat bounded runtime/timeout Chrome checks against production with draft preservation. This report does not claim the new fixes have already passed production Chrome verification. Tower repair remains unapplied; the known incomplete case 8/9 inputs are a separate data issue. Recovery verification still needs the existing user credential handoff and is not claimed complete.
+
+## Local real-Chrome verification before deployment — 2026-10-06, 11:20–11:30 UTC
+
+Tested branch HEAD `6aa0c09`, containing workspace fix `39313c8` and runner fix `1d82f42`. Started the repository's `pnpm dev` stack: Next web on localhost:3000, Nest API on localhost:4000, local Redis and judge worker. Used real regular Chrome, not Chrome for Testing, and signed in to the local app with the existing development student. Production Chrome tabs and John were not changed during this local pass.
+
+This is a local development deployment, **not a production-build or Linux-container qualification**. The API uses the separately configured hosted development Supabase project (confirmed distinct from production); the judge runs real local Pyodide child processes in development mode. The production sandbox memory-race regression remains supported by the deterministic and subprocess checks above, not proved absent by these browser runs.
+
+Created two isolated disposable exercises through CourseService in the development E2E course, one LEGACY_STDIO and one ELICE_STDIO, each with two public samples, one hidden case and 3,000-ms execution limits. Saved the existing student's drafts/progress and submission count before testing. Temporarily enabled the development academy's SERVER_SAMPLE_CHECKS flag (originally absent). No reseed or edits to existing exercise definitions; no Submit clicks.
+
+### Actual browser results
+
+| Exercise / probe | Observed in real Chrome |
+| --- | --- |
+| Legacy, correct output | Both samples passed, correct output and “Submit checks all grading cases” narration. |
+| Legacy, explicit RuntimeError | Both samples said “raised an error” and showed the expected stderr. No generic skipped-comparison label. |
+| Legacy, bounded four-second monotonic loop | Both samples said “exceeded its time limit.” No local false pass or generic skipped-comparison label. |
+| Legacy, wrong output | Both samples said “did not match” and displayed the wrong stdout. |
+| Loading / repeated runs | Queued state and Stop visible, Submit/reset/navigation disabled during runs; four sequential legacy batches accepted and completed. |
+| Enhanced, correct output | First public sample passed with correct narration. Second sample remained queued, then displayed “Something went wrong. Try again.” Controls reenabled. Retried batch could not get its first sample admitted. |
+
+Only public samples appeared in these batches; no hidden fixture contents were included in browser evidence or this report. A complete enhanced privacy/refresh verification, enhanced runtime/wrong/timeout checks and final draft-persistence check were **not completed**. Stop was clicked on the blocked retry and showed Stopping; then navigated away from the exercise to prevent further editing/autosaves. Do not count that as verified successful cancellation.
+
+### Backend corroboration and blocker
+
+Captured nine local Redis records generated by the actual browser clicks: legacy PASSED ×2, RUNTIME_ERROR ×2, TIME_LIMIT ×2 and WRONG_OUTPUT ×2; enhanced PASSED ×1. All nine completed, none was ENGINE_FAILURE. The timeout records specify 3,000 ms. Representative IDs: runtime `1387e0dd-8570-484f-91bc-f00874d4cc1d`, timeout `f285bba4-dcc0-401e-94de-7d83163c965b`, enhanced pass `42771d74-2ec5-4190-bd81-8044254d5c04`.
+
+The enhanced failure coincided with development PostgreSQL connectivity loss. API logs showed Prisma P1008 / SocketTimeout and ETIMEDOUT while reading Material for presence updates; direct TCP checks to both configured development PostgreSQL ports (6543 and 5432) timed out. No record was admitted for enhanced sample 2 or the retry at capture time. This supports a development database/connectivity blocker, not a measured runner failure; the exact failing HTTP request was not captured. No protection, memory enforcement or CAPTCHA behavior was disabled to work around it.
+
+### Cleanup status — pending development database connectivity
+
+Cleanup was attempted but failed on its initial database read with “Connection terminated due to connection timeout,” before its transaction. Two disposable development exercises therefore remain: `df2016dc-a586-4cf9-8b26-3cdc45776281` (legacy) and `ca31ebd7-6e7b-45ab-9ddf-03d9dbbd4806` (enhanced), along with their disposable drafts/session data; the development SERVER_SAMPLE_CHECKS override remains enabled. No temporary accounts or mailboxes were created in this pass. The pre-existing recovery account/mailbox status is unchanged.
+
+Git-ignored local artifacts in `packages/api/.migration-artifacts/`: `local-browser-manifest.json` holds the before-state and exact fixture IDs; `local-browser-results.json` holds sanitized server records; `local-browser-cleanup.ts` checks all pre-existing drafts/progress and submission count before deleting only these fixtures and restoring the original flag. Once database connectivity returns, finish enhanced browser probes first, leave the exercise page, then run the guarded cleanup. No claim that the final database equality check passed: it is blocked. Existing drafts were never edited in this pass; only disposable fixtures were edited. No official submissions were requested. Ordinary development learning-time activity and course content revision changed through normal use/fixture creation.
+
+No production deployment, Tower repair, student-progress reset or historical regrade occurred. Local verification is **partial**, not a complete pre-deployment pass. Remaining deployment scope is still studio web plus the judge worker/sandbox artifact pair, followed by real production Chrome verification.
+
+## Follow-up fixes — prepared, not yet browser-verified after deployment
+
+Branch remains `fix/auth-google-login-password-recovery`.
+
+- **39313c8**: Workspace retains and returns the complete SampleRun instead of reconstructing only outcome/verdict. Monitoring continues to read the same fields; runtime/time-limit narration, stderr, truncation and changed-code notes now reach the existing batch renderer. No fallback to local comparison, progress write or new submission behavior.
+- **1d82f42**: Separately investigated and fixed a deterministic runner lifecycle race. The memory timer continued after confirmed child exit while stdio drained; memoryMb deliberately returns null for exited children, so five 100-ms polls converted a known exit into ENGINE_FAILURE. The timer now skips measurement only after confirmed exit, still waiting for close/the existing drain bound. Initial baseline validation and unreadable-live-runner failure remain mandatory. No memory limit, sandbox protection or drain deadline was relaxed.
+
+Regression evidence:
+
+- Real Workspace → Test run button → batch sequence → real EditorPane integration tests fail before the workspace fix for error/timeout narration, then pass after it. They cover both legacy/enhanced modes, stderr and informational messages, local-practice fallback, monitoring lifecycle and absence of Submit calls. Combined focused web suites: **48 passed**. Web TypeScript and changed-file ESLint passed.
+- Deterministic process-event tests reproduce the exact memory-measurement error before the engine fix when both successful and failed child exits precede pipe close by 600 ms. They now preserve final output, stderr and exit verdict. Live unreadable-runner enforcement still rejects and kills the runner. Lifecycle/accounting suites: **6 passed**.
+- Real Pyodide subprocess tests for memory-monitoring failures and output draining: **8 passed**, 54 unrelated cases excluded by the focused name filter. API TypeScript passed.
+
+Production investigation is separate from that local reproduction. The sandbox cgroup reported memory.events max/oom/oom_kill/oom_group_kill all zero, memory.max 1,342,177,280 bytes and memory.peak 417,935,360 bytes. These counters do not support an OOM explanation for that container lifetime. The old incident log does not identify baseline versus live-poll failure or exit/close ordering; therefore the fixed race is a demonstrated possible cause, **not a conclusively traced root cause of the particular production check**. If it recurs, collect phase/exit-state telemetry rather than weakening fail-closed measurement.
+
+Deployment required: **studio web** for 39313c8 and **judge sandbox** for 1d82f42. Production declares one JUDGE_IMAGE for sandbox and worker, so roll the **judge-worker/sandbox pair** to the same new artifact during the normal release. Worker protocol/admission and API behavior are unchanged; no API redeployment or database migration is required specifically for these two fixes. Avoid terminating an active student run during rollout.
+
+Post-deployment verification is pending release confirmation. Use existing Chrome, reload old assets, verify deployed SHA, preserve drafts, then run bounded runtime-error/time-limit probes in legacy Card and enhanced Tower. Check explicit messages and stderr against ephemeral server records, correct/wrong output, repeated runs and unavailable classification. Respect sample throttling. Compare saved drafts, official submissions and progress before/after; restore John. Do not apply Tower repair or create official submissions for this verification. A successful Chrome repetition alone cannot prove the timing race will never recur; the deterministic event-order test is the regression guard.
+
+No browser interactions or student-data mutations were performed while implementing these fixes. Tower repair remains unapplied. Temporary recovery account/mailbox status remains as documented below; no credential changes or cleanup were performed in this implementation step.
+
+
+## Redeployment verification — 2026-10-06, 10:52 UTC onward
+
+This section supersedes the deployment and session status below; earlier sections remain historical evidence.
+
+### Deployed version (backend evidence)
+
+Running production API, studio web, judge worker and sandbox images all identify `sha-3499829e635e15c35cd812a0dbd09e1c1b35e48d`. Git confirms `73aa8d2` is its ancestor; merge title is “align server sample tests with legacy submission limits.” Compiled API contains sampleSnapshotFor and LEGACY_STDIO support; the running worker's `/app/dist/api/src/judge/sample-check.runner.js` contains the legacy branch. Compiled web SSR chunks contain serverDetails rendering. Web BUILD_ID is `build-TfctsWXpff2fKS`. Chrome DOM script URLs after reload identify `dpl=v2-0-28-3499829e635e15c35cd812a0dbd09e1c1b35e48d`. The academy server-sample flag remains enabled.
+
+### Actual Chrome tests
+
+Used the same regular Chrome profile and original user tab. Initially the tab had old v2.0.27 assets: two login attempts hit UnrecognizedActionError / “Server Action … was not found.” The in-app Try again button retained stale assets. A full browser reload recovered the page, showing the temporary recovery session. Normal sign-out and John login then succeeded with production protection unchanged.
+
+| Flow | Actual rendered result |
+| --- | --- |
+| Legacy Card, original correct code | Queued on the grading server, then Test 1 matches; actual output 4. Repeating the correct run also passed. |
+| Legacy Card, print(-1) | Correct wrong-output message and actual output -1. |
+| Legacy Card, explicit RuntimeError | Generic “Skipped the comparison because the program did not finish.” Missing runtime-error message and stderr: **display failure**. |
+| Legacy Card, bounded four-second monotonic loop | Generic skipped message; unlike the earlier local path, did not show a pass. Precise time-limit message remains missing: **display failure**. |
+| Enhanced Tower, reference algorithm | Five intact public samples matched. The two damaged public samples showed generic skipped, not the required runtime-error detail. |
+| Enhanced Tower, print(-1) | First two public samples displayed wrong output. The next admission hit “Too many sample checks. Wait a moment and try again.” Batch stopped with controls reenabled. Remaining samples were not run in that batch. |
+| Enhanced Tower, bounded four-second loop | Five 3-second cases displayed generic skipped. The two 60-second cases completed with wrong output, as intended for print(-1). Precise timeout labels remain missing. |
+| Enhanced Tower, explicit RuntimeError | First five public cases displayed generic skipped. Sixth public case showed “Sample could not be checked. Try again later”; batch stopped and seventh was not run. |
+| Loading and repeat behavior | Queued banner, Stop, and disabled Submit/reset/navigation observed in both modes. Sequential runs accepted; rapid enhanced repetition was correctly throttled. No rate or security controls altered. |
+| Refresh | Both Card and Tower practice results cleared on full refresh; restored drafts persisted. This is ephemeral practice-result behavior, not persistent submission history. |
+| Hidden privacy | Card showed one public case with eight hidden cases only counted; Tower showed seven public cases with two hidden cases only counted. No hidden input/expected/actual output was rendered. This is UI privacy evidence, not a network-payload audit. |
+
+### Failure cause
+
+The deployment contains the change, but `workspace.tsx:255` destructures only outcome/verdict/report from runSample and returns only outcome/verdict at line 311. It drops serverDetails before editor-pane receives batch results. Consequently the new runtime/timeout/stderr narration never reaches that panel. Correct/wrong-output classification survives. This is a code defect, not evidence of an old worker or sandbox outage. No implementation change is included in this verification-only update.
+
+### Server records correlated with the browser (backend evidence)
+
+Captured 27 admitted checks from the actual browser clicks before Redis expiry: 26 completed and one UNAVAILABLE. No backend-originated test executions were used to manufacture a browser pass.
+
+| Mode / probe | Server outcomes | Browser agreement |
+| --- | --- | --- |
+| Legacy, correct twice | PASSED ×2 | Matching messages agree. |
+| Legacy, wrong | WRONG_OUTPUT ×1 | Wrong-output message agrees. |
+| Legacy, runtime | RUNTIME_ERROR ×1 | Classification not shown; generic skipped. |
+| Legacy, four-second probe | TIME_LIMIT ×1, configured 3,000 ms | Execution fix works; timeout label missing. |
+| Enhanced, reference | PASSED ×5; RUNTIME_ERROR at fixture positions 8/9 | Matches five passes; generic skipped conceals runtime details. |
+| Enhanced, wrong | WRONG_OUTPUT at positions 1/3; later admission rejected by rate limit | Two mismatches and rate-limit warning agree. |
+| Enhanced, four-second probe | TIME_LIMIT ×5 at 3,000 ms; WRONG_OUTPUT ×2 at 60,000 ms | Skipped labels incomplete; two mismatch messages agree. |
+| Enhanced, explicit runtime | RUNTIME_ERROR ×5; ENGINE_FAILURE / UNAVAILABLE at position 8 | First five errors have incomplete labels; unavailable warning agrees. Position 9 was not run. |
+
+Representative check IDs: legacy correct `9101ea7e-4ee8-4243-9392-c7a2a36b1db0`, runtime `7500e41e-256f-46e5-a52b-03f2f0437b04`, wrong `76047add-2070-49d4-84cc-26be0cf96e80`, timeout `9e3b0406-f9d0-484d-a89e-57baafd77d86`.
+
+Infrastructure failure `4825104c-9b74-4af4-bdc8-c7d4603faae3`, 11:00:25 UTC: worker logged **“runner memory could not be measured; refusing to grade.”** Its record is UNAVAILABLE / ENGINE_FAILURE, not RUNTIME_ERROR. Worker and sandbox restart counts were zero and neither container was marked OOMKilled. This establishes the immediate failure reason, not its deeper cause; no security or memory protections were relaxed. The problem was not reproduced or fixed in this verification pass. Distinguish it from reference-code IndexError caused by truncated input: the explicit RuntimeError probe does not read the input at all.
+
+### Tower, student state and privacy
+
+Read-only checks confirmed Tower revision 6 and both before-fixture hashes still match the private plan. Cases 8/9 remain incomplete; the repair remains unapplied. No fixture publication, progress reset or historical regrade occurred.
+
+Both edited drafts were copied from the editor before changes and restored through the editor; Saved was observed. Final database comparison showed all three preserved exercise drafts exactly unchanged (Card, Tower, untouched Rods), identical official submissions and identical progress. No new Submit clicks or official attempts. Card remains attempts 6 / best 100; Tower attempts 1 / best 78; Rods attempts 3 / best 100. Ordinary learning-time activity changed through browser use.
+
+### Recovery and cleanup
+
+The retained recovery form still had blank new-password and confirmation fields. No completed password-entry handoff or new password was supplied during this verification. The prior authenticated temporary session is evidence of email confirmation, not password saving. New-password login, old-password rejection and reused-link rejection therefore remain untested. No password was entered or changed by the agent.
+
+Read-only checks confirm the temporary profile/auth link and controlled mailbox still exist. They are retained for the unfinished recovery test; account/mailbox cleanup is **not complete**. No extra temporary users were created. John was successfully restored through normal login, and the original tab was returned to `/academy/dlab-mapo`, visibly identifying **Dlab-Mapo · John**. The old password-form tab is not evidence of a usable recovery capability after switching accounts.
+
+### Remaining work
+
+- Carry serverDetails through the workspace's sample result into batch rendering, then deploy and verify runtime/timeout/stderr messages in both modes.
+- Diagnose the runner-memory measurement failure without relaxing protection; repeat the affected enhanced batch after fixing or explaining it.
+- Resume recovery only with the required user password-entry handoff and a fresh link as needed; complete login/replay checks, delete the isolated profile/auth identity and mailbox, and restore John afterward.
+- No new official Submit or historical-review tests were run; the user requested Test run preference and no additional submissions. Wrong-output enhanced samples after throttling and the final explicit-runtime sample after engine failure remain untested in those particular batches. Cancellation by clicking Stop was not tested; its loading-state presence was observed.
+
 
 ## Actual Chrome results this follow-up
 

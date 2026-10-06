@@ -13,7 +13,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
-import { narrateSampleCheck } from './sample-check-narration';
+import { narrateSampleCheck, type SampleCheckLine } from './sample-check-narration';
 import {
   comparesSampleLocally,
   resolveSampleVerdict,
@@ -47,6 +47,8 @@ export type SampleRun = {
    * as cancelled, never as a failed answer: a fault of ours is not the
    * student's zero.
    */
+  /** Preserve authoritative server verdicts and diagnostics in batch results. */
+  serverDetails?: SampleCheckLine[];
   report?: { lifecycle: Exclude<TerminalLifecycle, 'STARTED'>; passedCount: number };
 };
 
@@ -66,11 +68,10 @@ export type ServerSampleTarget = {
  *
  * Two paths, chosen per problem:
  *
- * - **Legacy grading** runs the sample in the browser and compares it here,
- *   with the normalizer that is byte-for-byte the judge's legacy one.
- * - **Enhanced grading**, where the academy has turned server checks on,
- *   sends the code to the grading server, which runs that one public case with
- *   exactly Submit's runner and CPython comparator. The terminal narrates
+ * Where the academy has turned server checks on, both grading modes run on
+ * the server. Legacy uses Submit's normalizer; enhanced uses its comparator.
+ * The enabled path sends the code to the grading server, which runs that one public case with
+ *   Submit's runner, execution limits and comparison rules. The terminal narrates
  *   Queued, Running and the verdict. There is no local fallback: when the
  *   server cannot answer the student is told so, never shown a verdict by
  *   different rules.
@@ -243,6 +244,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
               ? null
               : { stdout: narration.stdout, stopped: false, failed: narration.failed, error: null },
           verdict: narration.verdict,
+          serverDetails: narration.lines,
         },
         narration.lifecycle,
         narration.passedCount,
@@ -266,7 +268,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
         server?: ServerSampleTarget;
       },
     ): Promise<SampleRun> => {
-      if (options?.server && !comparesSampleLocally(options.gradingMode)) {
+      if (options?.server) {
         return runServer(code, sample, index, options.server, options);
       }
 

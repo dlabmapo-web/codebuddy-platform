@@ -171,6 +171,7 @@ function createService(options?: {
   const material =
     options?.material === undefined ? workspaceMaterial() : options.material;
   const prisma = {
+    academyFeatureFlag: { findUnique: vi.fn().mockResolvedValue(null) },
     course: {
       findMany: vi.fn().mockResolvedValue(course ? [course] : []),
       findFirst: vi.fn().mockResolvedValue(course),
@@ -312,6 +313,14 @@ describe("LearnService visible curriculum", () => {
         }),
       }),
     );
+  });
+
+  it.each([false, true])("advertises server samples for legacy exercises when enabled=%s", async (enabled) => {
+    const { service, prisma } = createService();
+    vi.mocked(prisma.academyFeatureFlag.findUnique).mockResolvedValue({ isEnabled: enabled } as never);
+    const result = await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
+    expect(result.exercise.serverSampleChecks).toBe(enabled);
+    expect(JSON.stringify(result)).not.toContain("secret input");
   });
 
   it("returns sample cases but only counts hidden grading cases", async () => {

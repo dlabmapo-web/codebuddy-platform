@@ -125,6 +125,28 @@ function setup(options: {
 }
 
 describe("SampleCheckRunner", () => {
+  it.each([
+    ["hello\r\n ", "PASSED", false, "PASSED"],
+    [" hello", "PASSED", false, "WRONG_OUTPUT"],
+    ["hello", "PASSED", true, "WRONG_OUTPUT"],
+    ["", "RUNTIME_ERROR", false, "RUNTIME_ERROR"],
+    ["", "TIME_LIMIT", false, "TIME_LIMIT"],
+  ] as const)("legacy sample matches Submit for %j / %s", async (stdout, outcome, outputTruncated, expected) => {
+    const initial = record().snapshot;
+    const { runner, store, engine, comparator, checkId } = setup({
+      record: { snapshot: {
+        gradingMode: "LEGACY_STDIO", engineVersion: "pyodide-0.27.5",
+        code: initial.code, memoryLimitMb: initial.memoryLimitMb,
+        totalTimeLimitMs: 60_000, comparatorTimeLimitMs: 1, testCase: initial.testCase,
+      } },
+      run: async () => ({ stdout, stderr: "", outcome, outputTruncated, runtimeMs: 12 }),
+    });
+    await runner.run(checkId);
+    expect(engine.run).toHaveBeenCalledWith({ code: initial.code, stdin: "hello\n", timeLimitMs: 3000, memoryLimitMb: 256 });
+    expect(comparator.compare).not.toHaveBeenCalled();
+    expect(store.records.get(checkId)).toMatchObject({ status: "COMPLETED", result: { outcome: expected } });
+  });
+
   it("completes a student timeout when case and total budgets are equal", async () => {
     const { runner, store, engine, checkId } = setup({
       record: {

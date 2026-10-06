@@ -270,18 +270,16 @@ export class LearnService {
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { status: true, gradingRevision: true },
       }),
-      // Only enhanced problems have a server check; legacy samples stay local.
-      exercise.gradingMode === "ELICE_STDIO"
-        ? this.prisma.academyFeatureFlag.findUnique({
-            where: {
-              academyId_feature: {
-                academyId: course.academyId,
-                feature: "SERVER_SAMPLE_CHECKS",
-              },
-            },
-            select: { isEnabled: true },
-          })
-        : null,
+      // The academy rollout flag applies to both supported grading modes.
+      this.prisma.academyFeatureFlag.findUnique({
+        where: {
+          academyId_feature: {
+            academyId: course.academyId,
+            feature: "SERVER_SAMPLE_CHECKS",
+          },
+        },
+        select: { isEnabled: true },
+      }),
     ]);
     const ordered = flattenOutlineExercises(
       nonemptyModules(course).map((module) => ({

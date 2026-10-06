@@ -62,7 +62,7 @@ describe("large grading data import", () => {
     expect(collectPlanIssues(plan)).toEqual(expect.arrayContaining([
       expect.objectContaining({code: "test_data_too_large"}),
     ]));
-    expect(canCommitPlan(plan)).toBe(false);
+    expect(canCommitPlan({counts: plan.counts, acknowledgeWarnings: false})).toBe(false);
   });
 });
 

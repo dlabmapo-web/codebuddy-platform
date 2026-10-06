@@ -22,11 +22,11 @@ const issuer = 'cove:auth';
 const audience = 'cove:password-recovery';
 const version = 1;
 
-/** Bound to `/auth` so the capability is not attached to studio requests. */
+/** Sent to the reset page and its Server Action, away from studio requests. */
 export const recoveryCookieOptions = {
   httpOnly: true,
   sameSite: 'lax',
-  path: '/auth',
+  path: '/reset-password',
   maxAge: recoveryCapabilityTtlSeconds,
   secure: process.env.NODE_ENV === 'production',
 } as const;

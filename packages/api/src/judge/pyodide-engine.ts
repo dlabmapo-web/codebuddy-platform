@@ -322,6 +322,12 @@ class RunnerProcess {
       const baselineMb = this.memoryMb();
       let blindSamples = 0;
       const memory = setInterval(() => {
+        // `exit` precedes `close`: the process is gone while its pipes may
+        // still be draining. There is no live allocation to measure then.
+        // Keep waiting for close/the drain bound, without converting a known
+        // exit into a telemetry failure. Live unreadable runners still fail
+        // closed below, and the initial baseline remains mandatory.
+        if (this.exited !== null) return;
         const chargedMb = this.memoryMb();
         if (chargedMb === null) {
           // Fail closed. A measurement that cannot be taken is not a

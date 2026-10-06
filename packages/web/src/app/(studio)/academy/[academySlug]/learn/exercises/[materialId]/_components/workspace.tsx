@@ -252,7 +252,7 @@ function ProgrammingWorkspace({
       // One id for both halves of the report: the presence summary and the
       // mirrored terminal describe the same execution, so a teacher cannot see
       // a transcript from one run beside a verdict from another.
-      const { outcome, verdict, report } = await runSample(draft.code, sample, index, {
+      const result = await runSample(draft.code, sample, index, {
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
         gradingMode: exercise.gradingMode,
@@ -268,6 +268,7 @@ function ProgrammingWorkspace({
             }
           : undefined,
       });
+      const { outcome, verdict, report } = result;
       setActiveSample(null);
       // A server check that ended without judging the program — stopped,
       // timed out, unavailable — reports as cancelled, never as a wrong answer.
@@ -291,7 +292,7 @@ function ProgrammingWorkspace({
           passedCount: 0,
           output: '',
         });
-        return { outcome, verdict };
+        return result;
       }
 
       // Counts and the output the student is already looking at. There is no
@@ -308,7 +309,7 @@ function ProgrammingWorkspace({
         passedCount: report?.passedCount ?? (verdict.kind === 'match' ? 1 : 0),
         output: outcome.stdout,
       });
-      return { outcome, verdict };
+      return result;
     },
     [
       academyId,

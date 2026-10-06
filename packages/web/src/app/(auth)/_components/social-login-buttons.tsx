@@ -23,9 +23,11 @@ const columnsForCount: Record<number, string> = {
 export function SocialLoginButtons({
   requestedAcademyId,
   academyRequired = false,
+  iconOnly = false,
 }: {
   requestedAcademyId?: string;
   academyRequired?: boolean;
+  iconOnly?: boolean;
 }) {
   const { t } = useTranslation('auth');
   const [error, setError] = useState<string>();
@@ -60,7 +62,11 @@ export function SocialLoginButtons({
   return (
     <div>
       <div
-        className={`grid gap-3 ${columnsForCount[providers.length] ?? 'grid-cols-3'}`}
+        className={
+          iconOnly
+            ? 'flex flex-wrap justify-center gap-3'
+            : `grid gap-3 ${columnsForCount[providers.length] ?? 'grid-cols-3'}`
+        }
       >
         {providers.map(({ id, label, Icon }) => {
           const isPending = pending === id;
@@ -75,6 +81,7 @@ export function SocialLoginButtons({
               }
               className={[
                 'flex h-12 items-center justify-center gap-2.5 rounded-xl border bg-card text-[15px] font-semibold text-ink transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed',
+                iconOnly ? 'w-18 shrink-0' : '',
                 isPending
                   ? 'border-brand/40 ring-2 ring-brand/15'
                   : 'border-border hover:border-ink/25 hover:bg-surface',
@@ -88,7 +95,7 @@ export function SocialLoginButtons({
               <Icon
                 className={isPending ? 'h-6 w-6 text-brand' : 'h-6 w-6'}
               />
-              <span
+              {iconOnly ? null : <span
                 className={
                   isPending
                     ? 'hidden text-brand sm:inline'
@@ -96,7 +103,7 @@ export function SocialLoginButtons({
                 }
               >
                 {isPending ? t('social.connecting') : label}
-              </span>
+              </span>}
             </button>
           );
         })}

@@ -1,6 +1,7 @@
 import type { Socket } from "node:net";
 
 import { z } from "zod";
+import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 /**
  * The one conversation between the judge and the student-code sandbox.
@@ -11,28 +12,32 @@ import { z } from "zod";
  * reply of the wrong shape, for the wrong request, or too large to be honest
  * is refused as an infrastructure fault — never read as a verdict.
  *
- * Deliberately free of project imports, so the sandbox side needs nothing but
- * this file, the engine and Pyodide.
+ * The shared limits subpath has no runtime dependencies. The sandbox does not
+ * import the API application or its credential-bearing services.
  */
 
-export const SANDBOX_PROTOCOL_VERSION = 1;
+// v2 adds per-request output ceilings; reject an older sandbox that could
+// silently ignore the larger ceiling frozen on a new submission.
+export const SANDBOX_PROTOCOL_VERSION = 2;
 
 /**
- * Code and stdin are each at most 100 000 characters, and JSON escapes a
- * control character as six bytes; program output is capped at 256 KiB per
- * stream. Four MiB bounds either frame with room to spare.
+ * stdin may contain 8 Mi characters, including JSON-escaped control characters.
+ * Code remains capped at 100,000 characters; stdout at 8 MiB. The frame ceiling
+ * allows their encoded representation while bounding both directions.
  */
-export const MAX_FRAME_BYTES = 4 * 1024 * 1024;
+export const MAX_FRAME_BYTES = gradingDataLimits.sandboxFrameBytes;
 
 const idSchema = z.string().uuid();
 
 export const sandboxRequestSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("run"),
+    protocol: z.literal(SANDBOX_PROTOCOL_VERSION),
     id: idSchema,
     request: z.object({
-      code: z.string().max(100_000),
-      stdin: z.string().max(100_000),
+      code: z.string().max(gradingDataLimits.codeChars),
+      stdin: z.string().max(gradingDataLimits.testTextChars),
+      outputLimitBytes: z.number().int().min(1).max(gradingDataLimits.stdoutBytes).optional(),
       timeLimitMs: z.number().int().min(1).max(300_000),
       memoryLimitMb: z.number().int().min(1).max(4_096),
     }),
@@ -58,6 +63,7 @@ export const sandboxResponseSchema = z.discriminatedUnion("type", [
       stderr: z.string(),
       outcome: z.enum(sandboxOutcomes),
       runtimeMs: z.number().int().nonnegative(),
+      outputTruncated: z.boolean().optional(),
     }),
   }),
   /** The sandbox could not execute the case: an infrastructure fault. */
@@ -65,7 +71,7 @@ export const sandboxResponseSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("health"),
     id: idSchema,
-    protocol: z.literal(SANDBOX_PROTOCOL_VERSION),
+    protocol: z.number().int().positive(),
     engineVersion: z.string(),
     /** Whether the sandbox verified its own isolation at boot. */
     isolated: z.boolean(),

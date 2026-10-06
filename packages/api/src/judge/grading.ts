@@ -23,10 +23,12 @@ export function caseOutcomeFor(input: {
   engineOutcome: CaseOutcome;
   stdout: string;
   expectedOutput: string;
+  outputTruncated?: boolean;
 }): CaseOutcome {
   // A crash or a timeout is not a wrong answer, and reporting it as one points
   // the student at entirely the wrong problem.
   if (input.engineOutcome !== "PASSED") return input.engineOutcome;
+  if (input.outputTruncated) return "WRONG_OUTPUT";
   return normalizeOutput(input.stdout) === normalizeOutput(input.expectedOutput)
     ? "PASSED"
     : "WRONG_OUTPUT";

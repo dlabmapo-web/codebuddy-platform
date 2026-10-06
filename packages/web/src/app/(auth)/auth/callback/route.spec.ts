@@ -38,12 +38,17 @@ describe('social login callback', () => {
     expect(mocks.begin).not.toHaveBeenCalled();
   });
 
-  it('keeps existing users on their normal landing route', async () => {
+  it.each(['google', 'naver', 'kakao'])('keeps existing %s users on their normal landing route without signup', async (provider) => {
+    mocks.exchange.mockResolvedValue({
+      data: { session: { access_token: 'test-token', user: { app_metadata: { provider } } } }, error: null,
+    });
     mocks.complete.mockResolvedValue({});
     const response = await GET(new NextRequest('https://internal.test/auth/callback?code=test'));
     expect(response.headers.get('location')).toBe('https://cove.test/academy/test');
     expect(mocks.signOut).not.toHaveBeenCalled();
     expect(mocks.begin).toHaveBeenCalledOnce();
+    expect(mocks.complete).toHaveBeenCalledWith({});
+    expect(mocks.exchange).toHaveBeenCalledWith('test');
   });
 
   it('preserves invitation routing', async () => {

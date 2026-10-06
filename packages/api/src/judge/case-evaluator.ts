@@ -4,12 +4,6 @@ import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
 import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { eliceCaseDecisionFor, type GraderFault } from "./grading.js";
 
-/**
- * How long past the allocated student budget an engine call may take to settle.
- * The run itself is capped at the remaining budget; this covers the forced
- * termination and pipe drain after it, not more student time.
- */
-const ENGINE_SETTLE_GRACE_MS = 2_500;
 /** Bounded scheduling, comparison, reporting and cleanup time, not student time. */
 export const GRADING_OVERHEAD_MS = 5_000;
 
@@ -60,16 +54,18 @@ export type EnhancedCaseEvaluation =
  * classification. Aggregation, points and persistence stay with the caller.
  *
  * `deadlineAt` is absolute and covers everything done here — waiting for a
- * runner, running, waiting for a comparator and comparing. Each operation is
- * held to the lesser of its own limit and what is left, and a result that
- * arrives after the deadline is `deadline`, never a verdict. An engine that
- * throws propagates: that is an infrastructure failure the caller records.
+ * runner, running, waiting for a comparator and comparing. Student execution
+ * and comparison have their own limits; acquiring and retiring a runner may
+ * use the time left before the overall deadline. A result arriving after that
+ * deadline is `deadline`, never a verdict. An engine that throws propagates:
+ * that is an infrastructure failure the caller records.
  */
 export async function evaluateEnhancedCase(
   deps: { engine: ExecutionEngine; comparator: OutputComparator },
   input: {
     code: string;
     memoryLimitMb: number;
+    outputLimitBytes?: number;
     comparatorTimeLimitMs: number;
     deadlineAt: number;
     executionBudgetMs?: number;
@@ -90,8 +86,13 @@ export async function evaluateEnhancedCase(
     stdin: testCase.input,
     timeLimitMs: limit,
     memoryLimitMb: input.memoryLimitMb,
+    ...(input.outputLimitBytes === undefined ? {} : { outputLimitBytes: input.outputLimitBytes }),
   });
-  const run = await settleWithin(execution, Math.min(remaining, limit + ENGINE_SETTLE_GRACE_MS));
+  // The engine enforces `limit` once student execution starts. Acquiring a
+  // fresh isolated runner and retiring it also take time, especially after
+  // the warm pool is exhausted. Bound that wait by the overall deadline,
+  // rather than treating runner startup as student execution time.
+  const run = await settleWithin(execution, remaining);
   const executionMs = Date.now() - executionStartedAt;
   if (run === "expired") {
     // Giving up on the answer is not the same as the program having stopped.
@@ -108,7 +109,7 @@ export async function evaluateEnhancedCase(
 
   let comparison: ComparisonResult | null = null;
   let comparisonMs = 0;
-  if (run.outcome === "PASSED") {
+  if (run.outcome === "PASSED" && !run.outputTruncated) {
     const comparisonStartedAt = Date.now();
     // The deadline, not just a budget: queueing for a comparator is the run's
     // time too, and the pool enforces the lesser of the two.
@@ -124,7 +125,7 @@ export async function evaluateEnhancedCase(
   }
 
   const decision = eliceCaseDecisionFor({
-    engineOutcome: run.outcome,
+    engineOutcome: run.outcome === "PASSED" && run.outputTruncated ? "WRONG_OUTPUT" : run.outcome,
     runtimeMs: run.runtimeMs,
     softTimeLimitMs: testCase.softTimeLimitMs,
     comparison,

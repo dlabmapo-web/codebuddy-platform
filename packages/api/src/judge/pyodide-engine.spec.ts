@@ -273,6 +273,7 @@ describe("PyodideExecutionEngine", () => {
       const result = await engine.run({
         ...limits,
         code: "print('x' * 400_000)",
+        outputLimitBytes: 256 * 1024,
       });
 
       expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(256 * 1024);

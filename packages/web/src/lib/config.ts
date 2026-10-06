@@ -21,6 +21,10 @@ export const publicConfig = {
     "NEXT_PUBLIC_SITE_URL",
     process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
   ),
+  /** Existing Google accounts need sign-in by default; "false" explicitly disables it. */
+  googleAuthEnabled: process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED !== 'false',
+  /** Naver remains unavailable until the deployment explicitly enables it. */
+  naverAuthEnabled: process.env.NEXT_PUBLIC_NAVER_AUTH_ENABLED === 'true',
   /*
    * Whether Kakao sign-in is offered.
    *
@@ -31,10 +35,6 @@ export const publicConfig = {
    * environment cannot publish a button that sends students to a broken
    * consent screen.
    */
-  /** Naver remains unavailable until the deployment explicitly enables it. */
-  /** Slide QA: social login is off unless explicitly enabled for a deployment. */
-  googleAuthEnabled: process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === 'true',
-  naverAuthEnabled: process.env.NEXT_PUBLIC_NAVER_AUTH_ENABLED === 'true',
   kakaoAuthEnabled: process.env.NEXT_PUBLIC_KAKAO_AUTH_ENABLED === 'true',
   /** Public Cloudflare Turnstile widget key. Supabase owns token validation. */
   turnstileSiteKey:

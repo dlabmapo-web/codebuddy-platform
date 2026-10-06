@@ -64,6 +64,7 @@ export const contentImportErrorCodes = [
   "title_too_long",
   "text_too_long",
   "code_too_long",
+  "test_data_too_large",
   "difficulty_missing",
   "difficulty_invalid",
   "description_missing",

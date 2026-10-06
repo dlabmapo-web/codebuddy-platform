@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { gradingDataLimits } from "../../grading-limits.js";
+import { readTestCasesSheet } from "./rows.js";
 
 import {
   isValidStableKey,
@@ -36,6 +38,33 @@ import { buildCurrentCourseWorkbook } from "./workbook-template.js";
 const header = <Sheet extends keyof typeof contentImportColumns>(
   sheet: Sheet,
 ): string[] => [...contentImportColumns[sheet]];
+
+describe("large grading data import", () => {
+  it("retains large input and expected output in full", () => {
+    const input = "1 ".repeat(2_500_000);
+    const expected = "0 ".repeat(1_750_000);
+    const result = readTestCasesSheet([header("Test Cases"), ["TOWER", "1", input, expected, "SAMPLE"]]);
+    expect(result.issues).toEqual([]);
+    expect(result.rows[0]!.input).toBe(input);
+    expect(result.rows[0]!.expectedOutput).toBe(expected);
+  });
+  it("rejects oversized expected output without including answers in diagnostics", () => {
+    const expected = "secret".repeat(Math.ceil((gradingDataLimits.testTextChars + 1) / 6));
+    const result = readTestCasesSheet([header("Test Cases"), ["TOWER", "1", "", expected, "HIDDEN"]]);
+    expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({code: "code_too_long", received: null})]));
+  });
+  it("blocks imports whose combined tests exceed the per-problem bound", () => {
+    const input = "1".repeat(gradingDataLimits.testTextChars);
+    const plan = planContentImport({workbook: workbook({...unchangedRows, tests: [
+      ["VAR-001", "1", input, "1", "SAMPLE"],
+      ["VAR-001", "2", input, "1", "HIDDEN"],
+    ]}), course: existingCourse});
+    expect(collectPlanIssues(plan)).toEqual(expect.arrayContaining([
+      expect.objectContaining({code: "test_data_too_large"}),
+    ]));
+    expect(canCommitPlan({counts: plan.counts, acknowledgeWarnings: false})).toBe(false);
+  });
+});
 
 const fixtureSolution = "name = input()\nprint(f'Hello, {name}!')\n";
 

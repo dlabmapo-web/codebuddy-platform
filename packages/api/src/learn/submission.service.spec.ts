@@ -561,7 +561,7 @@ describe("SubmissionService.submit grading snapshot", () => {
       expect.objectContaining({
         ...eliceProfile,
         gradingPolicySnapshot: expect.objectContaining({
-          version: 1,
+          version: 2,
           semanticVersion: "elice-v1",
           comparator: expect.objectContaining({ budgetMs: 100 }),
           ceilings: expect.objectContaining({ totalTimeLimitMs: 60_000, caseTimeLimitMs: 1_000 }),

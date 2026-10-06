@@ -1,16 +1,20 @@
 import type { CaseOutcome } from "@cove/shared";
+import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 /**
- * Program output kept per stream; anything past it is truncated, not a crash.
- * Recorded in every enhanced submission's policy snapshot.
+ * Maximum captured stdout, recorded in every enhanced submission's policy
+ * snapshot. Diagnostic stderr has a separate, smaller bound.
  */
-export const MAX_OUTPUT_BYTES = 256 * 1024;
+export const MAX_OUTPUT_BYTES = gradingDataLimits.stdoutBytes;
 
 export type ExecutionRequest = {
   code: string;
   stdin: string;
+  /** Student execution budget once the runner is ready; excludes acquisition. */
   timeLimitMs: number;
   memoryLimitMb: number;
+  /** Frozen enhanced-policy cap; older submissions retain their smaller cap. */
+  outputLimitBytes?: number;
 };
 
 export type ExecutionResult = {
@@ -18,6 +22,8 @@ export type ExecutionResult = {
   stderr: string;
   outcome: CaseOutcome;
   runtimeMs: number;
+  /** Captured stdout is incomplete and cannot be accepted as a correct answer. */
+  outputTruncated?: boolean;
 };
 
 /**

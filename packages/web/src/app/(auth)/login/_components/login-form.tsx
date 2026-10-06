@@ -143,7 +143,7 @@ export function LoginForm({
       </form>
 
       <AuthDivider label={t('divider.or')} />
-      <SocialLoginButtons />
+      <SocialLoginButtons iconOnly />
 
       <p className="mt-7 text-center text-[15px] text-sub">
         {t('login.no_account')}{' '}

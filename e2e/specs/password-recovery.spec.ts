@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { routes } from '../../packages/web/src/lib/routes';
+import {
+  recoveryCookieName,
+  recoveryCookieOptions,
+} from '../../packages/web/src/app/(auth)/_lib/recovery-capability';
 import { signInAs } from '../support/auth';
 
 /**
@@ -20,6 +24,29 @@ import { signInAs } from '../support/auth';
  */
 
 test.describe.configure({ mode: 'serial' });
+
+test('the browser sends recovery authorization to the reset page and action', async ({ context }) => {
+  const origin = 'https://recovery.test';
+  await context.addCookies([{
+    name: recoveryCookieName,
+    value: 'a-test-capability',
+    domain: 'recovery.test',
+    path: recoveryCookieOptions.path,
+    httpOnly: recoveryCookieOptions.httpOnly,
+    sameSite: 'Lax',
+    secure: true,
+  }]);
+
+  // Page navigation and Server Action POSTs use the same /reset-password URL.
+  // A name-only mock cookie store misses browser path filtering entirely.
+  const resetCookies = await context.cookies(`${origin}${routes.resetPassword}`);
+  expect(resetCookies.find(({ name }) => name === recoveryCookieName))
+    .toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax' });
+  for (const path of ['/auth/recovery/confirm', '/academy/dlab-mapo', '/login']) {
+    expect((await context.cookies(`${origin}${path}`))
+      .some(({ name }) => name === recoveryCookieName)).toBe(false);
+  }
+});
 
 const PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const STUDENT = process.env.E2E_STUDENT_USERNAME ?? 'cove-student';

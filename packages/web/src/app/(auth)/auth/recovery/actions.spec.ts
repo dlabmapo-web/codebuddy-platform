@@ -196,7 +196,7 @@ describe('confirmPasswordRecoveryAction', () => {
       expect.any(String),
       expect.objectContaining({
         httpOnly: true,
-        path: '/auth',
+        path: '/reset-password',
         sameSite: 'lax',
         maxAge: 900,
       }),

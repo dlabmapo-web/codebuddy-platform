@@ -205,6 +205,7 @@ async function serve(
         stderr: result.stderr,
         outcome: result.outcome,
         runtimeMs: Math.max(0, Math.round(result.runtimeMs)),
+        ...(result.outputTruncated === undefined ? {} : { outputTruncated: result.outputTruncated }),
       },
     });
   } catch (error) {

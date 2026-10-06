@@ -106,6 +106,7 @@ export class SampleCheckRunner {
         {
           code: snapshot.code,
           memoryLimitMb: snapshot.memoryLimitMb,
+          outputLimitBytes: snapshot.policy.ceilings.outputBytes,
           comparatorTimeLimitMs: snapshot.comparatorTimeLimitMs,
           deadlineAt,
           executionBudgetMs: snapshot.totalTimeLimitMs,

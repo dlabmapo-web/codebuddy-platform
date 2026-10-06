@@ -9,6 +9,7 @@ import type {
 import {
   readFrame,
   sandboxResponseSchema,
+  SANDBOX_PROTOCOL_VERSION,
   writeFrame,
   type SandboxRequest,
   type SandboxResponse,
@@ -69,6 +70,9 @@ export class SandboxExecutionEngine implements ExecutionEngine {
           HEALTH_TIMEOUT_MS,
         );
         if (reply.type !== "health") throw new Error("unexpected health reply");
+        if (reply.protocol !== SANDBOX_PROTOCOL_VERSION) {
+          throw new Error(`sandbox protocol ${reply.protocol}; judge expects sandbox protocol ${SANDBOX_PROTOCOL_VERSION}`);
+        }
         if (reply.engineVersion !== this.version) {
           throw new Error(
             `sandbox runs ${reply.engineVersion}, judge expects ${this.version}`,
@@ -94,12 +98,14 @@ export class SandboxExecutionEngine implements ExecutionEngine {
     const reply = await this.exchange(
       {
         type: "run",
+        protocol: SANDBOX_PROTOCOL_VERSION,
         id: randomUUID(),
         request: {
           code: request.code,
           stdin: request.stdin,
           timeLimitMs: request.timeLimitMs,
           memoryLimitMb: request.memoryLimitMb,
+          ...(request.outputLimitBytes === undefined ? {} : { outputLimitBytes: request.outputLimitBytes }),
         },
       },
       request.timeLimitMs + SANDBOX_SLACK_MS,

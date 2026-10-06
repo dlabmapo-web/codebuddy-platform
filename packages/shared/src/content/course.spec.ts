@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { gradingDataLimits } from "../grading-limits.js";
 
 import {
   courseHasNoVisibleContent,
@@ -44,6 +45,39 @@ const validExercise = {
 };
 
 describe("manual programming exercise schemas", () => {
+  it("accepts large tests without changing their text", () => {
+    const input = "x".repeat(5_000_000);
+    const expectedOutput = "y".repeat(3_500_000);
+    const parsed = createProgrammingExerciseSchema.parse({ ...validExercise,
+      testCases: [{ ...validExercise.testCases[0], input, expectedOutput }],
+    });
+    expect(parsed.testCases[0]!.input).toBe(input);
+    expect(parsed.testCases[0]!.expectedOutput).toBe(expectedOutput);
+  });
+
+  it("rejects oversized fields and aggregate test sets", () => {
+    const input = "x".repeat(gradingDataLimits.testTextChars + 1);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise,
+      testCases: [{ ...validExercise.testCases[0], input }],
+    }).success).toBe(false);
+    const testCase = { ...validExercise.testCases[0], input: input.slice(1) };
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise,
+      testCases: [testCase, testCase, testCase],
+    }).success).toBe(false);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise,
+      testCases: [{ ...validExercise.testCases[0], expectedOutput: "한".repeat(3_000_000) }],
+    }).success).toBe(false);
+  });
+
+  it("rejects JSON-escaped data beyond the edge body limit", () => {
+    const input = "\u0000".repeat(4_000_000);
+    const parsed = createProgrammingExerciseSchema.safeParse({ ...validExercise,
+      testCases: [{ ...validExercise.testCases[0], input }],
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("expected oversized encoded data to fail");
+    expect(parsed.error.issues).toEqual(expect.arrayContaining([expect.objectContaining({message: "Encoded problem data exceed the 20 MB request limit."})]));
+  });
   it("accepts the manual authoring fields with a correct answer", () => {
     expect(createProgrammingExerciseSchema.safeParse(validExercise).success)
       .toBe(true);

@@ -4,6 +4,38 @@ Branch: `fix/auth-google-login-password-recovery`. Code commit: `73aa8d2`.
 This report supersedes the configuration and cleanup status in the initial browser report. The initial follow-up below tested v2.0.27 / 2ffa32a. The new redeployment section records v2.0.28 / 3499829 containing 73aa8d2.
 
 
+## Deployment readiness — local Chrome completion, 2026-10-06, 11:39–11:44 UTC
+
+**The workspace narration and runner lifecycle fixes are ready for deployment.** This section supersedes the earlier local database blocker and pending disposable-fixture cleanup below. Branch remains `fix/auth-google-login-password-recovery`; application fixes are `39313c8` and `1d82f42`. No additional application or configuration change was needed: both development PostgreSQL endpoints became reachable again before testing. The earlier outage's underlying network cause has not been established.
+
+### Actual browser verification
+
+Used regular Chrome against the running local web/API/judge stack and the same isolated enhanced fixture. Both public samples completed each probe:
+
+- Correct output: explicit passed narration and matching stdout. Two complete batches passed; an initial editor-focus attempt left the correct code unchanged, so its second batch is correctly counted as another correct-output run, not a runtime test.
+- Explicit RuntimeError: “Sample N raised an error” plus `RuntimeError: local-qa-error` for each sample. No generic Skipped result.
+- Bounded four-second monotonic loop: “Sample N exceeded its time limit” for each sample, at the configured 3,000-ms server limit.
+- Wrong output: “Sample N did not match” for each sample, with wrong stdout displayed.
+- Sequential repeated runs completed. Queued/Stop and disabled Submit/reset/navigation were observed during execution; controls returned afterward.
+- Full refresh cleared ephemeral practice results, retained the saved test draft (`print("wrong")`) and displayed Saved. This draft belonged only to the disposable fixture.
+- Only the two public examples/results were rendered; the hidden case appeared only as a count. No hidden fixture contents appeared in the rendered evidence. This is UI privacy verification, not a network-payload audit.
+
+Together with the previous completed legacy checks, both grading modes now have real Chrome coverage for correct output, wrong output, runtime errors and bounded timeouts. No Submit clicks or official test submissions were made. Production tabs/session were not operated in this completion pass.
+
+### Backend and build evidence (separate from browser passes)
+
+Ten new Redis records from those browser clicks completed: PASSED ×4, RUNTIME_ERROR ×2, TIME_LIMIT ×2 and WRONG_OUTPUT ×2. All agreed with the browser; none was UNAVAILABLE or ENGINE_FAILURE. Representative records: runtime `db61e9a4-45c3-4930-acb9-4070e7779e43`, timeout `bf74511f-c1ec-4384-8249-3a85594df909`, wrong output `5661666f-ea85-4613-947e-9db907a7055d`.
+
+`pnpm --filter @cove/web build` passed optimized compilation, TypeScript and static-page generation. `pnpm --filter @cove/judge-worker build` passed Prisma generation and TypeScript compilation. Previously recorded focused regression tests remain applicable; no application code changed in this completion pass. Browser tests used the development server and real local Pyodide processes; production-build execution inside the Linux sandbox was not rerun locally. Production smoke verification remains required after release.
+
+### Cleanup and preserved state
+
+After leaving the exercise page, the guarded cleanup succeeded. Independent final reads confirmed zero remaining disposable materials, drafts or solve sessions for both fixture IDs, and zero SERVER_SAMPLE_CHECKS override rows for the development academy (restored to its original absent state). Existing student drafts and progress exactly matched the original snapshot, the official submission count was unchanged and there were zero fixture submissions. Ordinary learning activity/course content revisions are not rolled back. The production recovery account/mailbox and pending credential handoff were not part of this local grading completion and remain as documented below.
+
+### Release scope
+
+Deploy **studio web** and the **judge worker/sandbox pair** with a release containing `39313c8` and `1d82f42`; avoid interrupting active runs. No API redeployment, database migration, production feature-flag change or Tower fixture publication is required for these two fixes. After deployment, confirm artifact versions and repeat bounded runtime/timeout Chrome checks against production with draft preservation. This report does not claim the new fixes have already passed production Chrome verification. Tower repair remains unapplied; the known incomplete case 8/9 inputs are a separate data issue. Recovery verification still needs the existing user credential handoff and is not claimed complete.
+
 ## Local real-Chrome verification before deployment — 2026-10-06, 11:20–11:30 UTC
 
 Tested branch HEAD `6aa0c09`, containing workspace fix `39313c8` and runner fix `1d82f42`. Started the repository's `pnpm dev` stack: Next web on localhost:3000, Nest API on localhost:4000, local Redis and judge worker. Used real regular Chrome, not Chrome for Testing, and signed in to the local app with the existing development student. Production Chrome tabs and John were not changed during this local pass.

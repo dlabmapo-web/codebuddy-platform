@@ -4,6 +4,28 @@ Branch: `fix/auth-google-login-password-recovery`. Code commit: `73aa8d2`.
 This report supersedes the configuration and cleanup status in the initial browser report. The initial follow-up below tested v2.0.27 / 2ffa32a. The new redeployment section records v2.0.28 / 3499829 containing 73aa8d2.
 
 
+## Follow-up fixes — prepared, not yet browser-verified after deployment
+
+Branch remains `fix/auth-google-login-password-recovery`.
+
+- **39313c8**: Workspace retains and returns the complete SampleRun instead of reconstructing only outcome/verdict. Monitoring continues to read the same fields; runtime/time-limit narration, stderr, truncation and changed-code notes now reach the existing batch renderer. No fallback to local comparison, progress write or new submission behavior.
+- **1d82f42**: Separately investigated and fixed a deterministic runner lifecycle race. The memory timer continued after confirmed child exit while stdio drained; memoryMb deliberately returns null for exited children, so five 100-ms polls converted a known exit into ENGINE_FAILURE. The timer now skips measurement only after confirmed exit, still waiting for close/the existing drain bound. Initial baseline validation and unreadable-live-runner failure remain mandatory. No memory limit, sandbox protection or drain deadline was relaxed.
+
+Regression evidence:
+
+- Real Workspace → Test run button → batch sequence → real EditorPane integration tests fail before the workspace fix for error/timeout narration, then pass after it. They cover both legacy/enhanced modes, stderr and informational messages, local-practice fallback, monitoring lifecycle and absence of Submit calls. Combined focused web suites: **48 passed**. Web TypeScript and changed-file ESLint passed.
+- Deterministic process-event tests reproduce the exact memory-measurement error before the engine fix when both successful and failed child exits precede pipe close by 600 ms. They now preserve final output, stderr and exit verdict. Live unreadable-runner enforcement still rejects and kills the runner. Lifecycle/accounting suites: **6 passed**.
+- Real Pyodide subprocess tests for memory-monitoring failures and output draining: **8 passed**, 54 unrelated cases excluded by the focused name filter. API TypeScript passed.
+
+Production investigation is separate from that local reproduction. The sandbox cgroup reported memory.events max/oom/oom_kill/oom_group_kill all zero, memory.max 1,342,177,280 bytes and memory.peak 417,935,360 bytes. These counters do not support an OOM explanation for that container lifetime. The old incident log does not identify baseline versus live-poll failure or exit/close ordering; therefore the fixed race is a demonstrated possible cause, **not a conclusively traced root cause of the particular production check**. If it recurs, collect phase/exit-state telemetry rather than weakening fail-closed measurement.
+
+Deployment required: **studio web** for 39313c8 and **judge sandbox** for 1d82f42. Production declares one JUDGE_IMAGE for sandbox and worker, so roll the **judge-worker/sandbox pair** to the same new artifact during the normal release. Worker protocol/admission and API behavior are unchanged; no API redeployment or database migration is required specifically for these two fixes. Avoid terminating an active student run during rollout.
+
+Post-deployment verification is pending release confirmation. Use existing Chrome, reload old assets, verify deployed SHA, preserve drafts, then run bounded runtime-error/time-limit probes in legacy Card and enhanced Tower. Check explicit messages and stderr against ephemeral server records, correct/wrong output, repeated runs and unavailable classification. Respect sample throttling. Compare saved drafts, official submissions and progress before/after; restore John. Do not apply Tower repair or create official submissions for this verification. A successful Chrome repetition alone cannot prove the timing race will never recur; the deterministic event-order test is the regression guard.
+
+No browser interactions or student-data mutations were performed while implementing these fixes. Tower repair remains unapplied. Temporary recovery account/mailbox status remains as documented below; no credential changes or cleanup were performed in this implementation step.
+
+
 ## Redeployment verification — 2026-10-06, 10:52 UTC onward
 
 This section supersedes the deployment and session status below; earlier sections remain historical evidence.

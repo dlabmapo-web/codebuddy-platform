@@ -31,9 +31,11 @@ export type SampleSnapshot = {
   memoryLimitMb: number;
   totalTimeLimitMs: number;
   comparatorTimeLimitMs: number;
-  policy: GradingPolicySnapshot;
   testCase: EnhancedCase;
-};
+} & (
+  | { gradingMode?: "ELICE_STDIO"; policy: GradingPolicySnapshot }
+  | { gradingMode: "LEGACY_STDIO"; engineVersion: string }
+);
 
 export type StoredSampleResult = {
   outcome: SampleCheckOutcome;

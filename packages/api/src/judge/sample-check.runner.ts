@@ -5,6 +5,7 @@ import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionCapacity } from "./execution-capacity.js";
 import type { ExecutionEngine } from "./execution-engine.js";
+import { caseOutcomeFor } from "./grading.js";
 import { runtimeMismatch } from "./grading-profile.js";
 import type {
   SampleCheckRecord,
@@ -85,10 +86,21 @@ export class SampleCheckRunner {
 
   private async execute(record: SampleCheckRecord, dispatchedAt: number): Promise<void> {
     const { snapshot } = record;
-    const mismatch = runtimeMismatch(snapshot.policy, {
-      engine: this.engine.version,
-      comparator: this.comparator.version,
-    });
+    const legacy = snapshot.gradingMode === "LEGACY_STDIO";
+    const mismatch = legacy
+      ? snapshot.engineVersion !== this.engine.version
+      : runtimeMismatch(snapshot.policy, {
+          engine: this.engine.version,
+          comparator: this.comparator.version,
+        });
+    // Legacy Submit uses this exact normalizer, not the enhanced CPython rule.
+    const comparator: OutputComparator = legacy ? {
+      version: this.engine.version,
+      compare: async ({ actual, expected }) => ({
+        kind: caseOutcomeFor({ engineOutcome: "PASSED", stdout: actual, expectedOutput: expected }) === "PASSED"
+          ? "match" : "no-match",
+      }),
+    } : this.comparator;
     if (mismatch) {
       // No student code runs on a runtime the check was not recorded against.
       this.logger.error(`sample check ${record.checkId} runtime mismatch: ${mismatch}`);
@@ -102,11 +114,12 @@ export class SampleCheckRunner {
     let evaluation;
     try {
       evaluation = await evaluateEnhancedCase(
-        { engine: this.engine, comparator: this.comparator },
+        { engine: this.engine, comparator },
         {
           code: snapshot.code,
           memoryLimitMb: snapshot.memoryLimitMb,
-          outputLimitBytes: snapshot.policy.ceilings.outputBytes,
+          // Omit the override for legacy, just as Submit does.
+          ...(!legacy ? { outputLimitBytes: snapshot.policy.ceilings.outputBytes } : {}),
           comparatorTimeLimitMs: snapshot.comparatorTimeLimitMs,
           deadlineAt,
           executionBudgetMs: snapshot.totalTimeLimitMs,

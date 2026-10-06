@@ -15,11 +15,7 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import {
-  gradingSnapshotFor,
-  gradingPolicySnapshotSchema,
-  resolveGradingProfile,
-} from "../judge/grading-profile.js";
+import { sampleSnapshotFor } from "../judge/sample-check-snapshot.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { SAMPLE_QUEUE_WAIT_MS } from "../judge/sample-check.runner.js";
 import {
@@ -102,9 +98,8 @@ export class SampleCheckService {
       requestedClassId: input.classId,
     });
 
-    if (!(await this.enabledFor(input.academyId)) || exercise.gradingMode !== "ELICE_STDIO") {
-      // Legacy samples are judged in the browser, and a disabled academy
-      // keeps today's behaviour: neither has a server check to start.
+    if (!(await this.enabledFor(input.academyId))) {
+      // Disabled academies retain their existing local practice flow.
       throw unavailable();
     }
     if (exercise.gradingRevision !== input.workspaceRevision) {
@@ -117,17 +112,11 @@ export class SampleCheckService {
     // Hidden and nonexistent positions are indistinguishable from here.
     if (!testCase) throw notFound();
 
-    const profile = resolveGradingProfile(exercise, exercise.testCases);
-    if (profile.kind !== "elice") throw unavailable();
-    const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-    // The one case, snapshotted by the same function a submission uses, so
-    // its limits and runtime identity are resolved exactly as Submit's.
-    const snapshot = gradingSnapshotFor(
-      { ...exercise, testCases: [testCase] },
-      { engineVersion },
+    const snapshot = sampleSnapshotFor(
+      exercise, testCase, input.code,
+      this.config.get("PYODIDE_VERSION", { infer: true }),
     );
-    const policy = gradingPolicySnapshotSchema.parse(snapshot.submission.gradingPolicySnapshot);
-    const snapshotCase = snapshot.cases[0]!;
+    if (!snapshot) throw unavailable();
 
     const codeHash = sha256(input.code);
     const requestHash = sha256(
@@ -157,21 +146,8 @@ export class SampleCheckService {
         acceptedAt: now,
         dispatchedAt: null,
         finishedAt: null,
-        lostAfter: now + SAMPLE_QUEUE_WAIT_MS + profile.totalTimeLimitMs + LOST_SLACK_MS,
-        snapshot: {
-          code: input.code,
-          memoryLimitMb: exercise.memoryLimitMb,
-          totalTimeLimitMs: profile.totalTimeLimitMs,
-          comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
-          policy,
-          testCase: {
-            input: snapshotCase.input,
-            expectedOutput: snapshotCase.expectedOutput,
-            comparator: snapshotCase.comparator,
-            softTimeLimitMs: snapshotCase.softTimeLimitMs,
-            caseLimitMs: snapshotCase.effectiveTimeLimitMs ?? exercise.timeLimitMs,
-          },
-        },
+        lostAfter: now + SAMPLE_QUEUE_WAIT_MS + snapshot.totalTimeLimitMs + LOST_SLACK_MS,
+        snapshot,
         result: null,
         failure: null,
         timings: { queueMs: null, executionMs: null, comparisonMs: null },

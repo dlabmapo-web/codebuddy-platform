@@ -158,9 +158,17 @@ export function EditorPane({
                     <dt>{comparator && comparator !== 'STDOUT' ? t(`workspace.sample_rule.${comparator}`) : t('workspace.expected')}</dt><dd><pre className="whitespace-pre-wrap">{sampleTestCases[index]?.expectedOutput}</pre></dd>
                     <dt>{t('workspace.actual')}</dt><dd><pre className="whitespace-pre-wrap">{result.outcome?.stdout}</pre></dd>
                   </dl>
-                  <p className={result.verdict?.kind === 'match' ? 'text-green-400' : result.verdict?.kind === 'unchecked' || result.verdict?.kind === 'warning' ? 'text-amber-300' : 'text-red-400'}>
+                  {result.serverDetails ? result.serverDetails.map((line, lineIndex) => (
+                    'message' in line ? (
+                      <p key={lineIndex} className={line.kind === 'err' ? 'text-red-400' : line.kind === 'meta' ? 'text-green-400' : 'text-amber-300'}>
+                        {line.mark ? `${line.mark} ` : ''}{tc(line.message, { number: index + 1 })}
+                      </p>
+                    ) : 'text' in line && line.kind === 'err' ? (
+                      <pre key={lineIndex} className="whitespace-pre-wrap text-red-400">{line.text}</pre>
+                    ) : null
+                  )) : <p className={result.verdict?.kind === 'match' ? 'text-green-400' : result.verdict?.kind === 'unchecked' || result.verdict?.kind === 'warning' ? 'text-amber-300' : 'text-red-400'}>
                     {result.verdict?.kind === 'unchecked' ? tc('workspace.sample_checked_on_submit', { number: index + 1 }) : result.verdict?.kind === 'warning' ? tc('workspace.sample_check_warning', { number: index + 1 }) : t(result.verdict?.kind === 'match' ? 'workspace.sample_match' : result.verdict?.kind === 'mismatch' ? 'workspace.sample_mismatch' : 'workspace.sample_skipped', { number: index + 1 })}
-                  </p>
+                  </p>}
                   {result.outcome?.error ? (
                     <ErrorCoachPanel code={code} error={result.outcome.error} onFocusLine={onFocusLine} />
                   ) : null}

@@ -377,6 +377,61 @@ describe("AuthService.setUsername", () => {
 });
 
 describe("AuthService.completeOAuthOnboarding", () => {
+  it("reuses the existing Google account without an academy-selection intent", async () => {
+    const existing = {
+      ...userRecord(),
+      memberships: [{
+        academy: { id: academyId, name: "Cove Academy", slug: "cove-academy", featureFlags: [] },
+        role: "MANAGER",
+        extraRoles: [{ role: "TEACHER" }],
+        status: "ACTIVE",
+        memberProfile: null,
+      }],
+    };
+    const user = {
+      findUnique: vi.fn().mockResolvedValue(existing),
+      update: vi.fn().mockResolvedValue(existing),
+      create: vi.fn(),
+    };
+    const prisma = { user } as unknown as PrismaService;
+    const ensureSignupRequest = vi.fn().mockResolvedValue(undefined);
+    const onboarding = { ensureSignupRequest } as unknown as AcademyOnboardingService;
+    const service = new AuthService(prisma, onboarding, media, supabaseAuth());
+
+    const result = await service.completeOAuthOnboarding(identity);
+
+    expect(result.user.id).toBe(userId);
+    expect(user.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { authUserId },
+      select: { id: true },
+    });
+    expect(user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: userId },
+      data: expect.objectContaining({ lastSignInAt: expect.any(Date) }),
+    }));
+    expect(user.create).not.toHaveBeenCalled();
+    expect(result.user.authUserId).toBe(authUserId);
+    expect(result.user.memberships).toEqual([expect.objectContaining({
+      academy: { id: academyId, name: "Cove Academy", slug: "cove-academy" },
+      role: "MANAGER",
+      roles: expect.arrayContaining(["MANAGER", "TEACHER"]),
+      status: "ACTIVE",
+    })]);
+  });
+
+  it.each(["SUSPENDED", "DELETED"])("does not reactivate a %s Google account", async (status) => {
+    const user = {
+      findUnique: vi.fn().mockResolvedValue({ ...userRecord(), status }),
+      update: vi.fn(),
+      create: vi.fn(),
+    };
+    const service = new AuthService({ user } as unknown as PrismaService, {} as AcademyOnboardingService, media, supabaseAuth());
+
+    await expect(service.completeOAuthOnboarding(identity)).rejects.toMatchObject({ code: "USER_SUSPENDED" });
+    expect(user.update).not.toHaveBeenCalled();
+    expect(user.create).not.toHaveBeenCalled();
+  });
+
   it("requires an onboarding intent for a new social identity", async () => {
     const prisma = {
       user: { findUnique: vi.fn().mockResolvedValue(null) },

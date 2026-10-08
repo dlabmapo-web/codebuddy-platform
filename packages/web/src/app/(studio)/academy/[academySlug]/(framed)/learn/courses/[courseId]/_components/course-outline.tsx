@@ -1,5 +1,6 @@
 'use client';
 
+import { ManualGradeSummary } from '@/components/manual/manual-grade-summary';
 import { routes } from '@/lib/routes';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -61,11 +62,12 @@ export function CourseOutline({
   }, [outline.requestedLectureId]);
 
   const empty = initialOutline.modules.every((module) =>
-    module.lectures.every((lecture) => lecture.exercises.length === 0 && !lecture.documents?.length),
+    module.lectures.every((lecture) => lecture.exercises.length === 0 && !lecture.documents?.length && !lecture.manualMaterials?.length),
   );
 
   return (
     <div className="flex flex-col gap-5">
+      {initialOutline.manualAssessment?<ManualGradeSummary grade={initialOutline.manualAssessment}/>:null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/*
          * The way back left this row for `StudioPage`'s `back` slot, above the

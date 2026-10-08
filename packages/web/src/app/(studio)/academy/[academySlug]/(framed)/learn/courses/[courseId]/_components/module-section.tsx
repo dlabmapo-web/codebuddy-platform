@@ -99,7 +99,7 @@ export function ModuleSection({
                       : 'border-border'
                   }`}
                 >
-                  {lecture.exercises.length > 0 ||
+                  {lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
                   (lecture.documents?.length ?? 0) > 0 ? (
                     <header>
                       <Collapsible.Trigger asChild>
@@ -160,13 +160,14 @@ export function ModuleSection({
 
                   <Collapsible.Content className="cove-collapse">
                     {lecture.exercises.length === 0 &&
-                    !lecture.documents?.length ? (
+                    !lecture.documents?.length && !lecture.manualMaterials?.length ? (
                       <p className="border-t border-dashed border-border px-3 py-4 text-center text-[12.5px] text-sub">
                         {t('outline.lecture_empty')}
                       </p>
                     ) : (
                       <ul className="flex flex-col gap-2 border-t border-border bg-canvas/35 p-2.5">
                         {[
+                          ...(lecture.manualMaterials??[]).map(manual=>({kind:'manual' as const,position:manual.position,manual})),
                           ...lecture.exercises.map((exercise) => ({
                             kind: 'exercise' as const,
                             position: exercise.position,
@@ -182,7 +183,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'exercise' ? (
+                            row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnManual(slug,row.manual.materialId,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">Teacher graded · {row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}

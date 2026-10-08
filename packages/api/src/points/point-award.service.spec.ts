@@ -53,6 +53,7 @@ function createTx(options: {
     academyMembership: {
       findFirst: vi.fn().mockResolvedValue({ id: membershipId }),
     },
+    manualSubmission: {findMany:vi.fn().mockResolvedValue([])},
     studentExerciseProgress: { count: vi.fn().mockResolvedValue(0) },
     classScheduleSlot: { findMany: vi.fn().mockResolvedValue([]) },
   };
@@ -268,6 +269,18 @@ describe("PointAwardService.awardSolve", () => {
       "MODULE_COMPLETED",
       "COURSE_COMPLETED",
     ]);
+  });
+
+  it("waits for the latest class-scoped manual review before awarding mixed curriculum completion", async()=>{
+    const {tx,spies}=createTx();spies.material.findUnique.mockResolvedValue(visibleMaterial);
+    spies.material.findMany.mockResolvedValue([{id:materialId,type:'PROGRAMMING_EXERCISE'},{id:'manual',type:'TURTLE_EXERCISE'}]);spies.studentExerciseProgress.count.mockResolvedValue(1);
+    spies.manualSubmission.findMany.mockResolvedValue([{includeInScore:true,reviews:[]}] as never);
+    await createService().awardSolve(tx,solveInput);
+    expect(spies.pointAward.createMany.mock.calls.map(c=>c[0].data[0].reason)).toEqual(['EXERCISE_SOLVED']);
+    expect(spies.manualSubmission.findMany.mock.calls[0][0].where.classId).toBe(classId);
+    spies.pointAward.createMany.mockClear();spies.manualSubmission.findMany.mockResolvedValue([{includeInScore:true,reviews:[{completed:true}]}] as never);
+    await createService().awardSolve(tx,solveInput);
+    expect(spies.pointAward.createMany.mock.calls.map(c=>c[0].data[0].reason)).toEqual(['EXERCISE_SOLVED','LECTURE_COMPLETED','MODULE_COMPLETED','COURSE_COMPLETED']);
   });
 
   it("stops climbing when the lecture is not finished", async () => {

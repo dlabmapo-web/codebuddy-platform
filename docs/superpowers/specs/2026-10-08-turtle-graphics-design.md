@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 
-Status: revised design for review; implementation not started
+Status: implemented and verified on localhost on `feat/lecture-pdf-materials` alongside the PDF feature; production flags remain disabled; Elice reference gaps below remain unverified
 
 Reference: [Elice inspection and follow-up](../../research/2026-10-08-turtle-graphics.md)
 
@@ -154,7 +154,7 @@ Log session ids, approved profile/runtime, failure category, resource metrics, a
 
 ## 9. Verification and parity acceptance
 
-Separate verification into runtime/session infrastructure, manual assessment/content integration, and the end-to-end workspace. All three are required before representing the release as behavior parity. No Cove implementation or turtle localhost E2E has run yet.
+Separate verification into runtime/session infrastructure, manual assessment/content integration, and the end-to-end workspace. All three are required before representing the release as behavior parity. Implementation and verification results are recorded in the [runtime operations guide](../../operations/turtle-runtime.md). The unverified Elice transitions listed below remain reference gaps even after Cove's own tests pass.
 
 Runtime tests must exercise standard movement/fill/circles, pen state, multiple turtles, text, dimensions, `tracer`/`update`, keyboard/pointer/timer callbacks, `listen`, `mainloop`/`done`, terminal input, and Python errors. Use original examples reproducing the same interaction classes without copying Elice lesson content. Test Stop during loops/input/event loops, process descendants, time/memory/disk/output limits, gateway authorization, reconnect, expiry, capacity refusal, stale traffic, and clean subsequent runs.
 

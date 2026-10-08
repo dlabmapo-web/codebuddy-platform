@@ -92,6 +92,7 @@ const treeInclude = {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
               pdfDocument: { include: { asset: true } },
+              manualMaterial:true,
               programmingExercise: {
                 include: {
                   testCases: {
@@ -970,7 +971,7 @@ export class CourseService {
       if (material.lectureId !== input.fromLectureId) {
         throw new AppException("CONTENT_MOVE_STALE", HttpStatus.CONFLICT);
       }
-      const actor=material.type === "PDF_DOCUMENT" ? await this.requireCurriculumManager(identity,input.academyId) : await this.requireExerciseManager(identity,input.academyId);
+      const actor=material.type !== "PROGRAMMING_EXERCISE" ? await this.requireCurriculumManager(identity,input.academyId) : await this.requireExerciseManager(identity,input.academyId);
       const destination = await tx.lecture.findFirst({
         where: {
           id: input.toLectureId,
@@ -1896,6 +1897,7 @@ function toCourseTree(course: CourseRecord) {
           position: material.position,
           isRequired: material.isRequired,
           isVisible: material.isVisible,
+          manualMaterial: material.manualMaterial ? {revision:material.manualMaterial.revision,includeInScore:material.manualMaterial.includeInScore,submitEnabled:material.manualMaterial.submitEnabled,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
           pdfDocument: material.pdfDocument
             ? pdfMetadata(material.pdfDocument)
             : null,

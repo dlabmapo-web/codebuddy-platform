@@ -1,4 +1,5 @@
 'use client';
+import { manualApi } from '@/lib/manual-api';
 
 import { pdfApi } from '@/lib/pdf-api';
 import { routes } from '@/lib/routes';
@@ -180,6 +181,8 @@ export function useExerciseNavigation({
             l.documents?.some((d) => d.materialId === materialId),
           ),
         );
+        const isManual=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.manualMaterials?.some(a=>a.materialId===materialId)));
+        if(isManual){await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnManual(academySlug,materialId,{classId}));return;}
         if (isPdf) {
           await pdfApi.read({ academyId, materialId });
           if (tokenRef.current !== token) return;
@@ -353,7 +356,7 @@ export function useExerciseNavigation({
         !neighbor ||
         navigatorRef.current.course.modules.some((m) =>
           m.lectures.some((l) =>
-            l.documents?.some((d) => d.materialId === neighbor.materialId),
+            l.documents?.some((d) => d.materialId === neighbor.materialId) || l.manualMaterials?.some(m=>m.materialId===neighbor.materialId),
           ),
         )
       )

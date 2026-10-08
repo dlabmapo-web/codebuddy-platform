@@ -13,6 +13,7 @@ export function filterCourseModules(
       lectures: module.lectures
         .map((lecture) => ({
           ...lecture,
+          manualMaterials:lecture.manualMaterials?.filter(m=>m.title.toLowerCase().includes(query.toLowerCase())),
           documents: lecture.documents?.filter((document) =>
             document.title.toLocaleLowerCase().includes(needle),
           ),
@@ -22,7 +23,7 @@ export function filterCourseModules(
         }))
         .filter(
           (lecture) =>
-            lecture.exercises.length > 0 ||
+            lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
             (lecture.documents?.length ?? 0) > 0,
         ),
     }))
@@ -68,9 +69,11 @@ export function formatProblemOutlineNumber(
  */
 export function lectureProgress(lecture: {
   exercises: ReadonlyArray<{ status: string }>;
+  manualMaterials?:ReadonlyArray<{status:string;includeInScore:boolean}>;
 }): { total: number; solved: number; percent: number | null } {
-  const total = lecture.exercises.length;
-  const solved = lecture.exercises.filter(
+  const assessed=[...lecture.exercises,...(lecture.manualMaterials??[]).filter(m=>m.includeInScore)];
+  const total = assessed.length;
+  const solved = assessed.filter(
     (exercise) => exercise.status === 'SOLVED',
   ).length;
   return {

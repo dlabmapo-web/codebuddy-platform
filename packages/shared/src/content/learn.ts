@@ -73,12 +73,14 @@ export const learnExerciseSummarySchema = z.object({
 });
 export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
+export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
   id: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
   position: positionSchema,
   exercises: z.array(learnExerciseSummarySchema),
+  manualMaterials:z.array(learnManualSummarySchema).optional(),
   documents: z
     .array(
       z.object({
@@ -106,10 +108,12 @@ export const learnCourseProgressSchema = z.object({
 });
 export type LearnCourseProgress = z.infer<typeof learnCourseProgressSchema>;
 
+export const manualGradeSummarySchema=z.object({maximumHundredths:z.number().int().nonnegative(),scoreHundredths:z.number().int().nonnegative(),reviewed:z.number().int().nonnegative(),pending:z.number().int().nonnegative()});
 export const learnCourseSummarySchema = z.object({
   courseId: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
+  manualAssessment:manualGradeSummarySchema.optional(),
   counts: z.object({
     modules: z.number().int().nonnegative(),
     lectures: z.number().int().nonnegative(),
@@ -209,6 +213,7 @@ export const learnCourseOutlineSchema = z.object({
     description: descriptionSchema,
   }),
   progress: learnCourseProgressSchema,
+  manualAssessment:manualGradeSummarySchema.optional(),
   modules: z.array(learnModuleSchema),
 });
 export type LearnCourseOutline = z.infer<typeof learnCourseOutlineSchema>;
@@ -317,6 +322,7 @@ export const navigatorLectureSchema = z.object({
   position: positionSchema,
   exercises: z.array(navigatorExerciseSchema),
   documents: learnLectureSchema.shape.documents,
+  manualMaterials:learnLectureSchema.shape.manualMaterials,
 });
 
 export const navigatorModuleSchema = z.object({
@@ -555,6 +561,7 @@ export function toNavigatorContext(
           title: lecture.title,
           position: lecture.position,
           documents: lecture.documents,
+          manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
             materialId: exercise.materialId,
             title: exercise.title,

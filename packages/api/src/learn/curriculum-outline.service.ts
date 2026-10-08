@@ -38,6 +38,7 @@ export const visibleCurriculumInclude = {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
               programmingExercise: true,
+              manualMaterial: true,
               pdfDocument: { include: { asset: true } },
             },
           },
@@ -78,12 +79,46 @@ export class CurriculumOutlineService {
   async outlineFor(
     course: VisibleCourse,
     userId: string,
+    classId?: string,
   ): Promise<LearnCourseOutline> {
     const modules = nonemptyModules(course);
     const materialIds = exerciseMaterialIds({ ...course, modules });
     // One `userId + materialIds` query for the whole course. A per-row lookup
     // is what made v1's outline scale with the size of the curriculum.
-    const statuses = await this.statusByMaterial(userId, materialIds);
+    const statuses = await this.statusByMaterial(userId, materialIds, classId);
+
+    const manualIds = modules.flatMap((module) =>
+      module.lectures.flatMap((lecture) =>
+        lecture.materials.filter((m) => m.manualMaterial).map((m) => m.id),
+      ),
+    );
+    const manualAttempts = manualIds.length
+      ? await this.prisma.manualSubmission.findMany({
+          where: { userId, classId, materialId: { in: manualIds } },
+          orderBy: { createdAt: "desc" },
+          distinct: ["materialId"],
+          select: {
+            materialId: true,
+            includeInScore: true,
+            maximumHundredths: true,
+            reviews: {
+              orderBy: { version: "desc" },
+              take: 1,
+              select: { completed: true, scoreHundredths: true },
+            },
+          },
+        })
+      : [];
+    const manualStatuses = new Map(
+      manualAttempts.map((a) => [a.materialId, a]),
+    );
+    const eligible = modules.flatMap((module) =>
+      module.lectures.flatMap((lecture) =>
+        lecture.materials
+          .filter((m) => m.manualMaterial?.includeInScore)
+          .map((m) => m.id),
+      ),
+    );
 
     return {
       course: {
@@ -91,6 +126,7 @@ export class CurriculumOutlineService {
         title: course.title,
         description: course.description,
       },
+      manualAssessment: manualGradeSummaryFor(course, statuses),
       progress: countProgress(materialIds, statuses),
       modules: modules.map((courseModule) => ({
         id: courseModule.id,
@@ -102,6 +138,30 @@ export class CurriculumOutlineService {
           title: lecture.title,
           description: lecture.description,
           position: lecture.position,
+          manualMaterials: lecture.materials.flatMap((material) => {
+            if (!material.manualMaterial) return [];
+            const attempt = manualStatuses.get(material.id),
+              review = attempt?.reviews[0];
+            return [
+              {
+                materialId: material.id,
+                title: material.title,
+                position: material.position,
+                type: material.type as "TURTLE_EXERCISE" | "WRITTEN_RESPONSE",
+                includeInScore: material.manualMaterial.includeInScore,
+                status: review?.completed
+                  ? ("SOLVED" as const)
+                  : attempt
+                    ? ("IN_PROGRESS" as const)
+                    : ("NOT_STARTED" as const),
+                pending: Boolean(attempt && !review),
+                scoreHundredths: review?.scoreHundredths ?? null,
+                maximumHundredths:
+                  attempt?.maximumHundredths ??
+                  material.manualMaterial.maximumHundredths,
+              },
+            ];
+          }),
           documents: lecture.materials.flatMap((material) =>
             material.pdfDocument?.asset.state === "READY"
               ? [
@@ -136,6 +196,7 @@ export class CurriculumOutlineService {
   async statusByMaterial(
     userId: string,
     materialIds: string[],
+    classId?: string,
   ): Promise<ProgressByMaterial> {
     const statuses: ProgressByMaterial = new Map();
     if (materialIds.length === 0) return statuses;
@@ -194,13 +255,45 @@ export class CurriculumOutlineService {
         bestScore: record.bestScore,
       });
     }
+    const attempts = await this.prisma.manualSubmission.findMany({
+      where: { userId, classId, materialId: { in: materialIds } },
+      distinct: ["materialId"],
+      orderBy: { createdAt: "desc" },
+      select: {
+        materialId: true,
+        includeInScore: true,
+        maximumHundredths: true,
+        reviews: {
+          orderBy: { version: "desc" },
+          take: 1,
+          select: { completed: true, scoreHundredths: true },
+        },
+      },
+    });
+    for (const attempt of attempts)
+      statuses.set(attempt.materialId, {
+        status:
+          attempt.includeInScore && attempt.reviews[0]?.completed
+            ? "SOLVED"
+            : "IN_PROGRESS",
+        bestScore: 0,
+        scoreHundredths: attempt.includeInScore
+          ? attempt.reviews[0]?.scoreHundredths
+          : undefined,
+        maximumHundredths: attempt.maximumHundredths,
+      });
     return statuses;
   }
 }
 
 export type ProgressByMaterial = Map<
   string,
-  { status: ExerciseProgressStatus; bestScore: number }
+  {
+    status: ExerciseProgressStatus;
+    bestScore: number;
+    scoreHundredths?: number;
+    maximumHundredths?: number;
+  }
 >;
 
 /**
@@ -251,6 +344,7 @@ export function courseSummaryFor(
         0,
       ),
     },
+    manualAssessment: manualGradeSummaryFor(course, statuses),
     progress: countProgress(exercises, statuses),
   };
 }
@@ -264,6 +358,7 @@ export function nonemptyModules(
       lecture.materials.some(
         (material) =>
           material.programmingExercise != null ||
+          material.manualMaterial != null ||
           material.pdfDocument?.asset.state === "READY",
       ),
     );
@@ -277,7 +372,9 @@ export function exerciseMaterialIds(
   return course.modules.flatMap((courseModule) =>
     courseModule.lectures.flatMap((lecture) =>
       lecture.materials.flatMap((material) =>
-        material.programmingExercise ? [material.id] : [],
+        material.programmingExercise || material.manualMaterial?.includeInScore
+          ? [material.id]
+          : [],
       ),
     ),
   );
@@ -295,4 +392,28 @@ export function countProgress(
     else if (status === "IN_PROGRESS") started += 1;
   }
   return { total: materialIds.length, started: started + solved, solved };
+}
+
+export function manualGradeSummaryFor(
+  course: Pick<VisibleCourse, "modules">,
+  statuses: ProgressByMaterial,
+) {
+  let maximumHundredths = 0,
+    scoreHundredths = 0,
+    reviewed = 0,
+    pending = 0;
+  for (const module of course.modules)
+    for (const lecture of module.lectures)
+      for (const material of lecture.materials) {
+        if (!material.manualMaterial?.includeInScore) continue;
+        const status = statuses.get(material.id);
+        maximumHundredths +=
+          status?.maximumHundredths ??
+          material.manualMaterial.maximumHundredths;
+        if (status?.scoreHundredths !== undefined) {
+          scoreHundredths += status.scoreHundredths;
+          reviewed++;
+        } else if (status?.maximumHundredths !== undefined) pending++;
+      }
+  return { maximumHundredths, scoreHundredths, reviewed, pending };
 }

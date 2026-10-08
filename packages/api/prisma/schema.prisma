@@ -164,6 +164,8 @@ enum MonitoringVisitEndReason {
 enum MaterialType {
   PROGRAMMING_EXERCISE
   PDF_DOCUMENT
+  TURTLE_EXERCISE
+  WRITTEN_RESPONSE
 }
 
 enum PdfPlacement {
@@ -365,7 +367,10 @@ enum ExerciseProgressStatus {
 }
 
 model User {
-  pdfUploads PdfAsset[]
+  manualDrafts      ManualDraft[]
+  manualSubmissions ManualSubmission[]
+  manualReviews     ManualReview[]
+  pdfUploads        PdfAsset[]
 
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
@@ -1374,7 +1379,8 @@ model Course {
 /// Names are intentionally not unique — an academy reuses "Level 1" every
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
-  helpRequests StudentHelpRequest[]
+  manualSubmissions ManualSubmission[]
+  helpRequests      StudentHelpRequest[]
 
   id                  String      @id @default(uuid()) @db.Uuid
   academyId           String      @map("academy_id") @db.Uuid
@@ -1554,7 +1560,10 @@ model Lecture {
 }
 
 model Material {
-  pdfDocument PdfDocument?
+  manualMaterial    ManualMaterial?
+  manualDrafts      ManualDraft[]
+  manualSubmissions ManualSubmission[]
+  pdfDocument       PdfDocument?
 
   helpRequests StudentHelpRequest[]
 
@@ -1585,7 +1594,7 @@ model Material {
 
 model ProgrammingExercise {
   /// Native single-answer quiz. Null keeps the existing Python exercise path.
-  quiz Json?
+  quiz              Json?
   materialId        String             @id @map("material_id") @db.Uuid
   externalKey       String             @map("external_key")
   legacyProblemNo   Int?               @map("legacy_problem_no")
@@ -1727,7 +1736,7 @@ model ExerciseCollaborationDocument {
 /// One graded attempt at an exercise.
 model Submission {
   /// Immutable quiz question, choices and answer key, never executed as code.
-  quizSnapshot Json? @map("quiz_snapshot")
+  quizSnapshot     Json?            @map("quiz_snapshot")
   id               String           @id @default(uuid()) @db.Uuid
   userId           String           @map("user_id") @db.Uuid
   materialId       String?          @map("material_id") @db.Uuid
@@ -2306,7 +2315,6 @@ model AcademyPointPolicy {
   @@map("academy_point_policies")
 }
 
-
 enum HelpRequestStatus {
   WAITING
   IN_PROGRESS
@@ -2315,28 +2323,29 @@ enum HelpRequestStatus {
 }
 
 model StudentHelpRequest {
-  id String @id @default(uuid()) @db.Uuid
-  academyId String @map("academy_id") @db.Uuid
-  classId String @map("class_id") @db.Uuid
-  studentMembershipRef String @map("student_membership_ref") @db.Uuid
-  studentMembershipId String? @map("student_membership_id") @db.Uuid
-  materialRef String @map("material_ref") @db.Uuid
-  materialId String? @map("material_id") @db.Uuid
-  teacherMembershipRef String? @map("teacher_membership_ref") @db.Uuid
-  teacherMembershipId String? @map("teacher_membership_id") @db.Uuid
-  status HelpRequestStatus @default(WAITING)
-  requestedAt DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
-  claimedAt DateTime? @map("claimed_at") @db.Timestamptz(6)
-  closedAt DateTime? @map("closed_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  version Int @default(1)
-  closedByRef String? @map("closed_by_ref") @db.Uuid
-  closeReason String? @map("close_reason")
-  academy Academy @relation(fields: [academyId], references: [id], onDelete: Restrict)
-  class Class @relation(fields: [classId], references: [id], onDelete: Restrict)
-  studentMembership AcademyMembership? @relation("HelpRequestStudent", fields: [studentMembershipId], references: [id], onDelete: SetNull)
-  teacherMembership AcademyMembership? @relation("HelpRequestTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
-  material Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  id                   String             @id @default(uuid()) @db.Uuid
+  academyId            String             @map("academy_id") @db.Uuid
+  classId              String             @map("class_id") @db.Uuid
+  studentMembershipRef String             @map("student_membership_ref") @db.Uuid
+  studentMembershipId  String?            @map("student_membership_id") @db.Uuid
+  materialRef          String             @map("material_ref") @db.Uuid
+  materialId           String?            @map("material_id") @db.Uuid
+  teacherMembershipRef String?            @map("teacher_membership_ref") @db.Uuid
+  teacherMembershipId  String?            @map("teacher_membership_id") @db.Uuid
+  status               HelpRequestStatus  @default(WAITING)
+  requestedAt          DateTime           @default(now()) @map("requested_at") @db.Timestamptz(6)
+  claimedAt            DateTime?          @map("claimed_at") @db.Timestamptz(6)
+  closedAt             DateTime?          @map("closed_at") @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version              Int                @default(1)
+  closedByRef          String?            @map("closed_by_ref") @db.Uuid
+  closeReason          String?            @map("close_reason")
+  academy              Academy            @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  class                Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  studentMembership    AcademyMembership? @relation("HelpRequestStudent", fields: [studentMembershipId], references: [id], onDelete: SetNull)
+  teacherMembership    AcademyMembership? @relation("HelpRequestTeacher", fields: [teacherMembershipId], references: [id], onDelete: SetNull)
+  material             Material?          @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
   @@index([academyId, classId, status, requestedAt, id], map: "help_requests_class_queue_idx")
   @@index([studentMembershipRef, classId, status], map: "help_requests_student_active_idx")
   @@map("student_help_requests")
@@ -2344,43 +2353,139 @@ model StudentHelpRequest {
 
 // Durable operation receipts prevent a delayed create retry reopening a closed request.
 model HelpRequestReceipt {
-  actorRef String @map("actor_ref") @db.Uuid
-  key String @db.Uuid
+  actorRef    String   @map("actor_ref") @db.Uuid
+  key         String   @db.Uuid
   fingerprint String
-  result Json
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  result      Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
   @@id([actorRef, key])
   @@map("help_request_receipts")
 }
 
-
 model PdfAsset {
-  id String @id @default(uuid()) @db.Uuid
-  objectKey String @unique @map("object_key")
-  originalFilename String @map("original_filename")
-  byteSize Int @map("byte_size")
-  checksumSha256 String @map("checksum_sha256")
-  pageCount Int @default(0) @map("page_count")
-  uploaderUserId String @map("uploader_user_id") @db.Uuid
-  academyId String @map("academy_id") @db.Uuid
-  courseId String @map("course_id") @db.Uuid
-  lectureId String @map("lecture_id") @db.Uuid
-  state PdfAssetState @default(PENDING)
-  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  uploader User @relation(fields: [uploaderUserId], references: [id], onDelete: Restrict)
-  documents PdfDocument[]
+  id               String        @id @default(uuid()) @db.Uuid
+  objectKey        String        @unique @map("object_key")
+  originalFilename String        @map("original_filename")
+  byteSize         Int           @map("byte_size")
+  checksumSha256   String        @map("checksum_sha256")
+  pageCount        Int           @default(0) @map("page_count")
+  uploaderUserId   String        @map("uploader_user_id") @db.Uuid
+  academyId        String        @map("academy_id") @db.Uuid
+  courseId         String        @map("course_id") @db.Uuid
+  lectureId        String        @map("lecture_id") @db.Uuid
+  state            PdfAssetState @default(PENDING)
+  consumedAt       DateTime?     @map("consumed_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  uploader         User          @relation(fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  documents        PdfDocument[]
+
   @@index([state, createdAt])
   @@map("pdf_assets")
 }
 
 model PdfDocument {
-  materialId String @id @map("material_id") @db.Uuid
-  assetId String @map("asset_id") @db.Uuid
-  placement PdfPlacement @default(MAIN)
-  revision Int @default(1)
-  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  asset PdfAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  materialId String       @id @map("material_id") @db.Uuid
+  assetId    String       @map("asset_id") @db.Uuid
+  placement  PdfPlacement @default(MAIN)
+  revision   Int          @default(1)
+  material   Material     @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  asset      PdfAsset     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
   @@index([assetId])
   @@map("pdf_documents")
+}
+
+model ManualMaterial {
+  materialId        String   @id @map("material_id") @db.Uuid
+  description       String   @default("")
+  files             Json     @default("{}")
+  entryPoint        String   @default("main.py") @map("entry_point")
+  assets            Json     @default("[]")
+  modelAnswer       String   @default("") @map("model_answer")
+  solutionAssets    Json     @default("[]") @map("solution_assets")
+  solutionFiles     Json?    @map("solution_files")
+  hint              String   @default("")
+  width             Int      @default(1024)
+  height            Int      @default(640)
+  timeLimitSeconds  Int      @default(1800) @map("time_limit_seconds")
+  memoryLimitMb     Int      @default(512) @map("memory_limit_mb")
+  runtimeVersion    String   @default("cpython-tk-v1") @map("runtime_version")
+  submitEnabled     Boolean  @default(true) @map("submit_enabled")
+  includeInScore    Boolean  @default(false) @map("include_in_score")
+  maximumHundredths Int      @default(10000) @map("maximum_hundredths")
+  revision          Int      @default(1)
+  material          Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@map("manual_materials")
+}
+
+model ManualDraft {
+  materialId String   @map("material_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  files      Json     @default("{}")
+  answer     String   @default("")
+  revision   Int      @default(1)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([materialId, userId])
+  @@map("manual_drafts")
+}
+
+model ManualSubmission {
+  id                String         @id @default(uuid()) @db.Uuid
+  materialId        String         @map("material_id") @db.Uuid
+  userId            String         @map("user_id") @db.Uuid
+  classId           String         @map("class_id") @db.Uuid
+  files             Json
+  answer            String         @default("")
+  profile           Json
+  revision          Int
+  maximumHundredths Int            @map("maximum_hundredths")
+  includeInScore    Boolean        @map("include_in_score")
+  requestKey        String         @map("request_key") @db.Uuid
+  reviewVersion     Int            @default(0) @map("review_version")
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  material          Material       @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  class             Class          @relation(fields: [classId], references: [id], onDelete: Restrict)
+  reviews           ManualReview[]
+
+  @@unique([userId, requestKey])
+  @@index([materialId, classId, userId, createdAt])
+  @@map("manual_submissions")
+}
+
+model ManualReview {
+  id              String           @id @default(uuid()) @db.Uuid
+  submissionId    String           @map("submission_id") @db.Uuid
+  reviewerId      String           @map("reviewer_id") @db.Uuid
+  scoreHundredths Int              @map("score_hundredths")
+  completed       Boolean
+  feedback        String
+  version         Int
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  submission      ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  reviewer        User             @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@unique([submissionId, version])
+  @@map("manual_reviews")
+}
+
+/// Immutable private lesson assets. Retained while historical manifests may reference them.
+model ManualAsset {
+  id        String   @id @default(uuid()) @db.Uuid
+  academyId String   @map("academy_id") @db.Uuid
+  courseId  String   @map("course_id") @db.Uuid
+  objectKey String   @unique @map("object_key")
+  name      String
+  byteSize  Int      @map("byte_size")
+  mimeType  String   @map("mime_type")
+  sha256    String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([academyId, courseId])
+  @@map("manual_assets")
 }

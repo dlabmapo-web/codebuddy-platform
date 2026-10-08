@@ -1,3 +1,4 @@
+import { ManualModule } from "./manual/manual.module.js";
 import { DocumentsModule } from "./documents/documents.module.js";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
@@ -32,6 +33,7 @@ import { TeachModule } from "./teach/teach.module.js";
     }),
     DatabaseModule,
     DocumentsModule,
+    ManualModule,
     DraftsModule,
     AcademiesModule,
     AuthModule,

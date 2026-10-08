@@ -326,7 +326,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
       for (const lecture of module.lectures)
         for (const row of lecture.materials) {
           if (
-            row.programmingExercise ||
+            row.programmingExercise || row.manualMaterial ||
             (row.pdfDocument?.asset.state === "READY" &&
               pdfIsMain(row.pdfDocument.placement))
           )

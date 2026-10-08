@@ -79,7 +79,9 @@ export class PointAwardService {
 
   /** An academy's economy, or the shared defaults when it has never set one. */
   async policyFor(tx: PointsTx, academyId: string): Promise<PointPolicy> {
-    const row = await tx.academyPointPolicy.findUnique({ where: { academyId } });
+    const row = await tx.academyPointPolicy.findUnique({
+      where: { academyId },
+    });
     return row ? pointPolicyFrom(row) : DEFAULT_POINT_POLICY;
   }
 
@@ -283,6 +285,74 @@ export class PointAwardService {
    * problem to a finished five-problem lecture does not un-complete it and
    * cannot make it pay again: the key carries no material count. §7.4.
    */
+  async awardManualCompletion(
+    tx: PointsTx,
+    input: { materialId: string; userId: string; classId: string; now: Date },
+  ): Promise<void> {
+    const material = await tx.material.findUnique({
+      where: { id: input.materialId },
+      include: {
+        manualMaterial: true,
+        lecture: {
+          include: {
+            courseModule: {
+              include: { course: { include: { academy: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (
+      !material?.manualMaterial?.includeInScore ||
+      !material.isVisible ||
+      !material.lecture.isVisible ||
+      !material.lecture.courseModule.isVisible ||
+      !material.lecture.courseModule.course.isVisible
+    )
+      return;
+    const course = material.lecture.courseModule.course;
+    if (!(await this.enabled(tx, course.academyId))) return;
+    const latest = await tx.manualSubmission.findFirst({
+      where: {
+        materialId: material.id,
+        userId: input.userId,
+        classId: input.classId,
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        materialId: true,
+        includeInScore: true,
+        maximumHundredths: true,
+        reviews: {
+          orderBy: { version: "desc" },
+          take: 1,
+          select: { completed: true, scoreHundredths: true },
+        },
+      },
+    });
+    if (!latest?.includeInScore || !latest.reviews[0]?.completed) return;
+    const membership = await tx.academyMembership.findFirst({
+      where: {
+        academyId: course.academyId,
+        userId: input.userId,
+        role: "STUDENT",
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    if (!membership) return;
+    await this.awardCompletions(tx, {
+      academyId: course.academyId,
+      membershipId: membership.id,
+      userId: input.userId,
+      courseId: course.id,
+      classId: input.classId,
+      timeZone: course.academy.timeZone,
+      now: input.now,
+      policy: await this.policyFor(tx, course.academyId),
+      lecture: material.lecture,
+    });
+  }
   private async awardCompletions(
     tx: PointsTx,
     input: {
@@ -316,7 +386,14 @@ export class PointAwardService {
       classId: input.classId,
     };
 
-    if (!(await this.allSolved(tx, input.userId, { lectureId: lecture.id }))) {
+    if (
+      !(await this.allSolved(
+        tx,
+        input.userId,
+        { lectureId: lecture.id },
+        input.classId,
+      ))
+    ) {
       return;
     }
     await this.write(
@@ -333,7 +410,14 @@ export class PointAwardService {
       input.policy,
     );
 
-    if (!(await this.allSolved(tx, input.userId, { moduleId: module_.id }))) {
+    if (
+      !(await this.allSolved(
+        tx,
+        input.userId,
+        { moduleId: module_.id },
+        input.classId,
+      ))
+    ) {
       return;
     }
     await this.write(
@@ -350,7 +434,12 @@ export class PointAwardService {
     );
 
     if (
-      !(await this.allSolved(tx, input.userId, { courseId: module_.course.id }))
+      !(await this.allSolved(
+        tx,
+        input.userId,
+        { courseId: module_.course.id },
+        input.classId,
+      ))
     ) {
       return;
     }
@@ -382,9 +471,13 @@ export class PointAwardService {
     tx: PointsTx,
     userId: string,
     scope: { lectureId?: string; moduleId?: string; courseId?: string },
+    classId?: string,
   ): Promise<boolean> {
     const where = {
-      type: "PROGRAMMING_EXERCISE" as const,
+      OR: [
+        { type: "PROGRAMMING_EXERCISE" as const },
+        { manualMaterial: { includeInScore: true } },
+      ],
       isVisible: true,
       lecture: {
         isVisible: true,
@@ -397,17 +490,54 @@ export class PointAwardService {
       },
     };
 
-    const visible = await tx.material.findMany({ where, select: { id: true } });
+    const visible = await tx.material.findMany({
+      where,
+      select: { id: true, type: true },
+    });
     if (visible.length === 0) return false;
 
     const solved = await tx.studentExerciseProgress.count({
       where: {
         userId,
         status: "SOLVED",
-        materialId: { in: visible.map((material) => material.id) },
+        materialId: {
+          in: visible
+            .filter(
+              (m) =>
+                m.type !== "TURTLE_EXERCISE" && m.type !== "WRITTEN_RESPONSE",
+            )
+            .map((material) => material.id),
+        },
       },
     });
-    return solved >= visible.length;
+    const manualIds = visible
+      .filter(
+        (m) => m.type === "TURTLE_EXERCISE" || m.type === "WRITTEN_RESPONSE",
+      )
+      .map((m) => m.id);
+    const attempts = manualIds.length
+      ? await tx.manualSubmission.findMany({
+          where: { userId, classId, materialId: { in: manualIds } },
+          distinct: ["materialId"],
+          orderBy: { createdAt: "desc" },
+          select: {
+            materialId: true,
+            includeInScore: true,
+            maximumHundredths: true,
+            reviews: {
+              orderBy: { version: "desc" },
+              take: 1,
+              select: { completed: true, scoreHundredths: true },
+            },
+          },
+        })
+      : [];
+    return (
+      solved +
+        attempts.filter((a) => a.includeInScore && a.reviews[0]?.completed)
+          .length >=
+      visible.length
+    );
   }
 
   /**
@@ -498,13 +628,21 @@ export class PointAwardService {
         },
         OR: [
           { effectiveFrom: null },
-          { effectiveFrom: { lte: new Date(`${input.localDate}T00:00:00.000Z`) } },
+          {
+            effectiveFrom: {
+              lte: new Date(`${input.localDate}T00:00:00.000Z`),
+            },
+          },
         ],
         AND: [
           {
             OR: [
               { effectiveTo: null },
-              { effectiveTo: { gte: new Date(`${input.localDate}T00:00:00.000Z`) } },
+              {
+                effectiveTo: {
+                  gte: new Date(`${input.localDate}T00:00:00.000Z`),
+                },
+              },
             ],
           },
         ],
@@ -526,7 +664,8 @@ export class PointAwardService {
       }
 
       const late =
-        input.firstActiveMinute > slot.startMinute + policy.attendanceGraceMinutes;
+        input.firstActiveMinute >
+        slot.startMinute + policy.attendanceGraceMinutes;
 
       await this.write(
         tx,

@@ -145,6 +145,7 @@ function createService(options?: {
   media?: ProfileMediaService;
 }) {
   const prisma = {
+    manualSubmission:{findMany:vi.fn().mockResolvedValue([])},
     class: {
       findMany: vi.fn().mockResolvedValue(options?.classes ?? [studentClass()]),
       findFirst: vi

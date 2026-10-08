@@ -5,7 +5,7 @@ import { gradingDataLimits } from "../grading-limits.js";
 
 import { courseProvenanceSchema } from "../platform/library.js";
 
-export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT"] as const;
+export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
 
@@ -193,6 +193,7 @@ export const materialSchema = z.object({
   isVisible: z.boolean(),
   programmingExercise: programmingExerciseSchema.nullable(),
   pdfDocument: pdfMetadataSchema.nullable().optional(),
+  manualMaterial: z.object({revision:z.number().int(),includeInScore:z.boolean(),submitEnabled:z.boolean(),maximumHundredths:z.number().int()}).nullable().optional(),
 });
 
 export const lectureSchema = z.object({

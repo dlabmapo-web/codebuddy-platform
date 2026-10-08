@@ -31,6 +31,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
+    { name: 'webkit-turtle', testMatch: /turtle-materials\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {
       name: 'webkit-my-page',
@@ -106,8 +107,8 @@ export default defineConfig({
           stdout: 'ignore',
         },
         {
-          command: `pnpm --filter @cove/web exec next dev -p ${webPort}`,
-          env: { NEXT_PUBLIC_TURNSTILE_SITE_KEY: turnstileTestSiteKey },
+          command: `pnpm --filter @cove/web dev --port ${webPort}`,
+          env: { NEXT_PUBLIC_TURNSTILE_SITE_KEY: turnstileTestSiteKey, NEXT_PUBLIC_GUI_ENABLED: process.env.E2E_GUI_ENABLED === '1' ? 'true' : 'false' },
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

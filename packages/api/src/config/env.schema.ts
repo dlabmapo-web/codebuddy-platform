@@ -33,6 +33,10 @@ const postgresUrlSchema = z
   );
 
 export const apiEnvironmentSchema = z.object({
+  GUI_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
+  GUI_SERVICE_URL:httpUrlSchema.optional(),
+  GUI_SERVICE_SECRET:z.string().min(32).optional(),
+  GUI_PUBLIC_WS_URL:z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4_000),
   WEB_ORIGIN: httpUrlSchema,
@@ -186,6 +190,8 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if(environment.GUI_ENABLED){for(const key of ['GUI_SERVICE_URL','GUI_SERVICE_SECRET','GUI_PUBLIC_WS_URL'] as const)if(!environment[key])context.addIssue({code:'custom',path:[key],message:'is required when GUI_ENABLED'});if(environment.NODE_ENV==='production'&&environment.GUI_PUBLIC_WS_URL&&!environment.GUI_PUBLIC_WS_URL.startsWith('wss://'))context.addIssue({code:'custom',path:['GUI_PUBLIC_WS_URL'],message:'must use wss in production'});}
+
   if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {
     context.addIssue({
       code: "custom",

@@ -76,3 +76,7 @@ docs/operations/*.local.md
 
 # Local browser authentication states contain session credentials.
 e2e/.auth/
+
+# Browser bundle generated from pinned noVNC package
+packages/web/public/novnc-rfb.js*
+packages/web/public/novnc-LICENSE.txt

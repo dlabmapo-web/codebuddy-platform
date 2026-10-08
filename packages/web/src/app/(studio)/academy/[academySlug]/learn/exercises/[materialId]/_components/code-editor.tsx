@@ -62,11 +62,13 @@ export function CodeEditor({
   fontSize,
   onChange,
   onMount,
+  readOnly = false,
 }: {
   code: string;
   fontSize: number;
   onChange: (value: string) => void;
   onMount?: OnMount;
+  readOnly?: boolean;
 }) {
   const handleMount = React.useMemo(() => pinLfOnMount(onMount), [onMount]);
 
@@ -83,6 +85,7 @@ export function CodeEditor({
         onMount={handleMount}
         options={{
           automaticLayout: true,
+          readOnly,
           fontFamily: EDITOR_FONT_FAMILY,
           fontSize,
           // Reserved so the failing-line dot has a gutter to sit in; without

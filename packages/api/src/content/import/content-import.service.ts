@@ -198,7 +198,7 @@ export class ContentImportService {
     const course = await this.requireCourse(input.academyId, input.courseId);
 
     if (
-      await this.prisma.pdfDocument.count({
+      await this.prisma.manualMaterial.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.pdfDocument.count({
         where: {
           material: { lecture: { courseModule: { courseId: input.courseId } } },
         },
@@ -207,7 +207,7 @@ export class ContentImportService {
       throw new AppException(
         "PDF_EDIT_STALE",
         409,
-        "This course contains PDF materials. Use the course builder to edit it; workbook import cannot safely place PDFs.",
+        "This course contains PDF or manually assessed materials. Use the course builder to edit it; workbook import cannot safely place PDFs.",
       );
     const started = Date.now();
     const workbook = this.read(input.bytes);

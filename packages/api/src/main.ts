@@ -14,6 +14,7 @@ import type { ApiEnvironment } from "./config/env.schema.js";
 import { MonitoringSocketAdapter } from "./monitoring/monitoring-socket.adapter.js";
 import { MONITORING_REDIS } from "./monitoring/monitoring.tokens.js";
 import { registerORPCRoutes } from "./orpc/router.js";
+import { manualJsonBodyParser } from "./manual/manual-body-parser.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -46,6 +47,7 @@ async function bootstrap(): Promise<void> {
     },
   );
 
+  app.use("/api/manual", manualJsonBodyParser());
   app.setGlobalPrefix("api");
   app.enableCors({
     credentials: true,

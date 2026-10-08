@@ -170,6 +170,8 @@ export const routes = {
     academySlug: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/records`, query),
+  academyLearnManual: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/turtle/${segment(materialId)}`,query),
   academyLearnPdf: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
     withQuery(`${academyRoot(academySlug)}/learn/documents/${segment(materialId)}`, query),
   academyLearnExercise: (
@@ -177,6 +179,7 @@ export const routes = {
     materialId: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/exercises/${segment(materialId)}`, query),
+  academyTeachManual:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/manual/${segment(materialId)}`,
   academyTeachClasses: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/classes`,
   academyTeachClass: (academySlug: string, classId: string) =>

@@ -6,6 +6,8 @@ import { signInAs } from '../support/auth';
 const STUDENT_EMAIL = process.env.E2E_STUDENT_EMAIL ?? 'student@cove.test';
 const STUDENT_PASSWORD = process.env.E2E_STUDENT_PASSWORD ?? 'CoveDev123!';
 const ECHO_ID = 'e0000000-0000-4000-8000-000000000030';
+// The development account can retain memberships from other class fixtures.
+const CLASS_ID = 'e0000000-0000-4000-8000-000000000040';
 
 async function signIn(page: Page): Promise<string> {
   const response = await page.goto(routes.login);
@@ -50,7 +52,7 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   expect(workerResponse.headers()['cache-control']).toContain('immutable');
 
   await page.goto(
-    routes.academyLearnExercise(academySlug, ECHO_ID),
+    routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }),
   );
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
   await expect(page.getByText(/browser cannot run interactive input/i)).toHaveCount(0);
@@ -66,7 +68,7 @@ test('the interactive Python worker is isolated and accepts terminal input', asy
   await input.fill('Safari');
   await input.press('Enter');
 
-  await expect(page.getByRole('tabpanel')).toContainText('Hello, Safari', {
+  await expect(page.getByTestId('terminal')).toContainText('Hello, Safari', {
     timeout: 30_000,
   });
   await expect(run).toBeEnabled();
@@ -76,16 +78,15 @@ test('a failing run opens the error coach', async ({ page }) => {
   test.setTimeout(120_000);
   const academySlug = await signIn(page);
 
-  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
+  await page.goto(
+    routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }),
+  );
 
   const run = page.getByRole('button', { name: /^run$|^실행$/i });
-  const coachTab = page.getByRole('tab', {
-    name: /error interpretation|오류 해석/i,
-  });
   const coach = page.getByTestId('error-coach');
   const terminal = page.getByTestId('terminal');
 
-  await expect(coachTab).toHaveCount(0);
+  await expect(coach).toHaveCount(0);
 
   await replaceEditorCode(page, 'if True\nprint("hello" 2)');
   await expect(run).toBeEnabled({ timeout: 90_000 });
@@ -93,12 +94,12 @@ test('a failing run opens the error coach', async ({ page }) => {
 
   // Opens itself: the student does not have to find it.
   await expect(coach).toBeVisible({ timeout: 30_000 });
-  await expect(coachTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: /result|결과/i })).toContainText('if True');
 
   // The lesson is the actual mistake, not the exception class.
   await expect(coach).toContainText(/colon|콜론/i);
   // Line and column, their own code, and a caret under the character.
-  await expect(coach).toContainText(/\b1:8\b/);
+  await expect(coach.getByRole('button', { name: '1:8', exact: true })).toBeVisible();
   await expect(coach).toContainText('if True');
   await expect(coach).toContainText('^');
   // A correct example, and what to do next.
@@ -118,8 +119,7 @@ test('a failing run opens the error coach', async ({ page }) => {
   await run.click();
   await expect(terminal).toContainText('hi', { timeout: 30_000 });
   await expect(run).toBeEnabled();
-  await expect(coachTab).toHaveCount(0);
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(coach).toHaveCount(0);
   await expect(page.locator('.cove-error-line')).toHaveCount(0);
 });
 
@@ -129,7 +129,9 @@ test('output without a trailing newline belongs to the run that wrote it', async
   test.setTimeout(120_000);
   const academySlug = await signIn(page);
 
-  await page.goto(routes.academyLearnExercise(academySlug, ECHO_ID));
+  await page.goto(
+    routes.academyLearnExercise(academySlug, ECHO_ID, { classId: CLASS_ID }),
+  );
 
   const run = page.getByRole('button', { name: /^run$|^실행$/i });
   const terminal = page.getByTestId('terminal');

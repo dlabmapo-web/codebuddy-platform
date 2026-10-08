@@ -9,7 +9,7 @@ import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import { AppException } from "../../common/app-exception.js";
 import { PrismaService } from "../../database/prisma.service.js";
-import type { Prisma } from "../../generated/prisma/client.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import { toCourseSummary } from "../course.service.js";
 
 /**
@@ -167,6 +167,7 @@ export class AcademyLibraryService {
             pdfDocument: material.pdfDocument
               ? pdfMetadata(material.pdfDocument)
               : null,
+            manualMaterial:material.manualMaterial?{revision:material.manualMaterial.revision,submitEnabled:material.manualMaterial.submitEnabled,includeInScore:material.manualMaterial.includeInScore,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
             programmingExercise: null,
           })),
         })),
@@ -219,6 +220,7 @@ export class AcademyLibraryService {
     const lectures: Prisma.LectureCreateManyInput[] = [];
     const materials: Prisma.MaterialCreateManyInput[] = [];
     const documents: Prisma.PdfDocumentCreateManyInput[] = [];
+    const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
     const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
     const hints: Prisma.ExerciseHintCreateManyInput[] = [];
@@ -276,6 +278,7 @@ export class AcademyLibraryService {
               assetId: material.pdfDocument.assetId,
               placement: material.pdfDocument.placement,
             });
+          if(material.manualMaterial){const {solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
           const exercise = material.programmingExercise;
           if (!exercise) continue;
           exercises.push({
@@ -366,6 +369,7 @@ export class AcademyLibraryService {
         await lockPdfAsset(tx, assetId);
       if (documents.length)
         await tx.pdfDocument.createMany({ data: documents });
+      if(manuals.length)await tx.manualMaterial.createMany({data:manuals});
       if (exercises.length) {
         await tx.programmingExercise.createMany({ data: exercises });
       }
@@ -476,7 +480,7 @@ const previewInclude = {
         include: {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: { pdfDocument: { include: { asset: true } } },
+            include: { manualMaterial:true,pdfDocument: { include: { asset: true } } },
           },
         },
       },
@@ -498,6 +502,7 @@ const adoptInclude = {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
+              manualMaterial:true,
               pdfDocument: { include: { asset: true } },
               programmingExercise: {
                 include: {

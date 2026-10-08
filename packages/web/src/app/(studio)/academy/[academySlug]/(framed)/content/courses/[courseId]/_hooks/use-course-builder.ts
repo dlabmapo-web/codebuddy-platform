@@ -1,4 +1,5 @@
 'use client';
+import { manualApi } from '@/lib/manual-api';
 import { pdfApi } from '@/lib/pdf-api';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -231,7 +232,7 @@ export function useCourseBuilder({
       materialId: string;
       isVisible: boolean;
     }) =>
-      isPdf(input.materialId)
+      isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getTree(target))
@@ -255,9 +256,10 @@ export function useCourseBuilder({
     }) => orpc.academyCourses.moveLecture({ ...target, ...input }),
     onSuccess: applyTree,
   });
+  const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'))));
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
-      isPdf(input.materialId)
+      isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getTree(target))

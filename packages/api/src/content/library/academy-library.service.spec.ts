@@ -69,12 +69,13 @@ const master = {
   ],
 };
 
-function build() {
+function build(source=master) {
   const created: Record<string, unknown[]> = {
     courseModule: [],
     lecture: [],
     material: [],
     programmingExercise: [],
+    manualMaterial: [],
     exerciseTestCase: [],
     exerciseHint: [],
   };
@@ -116,7 +117,7 @@ function build() {
       findUniqueOrThrow: vi.fn(({ include }) =>
         Promise.resolve(
           include && 'modules' in include && 'orderBy' in (include.modules as object)
-            ? master
+            ? source
             : {
                 id: 'new-course',
                 academyId: branchId,
@@ -272,4 +273,16 @@ describe('AcademyLibraryService.adopt', () => {
     const data = courseValue() as { contentRevision: number; baselineRevision: number };
     expect(data.contentRevision).toBe(data.baselineRevision);
   });
+});
+
+describe('manual material adoption',()=>{
+ it('copies private author configuration and immutable assets into fresh materials without student history',async()=>{
+  const manual={revision:7,runtimeVersion:'approved-image',description:'Draw a circle',entryPoint:'main.py',files:{'main.py':'import turtle'},solutionFiles:{'main.py':'PRIVATE'},assets:[{assetId:'asset',name:'shape.gif',byteSize:43}],solutionAssets:[],modelAnswer:'PRIVATE_ANSWER',includeInScore:true,submitEnabled:true,maximumHundredths:10000};
+  const source={...master,modules:[{...master.modules[0],lectures:[{...master.modules[0].lectures[0],materials:[{title:'Turtle',type:'TURTLE_EXERCISE',position:1,isRequired:true,isVisible:true,manualMaterial:manual}]}]}]} as unknown as typeof master;
+  const {service,created}=build(source);await service.adopt(identity,{academyId:branchId,libraryCourseId:masterId,title:'Turtle copy'});
+  expect(created.manualMaterial).toHaveLength(1);expect(created.programmingExercise).toHaveLength(0);
+  expect(created.manualMaterial[0]).toMatchObject({...manual,revision:1});
+  expect(created.manualMaterial[0]).not.toHaveProperty('submissions');expect(created.manualMaterial[0]).not.toHaveProperty('drafts');
+  expect(created.material[0]).toMatchObject({type:'TURTLE_EXERCISE',isVisible:true});expect(created.manualMaterial[0]).toHaveProperty('materialId');
+ });
 });

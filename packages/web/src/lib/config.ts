@@ -4,6 +4,7 @@ function requiredPublicEnvironment(name: string, value: string | undefined): str
 }
 
 export const publicConfig = {
+  guiEnabled:process.env.NEXT_PUBLIC_GUI_ENABLED === 'true',
   supabaseUrl: requiredPublicEnvironment(
     "NEXT_PUBLIC_SUPABASE_URL",
     process.env.NEXT_PUBLIC_SUPABASE_URL,

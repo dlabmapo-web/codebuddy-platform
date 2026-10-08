@@ -1,3 +1,6 @@
+import { publicConfig } from '@/lib/config';
+import { useManualTranslation } from '@/components/manual/use-manual-translation';
+import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
 import { PdfAuthorDialog } from '@/components/pdf/pdf-author-dialog';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { ChevronRight, FileText, Plus, Sparkles } from 'lucide-react';
@@ -118,8 +121,10 @@ function ExerciseRow({
   const [deleting, setDeleting] = useState(false);
   const [pdfPreview, setPdfPreview] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [manualOpen,setManualOpen]=useState(false);
+  const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE';
   const rowEditable =
-    material.type === 'PDF_DOCUMENT'
+    material.type !== 'PROGRAMMING_EXERCISE'
       ? builder.editable
       : builder.exerciseEditable;
   const [moving, setMoving] = useState(false);
@@ -163,7 +168,7 @@ function ExerciseRow({
         <FileText aria-hidden className="size-4 shrink-0 text-brand" />
       ) : null}
       <div className="min-w-0 flex-1">
-        {material.type === 'PDF_DOCUMENT' ? (
+        {isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={titleClass}
@@ -245,7 +250,7 @@ function ExerciseRow({
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() =>
-            material.type === 'PDF_DOCUMENT'
+            isManual ? setManualOpen(true) : material.type === 'PDF_DOCUMENT'
               ? setPdfOpen(true)
               : router.push(href)
           }
@@ -270,6 +275,7 @@ function ExerciseRow({
         }}
         open={deleting}
       />
+      {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
       {pdfOpen ? (
         <PdfAuthorDialog
           target={{ ...builder.target, lectureId }}
@@ -305,6 +311,8 @@ export function LectureRow({
   const { t } = useTranslation(['content', 'courses']);
   const visibilityIsReal = useContentSurface() !== 'library';
   const [pdfAdding, setPdfAdding] = useState(false);
+  const {t:mt}=useManualTranslation();
+  const [manualAdding,setManualAdding]=useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -450,6 +458,7 @@ export function LectureRow({
               {t('pdf.add')}
             </button>
           ) : null}
+          {builder.editable && publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setManualAdding(true)}><Plus className="size-3.5"/>{mt('add_turtle_written_response')}</button> : null}
           {builder.exerciseEditable ? (
             <Link
               className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand hover:text-brand-deep"
@@ -461,6 +470,7 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
+        {manualAdding ? <ManualAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setManualAdding(false)} onSaved={builder.refresh}/> : null}
         {pdfAdding ? (
           <PdfAuthorDialog
             target={{ ...builder.target, lectureId: lecture.id }}

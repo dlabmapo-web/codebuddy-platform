@@ -61,9 +61,13 @@ export async function signInAs({
   }
 
   await page.goto('/login');
+  const submit = page.getByRole('button', { name: /sign in|로그인/i });
+  // With the test CAPTCHA, readiness also confirms client hydration. Filling
+  // controlled fields earlier can lose their values when WebKit hydrates.
+  await expect(submit).toBeEnabled();
   await page.locator('input[name="identifier"]').fill(identifier);
   await page.locator('input[type="password"]').fill(password);
-  const submit = page.getByRole('button', { name: /sign in|로그인/i });
+  await expect(page.locator('input[name="identifier"]')).toHaveValue(identifier);
   await expect(submit).toBeEnabled();
   await submit.click();
   await page.waitForURL(landing, { timeout: 30_000 });

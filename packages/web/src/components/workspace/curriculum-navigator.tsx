@@ -97,6 +97,7 @@ export function WorkspaceCurriculumNavigator({
       for (const lecture of courseModule.lectures) {
         const materials = [
           ...lecture.exercises,
+          ...(allowPdfNavigation ? lecture.manualMaterials??[] : []),
           ...(allowPdfNavigation
             ? (lecture.documents ?? []).filter(
                 (document) => document.pdf.placement !== 'SUPPLEMENTARY',
@@ -314,6 +315,7 @@ function ModuleBranch({
                 {lectureOpen ? (
                   <ul>
                     {[
+                      ...(allowPdfNavigation?lecture.manualMaterials??[]:[]).map(manual=>({kind:'manual' as const,position:manual.position,manual})),
                       ...lecture.exercises.map((exercise) => ({
                         kind: 'exercise' as const,
                         position: exercise.position,
@@ -329,7 +331,7 @@ function ModuleBranch({
                     ]
                       .sort((a, b) => a.position - b.position)
                       .map((row) =>
-                        row.kind === 'pdf' ? (
+                        row.kind === 'manual' ? (<li key={row.manual.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.manual.materialId)}>{materialNumbers.get(row.manual.materialId)}. {row.manual.title} · Teacher graded</button></li>) : row.kind === 'pdf' ? (
                           <li key={row.doc.materialId}>
                             <button
                               type="button"

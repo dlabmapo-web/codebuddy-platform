@@ -1,3 +1,4 @@
+import { DocumentsModule } from "./documents/documents.module.js";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
@@ -30,6 +31,7 @@ import { TeachModule } from "./teach/teach.module.js";
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    DocumentsModule,
     DraftsModule,
     AcademiesModule,
     AuthModule,

@@ -323,6 +323,11 @@ export const curriculumAuditActions = [
   "content.programming_exercise.deleted",
   "content.programming_exercise.reordered",
   "content.programming_exercise.moved",
+  "content.pdf.created",
+  "content.pdf.updated",
+  "content.pdf.visibility",
+  "content.pdf.deleted",
+  "content.pdf.moved",
 ] as const;
 export const curriculumAuditActionSchema = z.enum(curriculumAuditActions);
 export type CurriculumAuditAction = z.infer<typeof curriculumAuditActionSchema>;

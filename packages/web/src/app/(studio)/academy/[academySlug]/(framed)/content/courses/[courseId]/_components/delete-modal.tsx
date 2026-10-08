@@ -20,9 +20,9 @@ export function DeleteModal({
   open,
 }: {
   /** How many children disappear along with this row. */
-  cascade?: { lectures?: number; exercises?: number };
+  cascade?: { lectures?: number; exercises?: number; documents?: number };
   itemTitle: string;
-  kind: 'module' | 'lecture' | 'exercise';
+  kind: 'module' | 'lecture' | 'exercise' | 'pdf';
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
@@ -30,7 +30,8 @@ export function DeleteModal({
   const { t } = useTranslation(['content', 'common']);
   const lectures = cascade?.lectures ?? 0;
   const exercises = cascade?.exercises ?? 0;
-  const losesChildren = lectures > 0 || exercises > 0;
+  const documents = cascade?.documents ?? 0;
+  const losesChildren = lectures > 0 || exercises > 0 || documents > 0;
 
   return (
     <Modal onOpenChange={(next) => (next ? null : onCancel())} open={open}>
@@ -48,6 +49,9 @@ export function DeleteModal({
                 <ul className="mt-1 list-disc pl-4">
                   {lectures > 0 ? (
                     <li>{t('delete.cascade_lectures', { count: lectures })}</li>
+                  ) : null}
+                  {documents > 0 ? (
+                    <li>{t('pdf.document_count', { count: documents })}</li>
                   ) : null}
                   {exercises > 0 ? (
                     <li>

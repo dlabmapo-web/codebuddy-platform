@@ -126,7 +126,8 @@ services:
       redis:
         condition: service_healthy
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=128m,uid=1001,gid=1001
+      # Two concurrent PDF uploads may each use 95 MB while validating.
+      - /tmp:rw,noexec,nosuid,size=256m,uid=1001,gid=1001
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 20s

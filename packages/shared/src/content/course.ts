@@ -1,10 +1,11 @@
 import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
+import { pdfMetadataSchema } from "./pdf.js";
 import { gradingDataLimits } from "../grading-limits.js";
 
 import { courseProvenanceSchema } from "../platform/library.js";
 
-export const materialTypes = ["PROGRAMMING_EXERCISE"] as const;
+export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
 
@@ -101,6 +102,8 @@ export const courseContentCountsSchema = z.object({
    * that legible instead of baffling.
    */
   visibleExercises: z.number().int().nonnegative(),
+  documents: z.number().int().nonnegative().optional(),
+  visibleDocuments: z.number().int().nonnegative().optional(),
 });
 export type CourseContentCounts = z.infer<typeof courseContentCountsSchema>;
 
@@ -189,6 +192,7 @@ export const materialSchema = z.object({
   isRequired: z.boolean(),
   isVisible: z.boolean(),
   programmingExercise: programmingExerciseSchema.nullable(),
+  pdfDocument: pdfMetadataSchema.nullable().optional(),
 });
 
 export const lectureSchema = z.object({
@@ -256,9 +260,13 @@ export const setCourseContentVisibilitySchema = z.object({
  */
 export function courseHasNoVisibleContent(course: {
   isVisible: boolean;
-  content: { visibleExercises: number };
+  content: { visibleExercises: number; visibleDocuments?: number };
 }): boolean {
-  return course.isVisible && course.content.visibleExercises === 0;
+  return (
+    course.isVisible &&
+    course.content.visibleExercises + (course.content.visibleDocuments ?? 0) ===
+      0
+  );
 }
 
 export const courseIdInputSchema = z.object({
@@ -339,7 +347,11 @@ export const defaultExerciseTimeLimitMs = 3_000;
  */
 export const gradingProfileBounds = {
   totalTimeLimitMs: { min: 1_000, max: 300_000, default: 60_000 },
-  comparatorTimeLimitMs: { min: 10, max: 2_000, default: gradingDataLimits.comparatorBudgetMs },
+  comparatorTimeLimitMs: {
+    min: 10,
+    max: 2_000,
+    default: gradingDataLimits.comparatorBudgetMs,
+  },
   /** Material points in hundredths: 0.01 to 1,000.00. */
   materialMaximumHundredths: { min: 1, max: 100_000, default: 10_000 },
 } as const;
@@ -373,7 +385,9 @@ export const exerciseGradingProfileSchema = z.object({
     .nullable(),
   materialScorePolicy: materialScorePolicySchema.nullable(),
 });
-export type ExerciseGradingProfile = z.infer<typeof exerciseGradingProfileSchema>;
+export type ExerciseGradingProfile = z.infer<
+  typeof exerciseGradingProfileSchema
+>;
 
 export const legacyGradingProfile: ExerciseGradingProfile = {
   mode: "LEGACY_STDIO",
@@ -387,7 +401,8 @@ export const defaultEliceGradingProfile: ExerciseGradingProfile = {
   mode: "ELICE_STDIO",
   totalTimeLimitMs: gradingProfileBounds.totalTimeLimitMs.default,
   comparatorTimeLimitMs: gradingProfileBounds.comparatorTimeLimitMs.default,
-  materialMaximumHundredths: gradingProfileBounds.materialMaximumHundredths.default,
+  materialMaximumHundredths:
+    gradingProfileBounds.materialMaximumHundredths.default,
   materialScorePolicy: "PROPORTIONAL",
 };
 
@@ -402,10 +417,24 @@ export const legacyCaseGrading = {
 
 export const exerciseTestCaseDraftSchema = z
   .object({
-    input: z.string().max(gradingDataLimits.testTextChars, "Test input exceeds the 8 Mi character limit."),
-    expectedOutput: z.string().max(gradingDataLimits.testTextChars, "Expected output exceeds the 8 Mi character limit.")
-      .refine((text) => new TextEncoder().encode(text).byteLength <= gradingDataLimits.stdoutBytes,
-        "Expected output exceeds the 8 MiB output limit."),
+    input: z
+      .string()
+      .max(
+        gradingDataLimits.testTextChars,
+        "Test input exceeds the 8 Mi character limit.",
+      ),
+    expectedOutput: z
+      .string()
+      .max(
+        gradingDataLimits.testTextChars,
+        "Expected output exceeds the 8 Mi character limit.",
+      )
+      .refine(
+        (text) =>
+          new TextEncoder().encode(text).byteLength <=
+          gradingDataLimits.stdoutBytes,
+        "Expected output exceeds the 8 MiB output limit.",
+      ),
     visibility: testCaseVisibilitySchema,
     /** Required for the same reason as the profile: never silently reset. */
     comparator: caseComparatorSchema,
@@ -425,14 +454,12 @@ export const exerciseTestCaseDraftSchema = z
     (value) =>
       (value.softTimeLimitMs === null) === (value.softPenalty === null),
     {
-      error:
-        "A soft time limit and its penalty must be set together.",
+      error: "A soft time limit and its penalty must be set together.",
       path: ["softTimeLimitMs"],
     },
   )
   .refine(
-    (value) =>
-      value.softPenalty === null || value.softPenalty <= value.weight,
+    (value) => value.softPenalty === null || value.softPenalty <= value.weight,
     {
       // Otherwise a slow-but-correct answer would score below a wrong one.
       error: "A soft penalty cannot exceed the case's weight.",
@@ -556,14 +583,20 @@ export function gradingProfileIssues(input: {
   }
   testCases.forEach((testCase, index) => {
     const hardLimit = testCase.timeLimitMsOverride ?? exerciseLimit;
-    if (testCase.softTimeLimitMs !== null && testCase.softTimeLimitMs >= hardLimit) {
+    if (
+      testCase.softTimeLimitMs !== null &&
+      testCase.softTimeLimitMs >= hardLimit
+    ) {
       issues.push({
         code: "soft_limit_not_below_hard",
         path: ["testCases", index, "softTimeLimitMs"],
         message: "A soft time limit must be below the case's hard limit.",
       });
     }
-    if (grading.totalTimeLimitMs !== null && hardLimit > grading.totalTimeLimitMs) {
+    if (
+      grading.totalTimeLimitMs !== null &&
+      hardLimit > grading.totalTimeLimitMs
+    ) {
       issues.push({
         code: "case_limit_exceeds_total",
         path: ["testCases", index, "timeLimitMsOverride"],
@@ -580,7 +613,8 @@ export function gradingProfileIssues(input: {
       issues.push({
         code: "empty_negative_rule",
         path: ["testCases", index, "expectedOutput"],
-        message: "An empty text makes a 'does not contain' rule impossible to pass.",
+        message:
+          "An empty text makes a 'does not contain' rule impossible to pass.",
       });
     }
   });
@@ -596,9 +630,7 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
-  solutionCode: z
-    .string()
-    .max(programmingExerciseSolutionMaxLength),
+  solutionCode: z.string().max(programmingExerciseSolutionMaxLength),
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
   /**
@@ -618,27 +650,55 @@ export const exerciseDraftFieldsSchema = z.object({
 });
 export type ExerciseDraftFields = z.infer<typeof exerciseDraftFieldsSchema>;
 
-function refineGrading(
-  value: ExerciseDraftFields,
-  context: z.RefinementCtx,
-) {
-  if (value.testCases.reduce((total, testCase) => total + testCase.input.length + testCase.expectedOutput.length, 0) > gradingDataLimits.testSetChars) {
-    context.addIssue({ code: "custom", path: ["testCases"], message: "Combined test input and expected output exceed the 16 Mi character limit." });
+function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
+  if (
+    value.testCases.reduce(
+      (total, testCase) =>
+        total + testCase.input.length + testCase.expectedOutput.length,
+      0,
+    ) > gradingDataLimits.testSetChars
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["testCases"],
+      message:
+        "Combined test input and expected output exceed the 16 Mi character limit.",
+    });
   }
-  if (new TextEncoder().encode(JSON.stringify(value)).byteLength > gradingDataLimits.authoringBodyBytes - 4_096) {
+  if (
+    new TextEncoder().encode(JSON.stringify(value)).byteLength >
+    gradingDataLimits.authoringBodyBytes - 4_096
+  ) {
     // Leave room for the RPC envelope and parent IDs. The existing edge cap
     // applies to encoded bytes, including JSON escapes, rather than text length.
-    context.addIssue({ code: "custom", path: ["testCases"], message: "Encoded problem data exceed the 20 MB request limit." });
+    context.addIssue({
+      code: "custom",
+      path: ["testCases"],
+      message: "Encoded problem data exceed the 20 MB request limit.",
+    });
   }
   if (value.quiz) {
     if (value.testCases.length || value.grading.mode !== "LEGACY_STDIO") {
-      context.addIssue({ code: "custom", path: ["quiz"], message: "Quiz grading cannot contain Python test cases." });
+      context.addIssue({
+        code: "custom",
+        path: ["quiz"],
+        message: "Quiz grading cannot contain Python test cases.",
+      });
     }
     return;
   }
-  if (!value.solutionCode.trim()) context.addIssue({ code: "custom", path: ["solutionCode"], message: "A correct answer is required." });
+  if (!value.solutionCode.trim())
+    context.addIssue({
+      code: "custom",
+      path: ["solutionCode"],
+      message: "A correct answer is required.",
+    });
   for (const issue of gradingProfileIssues(value)) {
-    context.addIssue({ code: "custom", message: issue.message, path: issue.path });
+    context.addIssue({
+      code: "custom",
+      message: issue.message,
+      path: issue.path,
+    });
   }
 }
 

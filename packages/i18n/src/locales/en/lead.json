@@ -117,7 +117,12 @@
       "content.programming_exercise.visibility_changed": "exercise shown or hidden",
       "content.programming_exercise.deleted": "exercise deleted",
       "content.programming_exercise.reordered": "exercises reordered",
-      "content.programming_exercise.moved": "exercise moved"
+      "content.programming_exercise.moved": "exercise moved",
+      "content.pdf.created": "PDF added",
+      "content.pdf.updated": "PDF edited",
+      "content.pdf.visibility": "PDF shown or hidden",
+      "content.pdf.deleted": "PDF deleted",
+      "content.pdf.moved": "PDF moved"
     }
   },
   "period": {

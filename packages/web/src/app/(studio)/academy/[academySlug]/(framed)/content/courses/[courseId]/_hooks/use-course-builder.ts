@@ -1,4 +1,5 @@
 'use client';
+import { pdfApi } from '@/lib/pdf-api';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -42,7 +43,10 @@ export type MoveNotice =
  * Codes meaning the tree the author chose from is no longer the course: the
  * item or a destination moved or vanished in another session.
  */
-const staleMoveCodes = new Set(['CONTENT_MOVE_STALE', 'CONTENT_PARENT_MISMATCH']);
+const staleMoveCodes = new Set([
+  'CONTENT_MOVE_STALE',
+  'CONTENT_PARENT_MISMATCH',
+]);
 
 type BuilderTarget = {
   academyId: string;
@@ -77,6 +81,14 @@ export function useCourseBuilder({
   const editable = canEditCurriculum;
   const exerciseEditable = canEditExercises;
 
+  function isPdf(id: string) {
+    return tree.modules.some((m) =>
+      m.lectures.some((l) =>
+        l.materials.some((row) => row.id === id && row.type === 'PDF_DOCUMENT'),
+      ),
+    );
+  }
+
   function applyTree(next: CourseTree) {
     queryClient.setQueryData(queryKey, next);
   }
@@ -97,7 +109,10 @@ export function useCourseBuilder({
     await queryClient.cancelQueries({ queryKey });
     const previous = queryClient.getQueryData<CourseTree>(queryKey);
     if (previous) {
-      queryClient.setQueryData(queryKey, withVisibility(previous, target, id, isVisible));
+      queryClient.setQueryData(
+        queryKey,
+        withVisibility(previous, target, id, isVisible),
+      );
     }
     return { previous };
   }
@@ -152,7 +167,8 @@ export function useCourseBuilder({
       title?: string;
       isVisible?: boolean;
     }) => orpc.academyCourses.updateModule({ ...target, ...input }),
-    onMutate: (input) => flipOptimistically('module', input.moduleId, input.isVisible),
+    onMutate: (input) =>
+      flipOptimistically('module', input.moduleId, input.isVisible),
     onError: (_error, _input, context) => restoreTree(context),
     onSuccess: applyTree,
   });
@@ -173,7 +189,10 @@ export function useCourseBuilder({
         const byId = new Map(previous.modules.map((item) => [item.id, item]));
         const modules = orderedModuleIds.flatMap((id) => byId.get(id) ?? []);
         if (modules.length === previous.modules.length) {
-          queryClient.setQueryData(queryKey, renumbered({ ...previous, modules }));
+          queryClient.setQueryData(
+            queryKey,
+            renumbered({ ...previous, modules }),
+          );
         }
       }
       return { previous };
@@ -201,7 +220,8 @@ export function useCourseBuilder({
       title?: string;
       isVisible?: boolean;
     }) => orpc.academyCourses.updateLecture({ ...target, ...input }),
-    onMutate: (input) => flipOptimistically('lecture', input.lectureId, input.isVisible),
+    onMutate: (input) =>
+      flipOptimistically('lecture', input.lectureId, input.isVisible),
     onError: (_error, _input, context) => restoreTree(context),
     onSuccess: applyTree,
   });
@@ -210,7 +230,12 @@ export function useCourseBuilder({
       lectureId: string;
       materialId: string;
       isVisible: boolean;
-    }) => orpc.academyCourses.setExerciseVisibility({ ...target, ...input }),
+    }) =>
+      isPdf(input.materialId)
+        ? pdfApi
+            .mutate({ ...target, ...input })
+            .then(() => orpc.academyCourses.getTree(target))
+        : orpc.academyCourses.setExerciseVisibility({ ...target, ...input }),
     onMutate: (input) =>
       flipOptimistically('exercise', input.materialId, input.isVisible),
     onError: (_error, _input, context) => restoreTree(context),
@@ -232,7 +257,11 @@ export function useCourseBuilder({
   });
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
-      orpc.academyCourses.deleteExercise({ ...target, ...input }),
+      isPdf(input.materialId)
+        ? pdfApi
+            .mutate({ ...target, ...input })
+            .then(() => orpc.academyCourses.getTree(target))
+        : orpc.academyCourses.deleteExercise({ ...target, ...input }),
     onSuccess: applyTree,
   });
   const moveExerciseMutation = useMutation({
@@ -275,7 +304,10 @@ export function useCourseBuilder({
     await queryClient.cancelQueries({ queryKey });
     const previous = queryClient.getQueryData<CourseTree>(queryKey);
     if (previous) {
-      queryClient.setQueryData(queryKey, renumbered(movedTree(previous, kind, itemId, to)));
+      queryClient.setQueryData(
+        queryKey,
+        renumbered(movedTree(previous, kind, itemId, to)),
+      );
     }
     try {
       if (kind === 'lecture') {
@@ -318,7 +350,9 @@ export function useCourseBuilder({
     if (!courseModule) return '';
     if (kind === 'lecture') return courseModule.title;
     const lecture = courseModule.lectures.find((item) => item.id === parentId);
-    return lecture ? `${courseModule.title} › ${lecture.title}` : courseModule.title;
+    return lecture
+      ? `${courseModule.title} › ${lecture.title}`
+      : courseModule.title;
   }
 
   const structuralError = [
@@ -337,6 +371,8 @@ export function useCourseBuilder({
 
   return {
     tree,
+    target,
+    refresh: () => treeQuery.refetch(),
     editable,
     exerciseEditable,
     moduleTitle,
@@ -458,7 +494,9 @@ export function useCourseBuilder({
         move.kind === 'lecture'
           ? tree.modules.some((item) => item.id === move.from.parentId)
           : tree.modules.some((item) =>
-              item.lectures.some((lecture) => lecture.id === move.from.parentId),
+              item.lectures.some(
+                (lecture) => lecture.id === move.from.parentId,
+              ),
             );
       if (!originExists || !locateItem(tree, move.kind, move.itemId)) {
         setNotice({ id: Date.now(), kind: 'undo_unavailable' });

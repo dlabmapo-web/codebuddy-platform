@@ -170,6 +170,8 @@ export const routes = {
     academySlug: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/records`, query),
+  academyLearnPdf: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/documents/${segment(materialId)}`, query),
   academyLearnExercise: (
     academySlug: string,
     materialId: string,

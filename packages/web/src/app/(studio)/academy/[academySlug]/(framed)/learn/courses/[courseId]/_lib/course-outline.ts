@@ -13,11 +13,18 @@ export function filterCourseModules(
       lectures: module.lectures
         .map((lecture) => ({
           ...lecture,
+          documents: lecture.documents?.filter((document) =>
+            document.title.toLocaleLowerCase().includes(needle),
+          ),
           exercises: lecture.exercises.filter((exercise) =>
             exercise.title.toLocaleLowerCase().includes(needle),
           ),
         }))
-        .filter((lecture) => lecture.exercises.length > 0),
+        .filter(
+          (lecture) =>
+            lecture.exercises.length > 0 ||
+            (lecture.documents?.length ?? 0) > 0,
+        ),
     }))
     .filter((module) => module.lectures.length > 0);
 }

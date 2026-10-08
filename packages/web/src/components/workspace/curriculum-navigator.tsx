@@ -50,6 +50,7 @@ const statusIcons: Record<
 
 export function WorkspaceCurriculumNavigator({
   context,
+  allowPdfNavigation = true,
   displayedMaterialId,
   liveMaterialId,
   busyMaterialId,
@@ -65,6 +66,7 @@ export function WorkspaceCurriculumNavigator({
 }: {
   /** Null while the course is still loading or failed to load. */
   context: WorkspaceNavigatorContext | null;
+  allowPdfNavigation?: boolean;
   displayedMaterialId: string;
   /** The exercise the watched student has open. Teacher surfaces only. */
   liveMaterialId?: string | null;
@@ -89,6 +91,24 @@ export function WorkspaceCurriculumNavigator({
     () => (context ? flattenNavigatorExercises(context) : []),
     [context],
   );
+  const materialNumbers = React.useMemo(() => {
+    const numbers = new Map<string, number>();
+    for (const courseModule of context?.course.modules ?? []) {
+      for (const lecture of courseModule.lectures) {
+        const materials = [
+          ...lecture.exercises,
+          ...(allowPdfNavigation
+            ? (lecture.documents ?? []).filter(
+                (document) => document.pdf.placement !== 'SUPPLEMENTARY',
+              )
+            : []),
+        ].sort((a, b) => a.position - b.position);
+        for (const material of materials)
+          numbers.set(material.materialId, numbers.size + 1);
+      }
+    }
+    return numbers;
+  }, [context, allowPdfNavigation]);
 
   const displayedBranch = React.useMemo(
     () => rows.find((row) => row.materialId === displayedMaterialId),
@@ -151,7 +171,10 @@ export function WorkspaceCurriculumNavigator({
           <p className="text-[10.5px] font-bold uppercase tracking-wide text-sub">
             {t('navigator.title')}
           </p>
-          <p className="truncate text-[13.5px] font-bold" title={context?.course.title}>
+          <p
+            className="truncate text-[13.5px] font-bold"
+            title={context?.course.title}
+          >
             {context?.course.title ?? t('navigator.loading')}
           </p>
           {context ? (
@@ -191,7 +214,10 @@ export function WorkspaceCurriculumNavigator({
             ) : null}
           </div>
         ) : !context ? (
-          <p aria-live="polite" className="px-3 py-6 text-center text-[13px] text-sub">
+          <p
+            aria-live="polite"
+            className="px-3 py-6 text-center text-[13px] text-sub"
+          >
             {t('navigator.loading')}
           </p>
         ) : (
@@ -199,6 +225,7 @@ export function WorkspaceCurriculumNavigator({
             {context.course.modules.map((courseModule) => (
               <ModuleBranch
                 courseModule={courseModule}
+                allowPdfNavigation={allowPdfNavigation}
                 displayedMaterialId={displayedMaterialId}
                 busyMaterialId={busyMaterialId ?? null}
                 disabled={disabled ?? false}
@@ -208,13 +235,17 @@ export function WorkspaceCurriculumNavigator({
                 onSelect={onSelect}
                 onToggle={toggle}
                 rows={rows}
+                materialNumbers={materialNumbers}
               />
             ))}
           </ul>
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-border px-3 py-2" {...anchorProps('outline:footer')}>
+      <footer
+        className="shrink-0 border-t border-border px-3 py-2"
+        {...anchorProps('outline:footer')}
+      >
         <Link
           className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
           href={footer.href}
@@ -228,6 +259,7 @@ export function WorkspaceCurriculumNavigator({
 }
 
 function ModuleBranch({
+  allowPdfNavigation,
   busyMaterialId,
   courseModule,
   disabled,
@@ -237,7 +269,9 @@ function ModuleBranch({
   onSelect,
   onToggle,
   rows,
+  materialNumbers,
 }: {
+  allowPdfNavigation: boolean;
   busyMaterialId: string | null;
   courseModule: WorkspaceNavigatorContext['course']['modules'][number];
   disabled: boolean;
@@ -247,6 +281,7 @@ function ModuleBranch({
   onSelect: (materialId: string) => void;
   onToggle: (id: string) => void;
   rows: NavigatorRow[];
+  materialNumbers: ReadonlyMap<string, number>;
 }) {
   const { t } = useLayoutTranslation('learn');
   const open = expanded.has(courseModule.id);
@@ -268,7 +303,9 @@ function ModuleBranch({
               <li className="mb-0.5" key={lecture.id}>
                 <Branch
                   anchorKey={`lecture:${lecture.id}`}
-                  label={t('outline.lecture_label', { position: lecture.position })}
+                  label={t('outline.lecture_label', {
+                    position: lecture.position,
+                  })}
                   onToggle={() => onToggle(lecture.id)}
                   open={lectureOpen}
                   small
@@ -276,23 +313,55 @@ function ModuleBranch({
                 />
                 {lectureOpen ? (
                   <ul>
-                    {lecture.exercises.map((exercise) => {
-                      const row = rows.find(
-                        (candidate) => candidate.materialId === exercise.materialId,
-                      );
-                      return (
-                        <ExerciseRow
-                          busy={busyMaterialId === exercise.materialId}
-                          disabled={disabled}
-                          exercise={exercise}
-                          key={exercise.materialId}
-                          live={liveMaterialId === exercise.materialId}
-                          number={row?.number ?? exercise.position}
-                          onSelect={onSelect}
-                          selected={displayedMaterialId === exercise.materialId}
-                        />
-                      );
-                    })}
+                    {[
+                      ...lecture.exercises.map((exercise) => ({
+                        kind: 'exercise' as const,
+                        position: exercise.position,
+                        exercise,
+                      })),
+                      ...(allowPdfNavigation ? (lecture.documents ?? []) : [])
+                        .filter((doc) => doc.pdf.placement !== 'SUPPLEMENTARY')
+                        .map((doc) => ({
+                          kind: 'pdf' as const,
+                          position: doc.position,
+                          doc,
+                        })),
+                    ]
+                      .sort((a, b) => a.position - b.position)
+                      .map((row) =>
+                        row.kind === 'pdf' ? (
+                          <li key={row.doc.materialId}>
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40"
+                              onClick={() => onSelect(row.doc.materialId)}
+                            >
+                              {materialNumbers.get(row.doc.materialId)}. PDF ·{' '}
+                              {row.doc.title}
+                            </button>
+                          </li>
+                        ) : (
+                          <ExerciseRow
+                            key={row.exercise.materialId}
+                            busy={busyMaterialId === row.exercise.materialId}
+                            disabled={disabled}
+                            exercise={row.exercise}
+                            live={liveMaterialId === row.exercise.materialId}
+                            number={
+                              materialNumbers.get(row.exercise.materialId) ??
+                              rows.find(
+                                (r) => r.materialId === row.exercise.materialId,
+                              )?.number ??
+                              row.exercise.position
+                            }
+                            onSelect={onSelect}
+                            selected={
+                              displayedMaterialId === row.exercise.materialId
+                            }
+                          />
+                        ),
+                      )}
                   </ul>
                 ) : null}
               </li>
@@ -386,7 +455,10 @@ function ExerciseRow({
           {number}
         </span>
         {busy ? (
-          <LoaderCircle aria-hidden className="size-3.5 shrink-0 animate-spin text-brand" />
+          <LoaderCircle
+            aria-hidden
+            className="size-3.5 shrink-0 animate-spin text-brand"
+          />
         ) : (
           <status.Icon
             aria-hidden

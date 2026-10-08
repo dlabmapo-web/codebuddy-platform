@@ -1,3 +1,4 @@
+import { pdfMetadata } from "../documents/pdf-metadata.js";
 import { Injectable } from "@nestjs/common";
 import {
   progressStatusFromDraft,
@@ -35,7 +36,10 @@ export const visibleCurriculumInclude = {
           materials: {
             where: { isVisible: true },
             orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: { programmingExercise: true },
+            include: {
+              programmingExercise: true,
+              pdfDocument: { include: { asset: true } },
+            },
           },
         },
       },
@@ -98,17 +102,31 @@ export class CurriculumOutlineService {
           title: lecture.title,
           description: lecture.description,
           position: lecture.position,
+          documents: lecture.materials.flatMap((material) =>
+            material.pdfDocument?.asset.state === "READY"
+              ? [
+                  {
+                    materialId: material.id,
+                    title: material.title,
+                    position: material.position,
+                    pdf: pdfMetadata(material.pdfDocument),
+                  },
+                ]
+              : [],
+          ),
           exercises: lecture.materials.flatMap((material) =>
             material.programmingExercise
-              ? [{
-                  materialId: material.id,
-                  title: material.title,
-                  position: material.position,
-                  difficulty: material.programmingExercise.difficulty,
-                  status: statuses.get(material.id)?.status ?? "NOT_STARTED",
-                  bestScore: statuses.get(material.id)?.bestScore ?? 0,
-                }]
-              : []
+              ? [
+                  {
+                    materialId: material.id,
+                    title: material.title,
+                    position: material.position,
+                    difficulty: material.programmingExercise.difficulty,
+                    status: statuses.get(material.id)?.status ?? "NOT_STARTED",
+                    bestScore: statuses.get(material.id)?.bestScore ?? 0,
+                  },
+                ]
+              : [],
           ),
         })),
       })),
@@ -144,7 +162,10 @@ export class CurriculumOutlineService {
       }),
     ]);
     const currentRevision = new Map(
-      revisions.map((exercise) => [exercise.materialId, exercise.gradingRevision]),
+      revisions.map((exercise) => [
+        exercise.materialId,
+        exercise.gradingRevision,
+      ]),
     );
     for (const draft of drafts) {
       if (!draft.materialId) continue;
@@ -216,16 +237,35 @@ export function courseSummaryFor(
         0,
       ),
       exercises: exercises.length,
+      documents: modules.reduce(
+        (sum, module) =>
+          sum +
+          module.lectures.reduce(
+            (n, lecture) =>
+              n +
+              lecture.materials.filter(
+                (m) => m.pdfDocument?.asset.state === "READY",
+              ).length,
+            0,
+          ),
+        0,
+      ),
     },
     progress: countProgress(exercises, statuses),
   };
 }
 
 /** A lecture with no exercise is a heading; a module of those is not a module. */
-export function nonemptyModules(course: VisibleCourse): VisibleCourse["modules"] {
+export function nonemptyModules(
+  course: VisibleCourse,
+): VisibleCourse["modules"] {
   return course.modules.flatMap((courseModule) => {
     const lectures = courseModule.lectures.filter((lecture) =>
-      lecture.materials.some((material) => material.programmingExercise !== null)
+      lecture.materials.some(
+        (material) =>
+          material.programmingExercise != null ||
+          material.pdfDocument?.asset.state === "READY",
+      ),
     );
     return lectures.length > 0 ? [{ ...courseModule, lectures }] : [];
   });
@@ -237,9 +277,9 @@ export function exerciseMaterialIds(
   return course.modules.flatMap((courseModule) =>
     courseModule.lectures.flatMap((lecture) =>
       lecture.materials.flatMap((material) =>
-        material.programmingExercise ? [material.id] : []
-      )
-    )
+        material.programmingExercise ? [material.id] : [],
+      ),
+    ),
   );
 }
 

@@ -1,12 +1,19 @@
 'use client';
 
+import { PdfResourceLink } from '@/components/pdf/pdf-resource-link';
+import Link from 'next/link';
+import { routes } from '@/lib/routes';
+import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import type { LearnCourseOutline } from '@cove/shared';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { ChevronDown } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
-import { formatProblemOutlineNumber, lectureProgress } from '../_lib/course-outline';
+import {
+  formatProblemOutlineNumber,
+  lectureProgress,
+} from '../_lib/course-outline';
 import { ExerciseRow } from './exercise-row';
 
 type Module = LearnCourseOutline['modules'][number];
@@ -30,6 +37,7 @@ export function ModuleSection({
   onToggleLecture: (lectureId: string) => void;
   requestedLectureId: string | null;
 }) {
+  const slug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
   const exerciseCount = module.lectures.reduce(
     (total, lecture) => total + lecture.exercises.length,
@@ -91,7 +99,8 @@ export function ModuleSection({
                       : 'border-border'
                   }`}
                 >
-                  {lecture.exercises.length > 0 ? (
+                  {lecture.exercises.length > 0 ||
+                  (lecture.documents?.length ?? 0) > 0 ? (
                     <header>
                       <Collapsible.Trigger asChild>
                         <button
@@ -150,27 +159,83 @@ export function ModuleSection({
                   )}
 
                   <Collapsible.Content className="cove-collapse">
-                    {lecture.exercises.length === 0 ? (
+                    {lecture.exercises.length === 0 &&
+                    !lecture.documents?.length ? (
                       <p className="border-t border-dashed border-border px-3 py-4 text-center text-[12.5px] text-sub">
                         {t('outline.lecture_empty')}
                       </p>
                     ) : (
                       <ul className="flex flex-col gap-2 border-t border-border bg-canvas/35 p-2.5">
-                        {lecture.exercises.map((exercise, index) => (
-                          <ExerciseRow
-                            academyId={academyId}
-                            classId={classId}
-                            exercise={exercise}
-                            key={exercise.materialId}
-                            label={formatProblemOutlineNumber(
-                              module.position,
-                              lecture.position,
-                              index + 1,
-                            )}
-                          />
-                        ))}
+                        {[
+                          ...lecture.exercises.map((exercise) => ({
+                            kind: 'exercise' as const,
+                            position: exercise.position,
+                            exercise,
+                          })),
+                          ...(lecture.documents ?? [])
+                            .filter((d) => d.pdf.placement !== 'SUPPLEMENTARY')
+                            .map((doc) => ({
+                              kind: 'pdf' as const,
+                              position: doc.position,
+                              doc,
+                            })),
+                        ]
+                          .sort((a, b) => a.position - b.position)
+                          .map((row, index) =>
+                            row.kind === 'exercise' ? (
+                              <ExerciseRow
+                                academyId={academyId}
+                                classId={classId}
+                                exercise={row.exercise}
+                                key={row.exercise.materialId}
+                                label={formatProblemOutlineNumber(
+                                  module.position,
+                                  lecture.position,
+                                  index + 1,
+                                )}
+                              />
+                            ) : (
+                              <li key={row.doc.materialId}>
+                                <Link
+                                  className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand"
+                                  href={routes.academyLearnPdf(
+                                    slug,
+                                    row.doc.materialId,
+                                    { classId },
+                                  )}
+                                >
+                                  <span className="font-mono text-xs">PDF</span>
+                                  {row.doc.title}
+                                  <span className="ml-auto text-xs text-sub">
+                                    {row.doc.pdf.pageCount}
+                                  </span>
+                                </Link>
+                              </li>
+                            ),
+                          )}
                       </ul>
                     )}
+                    {lecture.documents?.some(
+                      (d) => d.pdf.placement !== 'MAIN',
+                    ) ? (
+                      <div className="border-t border-border p-3">
+                        <h4 className="mb-2 text-sm font-bold">
+                          {t('pdf.resources')}
+                        </h4>
+                        <ul className="grid gap-2">
+                          {lecture.documents
+                            .filter((d) => d.pdf.placement !== 'MAIN')
+                            .map((document) => (
+                              <PdfResourceLink
+                                key={document.materialId}
+                                academyId={academyId}
+                                classId={classId}
+                                document={document}
+                              />
+                            ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </Collapsible.Content>
                 </section>
               </Collapsible.Root>
@@ -189,11 +254,7 @@ export function ModuleSection({
  * width alone is not a number, and a bar is the first thing to become
  * unreadable at narrow widths or in high contrast.
  */
-function LectureProgress({
-  lecture,
-}: {
-  lecture: Module['lectures'][number];
-}) {
+function LectureProgress({ lecture }: { lecture: Module['lectures'][number] }) {
   const { t } = useLayoutTranslation('learn');
   const progress = lectureProgress(lecture);
   if (progress.percent === null) return null;

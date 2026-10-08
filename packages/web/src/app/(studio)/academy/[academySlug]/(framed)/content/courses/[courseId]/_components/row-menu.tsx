@@ -27,6 +27,8 @@ export function RowMenu({
   onDelete,
   onMove,
   onRename,
+  renameLabel,
+  extraItems,
   tone = 'default',
 }: {
   /** "Lecture", "Problem" — shown above the actions. */
@@ -39,6 +41,8 @@ export function RowMenu({
    */
   onMove?: () => void;
   onRename: () => void;
+  renameLabel?: string;
+  extraItems?: Array<{ label: string; onSelect: () => void }>;
   /** `strong` marks the group-level menu so it reads apart from child rows. */
   tone?: 'default' | 'strong';
 }) {
@@ -67,8 +71,13 @@ export function RowMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onRename}>
           <Pencil className="text-sub" />
-          {t('row.rename')}
+          {renameLabel ?? t('row.rename')}
         </DropdownMenuItem>
+        {extraItems?.map((item) => (
+          <DropdownMenuItem key={item.label} onSelect={item.onSelect}>
+            {item.label}
+          </DropdownMenuItem>
+        ))}
         {onMove ? (
           <DropdownMenuItem onSelect={onMove}>
             <ArrowUpDown className="text-sub" />

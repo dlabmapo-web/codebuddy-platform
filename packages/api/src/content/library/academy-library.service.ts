@@ -1,3 +1,5 @@
+import { lockPdfAsset } from "../../documents/pdf-document.service.js";
+import { pdfMetadata } from "../../documents/pdf-metadata.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { AvailableLibraryCourse } from "@cove/shared";
@@ -67,7 +69,7 @@ export class AcademyLibraryService {
         modules: {
           select: {
             _count: { select: { lectures: true } },
-            lectures: { select: { _count: { select: { materials: true } } } },
+            lectures: { select: { _count: { select: { materials: {where:{type:"PROGRAMMING_EXERCISE"}} } } } },
           },
         },
         // What this academy has already taken from this master. One query for
@@ -162,6 +164,9 @@ export class AcademyLibraryService {
             // Null throughout: a preview says what is in the course, never
             // what the answers are. The branch owns a full copy the moment it
             // adopts, and not one moment sooner.
+            pdfDocument: material.pdfDocument
+              ? pdfMetadata(material.pdfDocument)
+              : null,
             programmingExercise: null,
           })),
         })),
@@ -213,6 +218,7 @@ export class AcademyLibraryService {
     const modules: Prisma.CourseModuleCreateManyInput[] = [];
     const lectures: Prisma.LectureCreateManyInput[] = [];
     const materials: Prisma.MaterialCreateManyInput[] = [];
+    const documents: Prisma.PdfDocumentCreateManyInput[] = [];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
     const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
     const hints: Prisma.ExerciseHintCreateManyInput[] = [];
@@ -264,6 +270,12 @@ export class AcademyLibraryService {
             isVisible: true,
           });
 
+          if (material.pdfDocument)
+            documents.push({
+              materialId,
+              assetId: material.pdfDocument.assetId,
+              placement: material.pdfDocument.placement,
+            });
           const exercise = material.programmingExercise;
           if (!exercise) continue;
           exercises.push({
@@ -348,6 +360,12 @@ export class AcademyLibraryService {
       if (modules.length) await tx.courseModule.createMany({ data: modules });
       if (lectures.length) await tx.lecture.createMany({ data: lectures });
       if (materials.length) await tx.material.createMany({ data: materials });
+      for (const assetId of [
+        ...new Set(documents.map((d) => d.assetId)),
+      ].sort())
+        await lockPdfAsset(tx, assetId);
+      if (documents.length)
+        await tx.pdfDocument.createMany({ data: documents });
       if (exercises.length) {
         await tx.programmingExercise.createMany({ data: exercises });
       }
@@ -438,7 +456,7 @@ const summaryInclude = {
         select: {
           id: true,
           isVisible: true,
-          materials: { select: { isVisible: true } },
+          materials: { select: { isVisible: true, type: true } },
         },
       },
     },
@@ -456,7 +474,10 @@ const previewInclude = {
       lectures: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         include: {
-          materials: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+          materials: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            include: { pdfDocument: { include: { asset: true } } },
+          },
         },
       },
     },
@@ -477,6 +498,7 @@ const adoptInclude = {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
+              pdfDocument: { include: { asset: true } },
               programmingExercise: {
                 include: {
                   testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },

@@ -145,6 +145,13 @@
         "reordered": "문제 순서 변경",
         "updated": "문제 수정",
         "visibility_changed": "문제 공개 여부 변경"
+      },
+      "pdf": {
+        "created": "PDF 생성",
+        "updated": "PDF 수정",
+        "deleted": "PDF 삭제",
+        "moved": "PDF 이동",
+        "visibility": "PDF 공개 상태 변경"
       }
     },
     "platform": {

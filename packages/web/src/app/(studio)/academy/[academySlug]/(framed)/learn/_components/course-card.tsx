@@ -57,7 +57,7 @@ export function CourseCard({
   // The course is published but nothing inside it is visible yet. The card is
   // still here — a student told they have this course should find it — but
   // "Start →" would be a promise the outline behind it cannot keep.
-  const notReady = counts.exercises === 0;
+  const notReady = counts.exercises === 0 && !counts.documents;
 
   return (
     <Link
@@ -118,6 +118,7 @@ export function CourseCard({
            */}
           <p className="text-[15px] font-extrabold tracking-[-0.01em] tabular">
             {t('catalog.problems', { count: counts.exercises })}
+            {counts.documents ? ` · ${t('pdf.documents', { count: counts.documents })}` : ''}
           </p>
           <p className="mt-1 truncate text-[12px] text-sub">
             {t('catalog.structure', {

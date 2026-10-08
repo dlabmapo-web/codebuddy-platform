@@ -1,5 +1,6 @@
 import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
+import { pdfMetadataSchema } from "./pdf.js";
 
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
@@ -78,6 +79,16 @@ export const learnLectureSchema = z.object({
   description: descriptionSchema,
   position: positionSchema,
   exercises: z.array(learnExerciseSummarySchema),
+  documents: z
+    .array(
+      z.object({
+        materialId: z.uuid(),
+        title: titleSchema,
+        position: positionSchema,
+        pdf: pdfMetadataSchema,
+      }),
+    )
+    .optional(),
 });
 
 export const learnModuleSchema = z.object({
@@ -103,6 +114,7 @@ export const learnCourseSummarySchema = z.object({
     modules: z.number().int().nonnegative(),
     lectures: z.number().int().nonnegative(),
     exercises: z.number().int().nonnegative(),
+    documents: z.number().int().nonnegative().optional(),
   }),
   progress: learnCourseProgressSchema,
 });
@@ -264,9 +276,7 @@ export const learnExerciseWorkspaceSchema = z.object({
     previous: learnExerciseRefSchema.nullable(),
     next: learnExerciseRefSchema.nullable(),
   }),
-  draft: z
-    .object({ code: z.string(), updatedAt: z.iso.datetime() })
-    .nullable(),
+  draft: z.object({ code: z.string(), updatedAt: z.iso.datetime() }).nullable(),
   status: exerciseProgressStatusSchema,
 });
 export type LearnExerciseWorkspace = z.infer<
@@ -306,6 +316,7 @@ export const navigatorLectureSchema = z.object({
   title: titleSchema,
   position: positionSchema,
   exercises: z.array(navigatorExerciseSchema),
+  documents: learnLectureSchema.shape.documents,
 });
 
 export const navigatorModuleSchema = z.object({
@@ -543,6 +554,7 @@ export function toNavigatorContext(
           id: lecture.id,
           title: lecture.title,
           position: lecture.position,
+          documents: lecture.documents,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
             materialId: exercise.materialId,
             title: exercise.title,

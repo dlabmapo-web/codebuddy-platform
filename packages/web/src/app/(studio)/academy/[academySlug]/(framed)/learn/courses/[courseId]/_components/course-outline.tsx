@@ -61,7 +61,7 @@ export function CourseOutline({
   }, [outline.requestedLectureId]);
 
   const empty = initialOutline.modules.every((module) =>
-    module.lectures.every((lecture) => lecture.exercises.length === 0),
+    module.lectures.every((lecture) => lecture.exercises.length === 0 && !lecture.documents?.length),
   );
 
   return (
@@ -76,7 +76,7 @@ export function CourseOutline({
          * only report of the one thing this page is measuring, and a bar says
          * at a glance what the sentence made you read.
          */}
-        {isPreview ? (
+        {isPreview || outline.progress.total === 0 ? (
           <span />
         ) : (
           <div className="flex min-w-0 items-center gap-2.5">

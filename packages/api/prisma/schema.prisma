@@ -163,6 +163,20 @@ enum MonitoringVisitEndReason {
 
 enum MaterialType {
   PROGRAMMING_EXERCISE
+  PDF_DOCUMENT
+}
+
+enum PdfPlacement {
+  MAIN
+  SUPPLEMENTARY
+  BOTH
+}
+
+enum PdfAssetState {
+  PENDING
+  READY
+  DELETING
+  DELETED
 }
 
 enum ExerciseDifficulty {
@@ -351,6 +365,8 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  pdfUploads PdfAsset[]
+
   id                 String       @id @default(uuid()) @db.Uuid
   authUserId         String?      @unique @map("auth_user_id") @db.Uuid
   email              String?      @unique
@@ -1538,6 +1554,8 @@ model Lecture {
 }
 
 model Material {
+  pdfDocument PdfDocument?
+
   helpRequests StudentHelpRequest[]
 
   id         String       @id @default(uuid()) @db.Uuid
@@ -2333,4 +2351,36 @@ model HelpRequestReceipt {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@id([actorRef, key])
   @@map("help_request_receipts")
+}
+
+
+model PdfAsset {
+  id String @id @default(uuid()) @db.Uuid
+  objectKey String @unique @map("object_key")
+  originalFilename String @map("original_filename")
+  byteSize Int @map("byte_size")
+  checksumSha256 String @map("checksum_sha256")
+  pageCount Int @default(0) @map("page_count")
+  uploaderUserId String @map("uploader_user_id") @db.Uuid
+  academyId String @map("academy_id") @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  lectureId String @map("lecture_id") @db.Uuid
+  state PdfAssetState @default(PENDING)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  uploader User @relation(fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  documents PdfDocument[]
+  @@index([state, createdAt])
+  @@map("pdf_assets")
+}
+
+model PdfDocument {
+  materialId String @id @map("material_id") @db.Uuid
+  assetId String @map("asset_id") @db.Uuid
+  placement PdfPlacement @default(MAIN)
+  revision Int @default(1)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  asset PdfAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  @@index([assetId])
+  @@map("pdf_documents")
 }

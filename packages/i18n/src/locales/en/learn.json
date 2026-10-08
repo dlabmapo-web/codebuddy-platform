@@ -318,5 +318,13 @@
     "unavailable_title": "Your answer records could not be loaded",
     "unavailable_body": "Reload the page, or try again in a moment.",
     "refresh_failed": "Those records could not be refreshed. You are still looking at the last ones that loaded."
+  },
+  "pdf": {
+    "resources": "Resources",
+    "open": "Open",
+    "download": "Download",
+    "documents_one": "{{count}} PDF",
+    "documents_other": "{{count}} PDFs",
+    "unavailable": "This PDF is not available."
   }
 }

@@ -3,7 +3,7 @@ import { useManualTranslation } from "./use-manual-translation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import type { ManualSession } from "@cove/shared";
+import { effectiveManualResult, type ManualSession } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
 import { routes } from "@/lib/routes";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
@@ -50,6 +50,16 @@ export function ManualReviewWorkspace({
   const work = useQuery({
     queryKey: ["manual-learner", academyId, classId, materialId, selectedUser],
     queryFn: () => manualApi.roster({ ...target, userId: selectedUser! }),
+    refetchInterval: (query) =>
+      query.state.data?.some((s) =>
+        s.attempts.some((a) =>
+          ["PENDING", "EVALUATING"].includes(
+            a.shortAnswerAssessment?.status ?? "",
+          ),
+        ),
+      )
+        ? 3000
+        : false,
     enabled: Boolean(selectedUser),
     retry: false,
   });
@@ -57,13 +67,18 @@ export function ManualReviewWorkspace({
     attempt =
       learner?.attempts.find((a) => a.id === attemptId) ?? learner?.attempts[0],
     review = attempt?.reviews[0];
+  const effective = effectiveManualResult(attempt);
   useEffect(() => {
-    setScore((review?.scoreHundredths ?? 0) / 100);
-    setCompleted(review?.completed ?? false);
+    setScore((effective?.scoreHundredths ?? 0) / 100);
+    setCompleted(effective?.completed ?? false);
     setFeedback(review?.feedback ?? "");
     setFile(Object.keys(attempt?.files ?? {})[0] ?? "main.py");
     setEditing(false);
-  }, [attempt?.id, attempt?.reviewVersion]);
+  }, [
+    attempt?.id,
+    attempt?.reviewVersion,
+    attempt?.shortAnswerAssessment?.status,
+  ]);
   useEffect(() => {
     if (active.current) void manualApi.stop(active.current).catch(() => {});
     active.current = null;
@@ -238,8 +253,8 @@ export function ManualReviewWorkspace({
                   <span className="block text-xs">
                     {!s.attempts.length
                       ? mt("not_submitted")
-                      : s.attempts[0].reviews.length
-                        ? `${s.attempts[0].reviews[0].scoreHundredths / 100} / ${s.attempts[0].maximumHundredths / 100}`
+                      : effectiveManualResult(s.attempts[0])
+                        ? `${effectiveManualResult(s.attempts[0])!.scoreHundredths / 100} / ${s.attempts[0].maximumHundredths / 100}`
                         : mt("awaiting_review")}
                   </span>
                 </button>
@@ -263,6 +278,23 @@ export function ManualReviewWorkspace({
             >
               {mt("view_learner_drawing_read_only")}
             </button>
+          ) : null}
+          {attempt?.shortAnswerAssessment ? (
+            <p role="status">
+              {attempt.shortAnswerAssessment.status === "GRADED"
+                ? mt(
+                    attempt.shortAnswerAssessment.completed
+                      ? "correct"
+                      : "incorrect",
+                  )
+                : mt(
+                    attempt.shortAnswerAssessment.status === "ERROR"
+                      ? "evaluation_unavailable"
+                      : attempt.shortAnswerAssessment.status === "MANUAL"
+                        ? "awaiting_review"
+                        : "evaluating",
+                  )}
+            </p>
           ) : null}
           {attempt ? (
             <>
@@ -314,12 +346,12 @@ export function ManualReviewWorkspace({
                         busy ||
                         Boolean(
                           session &&
-                          [
-                            "QUEUED",
-                            "STARTING",
-                            "RUNNING",
-                            "WAITING_INPUT",
-                          ].includes(session.state),
+                            [
+                              "QUEUED",
+                              "STARTING",
+                              "RUNNING",
+                              "WAITING_INPUT",
+                            ].includes(session.state),
                         )
                       }
                       onClick={() => void run()}

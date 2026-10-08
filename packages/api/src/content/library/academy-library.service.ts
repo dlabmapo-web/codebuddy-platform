@@ -269,7 +269,7 @@ export class AcademyLibraryService {
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
-            isVisible: true,
+            isVisible: !material.manualMaterial?.shortAnswer,
           });
 
           if (material.pdfDocument)
@@ -278,7 +278,7 @@ export class AcademyLibraryService {
               assetId: material.pdfDocument.assetId,
               placement: material.pdfDocument.placement,
             });
-          if(material.manualMaterial){const {solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
+          if(material.manualMaterial){const {shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
           const exercise = material.programmingExercise;
           if (!exercise) continue;
           exercises.push({

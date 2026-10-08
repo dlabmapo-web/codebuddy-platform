@@ -2397,6 +2397,7 @@ model PdfDocument {
 }
 
 model ManualMaterial {
+  shortAnswer Json? @map("short_answer")
   materialId        String   @id @map("material_id") @db.Uuid
   description       String   @default("")
   files             Json     @default("{}")
@@ -2451,6 +2452,7 @@ model ManualSubmission {
   material          Material       @relation(fields: [materialId], references: [id], onDelete: Restrict)
   user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   class             Class          @relation(fields: [classId], references: [id], onDelete: Restrict)
+  shortAnswerAssessment ShortAnswerAssessment?
   reviews           ManualReview[]
 
   @@unique([userId, requestKey])
@@ -2488,4 +2490,20 @@ model ManualAsset {
 
   @@index([academyId, courseId])
   @@map("manual_assets")
+}
+
+/// Server-only immutable assessment definition and durable evaluation job/result.
+model ShortAnswerAssessment {
+  submissionId String @id @map("submission_id") @db.Uuid
+  definition Json
+  evaluatorVersion String @default("short-answer-js-v1") @map("evaluator_version")
+  status String
+  verdict String?
+  scoreHundredths Int? @map("score_hundredths")
+  completed Boolean?
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(6)
+  evaluatedAt DateTime? @map("evaluated_at") @db.Timestamptz(6)
+  submission ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  @@index([status, leaseUntil])
+  @@map("short_answer_assessments")
 }

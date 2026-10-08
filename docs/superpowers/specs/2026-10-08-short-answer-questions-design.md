@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 
-Status: proposed for review; not implemented
+Status: implemented and verified on localhost on `feat/lecture-pdf-materials`; production flags remain disabled; Elice reference gaps remain unverified
 
 Branch: `feat/lecture-pdf-materials`, alongside PDF and turtle features
 
@@ -30,7 +30,7 @@ Outside scope: multiple choice, OX, ordering questions, timed exams, multiple qu
 
 ## 3. Data and compatibility
 
-Keep `Material.type = WRITTEN_RESPONSE`. Add a one-to-one `ShortAnswerDefinition` linked to its existing ManualMaterial. Its presence opts the material into the new interaction; absence preserves the existing manual written-response contract.
+Keep `Material.type = WRITTEN_RESPONSE`. Store a schema-validated `ShortAnswerDefinition` in the nullable server-private `ManualMaterial.shortAnswer` JSON field. This keeps existing configuration copy/adoption atomic without a second material relation; its logical ownership is one definition per written-response material. Its presence opts the material into the new interaction; absence preserves the existing manual written-response contract.
 
 | Definition field | Contract |
 |---|---|
@@ -81,7 +81,7 @@ Display distinct Not submitted, Awaiting teacher review, Evaluating, Correct, In
 
 For EXACT, `orbit` matches `orbit`; `ORBIT`, ` orbit`, and `orbit\n` do not. Do not parse numbers, fold Unicode, trim, or collapse whitespace. For REGEX, `orbit` matches `orbital`, while `^orbit$` does not. Authors can express alternatives using regex alternation; no unobserved list of accepted answers is added. Literal matching normalization and submission-grade mapping are Cove policies pending Elice confirmation.
 
-Use a versioned server evaluator, proposed version `short-answer-js-v1`, with JavaScript RegExp syntax and no flags. Elice's backend engine is unknown, so this choice is a documented compatibility boundary. No `eval`, user code execution, STDIO judge, Python process, or turtle dependency is involved.
+Use a versioned server evaluator, proposed version `short-answer-js-v1`, with JavaScript RegExp syntax and no flags. Elice's backend engine is unknown, so this choice is a documented compatibility boundary. Authors supply matching data only; their input is never evaluated as JavaScript code. The worker bootstraps fixed trusted code. No STDIO judge, Python process, or turtle dependency is involved.
 
 Run regex compilation and matching in a terminable worker, never the API main event loop or browser main thread. Start with four workers, a queue capped at 16 jobs per API instance, and a 100 ms execution deadline after worker dispatch. Bound pattern/answer length before queuing. Terminate and replace a worker that exceeds the deadline; a saturated queue returns a retryable unavailable result. Apply existing authenticated rate limits to preview and submission. Resource limits are Cove operational defaults to validate under load, not measured Elice limits.
 
@@ -93,7 +93,7 @@ Reuse immutable ManualSubmission answer/class/user/material/content revision/max
 
 Automatic admission atomically stores the attempt, private snapshot, and durable evaluation job. A lightweight API worker processes jobs independently of the Python judge. Unique per-attempt terminal evaluation records prevent duplicate scoring; transient failure is recorded separately and retry uses the same immutable snapshot. A restart recovers pending jobs. Status queries return only safe learner outcome fields. MANUAL admission instead enters the existing awaiting-review path without an evaluation job.
 
-Store automatic results in `ShortAnswerEvaluation`, not as a fabricated teacher/user review. Records include attempt id, evaluator version, verdict, score/completion, and timestamp. Existing append-only ManualReview remains the teacher override/audit mechanism. A published teacher review takes precedence over the automatic result for the same attempt; review version conflicts follow the existing API contract. Re-evaluation must not erase a teacher override.
+Store automatic results and the durable lease/job lifecycle in the per-attempt `ShortAnswerAssessment` row, alongside the private definition snapshot, not as a fabricated teacher/user review. A GRADED result is terminal; retry only transitions ERROR back to PENDING. Records include attempt id, evaluator version, verdict, score/completion, and timestamp. Existing append-only ManualReview remains the teacher override/audit mechanism. A published teacher review takes precedence over the automatic result for the same attempt; review version conflicts follow the existing API contract. Re-evaluation must not erase a teacher override.
 
 The latest accepted attempt in the learner's class is active. A new pending attempt does not inherit an earlier correct result or review. Historical attempts remain visible to the learner and authorized teacher. This follows Cove's existing manual-material policy; Elice's final-attempt rule is unverified.
 
@@ -113,7 +113,7 @@ Rich text/images are sanitized and their access is checked using the same releas
 
 Use `SHORT_ANSWER_ENABLED` in the API and `NEXT_PUBLIC_SHORT_ANSWER_ENABLED` in the web app for new authoring/admission. Existing published content and histories remain readable when admission is disabled, with clear availability text. Legacy manual-response authoring must also be decoupled from GUI gating; GUI flags and runtime discovery apply only to TURTLE_EXERCISE. Do not require Docker/VNC or GUI secrets to save/submit a written answer.
 
-Migrations are additive: definition, private attempt snapshot, evaluation/job storage, constraints, and access policies. Existing materials without a definition stay manual, and old review/profile readers keep working. Copy, deletion restrictions, and retained assessment assets must preserve historical snapshots. Backend capabilities determine which modes the frontend offers during staged rollout; an older API must fail new payloads explicitly, not drop their grading fields.
+Migrations are additive: nullable definition JSON, private attempt snapshot with evaluation/job storage, constraints, and access policies. Existing materials without a definition stay manual, and old review/profile readers keep working. Copy, deletion restrictions, and retained assessment assets must preserve historical snapshots. Backend capabilities determine which modes the frontend offers during staged rollout; an older API must fail new payloads explicitly, not drop their grading fields.
 
 Enable and verify on localhost first. Production flags remain off until migration, API/web deployment, evaluator capacity checks, and reference-gap review are complete. Do not modify the secret local deployment guide as part of this feature.
 
@@ -133,4 +133,4 @@ Enable and verify on localhost first. Production flags remain off until migratio
 
 Run focused shared-schema/evaluator/API tests and localhost browser E2E with disposable Cove author/student/teacher accounts. At minimum E2E must exercise author creation/preview, student correct and incorrect automatic answers, manual submit/review, explanation gating, navigation guards, and the entire workflow with GUI disabled. Cover the main flow in Chromium and a second supported browser. Inspect actual API responses for privacy assertions rather than relying solely on hidden UI fields. Run relevant typechecks/builds and existing mixed-material/navigation regression checks.
 
-No tests were run for an implementation in this research task. Before declaring complete Elice parity, separately verify its real exact/regex submissions, normalization, feedback/retry flow, score/completion selection, explanation timing, and teacher grade publication using authorized disposable reference work. Differences must update this spec and the research notes rather than being hidden behind a passing Cove test suite.
+Implementation verification is recorded in the [operations notes](../../operations/short-answer-questions.md). Before declaring complete Elice parity, separately verify its real exact/regex submissions, normalization, feedback/retry flow, score/completion selection, explanation timing, and teacher grade publication using authorized disposable reference work. Differences must update this spec and the research notes rather than being hidden behind a passing Cove test suite.

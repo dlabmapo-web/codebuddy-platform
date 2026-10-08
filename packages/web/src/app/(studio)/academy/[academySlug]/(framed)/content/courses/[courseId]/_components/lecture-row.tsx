@@ -313,6 +313,8 @@ export function LectureRow({
   const [pdfAdding, setPdfAdding] = useState(false);
   const {t:mt}=useManualTranslation();
   const [manualAdding,setManualAdding]=useState(false);
+  const [shortAdding,setShortAdding]=useState(false);
+  const [writtenAdding,setWrittenAdding]=useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -459,6 +461,8 @@ export function LectureRow({
             </button>
           ) : null}
           {builder.editable && publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setManualAdding(true)}><Plus className="size-3.5"/>{mt('add_turtle_written_response')}</button> : null}
+          {builder.editable && publicConfig.shortAnswerEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setShortAdding(true)}><Plus className="size-3.5"/>{mt('add_short_answer')}</button> : null}
+          {builder.editable && !publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setWrittenAdding(true)}><Plus className="size-3.5"/>{mt('written_response')}</button> : null}
           {builder.exerciseEditable ? (
             <Link
               className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand hover:text-brand-deep"
@@ -470,6 +474,8 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
+        {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}
+        {writtenAdding ? <ManualAuthorDialog type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setWrittenAdding(false)} onSaved={builder.refresh}/> : null}
         {manualAdding ? <ManualAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setManualAdding(false)} onSaved={builder.refresh}/> : null}
         {pdfAdding ? (
           <PdfAuthorDialog

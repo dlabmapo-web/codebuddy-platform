@@ -1,5 +1,6 @@
 import { shouldForwardViewRole } from "./orpc-view-role";
 import type {
+  ShortAnswerDefinition,
   ManualWorkspace,
   ManualSession,
   ManualAttempt,
@@ -43,6 +44,27 @@ async function request<T>(
   return body as T;
 }
 export const manualApi = {
+  capabilities: () => request<{ shortAnswer: boolean }>("/capabilities"),
+  retryEvaluation: (data: {
+    academyId: string;
+    materialId: string;
+    classId: string;
+    submissionId: string;
+  }) => request("/retry-evaluation", "POST", data),
+  matchingPreview: (data: {
+    academyId: string;
+    definition: ShortAnswerDefinition;
+    answer: string;
+  }) => request<{ correct: boolean }>("/matching-preview", "POST", data),
+  explanation: (data: {
+    academyId: string;
+    materialId: string;
+    classId: string;
+    submissionId: string;
+  }) =>
+    request<{ explanation: string | null }>(
+      "/explanation?" + new URLSearchParams(data),
+    ),
   upload: async (
     target: { academyId: string; courseId: string },
     file: File,

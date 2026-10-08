@@ -21,7 +21,7 @@ export function ManualClassMaterials({
   if (!query.data?.length) return null;
   return (
     <section className="mb-5 rounded-card border border-border bg-card p-4">
-      <h2 className="font-bold">{mt("teacher_graded_activities")}</h2>
+      <h2 className="font-bold">{mt("assessment_activities")}</h2>
       <ul className="mt-3 flex flex-wrap gap-3">
         {query.data.map((m) => (
           <li key={m.materialId}>

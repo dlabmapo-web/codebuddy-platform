@@ -33,6 +33,7 @@ const postgresUrlSchema = z
   );
 
 export const apiEnvironmentSchema = z.object({
+  SHORT_ANSWER_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   GUI_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   GUI_SERVICE_URL:httpUrlSchema.optional(),
   GUI_SERVICE_SECRET:z.string().min(32).optional(),

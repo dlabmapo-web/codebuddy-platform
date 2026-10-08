@@ -43,7 +43,36 @@ export const manualAssetsSchema = z
         message: "Assets exceed 20 MiB or have duplicate paths",
       });
   });
+export const shortAnswerSchema = z.object({
+  version: z.literal(1).default(1),
+  question: z.string().trim().min(1).max(1000),
+  gradingMode: z.enum(["MANUAL", "EXACT", "REGEX"]),
+  expectedAnswer: z.string().max(10000).default(""),
+  pattern: z.string().max(2000).default(""),
+  explanationEnabled: z.boolean().default(false),
+  explanation: z.string().max(100000).default(""),
+});
+export type ShortAnswerDefinition = z.infer<typeof shortAnswerSchema>;
+export function effectiveManualResult<
+  T extends { completed: boolean; scoreHundredths: number },
+>(attempt?: {
+  reviews: T[];
+  shortAnswerAssessment?: {
+    status: string;
+    completed: boolean | null;
+    scoreHundredths: number | null;
+  } | null;
+}) {
+  if (attempt?.reviews[0]) return attempt.reviews[0];
+  const result = attempt?.shortAnswerAssessment;
+  return result?.status === "GRADED" &&
+    result.completed !== null &&
+    result.scoreHundredths !== null
+    ? { completed: result.completed, scoreHundredths: result.scoreHundredths }
+    : undefined;
+}
 export const manualConfigSchema = z.object({
+  shortAnswer: shortAnswerSchema.nullable().default(null),
   modelAnswer: z.string().max(10000).default(""),
   solutionAssets: manualAssetsSchema.default([]),
   assets: manualAssetsSchema.default([]),
@@ -78,6 +107,26 @@ export const saveManualSchema = manualConfigSchema
     title: z.string().trim().min(1).max(128),
   })
   .superRefine((x, ctx) => {
+    if (x.shortAnswer) {
+      if (x.type !== "WRITTEN_RESPONSE")
+        ctx.addIssue({
+          code: "custom",
+          message: "Short answers require written-response material",
+        });
+      if (
+        x.shortAnswer.gradingMode === "EXACT" &&
+        !x.shortAnswer.expectedAnswer.trim()
+      )
+        ctx.addIssue({ code: "custom", message: "Enter the correct answer" });
+      if (x.shortAnswer.gradingMode === "REGEX" && !x.shortAnswer.pattern)
+        ctx.addIssue({ code: "custom", message: "Enter a regular expression" });
+      if (
+        x.shortAnswer.explanationEnabled &&
+        !x.shortAnswer.explanation.replace(/<[^>]*>/g, "").trim() &&
+        !/<img\b/i.test(x.shortAnswer.explanation)
+      )
+        ctx.addIssue({ code: "custom", message: "Enter an explanation" });
+    }
     if (x.includeInScore && !x.submitEnabled)
       ctx.addIssue({
         code: "custom",
@@ -143,9 +192,17 @@ export type ManualAttempt = {
     version: number;
     createdAt: string;
   }>;
+  shortAnswerAssessment?: {
+    status: string;
+    verdict: string | null;
+    scoreHundredths: number | null;
+    completed: boolean | null;
+  } | null;
   learnerName?: string;
 };
 export type ManualWorkspace = {
+  definitionLocked?: boolean;
+  submissionUnavailable?: boolean;
   classes: Array<{ classId: string; name: string }>;
   materialId: string;
   title: string;

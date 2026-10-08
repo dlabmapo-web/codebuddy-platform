@@ -3,7 +3,7 @@ import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import type { ManualSession } from "@cove/shared";
+import { effectiveManualResult, type ManualSession } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
 import { routes } from "@/lib/routes";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
@@ -30,8 +30,11 @@ export function ManualWorkspace({
     queryFn: () =>
       manualApi.read({ ...target, preview, classId: deliveryClass }),
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.config.shortAnswer ? 3000 : false,
   });
   const data = query.data;
+  const short = data?.config.shortAnswer;
   const [files, setFiles] = useState<Record<string, string>>({});
   const [answer, setAnswer] = useState("");
   const [selected, setSelected] = useState("main.py");
@@ -49,6 +52,7 @@ export function ManualWorkspace({
   const saving = useRef<Promise<void> | null>(null);
   const draftRevision = useRef(0);
   const loaded = useRef(false);
+  const loadedContentRevision = useRef<number | undefined>(undefined);
   const active = useRef<string | null>(null);
   const connectionFailed = useRef(false);
   const latest = useRef({ files, answer });
@@ -57,11 +61,55 @@ export function ManualWorkspace({
   useEffect(() => {
     if (!data || loaded.current) return;
     loaded.current = true;
+    loadedContentRevision.current = data.config.revision;
     setFiles(data.draft?.files ?? data.config.files);
-    setAnswer(data.draft?.answer ?? "");
+    setAnswer(data.config.shortAnswer ? "" : (data.draft?.answer ?? ""));
     draftRevision.current = data.draft?.revision ?? 0;
     setSelected(data.config.entryPoint);
   }, [data]);
+  useEffect(() => {
+    if (!short || !dirty || preview) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const guard = (event: MouseEvent) => {
+      const link = (event.target as Element).closest?.("a[href]");
+      if (
+        !link ||
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.altKey ||
+        link.getAttribute("target") === "_blank"
+      )
+        return;
+      if (!window.confirm(mt("discard_answer"))) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    const url = window.location.href;
+    const state = window.history.state;
+    const backGuard = (event: PopStateEvent) => {
+      if (
+        window.location.href !== url &&
+        !window.confirm(mt("discard_answer"))
+      ) {
+        event.stopImmediatePropagation();
+        window.history.pushState(state, "", url);
+      }
+    };
+    window.addEventListener("popstate", backGuard, true);
+    window.addEventListener("beforeunload", warn);
+    document.addEventListener("click", guard, true);
+    return () => {
+      window.removeEventListener("popstate", backGuard, true);
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", guard, true);
+    };
+  }, [Boolean(short), dirty, preview, mt]);
   useEffect(
     () => () => {
       if (active.current) void manualApi.stop(active.current).catch(() => {});
@@ -115,7 +163,7 @@ export function ManualWorkspace({
     session &&
     ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT"].includes(session.state);
   async function save() {
-    if (preview) return;
+    if (preview || short) return;
     if (saving.current) return saving.current;
     const snapshot = latest.current;
     const operation = (async () => {
@@ -143,10 +191,10 @@ export function ManualWorkspace({
     return operation;
   }
   useEffect(() => {
-    if (preview || !dirty) return;
+    if (preview || short || !dirty) return;
     const timer = setTimeout(() => void save(), 1500);
     return () => clearTimeout(timer);
-  }, [files, answer, dirty, preview]);
+  }, [files, answer, dirty, preview, Boolean(short)]);
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
@@ -195,21 +243,27 @@ export function ManualWorkspace({
       const content = JSON.stringify({
         ...latest.current,
         classId: selectedClass,
-        revision: data!.config.revision,
+        revision: short ? loadedContentRevision.current : data!.config.revision,
       });
       if (pendingSubmit.current?.content !== content)
         pendingSubmit.current = { content, key: crypto.randomUUID() };
       await manualApi.submit({
         ...target,
         ...latest.current,
-        contentRevision: data!.config.revision,
+        contentRevision: short
+          ? loadedContentRevision.current!
+          : data!.config.revision,
         revision: draftRevision.current,
         classId: selectedClass,
         requestKey: pendingSubmit.current.key,
       });
       pendingSubmit.current = null;
+      if (short) {
+        setDirty(false);
+        setAnswer("");
+      }
       await query.refetch();
-      setSaved(mt("submitted_awaiting_teacher_review"));
+      setSaved(mt(short ? "submitted" : "submitted_awaiting_teacher_review"));
     } catch (e) {
       setError(e instanceof Error ? e.message : mt("submit_failed"));
     } finally {
@@ -226,6 +280,39 @@ export function ManualWorkspace({
         : routes.academyLearnManual(slug, m.materialId, {
             classId: selectedClass,
           });
+  const latestAttempt = data?.attempts.find((a) => a.classId === selectedClass);
+  const effective = effectiveManualResult(latestAttempt);
+  const explanation = useQuery({
+    queryKey: [
+      "short-answer-explanation",
+      latestAttempt?.id,
+      latestAttempt?.reviewVersion,
+      latestAttempt?.shortAnswerAssessment?.status,
+    ],
+    queryFn: () =>
+      manualApi.explanation({
+        ...target,
+        classId: selectedClass!,
+        submissionId: latestAttempt!.id,
+      }),
+    enabled: Boolean(
+      short && latestAttempt && selectedClass && effective?.completed,
+    ),
+    staleTime: 0,
+  });
+  const resultLabel = (attempt: NonNullable<typeof latestAttempt>) => {
+    const result = effectiveManualResult(attempt);
+    if (attempt.reviews[0])
+      return `${result!.scoreHundredths / 100} / ${attempt.maximumHundredths / 100} · ${result!.completed ? mt("completed") : mt("needs_revision")}`;
+    const assessment = attempt.shortAnswerAssessment;
+    return assessment?.status === "GRADED"
+      ? `${mt(assessment.completed ? "correct" : "incorrect")} · ${assessment.scoreHundredths! / 100} / ${attempt.maximumHundredths / 100}`
+      : assessment?.status === "ERROR"
+        ? mt("evaluation_unavailable")
+        : assessment && assessment.status !== "MANUAL"
+          ? mt("evaluating")
+          : mt("awaiting_teacher_review");
+  };
   if (!data)
     return (
       <main className="p-6" role={query.isError ? "alert" : "status"}>
@@ -250,15 +337,36 @@ export function ManualWorkspace({
         </Link>
         <h1 className="flex-1 font-bold">{data.title}</h1>
         <span className="text-xs">
-          {mt("teacher_graded")}{" "}
+          {mt(
+            short && short.gradingMode !== "MANUAL"
+              ? "automatic_graded"
+              : "teacher_graded",
+          )}{" "}
           {data.config.includeInScore
             ? mt("included_in_score")
             : mt("excluded_from_score")}
         </span>
+        <button
+          type="button"
+          onClick={() => {
+            if (document.fullscreenElement) void document.exitFullscreen?.();
+            else
+              void document.documentElement
+                .requestFullscreen?.()
+                .catch(() => {});
+          }}
+        >
+          {mt("fullscreen")}
+        </button>
         <button type="button" onClick={() => setDrawer((v) => !v)}>
           {mt("materials")}
         </button>
       </header>
+      {short && loadedContentRevision.current !== data.config.revision ? (
+        <p role="alert" className="p-3 text-danger">
+          {mt("content_changed")}
+        </p>
+      ) : null}
       {error ? (
         <p className="bg-danger/10 p-3 text-danger" role="alert">
           {error}
@@ -295,11 +403,27 @@ export function ManualWorkspace({
             <section className="mt-4 rounded border border-border p-3">
               <h2 className="font-bold">{mt("last_submission")}</h2>
               <p>{new Date(attempt.createdAt).toLocaleString()}</p>
-              <p>
-                {review
-                  ? `${review.scoreHundredths / 100} / ${attempt.maximumHundredths / 100} · ${review.completed ? mt("completed") : mt("needs_revision")}`
-                  : mt("awaiting_teacher_review")}
-              </p>
+              <p>{resultLabel(attempt)}</p>
+              {attempt.shortAnswerAssessment?.status === "ERROR" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true);
+                    void manualApi
+                      .retryEvaluation({
+                        ...target,
+                        classId: attempt.classId,
+                        submissionId: attempt.id,
+                      })
+                      .then(() => query.refetch())
+                      .catch((e) => setError(e.message))
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  {mt("retry_evaluation")}
+                </button>
+              ) : null}
               {review ? (
                 <p className="whitespace-pre-wrap">{review.feedback}</p>
               ) : null}
@@ -314,9 +438,7 @@ export function ManualWorkspace({
                   >
                     <p>
                       {new Date(old.createdAt).toLocaleString()} ·{" "}
-                      {old.reviews[0]
-                        ? `${old.reviews[0].scoreHundredths / 100} / ${old.maximumHundredths / 100}`
-                        : mt("awaiting_review")}
+                      {resultLabel(old)}
                     </p>
                     <details>
                       <summary>{mt("read_only")}</summary>
@@ -337,6 +459,15 @@ export function ManualWorkspace({
                   </article>
                 ))}
               </details>
+            </section>
+          ) : null}
+          {explanation.data?.explanation && effective?.completed ? (
+            <section data-testid="short-answer-explanation" className="mt-4">
+              <h2 className="font-bold">{mt("explanation")}</h2>
+              <RichTextFrame
+                content={explanation.data.explanation}
+                title={mt("explanation")}
+              />
             </section>
           ) : null}
           {drawer ? (
@@ -396,10 +527,14 @@ export function ManualWorkspace({
             </>
           ) : (
             <label className="flex flex-1 flex-col p-5">
-              {data.config.hint || mt("your_answer")}
+              {short
+                ? `Q. ${short.question}`
+                : data.config.hint || mt("your_answer")}
               <textarea
                 className="mt-3 min-h-[260px] rounded border border-border bg-card p-3"
                 aria-label={mt("your_answer")}
+                placeholder={short ? data.config.hint : undefined}
+                disabled={busy}
                 maxLength={10000}
                 value={answer}
                 onChange={(e) => {
@@ -432,18 +567,24 @@ export function ManualWorkspace({
             ) : null}
             {!preview ? (
               <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void save()}
-                >
-                  {mt("save_code")}
-                </button>
+                {!short ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void save()}
+                  >
+                    {mt("save_code")}
+                  </button>
+                ) : null}
                 {data.config.submitEnabled ? (
                   <button
                     className="rounded border border-border px-4 py-2"
                     type="button"
-                    disabled={busy}
+                    disabled={
+                      busy ||
+                      data.submissionUnavailable ||
+                      Boolean(short && answer.length === 0)
+                    }
                     onClick={() => void submit()}
                   >
                     {mt("submit")}
@@ -465,6 +606,11 @@ export function ManualWorkspace({
                   </option>
                 ))}
               </select>
+            ) : null}
+            {data.submissionUnavailable ? (
+              <p role="status" className="text-xs">
+                {mt("short_answer_unavailable")}
+              </p>
             ) : null}
             <span role="status" className="text-xs">
               {saved} {session?.state}{" "}

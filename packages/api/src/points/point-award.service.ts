@@ -1,3 +1,4 @@
+import { effectiveManualResult } from "@cove/shared";
 import { Injectable } from "@nestjs/common";
 import {
   DEFAULT_POINT_POLICY,
@@ -323,6 +324,7 @@ export class PointAwardService {
         materialId: true,
         includeInScore: true,
         maximumHundredths: true,
+        shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
         reviews: {
           orderBy: { version: "desc" },
           take: 1,
@@ -330,7 +332,7 @@ export class PointAwardService {
         },
       },
     });
-    if (!latest?.includeInScore || !latest.reviews[0]?.completed) return;
+    if (!latest?.includeInScore || !effectiveManualResult(latest)?.completed) return;
     const membership = await tx.academyMembership.findFirst({
       where: {
         academyId: course.academyId,
@@ -524,7 +526,8 @@ export class PointAwardService {
             materialId: true,
             includeInScore: true,
             maximumHundredths: true,
-            reviews: {
+            shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        reviews: {
               orderBy: { version: "desc" },
               take: 1,
               select: { completed: true, scoreHundredths: true },
@@ -534,7 +537,7 @@ export class PointAwardService {
       : [];
     return (
       solved +
-        attempts.filter((a) => a.includeInScore && a.reviews[0]?.completed)
+        attempts.filter((a) => a.includeInScore && effectiveManualResult(a)?.completed)
           .length >=
       visible.length
     );

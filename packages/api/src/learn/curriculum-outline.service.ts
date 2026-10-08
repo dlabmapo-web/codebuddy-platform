@@ -1,3 +1,4 @@
+import { effectiveManualResult } from "@cove/shared";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import { Injectable } from "@nestjs/common";
 import {
@@ -101,7 +102,8 @@ export class CurriculumOutlineService {
             materialId: true,
             includeInScore: true,
             maximumHundredths: true,
-            reviews: {
+            shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        reviews: {
               orderBy: { version: "desc" },
               take: 1,
               select: { completed: true, scoreHundredths: true },
@@ -141,7 +143,7 @@ export class CurriculumOutlineService {
           manualMaterials: lecture.materials.flatMap((material) => {
             if (!material.manualMaterial) return [];
             const attempt = manualStatuses.get(material.id),
-              review = attempt?.reviews[0];
+              review = effectiveManualResult(attempt);
             return [
               {
                 materialId: material.id,
@@ -263,6 +265,7 @@ export class CurriculumOutlineService {
         materialId: true,
         includeInScore: true,
         maximumHundredths: true,
+        shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
         reviews: {
           orderBy: { version: "desc" },
           take: 1,
@@ -273,12 +276,12 @@ export class CurriculumOutlineService {
     for (const attempt of attempts)
       statuses.set(attempt.materialId, {
         status:
-          attempt.includeInScore && attempt.reviews[0]?.completed
+          attempt.includeInScore && effectiveManualResult(attempt)?.completed
             ? "SOLVED"
             : "IN_PROGRESS",
         bestScore: 0,
         scoreHundredths: attempt.includeInScore
-          ? attempt.reviews[0]?.scoreHundredths
+          ? effectiveManualResult(attempt)?.scoreHundredths
           : undefined,
         maximumHundredths: attempt.maximumHundredths,
       });

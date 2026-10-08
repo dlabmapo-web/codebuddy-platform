@@ -1,4 +1,6 @@
 "use client";
+import { ShortAnswerFields } from "./short-answer-fields";
+import { publicConfig } from "@/lib/config";
 import { useManualTranslation } from "./use-manual-translation";
 import { RichEditor } from "@/components/editor/RichEditor";
 import { useEffect, useState } from "react";
@@ -17,21 +19,35 @@ export function ManualAuthorDialog({
   target,
   material,
   type = "TURTLE_EXERCISE",
+  shortAnswer = false,
   onClose,
   onSaved,
 }: {
   target: { academyId: string; courseId: string; lectureId: string };
   material?: { id: string; title: string; type: string };
   type?: SaveManual["type"];
+  shortAnswer?: boolean;
   onClose: () => void;
   onSaved: () => Promise<unknown>;
 }) {
   const { t: mt } = useManualTranslation();
   const slug = useAcademySlug();
   const [title, setTitle] = useState(material?.title ?? "");
-  const [config, setConfig] = useState<ManualConfig>(() =>
-    manualConfigSchema.parse({}),
-  );
+  const [config, setConfig] = useState<ManualConfig>(() => ({
+    ...manualConfigSchema.parse({}),
+    shortAnswer: shortAnswer
+      ? {
+          version: 1,
+          question: "",
+          gradingMode: "MANUAL",
+          expectedAnswer: "",
+          pattern: "",
+          explanationEnabled: false,
+          explanation: "",
+        }
+      : null,
+  }));
+  const [locked, setLocked] = useState(false);
   const [revision, setRevision] = useState<number>();
   const [busy, setBusy] = useState(Boolean(material));
   const [error, setError] = useState("");
@@ -51,6 +67,7 @@ export function ManualAuthorDialog({
         .then((data) => {
           if (active) {
             setConfig(data.config);
+            setLocked(Boolean(data.definitionLocked));
             setRevision(data.config.revision);
             setSourceName(data.config.entryPoint);
             setBusy(false);
@@ -73,6 +90,8 @@ export function ManualAuthorDialog({
     setBusy(true);
     setError("");
     try {
+      if (config.shortAnswer && !(await manualApi.capabilities()).shortAnswer)
+        throw new Error(mt("evaluation_unavailable"));
       await manualApi.save(
         saveManualSchema.parse({
           ...target,
@@ -118,7 +137,9 @@ export function ManualAuthorDialog({
               disabled={Boolean(material) || busy}
               onChange={(e) => setKind(e.target.value as SaveManual["type"])}
             >
-              <option value="TURTLE_EXERCISE">{mt("turtle_exercise")}</option>
+              {publicConfig.guiEnabled ? (
+                <option value="TURTLE_EXERCISE">{mt("turtle_exercise")}</option>
+              ) : null}
               <option value="WRITTEN_RESPONSE">{mt("written_response")}</option>
             </select>
           </label>
@@ -156,11 +177,21 @@ export function ManualAuthorDialog({
               Exclude from score
             </label>
           </div>
-          <p className="text-xs text-sub">
-            {mt(
-              "teacher_graded_drawings_are_not_automatically_marked_correct_or_wrong",
-            )}
-          </p>
+          {kind === "TURTLE_EXERCISE" ? (
+            <p className="text-xs text-sub">
+              {mt(
+                "teacher_graded_drawings_are_not_automatically_marked_correct_or_wrong",
+              )}
+            </p>
+          ) : null}
+          {config.shortAnswer ? (
+            <ShortAnswerFields
+              academyId={target.academyId}
+              value={config.shortAnswer}
+              onChange={(value) => field("shortAnswer", value)}
+              locked={locked}
+            />
+          ) : null}
           <label>
             {mt("maximum_score")}
             <input

@@ -1,3 +1,4 @@
+import { ShortAnswerService } from "./short-answer.service.js";
 import { PointsModule } from "../points/points.module.js";
 import { ManualAssetsService } from "./manual-assets.service.js";
 import { Module } from "@nestjs/common";
@@ -10,7 +11,12 @@ import { GuiClientService } from "./gui-client.service.js";
 @Module({
   imports: [PointsModule, AcademiesModule, AuthModule, AuthorizationModule],
   controllers: [ManualController],
-  providers: [ManualService, GuiClientService, ManualAssetsService],
+  providers: [
+    ShortAnswerService,
+    ManualService,
+    GuiClientService,
+    ManualAssetsService,
+  ],
   exports: [ManualService],
 })
 export class ManualModule {}

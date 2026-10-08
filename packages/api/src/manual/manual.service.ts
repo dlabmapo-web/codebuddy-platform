@@ -1,3 +1,4 @@
+import { ShortAnswerService } from "./short-answer.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Request } from "express";
 import { ManualAssetsService } from "./manual-assets.service.js";
@@ -16,7 +17,12 @@ import type {
   ManualWorkspace,
   ManualSession,
 } from "@cove/shared";
-import { sourceFilesSchema, manualConfigSchema } from "@cove/shared";
+import {
+  shortAnswerSchema,
+  effectiveManualResult,
+  sourceFilesSchema,
+  manualConfigSchema,
+} from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -59,6 +65,7 @@ export class ManualService {
     private readonly gui: GuiClientService,
     private readonly assets: ManualAssetsService,
     private readonly points: PointAwardService,
+    private readonly shortAnswers: ShortAnswerService,
   ) {}
   private async material(
     identity: SupabaseIdentity,
@@ -130,16 +137,42 @@ export class ManualService {
     return this.assets.upload(input.academyId, input.courseId, name, request);
   }
   async save(identity: SupabaseIdentity, input: SaveManual) {
-    this.gui.assertEnabled();
-    const runtimeVersion =
-      input.type === "TURTLE_EXERCISE"
-        ? await this.gui.runtimeVersion()
-        : "manual-response-v1";
     const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
       "curriculum.manage",
     );
+    if (input.type === "TURTLE_EXERCISE") this.gui.assertEnabled();
+    if (input.shortAnswer) {
+      input = {
+        ...input,
+        shortAnswer: {
+          ...input.shortAnswer,
+          expectedAnswer:
+            input.shortAnswer.gradingMode === "EXACT"
+              ? input.shortAnswer.expectedAnswer
+              : "",
+          pattern:
+            input.shortAnswer.gradingMode === "REGEX"
+              ? input.shortAnswer.pattern
+              : "",
+        },
+      };
+      this.shortAnswers.assertEnabled();
+      if (input.shortAnswer!.gradingMode === "REGEX") {
+        try {
+          await this.shortAnswers.evaluator.evaluate(input.shortAnswer!, "");
+        } catch (error) {
+          throw new BadRequestException(
+            error instanceof Error ? error.message : "Invalid pattern",
+          );
+        }
+      }
+    }
+    const runtimeVersion =
+      input.type === "TURTLE_EXERCISE"
+        ? await this.gui.runtimeVersion()
+        : "manual-response-v1";
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
       if (
@@ -185,6 +218,9 @@ export class ManualService {
       }
       const data = {
         ...config,
+        shortAnswer: config.shortAnswer
+          ? (config.shortAnswer as Prisma.InputJsonValue)
+          : Prisma.DbNull,
         runtimeVersion,
         assets: config.assets as Prisma.InputJsonValue,
         solutionAssets: config.solutionAssets as Prisma.InputJsonValue,
@@ -204,6 +240,29 @@ export class ManualService {
           current.manualMaterial.revision !== revision
         )
           throw new ConflictException("Content changed; reload before saving");
+        const before = current.manualMaterial.shortAnswer;
+        const next = input.shortAnswer;
+        const oldDefinition = before ? shortAnswerSchema.parse(before) : null;
+        const changedRule =
+          JSON.stringify(
+            oldDefinition && [
+              oldDefinition.gradingMode,
+              oldDefinition.expectedAnswer,
+              oldDefinition.pattern,
+            ],
+          ) !==
+          JSON.stringify(
+            next && [next.gradingMode, next.expectedAnswer, next.pattern],
+          );
+        const conversion = Boolean(before) !== Boolean(next);
+        if (
+          (changedRule || conversion) &&
+          (current.isVisible ||
+            (await tx.manualSubmission.count({ where: { materialId: id } })))
+        )
+          throw new ConflictException(
+            "Published or submitted answer definitions are locked; create a new question",
+          );
         await tx.manualMaterial.update({
           where: { materialId: id },
           data: { ...data, revision: { increment: 1 } },
@@ -301,7 +360,10 @@ export class ManualService {
         },
         orderBy: { createdAt: "desc" },
         take: 30,
-        include: { reviews: { orderBy: { version: "desc" } } },
+        include: {
+          shortAnswerAssessment: true,
+          reviews: { orderBy: { version: "desc" } },
+        },
       }),
       actor.role === "STUDENT"
         ? this.db.class.findMany({
@@ -333,6 +395,19 @@ export class ManualService {
             });
     const parsed = manualConfigSchema.parse({
       ...config,
+      shortAnswer: config.shortAnswer
+        ? (() => {
+            const definition = shortAnswerSchema.parse(config.shortAnswer);
+            return preview
+              ? definition
+              : {
+                  ...definition,
+                  expectedAnswer: "",
+                  pattern: "",
+                  explanation: "",
+                };
+          })()
+        : null,
       files: sourceFilesSchema.parse(config.files),
       solutionFiles: preview ? config.solutionFiles : null,
       solutionAssets: preview ? config.solutionAssets : [],
@@ -345,6 +420,17 @@ export class ManualService {
     )
       throw new NotFoundException();
     return {
+      definitionLocked: preview
+        ? row.isVisible ||
+          Boolean(
+            await this.db.manualSubmission.count({
+              where: { materialId: row.id },
+            }),
+          )
+        : undefined,
+      submissionUnavailable: Boolean(
+        parsed.shortAnswer && !this.shortAnswers.enabled(),
+      ),
       classes: classes.map((c) => ({ classId: c.id, name: c.name })),
       materialId: row.id,
       title: row.title,
@@ -359,13 +445,14 @@ export class ManualService {
         title: row.lecture.courseModule.course.title,
       },
       materials,
-      draft: draft
-        ? {
-            files: sourceFilesSchema.parse(draft.files),
-            answer: draft.answer,
-            revision: draft.revision,
-          }
-        : null,
+      draft:
+        draft && !config.shortAnswer
+          ? {
+              files: sourceFilesSchema.parse(draft.files),
+              answer: draft.answer,
+              revision: draft.revision,
+            }
+          : null,
       attempts: attempts.map((attempt) => this.publicAttempt(attempt)),
     };
   }
@@ -379,6 +466,12 @@ export class ManualService {
     maximumHundredths: number;
     includeInScore: boolean;
     reviewVersion: number;
+    shortAnswerAssessment?: {
+      status: string;
+      verdict: string | null;
+      scoreHundredths: number | null;
+      completed: boolean | null;
+    } | null;
     reviews: Array<{
       id: string;
       scoreHundredths: number;
@@ -398,6 +491,14 @@ export class ManualService {
       maximumHundredths: row.maximumHundredths,
       includeInScore: row.includeInScore,
       reviewVersion: row.reviewVersion,
+      shortAnswerAssessment: row.shortAnswerAssessment
+        ? {
+            status: row.shortAnswerAssessment.status,
+            verdict: row.shortAnswerAssessment.verdict,
+            scoreHundredths: row.shortAnswerAssessment.scoreHundredths,
+            completed: row.shortAnswerAssessment.completed,
+          }
+        : null,
       reviews: row.reviews.map((review) => ({
         id: review.id,
         scoreHundredths: review.scoreHundredths,
@@ -409,7 +510,11 @@ export class ManualService {
     };
   }
   async draft(identity: SupabaseIdentity, input: ManualWork) {
-    const { actor } = await this.material(identity, input);
+    const { actor, config } = await this.material(identity, input);
+    if (config.shortAnswer)
+      throw new BadRequestException(
+        "Short answers use explicit Submit; drafts are unavailable",
+      );
     return this.db
       .$transaction(
         async (tx) => {
@@ -477,7 +582,10 @@ export class ManualService {
       }))
     )
       throw new NotFoundException();
-    if (row.type === "WRITTEN_RESPONSE" && !input.answer.trim())
+    if (
+      row.type === "WRITTEN_RESPONSE" &&
+      !(config.shortAnswer ? input.answer.length : input.answer.trim())
+    )
       throw new BadRequestException("Enter an answer");
     if (
       row.type === "TURTLE_EXERCISE" &&
@@ -495,31 +603,77 @@ export class ManualService {
     if (existing) {
       if (existing.materialId !== row.id || existing.classId !== input.classId)
         throw new ConflictException();
+      if (config.shortAnswer) {
+        this.shortAnswers.assertEnabled();
+        await this.db.shortAnswerAssessment.updateMany({
+          where: { submissionId: existing.id, status: "ERROR" },
+          data: { status: "PENDING" },
+        });
+      }
       return { submissionId: existing.id };
     }
     if (input.contentRevision !== config.revision)
       throw new ConflictException("Content changed; reload before submitting");
-    const submission = await this.db.manualSubmission
-      .create({
-        data: {
-          materialId: row.id,
-          userId: actor.userId,
-          classId: input.classId,
-          files: input.files,
-          answer: input.answer,
-          profile: JSON.parse(
-            JSON.stringify({
-              ...config,
-              solutionFiles: null,
-              solutionAssets: [],
-              modelAnswer: "",
-            }),
-          ),
-          revision: config.revision,
-          maximumHundredths: config.maximumHundredths,
-          includeInScore: config.includeInScore,
-          requestKey: input.requestKey,
-        },
+    if (config.shortAnswer) this.shortAnswers.assertEnabled();
+    const submission = await this.db
+      .$transaction(async (tx) => {
+        const courseId = row.lecture.courseModule.course.id;
+        await tx.$queryRaw`SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+        const fresh = await tx.manualMaterial.findUnique({
+          where: { materialId: row.id },
+        });
+        const visible = await tx.material.findFirst({
+          where: {
+            id: row.id,
+            isVisible: true,
+            lecture: {
+              isVisible: true,
+              courseModule: {
+                isVisible: true,
+                course: { academyId: input.academyId, isVisible: true },
+              },
+            },
+          },
+          select: { isVisible: true },
+        });
+        if (!visible?.isVisible || fresh?.revision !== input.contentRevision)
+          throw new ConflictException(
+            "Content changed; reload before submitting",
+          );
+        return tx.manualSubmission.create({
+          data: {
+            materialId: row.id,
+            userId: actor.userId,
+            classId: input.classId,
+            files: row.type === "WRITTEN_RESPONSE" ? {} : input.files,
+            answer: input.answer,
+            shortAnswerAssessment: config.shortAnswer
+              ? {
+                  create: {
+                    definition: config.shortAnswer as Prisma.InputJsonValue,
+                    status:
+                      shortAnswerSchema.parse(config.shortAnswer)
+                        .gradingMode === "MANUAL"
+                        ? "MANUAL"
+                        : "PENDING",
+                  },
+                }
+              : undefined,
+            profile: JSON.parse(
+              JSON.stringify({
+                ...config,
+                shortAnswer: null,
+                solutionFiles: null,
+                solutionAssets: [],
+                modelAnswer: "",
+              }),
+            ),
+            revision: config.revision,
+            maximumHundredths: config.maximumHundredths,
+            includeInScore: config.includeInScore,
+            requestKey: input.requestKey,
+          },
+        });
       })
       .catch(async (error) => {
         if (
@@ -541,6 +695,85 @@ export class ManualService {
         throw error;
       });
     return { submissionId: submission.id };
+  }
+  capabilities() {
+    return { shortAnswer: this.shortAnswers.enabled() };
+  }
+  async matchingPreview(
+    identity: SupabaseIdentity,
+    input: { academyId: string; definition: unknown; answer: string },
+  ) {
+    await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.manage",
+    );
+    this.shortAnswers.assertEnabled();
+    try {
+      return {
+        correct: await this.shortAnswers.evaluator.evaluate(
+          shortAnswerSchema.parse(input.definition),
+          input.answer,
+        ),
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "Matching unavailable",
+      );
+    }
+  }
+  async explanation(
+    identity: SupabaseIdentity,
+    input: Target & { classId: string; submissionId: string },
+  ) {
+    const { actor, row } = await this.material(identity, input);
+    if (
+      !(await this.db.class.findFirst({
+        where: {
+          id: input.classId,
+          ...enrolledClassWhere(input.academyId, actor.userId),
+          courseAssignments: {
+            some: { courseId: row.lecture.courseModule.course.id },
+          },
+        },
+      }))
+    )
+      throw new NotFoundException();
+    const attempt = await this.db.manualSubmission.findFirst({
+      where: {
+        id: input.submissionId,
+        materialId: input.materialId,
+        classId: input.classId,
+        userId: actor.userId,
+      },
+      include: {
+        shortAnswerAssessment: true,
+        reviews: { orderBy: { version: "desc" } },
+      },
+    });
+    if (!attempt) throw new NotFoundException();
+    const definition = attempt.shortAnswerAssessment
+      ? shortAnswerSchema.parse(attempt.shortAnswerAssessment.definition)
+      : null;
+    return {
+      explanation:
+        definition?.explanationEnabled &&
+        effectiveManualResult(attempt)?.completed
+          ? definition.explanation
+          : null,
+    };
+  }
+  async retryEvaluation(
+    identity: SupabaseIdentity,
+    input: Target & { classId: string; submissionId: string },
+  ) {
+    await this.explanation(identity, input); // checks own attempt and current delivery access
+    this.shortAnswers.assertEnabled();
+    await this.db.shortAnswerAssessment.updateMany({
+      where: { submissionId: input.submissionId, status: "ERROR" },
+      data: { status: "PENDING" },
+    });
+    return { submissionId: input.submissionId };
   }
   private async reviewer(
     identity: SupabaseIdentity,
@@ -623,6 +856,10 @@ export class ManualService {
     input: Target & { classId: string; userId?: string },
   ) {
     await this.reviewer(identity, input, input.classId);
+    const definition = await this.db.manualMaterial.findUnique({
+      where: { materialId: input.materialId },
+      select: { shortAnswer: true },
+    });
     const seats = await this.db.classEnrollment.findMany({
       where: {
         classId: input.classId,
@@ -668,6 +905,7 @@ export class ManualService {
         reviewVersion: true,
         files: Boolean(input.userId),
         answer: Boolean(input.userId),
+        shortAnswerAssessment: true,
         reviews: {
           orderBy: { version: "desc" },
           ...(input.userId ? {} : { take: 1 }),
@@ -695,13 +933,14 @@ export class ManualService {
       return {
         userId: s.membership.userId,
         learnerName: s.membership.user.displayName,
-        draft: draft
-          ? {
-              files: sourceFilesSchema.parse(draft.files ?? {}),
-              answer: draft.answer ?? "",
-              revision: draft.revision,
-            }
-          : null,
+        draft:
+          draft && !definition?.shortAnswer
+            ? {
+                files: sourceFilesSchema.parse(draft.files ?? {}),
+                answer: draft.answer ?? "",
+                revision: draft.revision,
+              }
+            : null,
         attempts: attemptsByUser.get(s.membership.userId) ?? [],
       };
     });
@@ -711,6 +950,12 @@ export class ManualService {
     input: Target & { classId: string; userId: string },
   ) {
     const actor = await this.reviewer(identity, input, input.classId);
+    const definition = await this.db.manualMaterial.findUnique({
+      where: { materialId: input.materialId },
+      select: { shortAnswer: true },
+    });
+    if (definition?.shortAnswer)
+      throw new BadRequestException("Short answers have no editable draft");
     if (
       !(await this.db.classEnrollment.findFirst({
         where: {
@@ -787,6 +1032,12 @@ export class ManualService {
     },
   ) {
     const actor = await this.reviewer(identity, input, input.classId);
+    const definition = await this.db.manualMaterial.findUnique({
+      where: { materialId: input.materialId },
+      select: { shortAnswer: true },
+    });
+    if (definition?.shortAnswer)
+      throw new BadRequestException("Short answers have no editable draft");
     if (
       !(await this.db.classEnrollment.findFirst({
         where: {
@@ -839,6 +1090,7 @@ export class ManualService {
       orderBy: { createdAt: "desc" },
       take: 200,
       include: {
+        shortAnswerAssessment: true,
         user: { select: { displayName: true } },
         reviews: { orderBy: { version: "desc" } },
       },

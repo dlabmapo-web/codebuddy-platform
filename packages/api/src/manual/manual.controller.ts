@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import {
+  shortAnswerSchema,
   saveManualSchema,
   manualTargetSchema,
   manualWorkSchema,
@@ -92,6 +93,60 @@ export class ManualController {
       await this.identify(auth),
       input,
       input.preview === "true",
+    );
+  }
+  @Get("capabilities") async capabilities(
+    @Headers("authorization") auth?: string,
+  ) {
+    await this.identify(auth);
+    return this.service.capabilities();
+  }
+  @Post("matching-preview") async matchingPreview(
+    @Body() body: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    return this.service.matchingPreview(
+      await this.identify(auth),
+      parse(
+        z.object({
+          academyId: z.uuid(),
+          definition: shortAnswerSchema,
+          answer: z.string().max(10000),
+        }),
+        body,
+      ),
+    );
+  }
+  @Get("explanation")
+  @Header("Cache-Control", "private, no-store")
+  async explanation(
+    @Query() query: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    return this.service.explanation(
+      await this.identify(auth),
+      parse(
+        manualTargetSchema.extend({
+          classId: z.uuid(),
+          submissionId: z.uuid(),
+        }),
+        query,
+      ),
+    );
+  }
+  @Post("retry-evaluation") async retryEvaluation(
+    @Body() body: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    return this.service.retryEvaluation(
+      await this.identify(auth),
+      parse(
+        manualTargetSchema.extend({
+          classId: z.uuid(),
+          submissionId: z.uuid(),
+        }),
+        body,
+      ),
     );
   }
   @Post("visibility") async visibility(

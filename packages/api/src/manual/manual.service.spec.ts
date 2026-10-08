@@ -33,6 +33,7 @@ function fixture() {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue({ id: "class" }),
     },
+    manualMaterial: { findUnique: vi.fn().mockResolvedValue(null) },
     manualDraft: { findUnique: vi.fn().mockResolvedValue(null) },
     manualSubmission: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -54,8 +55,13 @@ function fixture() {
     gui as unknown as GuiClientService,
     assets as unknown as ManualAssetsService,
     points as unknown as PointAwardService,
+    {
+      enabled: () => true,
+      assertEnabled: () => {},
+      evaluator: { evaluate: vi.fn() },
+    } as never,
   );
-  return { service, db, access, audit, gui, points };
+  return { service, db, access, audit, gui, points, row, config };
 }
 describe("manual assessment boundaries", () => {
   it("projects only public attempt fields and omits private solutions for learners", async () => {
@@ -126,5 +132,78 @@ describe("manual assessment boundaries", () => {
     ).rejects.toThrow("Review changed");
     expect(audit.write).not.toHaveBeenCalled();
     expect(points.awardManualCompletion).not.toHaveBeenCalled();
+  });
+});
+
+describe("short-answer privacy and draft policy", () => {
+  it("redacts private definitions from the learner workspace", async () => {
+    const { service, db, row } = fixture();
+    db.material.findFirst.mockResolvedValue({
+      ...row,
+      type: "WRITTEN_RESPONSE",
+      manualMaterial: {
+        ...row.manualMaterial,
+        shortAnswer: {
+          version: 1,
+          question: "Public question",
+          gradingMode: "REGEX",
+          expectedAnswer: "PRIVATE_LITERAL",
+          pattern: "PRIVATE_PATTERN",
+          explanationEnabled: true,
+          explanation: "PRIVATE_EXPLANATION",
+        },
+      },
+    } as never);
+    const workspace = await service.workspace(identity, target);
+    expect(workspace.config.shortAnswer?.question).toBe("Public question");
+    expect(JSON.stringify(workspace)).not.toMatch(
+      /PRIVATE_LITERAL|PRIVATE_PATTERN|PRIVATE_EXPLANATION|PRIVATE_MODEL_ANSWER/,
+    );
+  });
+  it("rejects autosave requests for new short-answer definitions", async () => {
+    const { service, db, row } = fixture();
+    db.material.findFirst.mockResolvedValue({
+      ...row,
+      type: "WRITTEN_RESPONSE",
+      manualMaterial: {
+        ...row.manualMaterial,
+        shortAnswer: {
+          version: 1,
+          question: "Public question",
+          gradingMode: "MANUAL",
+        },
+      },
+    } as never);
+    await expect(
+      service.draft(identity, {
+        ...target,
+        files: {},
+        answer: "Unsent",
+        revision: 0,
+      }),
+    ).rejects.toThrow("explicit Submit");
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+  it("keeps configuration readable while flagging disabled short-answer admission", async () => {
+    const { service, db, row } = fixture();
+    db.material.findFirst.mockResolvedValue({
+      ...row,
+      type: "WRITTEN_RESPONSE",
+      manualMaterial: {
+        ...row.manualMaterial,
+        shortAnswer: {
+          version: 1,
+          question: "Public question",
+          gradingMode: "MANUAL",
+        },
+      },
+    } as never);
+    const shortAnswers = (
+      service as unknown as { shortAnswers: { enabled: () => boolean } }
+    ).shortAnswers;
+    vi.spyOn(shortAnswers, "enabled").mockReturnValue(false);
+    const workspace = await service.workspace(identity, target);
+    expect(workspace.submissionUnavailable).toBe(true);
+    expect(workspace.config.submitEnabled).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 # PDF learning materials: upload, read, and download
 
 Date: 2026-10-08
-Status: draft for user review; implementation is not authorized by this document
+Status: implementation requested by the user on 2026-10-08; implemented and verified locally
 Branch: `feat/lecture-pdf-materials`, based on `feat/cove-studio-v2`
 Reference research: [Elice inspection](../../research/2026-10-08-lecture-pdf-materials.md)
 
@@ -19,7 +19,7 @@ The supplied demonstration image shows 150% zoom, PDF page `1 / 18`, and learnin
 
 The Elice upload form offers a title, a file drop zone, a displayed 95 MB limit, and main/supplementary/both placement. Actual upload validation and downloading as a student were not tested. These limits and controls are reference observations, not evidence of Elice's backend implementation.
 
-The following Cove choices are proposed defaults for this draft: PDF-only files, 95 MB maximum, private Supabase Storage, uploads by existing curriculum authors, download enabled for every accessible PDF, and no PDF grading or completion points. They require review along with the rest of this spec.
+The implementation uses these defaults: PDF-only files, 95 MB maximum, private Supabase Storage, uploads by existing curriculum authors, download enabled for every accessible PDF, and no PDF grading or completion points. The development project's Storage ceiling is 50 MB; production configuration is documented separately.
 
 ## 3. Scope
 
@@ -190,4 +190,4 @@ Use the development Supabase project for validation. Run the deployment guide's 
 - Access controls, asset lifecycle, translations, accessibility, and relevant integration behavior pass the verification above.
 - Existing exercise authoring, imports, submissions, grading, monitoring, progress, and points retain their documented behavior.
 
-Before implementation, the user reviews this concrete draft, especially the proposed defaults in §2. No implementation plan or application changes are included in this request.
+The user requested implementation after reviewing this design and the research notes. Local verification results are recorded in the [implementation plan](../plans/2026-10-08-lecture-pdf-materials-implementation.md). Production bucket preparation, binary backups, and deployment requirements are documented in [PDF operations](../../operations/pdf-materials.md).

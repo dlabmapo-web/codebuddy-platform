@@ -1,0 +1,2 @@
+# Preserve PDF fixture bytes and use binary diffs.
+e2e/fixtures/*.pdf binary

@@ -1,5 +1,6 @@
 import { shouldForwardViewRole } from "./orpc-view-role";
 import type {
+  MultipleChoiceDefinition,
   ShortAnswerDefinition,
   ManualWorkspace,
   ManualSession,
@@ -44,7 +45,9 @@ async function request<T>(
   return body as T;
 }
 export const manualApi = {
-  capabilities: () => request<{ shortAnswer: boolean }>("/capabilities"),
+  capabilities: () => request<{ shortAnswer: boolean; multipleChoice: boolean }>("/capabilities"),
+  choicePreview: (data: {academyId:string;definition:MultipleChoiceDefinition;selectedOptionIds:string[];displayOrder:string[]}) => request<{correct:boolean}>("/choice-preview","POST",data),
+  choiceImage: (data:{academyId:string;materialId:string;assetId:string;classId?:string;submissionId?:string;preview?:boolean}) => request<{url:string}>("/choice-image?"+new URLSearchParams(Object.entries(data).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)]))),
   retryEvaluation: (data: {
     academyId: string;
     materialId: string;

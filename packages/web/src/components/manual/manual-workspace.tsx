@@ -1,4 +1,10 @@
 "use client";
+import {
+  ChoiceOptions,
+  ChoiceAttempt,
+  ChoiceRich,
+  ChoiceHistoryExplanation,
+} from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
@@ -31,10 +37,18 @@ export function ManualWorkspace({
       manualApi.read({ ...target, preview, classId: deliveryClass }),
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.config.shortAnswer ? 3000 : false,
+      query.state.data?.config.shortAnswer ||
+      query.state.data?.config.multipleChoice
+        ? 3000
+        : false,
   });
   const data = query.data;
   const short = data?.config.shortAnswer;
+  const choice = data?.config.multipleChoice;
+  const explicit = Boolean(short || choice);
+  const [choiceSelected, setChoiceSelected] = useState<string[]>([]);
+  const [loadedChoice, setLoadedChoice] = useState<typeof choice>(null);
+  const [loadedInstructions, setLoadedInstructions] = useState("");
   const [files, setFiles] = useState<Record<string, string>>({});
   const [answer, setAnswer] = useState("");
   const [selected, setSelected] = useState("main.py");
@@ -62,13 +76,15 @@ export function ManualWorkspace({
     if (!data || loaded.current) return;
     loaded.current = true;
     loadedContentRevision.current = data.config.revision;
+    setLoadedChoice(data.config.multipleChoice);
+    setLoadedInstructions(data.config.description);
     setFiles(data.draft?.files ?? data.config.files);
     setAnswer(data.config.shortAnswer ? "" : (data.draft?.answer ?? ""));
     draftRevision.current = data.draft?.revision ?? 0;
     setSelected(data.config.entryPoint);
   }, [data]);
   useEffect(() => {
-    if (!short || !dirty || preview) return;
+    if (!explicit || !dirty || preview) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
@@ -109,7 +125,7 @@ export function ManualWorkspace({
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", guard, true);
     };
-  }, [Boolean(short), dirty, preview, mt]);
+  }, [explicit, dirty, preview, mt]);
   useEffect(
     () => () => {
       if (active.current) void manualApi.stop(active.current).catch(() => {});
@@ -163,7 +179,7 @@ export function ManualWorkspace({
     session &&
     ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT"].includes(session.state);
   async function save() {
-    if (preview || short) return;
+    if (preview || explicit) return;
     if (saving.current) return saving.current;
     const snapshot = latest.current;
     const operation = (async () => {
@@ -191,10 +207,10 @@ export function ManualWorkspace({
     return operation;
   }
   useEffect(() => {
-    if (preview || short || !dirty) return;
+    if (preview || explicit || !dirty) return;
     const timer = setTimeout(() => void save(), 1500);
     return () => clearTimeout(timer);
-  }, [files, answer, dirty, preview, Boolean(short)]);
+  }, [files, answer, dirty, preview, explicit]);
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
@@ -243,14 +259,24 @@ export function ManualWorkspace({
       const content = JSON.stringify({
         ...latest.current,
         classId: selectedClass,
-        revision: short ? loadedContentRevision.current : data!.config.revision,
+        selectedOptionIds: choiceSelected,
+        displayOrder: loadedChoice?.options.map((o) => o.id),
+        revision: explicit
+          ? loadedContentRevision.current
+          : data!.config.revision,
       });
       if (pendingSubmit.current?.content !== content)
         pendingSubmit.current = { content, key: crypto.randomUUID() };
       await manualApi.submit({
         ...target,
         ...latest.current,
-        contentRevision: short
+        ...(choice
+          ? {
+              selectedOptionIds: choiceSelected,
+              displayOrder: loadedChoice!.options.map((o) => o.id),
+            }
+          : {}),
+        contentRevision: explicit
           ? loadedContentRevision.current!
           : data!.config.revision,
         revision: draftRevision.current,
@@ -258,12 +284,15 @@ export function ManualWorkspace({
         requestKey: pendingSubmit.current.key,
       });
       pendingSubmit.current = null;
-      if (short) {
+      if (explicit) {
+        setChoiceSelected([]);
         setDirty(false);
         setAnswer("");
       }
       await query.refetch();
-      setSaved(mt(short ? "submitted" : "submitted_awaiting_teacher_review"));
+      setSaved(
+        mt(explicit ? "submitted" : "submitted_awaiting_teacher_review"),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : mt("submit_failed"));
     } finally {
@@ -277,7 +306,7 @@ export function ManualWorkspace({
         ? routes.academyLearnExercise(slug, m.materialId, {
             classId: selectedClass,
           })
-        : routes.academyLearnManual(slug, m.materialId, {
+        : routes.academyLearnAssessment(slug, m.materialId, m.type, {
             classId: selectedClass,
           });
   const latestAttempt = data?.attempts.find((a) => a.classId === selectedClass);
@@ -296,7 +325,7 @@ export function ManualWorkspace({
         submissionId: latestAttempt!.id,
       }),
     enabled: Boolean(
-      short && latestAttempt && selectedClass && effective?.completed,
+      explicit && latestAttempt && selectedClass && effective?.completed,
     ),
     staleTime: 0,
   });
@@ -304,7 +333,8 @@ export function ManualWorkspace({
     const result = effectiveManualResult(attempt);
     if (attempt.reviews[0])
       return `${result!.scoreHundredths / 100} / ${attempt.maximumHundredths / 100} · ${result!.completed ? mt("completed") : mt("needs_revision")}`;
-    const assessment = attempt.shortAnswerAssessment;
+    const assessment =
+      attempt.multipleChoiceAssessment ?? attempt.shortAnswerAssessment;
     return assessment?.status === "GRADED"
       ? `${mt(assessment.completed ? "correct" : "incorrect")} · ${assessment.scoreHundredths! / 100} / ${attempt.maximumHundredths / 100}`
       : assessment?.status === "ERROR"
@@ -338,7 +368,7 @@ export function ManualWorkspace({
         <h1 className="flex-1 font-bold">{data.title}</h1>
         <span className="text-xs">
           {mt(
-            short && short.gradingMode !== "MANUAL"
+            choice || (short && short.gradingMode !== "MANUAL")
               ? "automatic_graded"
               : "teacher_graded",
           )}{" "}
@@ -362,7 +392,7 @@ export function ManualWorkspace({
           {mt("materials")}
         </button>
       </header>
-      {short && loadedContentRevision.current !== data.config.revision ? (
+      {explicit && loadedContentRevision.current !== data.config.revision ? (
         <p role="alert" className="p-3 text-danger">
           {mt("content_changed")}
         </p>
@@ -373,11 +403,24 @@ export function ManualWorkspace({
         </p>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <aside className="max-h-[30vh] overflow-auto border-b border-border bg-card p-5 md:max-h-none md:w-1/3 md:border-r">
-          <RichTextFrame
-            content={data.config.description}
-            title={mt("activity_instructions")}
-          />
+        <aside
+          className={
+            choice && !loadedInstructions && !attempt && !drawer
+              ? "hidden"
+              : "max-h-[30vh] overflow-auto border-b border-border bg-card p-5 md:max-h-none md:w-1/3 md:border-r"
+          }
+        >
+          {choice ? (
+            <ChoiceRich
+              content={loadedInstructions}
+              scope={{ ...target, classId: selectedClass, preview }}
+            />
+          ) : (
+            <RichTextFrame
+              content={data.config.description}
+              title={mt("activity_instructions")}
+            />
+          )}
           {preview && data.config.solutionFiles ? (
             <details className="mt-4">
               <summary>{mt("view_solution")}</summary>
@@ -442,13 +485,26 @@ export function ManualWorkspace({
                     </p>
                     <details>
                       <summary>{mt("read_only")}</summary>
-                      <pre className="overflow-auto whitespace-pre-wrap">
-                        {data.type === "WRITTEN_RESPONSE"
-                          ? old.answer
-                          : Object.entries(old.files)
-                              .map(([name, code]) => `${name}\n${code}`)
-                              .join("\n")}
-                      </pre>
+                      {old.multipleChoiceAssessment ? (
+                        <ChoiceAttempt
+                          attempt={old}
+                          scope={{ ...target, preview }}
+                        />
+                      ) : (
+                        <pre className="overflow-auto whitespace-pre-wrap">
+                          {data.type === "WRITTEN_RESPONSE"
+                            ? old.answer
+                            : Object.entries(old.files)
+                                .map(([name, code]) => `${name}\n${code}`)
+                                .join("\n")}
+                        </pre>
+                      )}
+                      {old.multipleChoiceAssessment && old.id !== attempt.id ? (
+                        <ChoiceHistoryExplanation
+                          attempt={old}
+                          scope={{ ...target, preview }}
+                        />
+                      ) : null}
                     </details>
                     {old.reviews.map((r) => (
                       <p key={r.id}>
@@ -464,10 +520,21 @@ export function ManualWorkspace({
           {explanation.data?.explanation && effective?.completed ? (
             <section data-testid="short-answer-explanation" className="mt-4">
               <h2 className="font-bold">{mt("explanation")}</h2>
-              <RichTextFrame
-                content={explanation.data.explanation}
-                title={mt("explanation")}
-              />
+              {choice ? (
+                <ChoiceRich
+                  content={explanation.data.explanation}
+                  scope={{
+                    ...target,
+                    classId: selectedClass,
+                    submissionId: attempt?.id,
+                  }}
+                />
+              ) : (
+                <RichTextFrame
+                  content={explanation.data.explanation}
+                  title={mt("explanation")}
+                />
+              )}
             </section>
           ) : null}
           {drawer ? (
@@ -525,6 +592,20 @@ export function ManualWorkspace({
                 />
               </div>
             </>
+          ) : loadedChoice ? (
+            <div className="mx-auto w-full max-w-3xl flex-1 overflow-auto p-5">
+              <ChoiceOptions
+                definition={loadedChoice}
+                selected={choiceSelected}
+                onChange={(ids) => {
+                  setChoiceSelected(ids);
+                  setDirty(true);
+                  setSaved(mt("unsaved_changes"));
+                }}
+                disabled={busy}
+                scope={{ ...target, classId: selectedClass, preview }}
+              />
+            </div>
           ) : (
             <label className="flex flex-1 flex-col p-5">
               {short
@@ -567,7 +648,7 @@ export function ManualWorkspace({
             ) : null}
             {!preview ? (
               <>
-                {!short ? (
+                {!explicit ? (
                   <button
                     type="button"
                     disabled={busy}
@@ -583,7 +664,9 @@ export function ManualWorkspace({
                     disabled={
                       busy ||
                       data.submissionUnavailable ||
-                      Boolean(short && answer.length === 0)
+                      !selectedClass ||
+                      Boolean(short && answer.length === 0) ||
+                      Boolean(choice && choiceSelected.length === 0)
                     }
                     onClick={() => void submit()}
                   >
@@ -609,7 +692,7 @@ export function ManualWorkspace({
             ) : null}
             {data.submissionUnavailable ? (
               <p role="status" className="text-xs">
-                {mt("short_answer_unavailable")}
+                {mt(choice ? "choice_unavailable" : "short_answer_unavailable")}
               </p>
             ) : null}
             <span role="status" className="text-xs">

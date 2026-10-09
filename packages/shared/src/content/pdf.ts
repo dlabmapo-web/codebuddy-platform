@@ -46,7 +46,7 @@ export type PdfReadResult = {
   materials: Array<{
     materialId: string;
     title: string;
-    type: "PDF_DOCUMENT" | "PROGRAMMING_EXERCISE" | "TURTLE_EXERCISE" | "WRITTEN_RESPONSE";
+    type: "PDF_DOCUMENT" | "PROGRAMMING_EXERCISE" | "TURTLE_EXERCISE" | "WRITTEN_RESPONSE" | "MULTIPLE_CHOICE";
     position: number;
     lectureId: string;
   }>;

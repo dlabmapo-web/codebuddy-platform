@@ -122,7 +122,7 @@ function ExerciseRow({
   const [pdfPreview, setPdfPreview] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [manualOpen,setManualOpen]=useState(false);
-  const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE';
+  const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE'||material.type==='MULTIPLE_CHOICE';
   const rowEditable =
     material.type !== 'PROGRAMMING_EXERCISE'
       ? builder.editable
@@ -168,7 +168,7 @@ function ExerciseRow({
         <FileText aria-hidden className="size-4 shrink-0 text-brand" />
       ) : null}
       <div className="min-w-0 flex-1">
-        {isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        {isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':material.type==='MULTIPLE_CHOICE'?'Multiple choice':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={titleClass}
@@ -313,6 +313,7 @@ export function LectureRow({
   const [pdfAdding, setPdfAdding] = useState(false);
   const {t:mt}=useManualTranslation();
   const [manualAdding,setManualAdding]=useState(false);
+  const [choiceAdding,setChoiceAdding] = useState(false);
   const [shortAdding,setShortAdding]=useState(false);
   const [writtenAdding,setWrittenAdding]=useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -461,6 +462,7 @@ export function LectureRow({
             </button>
           ) : null}
           {builder.editable && publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setManualAdding(true)}><Plus className="size-3.5"/>{mt('add_turtle_written_response')}</button> : null}
+          {builder.editable && publicConfig.multipleChoiceEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setChoiceAdding(true)}><Plus className="size-3.5"/>{mt("add_multiple_choice")}</button> : null}
           {builder.editable && publicConfig.shortAnswerEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setShortAdding(true)}><Plus className="size-3.5"/>{mt('add_short_answer')}</button> : null}
           {builder.editable && !publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setWrittenAdding(true)}><Plus className="size-3.5"/>{mt('written_response')}</button> : null}
           {builder.exerciseEditable ? (
@@ -474,6 +476,7 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
+        {choiceAdding ? <ManualAuthorDialog type="MULTIPLE_CHOICE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setChoiceAdding(false)} onSaved={builder.refresh}/> : null}
         {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}
         {writtenAdding ? <ManualAuthorDialog type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setWrittenAdding(false)} onSaved={builder.refresh}/> : null}
         {manualAdding ? <ManualAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setManualAdding(false)} onSaved={builder.refresh}/> : null}

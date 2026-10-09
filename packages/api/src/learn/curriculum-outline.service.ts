@@ -103,6 +103,7 @@ export class CurriculumOutlineService {
             includeInScore: true,
             maximumHundredths: true,
             shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
         reviews: {
               orderBy: { version: "desc" },
               take: 1,
@@ -149,7 +150,7 @@ export class CurriculumOutlineService {
                 materialId: material.id,
                 title: material.title,
                 position: material.position,
-                type: material.type as "TURTLE_EXERCISE" | "WRITTEN_RESPONSE",
+                type: material.type as "TURTLE_EXERCISE" | "WRITTEN_RESPONSE" | "MULTIPLE_CHOICE",
                 includeInScore: material.manualMaterial.includeInScore,
                 status: review?.completed
                   ? ("SOLVED" as const)
@@ -266,6 +267,7 @@ export class CurriculumOutlineService {
         includeInScore: true,
         maximumHundredths: true,
         shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
         reviews: {
           orderBy: { version: "desc" },
           take: 1,

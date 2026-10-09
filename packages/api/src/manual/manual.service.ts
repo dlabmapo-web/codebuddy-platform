@@ -1,3 +1,9 @@
+import { randomInt } from "node:crypto";
+import {
+  MultipleChoiceService,
+  sanitizeChoiceHtml,
+  choiceAssetIds,
+} from "./multiple-choice.service.js";
 import { ShortAnswerService } from "./short-answer.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Request } from "express";
@@ -18,6 +24,8 @@ import type {
   ManualSession,
 } from "@cove/shared";
 import {
+  multipleChoiceSchema,
+  publicChoice,
   shortAnswerSchema,
   effectiveManualResult,
   sourceFilesSchema,
@@ -66,6 +74,7 @@ export class ManualService {
     private readonly assets: ManualAssetsService,
     private readonly points: PointAwardService,
     private readonly shortAnswers: ShortAnswerService,
+    private readonly choices: MultipleChoiceService,
   ) {}
   private async material(
     identity: SupabaseIdentity,
@@ -81,7 +90,9 @@ export class ManualService {
     const row = await this.db.material.findFirst({
       where: {
         id: input.materialId,
-        type: { in: ["TURTLE_EXERCISE", "WRITTEN_RESPONSE"] },
+        type: {
+          in: ["TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"],
+        },
         AND: [
           preview
             ? scope.material
@@ -169,6 +180,24 @@ export class ManualService {
         }
       }
     }
+    if (input.multipleChoice) {
+      this.choices.assertEnabled();
+      input = {
+        ...input,
+        description: sanitizeChoiceHtml(input.description),
+        multipleChoice: this.choices.normalize(
+          input.multipleChoice,
+          input.assets.map((a) => a.assetId),
+          input.solutionAssets.map((a) => a.assetId),
+        ),
+      };
+      if (
+        choiceAssetIds(input.description).some(
+          (id) => !input.assets.some((a) => a.assetId === id),
+        )
+      )
+        throw new BadRequestException("Instruction image is not authorized");
+    }
     const runtimeVersion =
       input.type === "TURTLE_EXERCISE"
         ? await this.gui.runtimeVersion()
@@ -218,6 +247,9 @@ export class ManualService {
       }
       const data = {
         ...config,
+        multipleChoice: config.multipleChoice
+          ? (config.multipleChoice as Prisma.InputJsonValue)
+          : Prisma.DbNull,
         shortAnswer: config.shortAnswer
           ? (config.shortAnswer as Prisma.InputJsonValue)
           : Prisma.DbNull,
@@ -240,6 +272,27 @@ export class ManualService {
           current.manualMaterial.revision !== revision
         )
           throw new ConflictException("Content changed; reload before saving");
+        if (input.multipleChoice) {
+          const oldChoice = multipleChoiceSchema.parse(
+            current.manualMaterial.multipleChoice,
+          );
+          const structural = (d: typeof oldChoice) =>
+            JSON.stringify([
+              d.selectionMode,
+              d.options.map((o) => o.id),
+              d.correctOptionIds,
+              d.shuffleOptions,
+            ]);
+          if (
+            structural(oldChoice) !==
+              structural(multipleChoiceSchema.parse(input.multipleChoice)) &&
+            (current.isVisible ||
+              (await tx.manualSubmission.count({ where: { materialId: id } })))
+          )
+            throw new ConflictException(
+              "Published or submitted answer definitions are locked; create a new question",
+            );
+        }
         const before = current.manualMaterial.shortAnswer;
         const next = input.shortAnswer;
         const oldDefinition = before ? shortAnswerSchema.parse(before) : null;
@@ -347,11 +400,13 @@ export class ManualService {
         where: { id: row.lecture.courseModule.course.id },
         include: visibleCurriculumInclude,
       }),
-      this.db.manualDraft.findUnique({
-        where: {
-          materialId_userId: { materialId: row.id, userId: actor.userId },
-        },
-      }),
+      config.shortAnswer || config.multipleChoice
+        ? Promise.resolve(null)
+        : this.db.manualDraft.findUnique({
+            where: {
+              materialId_userId: { materialId: row.id, userId: actor.userId },
+            },
+          }),
       this.db.manualSubmission.findMany({
         where: {
           materialId: row.id,
@@ -362,6 +417,7 @@ export class ManualService {
         take: 30,
         include: {
           shortAnswerAssessment: true,
+          multipleChoiceAssessment: true,
           reviews: { orderBy: { version: "desc" } },
         },
       }),
@@ -395,6 +451,21 @@ export class ManualService {
             });
     const parsed = manualConfigSchema.parse({
       ...config,
+      multipleChoice: config.multipleChoice
+        ? (() => {
+            const definition = multipleChoiceSchema.parse(
+              config.multipleChoice,
+            );
+            const safe = preview ? definition : publicChoice(definition);
+            const options = [...safe.options];
+            if (!preview && safe.shuffleOptions)
+              for (let i = options.length - 1; i > 0; i--) {
+                const j = randomInt(i + 1);
+                [options[i], options[j]] = [options[j], options[i]];
+              }
+            return { ...safe, options };
+          })()
+        : null,
       shortAnswer: config.shortAnswer
         ? (() => {
             const definition = shortAnswerSchema.parse(config.shortAnswer);
@@ -429,7 +500,8 @@ export class ManualService {
           )
         : undefined,
       submissionUnavailable: Boolean(
-        parsed.shortAnswer && !this.shortAnswers.enabled(),
+        (parsed.shortAnswer && !this.shortAnswers.enabled()) ||
+        (parsed.multipleChoice && !this.choices.enabled()),
       ),
       classes: classes.map((c) => ({ classId: c.id, name: c.name })),
       materialId: row.id,
@@ -446,7 +518,7 @@ export class ManualService {
       },
       materials,
       draft:
-        draft && !config.shortAnswer
+        draft && !config.shortAnswer && !config.multipleChoice
           ? {
               files: sourceFilesSchema.parse(draft.files),
               answer: draft.answer,
@@ -466,6 +538,15 @@ export class ManualService {
     maximumHundredths: number;
     includeInScore: boolean;
     reviewVersion: number;
+    multipleChoiceAssessment?: {
+      definition: Prisma.JsonValue;
+      selectedOptionIds: Prisma.JsonValue;
+      displayOrder: Prisma.JsonValue;
+      status: string;
+      verdict: string;
+      scoreHundredths: number;
+      completed: boolean;
+    } | null;
     shortAnswerAssessment?: {
       status: string;
       verdict: string | null;
@@ -491,6 +572,22 @@ export class ManualService {
       maximumHundredths: row.maximumHundredths,
       includeInScore: row.includeInScore,
       reviewVersion: row.reviewVersion,
+      multipleChoiceAssessment: row.multipleChoiceAssessment
+        ? {
+            status: row.multipleChoiceAssessment.status,
+            verdict: row.multipleChoiceAssessment.verdict,
+            scoreHundredths: row.multipleChoiceAssessment.scoreHundredths,
+            completed: row.multipleChoiceAssessment.completed,
+            definition: publicChoice(
+              multipleChoiceSchema.parse(
+                row.multipleChoiceAssessment.definition,
+              ),
+            ),
+            selectedOptionIds: row.multipleChoiceAssessment
+              .selectedOptionIds as string[],
+            displayOrder: row.multipleChoiceAssessment.displayOrder as string[],
+          }
+        : null,
       shortAnswerAssessment: row.shortAnswerAssessment
         ? {
             status: row.shortAnswerAssessment.status,
@@ -511,7 +608,7 @@ export class ManualService {
   }
   async draft(identity: SupabaseIdentity, input: ManualWork) {
     const { actor, config } = await this.material(identity, input);
-    if (config.shortAnswer)
+    if (config.shortAnswer || config.multipleChoice)
       throw new BadRequestException(
         "Short answers use explicit Submit; drafts are unavailable",
       );
@@ -592,6 +689,30 @@ export class ManualService {
       !Object.hasOwn(input.files, config.entryPoint)
     )
       throw new BadRequestException("Entry point is missing");
+    if (
+      row.type !== "MULTIPLE_CHOICE" &&
+      (input.selectedOptionIds || input.displayOrder)
+    )
+      throw new BadRequestException(
+        "Choices require a multiple-choice material",
+      );
+    if (config.multipleChoice) this.choices.assertEnabled();
+    const sameChoiceRequest = (attempt: {
+      revision: number;
+      materialId: string;
+      classId: string;
+      multipleChoiceAssessment: {
+        selectedOptionIds: Prisma.JsonValue;
+        displayOrder: Prisma.JsonValue;
+      } | null;
+    }) =>
+      attempt.materialId === row.id &&
+      attempt.classId === input.classId &&
+      attempt.revision === input.contentRevision &&
+      JSON.stringify(attempt.multipleChoiceAssessment?.selectedOptionIds) ===
+        JSON.stringify(input.selectedOptionIds) &&
+      JSON.stringify(attempt.multipleChoiceAssessment?.displayOrder) ===
+        JSON.stringify(input.displayOrder);
     const existing = await this.db.manualSubmission.findUnique({
       where: {
         userId_requestKey: {
@@ -599,8 +720,13 @@ export class ManualService {
           requestKey: input.requestKey,
         },
       },
+      include: { multipleChoiceAssessment: true },
     });
     if (existing) {
+      if (config.multipleChoice && !sameChoiceRequest(existing))
+        throw new ConflictException(
+          "Request key already used for different work",
+        );
       if (existing.materialId !== row.id || existing.classId !== input.classId)
         throw new ConflictException();
       if (config.shortAnswer) {
@@ -640,13 +766,36 @@ export class ManualService {
           throw new ConflictException(
             "Content changed; reload before submitting",
           );
-        return tx.manualSubmission.create({
+        const choiceDefinition = fresh.multipleChoice
+          ? multipleChoiceSchema.parse(fresh.multipleChoice)
+          : null;
+        const correct = choiceDefinition
+          ? this.choices.evaluate(
+              choiceDefinition,
+              input.selectedOptionIds ?? [],
+              input.displayOrder ?? [],
+            )
+          : false;
+        const admitted = await tx.manualSubmission.create({
           data: {
             materialId: row.id,
             userId: actor.userId,
             classId: input.classId,
-            files: row.type === "WRITTEN_RESPONSE" ? {} : input.files,
-            answer: input.answer,
+            files: row.type === "TURTLE_EXERCISE" ? input.files : {},
+            answer: choiceDefinition ? "" : input.answer,
+            multipleChoiceAssessment: choiceDefinition
+              ? {
+                  create: {
+                    definition: choiceDefinition as Prisma.InputJsonValue,
+                    selectedOptionIds: input.selectedOptionIds!,
+                    displayOrder: input.displayOrder!,
+                    status: "GRADED",
+                    verdict: correct ? "CORRECT" : "INCORRECT",
+                    scoreHundredths: correct ? fresh.maximumHundredths : 0,
+                    completed: correct,
+                  },
+                }
+              : undefined,
             shortAnswerAssessment: config.shortAnswer
               ? {
                   create: {
@@ -662,6 +811,7 @@ export class ManualService {
             profile: JSON.parse(
               JSON.stringify({
                 ...config,
+                multipleChoice: null,
                 shortAnswer: null,
                 solutionFiles: null,
                 solutionAssets: [],
@@ -674,6 +824,14 @@ export class ManualService {
             requestKey: input.requestKey,
           },
         });
+        if (choiceDefinition)
+          await this.points.awardManualCompletion(tx, {
+            materialId: row.id,
+            userId: actor.userId,
+            classId: input.classId,
+            now: new Date(),
+          });
+        return admitted;
       })
       .catch(async (error) => {
         if (
@@ -687,7 +845,12 @@ export class ManualService {
                 requestKey: input.requestKey,
               },
             },
+            include: { multipleChoiceAssessment: true },
           });
+          if (config.multipleChoice && !sameChoiceRequest(replay))
+            throw new ConflictException(
+              "Request key already used for different work",
+            );
           if (replay.materialId === row.id && replay.classId === input.classId)
             return replay;
           throw new ConflictException();
@@ -697,7 +860,108 @@ export class ManualService {
     return { submissionId: submission.id };
   }
   capabilities() {
-    return { shortAnswer: this.shortAnswers.enabled() };
+    return {
+      shortAnswer: this.shortAnswers.enabled(),
+      multipleChoice: this.choices.enabled(),
+    };
+  }
+  async choicePreview(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      definition: unknown;
+      selectedOptionIds: string[];
+      displayOrder: string[];
+    },
+  ) {
+    await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "curriculum.manage",
+    );
+    this.choices.assertEnabled();
+    return {
+      correct: this.choices.evaluate(
+        multipleChoiceSchema.parse(input.definition),
+        input.selectedOptionIds,
+        input.displayOrder,
+      ),
+    };
+  }
+  async choiceImage(
+    identity: SupabaseIdentity,
+    input: Target & {
+      assetId: string;
+      classId?: string;
+      submissionId?: string;
+      preview?: boolean;
+    },
+  ) {
+    const { actor, config } = await this.material(
+      identity,
+      input,
+      Boolean(input.preview),
+    );
+    let publicHtml: string[] = [];
+    let privateHtml = "";
+    if (input.submissionId) {
+      if (input.preview && input.classId)
+        await this.reviewer(identity, input, input.classId);
+      const attempt = await this.db.manualSubmission.findFirst({
+        where: {
+          id: input.submissionId,
+          materialId: input.materialId,
+          ...(input.preview ? {} : { userId: actor.userId }),
+          classId: input.classId,
+        },
+        include: {
+          multipleChoiceAssessment: true,
+          reviews: { orderBy: { version: "desc" } },
+        },
+      });
+      if (!attempt?.multipleChoiceAssessment || !input.classId)
+        throw new NotFoundException();
+      if (!input.preview)
+        await this.explanation(identity, {
+          ...input,
+          classId: input.classId,
+          submissionId: input.submissionId,
+        });
+      const definition = multipleChoiceSchema.parse(
+        attempt.multipleChoiceAssessment.definition,
+      );
+      publicHtml = [
+        definition.problemDescription,
+        ...definition.options.map((o) => o.content),
+        (attempt.profile as { description?: string }).description ?? "",
+      ];
+      if (
+        effectiveManualResult(attempt)?.completed &&
+        definition.explanationEnabled
+      )
+        privateHtml = definition.explanation;
+    } else if (config.multipleChoice) {
+      const definition = multipleChoiceSchema.parse(config.multipleChoice);
+      publicHtml = [
+        config.description,
+        definition.problemDescription,
+        ...definition.options.map((o) => o.content),
+      ];
+      if (input.preview) privateHtml = definition.explanation;
+    }
+    if (
+      ![...publicHtml, privateHtml].some((html) =>
+        choiceAssetIds(html).includes(input.assetId),
+      )
+    )
+      throw new NotFoundException();
+    const asset = await this.db.manualAsset.findUnique({
+      where: { id: input.assetId },
+    });
+    if (!asset?.mimeType.startsWith("image/")) throw new NotFoundException();
+    return {
+      url: `data:${asset.mimeType};base64,${await this.assets.bytes(input.assetId)}`,
+    };
   }
   async matchingPreview(
     identity: SupabaseIdentity,
@@ -748,13 +1012,16 @@ export class ManualService {
       },
       include: {
         shortAnswerAssessment: true,
+        multipleChoiceAssessment: true,
         reviews: { orderBy: { version: "desc" } },
       },
     });
     if (!attempt) throw new NotFoundException();
-    const definition = attempt.shortAnswerAssessment
-      ? shortAnswerSchema.parse(attempt.shortAnswerAssessment.definition)
-      : null;
+    const definition = attempt.multipleChoiceAssessment
+      ? multipleChoiceSchema.parse(attempt.multipleChoiceAssessment.definition)
+      : attempt.shortAnswerAssessment
+        ? shortAnswerSchema.parse(attempt.shortAnswerAssessment.definition)
+        : null;
     return {
       explanation:
         definition?.explanationEnabled &&
@@ -858,7 +1125,7 @@ export class ManualService {
     await this.reviewer(identity, input, input.classId);
     const definition = await this.db.manualMaterial.findUnique({
       where: { materialId: input.materialId },
-      select: { shortAnswer: true },
+      select: { shortAnswer: true, multipleChoice: true },
     });
     const seats = await this.db.classEnrollment.findMany({
       where: {
@@ -906,6 +1173,7 @@ export class ManualService {
         files: Boolean(input.userId),
         answer: Boolean(input.userId),
         shortAnswerAssessment: true,
+        multipleChoiceAssessment: true,
         reviews: {
           orderBy: { version: "desc" },
           ...(input.userId ? {} : { take: 1 }),
@@ -934,7 +1202,7 @@ export class ManualService {
         userId: s.membership.userId,
         learnerName: s.membership.user.displayName,
         draft:
-          draft && !definition?.shortAnswer
+          draft && !definition?.shortAnswer && !definition?.multipleChoice
             ? {
                 files: sourceFilesSchema.parse(draft.files ?? {}),
                 answer: draft.answer ?? "",
@@ -952,9 +1220,9 @@ export class ManualService {
     const actor = await this.reviewer(identity, input, input.classId);
     const definition = await this.db.manualMaterial.findUnique({
       where: { materialId: input.materialId },
-      select: { shortAnswer: true },
+      select: { shortAnswer: true, multipleChoice: true },
     });
-    if (definition?.shortAnswer)
+    if (definition?.shortAnswer || definition?.multipleChoice)
       throw new BadRequestException("Short answers have no editable draft");
     if (
       !(await this.db.classEnrollment.findFirst({
@@ -1034,9 +1302,9 @@ export class ManualService {
     const actor = await this.reviewer(identity, input, input.classId);
     const definition = await this.db.manualMaterial.findUnique({
       where: { materialId: input.materialId },
-      select: { shortAnswer: true },
+      select: { shortAnswer: true, multipleChoice: true },
     });
-    if (definition?.shortAnswer)
+    if (definition?.shortAnswer || definition?.multipleChoice)
       throw new BadRequestException("Short answers have no editable draft");
     if (
       !(await this.db.classEnrollment.findFirst({
@@ -1091,6 +1359,7 @@ export class ManualService {
       take: 200,
       include: {
         shortAnswerAssessment: true,
+        multipleChoiceAssessment: true,
         user: { select: { displayName: true } },
         reviews: { orderBy: { version: "desc" } },
       },

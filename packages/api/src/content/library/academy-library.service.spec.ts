@@ -276,6 +276,21 @@ describe('AcademyLibraryService.adopt', () => {
 });
 
 describe('manual material adoption',()=>{
+ it('remaps choice identities and keys while preserving private content and excluding history',async()=>{
+  const ids=['00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002'];
+  const definition={version:1,question:'Original choice',selectionMode:'SINGLE',options:ids.map((id,i)=>({id,content:`Original ${i}`})),correctOptionIds:[ids[1]],shuffleOptions:true,explanationEnabled:true,explanation:'PRIVATE_EXPLANATION'};
+  const manual={revision:7,description:'',files:{},assets:[],solutionAssets:[],multipleChoice:definition,shortAnswer:null,modelAnswer:'',includeInScore:true,submitEnabled:true,maximumHundredths:10000};
+  const source={...master,modules:[{...master.modules[0],lectures:[{...master.modules[0].lectures[0],materials:[{title:'Choice',type:'MULTIPLE_CHOICE',position:1,isRequired:true,isVisible:true,manualMaterial:manual}]}]}]} as unknown as typeof master;
+  const {service,created}=build(source);
+  await service.adopt(identity,{academyId:branchId,libraryCourseId:masterId,title:'Choice copy'});
+  const copy=created.manualMaterial[0] as {multipleChoice:typeof definition;revision:number};
+  expect(copy.revision).toBe(1);
+  expect(copy.multipleChoice.options.map(o=>o.id)).not.toEqual(ids);
+  expect(copy.multipleChoice.correctOptionIds).toEqual([copy.multipleChoice.options[1].id]);
+  expect(copy.multipleChoice.explanation).toBe('PRIVATE_EXPLANATION');
+  expect(created.material[0]).toMatchObject({type:'MULTIPLE_CHOICE',isVisible:false});
+  expect(copy).not.toHaveProperty('submissions');expect(copy).not.toHaveProperty('drafts');
+ });
  it('copies private author configuration and immutable assets into fresh materials without student history',async()=>{
   const manual={revision:7,runtimeVersion:'approved-image',description:'Draw a circle',entryPoint:'main.py',files:{'main.py':'import turtle'},solutionFiles:{'main.py':'PRIVATE'},assets:[{assetId:'asset',name:'shape.gif',byteSize:43}],solutionAssets:[],modelAnswer:'PRIVATE_ANSWER',includeInScore:true,submitEnabled:true,maximumHundredths:10000};
   const source={...master,modules:[{...master.modules[0],lectures:[{...master.modules[0].lectures[0],materials:[{title:'Turtle',type:'TURTLE_EXERCISE',position:1,isRequired:true,isVisible:true,manualMaterial:manual}]}]}]} as unknown as typeof master;

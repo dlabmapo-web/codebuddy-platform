@@ -1,5 +1,14 @@
 import { z } from "zod";
-export const manualTypes = ["TURTLE_EXERCISE", "WRITTEN_RESPONSE"] as const;
+import {
+  multipleChoiceSchema,
+  publicChoiceSchema,
+  type PublicChoiceDefinition,
+} from "./multiple-choice.js";
+export const manualTypes = [
+  "TURTLE_EXERCISE",
+  "WRITTEN_RESPONSE",
+  "MULTIPLE_CHOICE",
+] as const;
 export const sourceFilesSchema = z
   .record(z.string(), z.string())
   .superRefine((files, ctx) => {
@@ -57,6 +66,11 @@ export function effectiveManualResult<
   T extends { completed: boolean; scoreHundredths: number },
 >(attempt?: {
   reviews: T[];
+  multipleChoiceAssessment?: {
+    status: string;
+    completed: boolean;
+    scoreHundredths: number;
+  } | null;
   shortAnswerAssessment?: {
     status: string;
     completed: boolean | null;
@@ -64,7 +78,8 @@ export function effectiveManualResult<
   } | null;
 }) {
   if (attempt?.reviews[0]) return attempt.reviews[0];
-  const result = attempt?.shortAnswerAssessment;
+  const result =
+    attempt?.multipleChoiceAssessment ?? attempt?.shortAnswerAssessment;
   return result?.status === "GRADED" &&
     result.completed !== null &&
     result.scoreHundredths !== null
@@ -72,6 +87,13 @@ export function effectiveManualResult<
     : undefined;
 }
 export const manualConfigSchema = z.object({
+  multipleChoice: publicChoiceSchema
+    .extend({
+      correctOptionIds: z.array(z.uuid()).optional(),
+      explanation: z.string().optional(),
+    })
+    .nullable()
+    .default(null),
   shortAnswer: shortAnswerSchema.nullable().default(null),
   modelAnswer: z.string().max(10000).default(""),
   solutionAssets: manualAssetsSchema.default([]),
@@ -107,6 +129,20 @@ export const saveManualSchema = manualConfigSchema
     title: z.string().trim().min(1).max(128),
   })
   .superRefine((x, ctx) => {
+    if (
+      (x.type === "MULTIPLE_CHOICE") !== Boolean(x.multipleChoice) ||
+      (x.multipleChoice && x.shortAnswer)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Multiple choice requires its own material and definition",
+      });
+    if (x.multipleChoice) {
+      const parsed = multipleChoiceSchema.safeParse(x.multipleChoice);
+      if (!parsed.success)
+        for (const issue of parsed.error.issues)
+          ctx.addIssue({ ...issue, path: ["multipleChoice", ...issue.path] });
+    }
     if (x.shortAnswer) {
       if (x.type !== "WRITTEN_RESPONSE")
         ctx.addIssue({
@@ -146,11 +182,15 @@ export const manualWorkSchema = manualTargetSchema.extend({
   answer: z.string().max(10000).default(""),
   revision: z.number().int().nonnegative(),
 });
-export const manualSubmitSchema = manualWorkSchema.extend({
-  contentRevision: z.number().int().positive(),
-  classId: z.uuid(),
-  requestKey: z.uuid(),
-});
+export const manualSubmitSchema = manualWorkSchema
+  .extend({
+    contentRevision: z.number().int().positive(),
+    classId: z.uuid(),
+    requestKey: z.uuid(),
+    selectedOptionIds: z.array(z.uuid()).max(20).optional(),
+    displayOrder: z.array(z.uuid()).max(20).optional(),
+  })
+  .strict();
 export const manualReviewSchema = manualTargetSchema.extend({
   submissionId: z.uuid(),
   expectedVersion: z.number().int().nonnegative(),
@@ -197,6 +237,15 @@ export type ManualAttempt = {
     verdict: string | null;
     scoreHundredths: number | null;
     completed: boolean | null;
+  } | null;
+  multipleChoiceAssessment?: {
+    status: string;
+    verdict: string;
+    scoreHundredths: number;
+    completed: boolean;
+    definition: PublicChoiceDefinition;
+    selectedOptionIds: string[];
+    displayOrder: string[];
   } | null;
   learnerName?: string;
 };

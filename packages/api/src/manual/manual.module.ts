@@ -1,3 +1,4 @@
+import { MultipleChoiceService } from "./multiple-choice.service.js";
 import { ShortAnswerService } from "./short-answer.service.js";
 import { PointsModule } from "../points/points.module.js";
 import { ManualAssetsService } from "./manual-assets.service.js";
@@ -13,6 +14,7 @@ import { GuiClientService } from "./gui-client.service.js";
   controllers: [ManualController],
   providers: [
     ShortAnswerService,
+    MultipleChoiceService,
     ManualService,
     GuiClientService,
     ManualAssetsService,

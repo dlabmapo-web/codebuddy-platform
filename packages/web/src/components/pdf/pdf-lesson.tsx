@@ -32,7 +32,7 @@ export function PdfLesson({
   const path = (row: PdfReadResult['materials'][number]) =>
     row.type === 'PDF_DOCUMENT'
       ? routes.academyLearnPdf(slug, row.materialId, { classId })
-      : row.type === 'PROGRAMMING_EXERCISE' ? routes.academyLearnExercise(slug,row.materialId,{classId}) : routes.academyLearnManual(slug,row.materialId,{classId});
+      : row.type === 'PROGRAMMING_EXERCISE' ? routes.academyLearnExercise(slug,row.materialId,{classId}) : routes.academyLearnAssessment(slug,row.materialId,row.type,{classId});
   if (!data)
     return (
       <main className="p-6" role={failed ? 'alert' : 'status'}>

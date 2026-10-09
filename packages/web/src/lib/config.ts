@@ -4,6 +4,7 @@ function requiredPublicEnvironment(name: string, value: string | undefined): str
 }
 
 export const publicConfig = {
+  multipleChoiceEnabled: process.env.NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED === 'true',
   shortAnswerEnabled:process.env.NEXT_PUBLIC_SHORT_ANSWER_ENABLED === 'true',
   guiEnabled:process.env.NEXT_PUBLIC_GUI_ENABLED === 'true',
   supabaseUrl: requiredPublicEnvironment(

@@ -16,6 +16,8 @@ import {
 import { z } from "zod";
 import {
   shortAnswerSchema,
+  multipleChoiceSchema,
+  choiceSelectionSchema,
   saveManualSchema,
   manualTargetSchema,
   manualWorkSchema,
@@ -100,6 +102,41 @@ export class ManualController {
   ) {
     await this.identify(auth);
     return this.service.capabilities();
+  }
+  @Post("choice-preview") async choicePreview(
+    @Body() body: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    return this.service.choicePreview(
+      await this.identify(auth),
+      parse(
+        choiceSelectionSchema.extend({
+          academyId: z.uuid(),
+          definition: multipleChoiceSchema,
+        }),
+        body,
+      ),
+    );
+  }
+  @Get("choice-image")
+  @Header("Cache-Control", "private, no-store")
+  async choiceImage(
+    @Query() query: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    const input = parse(
+      manualTargetSchema.extend({
+        assetId: z.uuid(),
+        classId: z.uuid().optional(),
+        submissionId: z.uuid().optional(),
+        preview: z.enum(["true", "false"]).optional(),
+      }),
+      query,
+    );
+    return this.service.choiceImage(await this.identify(auth), {
+      ...input,
+      preview: input.preview === "true",
+    });
   }
   @Post("matching-preview") async matchingPreview(
     @Body() body: unknown,

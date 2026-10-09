@@ -166,6 +166,7 @@ enum MaterialType {
   PDF_DOCUMENT
   TURTLE_EXERCISE
   WRITTEN_RESPONSE
+  MULTIPLE_CHOICE
 }
 
 enum PdfPlacement {
@@ -2397,6 +2398,7 @@ model PdfDocument {
 }
 
 model ManualMaterial {
+  multipleChoice Json? @map("multiple_choice")
   shortAnswer Json? @map("short_answer")
   materialId        String   @id @map("material_id") @db.Uuid
   description       String   @default("")
@@ -2453,6 +2455,7 @@ model ManualSubmission {
   user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   class             Class          @relation(fields: [classId], references: [id], onDelete: Restrict)
   shortAnswerAssessment ShortAnswerAssessment?
+  multipleChoiceAssessment MultipleChoiceAssessment?
   reviews           ManualReview[]
 
   @@unique([userId, requestKey])
@@ -2506,4 +2509,19 @@ model ShortAnswerAssessment {
   submission ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   @@index([status, leaseUntil])
   @@map("short_answer_assessments")
+}
+
+model MultipleChoiceAssessment {
+  submissionId String @id @map("submission_id") @db.Uuid
+  definition Json
+  selectedOptionIds Json @map("selected_option_ids")
+  displayOrder Json @map("display_order")
+  evaluatorVersion String @default("multiple-choice-set-v1") @map("evaluator_version")
+  status String @default("GRADED")
+  verdict String
+  scoreHundredths Int @map("score_hundredths")
+  completed Boolean
+  evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
+  submission ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  @@map("multiple_choice_assessments")
 }

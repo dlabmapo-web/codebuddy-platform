@@ -170,6 +170,10 @@ export const routes = {
     academySlug: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/records`, query),
+  academyLearnQuiz: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/quizzes/${segment(materialId)}`,query),
+  academyLearnAssessment: (academySlug:string, materialId:string, type:string, query?:Record<string,QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/${type === 'MULTIPLE_CHOICE' ? 'quizzes' : 'turtle'}/${segment(materialId)}`,query),
   academyLearnManual: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
     withQuery(`${academyRoot(academySlug)}/learn/turtle/${segment(materialId)}`,query),
   academyLearnPdf: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>

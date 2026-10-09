@@ -182,7 +182,7 @@ export function useExerciseNavigation({
           ),
         );
         const isManual=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.manualMaterials?.some(a=>a.materialId===materialId)));
-        if(isManual){await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnManual(academySlug,materialId,{classId}));return;}
+        if(isManual){const activity=await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnAssessment(academySlug,materialId,activity.type,{classId}));return;}
         if (isPdf) {
           await pdfApi.read({ academyId, materialId });
           if (tokenRef.current !== token) return;

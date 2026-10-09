@@ -5,7 +5,7 @@ import { gradingDataLimits } from "../grading-limits.js";
 
 import { courseProvenanceSchema } from "../platform/library.js";
 
-export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE"] as const;
+export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
 

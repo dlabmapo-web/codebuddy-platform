@@ -256,7 +256,7 @@ export function useCourseBuilder({
     }) => orpc.academyCourses.moveLecture({ ...target, ...input }),
     onSuccess: applyTree,
   });
-  const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'))));
+  const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'||x.type==='MULTIPLE_CHOICE'))));
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
       isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)

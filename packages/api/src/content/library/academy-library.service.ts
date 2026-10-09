@@ -1,3 +1,9 @@
+import { multipleChoiceSchema } from "@cove/shared";
+function remapChoiceDefinition(raw: unknown) {
+ const definition=multipleChoiceSchema.parse(raw);
+ const ids=new Map(definition.options.map(o=>[o.id,randomUUID()]));
+ return {...definition,options:definition.options.map(o=>({...o,id:ids.get(o.id)!})),correctOptionIds:definition.correctOptionIds.map(id=>ids.get(id)!)};
+}
 import { lockPdfAsset } from "../../documents/pdf-document.service.js";
 import { pdfMetadata } from "../../documents/pdf-metadata.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -269,7 +275,7 @@ export class AcademyLibraryService {
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
-            isVisible: !material.manualMaterial?.shortAnswer,
+            isVisible: !material.manualMaterial?.shortAnswer && !material.manualMaterial?.multipleChoice,
           });
 
           if (material.pdfDocument)
@@ -278,7 +284,7 @@ export class AcademyLibraryService {
               assetId: material.pdfDocument.assetId,
               placement: material.pdfDocument.placement,
             });
-          if(material.manualMaterial){const {shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
+          if(material.manualMaterial){const {multipleChoice,shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,multipleChoice:multipleChoice ? remapChoiceDefinition(multipleChoice) : Prisma.DbNull,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
           const exercise = material.programmingExercise;
           if (!exercise) continue;
           exercises.push({

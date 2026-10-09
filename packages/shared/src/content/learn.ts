@@ -73,7 +73,7 @@ export const learnExerciseSummarySchema = z.object({
 });
 export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
-export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
+export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE','MULTIPLE_CHOICE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
   id: z.uuid(),
   title: titleSchema,

@@ -1,5 +1,6 @@
 'use client';
 
+import { useManualTranslation } from '@/components/manual/use-manual-translation';
 import { PdfResourceLink } from '@/components/pdf/pdf-resource-link';
 import Link from 'next/link';
 import { routes } from '@/lib/routes';
@@ -37,6 +38,7 @@ export function ModuleSection({
   onToggleLecture: (lectureId: string) => void;
   requestedLectureId: string | null;
 }) {
+  const {t:mt}=useManualTranslation();
   const slug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
   const exerciseCount = module.lectures.reduce(
@@ -183,7 +185,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnManual(slug,row.manual.materialId,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">Teacher graded · {row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">{row.manual.type === "MULTIPLE_CHOICE" ? mt("automatic_graded") : mt("teacher_graded")} · {row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}

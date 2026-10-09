@@ -1,4 +1,5 @@
 "use client";
+import { ChoiceAttempt } from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -279,6 +280,7 @@ export function ManualReviewWorkspace({
               {mt("view_learner_drawing_read_only")}
             </button>
           ) : null}
+          {attempt?.multipleChoiceAssessment ? <p role="status">{mt(attempt.multipleChoiceAssessment.completed?"correct":"incorrect")}</p> : null}
           {attempt?.shortAnswerAssessment ? (
             <p role="status">
               {attempt.shortAnswerAssessment.status === "GRADED"
@@ -391,7 +393,7 @@ export function ManualReviewWorkspace({
                     </div>
                   ) : null}
                 </>
-              ) : (
+              ) : attempt.multipleChoiceAssessment ? <ChoiceAttempt attempt={attempt} scope={{academyId,materialId,classId,preview:true}}/> : (
                 <pre className="my-3 whitespace-pre-wrap rounded border border-border bg-card p-4">
                   {attempt.answer}
                 </pre>

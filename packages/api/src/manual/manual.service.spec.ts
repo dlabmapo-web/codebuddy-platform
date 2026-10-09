@@ -60,6 +60,7 @@ function fixture() {
       assertEnabled: () => {},
       evaluator: { evaluate: vi.fn() },
     } as never,
+    { enabled: () => true, assertEnabled: () => {} } as never,
   );
   return { service, db, access, audit, gui, points, row, config };
 }
@@ -98,7 +99,11 @@ describe("manual assessment boundaries", () => {
     const where = db.material.findFirst.mock.calls[0][0].where;
     expect(JSON.stringify(where)).toContain("isVisible");
     expect(JSON.stringify(where)).toContain("enrollments");
-    expect(where.type.in).toEqual(["TURTLE_EXERCISE", "WRITTEN_RESPONSE"]);
+    expect(where.type.in).toEqual([
+      "TURTLE_EXERCISE",
+      "WRITTEN_RESPONSE",
+      "MULTIPLE_CHOICE",
+    ]);
   });
   it("denies a guessed session id without cancelling its owner’s run", async () => {
     const { service, gui } = fixture();
@@ -205,5 +210,54 @@ describe("short-answer privacy and draft policy", () => {
     const workspace = await service.workspace(identity, target);
     expect(workspace.submissionUnavailable).toBe(true);
     expect(workspace.config.submitEnabled).toBe(true);
+  });
+});
+
+describe("multiple-choice read and admission boundaries", () => {
+  const ids = [
+    "00000000-0000-4000-8000-000000000001",
+    "00000000-0000-4000-8000-000000000002",
+  ];
+  const definition = {
+    version: 1,
+    question: "Public choice",
+    selectionMode: "SINGLE",
+    options: ids.map((id, i) => ({ id, content: `Option ${i}` })),
+    correctOptionIds: [ids[0]],
+    explanationEnabled: true,
+    explanation: "PRIVATE_CHOICE_EXPLANATION",
+  };
+  function choiceFixture() {
+    const f = fixture();
+    f.db.material.findFirst.mockResolvedValue({
+      ...f.row,
+      type: "MULTIPLE_CHOICE",
+      manualMaterial: { ...f.config, multipleChoice: definition },
+    } as never);
+    return f;
+  }
+  it("keeps flag-off public reads private and marks admission unavailable", async () => {
+    const { service, db } = choiceFixture();
+    const choices = (
+      service as unknown as { choices: { enabled: () => boolean } }
+    ).choices;
+    vi.spyOn(choices, "enabled").mockReturnValue(false);
+    const workspace = await service.workspace(identity, target);
+    expect(workspace.submissionUnavailable).toBe(true);
+    expect(workspace.config.multipleChoice?.question).toBe("Public choice");
+    expect(JSON.stringify(workspace)).not.toMatch(/correctOptionIds|PRIVATE/);
+    expect(db.manualDraft.findUnique).not.toHaveBeenCalled();
+  });
+  it("rejects draft autosave without a database write", async () => {
+    const { service, db } = choiceFixture();
+    await expect(
+      service.draft(identity, {
+        ...target,
+        files: {},
+        answer: "",
+        revision: 0,
+      }),
+    ).rejects.toThrow("explicit Submit");
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 });

@@ -325,6 +325,7 @@ export class PointAwardService {
         includeInScore: true,
         maximumHundredths: true,
         shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
         reviews: {
           orderBy: { version: "desc" },
           take: 1,
@@ -506,7 +507,7 @@ export class PointAwardService {
           in: visible
             .filter(
               (m) =>
-                m.type !== "TURTLE_EXERCISE" && m.type !== "WRITTEN_RESPONSE",
+                m.type !== "TURTLE_EXERCISE" && m.type !== "WRITTEN_RESPONSE" && m.type !== "MULTIPLE_CHOICE",
             )
             .map((material) => material.id),
         },
@@ -514,7 +515,7 @@ export class PointAwardService {
     });
     const manualIds = visible
       .filter(
-        (m) => m.type === "TURTLE_EXERCISE" || m.type === "WRITTEN_RESPONSE",
+        (m) => m.type === "TURTLE_EXERCISE" || m.type === "WRITTEN_RESPONSE" || m.type === "MULTIPLE_CHOICE",
       )
       .map((m) => m.id);
     const attempts = manualIds.length
@@ -527,6 +528,7 @@ export class PointAwardService {
             includeInScore: true,
             maximumHundredths: true,
             shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
+        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
         reviews: {
               orderBy: { version: "desc" },
               take: 1,

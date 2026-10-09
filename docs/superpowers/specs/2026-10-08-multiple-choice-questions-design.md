@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 
-Status: proposed design for review; implementation has not started
+Status: approved design; implemented on the feature branch. Verification and rollout details are in [operations](../../operations/multiple-choice-questions.md).
 
 Branch: `feat/lecture-pdf-materials`, alongside PDF, turtle, and short-answer features
 
@@ -17,6 +17,8 @@ Verified Elice behavior: single-mode radios replace prior selection and cannot b
 Elice submissions were not performed. Binary grading, final-attempt selection, explanation timing, shuffle persistence, limits, and teacher overrides below are concrete Cove policies pending reference verification. Implementation must not claim complete parity while these gaps remain.
 
 ## 2. Scope and architecture
+
+The baseline also has a native single-answer quiz definition on `ProgrammingExercise.quiz`. That authoring, grading, feedback, and historical data stay unchanged. The distinct material here supplies the approved rich single/multiple modes and shared manual-assessment lifecycle; no existing quizzes are converted.
 
 | Approach | Trade-off and decision |
 |---|---|

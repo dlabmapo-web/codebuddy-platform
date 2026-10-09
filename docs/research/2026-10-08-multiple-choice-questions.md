@@ -4,6 +4,8 @@ Date: 2026-10-08
 
 Purpose: define Cove multiple-choice questions from the user's signed-in Elice course. Research only; no feature implementation is reported here.
 
+Implementation baseline clarification: Cove already supports a native single-answer definition on `ProgrammingExercise.quiz`. The proposed `MULTIPLE_CHOICE` material adds rich single/multiple modes through the existing assessment lifecycle without converting or altering those quizzes.
+
 ## Sources and method
 
 - [Requested course](https://dlab.elice.io/courses/765886/lectures/all) and [introductory chapter](https://dlab.elice.io/courses/765886/lectures/6637911#list).

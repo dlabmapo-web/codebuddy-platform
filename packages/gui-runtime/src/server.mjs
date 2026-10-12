@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { StringDecoder } from "node:string_decoder";
 import { WebSocketServer } from "ws";
 import { equalSecret, validateRun, terminalParser } from "./policy.mjs";
+import { runtimeImages, selectRuntimeImage } from "./runtime-images.mjs";
 const exec = promisify(execFile);
 const secret = process.env.GUI_SERVICE_SECRET;
 if (!secret || secret.length < 32)
@@ -25,10 +26,11 @@ const seccomp = fileURLToPath(
 const sessions = new Map();
 const docker = (...args) =>
   exec("docker", args, { maxBuffer: 1024 * 1024, timeout: 30000 });
-const approvedImage = JSON.parse(
-  (await docker("image", "inspect", image)).stdout,
-)[0].Id;
-const runtimeInfo = JSON.parse(
+const versions = new Map();
+let runtimeVersion;
+for (const approvedReference of runtimeImages(image, process.env.GUI_RETAINED_RUNTIME_IMAGES, process.env.NODE_ENV === "production")) {
+  const approvedImage = JSON.parse((await docker("image", "inspect", approvedReference)).stdout)[0].Id;
+  const runtimeInfo = JSON.parse(
   (
     await docker(
       "run",
@@ -46,7 +48,10 @@ const runtimeInfo = JSON.parse(
     )
   ).stdout,
 );
-const runtimeVersion = `${approvedImage};python=${runtimeInfo.python};tk=${runtimeInfo.tk}`;
+  const version = `${approvedImage};python=${runtimeInfo.python};tk=${runtimeInfo.tk}`;
+  versions.set(version, approvedImage);
+  if (approvedReference === image) runtimeVersion = version;
+}
 async function stop(s, state = "STOPPED") {
   if (s.closed) return;
   s.closed = true;
@@ -67,11 +72,7 @@ async function stop(s, state = "STOPPED") {
 }
 async function start(body) {
   const data = validateRun(body);
-  if (body.runtimeVersion && body.runtimeVersion !== runtimeVersion)
-    throw Object.assign(
-      new Error("The saved runtime version is not available"),
-      { status: 503 },
-    );
+  const runtimeImage = selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion);
   const pendingBytes = Buffer.byteLength(JSON.stringify(data));
   if (
     [...sessions.values()].reduce(
@@ -106,6 +107,7 @@ async function start(body) {
     id,
     container,
     owner: data.owner,
+    runtimeImage,
     token: randomBytes(32).toString("hex"),
     state: busy ? "QUEUED" : "STARTING",
     data,
@@ -170,7 +172,7 @@ async function launch(s) {
       `GUI_WIDTH=${data.width}`,
       "-e",
       `GUI_HEIGHT=${data.height}`,
-      approvedImage,
+      s.runtimeImage,
     );
     for (let i = 0; i < 80; i++) {
       if (s.closed) throw new Error("Start cancelled");
@@ -241,7 +243,7 @@ async function launch(s) {
       JSON.stringify({
         event: "gui.started",
         sessionId: s.id,
-        runtimeImage: approvedImage,
+        runtimeImage: s.runtimeImage,
         width: data.width,
         height: data.height,
         memoryLimitMb: data.memoryLimitMb,

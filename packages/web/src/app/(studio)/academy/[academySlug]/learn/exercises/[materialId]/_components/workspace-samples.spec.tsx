@@ -42,6 +42,7 @@ vi.mock('@/components/workspace/curriculum-trigger', () => ({ CurriculumTrigger:
 vi.mock('@/components/workspace/problem-statement', () => ({ ProblemStatement: () => null }));
 vi.mock('@/components/monitoring/request-help', () => ({ RequestHelp: () => null }));
 vi.mock('@/components/monitoring/remote-pointer', () => ({ RemotePointer: () => null }));
+vi.mock('@/components/video/video-resource-links', () => ({ VideoResourceLinks: () => null }));
 import { Workspace } from './workspace';
 
 const bootstrap = {

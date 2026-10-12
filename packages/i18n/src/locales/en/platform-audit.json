@@ -152,6 +152,15 @@
         "deleted": "PDF removed",
         "moved": "PDF moved",
         "visibility": "PDF shown or hidden"
+      },
+      "manual": {
+        "created": "Question or turtle activity created",
+        "updated": "Question or turtle activity updated",
+        "visibility": "Question or turtle activity shown or hidden"
+      },
+      "video": {
+        "saved": "Video lesson saved",
+        "visibility": "Video lesson shown or hidden"
       }
     },
     "platform": {
@@ -215,6 +224,14 @@
       "identity": {
         "unlink_requested": "Social account disconnect requested",
         "unlinked": "Social account disconnected"
+      }
+    },
+    "manual": {
+      "draft": {
+        "teacher_edited": "Student draft edited by a teacher"
+      },
+      "review": {
+        "published": "Teacher review published"
       }
     }
   }

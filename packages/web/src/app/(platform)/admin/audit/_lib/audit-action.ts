@@ -213,6 +213,9 @@ export const auditActionLabels: Record<
   'content.lecture.updated': 'action.content.lecture.updated',
   'content.lecture.visibility_changed':
     'action.content.lecture.visibility_changed',
+  'content.manual.created': 'action.content.manual.created',
+  'content.manual.updated': 'action.content.manual.updated',
+  'content.manual.visibility': 'action.content.manual.visibility',
   'content.pdf.created': 'action.content.pdf.created',
   'content.pdf.updated': 'action.content.pdf.updated',
   'content.pdf.deleted': 'action.content.pdf.deleted',
@@ -230,6 +233,10 @@ export const auditActionLabels: Record<
     'action.content.programming_exercise.updated',
   'content.programming_exercise.visibility_changed':
     'action.content.programming_exercise.visibility_changed',
+  'content.video.saved': 'action.content.video.saved',
+  'content.video.visibility': 'action.content.video.visibility',
+  'manual.draft.teacher_edited': 'action.manual.draft.teacher_edited',
+  'manual.review.published': 'action.manual.review.published',
   'monitoring.exercise_solution.viewed':
     'action.monitoring.exercise_solution.viewed',
   'platform.academy.archived': 'action.platform.academy.archived',

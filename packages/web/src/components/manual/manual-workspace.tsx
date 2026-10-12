@@ -71,6 +71,8 @@ export function ManualWorkspace({
   const active = useRef<string | null>(null);
   const connectionFailed = useRef(false);
   const latest = useRef({ files, answer });
+  // Latest-value ref read only by autosave callbacks, never by render output.
+  // eslint-disable-next-line react-hooks/refs
   latest.current = { files, answer };
   const showError = useCallback((text: string) => setError(text), []);
   useEffect(() => {
@@ -393,6 +395,8 @@ export function ManualWorkspace({
           {mt("materials")}
         </button>
       </header>
+      {/* Assigned when a draft loads, alongside state that re-renders. */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       {explicit && loadedContentRevision.current !== data.config.revision ? (
         <p role="alert" className="p-3 text-danger">
           {mt("content_changed")}
@@ -706,6 +710,8 @@ export function ManualWorkspace({
                 ? mt("seconds_remaining", {
                     count: Math.max(
                       0,
+                      // A countdown: session polling re-renders this while a run is active.
+                      // eslint-disable-next-line react-hooks/purity
                       Math.ceil((session!.expiresAt - Date.now()) / 1000),
                     ),
                   })

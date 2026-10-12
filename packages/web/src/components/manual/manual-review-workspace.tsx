@@ -70,6 +70,8 @@ export function ManualReviewWorkspace({
     review = attempt?.reviews[0];
   const effective = effectiveManualResult(attempt);
   useEffect(() => {
+    // Resets the review form to the newly selected attempt's saved result.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setScore((effective?.scoreHundredths ?? 0) / 100);
     setCompleted(effective?.completed ?? false);
     setFeedback(review?.feedback ?? "");
@@ -83,6 +85,8 @@ export function ManualReviewWorkspace({
   useEffect(() => {
     if (active.current) void manualApi.stop(active.current).catch(() => {});
     active.current = null;
+    // Changing learner or attempt ends the previous rerun session.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(null);
     setEditing(false);
   }, [learner?.userId, attempt?.id]);

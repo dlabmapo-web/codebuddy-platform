@@ -41,6 +41,8 @@ export function VideoLesson({
   const data = query.data;
   useEffect(() => {
     if (!chosen && data?.classes.length === 1)
+      // A single-class learner has nothing to choose; adopt it once the read arrives.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChosen(data.classes[0].classId);
   }, [chosen, data?.classes]);
   const index =

@@ -118,6 +118,8 @@ export function useVideoProgress(
   return {
     progress,
     error,
+    // The session ref is assigned together with setProgress, which re-renders.
+    // eslint-disable-next-line react-hooks/refs
     ready: !target.enabled || Boolean(progress?.sessionId && session.current),
     checkpoint,
     retry: () => {

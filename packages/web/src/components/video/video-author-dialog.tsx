@@ -80,6 +80,8 @@ export function VideoAuthorDialog({
   useEffect(() => {
     if (query.data) {
       const data = query.data;
+      // Seeds the editable form from the saved lesson when it loads.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDescription(data.config.description);
       setPlacement(data.config.placement);
       setIncluded(data.config.includeInScore);
@@ -325,6 +327,8 @@ export function VideoAuthorDialog({
                 {asset.failureCode ? ` · ${asset.failureCode}` : ""}
               </p>
             ) : null}
+            {/* Every upload transition also sets busy/error, so this ref is current when read. */}
+            {/* eslint-disable-next-line react-hooks/refs */}
             {busy && upload.current ? (
               <button
                 type="button"
@@ -337,6 +341,8 @@ export function VideoAuthorDialog({
                 {t("pause_upload")}
               </button>
             ) : null}
+            {/* Every upload transition also sets busy/error, so this ref is current when read. */}
+            {/* eslint-disable-next-line react-hooks/refs */}
             {upload.current && error ? (
               <button
                 type="button"

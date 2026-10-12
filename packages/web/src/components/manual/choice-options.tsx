@@ -58,6 +58,8 @@ export function ChoiceRich({
     const doc = new DOMParser().parseFromString(safe, "text/html");
     const images = Array.from(doc.querySelectorAll("img"));
     for (const image of images) image.removeAttribute("src");
+    // DOMParser exists only in the browser, so sanitised HTML is set after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHtml(doc.body.innerHTML);
     if (scope || resolvePrivate)
       void Promise.all(

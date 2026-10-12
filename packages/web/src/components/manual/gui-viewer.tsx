@@ -19,6 +19,8 @@ export function GuiViewer({
 }) {
   const { t: mt } = useManualTranslation();
   const state = useRef(session.state);
+  // Latest-value ref read only by socket callbacks, never by render output.
+  // eslint-disable-next-line react-hooks/refs
   state.current = session.state;
   const admitted = session.state !== "QUEUED";
   const [connection, setConnection] = useState("connecting");

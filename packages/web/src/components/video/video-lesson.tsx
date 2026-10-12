@@ -14,6 +14,7 @@ import { ChoiceRich } from "@/components/manual/choice-options";
 import { VideoPlayer } from "./video-player";
 import { VideoWatchHistory } from "./video-watch-history";
 import { VideoResource } from "./video-resource";
+import { retryVideoRead, videoReadRetryDelay } from "./video-read-recovery";
 export function VideoLesson({
   academyId,
   materialId,
@@ -36,7 +37,8 @@ export function VideoLesson({
     queryKey: ["video", academyId, materialId, chosen, preview],
     queryFn: () =>
       videoApi.read({ academyId, materialId, classId: chosen, preview }),
-    retry: false,
+    retry: retryVideoRead,
+    retryDelay: videoReadRetryDelay,
   });
   const data = query.data;
   useEffect(() => {
@@ -68,7 +70,17 @@ export function VideoLesson({
   if (!data)
     return (
       <main role={query.isError ? "alert" : "status"} className="p-6">
-        {t(query.isError ? "unavailable" : "loading")}
+        <p>{t(query.isError ? "unavailable" : "loading")}</p>
+        {query.isError ? (
+          <button
+            type="button"
+            className="mt-3 rounded border border-border px-4 py-2 text-brand"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {t("retry")}
+          </button>
+        ) : null}
       </main>
     );
   const lecture = data.materials.filter((m) => m.lectureId === data.lecture.id),

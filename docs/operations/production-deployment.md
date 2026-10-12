@@ -62,6 +62,8 @@ The GitHub release workflow repeats this synchronization. It never overwrites
 `deployment.env`, real files in `secrets/`, or rendered secret-bearing
 configuration. The second `rsync` copies only tracked `.example` templates;
 the exclusion protects all server-owned secret files from deletion.
+The root synchronization must not use `--delete`: `/opt/cove` also contains
+video scratch data and deployment state that are not repository assets.
 
 ## 4. Create production configuration
 

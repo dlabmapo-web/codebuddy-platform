@@ -133,7 +133,8 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          rsync -az --delete \
+          # /opt/cove also contains server-owned runtime data and release history.
+          rsync -az \
             --exclude deployment.env \
             --exclude generated/ \
             --exclude secrets/ \

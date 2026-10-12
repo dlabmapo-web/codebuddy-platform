@@ -7,7 +7,7 @@ import { useManualTranslation } from "./use-manual-translation";
 import { RichEditor } from "@/components/editor/RichEditor";
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useAcademySlug } from "@/components/studio/academy-route-provider";
+import { useContentAcademySlug } from "@/components/studio/content-base-path-provider";
 import { Modal, ModalContent } from "@/components/studio/primitives";
 import {
   manualConfigSchema,
@@ -34,7 +34,7 @@ export function ManualAuthorDialog({
   onSaved: () => Promise<unknown>;
 }) {
   const { t: mt } = useManualTranslation();
-  const slug = useAcademySlug();
+  const slug = useContentAcademySlug();
   const imageUrls = useRef(new Map<string, string>());
   useEffect(
     () => () => {

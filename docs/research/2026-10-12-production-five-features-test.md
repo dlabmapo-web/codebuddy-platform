@@ -92,3 +92,28 @@ including execution after a default-image upgrade and exact container-image
 verification, plus the isolation/lifecycle cases. Six policy/registry checks
 and eight rollout checks pass. This follow-up source fix requires release;
 the operational runtime restoration is already applied to production.
+
+## v2.0.33 final runtime-retention verification
+
+[Release run 38286594823](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/38286594823)
+completed successfully for commit `2491c7c891026d4762711cd1412692d71d5d9194`.
+Production public smoke checks passed after the release and after QA cleanup.
+The permanent retention fix is now deployed; the temporary default-image
+restoration described above is no longer required.
+
+The broker reported a new default runtime image beginning `d2b70e928297`, while
+the existing QA lesson and saved submission recorded the older approved image
+beginning `89dc2d6a560b`. Student john10 ran the existing lesson successfully:
+the square rendered and the terminal displayed `QA square drawn`. Teacher
+mapo-teacher1 then reran the immutable saved submission with the same result.
+Server Docker inspection confirmed both sessions used image `89dc2d6a560b`,
+rather than the broker's newer default. Both sessions stopped successfully.
+No new submission or published review was created during this verification;
+the existing 100/100, Completed status and feedback remained intact.
+
+The QA course was hidden and the separate QA class archived again, with both
+states verified in the team-lead UI. Test accounts were signed out. The final
+broker health check reported ready with zero active sessions. This release
+check specifically exercised retained turtle execution and teacher replay;
+the other four core feature workflows were covered by the preceding live
+tests, with the configuration and parity limits above still applicable.

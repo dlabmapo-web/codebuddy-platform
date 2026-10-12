@@ -31,6 +31,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
+    {name:"webkit-video",testMatch:/video-materials\.spec\.ts/,use:{...devices["Desktop Safari"]}},
     {name:"webkit-multiple-choice", testMatch:/multiple-choice-materials\.spec\.ts/, use:{...devices["Desktop Safari"]}},
     { name: 'webkit-short-answer', testMatch: /short-answer-materials\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
     { name: 'webkit-turtle', testMatch: /turtle-materials\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
@@ -96,7 +97,7 @@ export default defineConfig({
     : [
         {
           command: 'pnpm --filter @cove/api dev',
-          env: {MULTIPLE_CHOICE_ENABLED:process.env.E2E_MULTIPLE_CHOICE_ENABLED === "1" ? "true" : "false",SHORT_ANSWER_ENABLED:process.env.E2E_SHORT_ANSWER_ENABLED === '1' ? 'true' : 'false'},
+          env: {VIDEO_LESSONS_ENABLED:process.env.E2E_VIDEO_ENABLED === "1"?"true":"false",MULTIPLE_CHOICE_ENABLED:process.env.E2E_MULTIPLE_CHOICE_ENABLED === "1" ? "true" : "false",SHORT_ANSWER_ENABLED:process.env.E2E_SHORT_ANSWER_ENABLED === '1' ? 'true' : 'false'},
           url: 'http://localhost:4000/api/health',
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
@@ -111,7 +112,7 @@ export default defineConfig({
         },
         {
           command: `pnpm --filter @cove/web dev --port ${webPort}`,
-          env: { NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED:process.env.E2E_MULTIPLE_CHOICE_ENABLED === "1" ? "true" : "false", NEXT_PUBLIC_SHORT_ANSWER_ENABLED: process.env.E2E_SHORT_ANSWER_ENABLED === '1' ? 'true' : 'false', NEXT_PUBLIC_TURNSTILE_SITE_KEY: turnstileTestSiteKey, NEXT_PUBLIC_GUI_ENABLED: process.env.E2E_GUI_ENABLED === '1' ? 'true' : 'false' },
+          env: { NEXT_PUBLIC_VIDEO_LESSONS_ENABLED:process.env.E2E_VIDEO_ENABLED === "1"?"true":"false", NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED:process.env.E2E_MULTIPLE_CHOICE_ENABLED === "1" ? "true" : "false", NEXT_PUBLIC_SHORT_ANSWER_ENABLED: process.env.E2E_SHORT_ANSWER_ENABLED === '1' ? 'true' : 'false', NEXT_PUBLIC_TURNSTILE_SITE_KEY: turnstileTestSiteKey, NEXT_PUBLIC_GUI_ENABLED: process.env.E2E_GUI_ENABLED === '1' ? 'true' : 'false' },
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

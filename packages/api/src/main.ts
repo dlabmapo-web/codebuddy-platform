@@ -48,6 +48,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.use("/api/manual", manualJsonBodyParser());
+  app.use("/api/videos", manualJsonBodyParser());
   app.setGlobalPrefix("api");
   app.enableCors({
     credentials: true,

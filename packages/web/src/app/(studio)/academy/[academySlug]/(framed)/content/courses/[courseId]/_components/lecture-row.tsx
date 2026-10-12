@@ -1,3 +1,4 @@
+import {VideoAuthorDialog} from "@/components/video/video-author-dialog";
 import { publicConfig } from '@/lib/config';
 import { useManualTranslation } from '@/components/manual/use-manual-translation';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
@@ -122,6 +123,7 @@ function ExerciseRow({
   const [pdfPreview, setPdfPreview] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [manualOpen,setManualOpen]=useState(false);
+  const [videoOpen,setVideoOpen]=useState(false);
   const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE'||material.type==='MULTIPLE_CHOICE';
   const rowEditable =
     material.type !== 'PROGRAMMING_EXERCISE'
@@ -168,7 +170,7 @@ function ExerciseRow({
         <FileText aria-hidden className="size-4 shrink-0 text-brand" />
       ) : null}
       <div className="min-w-0 flex-1">
-        {isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':material.type==='MULTIPLE_CHOICE'?'Multiple choice':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        {material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{t('content:video.badge')} · {material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':material.type==='MULTIPLE_CHOICE'?'Multiple choice':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={titleClass}
@@ -276,6 +278,7 @@ function ExerciseRow({
         open={deleting}
       />
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
+      {videoOpen?<VideoAuthorDialog target={{...builder.target,lectureId}} material={material} editable={rowEditable} onClose={()=>setVideoOpen(false)} onSaved={builder.refresh}/>:null}
       {pdfOpen ? (
         <PdfAuthorDialog
           target={{ ...builder.target, lectureId }}
@@ -314,6 +317,7 @@ export function LectureRow({
   const {t:mt}=useManualTranslation();
   const [manualAdding,setManualAdding]=useState(false);
   const [choiceAdding,setChoiceAdding] = useState(false);
+  const [videoAdding,setVideoAdding]=useState(false);
   const [shortAdding,setShortAdding]=useState(false);
   const [writtenAdding,setWrittenAdding]=useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -476,6 +480,8 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
+        {publicConfig.videoEnabled && builder.editable ? <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={()=>setVideoAdding(true)}>{t('content:video.add')}</button>:null}
+        {videoAdding?<VideoAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setVideoAdding(false)} onSaved={builder.refresh}/>:null}
         {choiceAdding ? <ManualAuthorDialog type="MULTIPLE_CHOICE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setChoiceAdding(false)} onSaved={builder.refresh}/> : null}
         {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}
         {writtenAdding ? <ManualAuthorDialog type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setWrittenAdding(false)} onSaved={builder.refresh}/> : null}

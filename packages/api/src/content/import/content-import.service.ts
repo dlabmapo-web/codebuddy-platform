@@ -198,7 +198,7 @@ export class ContentImportService {
     const course = await this.requireCourse(input.academyId, input.courseId);
 
     if (
-      await this.prisma.manualMaterial.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.pdfDocument.count({
+      await this.prisma.videoLesson.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.manualMaterial.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.pdfDocument.count({
         where: {
           material: { lecture: { courseModule: { courseId: input.courseId } } },
         },

@@ -1,4 +1,6 @@
 'use client';
+import {videoApi} from "@/lib/video-api";
+
 import { manualApi } from '@/lib/manual-api';
 import { pdfApi } from '@/lib/pdf-api';
 
@@ -232,7 +234,7 @@ export function useCourseBuilder({
       materialId: string;
       isVisible: boolean;
     }) =>
-      isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
+      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getTree(target))
@@ -256,10 +258,11 @@ export function useCourseBuilder({
     }) => orpc.academyCourses.moveLecture({ ...target, ...input }),
     onSuccess: applyTree,
   });
+  const isVideo=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&x.type==='VIDEO_LESSON')));
   const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'||x.type==='MULTIPLE_CHOICE'))));
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
-      isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
+      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getTree(target))

@@ -76,12 +76,15 @@ function build(source=master) {
     material: [],
     programmingExercise: [],
     manualMaterial: [],
+    videoLesson: [],
     exerciseTestCase: [],
     exerciseHint: [],
   };
   let courseData: Record<string, unknown> = {};
 
   const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    videoAsset: {findUnique: vi.fn().mockResolvedValue({state: "READY"})},
     course: {
       create: vi.fn(({ data }) => {
         courseData = data;
@@ -300,4 +303,16 @@ describe('manual material adoption',()=>{
   expect(created.manualMaterial[0]).not.toHaveProperty('submissions');expect(created.manualMaterial[0]).not.toHaveProperty('drafts');
   expect(created.material[0]).toMatchObject({type:'TURTLE_EXERCISE',isVisible:true});expect(created.manualMaterial[0]).toHaveProperty('materialId');
  });
+});
+
+it("adopts immutable ready video assets with hidden fresh lessons and no watch records",async()=>{
+ const videoLesson={assetId:"00000000-0000-4000-8000-000000000009",description:"Original description",placement:"BOTH",includeInScore:true,maximumHundredths:10000,thresholdBasisPoints:9000,captions:[],assets:[],revision:9};
+ const source={...master,modules:[{...master.modules[0],lectures:[{...master.modules[0].lectures[0],materials:[{title:"Video",type:"VIDEO_LESSON",position:1,isRequired:true,isVisible:true,videoLesson}]}]}]} as unknown as typeof master;
+ const {service,created}=build(source);
+ await service.adopt(identity,{academyId:branchId,libraryCourseId:masterId,title:"Video copy"});
+ expect(created.videoLesson).toHaveLength(1);
+ expect(created.videoLesson[0]).toMatchObject({...videoLesson,revision:1});
+ expect(created.material[0]).toMatchObject({type:"VIDEO_LESSON",isVisible:false});
+ expect(created.videoLesson[0]).not.toHaveProperty("progress");
+ expect(created.programmingExercise).toHaveLength(0);
 });

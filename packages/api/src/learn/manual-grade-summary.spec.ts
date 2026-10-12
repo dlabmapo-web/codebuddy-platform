@@ -86,3 +86,13 @@ describe("manual course assessment projection", () => {
     });
   });
 });
+
+it("includes ready main video scores and excludes resources, practice and processing", () => {
+ const video = (id: string, includeInScore: boolean, placement: string, state = "READY") => ({id, videoLesson: {includeInScore, placement, maximumHundredths: 10000, asset: {state}}});
+ const course = {modules:[{lectures:[{materials:[video("complete",true,"MAIN"),video("incomplete",true,"BOTH"),video("practice",false,"MAIN"),video("resource",true,"SUPPLEMENTARY"),video("processing",true,"MAIN","PROCESSING")]}]}]} as unknown as Course;
+ const statuses: ProgressByMaterial = new Map([
+  ["complete", {status:"SOLVED",bestScore:0,scoreHundredths:10000,maximumHundredths:10000}],
+  ["incomplete", {status:"IN_PROGRESS",bestScore:0,scoreHundredths:0,maximumHundredths:10000}],
+ ]);
+ expect(manualGradeSummaryFor(course,statuses)).toEqual({maximumHundredths:20000,scoreHundredths:10000,reviewed:2,pending:0});
+});

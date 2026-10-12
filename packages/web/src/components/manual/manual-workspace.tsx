@@ -1,4 +1,5 @@
 "use client";
+import {VideoResourceLinks} from "@/components/video/video-resource-links";
 import {
   ChoiceOptions,
   ChoiceAttempt,
@@ -537,6 +538,7 @@ export function ManualWorkspace({
               )}
             </section>
           ) : null}
+      <VideoResourceLinks academyId={academyId} materialId={materialId} classId={selectedClass} preview={preview}/>
           {drawer ? (
             <nav className="mt-5 grid gap-2">
               {data.materials.map((m) => (

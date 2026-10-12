@@ -288,7 +288,7 @@ export class LearnService {
           id: lecture.id,
           position: lecture.position,
           exercises: lecture.materials.flatMap((item) =>
-            (item.programmingExercise || item.manualMaterial || (item.pdfDocument?.asset.state === "READY" && item.pdfDocument.placement !== "SUPPLEMENTARY"))
+            (item.programmingExercise || item.manualMaterial || (item.videoLesson?.asset.state === "READY" && item.videoLesson.placement !== "SUPPLEMENTARY") || (item.pdfDocument?.asset.state === "READY" && item.pdfDocument.placement !== "SUPPLEMENTARY"))
               ? [{ materialId: item.id, title: item.title, position: item.position }]
               : []
           ),

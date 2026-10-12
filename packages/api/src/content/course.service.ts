@@ -1,3 +1,4 @@
+import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import {
   quizDefinitionSchema,
@@ -91,6 +92,7 @@ const treeInclude = {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
+              videoLesson: { include: { asset: true } },
               pdfDocument: { include: { asset: true } },
               manualMaterial:true,
               programmingExercise: {
@@ -1898,6 +1900,7 @@ function toCourseTree(course: CourseRecord) {
           isRequired: material.isRequired,
           isVisible: material.isVisible,
           manualMaterial: material.manualMaterial ? {revision:material.manualMaterial.revision,includeInScore:material.manualMaterial.includeInScore,submitEnabled:material.manualMaterial.submitEnabled,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
+          videoLesson:material.videoLesson?videoMetadata(material.videoLesson):null,
           pdfDocument: material.pdfDocument
             ? pdfMetadata(material.pdfDocument)
             : null,

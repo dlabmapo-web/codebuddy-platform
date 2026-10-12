@@ -1,4 +1,5 @@
 'use client';
+import {VideoResourceLinks} from '@/components/video/video-resource-links';
 
 import { QuizWorkspace } from './quiz-workspace';
 import { routes } from '@/lib/routes';
@@ -525,6 +526,7 @@ function ProgrammingWorkspace({
         />
       ))}
 
+      <VideoResourceLinks academyId={academyId} materialId={exercise.materialId} classId={classId}/>
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader
           feedback={

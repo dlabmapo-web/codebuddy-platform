@@ -162,6 +162,7 @@ enum MonitoringVisitEndReason {
 }
 
 enum MaterialType {
+  VIDEO_LESSON
   PROGRAMMING_EXERCISE
   PDF_DOCUMENT
   TURTLE_EXERCISE
@@ -1561,6 +1562,8 @@ model Lecture {
 }
 
 model Material {
+  videoLesson       VideoLesson?
+  videoProgress     VideoWatchProgress[]
   manualMaterial    ManualMaterial?
   manualDrafts      ManualDraft[]
   manualSubmissions ManualSubmission[]
@@ -2398,8 +2401,8 @@ model PdfDocument {
 }
 
 model ManualMaterial {
-  multipleChoice Json? @map("multiple_choice")
-  shortAnswer Json? @map("short_answer")
+  multipleChoice    Json?    @map("multiple_choice")
+  shortAnswer       Json?    @map("short_answer")
   materialId        String   @id @map("material_id") @db.Uuid
   description       String   @default("")
   files             Json     @default("{}")
@@ -2438,25 +2441,25 @@ model ManualDraft {
 }
 
 model ManualSubmission {
-  id                String         @id @default(uuid()) @db.Uuid
-  materialId        String         @map("material_id") @db.Uuid
-  userId            String         @map("user_id") @db.Uuid
-  classId           String         @map("class_id") @db.Uuid
-  files             Json
-  answer            String         @default("")
-  profile           Json
-  revision          Int
-  maximumHundredths Int            @map("maximum_hundredths")
-  includeInScore    Boolean        @map("include_in_score")
-  requestKey        String         @map("request_key") @db.Uuid
-  reviewVersion     Int            @default(0) @map("review_version")
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  material          Material       @relation(fields: [materialId], references: [id], onDelete: Restrict)
-  user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-  class             Class          @relation(fields: [classId], references: [id], onDelete: Restrict)
-  shortAnswerAssessment ShortAnswerAssessment?
+  id                       String                    @id @default(uuid()) @db.Uuid
+  materialId               String                    @map("material_id") @db.Uuid
+  userId                   String                    @map("user_id") @db.Uuid
+  classId                  String                    @map("class_id") @db.Uuid
+  files                    Json
+  answer                   String                    @default("")
+  profile                  Json
+  revision                 Int
+  maximumHundredths        Int                       @map("maximum_hundredths")
+  includeInScore           Boolean                   @map("include_in_score")
+  requestKey               String                    @map("request_key") @db.Uuid
+  reviewVersion            Int                       @default(0) @map("review_version")
+  createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  material                 Material                  @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  user                     User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  class                    Class                     @relation(fields: [classId], references: [id], onDelete: Restrict)
+  shortAnswerAssessment    ShortAnswerAssessment?
   multipleChoiceAssessment MultipleChoiceAssessment?
-  reviews           ManualReview[]
+  reviews                  ManualReview[]
 
   @@unique([userId, requestKey])
   @@index([materialId, classId, userId, createdAt])
@@ -2497,31 +2500,135 @@ model ManualAsset {
 
 /// Server-only immutable assessment definition and durable evaluation job/result.
 model ShortAnswerAssessment {
-  submissionId String @id @map("submission_id") @db.Uuid
-  definition Json
-  evaluatorVersion String @default("short-answer-js-v1") @map("evaluator_version")
-  status String
-  verdict String?
-  scoreHundredths Int? @map("score_hundredths")
-  completed Boolean?
-  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(6)
-  evaluatedAt DateTime? @map("evaluated_at") @db.Timestamptz(6)
-  submission ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId     String           @id @map("submission_id") @db.Uuid
+  definition       Json
+  evaluatorVersion String           @default("short-answer-js-v1") @map("evaluator_version")
+  status           String
+  verdict          String?
+  scoreHundredths  Int?             @map("score_hundredths")
+  completed        Boolean?
+  leaseUntil       DateTime?        @map("lease_until") @db.Timestamptz(6)
+  evaluatedAt      DateTime?        @map("evaluated_at") @db.Timestamptz(6)
+  submission       ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
   @@index([status, leaseUntil])
   @@map("short_answer_assessments")
 }
 
 model MultipleChoiceAssessment {
-  submissionId String @id @map("submission_id") @db.Uuid
-  definition Json
-  selectedOptionIds Json @map("selected_option_ids")
-  displayOrder Json @map("display_order")
-  evaluatorVersion String @default("multiple-choice-set-v1") @map("evaluator_version")
-  status String @default("GRADED")
-  verdict String
-  scoreHundredths Int @map("score_hundredths")
-  completed Boolean
-  evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
-  submission ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId      String           @id @map("submission_id") @db.Uuid
+  definition        Json
+  selectedOptionIds Json             @map("selected_option_ids")
+  displayOrder      Json             @map("display_order")
+  evaluatorVersion  String           @default("multiple-choice-set-v1") @map("evaluator_version")
+  status            String           @default("GRADED")
+  verdict           String
+  scoreHundredths   Int              @map("score_hundredths")
+  completed         Boolean
+  evaluatedAt       DateTime         @default(now()) @map("evaluated_at") @db.Timestamptz(6)
+  submission        ManualSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
   @@map("multiple_choice_assessments")
+}
+
+model VideoAsset {
+  id             String               @id @default(uuid()) @db.Uuid
+  requestKey     String               @unique @map("request_key") @db.Uuid
+  objectKey      String               @unique @map("object_key")
+  uploaderUserId String               @map("uploader_user_id") @db.Uuid
+  academyId      String               @map("academy_id") @db.Uuid
+  courseId       String               @map("course_id") @db.Uuid
+  lectureId      String               @map("lecture_id") @db.Uuid
+  filename       String
+  byteSize       BigInt               @map("byte_size")
+  durationMs     Int                  @default(0) @map("duration_ms")
+  processingVersion String @default("ffmpeg-h264-v1") @map("processing_version")
+  processingMetadata Json @default("{}") @map("processing_metadata")
+  checksum       String               @default("")
+  state          String               @default("UPLOADING")
+  failureCode    String?              @map("failure_code")
+  outputs        Json                 @default("[]")
+  renditions     Json                 @default("[]")
+  consumedAt     DateTime?            @map("consumed_at") @db.Timestamptz(6)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lessons        VideoLesson[]
+  progress       VideoWatchProgress[]
+  job            VideoProcessingJob?
+  captions       VideoCaption[]
+
+  @@index([state, createdAt])
+  @@map("video_assets")
+}
+
+model VideoLesson {
+  assets Json @default("[]")
+  materialId           String     @id @map("material_id") @db.Uuid
+  assetId              String     @map("asset_id") @db.Uuid
+  requestKey           String     @unique @map("request_key") @db.Uuid
+  revision             Int        @default(1)
+  description          String     @default("")
+  placement            String     @default("MAIN")
+  includeInScore       Boolean    @default(false) @map("include_in_score")
+  maximumHundredths    Int        @default(10000) @map("maximum_hundredths")
+  thresholdBasisPoints Int        @default(9000) @map("threshold_basis_points")
+  captions             Json       @default("[]")
+  material             Material   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  asset                VideoAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([assetId])
+  @@map("video_lessons")
+}
+
+model VideoCaption {
+  id             String     @id @default(uuid()) @db.Uuid
+  assetId        String     @map("asset_id") @db.Uuid
+  objectKey      String     @unique @map("object_key")
+  uploaderUserId String     @map("uploader_user_id") @db.Uuid
+  language       String
+  label          String
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset          VideoAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@map("video_captions")
+}
+
+model VideoProcessingJob {
+  assetId       String     @id @map("asset_id") @db.Uuid
+  status        String     @default("PENDING")
+  attempts      Int        @default(0)
+  leaseId       String?    @map("lease_id") @db.Uuid
+  leaseUntil    DateTime?  @map("lease_until") @db.Timestamptz(6)
+  nextAttemptAt DateTime   @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  asset         VideoAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@map("video_processing_jobs")
+}
+
+model VideoWatchProgress {
+  id                   String     @id @default(uuid()) @db.Uuid
+  materialId           String     @map("material_id") @db.Uuid
+  assetId              String     @map("asset_id") @db.Uuid
+  userId               String     @map("user_id") @db.Uuid
+  classId              String     @map("class_id") @db.Uuid
+  intervals            Json       @default("[]")
+  positionMs           Int        @default(0) @map("position_ms")
+  watchedMs            Int        @default(0) @map("watched_ms")
+  completed            Boolean    @default(false)
+  thresholdBasisPoints Int        @map("threshold_basis_points")
+  maximumHundredths    Int        @map("maximum_hundredths")
+  policyVersion        String     @default("video-watch-v1") @map("policy_version")
+  sessionId            String     @map("session_id") @db.Uuid
+  sequence             Int        @default(0)
+  previousPlaying      Boolean    @default(false) @map("previous_playing")
+  sampleElapsedMs      Int        @default(0) @map("sample_elapsed_ms")
+  sessionStartedAt     DateTime   @default(now()) @map("session_started_at") @db.Timestamptz(6)
+  updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  material             Material   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  asset                VideoAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([materialId, assetId, userId, classId])
+  @@index([userId, classId, materialId])
+  @@map("video_watch_progress")
 }

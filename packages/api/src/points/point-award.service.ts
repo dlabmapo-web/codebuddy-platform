@@ -480,6 +480,7 @@ export class PointAwardService {
       OR: [
         { type: "PROGRAMMING_EXERCISE" as const },
         { manualMaterial: { includeInScore: true } },
+        { videoLesson:{includeInScore:true,placement:{not:"SUPPLEMENTARY"},asset:{state:"READY"}} },
       ],
       isVisible: true,
       lecture: {
@@ -507,7 +508,7 @@ export class PointAwardService {
           in: visible
             .filter(
               (m) =>
-                m.type !== "TURTLE_EXERCISE" && m.type !== "WRITTEN_RESPONSE" && m.type !== "MULTIPLE_CHOICE",
+                m.type === "PROGRAMMING_EXERCISE",
             )
             .map((material) => material.id),
         },
@@ -537,8 +538,11 @@ export class PointAwardService {
           },
         })
       : [];
+    const videoIds=visible.filter(m=>m.type==="VIDEO_LESSON").map(m=>m.id);
+    const videoProgress=videoIds.length?await tx.videoWatchProgress.findMany({where:{userId,classId,materialId:{in:videoIds},completed:true},include:{material:{include:{videoLesson:true}}}}):[];
+    const videosCompleted=new Set(videoProgress.filter(p=>p.assetId===p.material.videoLesson?.assetId).map(p=>p.materialId)).size;
     return (
-      solved +
+      videosCompleted + solved +
         attempts.filter((a) => a.includeInScore && effectiveManualResult(a)?.completed)
           .length >=
       visible.length

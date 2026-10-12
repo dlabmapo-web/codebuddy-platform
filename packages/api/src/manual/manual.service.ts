@@ -440,6 +440,7 @@ export class ManualService {
           if (
             item.programmingExercise ||
             item.manualMaterial ||
+            (item.videoLesson?.asset.state === "READY" && item.videoLesson.placement !== "SUPPLEMENTARY") ||
             (item.pdfDocument?.asset.state === "READY" &&
               item.pdfDocument.placement !== "SUPPLEMENTARY")
           )

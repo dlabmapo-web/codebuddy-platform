@@ -1,3 +1,4 @@
+import {videoMetadataSchema} from "./video.js";
 import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
 import { pdfMetadataSchema } from "./pdf.js";
@@ -79,6 +80,7 @@ export const learnLectureSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   position: positionSchema,
+  videos:z.array(z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,video:videoMetadataSchema,status:exerciseProgressStatusSchema})).optional(),
   exercises: z.array(learnExerciseSummarySchema),
   manualMaterials:z.array(learnManualSummarySchema).optional(),
   documents: z
@@ -321,6 +323,7 @@ export const navigatorLectureSchema = z.object({
   title: titleSchema,
   position: positionSchema,
   exercises: z.array(navigatorExerciseSchema),
+  videos:learnLectureSchema.shape.videos,
   documents: learnLectureSchema.shape.documents,
   manualMaterials:learnLectureSchema.shape.manualMaterials,
 });
@@ -560,6 +563,7 @@ export function toNavigatorContext(
           id: lecture.id,
           title: lecture.title,
           position: lecture.position,
+          videos:lecture.videos,
           documents: lecture.documents,
           manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({

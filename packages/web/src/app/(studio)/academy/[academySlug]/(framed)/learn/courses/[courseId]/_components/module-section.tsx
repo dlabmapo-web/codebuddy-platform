@@ -1,4 +1,6 @@
 'use client';
+import {useVideoTranslation} from "@/components/video/use-video-translation";
+
 
 import { useManualTranslation } from '@/components/manual/use-manual-translation';
 import { PdfResourceLink } from '@/components/pdf/pdf-resource-link';
@@ -39,6 +41,7 @@ export function ModuleSection({
   requestedLectureId: string | null;
 }) {
   const {t:mt}=useManualTranslation();
+  const {t:vt}=useVideoTranslation();
   const slug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
   const exerciseCount = module.lectures.reduce(
@@ -102,7 +105,7 @@ export function ModuleSection({
                   }`}
                 >
                   {lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
-                  (lecture.documents?.length ?? 0) > 0 ? (
+                  (lecture.documents?.length ?? 0) > 0 || (lecture.videos?.length??0)>0 ? (
                     <header>
                       <Collapsible.Trigger asChild>
                         <button
@@ -162,13 +165,14 @@ export function ModuleSection({
 
                   <Collapsible.Content className="cove-collapse">
                     {lecture.exercises.length === 0 &&
-                    !lecture.documents?.length && !lecture.manualMaterials?.length ? (
+                    !lecture.documents?.length && !lecture.manualMaterials?.length && !lecture.videos?.length ? (
                       <p className="border-t border-dashed border-border px-3 py-4 text-center text-[12.5px] text-sub">
                         {t('outline.lecture_empty')}
                       </p>
                     ) : (
                       <ul className="flex flex-col gap-2 border-t border-border bg-canvas/35 p-2.5">
                         {[
+                          ...(lecture.videos??[]).map(video=>({kind:'video' as const,position:video.position,video})),
                           ...(lecture.manualMaterials??[]).map(manual=>({kind:'manual' as const,position:manual.position,manual})),
                           ...lecture.exercises.map((exercise) => ({
                             kind: 'exercise' as const,
@@ -185,7 +189,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">{row.manual.type === "MULTIPLE_CHOICE" ? mt("automatic_graded") : mt("teacher_graded")} · {row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'video' ? (<li key={row.video.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}><span>{row.video.title}</span><span className="ml-auto text-xs text-sub">{vt('badge')} · {row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</span></Link></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">{row.manual.type === "MULTIPLE_CHOICE" ? mt("automatic_graded") : mt("teacher_graded")} · {row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}

@@ -1,3 +1,4 @@
+import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
 import type grading from "@cove/i18n/locales/en/grading.json";
 import type sampleCheck from "@cove/i18n/locales/en/sample-check.json";
@@ -56,6 +57,7 @@ declare module 'i18next' {
     defaultNS: 'common';
     resources: {
       manual:typeof manual;
+      video:typeof video;
       quiz: typeof import("@cove/i18n/locales/en/quiz.json");
       grading: typeof grading;
       "sample-check": typeof sampleCheck;

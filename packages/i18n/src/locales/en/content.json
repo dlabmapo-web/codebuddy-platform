@@ -301,5 +301,9 @@
     "invalid_page": "Enter a page between 1 and {{total}}.",
     "document_count_other": "{{count}} PDFs",
     "document_count_one": "{{count}} PDF"
+  },
+  "video": {
+    "add": "Add video lesson",
+    "badge": "Video"
   }
 }

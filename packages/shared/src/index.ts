@@ -16,3 +16,4 @@ export * from "./monitoring/help-requests.js";
 export * from "./content/manual.js";
 
 export * from "./content/multiple-choice.js";
+export * from "./content/video.js";

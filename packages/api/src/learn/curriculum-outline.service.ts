@@ -1,3 +1,4 @@
+import {videoMetadata} from "../videos/video-metadata.js";
 import { effectiveManualResult } from "@cove/shared";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import { Injectable } from "@nestjs/common";
@@ -40,6 +41,7 @@ export const visibleCurriculumInclude = {
             include: {
               programmingExercise: true,
               manualMaterial: true,
+              videoLesson: { include: { asset: true } },
               pdfDocument: { include: { asset: true } },
             },
           },
@@ -165,6 +167,7 @@ export class CurriculumOutlineService {
               },
             ];
           }),
+          videos:lecture.materials.flatMap(material=>material.videoLesson?.asset.state==="READY"&&material.videoLesson.placement!=="SUPPLEMENTARY"?[{materialId:material.id,title:material.title,position:material.position,video:videoMetadata(material.videoLesson),status:statuses.get(material.id)?.status??"NOT_STARTED"}]:[]),
           documents: lecture.materials.flatMap((material) =>
             material.pdfDocument?.asset.state === "READY"
               ? [
@@ -287,6 +290,9 @@ export class CurriculumOutlineService {
           : undefined,
         maximumHundredths: attempt.maximumHundredths,
       });
+    const videos = await this.prisma.videoWatchProgress.findMany({where:{userId,classId,materialId:{in:materialIds}},include:{material:{include:{videoLesson:true}}},orderBy:{updatedAt:"desc"}});
+    const seenVideos=new Set<string>();
+    for(const p of videos){if(seenVideos.has(p.materialId))continue;const lesson=p.material.videoLesson;if(lesson?.assetId!==p.assetId||!lesson.includeInScore||lesson.placement==="SUPPLEMENTARY")continue;seenVideos.add(p.materialId);statuses.set(p.materialId,{status:p.completed?"SOLVED":"IN_PROGRESS",bestScore:0,scoreHundredths:p.completed?p.maximumHundredths:0,maximumHundredths:p.maximumHundredths});}
     return statuses;
   }
 }
@@ -364,7 +370,7 @@ export function nonemptyModules(
         (material) =>
           material.programmingExercise != null ||
           material.manualMaterial != null ||
-          material.pdfDocument?.asset.state === "READY",
+          material.pdfDocument?.asset.state === "READY" || material.videoLesson?.asset.state === "READY",
       ),
     );
     return lectures.length > 0 ? [{ ...courseModule, lectures }] : [];
@@ -377,7 +383,7 @@ export function exerciseMaterialIds(
   return course.modules.flatMap((courseModule) =>
     courseModule.lectures.flatMap((lecture) =>
       lecture.materials.flatMap((material) =>
-        material.programmingExercise || material.manualMaterial?.includeInScore
+        material.programmingExercise || material.manualMaterial?.includeInScore || (material.videoLesson?.includeInScore && material.videoLesson.asset.state==="READY" && material.videoLesson.placement!=="SUPPLEMENTARY")
           ? [material.id]
           : [],
       ),
@@ -410,11 +416,12 @@ export function manualGradeSummaryFor(
   for (const module of course.modules)
     for (const lecture of module.lectures)
       for (const material of lecture.materials) {
-        if (!material.manualMaterial?.includeInScore) continue;
+        const scored=material.manualMaterial??material.videoLesson;
+        if (!scored?.includeInScore || (material.videoLesson && (material.videoLesson.placement==="SUPPLEMENTARY" || material.videoLesson.asset.state!=="READY"))) continue;
         const status = statuses.get(material.id);
         maximumHundredths +=
           status?.maximumHundredths ??
-          material.manualMaterial.maximumHundredths;
+          scored.maximumHundredths;
         if (status?.scoreHundredths !== undefined) {
           scoreHundredths += status.scoreHundredths;
           reviewed++;

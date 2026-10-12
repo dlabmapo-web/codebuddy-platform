@@ -1,3 +1,4 @@
+import {videoMetadata} from "../../videos/video-metadata.js";
 import { multipleChoiceSchema } from "@cove/shared";
 function remapChoiceDefinition(raw: unknown) {
  const definition=multipleChoiceSchema.parse(raw);
@@ -6,7 +7,7 @@ function remapChoiceDefinition(raw: unknown) {
 }
 import { lockPdfAsset } from "../../documents/pdf-document.service.js";
 import { pdfMetadata } from "../../documents/pdf-metadata.js";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { ConflictException, HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { AvailableLibraryCourse } from "@cove/shared";
 
@@ -170,7 +171,8 @@ export class AcademyLibraryService {
             // Null throughout: a preview says what is in the course, never
             // what the answers are. The branch owns a full copy the moment it
             // adopts, and not one moment sooner.
-            pdfDocument: material.pdfDocument
+            videoLesson:material.videoLesson?videoMetadata(material.videoLesson):null,
+          pdfDocument: material.pdfDocument
               ? pdfMetadata(material.pdfDocument)
               : null,
             manualMaterial:material.manualMaterial?{revision:material.manualMaterial.revision,submitEnabled:material.manualMaterial.submitEnabled,includeInScore:material.manualMaterial.includeInScore,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
@@ -226,6 +228,7 @@ export class AcademyLibraryService {
     const lectures: Prisma.LectureCreateManyInput[] = [];
     const materials: Prisma.MaterialCreateManyInput[] = [];
     const documents: Prisma.PdfDocumentCreateManyInput[] = [];
+    const videos:Prisma.VideoLessonCreateManyInput[]=[];
     const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
     const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
@@ -275,9 +278,10 @@ export class AcademyLibraryService {
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
-            isVisible: !material.manualMaterial?.shortAnswer && !material.manualMaterial?.multipleChoice,
+            isVisible: !material.videoLesson && !material.manualMaterial?.shortAnswer && !material.manualMaterial?.multipleChoice,
           });
 
+          if(material.videoLesson){const {assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,captions,assets}=material.videoLesson;videos.push({materialId,assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,assets:assets as Prisma.InputJsonValue,captions:captions as Prisma.InputJsonValue,revision:1,requestKey:randomUUID()});}
           if (material.pdfDocument)
             documents.push({
               materialId,
@@ -373,6 +377,8 @@ export class AcademyLibraryService {
         ...new Set(documents.map((d) => d.assetId)),
       ].sort())
         await lockPdfAsset(tx, assetId);
+      for(const assetId of [...new Set(videos.map(v=>v.assetId))].sort()){await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${assetId}::uuid FOR UPDATE`;const asset=await tx.videoAsset.findUnique({where:{id:assetId}});if(asset?.state!=="READY")throw new ConflictException("Only ready video lessons can be adopted");}
+      if(videos.length)await tx.videoLesson.createMany({data:videos});
       if (documents.length)
         await tx.pdfDocument.createMany({ data: documents });
       if(manuals.length)await tx.manualMaterial.createMany({data:manuals});
@@ -486,7 +492,7 @@ const previewInclude = {
         include: {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: { manualMaterial:true,pdfDocument: { include: { asset: true } } },
+            include: { videoLesson:{include:{asset:true}},manualMaterial:true,pdfDocument: { include: { asset: true } } },
           },
         },
       },
@@ -509,6 +515,7 @@ const adoptInclude = {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
               manualMaterial:true,
+              videoLesson: { include: { asset: true } },
               pdfDocument: { include: { asset: true } },
               programmingExercise: {
                 include: {

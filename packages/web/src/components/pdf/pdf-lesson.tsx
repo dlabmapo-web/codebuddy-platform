@@ -1,4 +1,5 @@
 'use client';
+import {VideoResourceLinks} from '@/components/video/video-resource-links';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -74,6 +75,7 @@ export function PdfLesson({
           {t('pdf.contents')}
         </button>
       </header>
+      <VideoResourceLinks academyId={academyId} materialId={materialId} classId={classId}/>
       <div className="relative flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
           <PdfReader

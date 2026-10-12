@@ -1,4 +1,6 @@
 'use client';
+import {videoApi} from "@/lib/video-api";
+
 import { manualApi } from '@/lib/manual-api';
 
 import { pdfApi } from '@/lib/pdf-api';
@@ -181,6 +183,8 @@ export function useExerciseNavigation({
             l.documents?.some((d) => d.materialId === materialId),
           ),
         );
+        const isVideo=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.videos?.some(v=>v.materialId===materialId)));
+        if(isVideo){await videoApi.read({academyId,materialId,classId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnVideo(academySlug,materialId,{classId}));return;}
         const isManual=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.manualMaterials?.some(a=>a.materialId===materialId)));
         if(isManual){const activity=await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnAssessment(academySlug,materialId,activity.type,{classId}));return;}
         if (isPdf) {
@@ -356,7 +360,7 @@ export function useExerciseNavigation({
         !neighbor ||
         navigatorRef.current.course.modules.some((m) =>
           m.lectures.some((l) =>
-            l.documents?.some((d) => d.materialId === neighbor.materialId) || l.manualMaterials?.some(m=>m.materialId===neighbor.materialId),
+            l.videos?.some(v=>v.materialId===neighbor.materialId) || l.documents?.some((d) => d.materialId === neighbor.materialId) || l.manualMaterials?.some(m=>m.materialId===neighbor.materialId),
           ),
         )
       )

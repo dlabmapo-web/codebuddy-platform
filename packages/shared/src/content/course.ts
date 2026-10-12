@@ -1,3 +1,4 @@
+import {videoMetadataSchema} from "./video.js";
 import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
 import { pdfMetadataSchema } from "./pdf.js";
@@ -5,7 +6,7 @@ import { gradingDataLimits } from "../grading-limits.js";
 
 import { courseProvenanceSchema } from "../platform/library.js";
 
-export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"] as const;
+export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
 
@@ -192,6 +193,7 @@ export const materialSchema = z.object({
   isRequired: z.boolean(),
   isVisible: z.boolean(),
   programmingExercise: programmingExerciseSchema.nullable(),
+  videoLesson: videoMetadataSchema.nullable().optional(),
   pdfDocument: pdfMetadataSchema.nullable().optional(),
   manualMaterial: z.object({revision:z.number().int(),includeInScore:z.boolean(),submitEnabled:z.boolean(),maximumHundredths:z.number().int()}).nullable().optional(),
 });

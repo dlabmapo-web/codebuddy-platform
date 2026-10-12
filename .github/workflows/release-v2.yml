@@ -39,6 +39,9 @@ jobs:
           - image: cove-migration
             dockerfile: deploy/docker/api.Dockerfile
             target: migration
+          - image: cove-video-worker
+            dockerfile: deploy/docker/api.Dockerfile
+            target: video-worker
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,6 +86,7 @@ jobs:
             NEXT_PUBLIC_GUI_ENABLED=${{ vars.NEXT_PUBLIC_GUI_ENABLED || 'false' }}
             NEXT_PUBLIC_SHORT_ANSWER_ENABLED=${{ vars.NEXT_PUBLIC_SHORT_ANSWER_ENABLED || 'false' }}
             NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED=${{ vars.NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED || 'false' }}
+            NEXT_PUBLIC_VIDEO_LESSONS_ENABLED=${{ vars.NEXT_PUBLIC_VIDEO_LESSONS_ENABLED || 'false' }}
             NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=${{ vars.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED || 'true' }}
             NEXT_PUBLIC_NAVER_AUTH_ENABLED=${{ vars.NEXT_PUBLIC_NAVER_AUTH_ENABLED }}
             NEXT_PUBLIC_KAKAO_AUTH_ENABLED=${{ vars.NEXT_PUBLIC_KAKAO_AUTH_ENABLED }}

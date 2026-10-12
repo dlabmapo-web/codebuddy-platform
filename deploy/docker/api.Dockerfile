@@ -75,3 +75,14 @@ WORKDIR /app/packages/api
 # Invoke Prisma directly so the final one-shot image does not retain pnpm.
 ENTRYPOINT ["node", "node_modules/prisma/build/index.js"]
 CMD ["migrate", "deploy"]
+
+# Separate media process: never install decoders into the API/judge runtime.
+FROM runtime AS video-worker
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+USER cove
+ENV VIDEO_PROCESSING_ENABLED=false
+ENV VIDEO_SCRATCH_DIR=/tmp
+CMD ["node", "dist/src/videos/video-worker.js"]

@@ -1,7 +1,8 @@
 # Recorded video learning materials
 
 Date: 2026-10-12
-Status: draft for user review; implementation has not started
+Status: implemented with localhost verification; production rollout remains disabled
+Verification: [operations and test evidence](../../operations/video-lessons.md)
 Branch: `feat/lecture-pdf-materials`, alongside PDF, turtle, short-answer, and multiple-choice changes
 Reference: [Elice inspection and evidence limits](../../research/2026-10-12-video-learning-materials.md)
 
@@ -91,7 +92,7 @@ Supplementary-only videos are excluded from the ordered main list, cannot open a
 
 Proposed completion policy version `video-watch-v1`: completed after **90% unique watched duration**. This threshold is a Cove proposal, not a measured Elice rule. Seek position, opening the lesson, or an ended event alone never grants completion.
 
-Create one active playback session per user/material/class. Send sequential, idempotent checkpoints approximately every ten seconds while playing and on pause/end/navigation. Each carries asset identity, previous/current media positions, rate, and session sequence. Backend validates class/access, bounds and monotonic sequence, and elapsed server wall time. Credit contiguous playback intervals only up to elapsed time × allowed rate plus two seconds tolerance; seek discontinuities update resume position without crediting skipped ranges. Merge interval unions, never sum overlapping replay or simultaneous sessions. Paused/buffering time earns no credit. Checkpoint retries cannot double count; concurrent new sessions replace the older lease for crediting. Progress is an approximate learning signal, not proctored proof of attention or identity.
+Create one active playback session per user/material/class. Send sequential, idempotent checkpoints approximately every ten seconds while playing and on pause/end/navigation. Each carries asset identity, previous/current media positions, rate, and session sequence. Backend validates class/access, bounds and monotonic sequence, and elapsed server wall time. Checkpoints capture a monotonic elapsed timestamp at the client; the server rejects backward timestamps and values beyond its session lifetime plus two seconds. Credit uses capture-time deltas so delayed sequential uploads do not compress legitimate watch time. Credit contiguous playback intervals only up to elapsed time × allowed rate plus two seconds tolerance; seek discontinuities update resume position without crediting skipped ranges. Merge interval unions, never sum overlapping replay or simultaneous sessions. Paused/buffering time earns no credit. Checkpoint retries cannot double count; concurrent new sessions replace the older lease for crediting. Progress is an approximate learning signal, not proctored proof of attention or identity.
 
 Background natural playback may count; pause/seek/buffering never simulate watching. A failed checkpoint leaves playback usable and shows Progress not yet saved with retry. Only acknowledged progress is shown as saved. Revalidate identity after expiry; do not fabricate completion offline. Leaving pauses/stops playback and attempts the final bounded checkpoint, without treating a failed save as permission to mark watched.
 

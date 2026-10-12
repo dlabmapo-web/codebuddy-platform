@@ -333,7 +333,7 @@ function ModuleBranch({
                     ]
                       .sort((a, b) => a.position - b.position)
                       .map((row) =>
-                        row.kind === 'video' ? (<li key={row.video.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.video.materialId)}>{materialNumbers.get(row.video.materialId)}. {row.video.title}</button></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.manual.materialId)}>{materialNumbers.get(row.manual.materialId)}. {row.manual.title} · Teacher graded</button></li>) : row.kind === 'pdf' ? (
+                        row.kind === 'video' ? (<li key={row.video.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.video.materialId)}>{materialNumbers.get(row.video.materialId)}. {row.video.title}</button></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.manual.materialId)}>{materialNumbers.get(row.manual.materialId)}. {row.manual.title}</button></li>) : row.kind === 'pdf' ? (
                           <li key={row.doc.materialId}>
                             <button
                               type="button"

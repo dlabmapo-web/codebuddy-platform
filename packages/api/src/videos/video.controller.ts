@@ -244,12 +244,19 @@ export class VideoController {
       throw new BadRequestException("Only one valid byte range is supported");
     const abort = new AbortController();
     res.on("close", () => abort.abort());
-    const upstream = await this.storage.get(
-      key.key,
-      range,
-      abort.signal,
-      key.bucket,
-    );
+    let upstream: Awaited<ReturnType<VideoStorage["get"]>>;
+    try {
+      upstream = await this.storage.get(key.key, range, abort.signal, key.bucket);
+    } catch (error) {
+      // Leaving a lesson cancels its media request while Storage may still be
+      // sending headers. The disconnected client needs no error response.
+      if (abort.signal.aborted) return;
+      throw error;
+    }
+    if (abort.signal.aborted) {
+      await upstream.body?.cancel();
+      return;
+    }
     res.status(upstream.status);
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");

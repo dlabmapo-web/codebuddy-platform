@@ -7,7 +7,7 @@ const academyId = "20000000-0000-4000-8000-000000000001",
   lectureId = "ee020000-0000-4000-8000-000000000020",
   classId = "e0000000-0000-4000-8000-000000000040",
   slug = "development-academy";
-const api = "http://localhost:4000/api/manual";
+const api = process.env.E2E_TURTLE_API ?? "http://localhost:4000/api/manual";
 test.skip(
   process.env.E2E_GUI_ENABLED !== "1",
   "Requires the opt-in isolated GUI runtime",
@@ -321,7 +321,7 @@ test("turtle authoring, real drawing/input/game, immutable submission and teache
   });
   expect(stale.status()).toBe(409);
   await student.reload();
-  await expect(student.getByText("87.5 / 100 · Completed")).toBeVisible();
+  await expect(student.getByText("87.5 / 100 · Completed", { exact: true })).toBeVisible();
   await expect(
     student.getByText("Good event-loop and keyboard handling.").first(),
   ).toBeVisible();

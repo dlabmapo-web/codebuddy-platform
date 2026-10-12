@@ -337,8 +337,17 @@ test("author single choice, explicit student answers, private result, explanatio
     }
     await radios.nth(0).check();
     student.once("dialog", (d) => d.accept());
+    const materialList = (await read()).materials;
+    const currentIndex = materialList.findIndex(
+      (m: { materialId: string }) => m.materialId === materialId,
+    );
+    const previous = materialList[currentIndex - 1];
+    expect(previous).toBeDefined();
+    const destination = routes.academyLearnMaterial(
+      slug, previous.materialId, previous.type, { classId },
+    );
     await student.getByRole("link", { name: "Previous", exact: true }).click();
-    await expect(student).toHaveURL(/\/learn\/exercises\//);
+    await expect(student).toHaveURL(new URL(destination, student.url()).href);
   } finally {
     await context.close();
   }

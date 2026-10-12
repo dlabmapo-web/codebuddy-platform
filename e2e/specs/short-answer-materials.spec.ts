@@ -42,7 +42,7 @@ test.beforeAll(() => {
     { stdio: "pipe" },
   );
 });
-test("exact authoring, explicit input, private grading, explanation and teacher override with GUI disabled", async ({
+test("exact authoring, explicit input, private grading, explanation and teacher override", async ({
   page,
   browser,
 }) => {
@@ -53,9 +53,12 @@ test("exact authoring, explicit input, private grading, explanation and teacher 
     "teamlead@cove.test",
     routes.academyCourse(slug, courseId),
   );
-  await expect(
-    page.getByRole("button", { name: "Add turtle / written response" }),
-  ).toHaveCount(0);
+  const turtleAction = page.getByRole("button", {
+    name: "Add turtle / written response",
+  });
+  if (process.env.E2E_GUI_ENABLED === "1")
+    await expect(turtleAction.first()).toBeVisible();
+  else await expect(turtleAction).toHaveCount(0);
   await page
     .getByRole("button", { name: "Add short-answer question" })
     .first()

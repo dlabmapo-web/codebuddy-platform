@@ -41,3 +41,41 @@ The 90% unique-watch threshold, binary included score, and five-second auto-next
 - The guarded storage verification passed for the private bucket, all five private tables, reservation INSERT policy, private originals and READY manifest immutability. Real FFmpeg separately produced HLS/MP4 and verified 640×360 H.264 metadata from the original synthetic fixture.
 
 Production was not enabled, deployed, or pushed. Full-size six-hour/5 GB media, concurrent gateway load, production image execution, and backup/restore drills remain staging/rollout validation; the local fixtures deliberately use small synthetic media and a 50 MB storage limit. The local tests do not establish exact parity for unverified Elice completion/resume/auto-next policies.
+
+## Run all five lesson types together on localhost
+
+Start one API and one studio with turtle, short-answer, multiple-choice and video flags enabled together (`GUI_ENABLED`, `SHORT_ANSWER_ENABLED`, `MULTIPLE_CHOICE_ENABLED`, `VIDEO_LESSONS_ENABLED` and their `NEXT_PUBLIC_` counterparts set to `true`). PDF is not feature-gated. The GUI broker/image and video worker must also be running, with the private development buckets prepared as described in the respective runbooks. Use the synthetic MP4 fixture described above and prepared development auth states. Avoid editing/restarting the app while browser tests are active: development refreshes can discard the unsent answers being tested.
+
+Against an already running studio at port 3000 and API at port 4500:
+
+```bash
+export E2E_BASE_URL=http://localhost:3000
+export E2E_SKIP_SEED=1
+export E2E_AUTH_STATE_DIR=/tmp/cove-combined-auth
+export E2E_GUI_ENABLED=1 E2E_SHORT_ANSWER_ENABLED=1
+export E2E_MULTIPLE_CHOICE_ENABLED=1 E2E_VIDEO_ENABLED=1
+export E2E_PDF_API=http://localhost:4500/api/documents
+export E2E_TURTLE_API=http://localhost:4500/api/manual
+export E2E_SHORT_ANSWER_API=http://localhost:4500/api/manual
+export E2E_MULTIPLE_CHOICE_API=http://localhost:4500/api/manual
+export E2E_VIDEO_API=http://localhost:4500/api/videos
+
+pnpm exec playwright test --config e2e/playwright.config.ts \
+  e2e/specs/pdf-materials.spec.ts e2e/specs/turtle-materials.spec.ts \
+  e2e/specs/short-answer-materials.spec.ts e2e/specs/multiple-choice-materials.spec.ts \
+  e2e/specs/video-materials.spec.ts --project=chromium --workers=1
+
+E2E_MIXED_ENABLED=1 pnpm exec playwright test --config e2e/playwright.config.ts \
+  e2e/specs/mixed-material-navigation.spec.ts \
+  --project=chromium --project=webkit-mixed --workers=1
+```
+
+Run the feature suites before the mixed suite on a fresh development fixture: the mixed seed reuses their synthetic READY video and turtle runtime version. It owns its own private synthetic PDF and resets only its `ee060…` course; its guard rejects other Supabase projects. The mixed course contains coding → PDF → turtle → short answer → multiple choice → video → coding across two lectures, plus supplementary PDF/video resources. Tests cover both navigation directions, the coding course drawer, class context, resource exclusion from the main sequence, supplementary playback without auto-next, browser history and reload. Run with one worker because the fixture is reset between browser projects.
+
+### Combined verification, 2026-10-12
+
+All five feature flags were enabled on the same localhost API/studio. All **11 feature E2E scenarios passed across the initial run and targeted reruns**. Initial failures exposed assumptions in the tests (GUI disabled, a fixed previous lesson, a score selector matching both the result and history) and one development refresh interrupted an unsent-answer check; the corrected/repeated scenarios passed. PDF used real private upload/render/download, turtle used the isolated GUI runtime including teacher read-only viewing/mobile controls, and video used real encoding and decoded playback.
+
+Fixes on the current branch keep the floating query debug button off fullscreen lesson navigation, remove the inaccurate blanket “Teacher graded” label from the course drawer, and treat a video client disconnect as cancellation instead of a server error. Three focused API cancellation regression tests passed; API build and API/web/E2E typechecks passed. Production settings were not changed.
+
+The final mixed-course E2E run passed in **both Chromium and WebKit (2/2)** against the rebuilt API. It exercised the seven main lessons in both directions, cross-lecture navigation, drawer selection/labels, resource isolation and decoded resource playback, class-scoped URLs, browser Back/Forward and reload. The updated API logged no media AbortError/server errors during that run. Together with the feature suites, this is 13 passing browser scenarios (including targeted reruns), plus the three cancellation unit tests. Local development verification does not replace staging load, production storage/worker configuration, or deployment checks.

@@ -9,7 +9,7 @@ const academyId = '20000000-0000-4000-8000-000000000001';
 const courseId = 'ee010000-0000-4000-8000-000000000001';
 const lectureId = 'ee010000-0000-4000-8000-000000000020';
 const classId = 'e0000000-0000-4000-8000-000000000040';
-const api = 'http://localhost:4000/api/documents';
+const api = process.env.E2E_PDF_API ?? 'http://localhost:4000/api/documents';
 const fixture = resolve('e2e/fixtures/lecture-material.pdf');
 const title = `PDF lesson ${Date.now()}`;
 async function expectPaintedPdf(page: Page) {

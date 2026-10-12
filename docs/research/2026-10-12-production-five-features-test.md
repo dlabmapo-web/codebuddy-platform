@@ -42,11 +42,15 @@ Existing lessons, grades, drafts and class assignments were not edited.
 3. **Intermittent first video navigation:** first choice → video navigation
    eventually displayed "This video is unavailable." Reload succeeded; the
    second choice → video transition succeeded, including autoplay. No cause
-   was established. Keep as an unresolved intermittent finding, not a passed
-   first-navigation test.
+   was established. Recovery is now implemented for read queries: at most two
+   retries for network failures, malformed gateway responses, HTTP 429 and
+   HTTP 5xx, with an explicit Retry button if loading still fails. HTTP 4xx
+   access/content errors do not automatically retry. The original cause is
+   unconfirmed; do not describe that first navigation as passed.
 
-The two source fixes are not part of the live v2.0.31 release tested here.
-TypeScript and the three regression tests pass; targeted ESLint has no errors
+The source fixes are not part of the live v2.0.31 release tested here.
+TypeScript and 17 regression tests pass, including query recovery, bounded
+failure exhaustion and a later explicit refetch; targeted ESLint has no errors
 (one pre-existing useCallback dependency warning in the author dialog).
 
 ## Limits

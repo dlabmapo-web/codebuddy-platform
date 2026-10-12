@@ -5,6 +5,7 @@ import { useVideoTranslation } from "./use-video-translation";
 import { Modal, ModalContent } from "@/components/studio/primitives";
 import { videoApi } from "@/lib/video-api";
 import { VideoPlayer } from "./video-player";
+import { retryVideoRead, videoReadRetryDelay } from "./video-read-recovery";
 export function VideoResource({
   academyId,
   materialId,
@@ -23,7 +24,8 @@ export function VideoResource({
     queryFn: () =>
       videoApi.read({ academyId, materialId, classId, resource: true }),
     enabled: open,
-    retry: false,
+    retry: retryVideoRead,
+    retryDelay: videoReadRetryDelay,
   });
   return (
     <>
@@ -49,9 +51,18 @@ export function VideoResource({
                 resource
               />
             ) : (
-              <p role={query.isError ? "alert" : "status"}>
-                {t(query.isError ? "unavailable" : "loading")}
-              </p>
+              <div role={query.isError ? "alert" : "status"}>
+                <p>{t(query.isError ? "unavailable" : "loading")}</p>
+                {query.isError ? (
+                  <button
+                    type="button"
+                    disabled={query.isFetching}
+                    onClick={() => void query.refetch()}
+                  >
+                    {t("retry")}
+                  </button>
+                ) : null}
+              </div>
             )}
             <button type="button" onClick={() => setOpen(false)}>
               {t("close")}

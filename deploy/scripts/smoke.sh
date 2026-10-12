@@ -14,6 +14,10 @@ check_in_container studio http://127.0.0.1:3000/login
 check_in_container api http://127.0.0.1:4000/api/health/ready
 check_in_container mvp http://127.0.0.1:3200/login
 check_in_container judge-worker http://127.0.0.1:4101/health
+if feature_enabled GUI_ENABLED; then
+  compose exec -T api node -e \
+    "fetch(process.env.GUI_SERVICE_URL+'/health',{headers:{Authorization:'Bearer '+process.env.GUI_SERVICE_SECRET}}).then(async r=>{if(!r.ok||!(await r.json()).ready)process.exit(1)}).catch(()=>process.exit(1))"
+fi
 
 if [[ "${1:-}" == "--public" ]]; then
   require_command curl

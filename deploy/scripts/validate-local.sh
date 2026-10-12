@@ -48,6 +48,22 @@ PY
 
 COVE_DEPLOY_ROOT="$validation_root" "$validation_root/scripts/render-monitoring-config.sh"
 validation_compose config --quiet
+validation_compose --profile gui --profile video config --quiet
+learning_json="$(validation_compose --profile gui --profile video config --format json)"
+python3 - "$learning_json" <<'PY'
+import json, sys
+configuration = json.loads(sys.argv[1])
+services = configuration["services"]
+broker = services["gui-service"]
+if broker.get("ports") or broker.get("privileged"):
+    raise SystemExit("GUI broker must have no public ports or privileged mode")
+networks = broker["networks"]
+if set(networks) != {"gui-control"} or not configuration["networks"]["gui-control"].get("internal"):
+    raise SystemExit("GUI broker must use only the private control network")
+if any(volume.get("target") == "/var/run/docker.sock" for volume in services["video-worker"].get("volumes", [])):
+    raise SystemExit("Video worker must never have Docker access")
+print("Optional learning profiles: private GUI control network and isolated video worker")
+PY
 
 # Cloud VPS 6 has 12 GB RAM. Keep the sum of all always-on container limits at
 # or below 9 GiB so Ubuntu, Docker, filesystem cache, and deployments retain

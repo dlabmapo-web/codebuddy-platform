@@ -76,6 +76,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate deployment configuration
         run: bash deploy/scripts/validate-local.sh
+      - name: Test learning release and rollback selection
+        run: python3 deploy/scripts/learning-rollout.test.py
 
   container-images:
     runs-on: ubuntu-latest
@@ -98,13 +100,23 @@ jobs:
           - name: migration
             dockerfile: deploy/docker/api.Dockerfile
             target: migration
+          - name: video-worker
+            dockerfile: deploy/docker/api.Dockerfile
+            target: video-worker
+          - name: gui-service
+            dockerfile: deploy/Dockerfile.gui
+            target: runtime
+          - name: gui-runtime
+            dockerfile: packages/gui-runtime/docker/Dockerfile
+            context: packages/gui-runtime/docker
+            target: runtime
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build ${{ matrix.name }} image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
           load: true
@@ -118,6 +130,10 @@ jobs:
             NEXT_PUBLIC_SITE_URL=https://cs.coveedu.com
             NEXT_PUBLIC_STUDIO_URL=https://cs.coveedu.com
             NEXT_PUBLIC_MVP_URL=https://mvp.coveedu.com
+            NEXT_PUBLIC_GUI_ENABLED=true
+            NEXT_PUBLIC_SHORT_ANSWER_ENABLED=true
+            NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED=true
+            NEXT_PUBLIC_VIDEO_LESSONS_ENABLED=true
       - name: Scan runtime image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

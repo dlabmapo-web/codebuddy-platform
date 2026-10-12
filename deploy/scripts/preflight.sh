@@ -17,6 +17,12 @@ required_files=(
   "$deploy_root/secrets/redis-password"
   "$deploy_root/generated/alertmanager.yml"
 )
+if feature_enabled VIDEO_LESSONS_ENABLED; then
+  required_files+=("$deploy_root/secrets/video-worker.env")
+fi
+if feature_enabled GUI_ENABLED; then
+  required_files+=("$deploy_root/secrets/gui.env")
+fi
 
 for required in "${required_files[@]}"; do
   require_file "$required"
@@ -46,6 +52,61 @@ for image_variable in HOME_IMAGE STUDIO_IMAGE API_IMAGE JUDGE_IMAGE MIGRATION_IM
   [[ "$image_value" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
     || fail "$image_variable must be a private GHCR image pinned to sha-<40 lowercase hex>"
 done
+if feature_enabled VIDEO_LESSONS_ENABLED; then
+  [[ "${VIDEO_WORKER_IMAGE:-}" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
+    || fail "VIDEO_WORKER_IMAGE must be pinned to the approved release SHA"
+  scratch_path="${VIDEO_SCRATCH_HOST_PATH:-/opt/cove/video-scratch}"
+  [[ -d "$scratch_path" ]] || fail "video scratch directory must be provisioned before enabling video"
+  [[ "$(stat -c '%u' "$scratch_path")" == "1001" ]] || fail "video scratch must be owned by worker UID 1001"
+  scratch_available_kb="$(df -Pk "$scratch_path" | awk 'NR==2 {print $4}')"
+  (( scratch_available_kb >= 40 * 1024 * 1024 )) || fail "video processing requires at least 40 GiB free scratch space"
+  python3 - "$deploy_root/secrets/api.env" "$deploy_root/secrets/video-worker.env" <<'PY'
+import pathlib, sys
+def read(path):
+    values = {}
+    for line in pathlib.Path(path).read_text().splitlines():
+        key, separator, value = line.strip().partition("=")
+        if separator and not key.startswith("#"):
+            values[key.strip()] = value.strip().strip("\"'")
+    return values
+api, worker = map(read, sys.argv[1:])
+for key in ("DATABASE_URL", "SUPABASE_URL", "SUPABASE_SECRET_KEY"):
+    if not api.get(key) or api[key] != worker.get(key):
+        raise SystemExit(f"video worker {key} must match the API environment")
+PY
+fi
+
+if feature_enabled GUI_ENABLED; then
+  for image_variable in GUI_SERVICE_IMAGE GUI_RUNTIME_IMAGE; do
+    image_value="${!image_variable:-}"
+    [[ "$image_value" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
+      || fail "$image_variable must be pinned to the approved release SHA"
+  done
+  python3 - "$deploy_root/secrets/api.env" "$deploy_root/secrets/gui.env" <<'PY'
+import pathlib, sys
+def read(path):
+    values = {}
+    for line in pathlib.Path(path).read_text().splitlines():
+        key, separator, value = line.strip().partition("=")
+        if separator and not key.startswith("#"):
+            values[key.strip()] = value.strip().strip("\"'")
+    return values
+api, gui = map(read, sys.argv[1:])
+secret = gui.get("GUI_SERVICE_SECRET", "")
+if len(secret) < 32 or api.get("GUI_SERVICE_SECRET") != secret:
+    raise SystemExit("GUI broker and API shared secrets must match")
+if api.get("GUI_SERVICE_URL") != "http://gui-service:4010":
+    raise SystemExit("API GUI_SERVICE_URL must use the private GUI broker")
+if api.get("GUI_PUBLIC_WS_URL") != "wss://cs.coveedu.com/gui":
+    raise SystemExit("API GUI_PUBLIC_WS_URL must use the protected studio WebSocket route")
+if gui.get("GUI_ALLOWED_ORIGINS") != "https://cs.coveedu.com":
+    raise SystemExit("GUI_ALLOWED_ORIGINS must be the exact production studio origin")
+capacity = int(gui.get("GUI_SESSION_CAPACITY", "0"))
+if not 1 <= capacity <= 64:
+    raise SystemExit("GUI_SESSION_CAPACITY must explicitly reserve 1..64 learner slots")
+PY
+fi
+
 
 [[ "$ACME_EMAIL" == *@*.* ]] || fail "ACME_EMAIL is not a valid operational email address"
 
@@ -152,7 +213,15 @@ else
   available_kb="$total_kb"
 fi
 (( total_kb >= 10 * 1024 * 1024 )) || fail "production requires a VPS with at least 10 GiB total memory"
-(( available_kb >= 2 * 1024 * 1024 )) || fail "less than 2 GiB memory is currently available"
+reserved_available_kb=$((2 * 1024 * 1024))
+if feature_enabled VIDEO_LESSONS_ENABLED; then
+  reserved_available_kb=$((reserved_available_kb + 2 * 1024 * 1024))
+fi
+if feature_enabled GUI_ENABLED; then
+  gui_capacity="$(sed -n 's/^GUI_SESSION_CAPACITY=//p' "$deploy_root/secrets/gui.env" | tail -n 1)"
+  reserved_available_kb=$((reserved_available_kb + 256 * 1024 + gui_capacity * 512 * 1024))
+fi
+(( available_kb >= reserved_available_kb )) || fail "insufficient available memory for application headroom and enabled learning runtimes"
 cpu_count="$(getconf _NPROCESSORS_ONLN)"
 (( cpu_count >= 6 )) || fail "production requires at least 6 online CPU cores"
 available_disk_kb="$(df -Pk "$deploy_root" | awk 'NR==2 {print $4}')"

@@ -1,5 +1,11 @@
 name: cove-production
 
+x-learning-flags: &learning-flags
+  GUI_ENABLED: ${GUI_ENABLED:-false}
+  SHORT_ANSWER_ENABLED: ${SHORT_ANSWER_ENABLED:-false}
+  MULTIPLE_CHOICE_ENABLED: ${MULTIPLE_CHOICE_ENABLED:-false}
+  VIDEO_LESSONS_ENABLED: ${VIDEO_LESSONS_ENABLED:-false}
+
 x-application: &application
   restart: unless-stopped
   init: true
@@ -37,6 +43,7 @@ services:
     networks:
       - edge
       - monitoring
+      - gui-control
     depends_on:
       home:
         condition: service_healthy
@@ -116,12 +123,14 @@ services:
     env_file:
       - ./secrets/api.env
     environment:
+      <<: *learning-flags
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=1024
       PORT: 4000
     networks:
       - edge
       - backend
+      - gui-control
     depends_on:
       redis:
         condition: service_healthy
@@ -137,6 +146,36 @@ services:
     mem_limit: 1536m
     cpus: 1.25
     pids_limit: 512
+
+  gui-service:
+    <<: *application
+    profiles: [gui]
+    image: ${GUI_SERVICE_IMAGE:-ghcr.io/dlabmapo-web/cove-gui-service:disabled}
+    # The trusted broker controls Docker. Learner containers receive neither
+    # this socket nor the broker/API environment and have network=none.
+    cap_drop:
+      - ALL
+    env_file:
+      - ./secrets/gui.env
+    environment:
+      NODE_ENV: production
+      GUI_BIND_ADDRESS: 0.0.0.0
+      NODE_OPTIONS: --max-old-space-size=160
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gui-control
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health',{headers:{Authorization:'Bearer '+process.env.GUI_SERVICE_SECRET}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
 
   video-worker:
     <<: *application
@@ -331,6 +370,7 @@ services:
     env_file:
       - ./secrets/api.env
     environment:
+      <<: *learning-flags
       NODE_ENV: production
     networks:
       - backend
@@ -517,6 +557,8 @@ services:
         max-file: "3"
 
 networks:
+  gui-control:
+    internal: true
   edge:
   egress:
   backend:

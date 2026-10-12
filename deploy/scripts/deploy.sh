@@ -32,7 +32,11 @@ rollback_on_error() {
   fi
   printf 'Deployment failed; attempting application rollback.\n' >&2
   if [[ "$had_previous" == true ]]; then
+    stop_learning_services
     install -m 600 "$state_dir/previous-deployment.env" "$deployment_env"
+    if feature_enabled GUI_ENABLED; then
+      "$script_dir/pin-gui-runtime.sh" || true
+    fi
     compose up -d --remove-orphans || true
   fi
   exit "$status"
@@ -44,8 +48,18 @@ trap rollback_on_error ERR
 
 compose pull home studio api judge-worker judge-sandbox migrate mvp caddy redis \
   prometheus alertmanager grafana node-exporter cadvisor
+if feature_enabled VIDEO_LESSONS_ENABLED; then
+  compose pull video-worker
+fi
+if feature_enabled GUI_ENABLED; then
+  compose pull gui-service
+  "$script_dir/pin-gui-runtime.sh"
+fi
 compose --profile operations run --rm migrate
+compose --profile operations run --rm --entrypoint node migrate \
+  node_modules/tsx/dist/cli.mjs scripts/setup-learning-storage.mts --production
 compose up -d --remove-orphans
+compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "$script_dir/wait-healthy.sh"
 "$script_dir/smoke.sh"
 

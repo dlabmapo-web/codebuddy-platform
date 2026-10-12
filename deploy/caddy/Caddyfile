@@ -30,7 +30,14 @@
 			roll_keep 10
 			roll_keep_for 720h
 		}
-		format json
+		format filter {
+			wrap json
+			fields {
+				# The GUI capability is a WebSocket subprotocol, not a URL token.
+				request>headers>Sec-Websocket-Protocol delete
+				resp_headers>Sec-Websocket-Protocol delete
+			}
+		}
 	}
 }
 
@@ -52,10 +59,30 @@ www.coveedu.com {
 
 cs.coveedu.com {
 	import production_common
-	reverse_proxy studio:3000 {
-		transport http {
-			read_timeout 10m
-			write_timeout 10m
+	@turtle_display {
+		path_regexp turtle ^/gui/sessions/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/display$
+		method GET
+		header Upgrade websocket
+	}
+	handle @turtle_display {
+		uri strip_prefix /gui
+		reverse_proxy gui-service:4010 {
+			transport http {
+				read_timeout 35m
+				write_timeout 35m
+			}
+		}
+	}
+	# Public clients cannot reach the broker's REST control plane or health.
+	handle /gui/* {
+		respond 404
+	}
+	handle {
+		reverse_proxy studio:3000 {
+			transport http {
+				read_timeout 10m
+				write_timeout 10m
+			}
 		}
 	}
 }

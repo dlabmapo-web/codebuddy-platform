@@ -5,6 +5,12 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 timeout_seconds="${HEALTH_TIMEOUT_SECONDS:-300}"
 deadline=$((SECONDS + timeout_seconds))
 services=(redis api judge-sandbox judge-worker home studio mvp caddy prometheus alertmanager grafana node-exporter cadvisor)
+if feature_enabled VIDEO_LESSONS_ENABLED; then
+  services+=(video-worker)
+fi
+if feature_enabled GUI_ENABLED; then
+  services+=(gui-service)
+fi
 
 while (( SECONDS < deadline )); do
   pending=()

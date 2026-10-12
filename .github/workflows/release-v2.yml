@@ -42,6 +42,13 @@ jobs:
           - image: cove-video-worker
             dockerfile: deploy/docker/api.Dockerfile
             target: video-worker
+          - image: cove-gui-service
+            dockerfile: deploy/Dockerfile.gui
+            target: runtime
+          - image: cove-gui-runtime
+            dockerfile: packages/gui-runtime/docker/Dockerfile
+            context: packages/gui-runtime/docker
+            target: runtime
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,7 +71,7 @@ jobs:
       - name: Build and publish ${{ matrix.image }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
           push: true
@@ -154,6 +161,13 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          RELEASE_GUI_ENABLED: ${{ vars.NEXT_PUBLIC_GUI_ENABLED || 'false' }}
+          RELEASE_SHORT_ANSWER_ENABLED: ${{ vars.NEXT_PUBLIC_SHORT_ANSWER_ENABLED || 'false' }}
+          RELEASE_MULTIPLE_CHOICE_ENABLED: ${{ vars.NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED || 'false' }}
+          RELEASE_VIDEO_ENABLED: ${{ vars.NEXT_PUBLIC_VIDEO_LESSONS_ENABLED || 'false' }}
         run: |
+          for flag in RELEASE_GUI_ENABLED RELEASE_SHORT_ANSWER_ENABLED RELEASE_MULTIPLE_CHOICE_ENABLED RELEASE_VIDEO_ENABLED; do
+            [[ "${!flag}" == true || "${!flag}" == false ]] || { echo "$flag must be true or false"; exit 1; }
+          done
           ssh -i ~/.ssh/cove-production "$VPS_USER@$VPS_HOST" \
-            "/opt/cove/scripts/set-v2-release.sh '$REGISTRY_NAMESPACE' '$IMAGE_TAG'"
+            "/opt/cove/scripts/set-v2-release.sh '$REGISTRY_NAMESPACE' '$IMAGE_TAG' '$RELEASE_GUI_ENABLED' '$RELEASE_SHORT_ANSWER_ENABLED' '$RELEASE_MULTIPLE_CHOICE_ENABLED' '$RELEASE_VIDEO_ENABLED'"

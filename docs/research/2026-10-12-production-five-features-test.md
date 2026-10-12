@@ -66,3 +66,29 @@ QA content and submission history are retained for reproduction. After testing,
 the QA course was hidden and the separate class archived through the manager UI;
 both states were visibly verified. Test sessions were signed out. No submission
 history was permanently deleted.
+
+## v2.0.32 retest
+
+Deployment and public smoke checks passed. Platform admin opened all three
+assessment editors, loaded saved data, verified published grading locks and
+saved the existing short-answer question successfully. The student outline's
+incorrect teacher-grading label is gone. PDF pages and download passed; fresh
+short-answer and multiple-choice submissions returned 100/100. First video
+navigation and three additional quiz → video transitions succeeded without
+reload; completion and caption controls remained available.
+
+The retest exposed a separate deployment regression: changing the default GUI
+image prevented an existing turtle lesson from running its recorded runtime.
+The broker reported "The saved runtime version is not available." The only
+production turtle configuration used the prior approved image. Restoring that
+digest in the private broker environment recovered drawing, terminal output,
+submission and Stop without editing lesson data or immutable work.
+
+A permanent runtime registry and release retention fix is prepared separately:
+new lessons use the current approved image, historical configurations and
+submissions select their exact retained approved image, and arbitrary learner
+image references are rejected. Five real Docker integration checks pass,
+including execution after a default-image upgrade and exact container-image
+verification, plus the isolation/lifecycle cases. Six policy/registry checks
+and eight rollout checks pass. This follow-up source fix requires release;
+the operational runtime restoration is already applied to production.

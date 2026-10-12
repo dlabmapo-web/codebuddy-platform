@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WebSocket } from "ws";
+import { execFileSync } from "node:child_process";
 const secret = process.env.GUI_SERVICE_SECRET;
 const base = process.env.GUI_SERVICE_URL ?? "http://127.0.0.1:4010";
 const headers = {
@@ -33,6 +34,23 @@ const profile = {
   memoryLimitMb: 128,
   owner: "runtime-tests",
 };
+test('recorded runtime survives a broker default-image upgrade', {skip: !secret || !process.env.GUI_TEST_RETAINED_VERSION}, async () => {
+  const runtimeVersion = process.env.GUI_TEST_RETAINED_VERSION;
+  const health = await request('/health');
+  assert.notEqual(health.runtimeVersion, runtimeVersion);
+  const session = await request('/sessions', 'POST', {
+    ...profile,
+    runtimeVersion,
+    files: {'main.py': "print('RETAINED_RUNTIME', flush=True)\nimport turtle\nturtle.done()\n"},
+  });
+  try {
+    await until(session.id, (s) => s.output.includes('RETAINED_RUNTIME'));
+    const actual = execFileSync('docker', ['inspect', '--format', '{{.Image}}', `cove-gui-${session.id}`], {encoding:'utf8'}).trim();
+    assert.equal(actual, runtimeVersion.split(';')[0]);
+  } finally {
+    await request(`/sessions/${session.id}`, 'DELETE');
+  }
+});
 test(
   "isolated CPython/Tk drawing, input and read-only lesson assets",
   { skip: !secret },

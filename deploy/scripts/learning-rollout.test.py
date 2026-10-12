@@ -106,11 +106,15 @@ class LearningRolloutTests(unittest.TestCase):
         with self.manifest.open("a") as output:
             output.write(f"GUI_RUNTIME_IMAGE=ghcr.io/acme/cove-gui-runtime:sha-{SHA}\n")
         secret = self.root / "secrets" / "gui.env"
-        secret.write_text("GUI_SERVICE_SECRET=synthetic-test-value\nGUI_RUNTIME_IMAGE=old\n")
+        previous = 'c' * 64
+        secret.write_text(f"GUI_SERVICE_SECRET=synthetic-test-value\nGUI_RUNTIME_IMAGE=ghcr.io/acme/cove-gui-runtime@sha256:{previous}\n")
         (self.root / "docker").write_text(f'#!/bin/sh\nif [ "$1" = image ]; then printf "%s\\n" "ghcr.io/acme/cove-gui-runtime@sha256:{DIGEST}"; fi\n')
         self.run_script("pin-gui-runtime.sh")
         self.assertIn(f"GUI_RUNTIME_IMAGE=ghcr.io/acme/cove-gui-runtime@sha256:{DIGEST}", secret.read_text())
         self.assertIn("GUI_SERVICE_SECRET=synthetic-test-value", secret.read_text())
+        self.assertIn(f"GUI_RETAINED_RUNTIME_IMAGES=ghcr.io/acme/cove-gui-runtime@sha256:{previous}", secret.read_text())
+        self.run_script("pin-gui-runtime.sh")
+        self.assertEqual(secret.read_text().count(f"@sha256:{previous}"), 1)
         self.assertEqual(secret.stat().st_mode & 0o777, 0o600)
 
 

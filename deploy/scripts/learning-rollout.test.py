@@ -13,6 +13,25 @@ DIGEST = "b" * 64
 
 
 class LearningRolloutTests(unittest.TestCase):
+    def test_release_sync_preserves_server_owned_runtime_data(self):
+        workflow = (SCRIPTS.parents[1] / ".github/workflows/release-v2.yml").read_text()
+        commands = workflow.split('          rsync ')[1:]
+        root_command = commands[0].split('          rsync ')[0].split('\n          ssh ')[0]
+        self.assertNotIn('--delete', root_command)
+        with tempfile.TemporaryDirectory() as directory:
+            source = pathlib.Path(directory) / 'source'
+            destination = pathlib.Path(directory) / 'destination'
+            source.mkdir()
+            destination.mkdir()
+            (source / 'compose.production.yml').write_text('new assets')
+            for name in ('state', 'video-scratch'):
+                (destination / name).mkdir()
+                (destination / name / 'sentinel').write_text('server data')
+            subprocess.run(['rsync', '-az', str(source) + '/', str(destination) + '/'], check=True)
+            self.assertEqual((destination / 'compose.production.yml').read_text(), 'new assets')
+            for name in ('state', 'video-scratch'):
+                self.assertEqual((destination / name / 'sentinel').read_text(), 'server data')
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.temporary.name)

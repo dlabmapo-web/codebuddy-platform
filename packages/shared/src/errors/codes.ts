@@ -1,6 +1,15 @@
 import { z } from "zod";
 
 export const appErrorCodes = [
+  "PDF_TOO_LARGE",
+  "PDF_INVALID",
+  "PDF_BUSY",
+  "PDF_STORAGE_FAILED",
+  "PDF_NOT_AVAILABLE",
+  "PDF_UPLOAD_EXPIRED",
+  "PDF_EDIT_STALE",
+  "PDF_VALIDATION_LIMIT",
+
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
   "STUDENT_SESSION_EXPIRED",
@@ -197,8 +206,10 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",
   STUDENT_SESSION_UNAVAILABLE:
     "Student sessions are temporarily unavailable. Sign in again shortly.",
-  PROFILE_SECURITY_CHANGE_FAILED: "The account security change could not be completed. Please try again.",
-  PROFILE_LAST_IDENTITY_REQUIRED: "Keep at least one sign-in method connected to your account.",
+  PROFILE_SECURITY_CHANGE_FAILED:
+    "The account security change could not be completed. Please try again.",
+  PROFILE_LAST_IDENTITY_REQUIRED:
+    "Keep at least one sign-in method connected to your account.",
   PROFILE_INCOMPLETE: "Complete your profile to continue.",
   USER_SUSPENDED: "This account is suspended.",
   EMAIL_VERIFICATION_REQUIRED: "Verify your email to continue.",
@@ -209,7 +220,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   INVITATION_INVALID: "This invitation is invalid.",
   INVITATION_EXPIRED: "This invitation has expired.",
   INVITATION_EMAIL_MISMATCH: "Sign in with the invited email address.",
-  INVITATION_ALREADY_PENDING: "An invitation is already pending for this email.",
+  INVITATION_ALREADY_PENDING:
+    "An invitation is already pending for this email.",
   JOIN_REQUEST_ALREADY_PENDING: "A join request is already pending.",
   JOIN_REQUEST_NOT_FOUND: "The join request was not found.",
   JOIN_REQUEST_STATE_CONFLICT: "The join request has already been reviewed.",
@@ -221,8 +233,10 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   OAUTH_ONBOARDING_INTENT_REQUIRED: "Choose an academy before social signup.",
   OAUTH_ONBOARDING_INTENT_INVALID: "The social signup request is invalid.",
   OAUTH_ONBOARDING_INTENT_EXPIRED: "The social signup request has expired.",
-  OAUTH_ONBOARDING_INTENT_CONSUMED: "The social signup request was already used.",
-  OAUTH_PROVIDER_MISMATCH: "The social provider does not match this signup request.",
+  OAUTH_ONBOARDING_INTENT_CONSUMED:
+    "The social signup request was already used.",
+  OAUTH_PROVIDER_MISMATCH:
+    "The social provider does not match this signup request.",
   LAST_MANAGER_REQUIRED: "The academy must keep at least one active manager.",
   IDENTITY_LINK_CONFLICT: "This identity cannot be linked automatically.",
   USERNAME_TAKEN: "That username is already taken.",
@@ -230,51 +244,69 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   LEGACY_ACCOUNT_ALREADY_MIGRATED: "This legacy account is already migrated.",
   COURSE_NOT_FOUND: "The selected course was not found.",
   COURSE_TITLE_CONFLICT: "A course already uses this title.",
-  CONTENT_PARENT_MISMATCH: "The content does not belong to the selected parent.",
+  CONTENT_PARENT_MISMATCH:
+    "The content does not belong to the selected parent.",
   CONTENT_POSITION_CONFLICT: "Two content items cannot use the same position.",
-  CONTENT_MOVE_STALE: "This content changed in another session. Choose where to move it again.",
+  CONTENT_MOVE_STALE:
+    "This content changed in another session. Choose where to move it again.",
   CONTENT_VALIDATION_FAILED: "Fix the content validation issues and try again.",
   EXERCISE_NOT_FOUND: "The selected programming problem was not found.",
-  EXERCISE_VALIDATION_FAILED: "Complete the required problem fields and try again.",
-  CONTENT_EDIT_CONFLICT: "This problem changed in another session. Reload it before saving again.",
-  CONTENT_HAS_SUBMISSIONS: "This content has student submissions. Hide it instead of deleting it.",
+  EXERCISE_VALIDATION_FAILED:
+    "Complete the required problem fields and try again.",
+  CONTENT_EDIT_CONFLICT:
+    "This problem changed in another session. Reload it before saving again.",
+  CONTENT_HAS_SUBMISSIONS:
+    "This content has student submissions. Hide it instead of deleting it.",
   EXERCISE_NOT_AVAILABLE: "This problem is not available.",
   CLASS_NOT_FOUND: "The selected class was not found.",
   CLASS_ARCHIVED: "This class is archived. Restore it before changing it.",
-  CLASS_EDIT_CONFLICT: "This class changed in another session. Reload it before saving again.",
+  CLASS_EDIT_CONFLICT:
+    "This class changed in another session. Reload it before saving again.",
   CLASS_VALIDATION_FAILED: "Fix the class details and try again.",
-  CLASS_MEMBERSHIP_INELIGIBLE: "Only active students of this academy can be enrolled.",
+  CLASS_MEMBERSHIP_INELIGIBLE:
+    "Only active students of this academy can be enrolled.",
   // Deliberately one message for every eligibility failure: a caller must not
   // be able to tell a suspended teacher from one in another academy.
-  CLASS_TEACHER_INELIGIBLE: "Only an active teacher of this academy can be assigned to a class.",
+  CLASS_TEACHER_INELIGIBLE:
+    "Only an active teacher of this academy can be assigned to a class.",
   // Names the person's existing place on the class rather than refusing
   // vaguely: the fix is to change who is homeroom, not to try again.
-  CLASS_TEACHER_ALREADY_ASSIGNED: "That teacher already runs this class as its homeroom teacher.",
+  CLASS_TEACHER_ALREADY_ASSIGNED:
+    "That teacher already runs this class as its homeroom teacher.",
   COURSE_NOT_ASSIGNED: "This course is not available to you.",
   DRAFT_TOO_LARGE: "Your code is too large to save.",
-  SUBMISSION_IN_FLIGHT: "This problem is already being graded. Wait for the result.",
+  SUBMISSION_IN_FLIGHT:
+    "This problem is already being graded. Wait for the result.",
   SUBMISSION_RATE_LIMITED: "Too many submissions. Wait a moment and try again.",
   SUBMISSION_NOT_FOUND: "That submission was not found.",
-  SOLVE_SESSION_INVALID:
-    "This problem session expired. Please submit again.",
-  GRADING_UNAVAILABLE: "Grading is temporarily unavailable. Your code is saved.",
-  MONITORING_HELP_KEY_REUSED: "This request key was already used for another action. Refresh and try again.",
+  SOLVE_SESSION_INVALID: "This problem session expired. Please submit again.",
+  GRADING_UNAVAILABLE:
+    "Grading is temporarily unavailable. Your code is saved.",
+  MONITORING_HELP_KEY_REUSED:
+    "This request key was already used for another action. Refresh and try again.",
   SAMPLE_CHECK_NOT_FOUND: "This sample is not available.",
-  SAMPLE_CHECK_STALE: "This problem was updated. Refresh the page and try again.",
+  SAMPLE_CHECK_STALE:
+    "This problem was updated. Refresh the page and try again.",
   SAMPLE_CHECK_UNAVAILABLE: "Sample could not be checked. Try again later.",
-  SAMPLE_CHECK_BUSY: "A sample check is already running. Wait for it to finish.",
-  SAMPLE_CHECK_RATE_LIMITED: "Too many sample checks. Wait a moment and try again.",
-  SAMPLE_CHECK_CONFLICT: "That sample check was already started with different code. Try again.",
+  SAMPLE_CHECK_BUSY:
+    "A sample check is already running. Wait for it to finish.",
+  SAMPLE_CHECK_RATE_LIMITED:
+    "Too many sample checks. Wait a moment and try again.",
+  SAMPLE_CHECK_CONFLICT:
+    "That sample check was already started with different code. Try again.",
   MONITORING_DISABLED: "Live monitoring is not enabled for this academy.",
   // One message for every access failure — not assigned, wrong academy,
   // archived class, suspended membership — so a caller cannot learn which
   // classes or students exist by reading the error.
   MONITORING_ACCESS_DENIED: "You are not the assigned teacher for this class.",
-  MONITORING_STUDENT_UNAVAILABLE: "This student is not available to monitor right now.",
+  MONITORING_STUDENT_UNAVAILABLE:
+    "This student is not available to monitor right now.",
   MONITORING_WATCH_REPLACED: "This session was replaced by a newer one.",
   MONITORING_PAYLOAD_TOO_LARGE: "That change was too large to send.",
-  MONITORING_REALTIME_UNAVAILABLE: "Live monitoring is temporarily unavailable.",
-  MONITORING_FEEDBACK_INVALID: "Feedback must be between 1 and 2,000 characters.",
+  MONITORING_REALTIME_UNAVAILABLE:
+    "Live monitoring is temporarily unavailable.",
+  MONITORING_FEEDBACK_INVALID:
+    "Feedback must be between 1 and 2,000 characters.",
   // The client is speaking an older watch protocol than this server. Named
   // rather than folded into a generic denial, because the fix is a reload
   // and a teacher who is told "access denied" will go looking for a
@@ -324,7 +356,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // rather than widened: the two features share a shape and nothing else, and a
   // single IMPORT_SESSION_NOT_FOUND covering both would make a member session
   // and a course session interchangeable in every scope check that reads it.
-  CONTENT_IMPORT_FILE_REJECTED: "That file could not be read as a course workbook.",
+  CONTENT_IMPORT_FILE_REJECTED:
+    "That file could not be read as a course workbook.",
   CONTENT_IMPORT_TEMPLATE_UNSUPPORTED:
     "This workbook was made for a different template version. Download the workbook again.",
   // One code for a missing session, another course's, and another academy's, so
@@ -365,7 +398,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PROFILE_NUMBER_CONFLICT: "That number is already used in this academy.",
   PROFILE_IMAGE_TYPE_INVALID: "Choose a JPEG, PNG, or WebP image.",
   PROFILE_IMAGE_TOO_LARGE: "Choose an image smaller than 5 MB.",
-  PROFILE_IMAGE_DECODE_FAILED: "That image could not be read. Try another file.",
+  PROFILE_IMAGE_DECODE_FAILED:
+    "That image could not be read. Try another file.",
   // The previous photo is still in place when this arrives; nothing was lost.
   PROFILE_IMAGE_STORAGE_FAILED:
     "The image could not be saved. Your previous photo is unchanged.",
@@ -392,7 +426,8 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PLATFORM_USER_NOT_FOUND: "That account was not found.",
   ACADEMY_DELETE_NOT_CONFIRMED:
     "Type the academy's address exactly to confirm deletion.",
-  CONFIRMATION_MISMATCH: "Type the account's email or username exactly to confirm.",
+  CONFIRMATION_MISMATCH:
+    "Type the account's email or username exactly to confirm.",
   LAST_ADMIN_REQUIRED: "The platform must keep at least one operator.",
   PLATFORM_EXPORT_TOO_LARGE:
     "Too many accounts to download at once. Narrow the filter and try again.",
@@ -436,10 +471,17 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   // to show.
   OPERATION_ALREADY_RUNNING:
     "This problem is already being re-graded. Wait for that run to finish.",
-  OPERATION_PLAN_EMPTY:
-    "There is nothing left to re-grade for this problem.",
+  OPERATION_PLAN_EMPTY: "There is nothing left to re-grade for this problem.",
   OPERATION_RUN_NOT_PENDING:
     "This run has already been started. Open it to see how far it got.",
   OPERATION_PLAN_TOO_LARGE:
     "This re-grade is too large to run in one go. Contact engineering.",
+  PDF_TOO_LARGE: "Choose a PDF smaller than 95 MB.",
+  PDF_INVALID: "Choose a valid, unprotected PDF.",
+  PDF_BUSY: "Document validation is busy. Try again shortly.",
+  PDF_STORAGE_FAILED: "Document storage is unavailable. Try again.",
+  PDF_NOT_AVAILABLE: "This document is not available.",
+  PDF_UPLOAD_EXPIRED: "This upload expired. Choose the file again.",
+  PDF_EDIT_STALE: "The document changed. Refresh before editing.",
+  PDF_VALIDATION_LIMIT: "This PDF exceeds the validation time or memory limit.",
 };

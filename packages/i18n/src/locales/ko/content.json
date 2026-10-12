@@ -190,7 +190,9 @@
     "cascade_lectures_other": "강의 {{count}}개",
     "cascade_exercises_one": "문제 {{count}}개",
     "cascade_exercises_other": "문제 {{count}}개",
-    "irreversible": "삭제한 내용은 되돌릴 수 없습니다."
+    "irreversible": "삭제한 내용은 되돌릴 수 없습니다.",
+    "pdf_title": "PDF 자료 삭제",
+    "pdf_confirm": "PDF 삭제"
   },
   "outline": {
     "toggle": "‘{{title}}’ 펼치기·접기",
@@ -236,5 +238,68 @@
     "undo_failed": "되돌리지 못했습니다.",
     "dismiss": "닫기",
     "move_failed": "옮기지 못했습니다."
+  },
+  "pdf": {
+    "add": "PDF 추가",
+    "edit": "PDF 자료",
+    "description": "PDF 한 개를 업로드하고 표시 위치를 선택하세요. 새 자료는 비공개로 시작합니다.",
+    "title": "제목",
+    "placement": "표시 위치",
+    "placements": {
+      "MAIN": "주 학습 자료",
+      "SUPPLEMENTARY": "보충 자료",
+      "BOTH": "주 학습 및 보충 자료"
+    },
+    "choose": "PDF를 선택하거나 여기에 놓으세요",
+    "replace": "PDF 교체 (선택 사항)",
+    "file": "PDF 파일",
+    "limit": "PDF만 가능 · 최대 95 MB",
+    "save": "PDF 저장",
+    "cancel": "취소",
+    "open": "PDF 열기",
+    "back": "돌아가기",
+    "badge": "PDF",
+    "uploading": "업로드 중 {{progress}}%",
+    "validating": "PDF 검증 및 저장 중…",
+    "loading": "PDF 불러오는 중…",
+    "unavailable": "이 PDF를 사용할 수 없습니다.",
+    "retry": "다시 시도",
+    "previous_page": "이전 PDF 페이지",
+    "next_page": "다음 PDF 페이지",
+    "page": "PDF 페이지",
+    "zoom": "확대 비율",
+    "zoom_out": "축소",
+    "zoom_in": "확대",
+    "fit_width": "너비 맞춤",
+    "fit_page": "페이지 맞춤",
+    "download": "PDF 다운로드",
+    "fullscreen": "전체 화면 전환",
+    "resources": "보충 자료",
+    "previous_lesson": "이전 학습",
+    "next_lesson": "다음 학습",
+    "lesson": "학습 {{current}} / {{total}}",
+    "course": "강좌로 돌아가기",
+    "contents": "강좌 목차",
+    "errors": {
+      "PDF_TOO_LARGE": "95 MB 이하의 PDF를 선택하세요.",
+      "PDF_INVALID": "암호가 없는 올바른 PDF를 선택하세요.",
+      "PDF_BUSY": "PDF 검증이 진행 중입니다. 잠시 후 다시 시도하세요.",
+      "PDF_STORAGE_FAILED": "PDF를 저장하지 못했습니다. 다시 시도하세요.",
+      "PDF_NOT_AVAILABLE": "이 PDF를 사용할 수 없습니다.",
+      "PDF_UPLOAD_EXPIRED": "저장 전에 파일을 다시 업로드하세요.",
+      "PDF_EDIT_STALE": "자료가 변경되었습니다. 새로고침 후 수정하세요.",
+      "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다."
+    },
+    "remove_selection": "파일 선택 취소",
+    "preview": "PDF 미리보기",
+    "edit_action": "PDF 수정",
+    "replace_action": "PDF 교체",
+    "replacement_notice": "학생은 다음에 자료를 열 때 교체된 PDF를 보게 됩니다.",
+    "invalid_page": "1부터 {{total}}까지의 페이지를 입력하세요.",
+    "document_count_other": "PDF {{count}}개"
+  },
+  "video": {
+    "add": "동영상 수업 추가",
+    "badge": "동영상"
   }
 }

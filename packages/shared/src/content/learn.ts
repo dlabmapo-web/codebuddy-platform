@@ -1,5 +1,7 @@
+import {videoMetadataSchema} from "./video.js";
 import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
+import { pdfMetadataSchema } from "./pdf.js";
 
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
@@ -72,12 +74,25 @@ export const learnExerciseSummarySchema = z.object({
 });
 export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
+export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE','MULTIPLE_CHOICE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
   id: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
   position: positionSchema,
+  videos:z.array(z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,video:videoMetadataSchema,status:exerciseProgressStatusSchema})).optional(),
   exercises: z.array(learnExerciseSummarySchema),
+  manualMaterials:z.array(learnManualSummarySchema).optional(),
+  documents: z
+    .array(
+      z.object({
+        materialId: z.uuid(),
+        title: titleSchema,
+        position: positionSchema,
+        pdf: pdfMetadataSchema,
+      }),
+    )
+    .optional(),
 });
 
 export const learnModuleSchema = z.object({
@@ -95,14 +110,17 @@ export const learnCourseProgressSchema = z.object({
 });
 export type LearnCourseProgress = z.infer<typeof learnCourseProgressSchema>;
 
+export const manualGradeSummarySchema=z.object({maximumHundredths:z.number().int().nonnegative(),scoreHundredths:z.number().int().nonnegative(),reviewed:z.number().int().nonnegative(),pending:z.number().int().nonnegative()});
 export const learnCourseSummarySchema = z.object({
   courseId: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
+  manualAssessment:manualGradeSummarySchema.optional(),
   counts: z.object({
     modules: z.number().int().nonnegative(),
     lectures: z.number().int().nonnegative(),
     exercises: z.number().int().nonnegative(),
+    documents: z.number().int().nonnegative().optional(),
   }),
   progress: learnCourseProgressSchema,
 });
@@ -197,6 +215,7 @@ export const learnCourseOutlineSchema = z.object({
     description: descriptionSchema,
   }),
   progress: learnCourseProgressSchema,
+  manualAssessment:manualGradeSummarySchema.optional(),
   modules: z.array(learnModuleSchema),
 });
 export type LearnCourseOutline = z.infer<typeof learnCourseOutlineSchema>;
@@ -264,9 +283,7 @@ export const learnExerciseWorkspaceSchema = z.object({
     previous: learnExerciseRefSchema.nullable(),
     next: learnExerciseRefSchema.nullable(),
   }),
-  draft: z
-    .object({ code: z.string(), updatedAt: z.iso.datetime() })
-    .nullable(),
+  draft: z.object({ code: z.string(), updatedAt: z.iso.datetime() }).nullable(),
   status: exerciseProgressStatusSchema,
 });
 export type LearnExerciseWorkspace = z.infer<
@@ -306,6 +323,9 @@ export const navigatorLectureSchema = z.object({
   title: titleSchema,
   position: positionSchema,
   exercises: z.array(navigatorExerciseSchema),
+  videos:learnLectureSchema.shape.videos,
+  documents: learnLectureSchema.shape.documents,
+  manualMaterials:learnLectureSchema.shape.manualMaterials,
 });
 
 export const navigatorModuleSchema = z.object({
@@ -543,6 +563,9 @@ export function toNavigatorContext(
           id: lecture.id,
           title: lecture.title,
           position: lecture.position,
+          videos:lecture.videos,
+          documents: lecture.documents,
+          manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
             materialId: exercise.materialId,
             title: exercise.title,

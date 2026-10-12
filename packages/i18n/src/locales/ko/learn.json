@@ -306,5 +306,12 @@
     "unavailable_title": "제출 기록을 불러오지 못했습니다",
     "unavailable_body": "페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.",
     "refresh_failed": "기록을 새로 불러오지 못했습니다. 마지막으로 불러온 목록을 계속 보고 있습니다."
+  },
+  "pdf": {
+    "resources": "보충 자료",
+    "open": "열기",
+    "download": "다운로드",
+    "documents_other": "{{count}} PDF",
+    "unavailable": "이 PDF를 사용할 수 없습니다."
   }
 }

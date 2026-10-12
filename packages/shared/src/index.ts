@@ -12,3 +12,8 @@ export * from "./points/index.js";
 export * from "./profile/index.js";
 
 export * from "./monitoring/help-requests.js";
+
+export * from "./content/manual.js";
+
+export * from "./content/multiple-choice.js";
+export * from "./content/video.js";

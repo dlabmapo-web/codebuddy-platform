@@ -107,12 +107,7 @@ export function auditNamespace(action: string): string {
 
 export function auditFamily(action: string): AuditFamily {
   const verb = auditVerb(action);
-  for (const family of [
-    'destroyed',
-    'withdrawn',
-    'read',
-    'created',
-  ] as const) {
+  for (const family of ['destroyed', 'withdrawn', 'read', 'created'] as const) {
     if (familyVerbs[family].includes(verb)) return family;
   }
   // `changed` last and unconditional: it is both the widest list and the
@@ -143,7 +138,10 @@ export function auditFamily(action: string): AuditFamily {
  * raw code, which is exactly what the page did before. Nothing regresses while
  * somebody adds a line.
  */
-export const auditActionLabels: Record<string, TranslationKey<'platform-audit'>> = {
+export const auditActionLabels: Record<
+  string,
+  TranslationKey<'platform-audit'>
+> = {
   'academy.feature.updated': 'action.academy.feature.updated',
   'academy.invitation.accepted': 'action.academy.invitation.accepted',
   'academy.invitation.created': 'action.academy.invitation.created',
@@ -153,13 +151,16 @@ export const auditActionLabels: Record<string, TranslationKey<'platform-audit'>>
   'academy.join_request.rejected': 'action.academy.join_request.rejected',
   'profile.email.change_requested': 'action.profile.email.change_requested',
   'profile.email.change_sent': 'action.profile.email.change_sent',
-  'profile.identity.unlink_requested': 'action.profile.identity.unlink_requested',
+  'profile.identity.unlink_requested':
+    'action.profile.identity.unlink_requested',
   'profile.identity.unlinked': 'action.profile.identity.unlinked',
   'academy.student.renamed': 'action.academy.student.renamed',
   'academy.member.password.issued': 'action.academy.member.password.issued',
   'academy.member.password.revealed': 'action.academy.member.password.revealed',
-  'academy.member_profile.image_removed': 'action.academy.member_profile.image_removed',
-  'academy.member_profile.image_replaced': 'action.academy.member_profile.image_replaced',
+  'academy.member_profile.image_removed':
+    'action.academy.member_profile.image_removed',
+  'academy.member_profile.image_replaced':
+    'action.academy.member_profile.image_replaced',
   'academy.member_profile.updated': 'action.academy.member_profile.updated',
   'academy.membership.restored': 'action.academy.membership.restored',
   'academy.membership.role_changed': 'action.academy.membership.role_changed',
@@ -188,36 +189,56 @@ export const auditActionLabels: Record<string, TranslationKey<'platform-audit'>>
   'class.teacher.removed': 'action.class.teacher.removed',
   'class.teacher.replaced': 'action.class.teacher.replaced',
   'class.updated': 'action.class.updated',
-  'content.course.adopted_from_library': 'action.content.course.adopted_from_library',
-  'content.course.content_visibility_changed': 'action.content.course.content_visibility_changed',
+  'content.course.adopted_from_library':
+    'action.content.course.adopted_from_library',
+  'content.course.content_visibility_changed':
+    'action.content.course.content_visibility_changed',
   'content.course.created': 'action.content.course.created',
   'content.course.deleted': 'action.content.course.deleted',
   'content.course.updated': 'action.content.course.updated',
-  'content.course.visibility_changed': 'action.content.course.visibility_changed',
+  'content.course.visibility_changed':
+    'action.content.course.visibility_changed',
   'content.course_module.created': 'action.content.course_module.created',
   'content.course_module.deleted': 'action.content.course_module.deleted',
   'content.course_module.reordered': 'action.content.course_module.reordered',
   'content.course_module.updated': 'action.content.course_module.updated',
-  'content.course_module.visibility_changed': 'action.content.course_module.visibility_changed',
-  'content.curriculum_import.committed': 'action.content.curriculum_import.committed',
+  'content.course_module.visibility_changed':
+    'action.content.course_module.visibility_changed',
+  'content.curriculum_import.committed':
+    'action.content.curriculum_import.committed',
   'content.lecture.created': 'action.content.lecture.created',
   'content.lecture.deleted': 'action.content.lecture.deleted',
   'content.lecture.reordered': 'action.content.lecture.reordered',
   'content.lecture.moved': 'action.content.lecture.moved',
   'content.lecture.updated': 'action.content.lecture.updated',
-  'content.lecture.visibility_changed': 'action.content.lecture.visibility_changed',
-  'content.programming_exercise.created': 'action.content.programming_exercise.created',
-  'content.programming_exercise.deleted': 'action.content.programming_exercise.deleted',
-  'content.programming_exercise.reordered': 'action.content.programming_exercise.reordered',
-  'content.programming_exercise.moved': 'action.content.programming_exercise.moved',
-  'content.programming_exercise.updated': 'action.content.programming_exercise.updated',
-  'content.programming_exercise.visibility_changed': 'action.content.programming_exercise.visibility_changed',
-  'monitoring.exercise_solution.viewed': 'action.monitoring.exercise_solution.viewed',
+  'content.lecture.visibility_changed':
+    'action.content.lecture.visibility_changed',
+  'content.pdf.created': 'action.content.pdf.created',
+  'content.pdf.updated': 'action.content.pdf.updated',
+  'content.pdf.deleted': 'action.content.pdf.deleted',
+  'content.pdf.moved': 'action.content.pdf.moved',
+  'content.pdf.visibility': 'action.content.pdf.visibility',
+  'content.programming_exercise.created':
+    'action.content.programming_exercise.created',
+  'content.programming_exercise.deleted':
+    'action.content.programming_exercise.deleted',
+  'content.programming_exercise.reordered':
+    'action.content.programming_exercise.reordered',
+  'content.programming_exercise.moved':
+    'action.content.programming_exercise.moved',
+  'content.programming_exercise.updated':
+    'action.content.programming_exercise.updated',
+  'content.programming_exercise.visibility_changed':
+    'action.content.programming_exercise.visibility_changed',
+  'monitoring.exercise_solution.viewed':
+    'action.monitoring.exercise_solution.viewed',
   'platform.academy.archived': 'action.platform.academy.archived',
   'platform.academy.created': 'action.platform.academy.created',
   'platform.academy.deleted': 'action.platform.academy.deleted',
-  'platform.academy.first_manager_invitation_resent': 'action.platform.academy.first_manager_invitation_resent',
-  'platform.academy.first_manager_invited': 'action.platform.academy.first_manager_invited',
+  'platform.academy.first_manager_invitation_resent':
+    'action.platform.academy.first_manager_invitation_resent',
+  'platform.academy.first_manager_invited':
+    'action.platform.academy.first_manager_invited',
   'platform.academy.restored': 'action.platform.academy.restored',
   'platform.academy.suspended': 'action.platform.academy.suspended',
   'platform.academy.updated': 'action.platform.academy.updated',

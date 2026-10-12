@@ -30,8 +30,9 @@ export function ContentVisibilityControl({
   const [hiding, setHiding] = useState(false);
   const { course } = builder.tree;
   const everythingVisible =
-    course.content.exercises > 0 &&
-    course.content.visibleExercises === course.content.exercises;
+    course.content.exercises + (course.content.documents ?? 0) > 0 &&
+    course.content.visibleExercises === course.content.exercises &&
+    (course.content.visibleDocuments ?? 0) === (course.content.documents ?? 0);
 
   return (
     <>
@@ -63,6 +64,7 @@ export function ContentVisibilityControl({
             label: t('visibility_confirm.problems'),
             value: course.content.exercises,
           },
+          { label: t('pdf.badge'), value: course.content.documents ?? 0 },
         ]}
         itemTitle={course.title}
         kindLabel={t('builder.all_content_kind')}

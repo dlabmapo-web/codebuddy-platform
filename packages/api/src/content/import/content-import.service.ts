@@ -135,7 +135,10 @@ export class ContentImportService {
 
     if (input.kind === "blank") {
       return {
-        filename: workbookFilename({ courseTitle: course.title, kind: "blank" }),
+        filename: workbookFilename({
+          courseTitle: course.title,
+          kind: "blank",
+        }),
         bytes: writeWorkbook(buildBlankWorkbook(input.locale)),
       };
     }
@@ -159,9 +162,15 @@ export class ContentImportService {
     }
 
     return {
-      filename: workbookFilename({ courseTitle: course.title, kind: "current" }),
+      filename: workbookFilename({
+        courseTitle: course.title,
+        kind: "current",
+      }),
       bytes: writeWorkbook(
-        buildCurrentCourseWorkbook({ course: projection, locale: input.locale }),
+        buildCurrentCourseWorkbook({
+          course: projection,
+          locale: input.locale,
+        }),
       ),
     };
   }
@@ -188,6 +197,18 @@ export class ContentImportService {
     const actor = await this.requireImporter(identity, input.academyId);
     const course = await this.requireCourse(input.academyId, input.courseId);
 
+    if (
+      await this.prisma.videoLesson.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.manualMaterial.count({where:{material:{lecture:{courseModule:{courseId:input.courseId}}}}}) || await this.prisma.pdfDocument.count({
+        where: {
+          material: { lecture: { courseModule: { courseId: input.courseId } } },
+        },
+      })
+    )
+      throw new AppException(
+        "PDF_EDIT_STALE",
+        409,
+        "This course contains PDF or manually assessed materials. Use the course builder to edit it; workbook import cannot safely place PDFs.",
+      );
     const started = Date.now();
     const workbook = this.read(input.bytes);
 
@@ -458,11 +479,12 @@ export class ContentImportService {
         const receipt: ContentImportResult = {
           sessionId: session.id,
           status: "COMPLETED",
-          created: entities.filter((entity) => entity.action === "CREATE").length,
-          updated: entities.filter((entity) => entity.action === "UPDATE").length,
-          unchanged: entities.filter(
-            (entity) => entity.action === "UNCHANGED",
-          ).length,
+          created: entities.filter((entity) => entity.action === "CREATE")
+            .length,
+          updated: entities.filter((entity) => entity.action === "UPDATE")
+            .length,
+          unchanged: entities.filter((entity) => entity.action === "UNCHANGED")
+            .length,
           failed: 0,
           entities,
           contentRevision,
@@ -506,7 +528,9 @@ export class ContentImportService {
        * state is no longer certain — and a second attempt should re-read it.
        */
       const failureCode =
-        failure instanceof AppException ? failure.code : "CONTENT_IMPORT_FAILED";
+        failure instanceof AppException
+          ? failure.code
+          : "CONTENT_IMPORT_FAILED";
       await this.prisma.contentImportSession.updateMany({
         where: { id: session.id, status: "COMMITTING" },
         data: { status: "FAILED", failureCode },
@@ -552,7 +576,9 @@ export class ContentImportService {
     );
     const lecturesByKey = new Map(
       input.course.modules.flatMap((module) =>
-        module.lectures.map((lecture) => [lecture.externalKey, lecture] as const),
+        module.lectures.map(
+          (lecture) => [lecture.externalKey, lecture] as const,
+        ),
       ),
     );
     const materialsByKey = new Map(
@@ -572,7 +598,9 @@ export class ContentImportService {
     );
     const lectureIdsByKey = new Map(
       input.course.modules.flatMap((module) =>
-        module.lectures.map((lecture) => [lecture.externalKey, lecture.id] as const),
+        module.lectures.map(
+          (lecture) => [lecture.externalKey, lecture.id] as const,
+        ),
       ),
     );
     const materialIdsByKey = new Map(
@@ -582,7 +610,10 @@ export class ContentImportService {
             .filter((material) => material.programmingExercise)
             .map(
               (material) =>
-                [material.programmingExercise!.externalKey, material.id] as const,
+                [
+                  material.programmingExercise!.externalKey,
+                  material.id,
+                ] as const,
             ),
         ),
       ),
@@ -765,7 +796,11 @@ export class ContentImportService {
         targetType: "CourseModule",
         targetId: created.id,
         requestId: input.requestId,
-        after: { title: created.title, externalKey: planned.key, isVisible: false },
+        after: {
+          title: created.title,
+          externalKey: planned.key,
+          isVisible: false,
+        },
       });
       return created.id;
     }
@@ -829,7 +864,11 @@ export class ContentImportService {
         targetType: "Lecture",
         targetId: created.id,
         requestId: input.requestId,
-        after: { title: created.title, externalKey: planned.key, isVisible: false },
+        after: {
+          title: created.title,
+          externalKey: planned.key,
+          isVisible: false,
+        },
       });
       return created.id;
     }

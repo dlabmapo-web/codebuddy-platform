@@ -17,8 +17,12 @@
 		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		Strict-Transport-Security "max-age=15552000"
 	}
-	request_body {
+	request_body @standard_body {
 		max_size 20MB
+	}
+	@standard_body not path /api/documents/upload
+	request_body /api/documents/upload {
+		max_size 95MB
 	}
 	log {
 		output file /var/log/caddy/access.json {

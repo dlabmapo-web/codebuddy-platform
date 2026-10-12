@@ -41,8 +41,12 @@ export function ModuleCard({
   const addingLecture = builder.lectureModuleId === courseModule.id;
   const effectivelyVisible =
     builder.tree.course.isVisible && courseModule.isVisible;
+  const documentCount = courseModule.lectures.reduce(
+    (total, lecture) => total + lecture.materials.filter((m) => m.type === 'PDF_DOCUMENT').length,
+    0,
+  );
   const exerciseCount = courseModule.lectures.reduce(
-    (total, lecture) => total + lecture.materials.length,
+    (total, lecture) => total + lecture.materials.filter((m) => m.type !== 'PDF_DOCUMENT').length,
     0,
   );
 
@@ -234,6 +238,7 @@ export function ModuleCard({
       <DeleteModal
         cascade={{
           exercises: exerciseCount,
+          documents: documentCount,
           lectures: courseModule.lectures.length,
         }}
         itemTitle={courseModule.title}
@@ -255,6 +260,7 @@ export function ModuleCard({
             label: t('visibility_confirm.problems'),
             value: exerciseCount,
           },
+          { label: t('pdf.badge'), value: documentCount },
         ]}
         itemTitle={courseModule.title}
         kindLabel={t('row.kind_module')}

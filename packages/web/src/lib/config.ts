@@ -4,6 +4,10 @@ function requiredPublicEnvironment(name: string, value: string | undefined): str
 }
 
 export const publicConfig = {
+  videoEnabled:process.env.NEXT_PUBLIC_VIDEO_LESSONS_ENABLED === "true",
+  multipleChoiceEnabled: process.env.NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED === 'true',
+  shortAnswerEnabled:process.env.NEXT_PUBLIC_SHORT_ANSWER_ENABLED === 'true',
+  guiEnabled:process.env.NEXT_PUBLIC_GUI_ENABLED === 'true',
   supabaseUrl: requiredPublicEnvironment(
     "NEXT_PUBLIC_SUPABASE_URL",
     process.env.NEXT_PUBLIC_SUPABASE_URL,

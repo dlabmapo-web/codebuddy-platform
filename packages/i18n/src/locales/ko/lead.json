@@ -117,7 +117,12 @@
       "content.programming_exercise.visibility_changed": "문제 공개 상태 변경",
       "content.programming_exercise.deleted": "문제 삭제",
       "content.programming_exercise.reordered": "문제 순서 변경",
-      "content.programming_exercise.moved": "문제 이동"
+      "content.programming_exercise.moved": "문제 이동",
+      "content.pdf.created": "PDF 추가",
+      "content.pdf.updated": "PDF 수정",
+      "content.pdf.visibility": "PDF 공개 또는 숨김",
+      "content.pdf.deleted": "PDF 삭제",
+      "content.pdf.moved": "PDF 이동"
     }
   },
   "period": {

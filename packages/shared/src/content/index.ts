@@ -16,3 +16,5 @@ export * from "./teacher-roster.js";
 export * from "./teacher-students.js";
 
 export * from "./quiz.js";
+
+export * from "./pdf.js";

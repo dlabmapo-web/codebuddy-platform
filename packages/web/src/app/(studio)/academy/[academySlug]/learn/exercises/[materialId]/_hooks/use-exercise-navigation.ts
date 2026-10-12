@@ -1,5 +1,9 @@
 'use client';
+import {videoApi} from "@/lib/video-api";
 
+import { manualApi } from '@/lib/manual-api';
+
+import { pdfApi } from '@/lib/pdf-api';
 import { routes } from '@/lib/routes';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -34,7 +38,11 @@ export type ExerciseTransitionLifecycle = {
   beforeCommit: () => void;
 };
 
-export function workspaceQueryKey(academyId: string, classId: string, materialId: string) {
+export function workspaceQueryKey(
+  academyId: string,
+  classId: string,
+  materialId: string,
+) {
   return ['learn', academyId, 'workspace', classId, materialId];
 }
 
@@ -97,6 +105,7 @@ export function useExerciseNavigation({
    * and returns without touching anything — the alternative being a workspace
    * that lands on a problem nobody asked for.
    */
+  const navigatorRef = React.useRef(bootstrap.navigator);
   const tokenRef = React.useRef(0);
   const historyEntryRef = React.useRef<ExerciseHistoryEntry | null>(null);
 
@@ -169,6 +178,24 @@ export function useExerciseNavigation({
       try {
         // Resolves from cache when the neighbour was prefetched, so the common
         // case costs no request at all.
+        const isPdf = navigatorRef.current.course.modules.some((m) =>
+          m.lectures.some((l) =>
+            l.documents?.some((d) => d.materialId === materialId),
+          ),
+        );
+        const isVideo=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.videos?.some(v=>v.materialId===materialId)));
+        if(isVideo){await videoApi.read({academyId,materialId,classId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnVideo(academySlug,materialId,{classId}));return;}
+        const isManual=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.manualMaterials?.some(a=>a.materialId===materialId)));
+        if(isManual){const activity=await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnAssessment(academySlug,materialId,activity.type,{classId}));return;}
+        if (isPdf) {
+          await pdfApi.read({ academyId, materialId });
+          if (tokenRef.current !== token) return;
+          beforeTransitionRef.current?.beforeCommit();
+          router.push(
+            routes.academyLearnPdf(academySlug, materialId, { classId }),
+          );
+          return;
+        }
         const next = await fetchWorkspace(materialId);
         // Superseded while in flight: a newer destination owns the workspace
         // now, and this response is no longer about anywhere the reader is.
@@ -227,6 +254,7 @@ export function useExerciseNavigation({
     },
     [
       academyId,
+      academySlug,
       classId,
       beforeTransitionRef,
       exerciseUrl,
@@ -269,7 +297,11 @@ export function useExerciseNavigation({
   const outlineQuery = useQuery({
     queryKey: ['learn', academyId, 'navigator', classId, courseId],
     queryFn: async () => {
-      const outline = await orpc.learn.getCourseOutline({ academyId, classId, courseId });
+      const outline = await orpc.learn.getCourseOutline({
+        academyId,
+        classId,
+        courseId,
+      });
       const next = toNavigatorContext(outline, workspace.exercise.materialId);
       if (!next) throw new Error('COURSE_MISSING_EXERCISE');
       return next;
@@ -285,6 +317,10 @@ export function useExerciseNavigation({
     retry: false,
     staleTime: WORKSPACE_STALE_MS,
   });
+
+  React.useEffect(() => {
+    navigatorRef.current = outlineQuery.data ?? bootstrap.navigator;
+  }, [outlineQuery.data, bootstrap.navigator]);
 
   const navigator: WorkspaceNavigatorContext | null = React.useMemo(
     // The cached tree is a fact about the course; the path is a fact about the
@@ -320,7 +356,15 @@ export function useExerciseNavigation({
       workspace.neighbors.previous,
       workspace.neighbors.next,
     ]) {
-      if (!neighbor) continue;
+      if (
+        !neighbor ||
+        navigatorRef.current.course.modules.some((m) =>
+          m.lectures.some((l) =>
+            l.videos?.some(v=>v.materialId===neighbor.materialId) || l.documents?.some((d) => d.materialId === neighbor.materialId) || l.manualMaterials?.some(m=>m.materialId===neighbor.materialId),
+          ),
+        )
+      )
+        continue;
       void queryClient.prefetchQuery({
         queryKey: workspaceQueryKey(academyId, classId, neighbor.materialId),
         queryFn: () =>
@@ -332,7 +376,13 @@ export function useExerciseNavigation({
         staleTime: WORKSPACE_STALE_MS,
       });
     }
-  }, [academyId, classId, queryClient, workspace.neighbors]);
+  }, [
+    bootstrap.navigator,
+    academyId,
+    classId,
+    queryClient,
+    workspace.neighbors,
+  ]);
 
   /* --------------------------------------------------------------- history */
 

@@ -88,7 +88,7 @@ export function BuilderHeader({
           }}
           title={course.title}
         />
-        {builder.editable && builder.tree.course.content.exercises > 0 ? (
+        {builder.editable && course.content.exercises + (course.content.documents ?? 0) > 0 ? (
           <ContentVisibilityControl builder={builder} />
         ) : null}
         {builder.tree.modules.length > 0 ? (
@@ -112,6 +112,7 @@ export function BuilderHeader({
         affected={[
           { label: t('visibility_confirm.lectures'), value: course.content.lectures },
           { label: t('visibility_confirm.problems'), value: course.content.exercises },
+          { label: t('pdf.badge'), value: course.content.documents ?? 0 },
         ]}
         itemTitle={course.title}
         kindLabel={t('row.kind_course')}

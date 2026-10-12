@@ -171,6 +171,8 @@ function createService(options?: {
   const material =
     options?.material === undefined ? workspaceMaterial() : options.material;
   const prisma = {
+    manualSubmission:{findMany:vi.fn().mockResolvedValue([])},
+    videoWatchProgress:{findMany:vi.fn().mockResolvedValue([])},
     academyFeatureFlag: { findUnique: vi.fn().mockResolvedValue(null) },
     course: {
       findMany: vi.fn().mockResolvedValue(course ? [course] : []),

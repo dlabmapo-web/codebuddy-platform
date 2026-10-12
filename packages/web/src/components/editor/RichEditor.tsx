@@ -1,5 +1,6 @@
 'use client';
 
+import { usePrivateImageResolver } from './private-image-context';
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -29,6 +30,9 @@ import {
 
 function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
   const { src, alt, width } = node.attrs as { src: string; alt?: string; width?: number };
+  const resolvePrivate=usePrivateImageResolver();
+  const [resolvedSrc,setResolvedSrc]=useState(src.startsWith('cove-asset:')?'':src);
+  useEffect(()=>{let active=true;if(src.startsWith('cove-asset:')&&resolvePrivate)void resolvePrivate(src).then(url=>{if(active)setResolvedSrc(url);}).catch(()=>{if(active)setResolvedSrc('');});else setResolvedSrc(src);return ()=>{active=false;};},[src,resolvePrivate]);
   const containerRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startW = useRef(0);
@@ -61,7 +65,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
     >
       <span ref={containerRef as React.RefObject<HTMLSpanElement>} style={{ display: 'inline-block', position: 'relative' }}>
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt ?? ''}
           crossOrigin="anonymous"
           style={{
@@ -171,6 +175,7 @@ type Props = {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  onImageUpload?: (file: File) => Promise<string>;
 };
 
 const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32'];
@@ -178,9 +183,10 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function RichEditor({ value, onChange, placeholder = '문제 내용을 입력하세요...' }: Props) {
+export function RichEditor({ value, onChange, onImageUpload, placeholder = '문제 내용을 입력하세요...' }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError,setUploadError]=useState("");
   const [inTable, setInTable] = useState(false);
 
   const editor = useEditor({
@@ -230,6 +236,10 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
 
   const uploadFile = useCallback(async (file: File, asImage: boolean) => {
     if (!editor) return;
+    if (onImageUpload) {
+      if (asImage) editor.chain().focus().setImage({src:await onImageUpload(file),alt:file.name}).run();
+      return;
+    }
     const fd = new FormData();
     fd.append('file', file);
     const res = await fetch('/api/uploads', { method: 'POST', body: fd });
@@ -242,11 +252,11 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         `<a href="${json.url}" target="_blank" rel="noopener noreferrer">${json.name}</a>`
       ).run();
     }
-  }, [editor]);
+  }, [editor, onImageUpload]);
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) await uploadFile(file, true);
+    if (file) {try {setUploadError("");await uploadFile(file, true);}catch(e){setUploadError(e instanceof Error?e.message:"Image upload failed");}}
     e.target.value = '';
   }, [uploadFile]);
 
@@ -335,7 +345,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         </ToolBtn>
         <ToolBtn onClick={setLink} active={editor.isActive('link')} title="링크 삽입"><LinkIcon size={14} /></ToolBtn>
         <ToolBtn onClick={() => imageInputRef.current?.click()} title="이미지 첨부 (오른쪽 핸들 드래그로 크기 조절)"><ImageIcon size={14} /></ToolBtn>
-        <ToolBtn onClick={() => fileInputRef.current?.click()} title="파일 첨부"><Paperclip size={14} /></ToolBtn>
+        {!onImageUpload && <ToolBtn onClick={() => fileInputRef.current?.click()} title="파일 첨부"><Paperclip size={14} /></ToolBtn>}
       </div>
 
       {/* ── Table Context Toolbar ─────────────────────────────────────────── */}
@@ -397,6 +407,7 @@ export function RichEditor({ value, onChange, placeholder = '문제 내용을 �
         </div>
       )}
 
+      {uploadError?<p role="alert">{uploadError}</p>:null}
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
 

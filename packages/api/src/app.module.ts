@@ -1,3 +1,6 @@
+import { ManualModule } from "./manual/manual.module.js";
+import { VideosModule } from "./videos/videos.module.js";
+import { DocumentsModule } from "./documents/documents.module.js";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
@@ -30,6 +33,9 @@ import { TeachModule } from "./teach/teach.module.js";
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    DocumentsModule,
+    VideosModule,
+    ManualModule,
     DraftsModule,
     AcademiesModule,
     AuthModule,

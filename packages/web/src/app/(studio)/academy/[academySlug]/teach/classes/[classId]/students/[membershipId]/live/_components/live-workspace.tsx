@@ -472,6 +472,7 @@ export function LiveWorkspace({
           width from the workspace rather than covering it. */}
       <div className={navigatorRow}>
         <WorkspaceCurriculumNavigator
+          allowPdfNavigation={false}
           busyMaterialId={display.pendingMaterialId}
           context={display.navigator}
           // A follow in progress owns the display; a second selection during

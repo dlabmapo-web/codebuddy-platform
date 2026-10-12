@@ -1,4 +1,13 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import {videoMetadata} from "../../videos/video-metadata.js";
+import { multipleChoiceSchema } from "@cove/shared";
+function remapChoiceDefinition(raw: unknown) {
+ const definition=multipleChoiceSchema.parse(raw);
+ const ids=new Map(definition.options.map(o=>[o.id,randomUUID()]));
+ return {...definition,options:definition.options.map(o=>({...o,id:ids.get(o.id)!})),correctOptionIds:definition.correctOptionIds.map(id=>ids.get(id)!)};
+}
+import { lockPdfAsset } from "../../documents/pdf-document.service.js";
+import { pdfMetadata } from "../../documents/pdf-metadata.js";
+import { ConflictException, HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { AvailableLibraryCourse } from "@cove/shared";
 
@@ -7,7 +16,7 @@ import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import { AppException } from "../../common/app-exception.js";
 import { PrismaService } from "../../database/prisma.service.js";
-import type { Prisma } from "../../generated/prisma/client.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import { toCourseSummary } from "../course.service.js";
 
 /**
@@ -67,7 +76,7 @@ export class AcademyLibraryService {
         modules: {
           select: {
             _count: { select: { lectures: true } },
-            lectures: { select: { _count: { select: { materials: true } } } },
+            lectures: { select: { _count: { select: { materials: {where:{type:"PROGRAMMING_EXERCISE"}} } } } },
           },
         },
         // What this academy has already taken from this master. One query for
@@ -162,6 +171,11 @@ export class AcademyLibraryService {
             // Null throughout: a preview says what is in the course, never
             // what the answers are. The branch owns a full copy the moment it
             // adopts, and not one moment sooner.
+            videoLesson:material.videoLesson?videoMetadata(material.videoLesson):null,
+          pdfDocument: material.pdfDocument
+              ? pdfMetadata(material.pdfDocument)
+              : null,
+            manualMaterial:material.manualMaterial?{revision:material.manualMaterial.revision,submitEnabled:material.manualMaterial.submitEnabled,includeInScore:material.manualMaterial.includeInScore,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
             programmingExercise: null,
           })),
         })),
@@ -213,6 +227,9 @@ export class AcademyLibraryService {
     const modules: Prisma.CourseModuleCreateManyInput[] = [];
     const lectures: Prisma.LectureCreateManyInput[] = [];
     const materials: Prisma.MaterialCreateManyInput[] = [];
+    const documents: Prisma.PdfDocumentCreateManyInput[] = [];
+    const videos:Prisma.VideoLessonCreateManyInput[]=[];
+    const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
     const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
     const hints: Prisma.ExerciseHintCreateManyInput[] = [];
@@ -261,9 +278,17 @@ export class AcademyLibraryService {
             title: material.title,
             position: material.position,
             isRequired: material.isRequired,
-            isVisible: true,
+            isVisible: !material.videoLesson && !material.manualMaterial?.shortAnswer && !material.manualMaterial?.multipleChoice,
           });
 
+          if(material.videoLesson){const {assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,captions,assets}=material.videoLesson;videos.push({materialId,assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,assets:assets as Prisma.InputJsonValue,captions:captions as Prisma.InputJsonValue,revision:1,requestKey:randomUUID()});}
+          if (material.pdfDocument)
+            documents.push({
+              materialId,
+              assetId: material.pdfDocument.assetId,
+              placement: material.pdfDocument.placement,
+            });
+          if(material.manualMaterial){const {multipleChoice,shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,multipleChoice:multipleChoice ? remapChoiceDefinition(multipleChoice) : Prisma.DbNull,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
           const exercise = material.programmingExercise;
           if (!exercise) continue;
           exercises.push({
@@ -348,6 +373,15 @@ export class AcademyLibraryService {
       if (modules.length) await tx.courseModule.createMany({ data: modules });
       if (lectures.length) await tx.lecture.createMany({ data: lectures });
       if (materials.length) await tx.material.createMany({ data: materials });
+      for (const assetId of [
+        ...new Set(documents.map((d) => d.assetId)),
+      ].sort())
+        await lockPdfAsset(tx, assetId);
+      for(const assetId of [...new Set(videos.map(v=>v.assetId))].sort()){await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${assetId}::uuid FOR UPDATE`;const asset=await tx.videoAsset.findUnique({where:{id:assetId}});if(asset?.state!=="READY")throw new ConflictException("Only ready video lessons can be adopted");}
+      if(videos.length)await tx.videoLesson.createMany({data:videos});
+      if (documents.length)
+        await tx.pdfDocument.createMany({ data: documents });
+      if(manuals.length)await tx.manualMaterial.createMany({data:manuals});
       if (exercises.length) {
         await tx.programmingExercise.createMany({ data: exercises });
       }
@@ -438,7 +472,7 @@ const summaryInclude = {
         select: {
           id: true,
           isVisible: true,
-          materials: { select: { isVisible: true } },
+          materials: { select: { isVisible: true, type: true } },
         },
       },
     },
@@ -456,7 +490,10 @@ const previewInclude = {
       lectures: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         include: {
-          materials: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+          materials: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            include: { videoLesson:{include:{asset:true}},manualMaterial:true,pdfDocument: { include: { asset: true } } },
+          },
         },
       },
     },
@@ -477,6 +514,9 @@ const adoptInclude = {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
+              manualMaterial:true,
+              videoLesson: { include: { asset: true } },
+              pdfDocument: { include: { asset: true } },
               programmingExercise: {
                 include: {
                   testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },

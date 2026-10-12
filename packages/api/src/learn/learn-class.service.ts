@@ -158,7 +158,7 @@ export class LearnClassService {
       userId,
       record.courseAssignments.flatMap((assignment) =>
         exerciseMaterialIds({ modules: nonemptyModules(assignment.course) }),
-      ),
+      ),classId,
     );
     const courses = availableCourses(record, statuses);
 

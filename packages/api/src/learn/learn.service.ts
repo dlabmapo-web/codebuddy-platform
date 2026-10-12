@@ -112,7 +112,7 @@ export class LearnService {
     // own permissions and have no enrollment to deliver against, so they get
     // an empty context and the outline renders as a preview.
     const [outline, classContext] = await Promise.all([
-      this.curriculum.outlineFor(course, userId),
+      this.curriculum.outlineFor(course, userId,input.classId),
       role === "STUDENT"
         ? this.classContext.resolve({
             academyId: input.academyId,
@@ -288,7 +288,7 @@ export class LearnService {
           id: lecture.id,
           position: lecture.position,
           exercises: lecture.materials.flatMap((item) =>
-            item.programmingExercise
+            (item.programmingExercise || item.manualMaterial || (item.videoLesson?.asset.state === "READY" && item.videoLesson.placement !== "SUPPLEMENTARY") || (item.pdfDocument?.asset.state === "READY" && item.pdfDocument.placement !== "SUPPLEMENTARY"))
               ? [{ materialId: item.id, title: item.title, position: item.position }]
               : []
           ),

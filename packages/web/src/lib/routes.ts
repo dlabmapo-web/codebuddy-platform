@@ -170,11 +170,23 @@ export const routes = {
     academySlug: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/records`, query),
+  academyTeachVideo:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/videos/${segment(materialId)}`,
+  academyLearnVideo:(academySlug:string,materialId:string,query?:Record<string,QueryValue>)=>withQuery(`${academyRoot(academySlug)}/learn/videos/${segment(materialId)}`,query),
+  academyLearnMaterial:(academySlug:string,materialId:string,type:string,query?:Record<string,QueryValue>)=>withQuery(`${academyRoot(academySlug)}/learn/${type==='VIDEO_LESSON'?'videos':type==='PDF_DOCUMENT'?'documents':type==='PROGRAMMING_EXERCISE'?'exercises':type==='MULTIPLE_CHOICE'?'quizzes':'turtle'}/${segment(materialId)}`,query),
+  academyLearnQuiz: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/quizzes/${segment(materialId)}`,query),
+  academyLearnAssessment: (academySlug:string, materialId:string, type:string, query?:Record<string,QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/${type === 'VIDEO_LESSON' ? 'videos' : type === 'MULTIPLE_CHOICE' ? 'quizzes' : 'turtle'}/${segment(materialId)}`,query),
+  academyLearnManual: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/turtle/${segment(materialId)}`,query),
+  academyLearnPdf: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/documents/${segment(materialId)}`, query),
   academyLearnExercise: (
     academySlug: string,
     materialId: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/exercises/${segment(materialId)}`, query),
+  academyTeachManual:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/manual/${segment(materialId)}`,
   academyTeachClasses: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/classes`,
   academyTeachClass: (academySlug: string, classId: string) =>

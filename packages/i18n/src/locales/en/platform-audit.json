@@ -145,6 +145,13 @@
         "reordered": "Problems reordered",
         "updated": "Problem updated",
         "visibility_changed": "Problem shown or hidden"
+      },
+      "pdf": {
+        "created": "PDF created",
+        "updated": "PDF updated",
+        "deleted": "PDF removed",
+        "moved": "PDF moved",
+        "visibility": "PDF shown or hidden"
       }
     },
     "platform": {

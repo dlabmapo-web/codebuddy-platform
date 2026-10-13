@@ -33,6 +33,16 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
 }
 
 describe("PlatformAccessService", () => {
+  it("checks all capabilities with one account read", async () => {
+    const findUnique = vi.fn().mockResolvedValue(admin);
+    const service = new PlatformAccessService({ user: { findUnique } } as unknown as PrismaService);
+    await expect(service.requirePermissions("auth-1", [
+      "platform.library.manage", "platform.content.read", "platform.academies.inspect",
+    ])).resolves.toEqual({ userId: admin.id });
+    expect(findUnique).toHaveBeenCalledOnce();
+    findUnique.mockResolvedValue({ ...admin, platformRole: "USER" });
+    expect(await codeOf(service.requirePermissions("auth-1", ["platform.library.manage", "platform.content.read"]))).toBe("PLATFORM_ACCESS_DENIED");
+  });
   it("admits an active platform admin", async () => {
     const service = createService(admin);
     await expect(

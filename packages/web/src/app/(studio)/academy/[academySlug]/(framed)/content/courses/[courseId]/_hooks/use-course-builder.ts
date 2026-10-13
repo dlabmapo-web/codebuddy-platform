@@ -59,11 +59,13 @@ type BuilderTarget = {
 export function useCourseBuilder({
   target,
   initialTree,
+  treeStaleTime = 0,
   canEditCurriculum,
   canEditExercises,
 }: {
   target: BuilderTarget;
   initialTree: CourseTree;
+  treeStaleTime?: number;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
 }) {
@@ -78,6 +80,7 @@ export function useCourseBuilder({
     queryKey,
     queryFn: () => orpc.academyCourses.getTree(target),
     initialData: initialTree,
+    staleTime: treeStaleTime,
     retry: false,
   });
   const tree = treeQuery.data;

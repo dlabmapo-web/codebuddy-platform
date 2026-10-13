@@ -50,6 +50,35 @@ export const courseCopyInclude = {
 export type CourseCopySource = Prisma.CourseGetPayload<{
   include: typeof courseCopyInclude;
 }>;
+
+/** Preview needs definitions for validation, but never solutions, cases or hints. */
+export const courseImportPreviewInclude = {
+  modules: {
+    orderBy: courseCopyInclude.modules.orderBy,
+    include: {
+      lectures: {
+        orderBy: courseCopyInclude.modules.include.lectures.orderBy,
+        include: {
+          materials: {
+            orderBy: courseCopyInclude.modules.include.lectures.include.materials.orderBy,
+            include: {
+              manualMaterial: true,
+              programmingExercise: { select: { quiz: true } },
+              pdfDocument: { include: { asset: { select: { state: true } } } },
+              videoLesson: {
+                include: { asset: { select: { id: true, academyId: true, state: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.CourseInclude;
+
+export type CourseImportPreviewSource = Prisma.CourseGetPayload<{
+  include: typeof courseImportPreviewInclude;
+}>;
 export type CourseCopyPolicy = "ACADEMY_ADOPTION" | "PRESERVE_VISIBILITY";
 
 /** Copies authored descendants only; authorization and course ownership stay with callers. */

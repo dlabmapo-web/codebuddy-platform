@@ -144,6 +144,16 @@ afterEach(async () => {
 });
 
 describe('academy course copy dialog', () => {
+  it('reuses a recent preview when returning from the source picker', async () => {
+    await act(async () => root.render(null));
+    await act(async () => root.render(
+      <QueryClientProvider client={queryClient}>
+        <AcademyCourseImportDialog source={source} onClose={mocks.close} />
+      </QueryClientProvider>,
+    ));
+    await settle();
+    expect(mocks.preview).toHaveBeenCalledOnce();
+  });
   it('dismisses the picker on success instead of returning to source selection', async () => {
     const copied = vi.fn();
     await act(async () => root.render(
@@ -157,6 +167,7 @@ describe('academy course copy dialog', () => {
     expect(mocks.close).not.toHaveBeenCalled();
   });
   it('shows hidden content and all material type counts, then navigates to the draft', async () => {
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
     expect(host.textContent).toContain('Hidden chapter');
     expect(host.textContent).toContain('import.hidden');
     for (const type of Object.keys(fixture.materialCounts))
@@ -176,7 +187,9 @@ describe('academy course copy dialog', () => {
     expect(mocks.push).toHaveBeenCalledWith(
       '/admin/content/library/new-course?copied=1',
     );
-    expect(mocks.refresh).toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['platform-library'], refetchType: 'none' });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['platform-library-academy'], refetchType: 'none' });
   });
 
   it('reuses the request key after a lost response and retains form data', async () => {

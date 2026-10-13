@@ -8,12 +8,12 @@ import {
   type AcademyCourseImportPreview,
 } from "@cove/shared";
 import type { Prisma } from "../../generated/prisma/client.js";
-import type { CourseCopySource } from "./course-tree-copy.js";
+import type { CourseCopySource, CourseImportPreviewSource } from "./course-tree-copy.js";
 
 /** Checks only authored definitions and immutable asset metadata; never reads learner data. */
 export async function libraryImportBlockers(
   tx: Pick<Prisma.TransactionClient, "manualAsset" | "videoCaption">,
-  source: CourseCopySource,
+  source: CourseCopySource | CourseImportPreviewSource,
 ): Promise<AcademyCourseImportPreview["blockers"]> {
   const materials = source.modules.flatMap((module) =>
     module.lectures.flatMap((lecture) => lecture.materials),

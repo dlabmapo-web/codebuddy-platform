@@ -20,7 +20,7 @@ function setup(error: unknown) {
   const source = vi.fn().mockResolvedValue({});
   const service = new PlatformLibraryImportService(
     { $transaction: tx, libraryCourseImport: { findUnique: receipt } } as never,
-    { requirePermission: platform } as never,
+    { requirePermissions: platform } as never,
     { requirePermission: source } as never,
     {} as never,
     new ConfigService({ PLATFORM_ORGANIZATION_SLUG: "test" }) as never,

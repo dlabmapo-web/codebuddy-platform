@@ -80,6 +80,7 @@ export default async function LibraryCourseBuilderPage({
           canImport
           courseId={courseId}
           initialTree={initialTree}
+          treeStaleTime={30_000}
         />
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">

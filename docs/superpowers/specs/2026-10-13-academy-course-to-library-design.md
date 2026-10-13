@@ -431,3 +431,49 @@ entry point, copying hidden content, preserved visibility and origin display.
   GUI broker execution remain outside this programming-course browser fixture.
 - No production database, customer content or deployment was changed. Apply
   the additive migration before deploying the feature's API/UI.
+
+
+## Performance follow-up — 2026-10-13
+
+Approved by the user after profiling the slow preview and copy flow.
+
+- Preview loads structure and validation definitions only. Programming solutions,
+  starter code, test cases and hints are excluded. Subtype queries run only for
+  material types actually present. The repeatable-read snapshot and all blockers
+  remain in place; the copy transaction still validates the complete source.
+- Check the three platform capabilities against one current user lookup. Source
+  academy authorization and lifecycle checks remain separate and unchanged.
+- Build the new course response from the created course and copied snapshot
+  counts. Query the canonical ungradable-exercise predicate once instead of
+  rereading modules, lectures, materials and copies. Integration tests compare
+  this response with the actual library list.
+- Cache previews for 30 seconds, with explicit refresh after stale-source errors.
+  The server always checks the expected revision on submission.
+- Mark library queries stale without immediately refetching them before navigation.
+  Remove the redundant router refresh after push. Library course editors treat
+  the server-loaded tree as fresh for 30 seconds; explicit mutation invalidation
+  still refreshes it. Other academy editors retain their prior freshness default.
+
+Development measurements against the same remote Supabase database:
+
+| Operation | Before | After |
+| --- | --- | --- |
+| Preview, 38 materials | 4.1–4.6 s / 22 SQL queries | 2.64–2.74 s / 13 queries |
+| Preview, 222 materials | 4.2–4.6 s / 22 SQL queries | 2.63 s / 13 queries |
+| Preview source payload, 38 materials | 272,160 bytes | 17,466 bytes |
+| Preview source payload, 222 materials | 2,384,680 bytes | 101,949 bytes |
+| Copy, 38 materials | 8.1 s / 42 SQL queries | 7.71–7.77 s / 36 queries |
+
+Copy benchmarks deliberately rolled back their transactions and created no
+permanent courses. These are service timings, excluding HTTP authentication,
+Next.js compilation, navigation, and browser rendering. A separate cold copy
+measurement was 9.25 s; remote database latency varies. The copy transaction
+still takes several seconds, even after removing extra navigation requests.
+
+Validation: 26 focused API tests passed, including 13 real PostgreSQL integration
+cases on a migrated disposable database. Focused import dialog and picker UI
+checks passed, including recent-preview reuse, non-refetching invalidation,
+retry, stale-source recovery, and navigation. API/web typechecks and API build
+passed; scoped web ESLint reported no errors and one existing unused-import
+warning in the course builder. The local browser loaded the optimized preview.
+No production deployment or production database changes were made.

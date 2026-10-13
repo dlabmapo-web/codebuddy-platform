@@ -470,6 +470,8 @@ describe.skipIf(!databaseUrl)(
     it("copies complete authored configuration with fresh IDs and no student history", async () => {
       const before = await tree(source.id);
       const result = await service.importCourse(identity(admin), input());
+      const listed = await libraries.courses(identity(admin), { page: 1 });
+      expect(result.course).toEqual(listed.courses.find((course) => course.id === result.course.id));
       const copied = await tree(result.course.id);
       expect(copied).toMatchObject({
         isVisible: false,

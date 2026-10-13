@@ -41,7 +41,7 @@ export function AcademyCourseImportDialog({
         sourceAcademyId: source.academyId,
         sourceCourseId: source.id,
       }),
-    staleTime: 0,
+    staleTime: 30_000,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -103,15 +103,16 @@ export function AcademyCourseImportDialog({
               await Promise.all([
                 queryClient.invalidateQueries({
                   queryKey: ['platform-library'],
+                  refetchType: 'none',
                 }),
                 queryClient.invalidateQueries({
                   queryKey: ['platform-library-academy'],
+                  refetchType: 'none',
                 }),
               ]);
               router.push(
                 `${routes.adminLibraryCourse(result.course.id)}?copied=1`,
               );
-              router.refresh();
               (onCopied ?? onClose)();
             } catch (caught) {
               setError(caught);

@@ -30,6 +30,8 @@ import {
 } from "../generated/prisma/client.js";
 import { resolveContentLibrary } from "./library-academy.js";
 import { librarySelect, toLibraryCourse } from "./library-course-summary.js";
+import { problemWithoutTests } from "./content-stat-predicates.js";
+import { readCourseImportPreview } from "../content/library/course-import-preview.js";
 
 type Reader = Pick<Prisma.TransactionClient, "course" | "libraryCourseImport">;
 
@@ -68,19 +70,11 @@ export class PlatformLibraryImportService {
   }
 
   private async authorize(identity: SupabaseIdentity) {
-    const actor = await this.platform.requirePermission(
-      identity.authUserId,
+    return this.platform.requirePermissions(identity.authUserId, [
       "platform.library.manage",
-    );
-    await this.platform.requirePermission(
-      identity.authUserId,
       "platform.content.read",
-    );
-    await this.platform.requirePermission(
-      identity.authUserId,
       "platform.academies.inspect",
-    );
-    return actor;
+    ]);
   }
 
   private sourceWhere(input: PreviewAcademyCourseInput) {
@@ -106,13 +100,7 @@ export class PlatformLibraryImportService {
     );
     return this.prisma.$transaction(
       async (tx) => {
-        const source = await tx.course.findFirst({
-          where: this.sourceWhere(input),
-          include: {
-            ...courseCopyInclude,
-            academy: { select: { name: true } },
-          },
-        });
+        const source = await readCourseImportPreview(tx, this.sourceWhere(input));
         if (!source)
           throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
         const materialCounts = Object.fromEntries(
@@ -256,7 +244,7 @@ export class PlatformLibraryImportService {
                 `${blockers[0]!.materialTitle}: ${blockers[0]!.reason}`,
               );
             const courseId = randomUUID();
-            await tx.course.create({
+            const createdCourse = await tx.course.create({
               data: {
                 id: courseId,
                 academyId: library.id,
@@ -322,11 +310,31 @@ export class PlatformLibraryImportService {
                 materialCounts,
               },
             });
-            const course = await tx.course.findUniqueOrThrow({
-              where: { id: courseId },
-              select: librarySelect,
+            // The transaction just copied this exact snapshot. Reuse its
+            // counts instead of reading the new modules/lectures/materials
+            // back over several database round trips. Keep the canonical SQL
+            // predicate for ungradable exercises (including JSON-null rules).
+            const problemsWithoutTests = await tx.material.count({
+              where: {
+                ...problemWithoutTests,
+                lecture: { courseModule: { courseId } },
+              },
             });
-            return { academyId: library.id, course: toLibraryCourse(course) };
+            const course = toLibraryCourse({
+              ...createdCourse,
+              copies: [],
+              modules: source.modules.map((module) => ({
+                _count: { lectures: module.lectures.length },
+                lectures: module.lectures.map((lecture) => ({
+                  _count: { materials: lecture.materials.length },
+                  materials: [],
+                })),
+              })),
+            });
+            return {
+              academyId: library.id,
+              course: { ...course, problemsWithoutTests },
+            };
           },
           {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

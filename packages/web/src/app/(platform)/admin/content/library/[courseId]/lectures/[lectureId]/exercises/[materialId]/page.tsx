@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { PlatformShell } from '@/app/(platform)/admin/_components/platform-shell';
 import { ExerciseWorkspace } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/lectures/[lectureId]/exercises/_components/exercise-workspace';
 import { BackLink } from '@/components/studio/back-link';
+import { contentNamespaces } from '@/i18n/namespaces';
 import { createContentPaths } from '@/components/studio/content-paths';
 import { redirectIfExerciseMoved } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/moved-exercise';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
@@ -97,6 +98,7 @@ export default async function LibraryExercisePage({
         />
       }
       bleed
+      namespaces={contentNamespaces}
       title={context.course.title}
     >
       <ExerciseWorkspace

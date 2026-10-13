@@ -4,10 +4,7 @@ import { PlatformShell } from '@/app/(platform)/admin/_components/platform-shell
 import { CourseImportWizard } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/imports/_components/course-import-wizard';
 import { BackLink } from '@/components/studio/back-link';
 import { createContentPaths } from '@/components/studio/content-paths';
-import { PageTranslationsProvider } from '@/i18n';
-import { initTranslations } from '@/i18n/init-translations';
 import { contentImportNamespaces } from '@/i18n/namespaces';
-import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
@@ -36,11 +33,7 @@ export default async function LibraryCourseImportPage({
 }) {
   const { courseId } = await params;
   const academyId = await requireLibraryAcademyId();
-  const locale = await getLocale();
-  const [{ t }, { resources }] = await Promise.all([
-    getServerTranslation(['content-import']),
-    initTranslations(locale, contentImportNamespaces),
-  ]);
+  const { t } = await getServerTranslation(['content-import']);
 
   let courseTitle: string | null = null;
   let problemCount = 0;
@@ -81,14 +74,10 @@ export default async function LibraryCourseImportPage({
         />
       }
       bleed
+      namespaces={contentImportNamespaces}
       description={t('page_description')}
       title={t('page_title')}
     >
-      <PageTranslationsProvider
-        locale={locale}
-        namespaces={contentImportNamespaces}
-        resources={resources}
-      >
         {courseTitle ? (
           <CourseImportWizard
             academyId={academyId}
@@ -116,7 +105,6 @@ export default async function LibraryCourseImportPage({
             </Link>
           </div>
         )}
-      </PageTranslationsProvider>
     </PlatformShell>
   );
 }

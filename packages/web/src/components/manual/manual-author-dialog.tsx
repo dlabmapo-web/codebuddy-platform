@@ -198,7 +198,6 @@ export function ManualAuthorDialog({
       >
         <ModalContent
           title={material ? mt("edit_activity") : mt("add_activity")}
-          aria-label="Turtle and written-response authoring"
           className="max-w-3xl"
         >
           <h2 className="text-lg font-bold">
@@ -261,7 +260,7 @@ export function ManualAuthorDialog({
                   checked={config.submitEnabled}
                   onChange={(e) => field("submitEnabled", e.target.checked)}
                 />{" "}
-                Enable Submit
+                {mt("enable_submit")}
               </label>
               <label>
                 <input
@@ -269,7 +268,7 @@ export function ManualAuthorDialog({
                   checked={!config.includeInScore}
                   onChange={(e) => field("includeInScore", !e.target.checked)}
                 />{" "}
-                Exclude from score
+                {mt("exclude_from_score")}
               </label>
             </div>
             {kind === "TURTLE_EXERCISE" ? (
@@ -327,7 +326,7 @@ export function ManualAuthorDialog({
                   <label>
                     {mt("file")}
                     <select
-                      aria-label="Source file"
+                      aria-label={mt("file")}
                       className="ml-2 rounded border border-border bg-card p-2"
                       value={sourceName}
                       onChange={(e) => setSourceName(e.target.value)}

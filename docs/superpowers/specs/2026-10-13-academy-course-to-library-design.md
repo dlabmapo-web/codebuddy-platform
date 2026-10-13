@@ -477,3 +477,43 @@ retry, stale-source recovery, and navigation. API/web typechecks and API build
 passed; scoped web ESLint reported no errors and one existing unused-import
 warning in the course builder. The local browser loaded the optimized preview.
 No production deployment or production database changes were made.
+
+
+## Library translation audit — 2026-10-13
+
+The production screenshot showed untranslated `exercise.grading`,
+`exercise.controls`, and `exercise.test` keys. The Library exercise route did
+not mount the shared authoring namespace set; the Library builder omitted
+`grading`, `quiz`, and `common`. Both now use `contentNamespaces`. The console
+academy exercise route had the same missing resources and was fixed as well.
+
+Audited the Library list, creation/rename/copy controls, source picker, builder,
+new/existing programming and quiz editor, workbook importer, and shared
+PDF/manual/video authoring components. Changes include:
+
+- Load the importer resources through the single merged `PlatformShell`
+  provider rather than a second isolated provider.
+- Fix the importer crash caused by `useAcademySlug` on Library routes. The shared
+  content path helper keeps its links within the correct Library, console, or
+  academy surface.
+- Translate hardcoded manual submission/scoring labels and accessible file
+  labels. The dialog's existing localized title supplies its accessible name.
+- Add feature-scoped English/Korean resources for rich-text controls, table
+  controls, image-resize help, link prompts, upload fallback, and default
+  placeholder. This vocabulary does not enlarge the root layout payload.
+- Localize code-editor loading messages.
+- Clarify English/Korean test-case and grading terminology. Korean course
+  vocabulary consistently uses `과목` on the audited authoring/import surfaces.
+  Library material counts use `Materials / 콘텐츠`, covering all six types.
+- Clarify draft creation, picker labels, descriptions, and permission messages.
+  Keep authored course names/content unchanged.
+
+Validation: 22 focused UI tests passed, including first-render translations for
+all five Library route states in both languages, actual importer routing across
+three surfaces, rich-text toolbar/placeholder translations, and manual control
+labels. All 128 locale tests, web typecheck, translation catalog validation,
+and whitespace checks passed. Local browser verified Korean list, creation
+and picker controls, builder, PDF and written-response dialogs, existing and
+new exercise editors, weighted grading controls, and the importer. English
+importer/editor checks found no raw translation keys. No course changes were
+saved during this audit, and production has not been deployed.

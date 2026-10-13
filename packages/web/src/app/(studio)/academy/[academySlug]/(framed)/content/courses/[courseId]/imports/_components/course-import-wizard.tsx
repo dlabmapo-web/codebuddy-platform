@@ -1,8 +1,6 @@
 'use client';
 
-import { routes } from '@/lib/routes';
-
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type {
   ContentImportPreview,
@@ -80,7 +78,7 @@ export function CourseImportWizard({
   courseTitle: string;
   problemCount: number;
 }) {
-  const academySlug = useAcademySlug();
+  const contentPaths = useContentBasePath();
   const { i18n, t } = useTranslation('content-import');
   const errorText = useErrorText();
   const queryClient = useQueryClient();
@@ -170,7 +168,7 @@ export function CourseImportWizard({
     commit.reset();
   };
 
-  const courseHref = `${routes.academy(academySlug)}/content/courses/${courseId}`;
+  const courseHref = contentPaths.course(courseId);
 
   return (
     <div className="space-y-6">

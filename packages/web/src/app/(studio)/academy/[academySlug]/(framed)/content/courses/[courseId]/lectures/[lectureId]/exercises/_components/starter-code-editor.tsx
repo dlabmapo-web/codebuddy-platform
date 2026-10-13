@@ -21,6 +21,7 @@ export function StarterCodeEditor({
   editable: boolean;
 }) {
   const { t } = useTranslation('content');
+  const { t: common } = useLayoutTranslation('common');
 
   return (
     <SectionCard
@@ -34,6 +35,7 @@ export function StarterCodeEditor({
         </div>
         <MonacoEditor
           beforeMount={registerPaircodeTheme}
+          loading={common('state.loading')}
           height="280px"
           language="python"
           onChange={(next) => onChange(next ?? '')}

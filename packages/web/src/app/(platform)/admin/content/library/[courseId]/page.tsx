@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { CourseBuilder } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_components/course-builder';
 import { BackLink } from '@/components/studio/back-link';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { contentNamespaces } from '@/i18n/namespaces';
 import { isAccessDeniedError } from '@/lib/api-errors';
 import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
@@ -62,7 +63,7 @@ export default async function LibraryCourseBuilderPage({
         />
       }
       bleed
-      namespaces={['content', 'content-import', 'courses', 'platform-library']}
+      namespaces={[...contentNamespaces, 'content-import']}
       title={initialTree?.course.title ?? t('platform-library:title')}
     >
       {copied === '1' && initialTree ? <p role="status" className="mb-4 rounded-lg border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-ink">{t('platform-library:import.success')}</p> : null}

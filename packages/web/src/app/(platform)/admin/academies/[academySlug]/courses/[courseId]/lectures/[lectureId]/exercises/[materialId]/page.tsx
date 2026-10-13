@@ -1,3 +1,4 @@
+import { contentNamespaces } from '@/i18n/namespaces';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
@@ -88,6 +89,7 @@ export default async function PlatformExercisePage({
     <PlatformShell
       back={<BackLink href={back.href} label={back.label} />}
       bleed
+      namespaces={contentNamespaces}
       title={context.course.title}
     >
       <ExerciseWorkspace

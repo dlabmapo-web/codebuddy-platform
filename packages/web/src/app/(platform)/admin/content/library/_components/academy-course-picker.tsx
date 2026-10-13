@@ -37,27 +37,27 @@ export function AcademyCoursePicker({ onClose }: { onClose: () => void }) {
     setQuery((current) => ({ ...current, page: 1, ...partial }));
   const columns: ColumnDef<PlatformCourse>[] = [
     {
-      id: 'title', accessorKey: 'title', header: contentT('table.course'),
+      id: 'title', accessorKey: 'title', header: t('column.course'),
       enableHiding: false,
       cell: ({ row }) => <span className="font-bold">{row.original.title}</span>,
     },
     {
-      id: 'academy', accessorKey: 'academyName', header: contentT('table.academy'),
+      id: 'academy', accessorKey: 'academyName', header: t('column.copies'),
       enableSorting: false,
     },
     {
-      id: 'modules', accessorKey: 'moduleCount', header: contentT('table.modules'),
+      id: 'modules', accessorKey: 'moduleCount', header: t('column.modules'),
     },
     {
-      id: 'lectures', accessorKey: 'lectureCount', header: contentT('table.lectures'),
+      id: 'lectures', accessorKey: 'lectureCount', header: t('column.lectures'),
       enableSorting: false,
     },
     {
-      id: 'problems', accessorKey: 'exerciseCount', header: contentT('table.problems'),
+      id: 'problems', accessorKey: 'exerciseCount', header: t('column.problems'),
       enableSorting: false,
     },
     {
-      id: 'updatedAt', accessorKey: 'updatedAt', header: contentT('table.updated'),
+      id: 'updatedAt', accessorKey: 'updatedAt', header: t('column.updated'),
       cell: ({ row }) => formatShortDate(row.original.updatedAt, locale),
     },
     {
@@ -93,12 +93,12 @@ export function AcademyCoursePicker({ onClose }: { onClose: () => void }) {
           <DataTable
             columns={columns}
             data={result.data?.rows ?? []}
-            searchPlaceholder={contentT('table.search_courses')}
+            searchPlaceholder={t('picker.search')}
             emptyMessage={result.isFetching ? contentT('table.loading') : contentT('table.empty')}
             loadingLabel={contentT('table.loading')}
             pageSize={query.pageSize}
             facets={[{
-              columnId: 'academy', title: contentT('table.academy'),
+              columnId: 'academy', title: t('column.copies'),
               options: (result.data?.academyOptions ?? []).map((academy) => ({
                 label: academy.name, value: academy.id,
               })),

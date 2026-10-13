@@ -181,7 +181,8 @@
         "course": {
           "created": "Library course created",
           "restored": "Library course restored",
-          "retired": "Library course retired"
+          "retired": "Library course retired",
+          "imported_from_academy": "Academy course copied to the library"
         },
         "created": "Library created"
       },

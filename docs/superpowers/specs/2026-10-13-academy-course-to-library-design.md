@@ -413,9 +413,17 @@ entry point, copying hidden content, preserved visibility and origin display.
   Prisma migration comparison also reports existing foreign-key action
   differences in PDF and assessment tables; comparison with the pre-feature
   schema confirms those differences are unrelated to this change.
-- A signed-in Playwright regression is added to `e2e/specs/content-library.spec.ts`
-  and type-checks, but was not executed against the seeded Supabase environment.
-  Real storage downloads, video playback and GUI broker execution were not
-  exercised by the local metadata/configuration integration fixtures.
+- All four signed-in Chromium Playwright tests in
+  `e2e/specs/content-library.spec.ts` pass locally (28.3 seconds). API and studio
+  ran on localhost with a disposable PostgreSQL database and the existing pinned
+  development Supabase authentication accounts. No remote authentication accounts
+  or remote course data were modified. The tests cover library authoring access,
+  adoption/publishing/provenance, academy-to-library draft copying and origin
+  display, source-course retention, and library exclusion from customer lists.
+- Updated obsolete browser selectors for table rows and visibility switches,
+  used exact title/status matches and unique copy titles, waited for the actual
+  admin landing route, and allowed cold dev-route compilation in the new flow.
+  Browser-test type checking passes. Real storage downloads, video playback and
+  GUI broker execution remain outside this programming-course browser fixture.
 - No production database, customer content or deployment was changed. Apply
   the additive migration before deploying the feature's API/UI.

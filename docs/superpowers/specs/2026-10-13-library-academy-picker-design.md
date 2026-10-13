@@ -1,7 +1,7 @@
 # Copy from academy on the library page
 
 Date: 2026-10-13
-Status: Approved on 2026-10-13; implementation in progress.
+Status: Implemented on `feat/academy-course-to-library`; approved on 2026-10-13.
 Branch: `feat/academy-course-to-library`.
 
 ## Requested behavior
@@ -77,3 +77,26 @@ for this additional entry point.
    errors above its footer.
 4. Test server query controls, selection/return, successful dismissal, error
    visibility, then check types/lint and both entry points in the local browser.
+
+## Implementation verification
+
+- Reused the shared TanStack `DataTable`, faceted academy filter with plus
+  control, title search, sortable headers, column visibility, and pagination.
+  Query state stays within the picker and does not change the library URL.
+- The library button is permission-gated; existing server authorization still
+  protects preview and import. Selecting while discovery is pending or failed
+  is disabled. Returning from preview preserves query state.
+- Ten focused UI tests passed, including query reset on search/filter/sort,
+  recovery from discovery errors, success dismissal, and submission error
+  placement. All 126 locale tests passed. Web typecheck, scoped ESLint, and
+  `git diff --check` passed.
+- Local browser verified three source pages, search narrowing to four courses,
+  the Dlab-Mapo filter narrowing to two, title sorting, preview return, and
+  visible duplicate-title feedback with a long outline.
+- Library picker copied `알고리즘 Lv2` and opened the draft editor at
+  `/admin/content/library/be0205e1-cc4c-4c33-83e1-c8519ff67696?copied=1`
+  with the success receipt. The earlier Academy courses entry point also
+  succeeded after the development migration was applied.
+- These checks used localhost with its development database. Production was
+  not deployed or changed. The development verification draft documented
+  above remains available alongside the new draft.

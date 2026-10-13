@@ -1,6 +1,7 @@
+import { platformRoleHasPermission } from '@cove/shared';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isAccessDeniedError } from '@/lib/api-errors';
-import { createPlatformServerORPCClient } from '@/lib/orpc-server';
+import { createPlatformServerORPCClient, getAccount } from '@/lib/orpc-server';
 
 import { PlatformShell } from '../../_components/platform-shell';
 import { LibraryTable, type LibraryPage } from './_components/library-table';
@@ -24,6 +25,11 @@ export default async function PlatformLibraryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { t } = await getServerTranslation(['platform', 'platform-library']);
+  const account = await getAccount();
+  const canCopyFromAcademy =
+    platformRoleHasPermission(account.user.platformRole, 'platform.library.manage') &&
+    platformRoleHasPermission(account.user.platformRole, 'platform.academies.inspect') &&
+    platformRoleHasPermission(account.user.platformRole, 'platform.content.read');
   const params = await searchParams;
   const search = typeof params.search === 'string' ? params.search : undefined;
 
@@ -54,11 +60,12 @@ export default async function PlatformLibraryPage({
       // `courses` for the authoring-path preview the create dialog shares with
       // a Team Lead's own; `destructive` because deleting a master asks the
       // same confirmation, in the namespace that copy already lives in.
-      namespaces={['courses', 'destructive']}
+      namespaces={['courses', 'destructive', 'platform-content']}
       title={t('platform-library:title')}
     >
       {initialData ? (
         <LibraryTable
+          canCopyFromAcademy={canCopyFromAcademy}
           academyId={academyId}
           initialData={initialData}
           initialSearch={search ?? ''}

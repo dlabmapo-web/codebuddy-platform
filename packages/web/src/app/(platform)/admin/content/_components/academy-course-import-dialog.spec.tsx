@@ -144,6 +144,18 @@ afterEach(async () => {
 });
 
 describe('academy course copy dialog', () => {
+  it('dismisses the picker on success instead of returning to source selection', async () => {
+    const copied = vi.fn();
+    await act(async () => root.render(
+      <QueryClientProvider client={queryClient}>
+        <AcademyCourseImportDialog source={source} onClose={mocks.close} onCopied={copied} />
+      </QueryClientProvider>,
+    ));
+    await settle();
+    await submit();
+    expect(copied).toHaveBeenCalledOnce();
+    expect(mocks.close).not.toHaveBeenCalled();
+  });
   it('shows hidden content and all material type counts, then navigates to the draft', async () => {
     expect(host.textContent).toContain('Hidden chapter');
     expect(host.textContent).toContain('import.hidden');
@@ -171,6 +183,7 @@ describe('academy course copy dialog', () => {
     mocks.copy.mockRejectedValueOnce(new Error('Network unavailable'));
     await submit();
     expect(host.textContent).toContain('Network unavailable');
+    expect(host.querySelector('[role="alert"]')!.parentElement!.tagName).toBe('FORM');
     expect((host.querySelector('input') as HTMLInputElement).value).toBe(
       'Python',
     );

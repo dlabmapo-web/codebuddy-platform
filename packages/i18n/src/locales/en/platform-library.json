@@ -107,5 +107,11 @@
       "ASSET_MISSING": "Asset is missing or does not match its manifest",
       "CAPTION_INVALID": "Caption reference is invalid"
     }
+  },
+  "picker": {
+    "action": "Copy from academy",
+    "description": "Choose a course from any academy to copy into the library as an independent draft.",
+    "select": "Select course",
+    "retry": "Try again"
   }
 }

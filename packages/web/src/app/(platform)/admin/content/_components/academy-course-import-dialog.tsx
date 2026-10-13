@@ -15,9 +15,11 @@ import { routes } from '@/lib/routes';
 export function AcademyCourseImportDialog({
   source,
   onClose,
+  onCopied,
 }: {
   source: PlatformCourse;
   onClose: () => void;
+  onCopied?: () => void;
 }) {
   const { t } = useTranslation('platform-library');
   const errorText = useErrorText();
@@ -66,6 +68,7 @@ export function AcademyCourseImportDialog({
         description={t('import.description')}
       >
         <form
+          className="flex min-h-0 flex-col"
           onSubmit={async (event) => {
             event.preventDefault();
             if (
@@ -109,7 +112,7 @@ export function AcademyCourseImportDialog({
                 `${routes.adminLibraryCourse(result.course.id)}?copied=1`,
               );
               router.refresh();
-              onClose();
+              (onCopied ?? onClose)();
             } catch (caught) {
               setError(caught);
               const code = toApiError(caught).code;
@@ -124,7 +127,7 @@ export function AcademyCourseImportDialog({
             }
           }}
         >
-          <div className="grid max-h-[65vh] gap-4 overflow-y-auto px-6 py-5">
+          <div className="grid min-h-0 gap-4 overflow-y-auto px-6 py-5">
             <p className="text-sm text-sub">
               {source.academyName} · {source.title}
             </p>
@@ -209,11 +212,6 @@ export function AcademyCourseImportDialog({
                 </ul>
               </>
             ) : null}
-            {error ? (
-              <p role="alert" className="text-sm text-danger">
-                {errorText(error)}
-              </p>
-            ) : null}
             {stale || preview.isError || data?.blockers.length ? (
               <Button
                 disabled={busy || preview.isFetching}
@@ -225,7 +223,12 @@ export function AcademyCourseImportDialog({
               </Button>
             ) : null}
           </div>
-          <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+          {error ? (
+            <p role="alert" className="shrink-0 px-6 py-3 text-sm text-danger">
+              {errorText(error)}
+            </p>
+          ) : null}
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-6 py-4">
             <Button
               disabled={busy}
               onClick={close}

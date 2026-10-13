@@ -45,6 +45,7 @@ import { routes } from '@/lib/routes';
 import { LibraryStateChip } from './library-state-chip';
 import { LibraryCourseModal } from './library-course-modal';
 import { LibraryCopiesPanel } from './library-copies-panel';
+import { AcademyCoursePicker } from './academy-course-picker';
 
 export type LibraryPage = {
   courses: LibraryCourse[];
@@ -98,10 +99,12 @@ function CountCell({ value }: { value: number }) {
  * in each copy separately. It is silent at zero.
  */
 export function LibraryTable({
+  canCopyFromAcademy = false,
   academyId,
   initialData,
   initialSearch,
 }: {
+  canCopyFromAcademy?: boolean;
   /** The library's own academy. Null only while no library exists. */
   academyId: string | null;
   initialData: LibraryPage;
@@ -126,6 +129,7 @@ export function LibraryTable({
   const refetchLibrary = libraryQuery.refetch;
   const [editing, setEditing] = React.useState<LibraryCourse | null>(null);
   const [creating, setCreating] = React.useState(false);
+  const [pickingAcademyCourse, setPickingAcademyCourse] = React.useState(false);
   const [openCopies, setOpenCopies] = React.useState<LibraryCourse | null>(null);
   const [toDelete, setToDelete] = React.useState<LibraryCourse | null>(null);
   const [deletePending, setDeletePending] = React.useState(false);
@@ -396,12 +400,24 @@ export function LibraryTable({
         pageSize={10}
         searchPlaceholder={t('search.placeholder')}
         toolbarActions={
+          <>
+          {canCopyFromAcademy ? (
+            <Button variant="outline" onClick={() => setPickingAcademyCourse(true)}>
+              <Plus className="size-4" />
+              {t('picker.action')}
+            </Button>
+          ) : null}
           <Button onClick={() => setCreating(true)}>
             <Plus className="size-4" />
             {t('create.action')}
           </Button>
+          </>
         }
       />
+
+      {pickingAcademyCourse ? (
+        <AcademyCoursePicker onClose={() => setPickingAcademyCourse(false)} />
+      ) : null}
 
       <LibraryCourseModal
         academyId={academyId}

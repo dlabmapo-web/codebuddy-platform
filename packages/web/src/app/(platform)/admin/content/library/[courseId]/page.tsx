@@ -31,10 +31,13 @@ import { requireLibraryAcademyId } from '../_lib/require-library';
  */
 export default async function LibraryCourseBuilderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { courseId } = await params;
+  const { copied } = await searchParams;
   const academyId = await requireLibraryAcademyId();
   const { t } = await getServerTranslation(['content', 'platform-library']);
 
@@ -59,9 +62,16 @@ export default async function LibraryCourseBuilderPage({
         />
       }
       bleed
-      namespaces={['content', 'content-import', 'courses']}
+      namespaces={['content', 'content-import', 'courses', 'platform-library']}
       title={initialTree?.course.title ?? t('platform-library:title')}
     >
+      {copied === '1' && initialTree ? <p role="status" className="mb-4 rounded-lg border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-ink">{t('platform-library:import.success')}</p> : null}
+      {initialTree?.course.libraryImportOrigin ? <p className="mb-4 text-sm text-sub">{t('platform-library:import.origin', {
+        academy: initialTree.course.libraryImportOrigin.sourceAcademyName,
+        course: initialTree.course.libraryImportOrigin.sourceCourseTitle,
+        revision: initialTree.course.libraryImportOrigin.sourceContentRevision,
+        date: initialTree.course.libraryImportOrigin.copiedAt.slice(0, 10),
+      })}</p> : null}
       {initialTree ? (
         <CourseBuilder
           academyId={academyId}

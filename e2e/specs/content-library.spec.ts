@@ -144,6 +144,42 @@ test.describe('the content library', () => {
     await expect(row.getByText('Nothing visible')).toHaveCount(0);
   });
 
+  test('an admin copies an academy course into an independent library draft', async ({ page }) => {
+    const suffix = Date.now();
+    const sourceTitle = `Reverse source ${suffix}`;
+    const masterTitle = `Reverse master ${suffix}`;
+    await signInAsTeamLead(page);
+    await page.goto(routes.academyLibrary(ACADEMY_SLUG));
+    const published = page.getByRole('listitem').filter({ hasText: PUBLISHED });
+    await published.getByRole('button', { name: 'Preview' }).click();
+    await page.getByRole('textbox', { name: 'Name it in your academy' }).fill(sourceTitle);
+    await page.getByRole('button', { name: 'Copy to my academy' }).click();
+    await expect(page.getByRole('heading', { name: sourceTitle })).toBeVisible();
+
+    await signInAsOperator(page);
+    await page.goto(`/admin/content/courses?q=${encodeURIComponent(sourceTitle)}`);
+    const source = page.getByRole('row').filter({ hasText: sourceTitle });
+    await source.getByRole('button', { name: /Actions|More/i }).click();
+    await page.getByRole('menuitem', { name: 'Copy to library' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Variables and input')).toBeVisible();
+    await expect(dialog.getByText(/Student work and class assignments are not copied/)).toBeVisible();
+    await expect(dialog.getByRole('textbox', { name: 'Title in the library' })).toHaveValue(sourceTitle);
+    await dialog.getByRole('textbox', { name: 'Title in the library' }).fill(masterTitle);
+    await dialog.getByRole('button', { name: 'Create library draft' }).click();
+    await expect(page).toHaveURL(/\/admin\/content\/library\/[0-9a-f-]+\?copied=1$/);
+    await expect(page.getByRole('heading', { name: masterTitle })).toBeVisible();
+    await expect(page.getByText('Copied to library as a draft.', { exact: true })).toBeVisible();
+    await expect(page.getByText(new RegExp(`Copied from .*${sourceTitle}.*independent copy`))).toBeVisible();
+
+    await page.getByRole('link', { name: 'Library', exact: true }).last().click();
+    const imported = page.getByRole('listitem').filter({ hasText: masterTitle });
+    await expect(imported).toBeVisible();
+    await expect(imported.getByText('Draft', { exact: true })).toBeVisible();
+    await page.goto(`/admin/content/courses?q=${encodeURIComponent(sourceTitle)}`);
+    await expect(page.getByRole('row').filter({ hasText: sourceTitle })).toBeVisible();
+  });
+
   test('the library never appears among the platform’s customers', async ({
     page,
   }) => {

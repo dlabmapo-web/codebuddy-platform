@@ -79,5 +79,33 @@
     "body": "Academies that already copied it keep the name they chose.",
     "submit": "Save changes",
     "submitting": "Saving…"
+  },
+  "import": {
+    "action": "Copy to library",
+    "description": "Creates an independent draft in the library, including hidden content. Student work and class assignments are not copied.",
+    "title_label": "Title in the library",
+    "loading": "Loading course preview…",
+    "revision": "Source revision {{revision}}",
+    "hidden": "(hidden)",
+    "refresh": "Refresh preview",
+    "cancel": "Cancel",
+    "working": "Copying…",
+    "confirm": "Create library draft",
+    "success": "Copied to library as a draft.",
+    "origin": "Copied from {{academy}} · {{course}} · revision {{revision}} on {{date}}. This is an independent copy.",
+    "types": {
+      "PROGRAMMING_EXERCISE": "Programming",
+      "PDF_DOCUMENT": "PDF",
+      "TURTLE_EXERCISE": "Turtle",
+      "WRITTEN_RESPONSE": "Written response",
+      "MULTIPLE_CHOICE": "Multiple choice",
+      "VIDEO_LESSON": "Video"
+    },
+    "blockers": {
+      "INVALID_DEFINITION": "Invalid material definition",
+      "ASSET_NOT_READY": "Asset is not ready",
+      "ASSET_MISSING": "Asset is missing or does not match its manifest",
+      "CAPTION_INVALID": "Caption reference is invalid"
+    }
   }
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+
 import type { LibraryCourse } from '@cove/shared';
 import { libraryCourseState } from '@cove/shared';
 import { formatShortDate } from '@cove/i18n/format';
@@ -111,7 +113,17 @@ export function LibraryTable({
   const locale = useLocale();
   const router = useRouter();
 
-  const [courses, setCourses] = React.useState(initialData.courses);
+  const libraryQuery = useQuery({
+    queryKey: ['platform-library', initialSearch],
+    queryFn: () => orpc.platformLibrary.courses({
+      page: 1,
+      ...(initialSearch ? { search: initialSearch } : {}),
+    }),
+    initialData,
+    staleTime: 0,
+  });
+  const courses = libraryQuery.data.courses;
+  const refetchLibrary = libraryQuery.refetch;
   const [editing, setEditing] = React.useState<LibraryCourse | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [openCopies, setOpenCopies] = React.useState<LibraryCourse | null>(null);
@@ -121,16 +133,12 @@ export function LibraryTable({
 
   const reload = React.useCallback(async () => {
     try {
-      const next = await orpc.platformLibrary.courses({
-        page: 1,
-        ...(initialSearch ? { search: initialSearch } : {}),
-      });
-      setCourses(next.courses);
+      await refetchLibrary({ throwOnError: true });
       setError(null);
     } catch (caught) {
       setError(caught);
     }
-  }, [initialSearch]);
+  }, [refetchLibrary]);
 
   const run = React.useCallback(
     async (work: () => Promise<unknown>) => {
@@ -361,12 +369,12 @@ export function LibraryTable({
 
   return (
     <>
-      {error ? (
+      {error || libraryQuery.error ? (
         <p
           className="mb-3 rounded-lg bg-danger/5 px-3.5 py-2.5 text-[14px] font-semibold text-danger"
           role="alert"
         >
-          {errorText(error)}
+          {errorText(error ?? libraryQuery.error)}
         </p>
       ) : null}
 

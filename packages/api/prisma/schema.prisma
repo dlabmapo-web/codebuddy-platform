@@ -369,6 +369,7 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  libraryCourseImports LibraryCourseImport[]
   manualDrafts      ManualDraft[]
   manualSubmissions ManualSubmission[]
   manualReviews     ManualReview[]
@@ -1313,6 +1314,7 @@ model PlatformOperationRun {
 }
 
 model Course {
+  libraryImport LibraryCourseImport?
   id              String  @id @default(uuid()) @db.Uuid
   academyId       String  @map("academy_id") @db.Uuid
   title           String
@@ -2631,4 +2633,23 @@ model VideoWatchProgress {
   @@unique([materialId, assetId, userId, classId])
   @@index([userId, classId, materialId])
   @@map("video_watch_progress")
+}
+
+/// Independent import origin and durable request receipt; source IDs are snapshots.
+model LibraryCourseImport {
+  id                    String   @id @default(uuid()) @db.Uuid
+  libraryCourseId       String   @unique @map("library_course_id") @db.Uuid
+  requestKey            String   @unique @map("request_key") @db.Uuid
+  actorUserId           String   @map("actor_user_id") @db.Uuid
+  sourceAcademyId       String   @map("source_academy_id") @db.Uuid
+  sourceCourseId        String   @map("source_course_id") @db.Uuid
+  sourceAcademyName     String   @map("source_academy_name")
+  sourceCourseTitle     String   @map("source_course_title")
+  sourceContentRevision Int      @map("source_content_revision")
+  destinationTitle      String   @map("destination_title")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  libraryCourse         Course   @relation(fields: [libraryCourseId], references: [id], onDelete: Cascade)
+  actor                 User     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@map("library_course_imports")
 }

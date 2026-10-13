@@ -1,7 +1,7 @@
 # Copy academy courses into the platform library
 
 Date: 2026-10-13
-Status: Proposed spec for review; implementation is not authorized by this document.
+Status: Implemented on `feat/academy-course-to-library`; user approval received on 2026-10-13.
 Code reviewed: `feat/cove-studio-v2` at `81a510e3`.
 
 ## Purpose and confirmed decision
@@ -395,6 +395,27 @@ automatic synchronization, merging edits, partial module/material imports,
 bulk academy imports, academy approval workflows, source-content deletion,
 automatic publication, media re-upload and asynchronous copy jobs.
 
-The independent-draft behavior is confirmed. The remaining defaults in this
-spec—admin entry point, copying hidden content, preserved visibility and
-origin display—are proposed together for review before implementation.
+The user approved implementing this spec on 2026-10-13, including the admin
+entry point, copying hidden content, preserved visibility and origin display.
+
+
+## Implementation verification — 2026-10-13
+
+- 61 API tests pass, including 13 integration tests against disposable PostgreSQL.
+  Coverage includes all six material types, independent origin, private authored
+  configuration, no learner history, publish/adopt round trip, source deletion,
+  duplicate/replayed requests, title races, concurrent source edits and rollback.
+- 14 targeted UI tests, 18 shared library tests and 126 locale tests pass.
+- API/web and browser-test type checks, targeted web lint, Prisma validation,
+  whitespace checks and the API production build pass.
+- All migrations apply on a fresh disposable database. The new receipt table
+  matches its Prisma schema and disallows direct reads by `anon`/`authenticated`.
+  Prisma migration comparison also reports existing foreign-key action
+  differences in PDF and assessment tables; comparison with the pre-feature
+  schema confirms those differences are unrelated to this change.
+- A signed-in Playwright regression is added to `e2e/specs/content-library.spec.ts`
+  and type-checks, but was not executed against the seeded Supabase environment.
+  Real storage downloads, video playback and GUI broker execution were not
+  exercised by the local metadata/configuration integration fixtures.
+- No production database, customer content or deployment was changed. Apply
+  the additive migration before deploying the feature's API/UI.

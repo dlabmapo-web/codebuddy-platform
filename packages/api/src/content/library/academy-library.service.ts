@@ -1,13 +1,7 @@
-import {videoMetadata} from "../../videos/video-metadata.js";
-import { multipleChoiceSchema } from "@cove/shared";
-function remapChoiceDefinition(raw: unknown) {
- const definition=multipleChoiceSchema.parse(raw);
- const ids=new Map(definition.options.map(o=>[o.id,randomUUID()]));
- return {...definition,options:definition.options.map(o=>({...o,id:ids.get(o.id)!})),correctOptionIds:definition.correctOptionIds.map(id=>ids.get(id)!)};
-}
-import { lockPdfAsset } from "../../documents/pdf-document.service.js";
+import { copyCourseTree, courseCopyInclude } from "./course-tree-copy.js";
+import { videoMetadata } from "../../videos/video-metadata.js";
 import { pdfMetadata } from "../../documents/pdf-metadata.js";
-import { ConflictException, HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { AvailableLibraryCourse } from "@cove/shared";
 
@@ -16,7 +10,7 @@ import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import { AppException } from "../../common/app-exception.js";
 import { PrismaService } from "../../database/prisma.service.js";
-import { Prisma } from "../../generated/prisma/client.js";
+import type { Prisma } from "../../generated/prisma/client.js";
 import { toCourseSummary } from "../course.service.js";
 
 /**
@@ -220,136 +214,10 @@ export class AcademyLibraryService {
 
     const source = await this.prisma.course.findUniqueOrThrow({
       where: { id: master.id },
-      include: adoptInclude,
+      include: courseCopyInclude,
     });
 
     const courseId = randomUUID();
-    const modules: Prisma.CourseModuleCreateManyInput[] = [];
-    const lectures: Prisma.LectureCreateManyInput[] = [];
-    const materials: Prisma.MaterialCreateManyInput[] = [];
-    const documents: Prisma.PdfDocumentCreateManyInput[] = [];
-    const videos:Prisma.VideoLessonCreateManyInput[]=[];
-    const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
-    const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
-    const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
-    const hints: Prisma.ExerciseHintCreateManyInput[] = [];
-
-    for (const courseModule of source.modules) {
-      const moduleId = randomUUID();
-      modules.push({
-        id: moduleId,
-        courseId,
-        // Copied verbatim, not regenerated. Keys are unique per course and
-        // this is a new course, so they cannot collide — and preserving them
-        // means the branch can round-trip its copy through the Excel importer
-        // exactly as it could a course it authored by hand.
-        externalKey: courseModule.externalKey,
-        title: courseModule.title,
-        description: courseModule.description,
-        position: courseModule.position,
-        // Visible, whatever the master says. A hidden row in the library means
-        // "head office has not finished this" — there is no student in a
-        // library academy for it to be hidden *from* — and head office's real
-        // signal for not-ready is the course's DRAFT state, which
-        // `requireAdoptableMaster` refuses outright. Carrying a flag that means
-        // nothing at the source into a place where it means everything is what
-        // handed branches complete courses that could teach nothing.
-        isVisible: true,
-      });
-
-      for (const lecture of courseModule.lectures) {
-        const lectureId = randomUUID();
-        lectures.push({
-          id: lectureId,
-          courseModuleId: moduleId,
-          externalKey: lecture.externalKey,
-          title: lecture.title,
-          description: lecture.description,
-          position: lecture.position,
-          isVisible: true,
-        });
-
-        for (const material of lecture.materials) {
-          const materialId = randomUUID();
-          materials.push({
-            id: materialId,
-            lectureId,
-            type: material.type,
-            title: material.title,
-            position: material.position,
-            isRequired: material.isRequired,
-            isVisible: !material.videoLesson && !material.manualMaterial?.shortAnswer && !material.manualMaterial?.multipleChoice,
-          });
-
-          if(material.videoLesson){const {assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,captions,assets}=material.videoLesson;videos.push({materialId,assetId,description,placement,includeInScore,maximumHundredths,thresholdBasisPoints,assets:assets as Prisma.InputJsonValue,captions:captions as Prisma.InputJsonValue,revision:1,requestKey:randomUUID()});}
-          if (material.pdfDocument)
-            documents.push({
-              materialId,
-              assetId: material.pdfDocument.assetId,
-              placement: material.pdfDocument.placement,
-            });
-          if(material.manualMaterial){const {multipleChoice,shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,multipleChoice:multipleChoice ? remapChoiceDefinition(multipleChoice) : Prisma.DbNull,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
-          const exercise = material.programmingExercise;
-          if (!exercise) continue;
-          exercises.push({
-            materialId,
-            externalKey: exercise.externalKey,
-            // `legacyProblemNo` is deliberately absent: it identifies an
-            // MVP-era problem, which a branch's copy is not.
-            difficulty: exercise.difficulty,
-            description: exercise.description,
-            inputFormat: exercise.inputFormat,
-            outputFormat: exercise.outputFormat,
-            constraints: exercise.constraints,
-            ...(exercise.quiz ? { quiz: exercise.quiz } : {}),
-            starterCode: exercise.starterCode,
-            solutionCode: exercise.solutionCode,
-            language: exercise.language,
-            timeLimitMs: exercise.timeLimitMs,
-            memoryLimitMb: exercise.memoryLimitMb,
-            aiFeedbackEnabled: exercise.aiFeedbackEnabled,
-            // Restarts at 1. The copy has graded nothing, and inheriting the
-            // master's grading revision would claim otherwise.
-            //
-            // The profile travels whole, at the version the master was
-            // authored at: an adopted 30/30/40 problem must score 40, 60 and
-            // 100 in the branch exactly as it does in the library.
-            gradingMode: exercise.gradingMode,
-            gradingSemanticVersion: exercise.gradingSemanticVersion,
-            totalTimeLimitMs: exercise.totalTimeLimitMs,
-            comparatorTimeLimitMs: exercise.comparatorTimeLimitMs,
-            continuationPolicy: exercise.continuationPolicy,
-            exitStatusPolicy: exercise.exitStatusPolicy,
-            materialMaximumHundredths: exercise.materialMaximumHundredths,
-            materialScorePolicy: exercise.materialScorePolicy,
-          });
-          for (const testCase of exercise.testCases) {
-            testCases.push({
-              exerciseMaterialId: materialId,
-              position: testCase.position,
-              input: testCase.input,
-              expectedOutput: testCase.expectedOutput,
-              visibility: testCase.visibility,
-              comparator: testCase.comparator,
-              weight: testCase.weight,
-              timeLimitMsOverride: testCase.timeLimitMsOverride,
-              softTimeLimitMs: testCase.softTimeLimitMs,
-              softPenalty: testCase.softPenalty,
-              label: testCase.label,
-            });
-          }
-          for (const hint of exercise.hints) {
-            hints.push({
-              exerciseMaterialId: materialId,
-              position: hint.position,
-              content: hint.content,
-              triggerExpression: hint.triggerExpression,
-            });
-          }
-        }
-      }
-    }
-
     const created = await this.prisma.$transaction(async (tx) => {
       const course = await tx.course.create({
         data: {
@@ -370,25 +238,7 @@ export class AcademyLibraryService {
         },
       });
 
-      if (modules.length) await tx.courseModule.createMany({ data: modules });
-      if (lectures.length) await tx.lecture.createMany({ data: lectures });
-      if (materials.length) await tx.material.createMany({ data: materials });
-      for (const assetId of [
-        ...new Set(documents.map((d) => d.assetId)),
-      ].sort())
-        await lockPdfAsset(tx, assetId);
-      for(const assetId of [...new Set(videos.map(v=>v.assetId))].sort()){await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${assetId}::uuid FOR UPDATE`;const asset=await tx.videoAsset.findUnique({where:{id:assetId}});if(asset?.state!=="READY")throw new ConflictException("Only ready video lessons can be adopted");}
-      if(videos.length)await tx.videoLesson.createMany({data:videos});
-      if (documents.length)
-        await tx.pdfDocument.createMany({ data: documents });
-      if(manuals.length)await tx.manualMaterial.createMany({data:manuals});
-      if (exercises.length) {
-        await tx.programmingExercise.createMany({ data: exercises });
-      }
-      if (testCases.length) {
-        await tx.exerciseTestCase.createMany({ data: testCases });
-      }
-      if (hints.length) await tx.exerciseHint.createMany({ data: hints });
+      await copyCourseTree(tx, source, courseId, "ACADEMY_ADOPTION");
 
       await this.audit.write(tx, {
         actorUserId: actor.userId,
@@ -504,29 +354,3 @@ const previewInclude = {
 } as const satisfies Prisma.CourseInclude;
 
 /** Everything the copy has to carry across. */
-const adoptInclude = {
-  modules: {
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    include: {
-      lectures: {
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        include: {
-          materials: {
-            orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: {
-              manualMaterial:true,
-              videoLesson: { include: { asset: true } },
-              pdfDocument: { include: { asset: true } },
-              programmingExercise: {
-                include: {
-                  testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-                  hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-} as const satisfies Prisma.CourseInclude;

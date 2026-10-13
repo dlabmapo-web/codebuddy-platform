@@ -1,8 +1,12 @@
-import type { ContentLens, PlatformContentSummary } from '@cove/shared';
+import {
+  platformRoleHasPermission,
+  type ContentLens,
+  type PlatformContentSummary,
+} from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { isAccessDeniedError } from '@/lib/api-errors';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAccount, createServerORPCClient } from '@/lib/orpc-server';
 
 import { PlatformShell } from '../../_components/platform-shell';
 import {
@@ -43,6 +47,11 @@ export async function renderContentPage({
   const query = parseContentQuery(search.toString());
 
   const client = createServerORPCClient();
+  const account = await getAccount();
+  const canCopyToLibrary =
+    platformRoleHasPermission(account.user.platformRole, 'platform.library.manage') &&
+    platformRoleHasPermission(account.user.platformRole, 'platform.academies.inspect') &&
+    platformRoleHasPermission(account.user.platformRole, 'platform.content.read');
   let initialData: ContentPage | null = null;
   let denied = false;
 
@@ -72,13 +81,14 @@ export async function renderContentPage({
       bleed
       // Both content lenses reach the academy's visibility modal, whose copy
       // left the layout payload with the rest of the builder's.
-      namespaces={contentNamespaces}
+      namespaces={[...contentNamespaces, 'platform-library']}
       description={t(`platform-content:lens_description.${lens}`)}
       title={t(`platform-content:lens.${lens}`)}
     >
       <div className="grid gap-5">
         {initialData ? (
           <ContentTable
+            canCopyToLibrary={canCopyToLibrary}
             initialData={initialData}
             initialKey={serializeContentQuery(query)}
             initialSummary={initialSummary}

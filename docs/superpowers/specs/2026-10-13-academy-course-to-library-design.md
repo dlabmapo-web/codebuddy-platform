@@ -97,6 +97,10 @@ Add **Copy to library** to the course row actions at
 `/admin/content/courses`. Reuse its existing search and academy filters; do not
 build another source picker in the library page for this first release.
 
+The approved follow-up supersedes that initial limitation: see
+[Library academy picker](2026-10-13-library-academy-picker-design.md). It adds
+a second entry point using the existing TanStack table and shared copy dialog.
+
 Opening the action fetches a copy preview and displays the source academy,
 course title, captured revision, full outline including hidden items, and
 counts by material type. It shows an editable destination title and this

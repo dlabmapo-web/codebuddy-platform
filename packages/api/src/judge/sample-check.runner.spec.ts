@@ -125,6 +125,26 @@ function setup(options: {
 }
 
 describe("SampleCheckRunner", () => {
+  it.each([false, true])("passes frozen prompt suppression to execution, enhanced=%s", async (enhanced) => {
+    const initial = record().snapshot;
+    const snapshot = enhanced
+      ? { ...initial, inputPromptPolicy: "IGNORE" as const, gradingSemanticVersion: "elice-v2", policy: { ...policy, version: 3 as const, semanticVersion: "elice-v2", inputPromptPolicy: "IGNORE" as const } }
+      : { gradingMode: "LEGACY_STDIO" as const, engineVersion: "pyodide-0.27.5", code: initial.code, memoryLimitMb: 256,
+          totalTimeLimitMs: 60_000, comparatorTimeLimitMs: 1, testCase: initial.testCase,
+          inputPromptPolicy: "IGNORE" as const, gradingSemanticVersion: "legacy-v2" };
+    const { runner, engine, store, checkId } = setup({ record: { snapshot } });
+    await runner.run(checkId);
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ inputPromptPolicy: "IGNORE" }));
+    expect(store.records.get(checkId)).toMatchObject({ status: "COMPLETED", result: { outcome: "PASSED" } });
+  });
+
+  it("refuses an unknown or inconsistent sample policy before running code", async () => {
+    const { runner, engine, store, checkId } = setup({ record: { snapshot: { ...record().snapshot, inputPromptPolicy: "IGNORE" } } });
+    await runner.run(checkId);
+    expect(engine.run).not.toHaveBeenCalled();
+    expect(store.records.get(checkId)).toMatchObject({ status: "UNAVAILABLE", failure: "UNSUPPORTED_POLICY" });
+  });
+
   it.each([
     ["hello\r\n ", "PASSED", false, "PASSED"],
     [" hello", "PASSED", false, "WRONG_OUTPUT"],
@@ -142,7 +162,7 @@ describe("SampleCheckRunner", () => {
       run: async () => ({ stdout, stderr: "", outcome, outputTruncated, runtimeMs: 12 }),
     });
     await runner.run(checkId);
-    expect(engine.run).toHaveBeenCalledWith({ code: initial.code, stdin: "hello\n", timeLimitMs: 3000, memoryLimitMb: 256 });
+    expect(engine.run).toHaveBeenCalledWith({ inputPromptPolicy: "INCLUDE", code: initial.code, stdin: "hello\n", timeLimitMs: 3000, memoryLimitMb: 256 });
     expect(comparator.compare).not.toHaveBeenCalled();
     expect(store.records.get(checkId)).toMatchObject({ status: "COMPLETED", result: { outcome: expected } });
   });

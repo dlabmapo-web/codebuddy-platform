@@ -43,7 +43,7 @@ export function GradingSettings({
   function chooseMode(mode: ExerciseGradingProfile['mode']) {
     if (mode === grading.mode) return;
     if (mode === 'ELICE_STDIO') {
-      onChange(defaultEliceGradingProfile, testCases);
+      onChange({ ...defaultEliceGradingProfile, inputPromptPolicy: grading.inputPromptPolicy }, testCases);
       return;
     }
     const carriesSettings = testCases.some(
@@ -58,7 +58,7 @@ export function GradingSettings({
       return;
     }
     onChange(
-      legacyGradingProfile,
+      { ...legacyGradingProfile, inputPromptPolicy: grading.inputPromptPolicy },
       testCases.map((testCase) => ({ ...testCase, ...legacyCaseGrading })),
     );
   }
@@ -109,6 +109,23 @@ export function GradingSettings({
           );
         })}
       </div>
+
+      <label className="flex items-start gap-3 rounded-lg border border-border p-3">
+        <input
+          type="checkbox"
+          className="mt-1 accent-brand"
+          checked={grading.inputPromptPolicy === 'IGNORE'}
+          disabled={!editable}
+          onChange={(event) => onChange({ ...grading, inputPromptPolicy: event.target.checked ? 'IGNORE' : 'INCLUDE' }, testCases)}
+        />
+        <span>
+          <span className="block text-sm font-semibold">{t('grading:exercise.grading.ignore_input_prompts')}</span>
+          <span className="mt-1 block text-sm text-sub">{t('grading:exercise.grading.ignore_input_prompts_help')}</span>
+          {grading.inputPromptPolicy === 'IGNORE' && (
+            <span className="mt-1 block text-sm text-sub">{t('grading:exercise.grading.ignore_input_prompts_reminder')}</span>
+          )}
+        </span>
+      </label>
 
       {weighted ? (
         <>

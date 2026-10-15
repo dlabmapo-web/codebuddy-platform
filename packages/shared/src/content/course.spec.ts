@@ -45,6 +45,15 @@ const validExercise = {
 };
 
 describe("manual programming exercise schemas", () => {
+  it("requires an explicit prompt policy on writes and accepts ignore with strict equality", () => {
+    const grading = { ...legacyGradingProfile };
+    const { inputPromptPolicy: _policy, ...stale } = grading;
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, grading: stale }).success).toBe(false);
+    const result = createProgrammingExerciseSchema.parse({ ...validExercise, grading: { ...grading, inputPromptPolicy: "IGNORE" } });
+    expect(result.grading.inputPromptPolicy).toBe("IGNORE");
+    expect(result.testCases[0]?.comparator).toBe("STDOUT");
+  });
+
   it("accepts large tests without changing their text", () => {
     const input = "x".repeat(5_000_000);
     const expectedOutput = "y".repeat(3_500_000);

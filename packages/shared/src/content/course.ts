@@ -39,6 +39,9 @@ export const caseComparators = [
 export const caseComparatorSchema = z.enum(caseComparators);
 export type CaseComparator = z.infer<typeof caseComparatorSchema>;
 
+export const inputPromptPolicySchema = z.enum(["INCLUDE", "IGNORE"]);
+export type InputPromptPolicy = z.infer<typeof inputPromptPolicySchema>;
+
 export const gradingProfileModes = ["LEGACY_STDIO", "ELICE_STDIO"] as const;
 export const programmingExerciseGradingModeSchema = z.enum(gradingProfileModes);
 export type GradingProfileMode = z.infer<
@@ -54,7 +57,7 @@ export type GradingProfileMode = z.infer<
  * historical work under rules it was never judged by. An unknown version is a
  * configuration error, not a wrong answer — fail closed.
  */
-export const gradingSemanticVersions = ["legacy-v1", "elice-v1"] as const;
+export const gradingSemanticVersions = ["legacy-v1", "elice-v1", "legacy-v2", "elice-v2"] as const;
 export const gradingSemanticVersionSchema = z.enum(gradingSemanticVersions);
 export type GradingSemanticVersion = z.infer<
   typeof gradingSemanticVersionSchema
@@ -66,8 +69,26 @@ export const currentEliceSemanticVersion: GradingSemanticVersion = "elice-v1";
 /** The version a mode is authored at. Reading always uses the stored value. */
 export function semanticVersionForMode(
   mode: GradingProfileMode,
+  inputPromptPolicy: InputPromptPolicy = "INCLUDE",
 ): GradingSemanticVersion {
+  if (inputPromptPolicy === "IGNORE") return mode === "ELICE_STDIO" ? "elice-v2" : "legacy-v2";
   return mode === "ELICE_STDIO" ? currentEliceSemanticVersion : "legacy-v1";
+}
+
+/** Stored-version dispatch is independent of the version new authors use. */
+export function inputPromptPolicyForSemanticVersion(
+  mode: GradingProfileMode,
+  version: string,
+): InputPromptPolicy | null {
+  if (mode === "LEGACY_STDIO") {
+    if (version === "legacy-v1") return "INCLUDE";
+    if (version === "legacy-v2") return "IGNORE";
+  }
+  if (mode === "ELICE_STDIO") {
+    if (version === "elice-v1") return "INCLUDE";
+    if (version === "elice-v2") return "IGNORE";
+  }
+  return null;
 }
 
 /**
@@ -173,6 +194,7 @@ export const programmingExerciseSchema = z.object({
   /** The stored profile, including the semantic version it was authored at. */
   grading: z.object({
     mode: programmingExerciseGradingModeSchema,
+    inputPromptPolicy: inputPromptPolicySchema,
     /** A string, not the registry enum: a stored version is reported as is. */
     semanticVersion: z.string(),
     totalTimeLimitMs: z.number().int().positive().nullable(),
@@ -367,6 +389,7 @@ export const gradingProfileBounds = {
  * back to legacy, and its weights with it, without anyone having chosen that.
  */
 export const exerciseGradingProfileSchema = z.object({
+  inputPromptPolicy: inputPromptPolicySchema,
   mode: programmingExerciseGradingModeSchema,
   totalTimeLimitMs: z
     .number()
@@ -394,6 +417,7 @@ export type ExerciseGradingProfile = z.infer<
 
 export const legacyGradingProfile: ExerciseGradingProfile = {
   mode: "LEGACY_STDIO",
+  inputPromptPolicy: "INCLUDE",
   totalTimeLimitMs: null,
   comparatorTimeLimitMs: null,
   materialMaximumHundredths: null,
@@ -402,6 +426,7 @@ export const legacyGradingProfile: ExerciseGradingProfile = {
 
 export const defaultEliceGradingProfile: ExerciseGradingProfile = {
   mode: "ELICE_STDIO",
+  inputPromptPolicy: "INCLUDE",
   totalTimeLimitMs: gradingProfileBounds.totalTimeLimitMs.default,
   comparatorTimeLimitMs: gradingProfileBounds.comparatorTimeLimitMs.default,
   materialMaximumHundredths:

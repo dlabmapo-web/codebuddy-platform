@@ -8,6 +8,7 @@ import {
   caseComparatorSchema,
   exerciseDifficultySchema,
   exerciseLanguageSchema,
+  inputPromptPolicySchema,
   programmingExerciseGradingModeSchema,
 } from "./course.js";
 import { submissionResultSchema } from "./submission.js";
@@ -254,6 +255,7 @@ export const learnExerciseSchema = z.object({
    * rules that differ from the server's.
    */
   gradingMode: programmingExerciseGradingModeSchema.default("LEGACY_STDIO"),
+  inputPromptPolicy: inputPromptPolicySchema.default("INCLUDE"),
   /**
    * The grading revision this workspace was loaded at. A sample check names
    * it, and a mismatch means the case list may have moved: refresh first.

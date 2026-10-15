@@ -694,6 +694,7 @@ export class RegradeService {
               // exercise has now, exactly as a fresh submission would be.
               gradingMode: true,
               gradingSemanticVersion: true,
+              inputPromptPolicy: true,
               totalTimeLimitMs: true,
               comparatorTimeLimitMs: true,
               continuationPolicy: true,

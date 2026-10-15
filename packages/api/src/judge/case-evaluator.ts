@@ -1,4 +1,4 @@
-import type { CaseComparator, CaseOutcome } from "@cove/shared";
+import type { CaseComparator, CaseOutcome, InputPromptPolicy } from "@cove/shared";
 
 import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
 import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
@@ -64,6 +64,7 @@ export async function evaluateEnhancedCase(
   deps: { engine: ExecutionEngine; comparator: OutputComparator },
   input: {
     code: string;
+    inputPromptPolicy?: InputPromptPolicy;
     memoryLimitMb: number;
     outputLimitBytes?: number;
     comparatorTimeLimitMs: number;
@@ -82,6 +83,7 @@ export async function evaluateEnhancedCase(
   const limit = Math.min(studentLimit, remaining);
   const executionStartedAt = Date.now();
   const execution = deps.engine.run({
+    inputPromptPolicy: input.inputPromptPolicy ?? "INCLUDE",
     code: input.code,
     stdin: testCase.input,
     timeLimitMs: limit,

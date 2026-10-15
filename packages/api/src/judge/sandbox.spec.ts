@@ -171,6 +171,12 @@ describe("sandbox round trip", () => {
     );
   }, 60_000);
 
+  it("transmits prompt suppression across the sandbox boundary", async () => {
+    const result = await engine.run({ code: "print(input('Enter: '))", stdin: "42\n",
+      inputPromptPolicy: "IGNORE", timeLimitMs: 5_000, memoryLimitMb: 128 });
+    expect(result).toMatchObject({ outcome: "PASSED", stdout: "42\n" });
+  }, 60_000);
+
   it("reports a crash and a time limit as verdicts", async () => {
     const crash = await engine.run({
       code: "raise ValueError('nope')",
@@ -241,8 +247,8 @@ describe("the judge trusts only a well-formed answer to its own question", () =>
 
   it("refuses an older sandbox that cannot enforce the requested output ceiling", async () => {
     const engine = await fake("old-protocol", (request) => ({type: "health", id: request.id,
-      protocol: 1, engineVersion: "pyodide-0.27.5", isolated: true}));
-    await expect(engine.warmUp()).rejects.toThrow("judge expects sandbox protocol 2");
+      protocol: 2, engineVersion: "pyodide-0.27.5", isolated: true}));
+    await expect(engine.warmUp()).rejects.toThrow("judge expects sandbox protocol 3");
     await engine.dispose();
   });
 

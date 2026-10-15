@@ -1162,6 +1162,7 @@ export class CourseService {
               ...exerciseProfileColumns(input.grading),
               gradingSemanticVersion: semanticVersionForMode(
                 input.grading.mode,
+                input.grading.inputPromptPolicy,
               ),
               testCases: { create: testCaseCreates(input.testCases) },
               hints: { create: hintCreates(input.hints) },
@@ -1239,6 +1240,7 @@ export class CourseService {
                 // now. An unchanged one keeps the version it was authored at.
                 gradingSemanticVersion: semanticVersionForMode(
                   input.grading.mode,
+                  input.grading.inputPromptPolicy,
                 ),
               }
             : {}),
@@ -1716,6 +1718,7 @@ function exerciseAuditFromInput(
     isVisible,
     gradingRevision,
     gradingMode: input.grading.mode,
+    inputPromptPolicy: input.grading.inputPromptPolicy,
     totalWeight: input.testCases.reduce(
       (total, testCase) => total + testCase.weight,
       0,
@@ -1742,6 +1745,7 @@ function exerciseRecordAudit(record: ExerciseRecord) {
     isVisible: record.isVisible,
     gradingRevision: exercise.gradingRevision,
     gradingMode: exercise.gradingMode,
+    inputPromptPolicy: exercise.inputPromptPolicy,
     totalWeight: exercise.testCases.reduce(
       (total, testCase) => total + testCase.weight,
       0,
@@ -1937,6 +1941,7 @@ function serializeExercise(
     gradingRevision: exercise.gradingRevision,
     grading: {
       mode: exercise.gradingMode,
+      inputPromptPolicy: exercise.inputPromptPolicy,
       semanticVersion: exercise.gradingSemanticVersion,
       totalTimeLimitMs: exercise.totalTimeLimitMs,
       comparatorTimeLimitMs: exercise.comparatorTimeLimitMs,

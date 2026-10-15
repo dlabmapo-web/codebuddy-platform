@@ -101,6 +101,7 @@ export class SandboxExecutionEngine implements ExecutionEngine {
         protocol: SANDBOX_PROTOCOL_VERSION,
         id: randomUUID(),
         request: {
+          inputPromptPolicy: request.inputPromptPolicy ?? "INCLUDE",
           code: request.code,
           stdin: request.stdin,
           timeLimitMs: request.timeLimitMs,

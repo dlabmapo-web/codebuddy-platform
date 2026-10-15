@@ -221,6 +221,8 @@ describe('samples on weighted problems', () => {
     expect(comparesSampleLocally('LEGACY_STDIO')).toBe(true);
     expect(comparesSampleLocally(undefined)).toBe(true);
     expect(comparesSampleLocally('ELICE_STDIO')).toBe(false);
+    expect(comparesSampleLocally('LEGACY_STDIO', 'IGNORE')).toBe(false);
+    expect(comparesSampleLocally(undefined, 'IGNORE')).toBe(false);
   });
 });
 

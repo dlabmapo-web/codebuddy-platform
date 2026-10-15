@@ -49,6 +49,9 @@ const master = {
                 memoryLimitMb: 256,
                 aiFeedbackEnabled: true,
                 gradingRevision: 9,
+                inputPromptPolicy: 'IGNORE',
+                gradingMode: 'LEGACY_STDIO',
+                gradingSemanticVersion: 'legacy-v2',
                 testCases: [
                   {
                     position: 1,
@@ -202,6 +205,8 @@ describe('AcademyLibraryService.adopt', () => {
       solutionCode: 'print(sum(range(1, n + 1)))',
       timeLimitMs: 3000,
       aiFeedbackEnabled: true,
+      inputPromptPolicy: 'IGNORE',
+      gradingSemanticVersion: 'legacy-v2',
     });
     expect(created.exerciseTestCase[0]).toMatchObject({
       input: '3',

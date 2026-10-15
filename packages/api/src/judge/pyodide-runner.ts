@@ -48,7 +48,7 @@ const hostStdoutWrite = process.stdout.write.bind(process.stdout);
 const hostStderrWrite = process.stderr.write.bind(process.stderr);
 const hostBufferFrom = Buffer.from.bind(Buffer);
 
-type Job = { code: string; stdin: string };
+type Job = { code: string; stdin: string; inputPromptPolicy?: "INCLUDE" | "IGNORE" };
 
 /**
  * Host lockdown, applied after Pyodide is warm and before student code runs.
@@ -238,8 +238,13 @@ async function main(): Promise<void> {
   // turn an ordinary crash into a successful process exit.
   const entryGlobals = pyodide.runPython("dict()");
   pyodide.runPython(`
-def run_script(source, namespace):
+def run_script(source, namespace, ignore_input_prompts):
     import builtins
+    native_input = builtins.input
+    if ignore_input_prompts:
+        def input_without_prompt(prompt="", /):
+            return native_input()
+        builtins.input = input_without_prompt
     compile_script = builtins.compile
     execute = builtins.exec
     exit_type = builtins.SystemExit
@@ -271,7 +276,10 @@ def run_script(source, namespace):
   try {
     // Unhandled script exceptions surface to this
     // host frame, so the exit status below is decided outside the interpreter.
-    runScript(job.code, pyodide.globals);
+    if (job.inputPromptPolicy !== undefined && job.inputPromptPolicy !== "INCLUDE" && job.inputPromptPolicy !== "IGNORE") {
+      throw new Error("Unknown input prompt policy");
+    }
+    runScript(job.code, pyodide.globals, job.inputPromptPolicy === "IGNORE");
   } catch (error) {
     hostStderrWrite(formatPythonError(error));
     await flush();

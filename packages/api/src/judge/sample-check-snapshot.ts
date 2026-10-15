@@ -1,3 +1,4 @@
+import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
 import type { SampleSnapshot } from "./sample-check.store.js";
@@ -13,6 +14,8 @@ export function sampleSnapshotFor(
   if (profile.kind === "unsupported" || testCase.visibility !== "SAMPLE") return null;
   if (profile.kind === "legacy") {
     return {
+      inputPromptPolicy: profile.inputPromptPolicy,
+      gradingSemanticVersion: exercise.gradingSemanticVersion,
       gradingMode: "LEGACY_STDIO",
       engineVersion: `pyodide-${engineVersion}`,
       code,
@@ -33,6 +36,8 @@ export function sampleSnapshotFor(
   const snapshot = gradingSnapshotFor({ ...exercise, testCases: [testCase] }, { engineVersion });
   const selected = snapshot.cases[0]!;
   return {
+    inputPromptPolicy: profile.inputPromptPolicy,
+    gradingSemanticVersion: exercise.gradingSemanticVersion,
     code,
     memoryLimitMb: exercise.memoryLimitMb,
     totalTimeLimitMs: profile.totalTimeLimitMs,
@@ -46,4 +51,25 @@ export function sampleSnapshotFor(
       caseLimitMs: selected.effectiveTimeLimitMs ?? exercise.timeLimitMs,
     },
   };
+}
+
+/** Historical Redis records lack both fields. New semantics must be explicit. */
+export function sampleInputPromptPolicy(snapshot: SampleSnapshot): InputPromptPolicy | null {
+  const parsed = inputPromptPolicySchema.safeParse(snapshot.inputPromptPolicy === undefined ? "INCLUDE" : snapshot.inputPromptPolicy);
+  if (!parsed.success) return null;
+  const parsedMode = programmingExerciseGradingModeSchema.safeParse(
+    snapshot.gradingMode === undefined ? "ELICE_STDIO" : snapshot.gradingMode,
+  );
+  if (!parsedMode.success) return null;
+  const mode = parsedMode.data;
+  const recorded = snapshot.gradingSemanticVersion === undefined
+    ? (mode === "LEGACY_STDIO" ? "legacy-v1" : "elice-v1")
+    : snapshot.gradingSemanticVersion;
+  if (inputPromptPolicyForSemanticVersion(mode, recorded) !== parsed.data) return null;
+  if (mode === "ELICE_STDIO") {
+    const policy = gradingPolicySnapshotSchema.safeParse("policy" in snapshot ? snapshot.policy : undefined);
+    if (!policy.success || policy.data.semanticVersion !== recorded ||
+        (policy.data.inputPromptPolicy ?? "INCLUDE") !== parsed.data) return null;
+  }
+  return parsed.data;
 }

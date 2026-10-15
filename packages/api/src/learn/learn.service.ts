@@ -316,6 +316,7 @@ export class LearnService {
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
         gradingMode: exercise.gradingMode,
+        inputPromptPolicy: exercise.inputPromptPolicy,
         gradingRevision: exercise.gradingRevision,
         serverSampleChecks: sampleChecks?.isEnabled ?? false,
         sampleTestCases: exercise.testCases

@@ -316,6 +316,7 @@ export function LiveWorkspace({
       setActiveSample(index);
       await runSample(getCode(), sample, index, {
         gradingMode: liveExercise?.exercise.gradingMode,
+        inputPromptPolicy: liveExercise?.exercise.inputPromptPolicy,
       });
       setActiveSample(null);
     },

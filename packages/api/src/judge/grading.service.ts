@@ -194,6 +194,7 @@ export class GradingService {
         }
 
         const run = await this.engine.run({
+          inputPromptPolicy: submission.inputPromptPolicy,
           code: submission.code,
           stdin: testCase.input,
           timeLimitMs: submission.timeLimitMs,
@@ -276,6 +277,7 @@ export class GradingService {
         const evaluation = await evaluateEnhancedCase(
           { engine: this.engine, comparator: this.comparator },
           {
+            inputPromptPolicy: submission.inputPromptPolicy,
             code: submission.code,
             memoryLimitMb: submission.memoryLimitMb,
             outputLimitBytes: profile.policy?.ceilings.outputBytes,

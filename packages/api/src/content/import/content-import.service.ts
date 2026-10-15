@@ -922,6 +922,8 @@ export class ContentImportService {
     }
     if (existing && planned.action === "UNCHANGED") return existing.id;
 
+    // Workbooks do not carry inputPromptPolicy. Omit it on updates to preserve
+    // the teacher's choice; creates use the database INCLUDE default.
     const exerciseFields = {
       difficulty: planned.difficulty,
       description: planned.description,

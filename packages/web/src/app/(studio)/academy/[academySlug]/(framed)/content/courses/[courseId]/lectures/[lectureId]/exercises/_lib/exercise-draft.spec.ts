@@ -188,7 +188,7 @@ describe('exercise draft helpers', () => {
           aiFeedbackEnabled: false,
           gradingRevision: 3,
           grading: {
-            mode: 'ELICE_STDIO',
+            mode: 'ELICE_STDIO', inputPromptPolicy: "INCLUDE" as const,
             semanticVersion: 'elice-v1',
             totalTimeLimitMs: 60_000,
             comparatorTimeLimitMs: 100,
@@ -217,7 +217,7 @@ describe('exercise draft helpers', () => {
     const payload = draftToPayload(loaded);
 
     expect(payload.grading).toEqual({
-      mode: 'ELICE_STDIO',
+      mode: 'ELICE_STDIO', inputPromptPolicy: "INCLUDE" as const,
       totalTimeLimitMs: 60_000,
       comparatorTimeLimitMs: 100,
       materialMaximumHundredths: 10_000,
@@ -229,6 +229,11 @@ describe('exercise draft helpers', () => {
       expect.objectContaining({ weight: 40, softTimeLimitMs: 500, softPenalty: 10 }),
     ]);
     expect(draftGradingIssues(loaded)).toEqual([]);
+  });
+
+  it('retains prompt handling through draft serialization', () => {
+    const value = draft({ grading: { ...legacyGradingProfile, inputPromptPolicy: 'IGNORE' } });
+    expect(draftToPayload(value).grading.inputPromptPolicy).toBe('IGNORE');
   });
 
   it('reports a weight on a standard problem before the server has to refuse it', () => {

@@ -1596,6 +1596,11 @@ model Material {
   @@map("materials")
 }
 
+enum InputPromptPolicy {
+  INCLUDE
+  IGNORE
+}
+
 model ProgrammingExercise {
   /// Native single-answer quiz. Null keeps the existing Python exercise path.
   quiz              Json?
@@ -1618,6 +1623,7 @@ model ProgrammingExercise {
   /// The grading profile. Copied onto every submission at admission and never
   /// read back from here while grading, so editing an exercise cannot
   /// reinterpret work a student has already handed in.
+  inputPromptPolicy         InputPromptPolicy    @default(INCLUDE) @map("input_prompt_policy")
   gradingMode               GradingProfileMode   @default(LEGACY_STDIO) @map("grading_mode")
   /// Which version of the comparison and scoring semantics applies. Dispatch
   /// reads the value stored with the data, never a constant in source.
@@ -1779,6 +1785,7 @@ model Submission {
   /// Copied, not referenced: the exercise's settings may change tomorrow, and
   /// a regrade of this submission must reproduce the rules it was judged under,
   /// not the rules that happen to be current.
+  inputPromptPolicy         InputPromptPolicy    @default(INCLUDE) @map("input_prompt_policy")
   gradingMode               GradingProfileMode   @default(LEGACY_STDIO) @map("grading_mode")
   gradingSemanticVersion    String               @default("legacy-v1") @map("grading_semantic_version")
   totalTimeLimitMs          Int?                 @map("total_time_limit_ms")

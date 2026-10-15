@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   createProgrammingExerciseSchema,
   defaultEliceGradingProfile,
+  legacyGradingProfile,
   updateProgrammingExerciseSchema,
 } from "@cove/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -250,9 +251,10 @@ else:
     const exercise = reread.material!.programmingExercise!;
     expect(exercise.grading).toEqual({
       mode: "ELICE_STDIO",
+      inputPromptPolicy: "INCLUDE",
       semanticVersion: "elice-v1",
       totalTimeLimitMs: 60_000,
-      comparatorTimeLimitMs: 100,
+      comparatorTimeLimitMs: defaultEliceGradingProfile.comparatorTimeLimitMs,
       materialMaximumHundredths: 10_000,
       materialScorePolicy: "PROPORTIONAL",
     });
@@ -368,4 +370,34 @@ else:
     const next = await submitAndGrade(program([[3, 2]]));
     expect(next).toEqual(expect.objectContaining({ score: 25, earnedWeight: 25 }));
   }, 180_000);
+
+  it.each(["LEGACY_STDIO", "ELICE_STDIO"] as const)("persists prompt handling and freezes queued %s submissions", async (mode) => {
+    const authoredProfile = mode === "LEGACY_STDIO" ? legacyGradingProfile : defaultEliceGradingProfile;
+    async function setPolicy(inputPromptPolicy: "INCLUDE" | "IGNORE") {
+      const context = await courses.getExercise(manager, { academyId: ids.academy, courseId, lectureId, materialId });
+      const exercise = context.material!.programmingExercise!;
+      await courses.updateExercise(manager, updateProgrammingExerciseSchema.parse({
+        academyId: ids.academy, courseId, lectureId, materialId, expectedUpdatedAt: exercise.updatedAt,
+        title: "Prompt example", difficulty: "EASY", description: exercise.description,
+        inputFormat: "", outputFormat: "", constraints: "", starterCode: "", solutionCode: "print(input())",
+        aiFeedbackEnabled: false, isVisible: true, hints: [],
+        testCases: [{ ...calculatorCases[0]!, input: "4\n", expectedOutput: "4", weight: 1 }],
+        grading: { ...authoredProfile, inputPromptPolicy },
+      }));
+    }
+    await setPolicy("IGNORE");
+    const stored = await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId } });
+    expect(stored).toMatchObject({ inputPromptPolicy: "IGNORE", gradingSemanticVersion: mode === "LEGACY_STDIO" ? "legacy-v2" : "elice-v2" });
+    const accepted = await submissions.submit(student, { academyId: ids.academy, classId: ids.klass, materialId,
+      code: "print(input('Enter: '))" });
+    const frozen = await prisma.submission.findUniqueOrThrow({ where: { id: accepted.submissionId } });
+    expect(frozen.inputPromptPolicy).toBe("IGNORE");
+    await setPolicy("INCLUDE");
+    await grading.grade(accepted.submissionId, async () => undefined);
+    expect(await submissions.get(student, { academyId: ids.academy, submissionId: accepted.submissionId })).toMatchObject({ status: "PASSED", score: 100 });
+    expect(await submitAndGrade("print(input('Enter: '))")).toMatchObject({ status: "FAILED", score: 0 });
+    await setPolicy("IGNORE");
+    expect(await submitAndGrade("print(input('Enter: '))\nprint('extra')")).toMatchObject({ status: "FAILED", score: 0 });
+  }, 120_000);
+
 });

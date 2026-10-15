@@ -1,4 +1,5 @@
 {
+  "input_prompts_notice": "Input prompts are excluded during grading.",
   "workspace": {
     "sample_checked_on_submit": "Test {{number}} ran. This problem is graded by rules the browser does not reproduce exactly, so its result is decided when you submit.",
     "sample_check_banner": "sample check · Test {{number}}",

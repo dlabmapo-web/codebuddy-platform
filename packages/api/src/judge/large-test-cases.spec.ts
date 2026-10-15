@@ -37,7 +37,7 @@ describe("large test cases through the real sandbox transport", () => {
     const expectedOutput = Array.from({length: n}, (_, i) => i).join(" ");
     expect(Buffer.byteLength(input)).toBeGreaterThan(4 * 1024 * 1024);
     expect(Buffer.byteLength(expectedOutput)).toBeGreaterThan(256 * 1024);
-    expect(sandboxRequestSchema.safeParse({type: "run", protocol: 2,
+    expect(sandboxRequestSchema.safeParse({type: "run", protocol: 3,
       id: "20000000-0000-4000-8000-000000000001",
       request: {code: "print(1)", stdin: input, timeLimitMs: 60_000, memoryLimitMb: 256},
     }).success).toBe(true);
@@ -72,7 +72,7 @@ sys.stdout.write(' '.join(receivers))`,
   }, 60_000);
 
   it("rejects over-limit inputs without truncating them", () => {
-    expect(sandboxRequestSchema.safeParse({type: "run", protocol: 2,
+    expect(sandboxRequestSchema.safeParse({type: "run", protocol: 3,
       id: "20000000-0000-4000-8000-000000000001",
       request: {code: "print(1)", stdin: "x".repeat(gradingDataLimits.testTextChars + 1),
         timeLimitMs: 3_000, memoryLimitMb: 256},

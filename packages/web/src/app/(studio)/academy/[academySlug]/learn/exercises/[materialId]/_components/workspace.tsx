@@ -90,6 +90,7 @@ function ProgrammingWorkspace({
   // The monitoring copy is mounted by this page for the indicator; the peer
   // labels come from the same namespace.
   const { t: tm } = useTranslation('monitoring');
+  const { t: tsample } = useTranslation('sample-check');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [sampleResults, setSampleResults] = React.useState<SampleRun[]>([]);
   const [testingSamples, setTestingSamples] = React.useState(false);
@@ -257,6 +258,7 @@ function ProgrammingWorkspace({
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
         gradingMode: exercise.gradingMode,
+        inputPromptPolicy: exercise.inputPromptPolicy,
         // Judged on the server, by Submit's rules, where the academy has it
         // on. Otherwise the browser runs it and says nothing it cannot back.
         server: exercise.serverSampleChecks
@@ -317,6 +319,7 @@ function ProgrammingWorkspace({
       classId,
       draft.code,
       exercise.gradingMode,
+      exercise.inputPromptPolicy,
       exercise.gradingRevision,
       exercise.materialId,
       exercise.sampleTestCases,
@@ -662,6 +665,9 @@ function ProgrammingWorkspace({
               mobileTab === 'code' ? 'flex' : 'hidden'
             } md:flex`}
           >
+            {exercise.inputPromptPolicy === 'IGNORE' && (
+              <p className="px-4 py-2 text-sm text-sub" role="note">{tsample('input_prompts_notice')}</p>
+            )}
             <EditorPane
               onReset={() => {
                 const starter = toSharedDocumentText(exercise.starterCode);

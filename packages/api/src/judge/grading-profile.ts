@@ -1,5 +1,8 @@
 import {
   gradingProfileBounds,
+  inputPromptPolicySchema,
+  inputPromptPolicyForSemanticVersion,
+  type InputPromptPolicy,
   legacyCaseGrading,
   type CaseComparator,
   type GradingProfileMode,
@@ -24,6 +27,7 @@ type ContinuationPolicy = "LEGACY_STOP_ON_RESOURCE" | "CONTINUE_WITHIN_BUDGET";
 type ExitStatusPolicy = "FAIL_ON_RUNTIME_ERROR";
 
 type ProfileColumns = {
+  inputPromptPolicy?: InputPromptPolicy;
   gradingMode: GradingProfileMode;
   gradingSemanticVersion: string;
   totalTimeLimitMs: number | null;
@@ -64,7 +68,8 @@ export type ExerciseGradingSource = ProfileColumns & {
  * at. Never holds a secret.
  */
 export const gradingPolicySnapshotSchema = z.object({
-  version: z.union([z.literal(1), z.literal(2)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  inputPromptPolicy: inputPromptPolicySchema.optional(),
   semanticVersion: z.string(),
   runtime: z.object({
     engine: z.literal("pyodide"),
@@ -81,6 +86,11 @@ export const gradingPolicySnapshotSchema = z.object({
     memoryLimitMb: z.number().int().positive(),
     outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES),
   }),
+}).superRefine((policy, ctx) => {
+  const valid = policy.version === 3
+    ? policy.semanticVersion === "elice-v2" && policy.inputPromptPolicy === "IGNORE"
+    : policy.semanticVersion === "elice-v1" && (policy.inputPromptPolicy === undefined || policy.inputPromptPolicy === "INCLUDE");
+  if (!valid) ctx.addIssue({ code: "custom", message: "Inconsistent prompt policy snapshot" });
 });
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
 
@@ -101,7 +111,8 @@ export function gradingSnapshotFor(
     ? {
         // Older workers only understand v1 and must refuse these submissions
         // rather than grade them using their smaller, hardcoded output cap.
-        version: 2,
+        version: exercise.inputPromptPolicy === "IGNORE" ? 3 : 2,
+        ...(exercise.inputPromptPolicy === "IGNORE" ? { inputPromptPolicy: "IGNORE" as const } : {}),
         semanticVersion: exercise.gradingSemanticVersion,
         runtime: { engine: "pyodide", engineVersion: runtime.engineVersion },
         comparator: {
@@ -124,6 +135,7 @@ export function gradingSnapshotFor(
 
   return {
     submission: {
+      inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE",
       gradingMode: exercise.gradingMode,
       gradingSemanticVersion: exercise.gradingSemanticVersion,
       totalTimeLimitMs: exercise.totalTimeLimitMs,
@@ -154,9 +166,10 @@ export function gradingSnapshotFor(
 }
 
 export type ResolvedGradingProfile =
-  | { kind: "legacy" }
+  | { kind: "legacy"; inputPromptPolicy: InputPromptPolicy }
   | {
       kind: "elice";
+      inputPromptPolicy: InputPromptPolicy;
       totalTimeLimitMs: number;
       comparatorTimeLimitMs: number;
       continuationPolicy: ContinuationPolicy;
@@ -185,8 +198,12 @@ export function resolveGradingProfile(
   cases: ReadonlyArray<CaseGrading>,
   policySnapshot?: unknown,
 ): ResolvedGradingProfile {
+  const prompt = inputPromptPolicySchema.safeParse(profile.inputPromptPolicy === undefined ? "INCLUDE" : profile.inputPromptPolicy);
+  if (!prompt.success) return unsupported("unknown input prompt policy");
+  const inputPromptPolicy = prompt.data;
+  const versionPolicy = inputPromptPolicyForSemanticVersion(profile.gradingMode, profile.gradingSemanticVersion);
   if (profile.gradingMode === "LEGACY_STDIO") {
-    if (profile.gradingSemanticVersion !== "legacy-v1") {
+    if (versionPolicy !== inputPromptPolicy) {
       return unsupported(`unknown legacy version ${profile.gradingSemanticVersion}`);
     }
     const carriesEnhancedSetting = cases.some((testCase) =>
@@ -197,13 +214,13 @@ export function resolveGradingProfile(
     if (carriesEnhancedSetting) {
       return unsupported("legacy profile carries case settings it cannot honour");
     }
-    return { kind: "legacy" };
+    return { kind: "legacy", inputPromptPolicy };
   }
 
   if (profile.gradingMode !== "ELICE_STDIO") {
     return unsupported(`unknown grading mode ${String(profile.gradingMode)}`);
   }
-  if (profile.gradingSemanticVersion !== "elice-v1") {
+  if (versionPolicy !== inputPromptPolicy) {
     return unsupported(`unknown enhanced version ${profile.gradingSemanticVersion}`);
   }
   const {
@@ -241,6 +258,7 @@ export function resolveGradingProfile(
   }
   return {
     kind: "elice",
+    inputPromptPolicy,
     totalTimeLimitMs: totalTimeLimitMs!,
     comparatorTimeLimitMs: comparatorTimeLimitMs!,
     continuationPolicy: profile.continuationPolicy,
@@ -293,6 +311,7 @@ function unsupported(reason: string): ResolvedGradingProfile {
 /** The exercise-side columns an authored profile writes, by mode. */
 export function exerciseProfileColumns(grading: {
   mode: GradingProfileMode;
+  inputPromptPolicy: InputPromptPolicy;
   totalTimeLimitMs: number | null;
   comparatorTimeLimitMs: number | null;
   materialMaximumHundredths: number | null;
@@ -301,6 +320,7 @@ export function exerciseProfileColumns(grading: {
   const enhanced = grading.mode === "ELICE_STDIO";
   return {
     gradingMode: grading.mode,
+    inputPromptPolicy: grading.inputPromptPolicy,
     continuationPolicy: enhanced
       ? ("CONTINUE_WITHIN_BUDGET" as const)
       : ("LEGACY_STOP_ON_RESOURCE" as const),

@@ -186,6 +186,22 @@ function answers(correct: number[], runtimeMs = 10) {
 }
 
 describe("GradingService.grade", () => {
+  it.each([false, true])("uses the frozen prompt policy and keeps equality strict, enhanced=%s", async (enhanced) => {
+    const profile = enhanced ? { ...eliceProfile, inputPromptPolicy: "IGNORE", gradingSemanticVersion: "elice-v2",
+      gradingPolicySnapshot: { ...eliceProfile.gradingPolicySnapshot, version: 3, semanticVersion: "elice-v2", inputPromptPolicy: "IGNORE" } }
+      : { ...legacyProfile, inputPromptPolicy: "IGNORE", gradingSemanticVersion: "legacy-v2" };
+    const cases = [{ ...legacyCase, position: 1, isSample: true, input: "4\n", expectedOutput: "answer" }];
+    for (const [stdout, status] of [["answer\n", "PASSED"], ["answer\ndebug\n", "FAILED"]]) {
+      const { service, engine, tx } = createService({ profile, cases,
+        run: async () => ({ stdout: stdout!, stderr: "", outcome: "PASSED", runtimeMs: 5 }) });
+      await service.grade(submissionId, async () => undefined);
+      expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ inputPromptPolicy: "IGNORE" }));
+      expect(tx.submission.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status }),
+      }));
+    }
+  });
+
   it("runs every case after a wrong answer, so each one is reported", async () => {
     // A wrong answer on one case says nothing about the others. Stopping here
     // used to score a student for cases nobody ran — the whole reason the

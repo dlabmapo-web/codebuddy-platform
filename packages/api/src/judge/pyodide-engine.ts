@@ -390,7 +390,7 @@ class RunnerProcess {
         // unhandled write error would take the judge down with it.
         control.on("error", () => undefined);
         control.write(
-          `${JSON.stringify({ code: request.code, stdin: request.stdin })}\n`,
+          `${JSON.stringify({ code: request.code, stdin: request.stdin, inputPromptPolicy: request.inputPromptPolicy ?? "INCLUDE" })}\n`,
           () => undefined,
         );
       }
@@ -637,6 +637,9 @@ export class PyodideExecutionEngine implements ExecutionEngine {
   }
 
   async run(request: ExecutionRequest): Promise<ExecutionResult> {
+    if (request.inputPromptPolicy !== undefined && request.inputPromptPolicy !== "INCLUDE" && request.inputPromptPolicy !== "IGNORE") {
+      throw new Error("unsupported input prompt policy");
+    }
     const runner = await this.acquire();
     try {
       return await runner.run(request);

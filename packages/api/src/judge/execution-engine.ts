@@ -1,4 +1,4 @@
-import type { CaseOutcome } from "@cove/shared";
+import type { CaseOutcome, InputPromptPolicy } from "@cove/shared";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 /**
@@ -8,6 +8,7 @@ import { gradingDataLimits } from "@cove/shared/grading-limits";
 export const MAX_OUTPUT_BYTES = gradingDataLimits.stdoutBytes;
 
 export type ExecutionRequest = {
+  inputPromptPolicy?: InputPromptPolicy;
   code: string;
   stdin: string;
   /** Student execution budget once the runner is ready; excludes acquisition. */

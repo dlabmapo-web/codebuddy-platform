@@ -308,7 +308,7 @@ const legacyCase = {
 };
 
 const legacyGrading = {
-  mode: "LEGACY_STDIO" as const,
+  mode: "LEGACY_STDIO" as const, inputPromptPolicy: "INCLUDE" as const,
   totalTimeLimitMs: null,
   comparatorTimeLimitMs: null,
   materialMaximumHundredths: null,
@@ -316,7 +316,7 @@ const legacyGrading = {
 };
 
 const weightedGrading = {
-  mode: "ELICE_STDIO" as const,
+  mode: "ELICE_STDIO" as const, inputPromptPolicy: "INCLUDE" as const,
   totalTimeLimitMs: 60_000,
   comparatorTimeLimitMs: 100,
   materialMaximumHundredths: 10_000,
@@ -360,6 +360,7 @@ function exerciseRecord() {
       aiFeedbackEnabled: false,
       gradingRevision: 1,
       gradingMode: "LEGACY_STDIO",
+      inputPromptPolicy: "INCLUDE",
       gradingSemanticVersion: "legacy-v1",
       totalTimeLimitMs: null,
       comparatorTimeLimitMs: null,
@@ -496,6 +497,23 @@ describe("CourseService direct problem editing", () => {
       academyId,
       "exercises.manage",
     );
+  });
+
+  it("changes prompt policy as a new grading revision and audits it", async () => {
+    const { service, transaction, audit } = createExerciseService();
+    const updated = exerciseRecord();
+    updated.programmingExercise.inputPromptPolicy = "IGNORE";
+    updated.programmingExercise.gradingSemanticVersion = "legacy-v2";
+    updated.programmingExercise.gradingRevision = 2;
+    transaction.material.findUniqueOrThrow.mockResolvedValue(updated);
+    await service.updateExercise(identity, { ...exerciseInput,
+      grading: { ...exerciseInput.grading, inputPromptPolicy: "IGNORE" } });
+    expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ inputPromptPolicy: "IGNORE", gradingSemanticVersion: "legacy-v2", gradingRevision: 2 }),
+    }));
+    expect(audit.write).toHaveBeenCalledWith(transaction, expect.objectContaining({
+      after: expect.objectContaining({ inputPromptPolicy: "IGNORE", gradingChanged: true }),
+    }));
   });
 
   it("bumps the course content revision so an open import preview goes stale", async () => {

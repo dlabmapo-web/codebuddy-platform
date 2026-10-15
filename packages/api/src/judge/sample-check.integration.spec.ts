@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   createProgrammingExerciseSchema,
   defaultEliceGradingProfile,
+  legacyGradingProfile,
   updateProgrammingExerciseSchema,
   type SampleCheckView,
 } from "@cove/shared";
@@ -463,6 +464,22 @@ describe.skipIf(!databaseUrl || !redisUrl)("public sample checks, end to end", (
       });
     }
   });
+
+  it.each(["LEGACY_STDIO", "ELICE_STDIO"] as const)("uses the saved prompt policy for %s public samples", async (mode) => {
+    const context = await courses.getExercise(manager, { academyId: ids.academy, courseId, lectureId, materialId });
+    const exercise = context.material!.programmingExercise!;
+    const saved = await courses.updateExercise(manager, updateProgrammingExerciseSchema.parse({
+      academyId: ids.academy, courseId, lectureId, materialId, expectedUpdatedAt: exercise.updatedAt,
+      title: "Prompt example", difficulty: "EASY", description: exercise.description,
+      inputFormat: "", outputFormat: "", constraints: "", starterCode: "", solutionCode: "print(input())",
+      aiFeedbackEnabled: false, isVisible: true, hints: [],
+      testCases: [answer("4\n", "4", 1, "SAMPLE")],
+      grading: { ...(mode === "LEGACY_STDIO" ? legacyGradingProfile : defaultEliceGradingProfile), inputPromptPolicy: "IGNORE" },
+    }));
+    revision = saved.material!.programmingExercise!.gradingRevision;
+    expect(await check(1, "print(input('Enter: '))")).toMatchObject({ status: "COMPLETED", result: { outcome: "PASSED", stdout: "4\n" } });
+    expect(await check(1, "print(input('Enter: '))\nprint('extra')")).toMatchObject({ status: "COMPLETED", result: { outcome: "WRONG_OUTPUT" } });
+  }, 120_000);
 
   it("never let a hidden case's text into any response", () => {
     expect(responses.length).toBeGreaterThan(10);

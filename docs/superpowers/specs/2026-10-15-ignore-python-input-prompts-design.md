@@ -1,7 +1,7 @@
 # Ignore Python input prompts during grading
 
 Date: 2026-10-15
-Status: Proposed spec for review; no implementation or deployment performed.
+Status: Implementation authorized by the user; local verification recorded below. Not deployed.
 Code reviewed: checkout at `e325af1e`.
 
 ## Purpose and agreed direction
@@ -12,8 +12,8 @@ excludes Python input prompts during automated execution. Keep prompts visible
 in interactive Run and keep the selected output comparator unchanged.
 
 The user selected this direction after discussing Elice's alternative. This
-document specifies the change for implementation review. It does not authorize
-changing production exercises or regrading existing submissions automatically.
+document specifies the authorized implementation. Changing production exercises
+or regrading existing submissions automatically remains outside this task.
 
 Example student program:
 
@@ -260,3 +260,50 @@ accept the example without prompt text in expected output. Ordinary extra
 printed text must still fail. Existing exercises, interactive prompts and
 historical grading behavior remain unchanged unless explicitly opted in or
 regraded.
+
+
+## Implementation and verification record
+
+Implemented on branch `feat/ignore-python-input-prompts`:
+
+- Added required authoring policy, exercise/submission persistence and migration
+  `20261015080000_input_prompt_policy`. Existing/default content uses `INCLUDE`.
+- Added `legacy-v2`/`elice-v2` and enhanced snapshot v3 for `IGNORE`. Stored-version
+  dispatch is independent of the version used to author new exercises. Redis
+  sample snapshots preserve policy and reject unsupported combinations.
+- Advanced the sandbox protocol to v3 and installed the native-input wrapper in
+  each opted-in disposable runner. Comparators and interactive Run are unchanged.
+- Added the English/Korean authoring control, mode-switch/draft preservation,
+  learner notice and unchecked browser fallback. Preserved policy in library
+  copies, monitoring data and regrade selection; workbook updates omit the
+  policy and therefore retain the stored choice.
+
+Validation performed locally:
+
+- Shared package: 854 tests passed. Web: 1,218 tests passed, including the
+  authoring control and sample-workspace regression suites.
+- Real runner/sandbox/large-case transport: 94 tests passed with one test worker.
+  Focused API suites passed for grading, snapshots, sample checks, submission
+  admission, authoring, library copying, import and regrade behavior.
+- Type checks passed for shared, API, web and E2E TypeScript. Prisma schema
+  validation passed. Web lint had zero errors and 86 warnings in existing code.
+  Translation checks passed, including 126 catalog tests.
+- Applied all 56 migrations to a disposable PostgreSQL 17 database, including
+  the new migration. Database-backed grading and sample integration suites
+  cover both modes, save/read, queued-policy preservation and rejection of
+  extra printed output: 8 submission integration tests and 16 public-sample
+  integration tests passed.
+
+The disposable database needed minimal Supabase roles plus auth/storage schema
+stubs to apply existing unrelated migrations. These tests exercise grading,
+not Supabase storage authorization. They do not modify the shared development
+or production database. An existing integration assertion used an obsolete
+100 ms comparator default; it now compares against the profile actually authored.
+
+An initial parallel runner test pass refused two executions because host memory
+measurement was unavailable. The subsequent serial runtime suite passed all 94
+tests; this does not establish the cause of the earlier measurement failures.
+No production build, production migration, deployment, mass opt-in or regrade
+was performed. UI verification used component tests, not a manual browser or
+mobile session. Follow the coordinated rollout section before enabling this
+option in production.

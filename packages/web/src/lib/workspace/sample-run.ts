@@ -83,8 +83,8 @@ export type SampleVerdict =
  * would pass samples that fail on Submit, or the reverse. Better to say
  * nothing than to say something the grade will contradict.
  */
-export function comparesSampleLocally(gradingMode: string | undefined): boolean {
-  return (gradingMode ?? 'LEGACY_STDIO') === 'LEGACY_STDIO';
+export function comparesSampleLocally(gradingMode: string | undefined, inputPromptPolicy = 'INCLUDE'): boolean {
+  return inputPromptPolicy === 'INCLUDE' && (gradingMode ?? 'LEGACY_STDIO') === 'LEGACY_STDIO';
 }
 
 /**

@@ -315,6 +315,7 @@ export class AcademyLibraryService {
             // authored at: an adopted 30/30/40 problem must score 40, 60 and
             // 100 in the branch exactly as it does in the library.
             gradingMode: exercise.gradingMode,
+            inputPromptPolicy: exercise.inputPromptPolicy,
             gradingSemanticVersion: exercise.gradingSemanticVersion,
             totalTimeLimitMs: exercise.totalTimeLimitMs,
             comparatorTimeLimitMs: exercise.comparatorTimeLimitMs,

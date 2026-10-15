@@ -667,6 +667,7 @@ export class MonitoringService {
             timeLimitMs: true,
             memoryLimitMb: true,
             gradingMode: true,
+            inputPromptPolicy: true,
             gradingRevision: true,
             testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
             hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
@@ -707,6 +708,7 @@ export class MonitoringService {
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
         gradingMode: exercise.gradingMode,
+        inputPromptPolicy: exercise.inputPromptPolicy,
         gradingRevision: exercise.gradingRevision,
         // The teacher's copy runs locally and never claims a server verdict.
         serverSampleChecks: false,

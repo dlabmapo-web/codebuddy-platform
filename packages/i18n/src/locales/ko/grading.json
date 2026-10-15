@@ -1,6 +1,9 @@
 {
   "exercise": {
     "grading": {
+      "ignore_input_prompts": "채점 시 입력 안내 문구 무시",
+      "ignore_input_prompts_help": "자동 채점에서 Python input()의 안내 문구를 제외합니다. 직접 실행할 때는 안내 문구가 표시됩니다. 나머지 출력에는 선택한 정답 비교 규칙이 적용됩니다.",
+      "ignore_input_prompts_reminder": "테스트 입력에는 값만 넣고, 예상 출력에서는 안내 문구를 제외하세요.",
       "title": "채점",
       "help": "기본 채점은 정답 비중이 같습니다. 가중치 채점은 엘리스처럼 배점과 비교 방식을 정합니다.",
       "mode_label": "채점 방식",

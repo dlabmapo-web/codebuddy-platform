@@ -89,6 +89,53 @@ describe("PyodideExecutionEngine", () => {
     });
   });
 
+  describe("input prompt policy", () => {
+    it("suppresses only native prompts, including aliases and dynamic prompts", async () => {
+      const result = await engine.run({ ...limits, inputPromptPolicy: "IGNORE", stdin: "4\n30\nname\n", code: [
+        "import builtins, sys",
+        "read = builtins.input",
+        "hour = read('몇 시?: ')",
+        "minute = input('몇 분?: ' + str(1))",
+        "name = input()",
+        "print(f'현재 {hour}시 {minute}분입니다.')",
+        "print(name)",
+        "print('몇 시?: ')",
+        "sys.stderr.write('diagnostic')",
+      ].join("\n") });
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("현재 4시 30분입니다.\nname\n몇 시?: \n");
+      expect(result.stderr).toBe("diagnostic");
+    });
+
+    it("preserves prompt expression effects, without stringifying the prompt object", async () => {
+      const result = await engine.run({ ...limits, inputPromptPolicy: "IGNORE", stdin: "yes\nrest", code: [
+        "import sys",
+        "class Prompt:",
+        "    def __str__(self): raise AssertionError('must not stringify')",
+        "def prompt():",
+        "    print('expression effect')",
+        "    return Prompt()",
+        "print(input(prompt()))",
+        "print(sys.stdin.read())",
+      ].join("\n") });
+      expect(result.outcome).toBe("PASSED");
+      expect(result.stdout).toBe("expression effect\nyes\nrest\n");
+    });
+
+    it.each(["input(prompt='x')", "input('x', 'y')", "input()"])("keeps argument errors and EOF for %s", async (code) => {
+      const result = await engine.run({ ...limits, inputPromptPolicy: "IGNORE", code });
+      expect(result.outcome).toBe("RUNTIME_ERROR");
+      expect(result.stderr).toContain(code === "input()" ? "EOFError" : "TypeError");
+    });
+
+    it("does not suppress custom input functions or contaminate the next interpreter", async () => {
+      const custom = await engine.run({ ...limits, inputPromptPolicy: "IGNORE", code: "def input(prompt):\n    print(prompt)\ninput('custom')" });
+      expect(custom.stdout).toBe("custom\n");
+      const next = await engine.run({ ...limits, stdin: "4\n", code: "print(input('prompt: '))" });
+      expect(next.stdout).toBe("prompt: 4\n");
+    });
+  });
+
   describe("ordinary Python script semantics", () => {
     it.each(["0", "None", "False"])("preserves output on sys.exit(%s)", async (code) => {
       const result = await engine.run({ ...limits, code: `import sys\nprint('answer', end='')\nsys.exit(${code})` });

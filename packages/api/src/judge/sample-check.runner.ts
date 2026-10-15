@@ -6,6 +6,7 @@ import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionCapacity } from "./execution-capacity.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import { caseOutcomeFor } from "./grading.js";
+import { sampleInputPromptPolicy } from "./sample-check-snapshot.js";
 import { runtimeMismatch } from "./grading-profile.js";
 import type {
   SampleCheckRecord,
@@ -86,6 +87,11 @@ export class SampleCheckRunner {
 
   private async execute(record: SampleCheckRecord, dispatchedAt: number): Promise<void> {
     const { snapshot } = record;
+    const inputPromptPolicy = sampleInputPromptPolicy(snapshot);
+    if (inputPromptPolicy === null) {
+      await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "UNSUPPORTED_POLICY" });
+      return;
+    }
     const legacy = snapshot.gradingMode === "LEGACY_STDIO";
     const mismatch = legacy
       ? snapshot.engineVersion !== this.engine.version
@@ -116,6 +122,7 @@ export class SampleCheckRunner {
       evaluation = await evaluateEnhancedCase(
         { engine: this.engine, comparator },
         {
+          inputPromptPolicy,
           code: snapshot.code,
           memoryLimitMb: snapshot.memoryLimitMb,
           // Omit the override for legacy, just as Submit does.

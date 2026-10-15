@@ -127,6 +127,7 @@ export function contextToDraft(
     })),
     grading: {
       mode: exercise.grading.mode,
+      inputPromptPolicy: exercise.grading.inputPromptPolicy,
       totalTimeLimitMs: exercise.grading.totalTimeLimitMs,
       comparatorTimeLimitMs: exercise.grading.comparatorTimeLimitMs,
       materialMaximumHundredths: exercise.grading.materialMaximumHundredths,

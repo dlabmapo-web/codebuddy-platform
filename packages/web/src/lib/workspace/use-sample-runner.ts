@@ -264,6 +264,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
         sampleCount?: number;
         /** How the server grades this problem; decides if a verdict is ours to give. */
         gradingMode?: GradingProfileMode;
+        inputPromptPolicy?: 'INCLUDE' | 'IGNORE';
         /** Present when the server judges this problem's public samples. */
         server?: ServerSampleTarget;
       },
@@ -292,7 +293,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
         expectedOutput: sample.expectedOutput,
         stopped: outcome.stopped,
         failed: outcome.failed,
-        comparesLocally: comparesSampleLocally(options?.gradingMode),
+        comparesLocally: comparesSampleLocally(options?.gradingMode, options?.inputPromptPolicy),
       });
 
       if (verdict.kind === 'match') {

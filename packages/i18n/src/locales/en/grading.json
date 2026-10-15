@@ -1,6 +1,9 @@
 {
   "exercise": {
     "grading": {
+      "ignore_input_prompts": "Ignore input prompts during grading",
+      "ignore_input_prompts_help": "Exclude messages passed to Python input() from automated grading. Prompts remain visible when students run their code. Other output uses the selected answer rule.",
+      "ignore_input_prompts_reminder": "Use only values in test input and omit prompts from expected answers.",
       "title": "Grading",
       "help": "Standard grading scores every answer equally by exact output. Weighted grading gives each answer its own points and comparison rule, the way Elice exercises are graded.",
       "mode_label": "Grading method",

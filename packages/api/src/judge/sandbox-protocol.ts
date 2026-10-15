@@ -16,9 +16,8 @@ import { gradingDataLimits } from "@cove/shared/grading-limits";
  * import the API application or its credential-bearing services.
  */
 
-// v2 adds per-request output ceilings; reject an older sandbox that could
-// silently ignore the larger ceiling frozen on a new submission.
-export const SANDBOX_PROTOCOL_VERSION = 2;
+// v3 adds input prompt handling; an older sandbox must not ignore the policy.
+export const SANDBOX_PROTOCOL_VERSION = 3;
 
 /**
  * stdin may contain 8 Mi characters, including JSON-escaped control characters.
@@ -37,6 +36,7 @@ export const sandboxRequestSchema = z.discriminatedUnion("type", [
     request: z.object({
       code: z.string().max(gradingDataLimits.codeChars),
       stdin: z.string().max(gradingDataLimits.testTextChars),
+      inputPromptPolicy: z.enum(["INCLUDE", "IGNORE"]).default("INCLUDE"),
       outputLimitBytes: z.number().int().min(1).max(gradingDataLimits.stdoutBytes).optional(),
       timeLimitMs: z.number().int().min(1).max(300_000),
       memoryLimitMb: z.number().int().min(1).max(4_096),

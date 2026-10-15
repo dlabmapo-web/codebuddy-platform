@@ -230,6 +230,10 @@ test('passing a problem marks it solved in the outline and catalog', async ({
   // student's visible progress, not just render a panel.
   await page.goto(catalogUrl());
   await courseCard(page).click();
+  // Lecture contents are collapsed in the current outline. Reveal the row
+  // before checking its solved state, just as a student would.
+  const lecture = page.getByRole('button', { name: 'Expand or collapse Reading input', exact: true });
+  if (await lecture.getAttribute('aria-expanded') !== 'true') await lecture.click();
   const row = page
     .locator('li')
     .filter({ has: page.getByRole('link', { name: /Echo the input/i }) })

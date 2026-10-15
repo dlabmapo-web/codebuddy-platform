@@ -1,7 +1,7 @@
 # Ignore Python input prompts during grading
 
 Date: 2026-10-15
-Status: Implementation authorized by the user; local verification recorded below. Not deployed.
+Status: Implemented and locally verified. Not deployed.
 Code reviewed: checkout at `e325af1e`.
 
 ## Purpose and agreed direction
@@ -304,6 +304,10 @@ An initial parallel runner test pass refused two executions because host memory
 measurement was unavailable. The subsequent serial runtime suite passed all 94
 tests; this does not establish the cause of the earlier measurement failures.
 No production build, production migration, deployment, mass opt-in or regrade
-was performed. UI verification used component tests, not a manual browser or
-mobile session. Follow the coordinated rollout section before enabling this
-option in production.
+was performed. Initial UI verification used component tests. Subsequent local browser E2E
+verification passed 22 focused checks across Chromium and WebKit/Safari,
+including save/reload, strict samples/Submit, native prompts during Run and
+unchecked local fallback. See [the E2E report](../../research/2026-10-15-input-prompt-policy-local-e2e.md)
+for results, the corrected collapsed-lecture test and reproduction instructions.
+No manual mobile session was performed. Follow the coordinated rollout section
+before enabling this option in production.

@@ -32,6 +32,11 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'webkit-input-prompts',
+      testMatch: /input-prompt-policy\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
       name: 'webkit-mixed',
       testMatch: /mixed-material-navigation\.spec\.ts/,
       use: { ...devices['Desktop Safari'] },

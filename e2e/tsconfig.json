@@ -9,5 +9,5 @@
     "types": ["node"],
     "jsx": "preserve"
   },
-  "include": ["specs/**/*.ts", "support/**/*.ts", "*.ts"]
+  "include": ["specs/**/*.ts", "support/**/*.ts", "*.ts", "../packages/api/scripts/seed-input-prompts-e2e.mts"]
 }

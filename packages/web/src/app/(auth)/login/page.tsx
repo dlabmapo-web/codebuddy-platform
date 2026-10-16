@@ -1,3 +1,5 @@
+import { dlabEnabled } from '@/lib/dlab-sso';
+
 import { redirect, RedirectType } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
@@ -27,6 +29,7 @@ export default async function LoginPage({
     <AuthCard
       title={t('login.title')}
     >
+      {dlabEnabled() && <a href="/sso/start" className="mb-5 flex min-h-11 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted">{t('dlab.login')}</a>}
       <LoginForm
         initialError={initialError}
         signupComplete={query.signup === 'success'}

@@ -56,6 +56,10 @@ export class AuthService {
       include: userInclude,
     });
 
+    if (existing && await this.supabaseAuth.isDlabManaged?.(identity.authUserId)) {
+      if (existing.status !== 'ACTIVE') throw new AppException('USER_SUSPENDED', HttpStatus.FORBIDDEN);
+      return this.present(existing);
+    }
     if (existing) {
       if (existing.status === "SUSPENDED" || existing.status === "DELETED") {
         throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
@@ -425,8 +429,9 @@ export class AuthService {
 
     const owner = await this.prisma.user.findUnique({
       where: { username: normalized },
-      select: { email: true },
+      select: { email: true, authUserId: true },
     });
+    if (owner?.authUserId && await this.supabaseAuth.isDlabManaged?.(owner.authUserId)) throw new AppException("DLAB_LOGIN_REQUIRED", HttpStatus.FORBIDDEN);
     return {
       email: owner?.email ?? `${normalized}@${unresolvedEmailDomain}`,
     };

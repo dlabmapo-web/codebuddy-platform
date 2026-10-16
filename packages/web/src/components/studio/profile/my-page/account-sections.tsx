@@ -59,6 +59,8 @@ export function AccountSections({
     onRemove: () => void;
   } | null;
 }) {
+  const managed = profile.security.connectedProviders.includes('dlab');
+  const { t: profileT } = useTranslation('profile');
   const [accountDirty, setAccountDirty] = useState(false);
   const [preferencesDirty, setPreferencesDirty] = useState(false);
   useEffect(() => onDirtyChange(accountDirty || preferencesDirty), [accountDirty, preferencesDirty, onDirtyChange]);
@@ -67,9 +69,10 @@ export function AccountSections({
       {globalImage ? (
         <GlobalPhotoSection image={globalImage} profile={profile} />
       ) : null}
-      <AccountSection onDirtyChange={setAccountDirty} onSaved={onSaved} profile={profile} />
+      {managed && <p className="text-sm text-sub">{profileT('dlab.managed_fields')}</p>}
+      <fieldset disabled={managed}><AccountSection onDirtyChange={setAccountDirty} onSaved={onSaved} profile={profile} /></fieldset>
       <PreferencesSection onDirtyChange={setPreferencesDirty} onSaved={onSaved} profile={profile} />
-      <SecuritySection onSaved={onSaved} profile={profile} />
+      <fieldset disabled={managed}><SecuritySection onSaved={onSaved} profile={profile} /></fieldset>
     </>
   );
 }

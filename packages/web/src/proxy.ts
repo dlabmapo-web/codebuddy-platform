@@ -18,6 +18,7 @@ export const config = {
     '/invite/:path*',
     '/account',
     '/auth/:path*',
+    '/sso/:path*',
     '/academy/:path*',
     '/admin/:path*',
     '/studio/:path*',

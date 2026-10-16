@@ -90,6 +90,12 @@ The deactivation test changed only Cove's development copy of the source identit
 
 Focused verification: 49 API tests passed across ordinary auth, Supabase auth, DLAB controller, managed auth, and source behavior; eight web SSO helper tests passed. A read-only SSH inspection confirmed production API/Studio had no DLAB flag configured and production API had no DLAB credentials, callback, or allowlist configured. No production deployment or database mutation was performed.
 
+## Integration with the current v2 branch
+
+The feature branch now includes `origin/feat/cove-studio-v2` through `c1aea604`. Merge conflicts were resolved by retaining both the library-import and DLAB schema additions and all error keys. Korean error messages were shortened to keep the existing namespace payload budget.
+
+After integration, Prisma validation, 62 focused API/auth/library tests, and all 128 translation tests passed. The earlier eight web SSO helper tests also passed before integration. The combined API release build was stopped and retried with a lower heap limit, then stopped again under sustained local memory pressure (8 GB RAM, about 15 GB swap in use). Neither attempt produced a TypeScript diagnostic before being stopped; this is not a passing build. Full release builds and remaining checks are required in CI before release. The extra earlier agent API watcher was removed; the user's API on port 4000 was retained.
+
 ## Start commands
 
 From the repository root, in separate terminals:

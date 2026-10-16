@@ -50,7 +50,7 @@ Production was inspected read-only. DLAB flags and credentials were not configur
 
 The safe release sequence is:
 
-1. Reconcile the feature branch with the current v2 release branch and pass CI/build checks. The release workflow accepts a tagged commit only when it is contained in `origin/feat/cove-studio-v2`.
+1. The feature branch includes the current v2 changes through `c1aea604`. Pass CI/build checks and review the change before merging it into the v2 release branch. The release workflow accepts a tagged commit only when it is contained in `origin/feat/cove-studio-v2`.
 2. Resolve the session-cookie requirement with HQ. Cove currently uses its existing Supabase browser session model; only the SSO transaction cookie is HttpOnly. See the [operations runbook](dlab-sso.md).
 3. Release the additive schema and application through the existing protected production workflow with DLAB SSO disabled. Install and verify the separate Supabase provider guard in the production project.
 4. Verify ordinary Mapo login and representative student/teacher access while SSO remains disabled.

@@ -1,9 +1,17 @@
+import {
+  courseTreeCountSelect,
+  courseTreeCounts,
+} from "./course-tree-counts.js";
+import { PlatformLibraryImportService } from "./platform-library-import.service.js";
+import { lockLibraryTitles } from "../content/library/library-title-lock.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   LIBRARY_PAGE_SIZE,
   isCourseCustomized,
   type LibraryCopy,
+  type PreviewAcademyCourseInput,
+  type ImportAcademyCourseInput,
   type LibraryCourse,
   type ListLibraryCoursesInput,
 } from "@cove/shared";
@@ -15,10 +23,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import {
-  courseTreeCountSelect,
-  courseTreeCounts,
-} from "./course-tree-counts.js";
+import { librarySelect, toLibraryCourse } from "./library-course-summary.js";
 import { resolveContentLibrary } from "./library-academy.js";
 
 /**
@@ -30,7 +35,7 @@ import { resolveContentLibrary } from "./library-academy.js";
  * `academyContentImports.*` unchanged, because a library course is an ordinary
  * `Course` in an academy whose `kind` is `LIBRARY`, and the console mounts the
  * very same editors over it. This service exists for the three things those
- * contracts cannot express: making a course without naming an academy,
+ * contracts cannot express: importing an academy snapshot, making a course without naming an academy,
  * withdrawing one from the library, and reading who has adopted it.
  */
 @Injectable()
@@ -40,7 +45,22 @@ export class PlatformLibraryService {
     private readonly access: PlatformAccessService,
     private readonly audit: AuditService,
     private readonly config: ConfigService<ApiEnvironment, true>,
+    private readonly imports: PlatformLibraryImportService,
   ) {}
+
+  previewAcademyCourse(
+    identity: SupabaseIdentity,
+    input: PreviewAcademyCourseInput,
+  ) {
+    return this.imports.preview(identity, input);
+  }
+
+  importAcademyCourse(
+    identity: SupabaseIdentity,
+    input: ImportAcademyCourseInput,
+  ) {
+    return this.imports.importCourse(identity, input);
+  }
 
   async academy(
     identity: SupabaseIdentity,
@@ -164,6 +184,7 @@ export class PlatformLibraryService {
         });
       }
 
+      await lockLibraryTitles(transaction, library.id);
       const duplicate = await transaction.course.findFirst({
         where: {
           academyId: library.id,
@@ -311,48 +332,6 @@ export class PlatformLibraryService {
     }
     return course;
   }
-}
-
-const librarySelect = {
-  id: true,
-  title: true,
-  description: true,
-  isVisible: true,
-  retiredAt: true,
-  contentRevision: true,
-  updatedAt: true,
-  ...courseTreeCountSelect,
-  copies: { select: { sourceContentRevision: true } },
-} as const;
-
-function toLibraryCourse(record: {
-  id: string;
-  title: string;
-  description: string;
-  isVisible: boolean;
-  retiredAt: Date | null;
-  contentRevision: number;
-  updatedAt: Date;
-  modules: {
-    _count: { lectures: number };
-    lectures: { _count: { materials: number }; materials: { id: string }[] }[];
-  }[];
-  copies: { sourceContentRevision: number | null }[];
-}): LibraryCourse {
-  return {
-    id: record.id,
-    title: record.title,
-    description: record.description,
-    isVisible: record.isVisible,
-    retiredAt: record.retiredAt?.toISOString() ?? null,
-    contentRevision: record.contentRevision,
-    ...courseTreeCounts(record),
-    copyCount: record.copies.length,
-    behindCount: record.copies.filter(
-      (copy) => (copy.sourceContentRevision ?? 0) < record.contentRevision,
-    ).length,
-    updatedAt: record.updatedAt.toISOString(),
-  };
 }
 
 /**

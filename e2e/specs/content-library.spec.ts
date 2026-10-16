@@ -17,7 +17,7 @@ async function signInAsOperator(page: Page) {
     page,
     identifier: ADMIN,
     password: PASSWORD,
-    landing: /\/admin/,
+    landing: /\/admin\/academies(?:[/?#]|$)/,
   });
 }
 
@@ -47,14 +47,16 @@ test.describe('the content library', () => {
       page.getByRole('link', { name: 'Academy courses' }),
     ).toBeVisible();
 
-    const published = page.getByRole('listitem').filter({ hasText: PUBLISHED });
+    const published = page.getByRole('row').filter({ hasText: PUBLISHED });
     await expect(published).toBeVisible();
-    await expect(published.getByText('Published')).toBeVisible();
+    await expect(
+      published.getByText('Published', { exact: true }),
+    ).toBeVisible();
 
     // Both states are on the page, which is what proves the branch-side list
     // is filtering rather than simply happening to show one course.
-    const draft = page.getByRole('listitem').filter({ hasText: DRAFT });
-    await expect(draft.getByText('Draft')).toBeVisible();
+    const draft = page.getByRole('row').filter({ hasText: DRAFT });
+    await expect(draft.getByText('Draft', { exact: true })).toBeVisible();
 
     // The library's own editor, at an address carrying no academy slug: head
     // office never sees its curriculum addressed as a customer's academy.
@@ -79,8 +81,10 @@ test.describe('the content library', () => {
 
     // Only what head office published. A draft offered here would be the one
     // failure this page must never have.
-    await expect(page.getByText(PUBLISHED)).toBeVisible();
-    await expect(page.getByText(DRAFT)).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: PUBLISHED, exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(DRAFT, { exact: true })).toHaveCount(0);
 
     const card = page.getByRole('listitem').filter({ hasText: PUBLISHED });
     await card.getByRole('button', { name: 'Preview' }).click();
@@ -93,7 +97,7 @@ test.describe('the content library', () => {
       name: 'Name it in your academy',
     });
     await expect(name).toHaveValue(PUBLISHED);
-    const copyTitle = `${PUBLISHED} (e2e)`;
+    const copyTitle = `${PUBLISHED} (e2e ${Date.now()})`;
     await name.fill(copyTitle);
     await page.getByRole('button', { name: 'Copy to my academy' }).click();
 
@@ -115,8 +119,17 @@ test.describe('the content library', () => {
     const copiedModule = page
       .getByRole('article')
       .filter({ hasText: 'Variables and input' });
-    await expect(copiedModule.getByText('Visible').first()).toBeVisible();
-    await expect(copiedModule.getByText('Hidden')).toHaveCount(0);
+    for (const title of [
+      'Variables and input',
+      'Reading a line',
+      'Echo the input',
+    ]) {
+      await expect(
+        copiedModule.getByRole('switch', {
+          name: `Show “${title}” to students`,
+        }),
+      ).toBeChecked();
+    }
 
     // Back the way a Team Lead actually goes — the builder's own "All courses"
     // link, not a fresh page load. One query client spans both routes, and the
@@ -136,12 +149,84 @@ test.describe('the content library', () => {
     // Publishing is the one switch, and it is only that: a course whose
     // delivery changed has not had its content edited, so the copy must not
     // start reporting itself as customized for having been switched on.
-    await row.getByRole('button', { name: /Actions|More/i }).first().click();
-    await page.getByRole('menuitem', { name: 'Show' }).click();
+    const visibility = row.getByRole('switch', {
+      name: `Show “${copyTitle}” to students`,
+    });
+    await visibility.click();
+    await expect(visibility).toBeChecked();
     await expect(row.getByText('Visible')).toBeVisible();
     await expect(row.getByText('Customized')).toHaveCount(0);
     // And nothing warns, because the course can actually teach something.
     await expect(row.getByText('Nothing visible')).toHaveCount(0);
+  });
+
+  test('an admin copies an academy course into an independent library draft', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const suffix = Date.now();
+    const sourceTitle = `Reverse source ${suffix}`;
+    const masterTitle = `Reverse master ${suffix}`;
+    await signInAsTeamLead(page);
+    await page.goto(routes.academyLibrary(ACADEMY_SLUG));
+    const published = page.getByRole('listitem').filter({ hasText: PUBLISHED });
+    await published.getByRole('button', { name: 'Preview' }).click();
+    await page
+      .getByRole('textbox', { name: 'Name it in your academy' })
+      .fill(sourceTitle);
+    await page.getByRole('button', { name: 'Copy to my academy' }).click();
+    await expect(
+      page.getByRole('heading', { name: sourceTitle }),
+    ).toBeVisible();
+
+    await signInAsOperator(page);
+    await page.goto(
+      `/admin/content/courses?q=${encodeURIComponent(sourceTitle)}`,
+    );
+    const source = page.getByRole('row').filter({ hasText: sourceTitle });
+    await source.getByRole('button', { name: /Actions|More/i }).click();
+    await page.getByRole('menuitem', { name: 'Copy to library' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Variables and input')).toBeVisible();
+    await expect(
+      dialog.getByText(/Student work and class assignments are not copied/),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole('textbox', { name: 'Title in the library' }),
+    ).toHaveValue(sourceTitle);
+    await dialog
+      .getByRole('textbox', { name: 'Title in the library' })
+      .fill(masterTitle);
+    await dialog.getByRole('button', { name: 'Create library draft' }).click();
+    await expect(page).toHaveURL(
+      /\/admin\/content\/library\/[0-9a-f-]+\?copied=1$/,
+      { timeout: 30_000 },
+    );
+    await expect(
+      page.getByRole('heading', { name: masterTitle }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Copied to library as a draft.', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        new RegExp(`Copied from .*${sourceTitle}.*independent copy`),
+      ),
+    ).toBeVisible();
+
+    await page
+      .getByRole('link', { name: 'Library', exact: true })
+      .last()
+      .click();
+    const imported = page.getByRole('row').filter({ hasText: masterTitle });
+    await expect(imported).toBeVisible();
+    await expect(imported.getByText('Draft', { exact: true })).toBeVisible();
+    await page.goto(
+      `/admin/content/courses?q=${encodeURIComponent(sourceTitle)}`,
+    );
+    await expect(
+      page.getByRole('row').filter({ hasText: sourceTitle }),
+    ).toBeVisible();
   });
 
   test('the library never appears among the platform’s customers', async ({
@@ -153,14 +238,14 @@ test.describe('the content library', () => {
     // The academies table is the list that says who the customers are. A
     // library counted among them is head office's own curriculum turning up in
     // the middle of a support call.
-    await page.goto('/admin');
+    await page.goto(routes.adminAcademies);
     await expect(page.getByText('Content Library')).toHaveCount(0);
 
     // And the cross-academy browser answers "what is this academy running",
     // which a master course is not an answer to.
     await page.goto('/admin/content/courses');
-    await expect(page.getByRole('row').filter({ hasText: PUBLISHED })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByRole('table').getByText(PUBLISHED, { exact: true }),
+    ).toHaveCount(0);
   });
 });

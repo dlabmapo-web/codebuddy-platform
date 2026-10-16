@@ -181,7 +181,8 @@
         "course": {
           "created": "라이브러리 코스 생성",
           "restored": "라이브러리 코스 복구",
-          "retired": "라이브러리 코스 폐기"
+          "retired": "라이브러리 코스 폐기",
+          "imported_from_academy": "학원 과목을 라이브러리로 복사"
         },
         "created": "라이브러리 생성"
       },

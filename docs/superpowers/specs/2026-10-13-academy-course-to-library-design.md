@@ -1,7 +1,7 @@
 # Copy academy courses into the platform library
 
 Date: 2026-10-13
-Status: Proposed spec for review; implementation is not authorized by this document.
+Status: Implemented on `feat/academy-course-to-library`; user approval received on 2026-10-13.
 Code reviewed: `feat/cove-studio-v2` at `81a510e3`.
 
 ## Purpose and confirmed decision
@@ -96,6 +96,10 @@ transaction rather than inheriting that concurrency gap.
 Add **Copy to library** to the course row actions at
 `/admin/content/courses`. Reuse its existing search and academy filters; do not
 build another source picker in the library page for this first release.
+
+The approved follow-up supersedes that initial limitation: see
+[Library academy picker](2026-10-13-library-academy-picker-design.md). It adds
+a second entry point using the existing TanStack table and shared copy dialog.
 
 Opening the action fetches a copy preview and displays the source academy,
 course title, captured revision, full outline including hidden items, and
@@ -395,6 +399,121 @@ automatic synchronization, merging edits, partial module/material imports,
 bulk academy imports, academy approval workflows, source-content deletion,
 automatic publication, media re-upload and asynchronous copy jobs.
 
-The independent-draft behavior is confirmed. The remaining defaults in this
-spec—admin entry point, copying hidden content, preserved visibility and
-origin display—are proposed together for review before implementation.
+The user approved implementing this spec on 2026-10-13, including the admin
+entry point, copying hidden content, preserved visibility and origin display.
+
+
+## Implementation verification — 2026-10-13
+
+- 61 API tests pass, including 13 integration tests against disposable PostgreSQL.
+  Coverage includes all six material types, independent origin, private authored
+  configuration, no learner history, publish/adopt round trip, source deletion,
+  duplicate/replayed requests, title races, concurrent source edits and rollback.
+- 14 targeted UI tests, 18 shared library tests and 126 locale tests pass.
+- API/web and browser-test type checks, targeted web lint, Prisma validation,
+  whitespace checks and the API production build pass.
+- All migrations apply on a fresh disposable database. The new receipt table
+  matches its Prisma schema and disallows direct reads by `anon`/`authenticated`.
+  Prisma migration comparison also reports existing foreign-key action
+  differences in PDF and assessment tables; comparison with the pre-feature
+  schema confirms those differences are unrelated to this change.
+- All four signed-in Chromium Playwright tests in
+  `e2e/specs/content-library.spec.ts` pass locally (28.3 seconds). API and studio
+  ran on localhost with a disposable PostgreSQL database and the existing pinned
+  development Supabase authentication accounts. No remote authentication accounts
+  or remote course data were modified. The tests cover library authoring access,
+  adoption/publishing/provenance, academy-to-library draft copying and origin
+  display, source-course retention, and library exclusion from customer lists.
+- Updated obsolete browser selectors for table rows and visibility switches,
+  used exact title/status matches and unique copy titles, waited for the actual
+  admin landing route, and allowed cold dev-route compilation in the new flow.
+  Browser-test type checking passes. Real storage downloads, video playback and
+  GUI broker execution remain outside this programming-course browser fixture.
+- No production database, customer content or deployment was changed. Apply
+  the additive migration before deploying the feature's API/UI.
+
+
+## Performance follow-up — 2026-10-13
+
+Approved by the user after profiling the slow preview and copy flow.
+
+- Preview loads structure and validation definitions only. Programming solutions,
+  starter code, test cases and hints are excluded. Subtype queries run only for
+  material types actually present. The repeatable-read snapshot and all blockers
+  remain in place; the copy transaction still validates the complete source.
+- Check the three platform capabilities against one current user lookup. Source
+  academy authorization and lifecycle checks remain separate and unchanged.
+- Build the new course response from the created course and copied snapshot
+  counts. Query the canonical ungradable-exercise predicate once instead of
+  rereading modules, lectures, materials and copies. Integration tests compare
+  this response with the actual library list.
+- Cache previews for 30 seconds, with explicit refresh after stale-source errors.
+  The server always checks the expected revision on submission.
+- Mark library queries stale without immediately refetching them before navigation.
+  Remove the redundant router refresh after push. Library course editors treat
+  the server-loaded tree as fresh for 30 seconds; explicit mutation invalidation
+  still refreshes it. Other academy editors retain their prior freshness default.
+
+Development measurements against the same remote Supabase database:
+
+| Operation | Before | After |
+| --- | --- | --- |
+| Preview, 38 materials | 4.1–4.6 s / 22 SQL queries | 2.64–2.74 s / 13 queries |
+| Preview, 222 materials | 4.2–4.6 s / 22 SQL queries | 2.63 s / 13 queries |
+| Preview source payload, 38 materials | 272,160 bytes | 17,466 bytes |
+| Preview source payload, 222 materials | 2,384,680 bytes | 101,949 bytes |
+| Copy, 38 materials | 8.1 s / 42 SQL queries | 7.71–7.77 s / 36 queries |
+
+Copy benchmarks deliberately rolled back their transactions and created no
+permanent courses. These are service timings, excluding HTTP authentication,
+Next.js compilation, navigation, and browser rendering. A separate cold copy
+measurement was 9.25 s; remote database latency varies. The copy transaction
+still takes several seconds, even after removing extra navigation requests.
+
+Validation: 26 focused API tests passed, including 13 real PostgreSQL integration
+cases on a migrated disposable database. Focused import dialog and picker UI
+checks passed, including recent-preview reuse, non-refetching invalidation,
+retry, stale-source recovery, and navigation. API/web typechecks and API build
+passed; scoped web ESLint reported no errors and one existing unused-import
+warning in the course builder. The local browser loaded the optimized preview.
+No production deployment or production database changes were made.
+
+
+## Library translation audit — 2026-10-13
+
+The production screenshot showed untranslated `exercise.grading`,
+`exercise.controls`, and `exercise.test` keys. The Library exercise route did
+not mount the shared authoring namespace set; the Library builder omitted
+`grading`, `quiz`, and `common`. Both now use `contentNamespaces`. The console
+academy exercise route had the same missing resources and was fixed as well.
+
+Audited the Library list, creation/rename/copy controls, source picker, builder,
+new/existing programming and quiz editor, workbook importer, and shared
+PDF/manual/video authoring components. Changes include:
+
+- Load the importer resources through the single merged `PlatformShell`
+  provider rather than a second isolated provider.
+- Fix the importer crash caused by `useAcademySlug` on Library routes. The shared
+  content path helper keeps its links within the correct Library, console, or
+  academy surface.
+- Translate hardcoded manual submission/scoring labels and accessible file
+  labels. The dialog's existing localized title supplies its accessible name.
+- Add feature-scoped English/Korean resources for rich-text controls, table
+  controls, image-resize help, link prompts, upload fallback, and default
+  placeholder. This vocabulary does not enlarge the root layout payload.
+- Localize code-editor loading messages.
+- Clarify English/Korean test-case and grading terminology. Korean course
+  vocabulary consistently uses `과목` on the audited authoring/import surfaces.
+  Library material counts use `Materials / 콘텐츠`, covering all six types.
+- Clarify draft creation, picker labels, descriptions, and permission messages.
+  Keep authored course names/content unchanged.
+
+Validation: 22 focused UI tests passed, including first-render translations for
+all five Library route states in both languages, actual importer routing across
+three surfaces, rich-text toolbar/placeholder translations, and manual control
+labels. All 128 locale tests, web typecheck, translation catalog validation,
+and whitespace checks passed. Local browser verified Korean list, creation
+and picker controls, builder, PDF and written-response dialogs, existing and
+new exercise editors, weighted grading controls, and the importer. English
+importer/editor checks found no raw translation keys. No course changes were
+saved during this audit, and production has not been deployed.

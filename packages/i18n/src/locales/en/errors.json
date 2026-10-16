@@ -154,5 +154,9 @@
   "PDF_UPLOAD_EXPIRED": "Upload the file again before saving.",
   "PDF_EDIT_STALE": "The material changed. Reload before editing.",
   "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
+  "LIBRARY_IMPORT_SOURCE_CHANGED": "The source course changed. Refresh the preview before copying.",
+  "LIBRARY_IMPORT_CONTENT_INVALID": "The source contains invalid content or unavailable assets. Repair it before copying.",
+  "LIBRARY_IMPORT_REQUEST_CONFLICT": "This copy request was already used with different details.",
+  "LIBRARY_IMPORT_BUSY": "The library is busy. Retry this copy request.",
   "DLAB_LOGIN_REQUIRED": "Use the “Log in with DLAB” button for this account."
 }

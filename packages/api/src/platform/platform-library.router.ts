@@ -18,6 +18,22 @@ export function createPlatformLibraryRouters(
 
   return {
     platformLibrary: {
+      previewAcademyCourse: os.platformLibrary.previewAcademyCourse
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformLibraryService.previewAcademyCourse(
+            context.identity,
+            input,
+          ),
+        ),
+      importAcademyCourse: os.platformLibrary.importAcademyCourse
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.platformLibraryService.importAcademyCourse(
+            context.identity,
+            input,
+          ),
+        ),
       academy: os.platformLibrary.academy
         .use(access.authenticated)
         .handler(({ context }) =>

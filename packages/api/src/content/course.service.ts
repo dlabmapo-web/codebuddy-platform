@@ -1,3 +1,4 @@
+import { lockLibraryTitles, assertLibraryTitleAvailable } from "./library/library-title-lock.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import {
@@ -51,6 +52,16 @@ type ContentRequestContext = { requestId?: string };
  * narrow select is the whole of that boundary.
  */
 const sourceCourseInclude = {
+  libraryImport: {
+    select: {
+      sourceAcademyId: true,
+      sourceCourseId: true,
+      sourceAcademyName: true,
+      sourceCourseTitle: true,
+      sourceContentRevision: true,
+      createdAt: true,
+    },
+  },
   sourceCourse: {
     select: { id: true, title: true, contentRevision: true, retiredAt: true },
   },
@@ -188,6 +199,9 @@ export class CourseService {
     const title = input.title.trim();
     await this.assertTitleAvailable(input.academyId, title);
     const course = await this.prisma.$transaction(async (tx) => {
+      if (actor.via === "platform" && await lockLibraryTitles(tx, input.academyId)) {
+        await assertLibraryTitleAvailable(tx, input.academyId, title);
+      }
       const created = await tx.course.create({
         data: {
           academyId: input.academyId,
@@ -235,6 +249,9 @@ export class CourseService {
       await this.assertTitleAvailable(input.academyId, title, current.id);
     }
     const course = await this.prisma.$transaction(async (tx) => {
+      if (title && actor.via === "platform" && await lockLibraryTitles(tx, input.academyId)) {
+        await assertLibraryTitleAvailable(tx, input.academyId, title, input.courseId);
+      }
       const updated = await tx.course.update({
         where: { id: current.id },
         data: {
@@ -1805,6 +1822,14 @@ export function toCourseSummary(course: {
   isVisible: boolean;
   createdAt: Date;
   updatedAt: Date;
+  libraryImport?: {
+    sourceAcademyId: string;
+    sourceCourseId: string;
+    sourceAcademyName: string;
+    sourceCourseTitle: string;
+    sourceContentRevision: number;
+    createdAt: Date;
+  } | null;
   contentRevision?: number;
   baselineRevision?: number | null;
   sourceContentRevision?: number | null;
@@ -1871,6 +1896,14 @@ export function toCourseSummary(course: {
       documents,
       visibleDocuments,
     },
+    libraryImportOrigin: course.libraryImport ? {
+      sourceAcademyId: course.libraryImport.sourceAcademyId,
+      sourceCourseId: course.libraryImport.sourceCourseId,
+      sourceAcademyName: course.libraryImport.sourceAcademyName,
+      sourceCourseTitle: course.libraryImport.sourceCourseTitle,
+      sourceContentRevision: course.libraryImport.sourceContentRevision,
+      copiedAt: course.libraryImport.createdAt.toISOString(),
+    } : null,
     provenance: courseProvenance(course),
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),

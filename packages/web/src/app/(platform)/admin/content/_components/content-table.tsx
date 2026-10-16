@@ -1,5 +1,6 @@
 'use client';
 
+import { AcademyCourseImportDialog } from './academy-course-import-dialog';
 import type {
   ContentLens,
   ContentSortKey,
@@ -99,6 +100,7 @@ export function ContentTable({
   initialSummary,
   initialSummaryKey,
   lens,
+  canCopyToLibrary = false,
 }: {
   initialData: ContentPage | null;
   initialKey: string;
@@ -106,8 +108,11 @@ export function ContentTable({
   initialSummary: PlatformContentSummary | null;
   initialSummaryKey: string;
   lens: ContentLens;
+  canCopyToLibrary?: boolean;
 }) {
   const { t } = useTranslation('platform-content');
+  const { t: libraryT } = useTranslation('platform-library');
+  const [copySource, setCopySource] = React.useState<PlatformCourse | null>(null);
   const { t: platform } = useTranslation('platform');
   const { t: coursesT } = useLayoutTranslation('courses');
   const { t: classesT } = useLayoutTranslation('classes');
@@ -329,6 +334,10 @@ export function ContentTable({
               deleteLabel={platform('content_panel.delete_course')}
               href={contentDetailHref.course(row.original, path)}
               label={row.original.title}
+              copyAction={canCopyToLibrary ? {
+                label: libraryT('import.action'),
+                onSelect: () => setCopySource(row.original),
+              } : undefined}
               onRename={() =>
                 setDraft({
                   mode: 'edit',
@@ -482,6 +491,8 @@ export function ContentTable({
   }, [
     classesT,
     coursesT,
+    canCopyToLibrary,
+    libraryT,
     lens,
     locale,
     path,
@@ -671,6 +682,9 @@ export function ContentTable({
         }}
       />
 
+      {copySource ? (
+        <AcademyCourseImportDialog source={copySource} onClose={() => setCopySource(null)} />
+      ) : null}
       <ContentDeleteDialog
         academyId={deleteState?.academyId ?? null}
         onClose={() => setDeleteState(null)}

@@ -54,10 +54,10 @@
     "preview_close": "Close preview",
     "section": {
       "basics": "Basic information",
-      "tests": "Answers",
+      "tests": "Test cases",
       "hints": "Hints"
     },
-    "basic_help": "The same fields as the original manual problem form, presented together without hidden sections.",
+    "basic_help": "Set the problem title, difficulty, description, and input/output requirements.",
     "code_help": "Optional code students see when they first open the problem.",
     "solution_code_help": "Required correct Python solution. Only authorized problem authors and a teacher actively monitoring the assigned student can view it.",
     "language_python": "Python 3",
@@ -65,7 +65,7 @@
       "title": "Problem title",
       "difficulty": "Difficulty",
       "description": "Problem description",
-      "test": "One sample answer",
+      "test": "One sample test case",
       "solution": "Correct answer code"
     },
     "field": {
@@ -73,7 +73,7 @@
       "difficulty": "Difficulty",
       "language": "Language",
       "ai_feedback": "Enable AI feedback",
-      "ai_feedback_hint": "This stores the preference. Feedback-rule management is a later migration step.",
+      "ai_feedback_hint": "For now, this saves whether AI feedback is enabled for the problem.",
       "description": "Problem description",
       "constraints": "Conditions and constraints (optional)",
       "starter_code": "Initial code (editor default)",
@@ -90,12 +90,12 @@
       "output_format": "e.g. Print the sum on a single line."
     },
     "test": {
-      "add": "Add answer",
-      "help": "Choose per answer whether students see it as a sample or it stays hidden for grading. A problem with no answers can be saved, but nobody can attempt it.",
-      "label": "Answer {{number}}",
+      "add": "Add test case",
+      "help": "Choose which test cases students can see as examples and which stay hidden for grading. A problem without test cases can be saved, but students cannot attempt it.",
+      "label": "Test case {{number}}",
       "input": "Input",
       "expected": "Expected output",
-      "remove": "Remove answer {{number}}",
+      "remove": "Remove test case {{number}}",
       "sample_badge": "Shown to students",
       "hidden_badge": "Hidden",
       "toggle_visibility": "Toggle visibility"
@@ -112,7 +112,7 @@
       "ai": "AI",
       "hidden": "Hidden"
     },
-    "preview_student_note": "This is what students see. Only sample answers and hints appear here.",
+    "preview_student_note": "This is what students see. Only sample test cases and hints appear here.",
     "preview_problem": "Problem",
     "preview_no_description": "No problem description yet.",
     "preview_input": "Input format",
@@ -128,7 +128,7 @@
       "title": "Enter a problem title.",
       "difficulty": "Pick a difficulty.",
       "description": "Write the problem description.",
-      "test": "Add at least one sample answer students can see.",
+      "test": "Add at least one sample test case that students can see.",
       "solution": "Add the correct answer code."
     },
     "location": "Problem location",
@@ -137,7 +137,7 @@
     "preview_stdin": "Input",
     "preview_stdout": "Expected output",
     "preview_starter": "Starter code",
-    "no_tests_note": "No answers yet, so no student can attempt this problem. You can save it now and add answers later."
+    "no_tests_note": "No test cases yet, so students cannot attempt this problem. You can save it now and add test cases later."
   },
   "rename": {
     "module_title": "Edit module name",

@@ -106,7 +106,7 @@
   },
   "unavailable": {
     "denied_title": "Import is not available to you",
-    "denied_body": "Only a Team Lead can import curriculum content into a course.",
+    "denied_body": "You do not have permission to import content into this course.",
     "load_failed_title": "This course could not be loaded",
     "load_failed_body": "Something went wrong on our side. Try again in a moment.",
     "back": "Back to the course"

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
+import type { ArgumentsHost } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { DlabInboundController, DlabInternalController } from './dlab.controller.js';
+import { DlabExceptionFilter, DlabInboundController, DlabInternalController } from './dlab.controller.js';
+import { DlabError } from './dlab-error.js';
 import type { DlabSourceService } from './dlab-source.service.js';
 import type { DlabSsoService } from './dlab-sso.service.js';
 const key = 'fake-inbound-key-for-tests-only-32-bytes';
@@ -10,6 +13,20 @@ function request(auth?: string, duplicates = false) {
   return { headers: { ...(auth ? { authorization: auth } : {}), 'x-request-id': uuid }, rawHeaders: [...(auth ? ['Authorization', auth] : []), ...(duplicates ? ['Authorization', auth!] : []), 'X-Request-Id', uuid], body: {} } as unknown as Request;
 }
 describe('DLAB incoming trust boundaries', () => {
+  it('logs a safe reason without request or exception secrets', () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const response = { setHeader: vi.fn(), status: vi.fn().mockReturnThis(), json: vi.fn() };
+    const req = { headers: { 'x-request-id': uuid, authorization: 'secret-header' }, url: '/callback?code=secret-code', body: { token: 'secret-token' } };
+    const host = { switchToHttp: () => ({ getRequest: () => req, getResponse: () => response }) } as unknown as ArgumentsHost;
+    try {
+      const filter = new DlabExceptionFilter();
+      filter.catch(new DlabError('code_exchange_failed'), host);
+      expect(warn).toHaveBeenLastCalledWith({ status: 400, reason: 'code_exchange_failed', requestId: uuid });
+      filter.catch(new Error('secret-exception'), host);
+      expect(warn).toHaveBeenLastCalledWith({ status: 503, reason: 'integration_unavailable', requestId: uuid });
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('secret');
+    } finally { warn.mockRestore(); }
+  });
   it.each([undefined, 'Bearer wrong', `Basic ${key}`, `Bearer ${key} extra`])('rejects %j before parsing or storage', async auth => {
     const source = { campus: vi.fn(), user: vi.fn() };
     const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key }) as never, source as unknown as DlabSourceService);

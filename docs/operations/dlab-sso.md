@@ -2,6 +2,10 @@
 
 Implementation branch: `feat/dlab-os-sso`. Design: [SSO connection spec](../superpowers/specs/2026-10-16-dlab-os-sso-connection-design.md).
 
+For startup commands, campus mapping, browser steps, expected results, and troubleshooting, use the [local testing guide](dlab-sso-local-testing.md).
+
+The [demo and production connection guide](dlab-sso-demo-rollout.md) records the working Daechi development mapping, team demonstration steps, and remaining production/HQ setup.
+
 ## Release scope
 
 Phase A implements controlled student login, campus/user PUT updates, managed identity provisioning, Supabase session activation, and account eligibility checks. It does not implement `GET /v1/courses`, enrollment import, automatic staff privileges, or existing-account conversion. Do not tell OS that the full v1.2.1 contract is ready.

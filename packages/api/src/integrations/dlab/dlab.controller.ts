@@ -1,4 +1,4 @@
-import { ArgumentsHost, Body, Catch, Controller, ExceptionFilter, Param, Post, Put, Req, Res, UseFilters } from '@nestjs/common';
+import { ArgumentsHost, Body, Catch, Controller, ExceptionFilter, Logger, Param, Post, Put, Req, Res, UseFilters } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -22,12 +22,16 @@ export function uniqueHeader(req: Request, name: string): string | null {
 }
 @Catch()
 export class DlabExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(DlabExceptionFilter.name);
   catch(error: unknown, host: ArgumentsHost) {
     const req = host.switchToHttp().getRequest<Request>();
     const res = host.switchToHttp().getResponse<Response>();
     const requestId = z.uuid().safeParse(req.headers['x-request-id']);
     const status = error instanceof DlabError ? error.getStatus() : 503;
     const body = error instanceof DlabError ? error.getResponse() as object : { code: 'internal_error', message: 'integration_unavailable' };
+    const reason = error instanceof DlabError && /^[a-z_]{1,80}$/.test(error.reason) ? error.reason : 'integration_unavailable';
+    // Never log request URLs, bodies, headers, provider responses, or exception text.
+    this.logger.warn({ status, reason, requestId: requestId.success ? requestId.data : undefined });
     res.setHeader('Cache-Control', 'no-store');
     res.status(status).json({ ...body, request_id: requestId.success ? requestId.data : randomUUID() });
   }

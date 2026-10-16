@@ -153,5 +153,6 @@
   "PDF_NOT_AVAILABLE": "This PDF is not available.",
   "PDF_UPLOAD_EXPIRED": "Upload the file again before saving.",
   "PDF_EDIT_STALE": "The material changed. Reload before editing.",
-  "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit."
+  "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
+  "DLAB_LOGIN_REQUIRED": "Use the “Log in with DLAB” button for this account."
 }

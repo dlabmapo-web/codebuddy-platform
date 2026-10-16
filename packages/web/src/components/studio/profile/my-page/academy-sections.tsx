@@ -38,11 +38,13 @@ import { SectionCard } from '@/components/studio/profile/section-card';
  * the guardian phone still keeps the school.
  */
 export function AcademySections({
+  managed = false,
   academy,
   academySlug,
   onSaved,
   onDirtyChange,
 }: {
+  managed?: boolean;
   academy: AcademyProfileResponse;
   /*
    * Passed, not read from the academy route context: My Page lives at
@@ -68,10 +70,10 @@ export function AcademySections({
 
   return (
     <>
-      <CommonSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} />
+      <fieldset disabled={managed}><CommonSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} /></fieldset>
       {isStudent ? (
         <>
-          <StudentDetailsSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} />
+          <fieldset disabled={managed}><StudentDetailsSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} /></fieldset>
           <StudentExpressionSection academy={academy} onSaved={onSaved} reportDirty={reportDirty} />
         </>
       ) : (

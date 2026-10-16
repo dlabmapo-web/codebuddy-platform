@@ -1,3 +1,5 @@
+import { DlabPolicyModule } from "../integrations/dlab/dlab-policy.module.js";
+
 import { Module } from "@nestjs/common";
 
 import { SupabaseAuthService } from "./supabase-auth.service.js";
@@ -13,6 +15,7 @@ import { SupabaseAuthService } from "./supabase-auth.service.js";
  * a module of its own is where it belonged anyway.
  */
 @Module({
+  imports: [DlabPolicyModule],
   providers: [SupabaseAuthService],
   exports: [SupabaseAuthService],
 })

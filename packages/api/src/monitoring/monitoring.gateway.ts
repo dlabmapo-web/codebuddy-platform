@@ -291,6 +291,8 @@ export class MonitoringGateway
       void this.auth
         .verifyAccessToken(token)
         .then((identity) => {
+          const stopDlabCheck = this.auth.watchAccessToken?.(token, () => socket.disconnect(true));
+          if (stopDlabCheck) socket.once('disconnect', stopDlabCheck);
           socket.data = {
             identity,
             generation: randomUUID(),

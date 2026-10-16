@@ -1,3 +1,6 @@
+import { DlabPolicyService } from "../integrations/dlab/dlab-policy.service.js";
+import { DlabError } from "../integrations/dlab/dlab-error.js";
+
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -19,7 +22,7 @@ export class SupabaseAuthService {
   private readonly authUrl: string;
   private readonly authKey: string;
 
-  constructor(config: ConfigService<ApiEnvironment, true>) {
+  constructor(config: ConfigService<ApiEnvironment, true>, private readonly dlab?: DlabPolicyService) {
     this.authUrl = config.get("SUPABASE_URL", { infer: true }).replace(/\/$/, "") + "/auth/v1";
     this.authKey = config.get("SUPABASE_SECRET_KEY", { infer: true });
     this.client = createClient(
@@ -50,10 +53,12 @@ export class SupabaseAuthService {
   }
 
   async requestEmailChange(token: string, email: string): Promise<void> {
+    if (this.dlab) await this.assertLocalIdentity((await this.verifyAccessToken(token)).authUserId);
     await this.updateIdentity(token, "/user", "PUT", { email });
   }
 
   async unlinkProvider(token: string, authUserId: string, provider: string): Promise<void> {
+    await this.assertLocalIdentity(authUserId);
     const { data, error } = await this.client.auth.getUser(token);
     if (error || !data.user || data.user.id !== authUserId) {
       throw new AppException("TOKEN_INVALID", HttpStatus.UNAUTHORIZED);
@@ -69,6 +74,30 @@ export class SupabaseAuthService {
   }
 
   async verifyAccessToken(token: string): Promise<SupabaseIdentity> {
+    const identity = await this.verifyTokenClaims(token);
+    try { await this.dlab?.assertSession(identity); }
+    catch (error) {
+      if (!(error instanceof DlabError)) throw error;
+      if (error.getStatus() === 401) throw new AppException('TOKEN_INVALID', HttpStatus.UNAUTHORIZED);
+      if (error.getStatus() === 403) throw new AppException('USER_SUSPENDED', HttpStatus.FORBIDDEN);
+      throw new AppException('STUDENT_SESSION_UNAVAILABLE', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return identity;
+  }
+
+  watchAccessToken(token: string, invalid: () => void): () => void {
+    const check = () => { void this.verifyAccessToken(token).catch(invalid); };
+    const unwatch = this.dlab?.watch(check);
+    const timer = setInterval(check, 10_000);
+    timer.unref();
+    return () => { clearInterval(timer); unwatch?.(); };
+  }
+
+  async isDlabManaged(authUserId: string) { return Boolean(await this.dlab?.managed(authUserId)); }
+  async assertLocalIdentity(authUserId: string) { await this.dlab?.forbidMutation(authUserId); }
+
+  /** Only the trusted activation endpoint may use claims without session activation. */
+  async verifyTokenClaims(token: string): Promise<SupabaseIdentity> {
     const { data, error } = await this.client.auth.getClaims(token);
     const claims = data?.claims;
 
@@ -147,6 +176,23 @@ export class SupabaseAuthService {
     return { authUserId: data.user.id };
   }
 
+  async createDlabUser(id: string, email: string, name: string): Promise<void> {
+    const found = await this.client.auth.admin.getUserById(id);
+    if (found.data?.user) {
+      if (found.data.user.email !== email || found.data.user.app_metadata?.dlab_managed !== true) throw new DlabError('identity_conflict', 409);
+      return;
+    }
+    if (found.error && found.error.status !== 404 && found.error.code !== 'user_not_found') throw new DlabError('auth_provider_unavailable', 503);
+    const { data, error } = await this.client.auth.admin.createUser({ id, email, email_confirm: true, app_metadata: { dlab_managed: true }, user_metadata: { full_name: name } });
+    if (error || data.user?.id !== id) throw new DlabError('auth_provisioning_failed', 503);
+  }
+
+  async dlabTokenHash(authUserId: string, email: string): Promise<string> {
+    const { data, error } = await this.client.auth.admin.generateLink({ type: 'magiclink', email });
+    if (error || data.user?.id !== authUserId || !data.properties?.hashed_token) throw new DlabError('session_bridge_failed', 503);
+    return data.properties.hashed_token;
+  }
+
   /**
    * Removes an auth identity.
    *
@@ -167,6 +213,7 @@ export class SupabaseAuthService {
    * computer clicked a button; the new password is for the next sign-in.
    */
   async setPassword(authUserId: string, password: string): Promise<void> {
+    await this.assertLocalIdentity(authUserId);
     const { error } = await this.client.auth.admin.updateUserById(authUserId, {
       password,
     });
@@ -203,6 +250,7 @@ export class SupabaseAuthService {
     authUserId: string,
   ): Promise<{ providers: string[]; hasPasswordIdentity: boolean }> {
     const empty = { providers: [], hasPasswordIdentity: false };
+    if (await this.isDlabManaged(authUserId)) return { providers: ["dlab"], hasPasswordIdentity: false };
     try {
       const { data, error } = await this.client.auth.admin.getUserById(
         authUserId,
@@ -230,6 +278,7 @@ export class SupabaseAuthService {
   async passwordIdentityStatus(
     authUserId: string,
   ): Promise<PasswordIdentityStatus> {
+    if (await this.isDlabManaged(authUserId)) return "absent";
     try {
       const { data, error } = await this.client.auth.admin.getUserById(
         authUserId,

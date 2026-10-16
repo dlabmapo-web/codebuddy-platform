@@ -315,5 +315,11 @@
     "cancel": "Cancel",
     "remove_role": "Remove the {{role}} role",
     "student_exclusive": "A student account cannot also hold a staff role. Use a separate account if they need one."
+  },
+  "dlab": {
+    "error_title": "DLAB login could not be completed",
+    "error_description": "Please start again. If this continues, ask your teacher to check your account and campus connection.",
+    "back_to_login": "Back to login",
+    "managed_fields": "Your name, academy details, and login are managed through DLAB. Contact your teacher to change them."
   }
 }

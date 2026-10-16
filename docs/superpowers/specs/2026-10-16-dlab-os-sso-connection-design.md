@@ -1,7 +1,7 @@
 # Cove v2 — DLAB OS SSO connection
 
 Date: 2026-10-16 (Asia/Tashkent)
-Status: Draft for user review; no application implementation or production verification
+Status: Approved for Phase A implementation; production validation gates remain open
 Reviewed branch: `feat/cove-studio-v2` at `89327b88`
 Contract: DLAB OS integration v1.2.1
 
@@ -106,6 +106,8 @@ To preserve `/api` while exposing `/v1`, add a scoped integration controller und
 | `BFF_SHARED_SECRET` | Existing API and Studio env | Existing trusted server boundary, unchanged in purpose. |
 
 Use runtime server config for button availability so enabling SSO does not depend on a secret-bearing client build. Keep secrets out of `NEXT_PUBLIC_*` variables. Local tests use fake OS endpoints via dependency injection; production config must not permit arbitrary hosts or insecure URLs. For a real local browser flow, register its callback first; no assumption that localhost is already allowed.
+
+Implementation rollout boundary: `DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS` explicitly lists the controlled student IDs allowed to log in. An empty list permits no SSO users. This keeps test enablement separate from general production release.
 
 Redis is required when SSO is enabled: it stores transactions and enforces the existing student inactivity policy. Missing dependencies fail SSO closed without taking down ordinary external-user login. Disabled start/callback return a clear unavailable response and the button is hidden.
 

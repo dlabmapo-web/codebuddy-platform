@@ -100,7 +100,7 @@ export async function loginAction(
     identifier: formData.get('identifier'),
     password: formData.get('password'),
   });
-  const { t } = await getServerTranslation(['auth', 'validation']);
+  const { t } = await getServerTranslation(['auth', 'validation', 'errors']);
   if (!input.success) {
     return { message: t('validation:credentials_invalid') };
   }
@@ -120,7 +120,9 @@ export async function loginAction(
     // what extends the limit. An outage and a limit needed different sentences.
     return {
       message: t(
-        toApiError(error).code === 'RATE_LIMITED'
+        toApiError(error).code === 'DLAB_LOGIN_REQUIRED'
+          ? 'errors:DLAB_LOGIN_REQUIRED'
+          : toApiError(error).code === 'RATE_LIMITED'
           ? 'error.too_many_attempts'
           : 'error.sign_in_failed',
       ),

@@ -85,6 +85,7 @@ export class ProfileService {
     },
   ): Promise<MyProfileResponse> {
     const user = await this.requireUser(identity);
+    await this.supabaseAuth.assertLocalIdentity?.(identity.authUserId);
     const result = await this.prisma.user.updateMany({
       where: { id: user.id, updatedAt: new Date(input.expectedUpdatedAt) },
       data: {

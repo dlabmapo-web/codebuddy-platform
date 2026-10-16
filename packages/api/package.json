@@ -36,7 +36,8 @@
     "db:seed:regrade": "tsx prisma/seed/regrade-fixture.ts",
     "judge:try": "tsx scripts/judge-try.mts",
     "dev:video": "tsx src/videos/video-worker.ts",
-    "start:video": "node dist/src/videos/video-worker.js"
+    "start:video": "node dist/src/videos/video-worker.js",
+    "dlab:map-campus": "tsx src/integrations/dlab/scripts/map-campus.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

@@ -153,5 +153,6 @@
   "PDF_NOT_AVAILABLE": "이 PDF를 사용할 수 없습니다.",
   "PDF_UPLOAD_EXPIRED": "저장 전에 파일을 다시 업로드하세요.",
   "PDF_EDIT_STALE": "자료가 변경되었습니다. 새로고침 후 수정하세요.",
-  "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다."
+  "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다.",
+  "DLAB_LOGIN_REQUIRED": "디랩 계정은 [디랩 계정으로 로그인] 버튼을 이용해 주세요."
 }

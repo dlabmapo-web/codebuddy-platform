@@ -10,6 +10,7 @@ export const appErrorCodes = [
   "PDF_EDIT_STALE",
   "PDF_VALIDATION_LIMIT",
 
+  "DLAB_LOGIN_REQUIRED",
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
   "STUDENT_SESSION_EXPIRED",
@@ -201,6 +202,7 @@ export function isAppErrorCode(value: unknown): value is AppErrorCode {
 export const appErrorFallbacks: Record<AppErrorCode, string> = {
   POINTS_ACCESS_DENIED: "You do not have access to these points.",
   POINTS_UNAVAILABLE: "This academy does not use points.",
+  DLAB_LOGIN_REQUIRED: "Use the DLAB login button for this account.",
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",
   STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",

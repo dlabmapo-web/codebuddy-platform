@@ -17,3 +17,4 @@ export * from "./content/manual.js";
 
 export * from "./content/multiple-choice.js";
 export * from "./content/video.js";
+export * from "./integrations/dlab/contract.js";

@@ -33,6 +33,13 @@ const postgresUrlSchema = z
   );
 
 export const apiEnvironmentSchema = z.object({
+  DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: z.string().default('').transform(v => v.split(',').map(s => s.trim()).filter(Boolean)),
+  DLAB_SSO_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  DLAB_OS_BASE_URL: z.literal('https://dlab-os.onrender.com/v1').default('https://dlab-os.onrender.com/v1'),
+  DLAB_CLIENT_ID: z.literal('cove').default('cove'),
+  DLAB_CLIENT_SECRET: z.string().min(32).optional(),
+  DLAB_INBOUND_SERVER_KEY: z.string().min(32).optional(),
+  DLAB_REDIRECT_URI: httpUrlSchema.optional(),
   VIDEO_LESSONS_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   VIDEO_MAX_UPLOAD_BYTES:z.coerce.number().int().min(1).max(5000000000).default(5000000000),
   VIDEO_COURSE_QUOTA_BYTES:z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(100000000000),
@@ -194,6 +201,16 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if (environment.DLAB_SSO_ENABLED) {
+    for (const key of ['DLAB_CLIENT_SECRET', 'DLAB_INBOUND_SERVER_KEY', 'DLAB_REDIRECT_URI', 'BFF_SHARED_SECRET'] as const) {
+      if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required when DLAB SSO is enabled' });
+    }
+    if (!environment.MONITORING_REDIS_URL && !environment.REDIS_URL) context.addIssue({ code: 'custom', path: ['REDIS_URL'], message: 'is required for DLAB SSO' });
+    if (environment.DLAB_INBOUND_SERVER_KEY && [environment.DLAB_CLIENT_SECRET, environment.BFF_SHARED_SECRET].includes(environment.DLAB_INBOUND_SERVER_KEY)) context.addIssue({ code: 'custom', path: ['DLAB_INBOUND_SERVER_KEY'], message: 'must be independent from client and BFF secrets' });
+    const expected = environment.WEB_ORIGIN.replace(/\/$/, '') + '/sso/callback';
+    if (environment.DLAB_REDIRECT_URI !== expected) context.addIssue({ code: 'custom', path: ['DLAB_REDIRECT_URI'], message: 'must match WEB_ORIGIN /sso/callback' });
+  }
+
   if(environment.GUI_ENABLED){for(const key of ['GUI_SERVICE_URL','GUI_SERVICE_SECRET','GUI_PUBLIC_WS_URL'] as const)if(!environment[key])context.addIssue({code:'custom',path:[key],message:'is required when GUI_ENABLED'});if(environment.NODE_ENV==='production'&&environment.GUI_PUBLIC_WS_URL&&!environment.GUI_PUBLIC_WS_URL.startsWith('wss://'))context.addIssue({code:'custom',path:['GUI_PUBLIC_WS_URL'],message:'must use wss in production'});}
 
   if (environment.NODE_ENV === "production" && !environment.BFF_SHARED_SECRET) {

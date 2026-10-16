@@ -5,13 +5,12 @@ BEGIN;
 CREATE OR REPLACE FUNCTION public.cove_guard_dlab_auth() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN
-  IF TG_OP = 'INSERT' THEN
-    IF NEW.raw_app_meta_data->>'dlab_managed' = 'true' AND COALESCE(NEW.encrypted_password, '') <> '' THEN
-      RAISE EXCEPTION 'DLAB accounts cannot have a local password';
-    END IF;
-  ELSIF OLD.raw_app_meta_data->>'dlab_managed' = 'true' THEN
+  -- GoTrue may generate an unknown random password hash for a passwordless
+  -- admin-created identity. The trusted provisioning API never accepts a
+  -- password. Preserve the provider's initial hash; prohibit later changes.
+  IF TG_OP = 'UPDATE' AND OLD.raw_app_meta_data->>'dlab_managed' = 'true' THEN
     IF NEW.raw_app_meta_data->>'dlab_managed' IS DISTINCT FROM 'true'
-      OR COALESCE(NEW.encrypted_password, '') <> ''
+      OR NEW.encrypted_password IS DISTINCT FROM OLD.encrypted_password
       OR NEW.email IS DISTINCT FROM OLD.email
       OR COALESCE(NEW.email_change, '') <> ''
       OR NEW.phone IS DISTINCT FROM OLD.phone THEN

@@ -5,6 +5,8 @@ Branch: `feat/dlab-os-sso`
 Scope: Phase A of [the approved design](../superpowers/specs/2026-10-16-dlab-os-sso-connection-design.md).
 Operations and joint test instructions: [DLAB SSO runbook](../operations/dlab-sso.md).
 
+Subsequent development-project setup and live Supabase bridge validation are recorded in [local readiness](2026-10-16-dlab-sso-local-readiness.md). The live check also identified and corrected the initial provider credential-guard behavior described there.
+
 ## Implemented
 
 - GET login start and callback with browser-bound, single-use Redis state.

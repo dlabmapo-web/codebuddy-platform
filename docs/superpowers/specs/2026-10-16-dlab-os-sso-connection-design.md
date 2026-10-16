@@ -1,8 +1,8 @@
 # Cove v2 — DLAB OS SSO connection
 
-Date: 2026-10-16 (Asia/Tashkent)  
-Status: Draft for user review; no application implementation or production verification  
-Reviewed branch: `feat/cove-studio-v2` at `89327b88`  
+Date: 2026-10-16 (Asia/Tashkent)
+Status: Draft for user review; no application implementation or production verification
+Reviewed branch: `feat/cove-studio-v2` at `89327b88`
 Contract: DLAB OS integration v1.2.1
 
 ## 1. Outcome
@@ -19,7 +19,7 @@ The supplied messages establish that Finn has issued `client_id=cove` and a clie
 
 No secret values belong in this file, fixtures, commits, screenshots, request examples, or test evidence. Existing handoff wording that says credentials have not yet been issued is historical as of October 15.
 
-Reference ZIP: `TalkFile_dlab-integration-spec-v1.2.1-20261014.zip`  
+Reference ZIP: `TalkFile_dlab-integration-spec-v1.2.1-20261014.zip`
 SHA-256: `f8f8d6dc3bc1d82996e92cc5b4a83a26b91f781c04758afed0a1e2769e89d2ae`
 
 Read `api.yaml` and `contract.dbml` as the integration contract. The reference JS files are incomplete examples, not production code: account/session issuance is intentionally omitted, and the example's unrestricted `return_to` must not be copied.

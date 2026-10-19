@@ -45,6 +45,7 @@ export default defineConfig({
     {name:"webkit-multiple-choice", testMatch:/multiple-choice-materials\.spec\.ts/, use:{...devices["Desktop Safari"]}},
     { name: 'webkit-short-answer', testMatch: /short-answer-materials\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
     { name: 'webkit-turtle', testMatch: /turtle-materials\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
+    { name: 'webkit-pdf-practice', testMatch: /pdf-practice\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {
       name: 'webkit-my-page',

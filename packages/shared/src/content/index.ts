@@ -18,3 +18,5 @@ export * from "./teacher-students.js";
 export * from "./quiz.js";
 
 export * from "./pdf.js";
+
+export * from "./solutions.js";

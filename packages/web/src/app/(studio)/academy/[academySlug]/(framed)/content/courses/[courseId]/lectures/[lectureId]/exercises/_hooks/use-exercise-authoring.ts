@@ -1,5 +1,7 @@
 'use client';
 
+import type { ExerciseSolutionEntry } from "@cove/shared";
+
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import { exerciseDraftFieldsSchema, type ExerciseAuthoringContext } from '@cove/shared';
@@ -32,13 +34,13 @@ export function useExerciseAuthoring({
   target,
   initialContext,
   canEdit,
-  initialSolutionCode,
+  initialSolutions,
   requireReferencePdf = false,
 }: {
   target: AuthoringTarget;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
-  initialSolutionCode: string;
+  initialSolutions: ExerciseSolutionEntry[];
   requireReferencePdf?: boolean;
 }) {
   const contentPaths = useContentBasePath();
@@ -46,8 +48,8 @@ export function useExerciseAuthoring({
   const router = useRouter();
   const queryClient = useQueryClient();
   const initialDraft = React.useMemo(
-    () => contextToDraft(initialContext, initialSolutionCode),
-    [initialContext, initialSolutionCode],
+    () => contextToDraft(initialContext, initialSolutions),
+    [initialContext, initialSolutions],
   );
   const [draft, setDraft] = React.useState(initialDraft);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -149,7 +151,7 @@ export function useExerciseAuthoring({
   /** Errors surface per field, next to the input that needs fixing. */
   function errorFor(field: 'title' | 'difficulty' | 'description' | 'solution' | 'test') {
     if (!editable) return null;
-    const key = field === 'test' ? 'testCases' : field === 'solution' ? 'solutionCode' : field;
+    const key = field === 'test' ? 'testCases' : field === 'solution' ? 'solutions' : field;
     if (!touched.has(key)) return null;
     // `missing` no longer includes `test` — answers are optional — so the
     // comparison is widened here rather than widening `missing` itself, which

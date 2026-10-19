@@ -1,3 +1,5 @@
+
+import type { ExerciseSolutionEntry } from "@cove/shared";
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
@@ -28,7 +30,7 @@ export default async function LibraryExercisePage({
   const client = createPlatformServerORPCClient();
 
   let context: ExerciseAuthoringContext;
-  let solutionCode = '';
+  let solutions: ExerciseSolutionEntry[] = [];
   if (materialId === 'new') {
     // A failed load and a missing lecture are different answers and used to
     // share one: `.catch(() => null)` turned every fault — a refused
@@ -80,10 +82,9 @@ export default async function LibraryExercisePage({
         });
         return notFound();
       });
-    solutionCode = await client.academyCourses
+    solutions = await client.academyCourses
       .getExerciseSolution({ academyId, courseId, lectureId, materialId })
-      .then((solution) => solution.solutionCode ?? '')
-      .catch(() => '');
+      .then((solution) => solution.solutions);
   }
 
   const contentPaths = createContentPaths('', 'library');
@@ -104,7 +105,7 @@ export default async function LibraryExercisePage({
         canEdit
         courseId={courseId}
         initialContext={context}
-        initialSolutionCode={solutionCode}
+        initialSolutions={solutions}
         lectureId={lectureId}
       />
     </PlatformShell>

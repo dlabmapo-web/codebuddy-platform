@@ -1,3 +1,4 @@
+import { exerciseSolutionsSchema } from "../content/solutions.js";
 import { z } from "zod";
 
 import {
@@ -875,7 +876,7 @@ export const monitoringExerciseSolutionInputSchema =
 
 export const monitoringExerciseSolutionSchema = z.object({
   materialId: z.uuid(),
-  solutionCode: z.string(),
+  solutions: exerciseSolutionsSchema,
 });
 
 export const listFeedbackInputSchema = monitoringStudentInputSchema.extend({

@@ -31,7 +31,7 @@ const validExercise = {
   outputFormat: "",
   constraints: "",
   starterCode: "",
-  solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
+  solutions: [{ title: null, code: "a, b = map(int, input().split())\nprint(a + b)\n" }],
   aiFeedbackEnabled: false,
   isVisible: true,
   testCases: [{
@@ -92,10 +92,18 @@ describe("manual programming exercise schemas", () => {
       .toBe(true);
   });
 
+  it("rejects scalar-only stale clients instead of dropping alternative solutions", () => {
+    const { solutions, ...oldDraft } = validExercise;
+    const result = createProgrammingExerciseSchema.safeParse({ ...oldDraft, solutionCode: solutions[0].code });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.some(issue => issue.code === 'unrecognized_keys')).toBe(true);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, solutions: [] }).success).toBe(false);
+  });
+
   it("requires a nonblank correct answer without trimming valid code", () => {
     expect(createProgrammingExerciseSchema.safeParse({
       ...validExercise,
-      solutionCode: "  \n",
+      solutions: [{ title: null, code: "  \n" }],
     }).success).toBe(false);
   });
 

@@ -85,7 +85,9 @@
     "confirm_action_one": "Import {{count}} change",
     "confirm_action_other": "Import {{count}} changes",
     "download_issues_one": "Download {{count}} issue",
-    "download_issues_other": "Download {{count}} issues"
+    "download_issues_other": "Download {{count}} issues",
+    "solutions_summary": "Solutions: {{added}} added, {{changed}} changed, {{removed}} removed",
+    "solutions_reordered": "Solution order changed"
   },
   "result": {
     "title": "Import finished",
@@ -126,7 +128,7 @@
     "difficulty_missing": "Set the difficulty to EASY, MEDIUM, or HARD.",
     "difficulty_invalid": "Difficulty must be EASY, MEDIUM, or HARD.",
     "description_missing": "Every problem needs a description.",
-    "solution_code_missing": "Add the correct Python answer in solution_code. Existing answers cannot be cleared.",
+    "solution_code_missing": "Add at least one complete Python program in the Solutions sheet. Existing solutions cannot all be cleared.",
     "description_format_invalid": "description_format must be PLAIN_TEXT or RICH_TEXT_HTML.",
     "boolean_invalid": "Use TRUE or FALSE.",
     "order_missing": "This row needs an order number.",
@@ -155,6 +157,7 @@
     "clears_hints": "This problem's hints are being removed, because the workbook has none for it.",
     "grading_revision_advances": "Grading changes, so past submissions are measured against the new tests.",
     "unknown_sheet_ignored": "This sheet is not part of the format and is ignored.",
-    "unknown_column_ignored": "These columns are not part of the format and are ignored."
+    "unknown_column_ignored": "These columns are not part of the format and are ignored.",
+    "solution_invalid": "Invalid solution code, name, order, or count."
   }
 }

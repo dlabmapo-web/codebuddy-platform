@@ -1,3 +1,4 @@
+import { privateSolutions, prepareExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
 import {videoMetadata} from "../../videos/video-metadata.js";
 import { multipleChoiceSchema } from "@cove/shared";
 function remapChoiceDefinition(raw: unknown) {
@@ -232,6 +233,7 @@ export class AcademyLibraryService {
     const references: Array<{ materialId: string; referenceId: string }> = [];
     const videos:Prisma.VideoLessonCreateManyInput[]=[];
     const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
+    const copiedSolutions: Prisma.ProgrammingExerciseSolutionCreateManyInput[] = [];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
     const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
     const hints: Prisma.ExerciseHintCreateManyInput[] = [];
@@ -295,6 +297,8 @@ export class AcademyLibraryService {
           if(material.manualMaterial){const {multipleChoice,shortAnswer,solutionAssets,solutionFiles,files,assets,...manual}=material.manualMaterial;manuals.push({...manual,multipleChoice:multipleChoice ? remapChoiceDefinition(multipleChoice) : Prisma.DbNull,shortAnswer:shortAnswer?shortAnswer as Prisma.InputJsonValue:Prisma.DbNull,materialId,revision:1,files:files as Prisma.InputJsonValue,assets:assets as Prisma.InputJsonValue,solutionAssets:solutionAssets as Prisma.InputJsonValue,solutionFiles:solutionFiles?solutionFiles as Prisma.InputJsonValue:Prisma.DbNull});}
           const exercise = material.programmingExercise;
           if (!exercise) continue;
+          const preparedSolutions = prepareExerciseSolutions(materialId, privateSolutions(exercise.solutions));
+          copiedSolutions.push(...preparedSolutions.rows);
           exercises.push({
             materialId,
             externalKey: exercise.externalKey,
@@ -307,7 +311,8 @@ export class AcademyLibraryService {
             constraints: exercise.constraints,
             ...(exercise.quiz ? { quiz: exercise.quiz } : {}),
             starterCode: exercise.starterCode,
-            solutionCode: exercise.solutionCode,
+            solutionCode: preparedSolutions.solutionCode,
+
             language: exercise.language,
             timeLimitMs: exercise.timeLimitMs,
             memoryLimitMb: exercise.memoryLimitMb,
@@ -398,6 +403,7 @@ export class AcademyLibraryService {
       if (testCases.length) {
         await tx.exerciseTestCase.createMany({ data: testCases });
       }
+      if (copiedSolutions.length) await tx.programmingExerciseSolution.createMany({ data: copiedSolutions });
       if (hints.length) await tx.exerciseHint.createMany({ data: hints });
 
       await this.audit.write(tx, {
@@ -529,6 +535,7 @@ const adoptInclude = {
               pdfDocument: { include: { asset: true } },
               programmingExercise: {
                 include: {
+                  solutions: solutionOrder,
                   testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
                   hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
                 },

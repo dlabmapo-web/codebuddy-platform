@@ -57,6 +57,7 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common';
     resources: {
+      solutions: typeof import("@cove/i18n/locales/en/solutions.json");
       manual:typeof manual;
       video:typeof video;
       quiz: typeof import("@cove/i18n/locales/en/quiz.json");

@@ -55,6 +55,12 @@ describe("ContentImportService session safety", () => {
     });
   });
 
+  it("refuses a preview staged by an older workbook version", async () => {
+    const prisma = { contentImportSession: { findFirst: vi.fn().mockResolvedValue({ templateVersion: 2, plan: {} }) } } as unknown as PrismaService;
+    const service = new ContentImportService(prisma, access(), audit());
+    await expect(service.getPreview(identity, { academyId, courseId, sessionId })).rejects.toMatchObject({ code: 'CONTENT_IMPORT_TEMPLATE_UNSUPPORTED' });
+  });
+
   it("stores the completed receipt inside the curriculum transaction", async () => {
     const plan = {
       modules: [],
@@ -79,7 +85,7 @@ describe("ContentImportService session safety", () => {
       capturedContentRevision: 7,
       expiresAt: new Date(Date.now() + 60_000),
       checksumSha256: "a".repeat(64),
-      templateVersion: 1,
+      templateVersion: 3,
     };
     const transaction = {
       $queryRaw: vi.fn().mockResolvedValue([{ id: courseId }]),

@@ -206,7 +206,7 @@ function createService(options?: {
     title: string;
     lecture: { courseModule: { courseId: string } };
   }[];
-  visit?: { id: string; material: { programmingExercise: { solutionCode: string | null } | null } | null } | null;
+  visit?: { id: string; material: { programmingExercise: { solutions: { title: string | null; code: string }[] } | null } | null } | null;
   latestSubmission?: { id: string; status: string } | null;
 }) {
   const prisma = {
@@ -235,7 +235,7 @@ function createService(options?: {
       ),
     },
     programmingExercise: {
-      findUnique: vi.fn().mockResolvedValue({ solutionCode: "print('answer')\n" }),
+      findUnique: vi.fn().mockResolvedValue({ _count: { solutions: 1 } }),
     },
     submission: {
       findFirst: vi.fn().mockResolvedValue(options?.latestSubmission ?? null),
@@ -246,7 +246,7 @@ function createService(options?: {
           ? {
               id: visitId,
               material: {
-                programmingExercise: { solutionCode: "print('answer')\n" },
+                programmingExercise: { solutions: [{ title: null, code: "print('answer')\n" }] },
               },
             }
           : options.visit,
@@ -590,7 +590,7 @@ describe("getExerciseSolution", () => {
 
     await expect(service.getExerciseSolution(identity, input)).resolves.toEqual({
       materialId,
-      solutionCode: "print('answer')\n",
+      solutions: [{ title: null, code: "print('answer')\n" }],
     });
     expect(prisma.teacherMonitoringVisit.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -623,7 +623,7 @@ describe("getExerciseSolution", () => {
     const { service } = createService({
       visit: {
         id: visitId,
-        material: { programmingExercise: { solutionCode: null } },
+        material: { programmingExercise: { solutions: [] } },
       },
     });
     await expect(

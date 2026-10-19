@@ -86,6 +86,7 @@ try {
           description: '<p>Print hello.</p>',
           starterCode: 'print("hello")',
           solutionCode: 'print("hello")',
+          solutions: { create: [{ position: 0, title: null, code: 'print("hello")' }] },
           inputFormat: '',
           outputFormat: '',
           constraints: '',

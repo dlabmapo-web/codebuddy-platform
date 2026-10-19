@@ -1,3 +1,4 @@
+import { type ExerciseSolutionEntry } from "../solutions.js";
 import { z } from "zod";
 import { gradingDataLimits } from "../../grading-limits.js";
 
@@ -102,7 +103,9 @@ export const plannedProblemSchema = z
     outputFormat: z.string(),
     constraints: z.string(),
     starterCode: z.string(),
-    solutionCode: z.string().nullable(),
+    // Invalid rows must remain representable so preview can show redacted diagnostics.
+    solutions: z.array(z.object({ title: z.string().nullable(), code: z.string() }).strict()),
+    solutionChanges: z.object({ added: z.number().int().nonnegative(), changed: z.number().int().nonnegative(), removed: z.number().int().nonnegative(), reordered: z.boolean() }),
     aiFeedbackEnabled: z.boolean(),
     /** Explicit order from the workbook, or null to preserve or append. */
     order: z.number().int().positive().nullable(),
@@ -201,7 +204,7 @@ export type ExistingProblem = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
-  solutionCode?: string | null;
+  solutions: ExerciseSolutionEntry[];
   aiFeedbackEnabled: boolean;
   /**
    * Absent means legacy. A weighted problem's tests carry settings the
@@ -1072,8 +1075,8 @@ function planProblem(input: {
     row.aiFeedbackEnabled ?? current?.problem.aiFeedbackEnabled ?? false;
 
   const difficulty = row.difficulty ?? current?.problem.difficulty ?? "EASY";
-  const currentSolutionCode = current?.problem.solutionCode ?? null;
-  const solutionCode = row.solutionCode ?? currentSolutionCode;
+  const currentSolutions = current?.problem.solutions ?? [];
+  const solutions = row.solutions;
 
   const changedFields = current
     ? diffFields([
@@ -1084,13 +1087,7 @@ function planProblem(input: {
         ["output_format", row.outputFormat, current.problem.outputFormat],
         ["constraints", row.constraints, current.problem.constraints],
         ["starter_code", row.starterCode, current.problem.starterCode],
-        ...(row.solutionCode !== null
-          ? [[
-              "solution_code",
-              row.solutionCode,
-              currentSolutionCode,
-            ] as [string, unknown, unknown]]
-          : []),
+        ["solutions", JSON.stringify(solutions), JSON.stringify(currentSolutions)],
         [
           "ai_feedback_enabled",
           aiFeedbackEnabled,
@@ -1129,9 +1126,7 @@ function planProblem(input: {
   const gradingChanged = action === "UPDATE" && testsChanged;
 
   if (
-    (!current && solutionCode === null) ||
-    (current && currentSolutionCode !== null && row.solutionCode === null) ||
-    (action === "UPDATE" && solutionCode === null)
+    solutions.length === 0 && (!current || currentSolutions.length > 0 || action === "UPDATE")
   ) {
     issues.push(
       error("solution_code_missing", problem.key, "Problems", row.rowNumber),
@@ -1168,7 +1163,8 @@ function planProblem(input: {
     outputFormat: row.outputFormat,
     constraints: row.constraints,
     starterCode: row.starterCode,
-    solutionCode,
+    solutions,
+    solutionChanges: solutionChanges(currentSolutions, solutions),
     aiFeedbackEnabled,
     order: row.problemOrder,
     testCases,
@@ -1416,4 +1412,17 @@ export function canCommitPlan(input: {
   if (input.counts.create + input.counts.update === 0) return false;
   if (input.counts.warnings > 0 && !input.acknowledgeWarnings) return false;
   return true;
+}
+
+/** Metadata only; matching uses a multiset so duplicate programs remain distinct. */
+function solutionChanges(before: ExerciseSolutionEntry[], after: ExerciseSolutionEntry[]) {
+  const remaining = before.map(entry => JSON.stringify(entry));
+  let unmatched = 0;
+  for (const entry of after) {
+    const index = remaining.indexOf(JSON.stringify(entry));
+    if (index < 0) unmatched++; else remaining.splice(index, 1);
+  }
+  const changed = Math.min(remaining.length, unmatched);
+  return { added: unmatched - changed, removed: remaining.length - changed, changed,
+    reordered: !unmatched && !remaining.length && JSON.stringify(before) !== JSON.stringify(after) };
 }

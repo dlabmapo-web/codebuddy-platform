@@ -1,5 +1,7 @@
 'use client';
 
+import type { ExerciseSolutionEntry } from "@cove/shared";
+
 import { useSearchParams } from 'next/navigation';
 import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
 import { useTranslation } from 'react-i18next';
@@ -22,14 +24,14 @@ export function ExerciseWorkspace({
   lectureId,
   initialContext,
   canEdit,
-  initialSolutionCode,
+  initialSolutions,
 }: {
   academyId: string;
   courseId: string;
   lectureId: string;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
-  initialSolutionCode: string;
+  initialSolutions: ExerciseSolutionEntry[];
 }) {
   const { t: tq } = useTranslation('quiz');
   const { t } = useTranslation(['content', 'pdf-practice']);
@@ -38,7 +40,7 @@ export function ExerciseWorkspace({
     target: { academyId, courseId, lectureId },
     initialContext,
     canEdit,
-    initialSolutionCode,
+    initialSolutions,
     requireReferencePdf,
   });
   const { draft, editable, update } = authoring;
@@ -74,8 +76,8 @@ export function ExerciseWorkspace({
         {editable ? (
           <SolutionCodeEditor
             error={authoring.errorFor('solution')}
-            onChange={(solutionCode) => update('solutionCode', solutionCode)}
-            value={draft.solutionCode}
+            onChange={(solutions) => update('solutions', solutions)}
+            value={draft.solutions}
           />
         ) : null}
         <AnswersEditor

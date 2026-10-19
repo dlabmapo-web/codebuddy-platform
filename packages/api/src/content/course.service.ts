@@ -1,3 +1,5 @@
+import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "./exercise-solutions.js";
+import type { ExerciseSolutionEntry } from "@cove/shared";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
@@ -123,6 +125,7 @@ const exerciseAuthoringInclude = {
   },
   programmingExercise: {
     include: {
+      solutions: solutionOrder,
       testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
       hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
     },
@@ -147,7 +150,7 @@ type ExerciseWriteInput = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
-  solutionCode: string;
+  solutions: ExerciseSolutionEntry[];
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
   testCases: ExerciseTestCaseDraft[];
@@ -1137,7 +1140,7 @@ export class CourseService {
     }
     return {
       materialId: material.id,
-      solutionCode: material.programmingExercise.solutionCode,
+      solutions: privateSolutions(material.programmingExercise.solutions),
     };
   }
 
@@ -1176,7 +1179,7 @@ export class CourseService {
               outputFormat: input.outputFormat,
               constraints: input.constraints,
               starterCode: input.starterCode,
-              solutionCode: input.solutionCode,
+
               language: "PYTHON",
               timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
               memoryLimitMb: 256,
@@ -1194,6 +1197,7 @@ export class CourseService {
         },
         include: exerciseAuthoringInclude,
       });
+      await replaceExerciseSolutions(tx, material.id, input.solutions);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -1258,7 +1262,7 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
-          solutionCode: input.solutionCode,
+
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged
             ? {
@@ -1281,6 +1285,7 @@ export class CourseService {
         where: { id: current.id },
         data: { title: input.title.trim(), isVisible: input.isVisible },
       });
+      await replaceExerciseSolutions(tx, current.id, input.solutions);
       await tx.exerciseTestCase.deleteMany({
         where: { exerciseMaterialId: current.id },
       });
@@ -1759,7 +1764,8 @@ function exerciseAuditFromInput(
       (testCase) => testCase.visibility === "SAMPLE",
     ).length,
     hintCount: input.hints.length,
-    hasSolution: input.solutionCode.trim().length > 0,
+    hasSolution: input.solutions.length > 0,
+    solutionCount: input.solutions.length,
   };
 }
 
@@ -1787,7 +1793,8 @@ function exerciseRecordAudit(record: ExerciseRecord) {
       (testCase) => testCase.visibility === "SAMPLE",
     ).length,
     hintCount: exercise.hints.length,
-    hasSolution: Boolean(exercise.solutionCode?.trim()),
+    hasSolution: Boolean(exercise.solutions?.length),
+    solutionCount: exercise.solutions?.length ?? 0,
   };
 }
 

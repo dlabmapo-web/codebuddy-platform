@@ -1,3 +1,5 @@
+import { privateSolutions, solutionOrder } from "../content/exercise-solutions.js";
+import type { ExerciseSolutionEntry } from "@cove/shared";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -396,7 +398,7 @@ export class MonitoringService {
       materialId: string;
       visitId: string;
     },
-  ): Promise<{ materialId: string; solutionCode: string }> {
+  ): Promise<{ materialId: string; solutions: ExerciseSolutionEntry[] }> {
     const claim = await this.requireClass(identity, input);
     const student = await this.access.requireMonitorableStudent(
       claim,
@@ -418,13 +420,13 @@ export class MonitoringService {
         id: true,
         material: {
           select: {
-            programmingExercise: { select: { solutionCode: true } },
+            programmingExercise: { select: { solutions: solutionOrder } },
           },
         },
       },
     });
-    const solutionCode = visit?.material?.programmingExercise?.solutionCode;
-    if (!solutionCode?.trim()) {
+    const solutions = visit?.material?.programmingExercise?.solutions;
+    if (!solutions?.length) {
       throw new AppException(
         "MONITORING_STUDENT_UNAVAILABLE",
         HttpStatus.NOT_FOUND,
@@ -446,7 +448,7 @@ export class MonitoringService {
       }),
     );
 
-    return { materialId: input.materialId, solutionCode };
+    return { materialId: input.materialId, solutions: privateSolutions(solutions) };
   }
 
   /**
@@ -602,7 +604,7 @@ export class MonitoringService {
       }),
       this.prisma.programmingExercise.findUnique({
         where: { materialId },
-        select: { solutionCode: true },
+        select: { _count: { select: { solutions: true } } },
       }),
       this.prisma.submission.findFirst({
         where: { userId: studentUserId, materialId },
@@ -617,7 +619,7 @@ export class MonitoringService {
       // document is created lazily, and naming a room for a draft that does
       // not exist is how a client ends up inventing one.
       draftId: draft?.id ?? null,
-      hasSolution: Boolean(answer?.solutionCode?.trim()),
+      hasSolution: Boolean(answer?._count.solutions),
       latestSubmission: latest
         ? { submissionId: latest.id, status: latest.status }
         : null,

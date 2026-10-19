@@ -1,3 +1,5 @@
+
+import type { ExerciseSolutionEntry } from "@cove/shared";
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { notFound } from 'next/navigation';
 
@@ -33,7 +35,7 @@ export default async function PlatformExercisePage({
   if (!academy) notFound();
 
   let context: ExerciseAuthoringContext;
-  let solutionCode = '';
+  let solutions: ExerciseSolutionEntry[] = [];
   if (materialId === 'new') {
     const tree = await client.academyCourses
       .getTree({ academyId, courseId })
@@ -64,10 +66,9 @@ export default async function PlatformExercisePage({
         });
         return notFound();
       });
-    solutionCode = await client.academyCourses
+    solutions = await client.academyCourses
       .getExerciseSolution({ academyId, courseId, lectureId, materialId })
-      .then((solution) => solution.solutionCode ?? '')
-      .catch(() => '');
+      .then((solution) => solution.solutions);
   }
 
   const contentPaths = createContentPaths(academySlug, 'console');
@@ -95,7 +96,7 @@ export default async function PlatformExercisePage({
         canEdit
         courseId={courseId}
         initialContext={context}
-        initialSolutionCode={solutionCode}
+        initialSolutions={solutions}
         lectureId={lectureId}
       />
     </PlatformShell>

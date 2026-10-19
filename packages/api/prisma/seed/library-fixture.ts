@@ -136,6 +136,7 @@ export async function seedLibraryFixture(prisma: PrismaClient) {
       description: "<p>Read one line and print it back.</p>",
       starterCode: "line = input()\n",
       solutionCode: "print(input())\n",
+      solutions: { create: [{ position: 0, title: null, code: "print(input())\n" }] },
       testCases: {
         create: [
           {

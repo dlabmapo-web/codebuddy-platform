@@ -25,6 +25,7 @@ export const contentImportSheets = [
   "Instructions",
   "Structure",
   "Problems",
+  "Solutions",
   "Test Cases",
   "Hints",
 ] as const;
@@ -42,6 +43,7 @@ export const requiredContentImportSheets: readonly ContentImportSheet[] = [
   "Instructions",
   "Structure",
   "Problems",
+  "Solutions",
   "Test Cases",
 ];
 
@@ -66,6 +68,9 @@ export const requiredStructureColumns: readonly StructureColumn[] = [
   "lecture_title",
 ];
 
+export const solutionColumns = ["problem_key", "solution_order", "solution_title", "solution_code"] as const;
+export const requiredSolutionColumns = ["problem_key", "solution_order", "solution_code"] as const;
+
 export const problemColumns = [
   "problem_key",
   "lecture_key",
@@ -78,7 +83,6 @@ export const problemColumns = [
   "output_format",
   "constraints",
   "starter_code",
-  "solution_code",
   "ai_feedback_enabled",
 ] as const;
 export type ProblemColumn = (typeof problemColumns)[number];
@@ -89,7 +93,6 @@ export const requiredProblemColumns: readonly ProblemColumn[] = [
   "title",
   "difficulty",
   "description",
-  "solution_code",
 ];
 
 export const testCaseColumns = [
@@ -126,6 +129,7 @@ export const requiredHintColumns: readonly HintColumn[] = [
 export const contentImportColumns = {
   Structure: structureColumns,
   Problems: problemColumns,
+  Solutions: solutionColumns,
   "Test Cases": testCaseColumns,
   Hints: hintColumns,
 } as const;
@@ -133,6 +137,7 @@ export const contentImportColumns = {
 export const requiredContentImportColumns = {
   Structure: requiredStructureColumns,
   Problems: requiredProblemColumns,
+  Solutions: requiredSolutionColumns,
   "Test Cases": requiredTestCaseColumns,
   Hints: requiredHintColumns,
 } as const;

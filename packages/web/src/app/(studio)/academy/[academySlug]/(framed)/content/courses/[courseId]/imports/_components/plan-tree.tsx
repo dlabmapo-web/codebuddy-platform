@@ -139,6 +139,7 @@ function LectureBranch({ lecture }: { lecture: PlannedLecture }) {
 }
 
 function ProblemRow({ problem }: { problem: PlannedProblem }) {
+  const { t } = useTranslation('content-import');
   const tone = rowTone({
     action: problem.action,
     severities: problem.issues.map((issue) => issue.severity),
@@ -161,6 +162,7 @@ function ProblemRow({ problem }: { problem: PlannedProblem }) {
         title={problem.title}
         tone={tone}
       />
+      <p className="ml-8 text-xs text-sub">{t('review.solutions_summary', problem.solutionChanges)}{problem.solutionChanges.reordered ? ` · ${t('review.solutions_reordered')}` : ''}</p>
     </li>
   );
 }

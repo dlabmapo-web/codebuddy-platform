@@ -1,3 +1,4 @@
+import { exerciseSolutionsSchema } from "./solutions.js";
 import {videoMetadataSchema} from "./video.js";
 import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
@@ -660,7 +661,7 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
-  solutionCode: z.string().max(programmingExerciseSolutionMaxLength),
+  solutions: exerciseSolutionsSchema,
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
   /**
@@ -711,6 +712,7 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     context.addIssue({ code: "custom", path: ["referencePdfMaterialId"], message: "PDF references require a Python exercise." });
   }
   if (value.quiz) {
+    if (value.solutions.length) context.addIssue({ code: "custom", path: ["solutions"], message: "Quizzes cannot contain Python solutions." });
     if (value.testCases.length || value.grading.mode !== "LEGACY_STDIO") {
       context.addIssue({
         code: "custom",
@@ -720,10 +722,10 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     }
     return;
   }
-  if (!value.solutionCode.trim())
+  if (!value.solutions.length)
     context.addIssue({
       code: "custom",
-      path: ["solutionCode"],
+      path: ["solutions"],
       message: "A correct answer is required.",
     });
   for (const issue of gradingProfileIssues(value)) {
@@ -767,7 +769,7 @@ export const exerciseMaterialInputSchema = exerciseParentInputSchema.extend({
 
 export const exerciseSolutionSchema = z.object({
   materialId: z.uuid(),
-  solutionCode: z.string().nullable(),
+  solutions: exerciseSolutionsSchema,
 });
 
 /**

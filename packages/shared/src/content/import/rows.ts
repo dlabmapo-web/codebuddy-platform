@@ -1,3 +1,4 @@
+import { exerciseSolutionsSchema, type ExerciseSolutionEntry } from "../solutions.js";
 import type { ExerciseDifficulty, TestCaseVisibility } from "../course.js";
 import { gradingDataLimits } from "../../grading-limits.js";
 import { parseStableKey } from "./keys.js";
@@ -14,6 +15,8 @@ import type {
 } from "./issues.js";
 import {
   cellAt,
+  solutionColumns,
+  requiredSolutionColumns,
   hintColumns,
   indexHeaderRow,
   missingRequiredColumns,
@@ -84,7 +87,7 @@ export type NormalizedProblemRow = RowLocation & {
   constraints: string;
   starterCode: string;
   /** Null means the cell was blank; the planner applies legacy update rules. */
-  solutionCode: string | null;
+  solutions: ExerciseSolutionEntry[];
   /** Null means the cell was blank: create as false, preserve on update. */
   aiFeedbackEnabled: boolean | null;
 };
@@ -534,13 +537,7 @@ export function readProblemsSheet(grid: SheetGrid): {
         issues,
         problemKey,
       ),
-      solutionCode: readSensitiveCode(
-        location,
-        get("solution_code"),
-        "solution_code",
-        issues,
-        problemKey,
-      ),
+      solutions: [],
       aiFeedbackEnabled,
     });
   }
@@ -771,18 +768,21 @@ export function readHintsSheet(grid: SheetGrid): {
 export function readWorkbookRows(grids: {
   Structure: SheetGrid;
   Problems: SheetGrid;
+  Solutions: SheetGrid;
   "Test Cases": SheetGrid;
   Hints: SheetGrid;
   unknownSheets?: readonly string[];
 }): NormalizedWorkbook {
   const structure = readStructureSheet(grids.Structure);
   const problems = readProblemsSheet(grids.Problems);
+  const solutions = readSolutionsSheet(grids.Solutions, problems.rows);
   const testCases = readTestCasesSheet(grids["Test Cases"]);
   const hints = readHintsSheet(grids.Hints);
 
   const issues: ContentImportIssue[] = [
     ...structure.issues,
     ...problems.issues,
+    ...solutions.issues,
     ...testCases.issues,
     ...hints.issues,
   ];
@@ -790,6 +790,7 @@ export function readWorkbookRows(grids: {
   const unknownColumns: Array<[ContentImportSheet, string[]]> = [
     ["Structure", structure.unknownColumns],
     ["Problems", problems.unknownColumns],
+    ["Solutions", solutions.unknownColumns],
     ["Test Cases", testCases.unknownColumns],
     ["Hints", hints.unknownColumns],
   ];
@@ -828,4 +829,43 @@ export function readWorkbookRows(grids: {
     hints: hints.rows,
     issues,
   };
+}
+
+function readSolutionsSheet(grid: SheetGrid, problems: NormalizedProblemRow[]) {
+  const issues: ContentImportIssue[] = [];
+  const header = readHeader("Solutions", grid, solutionColumns, requiredSolutionColumns, issues);
+  if (!header) return { issues, unknownColumns: [] };
+  const byKey = new Map(problems.map(problem => [problem.problemKey, problem]));
+  const groups = new Map<string, { order: number; title: string | null; code: string; rowNumber: number }[]>();
+  for (let index = 1; index < grid.length; index++) {
+    if (rowIsBlank(grid[index])) continue;
+    const location = { sheet: "Solutions", rowNumber: index + 1 } as const;
+    const get = (column: typeof solutionColumns[number]) => cellAt(grid[index], header.columns, column);
+    const key = readKey(location, get("problem_key"), "problem_key", issues);
+    if (!key || !byKey.has(key)) {
+      issues.push(issue(location, "solution_invalid", "problem_key", null, key));
+      continue;
+    }
+    const order = readOptionalOrder(location, get("solution_order"), "solution_order", issues, key);
+    if (order === null) issues.push(issue(location, "order_invalid", "solution_order", null, key));
+    const code = readSensitiveCode(location, get("solution_code"), "solution_code", issues, key) ?? "";
+    const title = normalizeTrimmedText(get("solution_title")) || null;
+    const group = groups.get(key) ?? [];
+    group.push({ order: order ?? 0, title, code, rowNumber: index + 1 });
+    groups.set(key, group);
+  }
+  for (const [key, group] of groups) {
+    group.sort((a, b) => a.order - b.order);
+    group.forEach((entry, index) => {
+      if (entry.order !== index + 1) issues.push(issue({ sheet: "Solutions", rowNumber: entry.rowNumber }, "order_invalid", "solution_order", null, key));
+    });
+    const entries = group.map(({ title, code }) => ({ title, code }));
+    const result = exerciseSolutionsSchema.safeParse(entries);
+    if (!result.success) for (const error of result.error.issues) {
+      const index = typeof error.path[0] === "number" ? error.path[0] : 0;
+      issues.push(issue({ sheet: "Solutions", rowNumber: group[index]?.rowNumber ?? group[0].rowNumber }, "solution_invalid", error.path[1] === "title" ? "solution_title" : "solution_code", null, key));
+    }
+    byKey.get(key)!.solutions = entries;
+  }
+  return { issues, unknownColumns: header.unknown };
 }

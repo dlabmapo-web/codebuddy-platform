@@ -53,13 +53,14 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
   en: {
     title: "Cove course import",
     intro: [
-      "Edit the Structure, Problems, Test Cases, and Hints sheets, then upload this file to the course you exported it from.",
+      "Edit the Structure, Problems, Solutions, Test Cases, and Hints sheets, then upload this file to the course you exported it from.",
       "Uploading shows a preview. Nothing changes in the course until you confirm it.",
     ],
     sheetNotes: [
       "Structure — one row per lecture, with the module it belongs to.",
       "Problems — one row per problem. Link it to a lecture with lecture_key.",
       "Test Cases — one row per test. Every problem needs at least one SAMPLE.",
+      "Solutions — one complete private Python program per row; contiguous solution_order starts at 1. Rows replace all solutions for each included problem. Names are optional. Maximum 10 solutions, 100,000 characters each, 500,000 combined.",
       "Hints — optional, one row per hint.",
     ],
     rules: [
@@ -68,7 +69,7 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
       "Test and hint rows replace the whole set for that problem. Leave a problem's tests in the file to keep them.",
       "New modules, lectures, and problems arrive hidden from students. Make them visible in the course builder.",
       "difficulty accepts EASY, MEDIUM, or HARD. visibility accepts SAMPLE or HIDDEN.",
-      "Every new or changed problem needs solution_code. It is the private correct Python answer teachers can reveal while monitoring.",
+      "Every new or changed problem needs at least one row in Solutions. It is the private correct Python answer teachers can reveal while monitoring.",
       "Do not rename the sheets or the header row.",
     ],
     versionLabel: "template_version",
@@ -76,13 +77,14 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
   ko: {
     title: "Cove 코스 가져오기",
     intro: [
-      "Structure, Problems, Test Cases, Hints 시트를 편집한 뒤 내보낸 코스에 이 파일을 업로드하세요.",
+      "Structure, Problems, Solutions, Test Cases, Hints 시트를 편집한 뒤 내보낸 코스에 이 파일을 업로드하세요.",
       "업로드하면 미리보기가 나타납니다. 확인하기 전까지 코스는 바뀌지 않습니다.",
     ],
     sheetNotes: [
       "Structure — 강의 한 개당 한 행, 소속 모듈을 함께 적습니다.",
       "Problems — 문제 한 개당 한 행. lecture_key로 강의에 연결합니다.",
       "Test Cases — 테스트 한 개당 한 행. 모든 문제에 SAMPLE이 최소 한 개 필요합니다.",
+      "Solutions — 정답 코드 한 개당 한 행. solution_order는 1부터 연속으로 지정합니다. 해당 문제의 전체 정답 목록을 대체합니다. 이름은 선택이며 최대 10개, 각 100,000자, 합계 500,000자입니다.",
       "Hints — 선택 사항이며 힌트 한 개당 한 행입니다.",
     ],
     rules: [
@@ -91,7 +93,7 @@ const instructionCopy: Record<WorkbookLocale, InstructionCopy> = {
       "테스트와 힌트 행은 해당 문제의 전체 목록을 대체합니다. 유지하려면 파일에 그대로 두세요.",
       "새로 만든 모듈·강의·문제는 학생에게 숨겨진 상태로 추가됩니다. 코스 빌더에서 공개하세요.",
       "difficulty는 EASY, MEDIUM, HARD만 허용합니다. visibility는 SAMPLE 또는 HIDDEN입니다.",
-      "새 문제와 변경하는 모든 문제에는 solution_code가 필요합니다. 교사가 모니터링 중 확인할 수 있는 비공개 Python 정답입니다.",
+      "새 문제와 변경하는 모든 문제에는 Solutions 시트에 정답 행이 필요합니다. 교사가 모니터링 중 확인할 수 있는 비공개 Python 정답입니다.",
       "시트 이름과 머리글 행은 바꾸지 마세요.",
     ],
     versionLabel: "template_version",
@@ -196,7 +198,8 @@ export function buildBlankWorkbook(locale: WorkbookLocale): GeneratedWorkbook {
     sheets: [
       { name: "Instructions", rows: instructionsSheet(locale) },
       { name: "Structure", rows: withHeader("Structure", sampleStructure) },
-      { name: "Problems", rows: withHeader("Problems", sampleProblems) },
+      { name: "Problems", rows: withHeader("Problems", sampleProblems.map(row => row.filter((_, index) => index !== 11))) },
+      { name: "Solutions", rows: withHeader("Solutions", [...sampleProblems.map(row => [row[0], "1", "", row[11]]), ["VAR-001", "2", "Formatted string", 'name = input()\nprint(f"Hello, {name}!")\n']]) },
       { name: "Test Cases", rows: withHeader("Test Cases", sampleTestCases) },
       { name: "Hints", rows: withHeader("Hints", sampleHints) },
     ],
@@ -231,6 +234,7 @@ export function buildCurrentCourseWorkbook(input: {
 }): GeneratedWorkbook {
   const structure: string[][] = [];
   const problems: string[][] = [];
+  const solutions: string[][] = [];
   const testCases: string[][] = [];
   const hints: string[][] = [];
 
@@ -260,9 +264,10 @@ export function buildCurrentCourseWorkbook(input: {
           problem.outputFormat,
           problem.constraints,
           problem.starterCode,
-          problem.solutionCode ?? "",
           problem.aiFeedbackEnabled ? "TRUE" : "FALSE",
         ]);
+
+        problem.solutions.forEach((solution, index) => solutions.push([problem.key, String(index + 1), solution.title ?? "", solution.code]));
 
         for (const test of [...problem.testCases].sort(
           (left, right) => left.position - right.position,
@@ -305,6 +310,7 @@ export function buildCurrentCourseWorkbook(input: {
       { name: "Instructions", rows: instructionsSheet(input.locale) },
       { name: "Structure", rows: withHeader("Structure", structure) },
       { name: "Problems", rows: withHeader("Problems", problems) },
+      { name: "Solutions", rows: withHeader("Solutions", solutions) },
       { name: "Test Cases", rows: withHeader("Test Cases", testCases) },
       { name: "Hints", rows: withHeader("Hints", hints) },
     ],

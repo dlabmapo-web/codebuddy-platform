@@ -48,7 +48,7 @@ export default async function NewExercisePage({
         canEdit
         courseId={courseId}
         initialContext={context}
-        initialSolutionCode=""
+        initialSolutions={[]}
         lectureId={lectureId}
       />
     </StudioPage>

@@ -8,7 +8,7 @@ export { layoutNamespaces, type LayoutNamespace } from "@cove/i18n/settings";
  * `@cove/i18n`'s `locales.spec.ts` measures the layout list only, and caps
  * each namespace separately.
  */
-export const monitoringNamespaces = ["monitoring", "errors"] as const;
+export const monitoringNamespaces = ["solutions", "monitoring", "errors"] as const;
 
 /**
  * The signed-out screens: sign in, sign up, invitations, approval, and the
@@ -39,7 +39,7 @@ export const authNamespaces = ["auth"] as const;
  * Mounted by the `(framed)/content` layout, and by the two platform-console
  * surfaces that render the same builder against the shared library.
  */
-export const contentNamespaces = ["pdf-practice", "quiz", "content", "grading", "common", "courses"] as const;
+export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses"] as const;
 
 /**
  * The student exercise workspace.
@@ -53,7 +53,7 @@ export const contentNamespaces = ["pdf-practice", "quiz", "content", "grading", 
  * split rather than raise the cap.
  */
 export const exerciseNamespaces = [
-  "pdf-practice", "content",
+  "solutions", "pdf-practice", "content",
   "quiz",
   "sample-check",
   "monitoring",
@@ -69,7 +69,7 @@ export const exerciseNamespaces = [
  * the same list because a teacher moves between them through the class header.
  */
 export const teachNamespaces = [
-  "pdf-practice", "content",
+  "solutions", "pdf-practice", "content",
   "quiz",
   "sample-check",
   "monitoring",

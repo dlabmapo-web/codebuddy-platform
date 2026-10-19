@@ -66,6 +66,7 @@ const projection: CourseProjection = {
               outputFormat: "",
               constraints: "",
               // Indentation is Python's syntax. A trim here breaks the problem.
+              solutions: [],
               starterCode: "def greet(name):\n    return f'Hello, {name}!'\n",
               aiFeedbackEnabled: true,
               testCases: [
@@ -109,6 +110,7 @@ describe("content workbook round trip", () => {
     expect([...read.sheets.keys()].sort()).toEqual([
       "Hints",
       "Problems",
+      "Solutions",
       "Structure",
       "Test Cases",
     ]);
@@ -123,6 +125,7 @@ describe("content workbook round trip", () => {
       Structure: read.sheets.get("Structure") ?? [],
       Problems: read.sheets.get("Problems") ?? [],
       "Test Cases": read.sheets.get("Test Cases") ?? [],
+      Solutions: read.sheets.get("Solutions") ?? [],
       Hints: read.sheets.get("Hints") ?? [],
     });
 
@@ -147,6 +150,7 @@ describe("content workbook round trip", () => {
       Structure: read.sheets.get("Structure") ?? [],
       Problems: read.sheets.get("Problems") ?? [],
       "Test Cases": read.sheets.get("Test Cases") ?? [],
+      Solutions: read.sheets.get("Solutions") ?? [],
       Hints: read.sheets.get("Hints") ?? [],
     });
 
@@ -163,6 +167,7 @@ describe("content workbook round trip", () => {
       Structure: read.sheets.get("Structure") ?? [],
       Problems: read.sheets.get("Problems") ?? [],
       "Test Cases": read.sheets.get("Test Cases") ?? [],
+      Solutions: read.sheets.get("Solutions") ?? [],
       Hints: read.sheets.get("Hints") ?? [],
     });
 

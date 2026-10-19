@@ -29,7 +29,7 @@ function draft(overrides: Partial<ExerciseDraft> = {}): ExerciseDraft {
     outputFormat: '',
     constraints: '',
     starterCode: '',
-    solutionCode: 'print(sum(map(int, input().split())))\n',
+    solutions: [{ title: null, code: 'print(sum(map(int, input().split())))\n' }],
     aiFeedbackEnabled: false,
     isVisible: true,
     testCases: [
@@ -289,7 +289,7 @@ describe('quiz authoring', () => {
     correctChoiceId: 'b', explanation: 'Because B',
   };
   it('saves a complete quiz without Python code or inherited test cases', () => {
-    const value = draft({ quiz, solutionCode: '', grading: defaultEliceGradingProfile });
+    const value = draft({ quiz, solutions: [], grading: defaultEliceGradingProfile });
     const payload = draftToPayload(value);
     expect(payload.testCases).toEqual([]);
     expect(payload.grading).toEqual(legacyGradingProfile);

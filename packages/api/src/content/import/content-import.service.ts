@@ -1,3 +1,4 @@
+import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -81,6 +82,7 @@ const projectionInclude = {
             include: {
               programmingExercise: {
                 include: {
+                  solutions: solutionOrder,
                   testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
                   hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
                 },
@@ -161,18 +163,14 @@ export class ContentImportService {
       );
     }
 
-    return {
-      filename: workbookFilename({
-        courseTitle: course.title,
-        kind: "current",
-      }),
-      bytes: writeWorkbook(
-        buildCurrentCourseWorkbook({
-          course: projection,
-          locale: input.locale,
-        }),
-      ),
-    };
+    const bytes = writeWorkbook(buildCurrentCourseWorkbook({ course: projection, locale: input.locale }));
+    try { readContentWorkbook(bytes); }
+    catch (error) {
+      if (!(error instanceof ContentWorkbookError)) throw error;
+      throw new AppException("CONTENT_IMPORT_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, error.reason);
+    }
+    return { filename: workbookFilename({ courseTitle: course.title, kind: "current" }), bytes };
+
   }
 
   /* -------------------------------------------------------------- preview */
@@ -232,6 +230,7 @@ export class ContentImportService {
       Problems: workbook.sheets.get("Problems") ?? [],
       "Test Cases": workbook.sheets.get("Test Cases") ?? [],
       Hints: workbook.sheets.get("Hints") ?? [],
+      Solutions: workbook.sheets.get("Solutions") ?? [],
       unknownSheets: workbook.unknownSheets,
     });
 
@@ -291,6 +290,7 @@ export class ContentImportService {
       ...input,
       actorUserId: actor.userId,
     });
+    if (session.templateVersion !== CONTENT_IMPORT_TEMPLATE_VERSION) throw new AppException("CONTENT_IMPORT_TEMPLATE_UNSUPPORTED", HttpStatus.CONFLICT);
     const plan = parsePlan(session.plan);
 
     // Expiry is evaluated on read rather than swept by a job. A session nobody
@@ -382,6 +382,7 @@ export class ContentImportService {
       );
     }
 
+    if (session.templateVersion !== CONTENT_IMPORT_TEMPLATE_VERSION) throw new AppException("CONTENT_IMPORT_TEMPLATE_UNSUPPORTED", HttpStatus.CONFLICT);
     const plan = parsePlan(session.plan);
     if (
       !canCommitPlan({
@@ -931,7 +932,6 @@ export class ContentImportService {
       outputFormat: planned.outputFormat,
       constraints: planned.constraints,
       starterCode: planned.starterCode,
-      solutionCode: planned.solutionCode,
       aiFeedbackEnabled: planned.aiFeedbackEnabled,
     };
 
@@ -980,8 +980,10 @@ export class ContentImportService {
           isVisible: false,
           testCaseCount: planned.testCases.length,
           hintCount: planned.hints.length,
+          solutionCount: planned.solutions.length,
         },
       });
+      await replaceExerciseSolutions(tx, material.id, planned.solutions);
       return material.id;
     }
 
@@ -1003,6 +1005,8 @@ export class ContentImportService {
           : {}),
       },
     });
+
+    await replaceExerciseSolutions(tx, existing.id, planned.solutions);
 
     // A weighted problem's cases carry comparators, weights and limits the
     // workbook has no columns for. The planner refuses a workbook that changes
@@ -1051,12 +1055,14 @@ export class ContentImportService {
         difficulty: currentExercise?.difficulty,
         testCaseCount: currentExercise?.testCases.length ?? 0,
         hintCount: currentExercise?.hints.length ?? 0,
+        solutionCount: currentExercise?.solutions.length ?? 0,
       },
       after: {
         title: planned.title,
         difficulty: planned.difficulty,
         testCaseCount: planned.testCases.length,
         hintCount: planned.hints.length,
+          solutionCount: planned.solutions.length,
         gradingChanged: planned.gradingChanged,
         changedFields: planned.changedFields,
       },
@@ -1229,7 +1235,7 @@ function toProjection(course: CourseWithContent): CourseProjection {
               outputFormat: exercise.outputFormat,
               constraints: exercise.constraints,
               starterCode: exercise.starterCode,
-              solutionCode: exercise.solutionCode,
+              solutions: privateSolutions(exercise.solutions),
               aiFeedbackEnabled: exercise.aiFeedbackEnabled,
               gradingMode: exercise.gradingMode,
               testCases: exercise.testCases.map((testCase) => ({
@@ -1287,7 +1293,9 @@ function parsePlan(stored: unknown): ContentImportPlan {
   // Parsed rather than cast. The row was written by an older deploy's planner,
   // and a shape change between then and now should fail here — where it names
   // the field — rather than three layers deeper inside the commit.
-  return contentImportPlanSchema.parse(stored);
+  const result = contentImportPlanSchema.safeParse(stored);
+  if (!result.success) throw new AppException("CONTENT_IMPORT_TEMPLATE_UNSUPPORTED", HttpStatus.CONFLICT);
+  return result.data;
 }
 
 function toPreview(

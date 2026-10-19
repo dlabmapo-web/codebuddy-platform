@@ -1,0 +1,15 @@
+{
+  "title": "Reference solutions",
+  "help": "Add complete Python programs for teachers to compare. Each solution is copied separately.",
+  "answer": "Answer {{number}}",
+  "name": "Method name",
+  "add": "Add solution",
+  "up": "Move up",
+  "down": "Move down",
+  "remove": "Remove",
+  "confirm": "Remove this solution from the draft? Save to apply the change.",
+  "invalid": "Enter nonblank code (up to 100,000 characters) and an optional name of up to 80 characters.",
+  "total": "Use 1–10 solutions with at most 500,000 code characters in total.",
+  "copy": "Copy answer {{number}}",
+  "retry": "Retry"
+}

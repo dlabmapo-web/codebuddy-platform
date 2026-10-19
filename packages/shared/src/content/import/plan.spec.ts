@@ -80,11 +80,10 @@ function workbook(input: {
     Problems: [
       header("Problems"),
       ...(input.problems ?? []).map((row) =>
-        row.length === 12
-          ? [...row.slice(0, 11), fixtureSolution, ...row.slice(11)]
-          : row
+        row.length === 13 ? row.filter((_, index) => index !== 11) : row
       ),
     ],
+    Solutions: [header("Solutions"), ...(input.problems ?? []).flatMap(row => { const code = row.length === 13 ? row[11] : fixtureSolution; return code ? [[row[0], "1", "", code]] : []; })],
     "Test Cases": [header("Test Cases"), ...(input.tests ?? [])],
     Hints: input.hints ? [header("Hints"), ...input.hints] : [],
     unknownSheets: input.unknownSheets,
@@ -133,7 +132,7 @@ const existingCourse: CourseProjection = {
               outputFormat: "A greeting.",
               constraints: "",
               starterCode: "name = input()\n",
-              solutionCode: fixtureSolution,
+              solutions: [{ title: null, code: fixtureSolution }],
               aiFeedbackEnabled: false,
               testCases: [
                 {
@@ -292,7 +291,7 @@ describe("planContentImport", () => {
           ...lecture,
           problems: lecture.problems.map((problem) => ({
             ...problem,
-            solutionCode: null,
+            solutions: [],
           })),
         })),
       })),
@@ -357,6 +356,7 @@ describe("planContentImport", () => {
         Structure: sheet("Structure"),
         Problems: sheet("Problems"),
         "Test Cases": sheet("Test Cases"),
+        Solutions: sheet("Solutions"),
         Hints: sheet("Hints"),
       }),
       course: existingCourse,
@@ -597,6 +597,7 @@ describe("planContentImport", () => {
         Structure: [[...header("Structure"), "owner"], ["M1", "1", "One", "", "L1", "1", "Lecture", "", "Minji"]],
         Problems: [header("Problems")],
         "Test Cases": [header("Test Cases")],
+        Solutions: [header("Solutions")],
         Hints: [],
         unknownSheets: ["Scratch"],
       }),
@@ -675,5 +676,43 @@ describe("renderPlainTextDescription", () => {
 
   it("keeps single newlines as line breaks", () => {
     expect(renderPlainTextDescription("one\ntwo")).toBe("<p>one<br>two</p>");
+  });
+});
+
+describe('multiple solutions round trips', () => {
+  function fixture() {
+    const course = structuredClone(existingCourse);
+    course.modules[0].lectures[0].problems[0].solutions = [
+      { title: 'Loop', code: '# private one\nprint(1)\n' },
+      { title: 'Formula', code: '# private two\nprint(2 // 2)\n' },
+    ];
+    const sheets = new Map(buildCurrentCourseWorkbook({ course, locale: 'en' }).sheets.map(sheet => [sheet.name, sheet.rows]));
+    const plan = () => planContentImport({ course, workbook: readWorkbookRows({
+      Structure: sheets.get('Structure')!, Problems: sheets.get('Problems')!, Solutions: sheets.get('Solutions')!, 'Test Cases': sheets.get('Test Cases')!, Hints: sheets.get('Hints')!,
+    }) });
+    return { course, sheets, plan };
+  }
+  it('round trips every code and title without grading or content changes', () => {
+    const { course, plan } = fixture();
+    const result = plan();
+    const problem = result.modules[0].lectures[0].problems[0];
+    expect(result.counts.errors).toBe(0);
+    expect(problem.action).toBe('UNCHANGED');
+    expect(problem.solutions).toEqual(course.modules[0].lectures[0].problems[0].solutions);
+    expect(problem.gradingChanged).toBe(false);
+  });
+  it('treats reorder, rename and removal as solution-only updates with metadata summaries', () => {
+    const { sheets, plan } = fixture();
+    const rows = sheets.get('Solutions')!;
+    [rows[1], rows[2]] = [rows[2], rows[1]];
+    rows[1][1] = '1'; rows[2][1] = '2';
+    let problem = plan().modules[0].lectures[0].problems[0];
+    expect(problem.solutionChanges).toEqual({ added: 0, removed: 0, changed: 0, reordered: true });
+    expect(problem.gradingChanged).toBe(false);
+    rows.pop(); rows[1][2] = 'Renamed';
+    problem = plan().modules[0].lectures[0].problems[0];
+    expect(problem.solutionChanges).toEqual({ added: 0, removed: 1, changed: 1, reordered: false });
+    expect(problem.changedFields).toEqual(['solutions']);
+    expect(problem.gradingChanged).toBe(false);
   });
 });

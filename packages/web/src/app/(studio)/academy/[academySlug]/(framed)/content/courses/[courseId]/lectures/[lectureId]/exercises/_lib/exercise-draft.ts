@@ -1,3 +1,6 @@
+
+import type { ExerciseSolutionEntry } from "@cove/shared";
+import { exerciseSolutionsSchema } from "@cove/shared";
 import {
   quizDefinitionSchema,
   type QuizDefinition,
@@ -65,7 +68,7 @@ export type ExerciseDraft = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
-  solutionCode: string;
+  solutions: ExerciseSolutionEntry[];
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
   testCases: TestCaseDraft[];
@@ -81,7 +84,7 @@ export type ExerciseDraftUpdate = <K extends ExerciseDraftKey>(
 
 export function contextToDraft(
   context: ExerciseAuthoringContext,
-  solutionCode = '',
+  solutions: ExerciseSolutionEntry[] = [],
 ): ExerciseDraft {
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
@@ -94,7 +97,7 @@ export function contextToDraft(
       outputFormat: '',
       constraints: '',
       starterCode: '',
-      solutionCode,
+      solutions: solutions.length ? solutions : [{ title: null, code: '' }],
       aiFeedbackEnabled: false,
       isVisible: false,
       testCases: [newTestCaseDraft('new-sample', 'SAMPLE')],
@@ -113,7 +116,7 @@ export function contextToDraft(
     outputFormat: exercise.outputFormat,
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
-    solutionCode,
+    solutions: exercise.quiz ? [] : solutions.length ? solutions : [{ title: null, code: '' }],
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
     isVisible: context.material!.isVisible,
     testCases: exercise.testCases.map((testCase) => ({
@@ -155,7 +158,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
-    solutionCode: draft.solutionCode,
+    solutions: draft.quiz ? [] : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
     testCases: (draft.quiz ? [] : draft.testCases)
@@ -201,7 +204,7 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
     },
     {
       id: 'solution',
-      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.solutionCode.trim().length > 0,
+      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.solutions.length > 0 && exerciseSolutionsSchema.safeParse(draft.solutions).success,
       optional: false,
     },
     {

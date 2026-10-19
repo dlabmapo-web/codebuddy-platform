@@ -35,6 +35,7 @@ const master = {
               isRequired: true,
               isVisible: false,
               programmingExercise: {
+                solutions: [{ title: "Loop", code: "print(sum(range(1, n + 1)))" }, { title: "Formula", code: "print(n * (n + 1) // 2)" }],
                 externalKey: 'p1',
                 legacyProblemNo: 412,
                 difficulty: 'EASY',
@@ -43,7 +44,7 @@ const master = {
                 outputFormat: 'one integer',
                 constraints: '1 <= n <= 100',
                 starterCode: 'n = int(input())',
-                solutionCode: 'print(sum(range(1, n + 1)))',
+
                 language: 'PYTHON',
                 timeLimitMs: 3000,
                 memoryLimitMb: 256,
@@ -79,6 +80,7 @@ function build(source: unknown = master) {
     lecture: [],
     material: [],
     programmingExercise: [],
+    programmingExerciseSolution: [],
     manualMaterial: [],
     videoLesson: [],
     pdfDocument: [],
@@ -105,6 +107,7 @@ function build(source: unknown = master) {
             if (model === "programmingExercise") remapped.push({ materialId: where.materialId, ...data });
             return Promise.resolve({});
           }),
+          deleteMany: vi.fn(),
           createMany: vi.fn(({ data }) => {
             created[model]!.push(...data);
             return Promise.resolve({ count: data.length });
@@ -207,9 +210,11 @@ describe('AcademyLibraryService.adopt', () => {
       libraryCourseId: masterId,
       title: 'Python Level 1',
     });
+    expect(created.programmingExerciseSolution).toHaveLength(2);
+    expect(created.programmingExerciseSolution[1]).toMatchObject({title: 'Formula', position: 1, code: 'print(n * (n + 1) // 2)'});
     expect(created.programmingExercise[0]).toMatchObject({
       difficulty: 'EASY',
-      solutionCode: 'print(sum(range(1, n + 1)))',
+
       timeLimitMs: 3000,
       aiFeedbackEnabled: true,
       inputPromptPolicy: 'IGNORE',
@@ -344,7 +349,7 @@ it('remaps a reference even when the exercise precedes its PDF in the copied tre
   const copied = created.material as Array<{ id: string; type: string }>;
   const exercise = copied.find(m => m.type === 'PROGRAMMING_EXERCISE')!;
   const document = copied.find(m => m.type === 'PDF_DOCUMENT')!;
-  expect(remapped).toEqual([{ materialId: exercise.id, referencePdfMaterialId: document.id }]);
+  expect(remapped.filter((row: any) => row.referencePdfMaterialId)).toEqual([{ materialId: exercise.id, referencePdfMaterialId: document.id }]);
   expect(document.id).not.toBe('source-pdf');
   expect(created.pdfDocument).toEqual([expect.objectContaining({ materialId: document.id, assetId: 'immutable-asset' })]);
 });

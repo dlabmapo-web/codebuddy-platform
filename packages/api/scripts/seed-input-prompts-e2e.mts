@@ -1,3 +1,4 @@
+import { replaceExerciseSolutions } from "../src/content/exercise-solutions.js";
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config } from 'dotenv';
@@ -62,6 +63,7 @@ try {
         gradingSemanticVersion: weighted ? 'elice-v1' : 'legacy-v1',
       };
       await prisma.programmingExercise.upsert({ where: { materialId }, update: exercise, create: { materialId, ...exercise } });
+      await prisma.$transaction(tx => replaceExerciseSolutions(tx, materialId, [{ title: null, code: exercise.solutionCode }]));
       await prisma.exerciseTestCase.deleteMany({ where: { exerciseMaterialId: materialId } });
       await prisma.exerciseTestCase.createMany({ data: [
         { exerciseMaterialId: materialId, position: 1, input: '4\n30\n', expectedOutput: 'Time: 4:30', visibility: 'SAMPLE' },

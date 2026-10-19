@@ -357,7 +357,7 @@ function exerciseRecord() {
       outputFormat: "One integer",
       constraints: "",
       starterCode: "",
-      solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
+      solutions: [{ title: null, code: "a, b = map(int, input().split())\nprint(a + b)\n" }],
       language: "PYTHON",
       timeLimitMs: 3_000,
       memoryLimitMb: 256,
@@ -406,7 +406,7 @@ const exerciseInput = {
   outputFormat: "One integer",
   constraints: "",
   starterCode: "",
-  solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
+  solutions: [{ title: null, code: "a, b = map(int, input().split())\nprint(a + b)\n" }],
   aiFeedbackEnabled: false,
   isVisible: true,
   testCases: [
@@ -427,7 +427,9 @@ function createExerciseService() {
   const transaction = {
     $queryRaw: vi.fn(),
 
+    programmingExerciseSolution: { deleteMany: vi.fn(), createMany: vi.fn() },
     programmingExercise: {
+      update: vi.fn(),
       findUniqueOrThrow: vi.fn().mockResolvedValue(current.programmingExercise),
       findMany: vi.fn().mockResolvedValue([]),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -498,7 +500,7 @@ describe("CourseService direct problem editing", () => {
       }),
     ).resolves.toEqual({
       materialId,
-      solutionCode: "a, b = map(int, input().split())\nprint(a + b)\n",
+      solutions: [{ title: null, code: "a, b = map(int, input().split())\nprint(a + b)\n" }],
     });
     expect(access.requirePermission).toHaveBeenCalledWith(
       identity.authUserId,
@@ -603,16 +605,10 @@ describe("CourseService direct problem editing", () => {
 
     await service.updateExercise(identity, {
       ...exerciseInput,
-      solutionCode: "print(sum(map(int, input().split())))\n",
+      solutions: [{ title: null, code: "print(sum(map(int, input().split())))\n" }],
     });
 
-    expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          solutionCode: "print(sum(map(int, input().split())))\n",
-        }),
-      }),
-    );
+    expect(transaction.programmingExerciseSolution.createMany).toHaveBeenCalledWith({data: [{ materialId, position: 0, title: null, code: "print(sum(map(int, input().split())))\n" }]});
     expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.not.objectContaining({ gradingRevision: 2 }),

@@ -1,3 +1,5 @@
+
+import type { ExerciseSolutionEntry } from "@cove/shared";
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { notFound } from 'next/navigation';
 
@@ -27,7 +29,7 @@ export default async function ExercisePage({
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
   let context;
-  let solutionCode = '';
+  let solutions: ExerciseSolutionEntry[] = [];
   try {
     context = await client.academyCourses.getExercise({
       academyId,
@@ -50,16 +52,10 @@ export default async function ExercisePage({
   }
   const canEdit = canManageExercises(roles);
   if (canEdit) {
-    // Its own request, and its own failure. The model solution is the one
-    // field this page can open without: legacy problems have none, and the
-    // save path refuses a blank one anyway, so an unreadable answer costs the
-    // author a retype rather than the whole editor. Letting it throw here sent
-    // the entire problem to the error boundary over a field that is optional
-    // for most of the existing curriculum.
-    solutionCode = await client.academyCourses
+    // Fail closed: an unread collection must not be overwritten by an empty draft.
+    solutions = await client.academyCourses
       .getExerciseSolution({ academyId, courseId, lectureId, materialId })
-      .then((solution) => solution.solutionCode ?? '')
-      .catch(() => '');
+      .then((solution) => solution.solutions);
   }
 
   return (
@@ -69,7 +65,7 @@ export default async function ExercisePage({
         canEdit={canEdit}
         courseId={courseId}
         initialContext={context}
-        initialSolutionCode={solutionCode}
+        initialSolutions={solutions}
         lectureId={lectureId}
       />
     </StudioPage>

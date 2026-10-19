@@ -31,7 +31,7 @@ describe("large authoring requests through the API RPC transport", () => {
     lectureId: "20000000-0000-4000-8000-000000000003",
     title: "Large grading test", difficulty: "EASY", description: "",
     inputFormat: "", outputFormat: "", constraints: "", starterCode: "",
-    solutionCode: "print(1)", aiFeedbackEnabled: false, isVisible: false,
+    solutions: [{ title: null, code: "print(1)" }], aiFeedbackEnabled: false, isVisible: false,
     grading: defaultEliceGradingProfile, hints: [],
     testCases: [{input, expectedOutput, visibility: "SAMPLE", comparator: "STDOUT",
       weight: 1, timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null, label: null}],

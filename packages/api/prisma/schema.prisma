@@ -1616,6 +1616,7 @@ model ProgrammingExercise {
   outputFormat      String             @default("") @map("output_format")
   constraints       String             @default("")
   starterCode       String             @default("") @map("starter_code")
+  solutions         ProgrammingExerciseSolution[]
   solutionCode      String?            @map("solution_code") @db.Text
   language          ExerciseLanguage   @default(PYTHON)
   timeLimitMs       Int                @default(3000) @map("time_limit_ms")
@@ -2644,4 +2645,15 @@ model VideoWatchProgress {
   @@unique([materialId, assetId, userId, classId])
   @@index([userId, classId, materialId])
   @@map("video_watch_progress")
+}
+
+model ProgrammingExerciseSolution {
+  id String @id @default(uuid()) @db.Uuid
+  materialId String @map("material_id") @db.Uuid
+  exercise ProgrammingExercise @relation(fields: [materialId], references: [materialId], onDelete: Cascade)
+  position Int
+  title String? @db.VarChar(80)
+  code String @db.Text
+  @@unique([materialId, position])
+  @@map("programming_exercise_solutions")
 }

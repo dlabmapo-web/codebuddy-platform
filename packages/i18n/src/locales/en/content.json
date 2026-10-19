@@ -291,7 +291,10 @@
       "PDF_NOT_AVAILABLE": "This PDF is not available.",
       "PDF_UPLOAD_EXPIRED": "Upload the file again before saving.",
       "PDF_EDIT_STALE": "The material changed. Reload before editing.",
-      "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit."
+      "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
+      "PDF_REFERENCE_INVALID": "Choose a supplementary PDF in the same lecture for this Python exercise.",
+      "PDF_REFERENCE_IN_USE": "This PDF is linked to coding exercises. Detach or change their reference PDFs before moving, deleting, or changing its placement.",
+      "PDF_REFERENCE_NOT_READY": "Publish the reference PDF and its parents before publishing this exercise."
     },
     "remove_selection": "Remove selection",
     "preview": "Preview PDF",

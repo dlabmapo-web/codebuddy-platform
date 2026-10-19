@@ -13,7 +13,7 @@ import {
   type PdfReadResult,
 } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma as PrismaValues, type Prisma } from "../generated/prisma/client.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -141,6 +141,10 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
           },
         });
         if (!lecture) throw new AppException("PDF_NOT_AVAILABLE", 404);
+        if (input.materialId && input.placement === "MAIN") {
+          const references = await tx.programmingExercise.count({ where: { referencePdfMaterialId: input.materialId } });
+          if (references) throw new AppException("PDF_REFERENCE_IN_USE", 409);
+        }
         let assetId = input.assetId;
         let revision = 1;
         if (input.materialId) {
@@ -239,6 +243,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
         });
         if (!material) throw new AppException("PDF_NOT_AVAILABLE", 404);
         if (visible === undefined) {
+          if (await tx.programmingExercise.count({ where: { referencePdfMaterialId: material.id } })) throw new AppException("PDF_REFERENCE_IN_USE", 409);
           await tx.material.delete({ where: { id: material.id } });
           await compactMaterialPositions(tx, target.lectureId);
         } else
@@ -270,6 +275,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
       materialId: string;
       preview?: boolean;
       download?: boolean;
+      exerciseMaterialId?: string;
     },
   ): Promise<PdfReadResult> {
     const actor = await this.access.requirePermission(
@@ -297,6 +303,13 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
             },
           ],
         };
+    if (input.exerciseMaterialId) {
+      const exercise = await this.prisma.material.findFirst({
+        where: { AND: [where, { id: input.exerciseMaterialId, type: "PROGRAMMING_EXERCISE", programmingExercise: { referencePdfMaterialId: input.materialId, quiz: { equals: PrismaValues.DbNull } } }] },
+        select: { id: true },
+      });
+      if (!exercise) throw new AppException("PDF_NOT_AVAILABLE", 404);
+    }
     const material = await this.prisma.material.findFirst({
       where: {
         AND: [
@@ -316,7 +329,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     if (!material?.pdfDocument)
       throw new AppException("PDF_NOT_AVAILABLE", 404);
     const course = material.lecture.courseModule.course;
-    const outline = await this.prisma.course.findUnique({
+    const outline = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
       where: { id: course.id },
       include: visibleCurriculumInclude,
     });

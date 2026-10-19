@@ -38,6 +38,16 @@ function setup() {
   return { prisma, access, storage, service };
 }
 describe("PDF authorization and asset lifecycle", () => {
+  it("requires an accessible exercise with the exact persisted PDF link before embedded signing", async () => {
+    const { service, prisma, storage } = setup();
+    prisma.material.findFirst.mockResolvedValue(null);
+    await expect(service.read(identity, { ...target, exerciseMaterialId: "wrong-exercise" })).rejects.toMatchObject({ code: "PDF_NOT_AVAILABLE" });
+    expect(prisma.material.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: [expect.anything(), expect.objectContaining({
+      id: "wrong-exercise", type: "PROGRAMMING_EXERCISE", programmingExercise: expect.objectContaining({ referencePdfMaterialId: target.materialId }),
+    })] } }));
+    expect(storage.sign).not.toHaveBeenCalled();
+  });
+
   it("checks every visibility ancestor and active enrollment before signing", async () => {
     const { service, prisma, storage, access } = setup();
     prisma.material.findFirst.mockResolvedValue(null);

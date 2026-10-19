@@ -1,4 +1,5 @@
 'use client';
+import { useTranslation } from 'react-i18next';
 
 import type {
   ExerciseProgressStatus,
@@ -439,6 +440,7 @@ function ExerciseRow({
   selected: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
+  const { t: tp } = useTranslation('pdf-practice');
   const status = statusIcons[exercise.status];
 
   return (
@@ -475,7 +477,7 @@ function ExerciseRow({
           }`}
           title={exercise.title}
         >
-          {exercise.title}
+          {exercise.title}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
         </span>
         {/* Status is a word as well as a colour: a red and a green dot are the
             same dot to a large share of readers. */}

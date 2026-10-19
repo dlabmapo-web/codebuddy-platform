@@ -1,5 +1,7 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
+import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
 import { useTranslation } from 'react-i18next';
 import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
@@ -30,11 +32,14 @@ export function ExerciseWorkspace({
   initialSolutionCode: string;
 }) {
   const { t: tq } = useTranslation('quiz');
+  const { t } = useTranslation(['content', 'pdf-practice']);
+  const requireReferencePdf = useSearchParams().get('referencePdf') === 'required' && !initialContext.material;
   const authoring = useExerciseAuthoring({
     target: { academyId, courseId, lectureId },
     initialContext,
     canEdit,
     initialSolutionCode,
+    requireReferencePdf,
   });
   const { draft, editable, update } = authoring;
 
@@ -52,6 +57,8 @@ export function ExerciseWorkspace({
             <option value="python">{tq('programming')}</option><option value="quiz">{tq('single_answer')}</option>
           </select>
         </label>
+        {!draft.quiz ? <ReferencePdfPicker target={{ academyId, courseId, lectureId }} value={draft.referencePdfMaterialId} disabled={!editable} onChange={id => update("referencePdfMaterialId", id)} /> : null}
+        {requireReferencePdf && !draft.referencePdfMaterialId ? <p role="status" className="text-sm text-sub">{t("pdf-practice:required")}</p> : null}
         <BasicInformation
           authoring={authoring}
           draft={draft}

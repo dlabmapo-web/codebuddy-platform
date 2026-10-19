@@ -1,3 +1,4 @@
+import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import {
@@ -134,6 +135,7 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 }>;
 
 type ExerciseWriteInput = {
+  referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   academyId: string;
   courseId: string;
@@ -282,11 +284,13 @@ export class CourseService {
       );
     }
     const course = await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
       const updated = await tx.course.update({
         where: { id: current.id },
         data: { isVisible: input.isVisible },
         include: courseSummaryInclude,
       });
+      if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -333,6 +337,7 @@ export class CourseService {
     );
     const course = await this.requireCourse(input.academyId, input.courseId);
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
       const modules = await tx.courseModule.updateMany({
         where: { courseId: course.id },
         data: { isVisible: input.isVisible },
@@ -345,6 +350,7 @@ export class CourseService {
         where: { lecture: { courseModule: { courseId: course.id } } },
         data: { isVisible: input.isVisible },
       });
+      if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -448,6 +454,7 @@ export class CourseService {
     );
     const current = await this.requireModule(input.courseId, input.moduleId);
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
       const updated = await tx.courseModule.update({
         where: { id: current.id },
         data: {
@@ -460,6 +467,7 @@ export class CourseService {
             : { isVisible: input.isVisible }),
         },
       });
+      if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -556,6 +564,8 @@ export class CourseService {
         where: { courseId: course.id },
       });
       // Modules cascade to lectures, materials, exercises, cases and hints.
+      await lockCourse(tx, course.id);
+      await detachSubtreePdfReferences(tx, { lecture: { courseModule: { courseId: course.id } } });
       await tx.courseModule.deleteMany({ where: { courseId: course.id } });
       await tx.course.delete({ where: { id: course.id } });
 
@@ -585,6 +595,8 @@ export class CourseService {
     const current = await this.requireModule(input.courseId, input.moduleId);
     await this.assertNoSubmissions({ moduleId: current.id });
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      await detachSubtreePdfReferences(tx, { lecture: { courseModuleId: current.id } });
       await tx.courseModule.delete({ where: { id: current.id } });
       await compactModulePositions(tx, input.courseId);
       await this.audit.write(tx, {
@@ -702,6 +714,7 @@ export class CourseService {
     );
     const current = await this.requireLecture(input.courseId, input.lectureId);
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
       const updated = await tx.lecture.update({
         where: { id: current.id },
         data: {
@@ -714,6 +727,7 @@ export class CourseService {
             : { isVisible: input.isVisible }),
         },
       });
+      if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -751,6 +765,8 @@ export class CourseService {
     const current = await this.requireLecture(input.courseId, input.lectureId);
     await this.assertNoSubmissions({ lectureId: current.id });
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      await detachSubtreePdfReferences(tx, { lectureId: current.id });
       await tx.lecture.delete({ where: { id: current.id } });
       await compactLecturePositions(tx, current.courseModuleId);
       await this.audit.write(tx, {
@@ -1006,6 +1022,8 @@ export class CourseService {
       if (!reparenting && sameOrder(currentIds, ordering)) return false;
 
       if (reparenting) {
+        const linked = await tx.programmingExercise.count({ where: { OR: [{ materialId: material.id, referencePdfMaterialId: { not: null } }, { referencePdfMaterialId: material.id }] } });
+        if (linked) throw new AppException("PDF_REFERENCE_IN_USE", HttpStatus.CONFLICT);
         await reparentAbovePositions(
           tx,
           "material",
@@ -1129,9 +1147,13 @@ export class CourseService {
     context: ContentRequestContext = {},
   ) {
     const actor = await this.requireExerciseManager(identity, input.academyId);
+    await this.requireCourse(input.academyId, input.courseId);
     await this.requireLecture(input.courseId, input.lectureId);
+    if (input.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
     const record = await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      await validatePdfReference(tx, input, input.referencePdfMaterialId);
       const position = await nextMaterialPosition(tx, input.lectureId);
       const material = await tx.material.create({
         data: {
@@ -1146,6 +1168,7 @@ export class CourseService {
               // §9.1 — the same canonical form imported keys use, so a
               // generated workbook round-trips a hand-made problem unchanged.
               externalKey: stableKeyFromUuid(randomUUID()),
+              referencePdfMaterialId: input.referencePdfMaterialId ?? null,
               quiz: input.quiz ?? PrismaValues.DbNull,
               difficulty: input.difficulty,
               description: input.description,
@@ -1199,6 +1222,7 @@ export class CourseService {
     const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
     const exercise = current.programmingExercise!;
+    if (input.referencePdfMaterialId !== undefined && input.referencePdfMaterialId !== exercise.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     // An old client or a forged request cannot reinterpret existing attempts
     // as a different question type. Create another material to change type.
     if (Boolean(exercise.quiz) !== Boolean(input.quiz)) {
@@ -1217,12 +1241,16 @@ export class CourseService {
       !sameGradingProfile(exercise, profileColumns);
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
+      const latest = await tx.programmingExercise.findUniqueOrThrow({ where: { materialId: current.id } });
+      await validatePdfReference(tx, input, input.referencePdfMaterialId === undefined ? latest.referencePdfMaterialId : input.referencePdfMaterialId, input.isVisible);
       const claimed = await tx.programmingExercise.updateMany({
         where: {
           materialId: current.id,
           updatedAt: atRevision(exercise.updatedAt),
         },
         data: {
+          ...(input.referencePdfMaterialId !== undefined ? { referencePdfMaterialId: input.referencePdfMaterialId } : {}),
           quiz: input.quiz ?? PrismaValues.DbNull,
           difficulty: input.difficulty,
           description: input.description,
@@ -1329,10 +1357,12 @@ export class CourseService {
     const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
     await this.prisma.$transaction(async (tx) => {
+      await lockCourse(tx, input.courseId);
       await tx.material.update({
         where: { id: current.id },
         data: { isVisible: input.isVisible },
       });
+      if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -1708,6 +1738,7 @@ function exerciseAuditFromInput(
   gradingRevision: number,
 ) {
   return {
+    referencePdfMaterialId: input.referencePdfMaterialId,
     title: input.title.trim(),
     difficulty: input.difficulty,
     position,
@@ -1735,6 +1766,7 @@ function exerciseAuditFromInput(
 function exerciseRecordAudit(record: ExerciseRecord) {
   const exercise = record.programmingExercise!;
   return {
+    referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     title: record.title,
     difficulty: exercise.difficulty,
     position: record.position,
@@ -1925,6 +1957,7 @@ function serializeExercise(
   return {
     quiz:
       exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz),
+    referencePdfMaterialId: exercise.referencePdfMaterialId,
     materialId: exercise.materialId,
     externalKey: exercise.externalKey,
     legacyProblemNo: exercise.legacyProblemNo,

@@ -33,11 +33,13 @@ export function useExerciseAuthoring({
   initialContext,
   canEdit,
   initialSolutionCode,
+  requireReferencePdf = false,
 }: {
   target: AuthoringTarget;
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
   initialSolutionCode: string;
+  requireReferencePdf?: boolean;
 }) {
   const contentPaths = useContentBasePath();
   const { t } = useTranslation('content');
@@ -76,6 +78,7 @@ export function useExerciseAuthoring({
    */
   const gradingIssues = draftGradingIssues(draft);
   const saveReady =
+    (!requireReferencePdf || Boolean(draft.referencePdfMaterialId)) &&
     required.every((item) => item.complete) && gradingIssues.length === 0 &&
     exerciseDraftFieldsSchema.safeParse(draftToPayload(draft)).success;
   const missing = required

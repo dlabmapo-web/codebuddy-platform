@@ -17,6 +17,7 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
+import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { useLayoutTranslation } from '@/i18n';
 import { orpc } from '@/lib/orpc';
@@ -505,18 +506,19 @@ export function LiveWorkspace({
           <div
             className="@container min-w-0 shrink-0 overflow-x-hidden overflow-y-auto bg-card"
             style={{ flexBasis: `${statementWidth}%` }}
-            {...surfaceProps('statement')}
           >
             {shown ? (
               // Every hint is already revealed here: the teacher is the one
               // deciding which of them this student needs to hear. A preview
               // renders through exactly the same presentation, because a public
               // statement is a public statement whichever mode fetched it.
+              <ExerciseReferencePane key={shown.exercise.materialId} academyId={academyId} exercise={shown.exercise} teacher>
               <ProblemStatement
                 collaborating={live.collaborating}
                 exercise={shown.exercise}
                 revealedHints={shown.exercise.hints.length}
               />
+              </ExerciseReferencePane>
             ) : (
               <div className="px-5 py-6">
                 <h2 className="text-[15px] font-bold">

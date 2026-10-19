@@ -188,6 +188,7 @@ export class CurriculumOutlineService {
                     title: material.title,
                     position: material.position,
                     difficulty: material.programmingExercise.difficulty,
+                    hasReferencePdf: Boolean(material.programmingExercise.referencePdfMaterialId),
                     status: statuses.get(material.id)?.status ?? "NOT_STARTED",
                     bestScore: statuses.get(material.id)?.bestScore ?? 0,
                   },

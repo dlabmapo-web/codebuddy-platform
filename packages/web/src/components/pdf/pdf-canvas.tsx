@@ -28,17 +28,19 @@ export function PdfCanvas({
   academyId,
   materialId,
   preview = false,
+  exerciseMaterialId,
 }: {
   academyId: string;
   materialId: string;
   preview?: boolean;
+  exerciseMaterialId?: string;
 }) {
   const { t } = useTranslation('content');
   const root = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const query = useQuery({
-    queryKey: ['pdf', academyId, materialId, preview],
-    queryFn: () => pdfApi.read({ academyId, materialId, preview }),
+    queryKey: ['pdf', academyId, materialId, preview, ...(exerciseMaterialId ? [exerciseMaterialId] : [])],
+    queryFn: () => pdfApi.read({ academyId, materialId, preview, exerciseMaterialId }),
     retry: false,
     staleTime: 0,
   });
@@ -56,9 +58,11 @@ export function PdfCanvas({
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const observer = new ResizeObserver(() =>
-      setSize({ width: node.clientWidth - 32, height: node.clientHeight - 32 }),
-    );
+    const observer = new ResizeObserver(() => {
+      // Hidden mobile/reference tabs retain their renderer and last valid geometry.
+      if (node.clientWidth > 32 && node.clientHeight > 32)
+        setSize({ width: node.clientWidth - 32, height: node.clientHeight - 32 });
+    });
     observer.observe(node);
     return () => observer.disconnect();
   }, [data]);
@@ -76,6 +80,7 @@ export function PdfCanvas({
         academyId,
         materialId,
         preview,
+        exerciseMaterialId,
         download: true,
       });
       const link = document.createElement('a');
@@ -244,7 +249,10 @@ export function PdfCanvas({
           file={file}
           options={options}
           error={<p role="alert">{t('pdf.unavailable')}</p>}
-          onLoadSuccess={() => setError(undefined)}
+          onLoadSuccess={(document) => {
+            setPage(current => Math.min(current, document.numPages));
+            setError(undefined);
+          }}
           loading={<p role="status">{t('pdf.loading')}</p>}
           onLoadError={() => {
             if (!renewed.current) {

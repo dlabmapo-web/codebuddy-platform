@@ -1,3 +1,4 @@
+import type pdfPractice from '@cove/i18n/locales/en/pdf-practice.json';
 import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
 import type grading from "@cove/i18n/locales/en/grading.json";
@@ -68,6 +69,7 @@ declare module 'i18next' {
       classes: typeof classes;
       common: typeof common;
       content: typeof content;
+      "pdf-practice": typeof pdfPractice;
       'content-import': typeof contentImport;
       courses: typeof courses;
       destructive: typeof destructive;

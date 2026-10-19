@@ -228,6 +228,8 @@ export class AcademyLibraryService {
     const lectures: Prisma.LectureCreateManyInput[] = [];
     const materials: Prisma.MaterialCreateManyInput[] = [];
     const documents: Prisma.PdfDocumentCreateManyInput[] = [];
+    const materialIds = new Map<string, string>();
+    const references: Array<{ materialId: string; referenceId: string }> = [];
     const videos:Prisma.VideoLessonCreateManyInput[]=[];
     const manuals:Prisma.ManualMaterialCreateManyInput[]=[];
     const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
@@ -271,6 +273,8 @@ export class AcademyLibraryService {
 
         for (const material of lecture.materials) {
           const materialId = randomUUID();
+          materialIds.set(material.id, materialId);
+          if (material.programmingExercise?.referencePdfMaterialId) references.push({ materialId, referenceId: material.programmingExercise.referencePdfMaterialId });
           materials.push({
             id: materialId,
             lectureId,
@@ -385,6 +389,11 @@ export class AcademyLibraryService {
       if(manuals.length)await tx.manualMaterial.createMany({data:manuals});
       if (exercises.length) {
         await tx.programmingExercise.createMany({ data: exercises });
+      }
+      for (const reference of references) {
+        const referenceId = materialIds.get(reference.referenceId);
+        if (!referenceId) throw new AppException("PDF_REFERENCE_INVALID", HttpStatus.CONFLICT);
+        await tx.programmingExercise.update({ where: { materialId: reference.materialId }, data: { referencePdfMaterialId: referenceId } });
       }
       if (testCases.length) {
         await tx.exerciseTestCase.createMany({ data: testCases });

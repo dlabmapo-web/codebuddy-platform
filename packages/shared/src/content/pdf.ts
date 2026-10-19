@@ -29,6 +29,7 @@ export const pdfMaterialTargetSchema = pdfTargetSchema.extend({
   materialId: z.uuid(),
 });
 export const pdfReadSchema = z.object({
+  exerciseMaterialId: z.uuid().optional(),
   academyId: z.uuid(),
   materialId: z.uuid(),
   preview: z
@@ -63,3 +64,6 @@ export function pdfIsMain(placement: PdfPlacement) {
 export function pdfIsResource(placement: PdfPlacement) {
   return placement !== "MAIN";
 }
+
+/** Embedded delivery omits course navigation; access is checked against both materials. */
+export type PdfDeliveryResult = Pick<PdfReadResult, "materialId" | "title" | "pdf" | "url">;

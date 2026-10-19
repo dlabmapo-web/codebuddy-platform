@@ -32,11 +32,12 @@ export const pdfApi = {
     materialId: string;
     preview?: boolean;
     download?: boolean;
+    exerciseMaterialId?: string;
   }) =>
     request<PdfReadResult>(
       '?' +
         new URLSearchParams(
-          Object.entries(input).map(([k, v]) => [k, String(v)]),
+          Object.entries(input).filter(([, value]) => value !== undefined).map(([k, v]) => [k, String(v)]),
         ),
     ),
   save: (input: SavePdf) =>

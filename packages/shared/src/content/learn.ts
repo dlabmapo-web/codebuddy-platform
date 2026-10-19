@@ -65,6 +65,7 @@ export const learnHintSchema = z.object({
 export type LearnHint = z.infer<typeof learnHintSchema>;
 
 export const learnExerciseSummarySchema = z.object({
+  hasReferencePdf: z.boolean().optional(),
   materialId: z.uuid(),
   title: titleSchema,
   position: positionSchema,
@@ -236,6 +237,8 @@ export const learnExerciseRefSchema = z.object({
 export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
+  hasReferencePdf: z.boolean().optional(),
+  referencePdf: z.object({ materialId: z.uuid(), title: z.string(), revision: z.number().int().positive(), originalFilename: z.string(), pageCount: z.number().int().positive(), byteSize: z.number().int().positive() }).nullable().optional(),
   quiz: publicQuizSchema.nullable().optional(),
   materialId: z.uuid(),
   title: titleSchema,
@@ -311,6 +314,7 @@ export const navigatorPathSchema = z.object({
 export type NavigatorPath = z.infer<typeof navigatorPathSchema>;
 
 export const navigatorExerciseSchema = z.object({
+  hasReferencePdf: z.boolean().optional(),
   materialId: z.uuid(),
   title: titleSchema,
   position: positionSchema,
@@ -569,6 +573,7 @@ export function toNavigatorContext(
           documents: lecture.documents,
           manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
+            hasReferencePdf: exercise.hasReferencePdf,
             materialId: exercise.materialId,
             title: exercise.title,
             position: exercise.position,

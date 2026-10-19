@@ -13,18 +13,22 @@ export function PdfAuthorDialog({
   onClose,
   onSaved,
   initialPreview = false,
+  initialPlacement = "MAIN",
+  referringExercises = [],
 }: {
   target: { academyId: string; courseId: string; lectureId: string };
   material?: { id: string; title: string; pdfDocument?: PdfMetadata | null };
   editable: boolean;
   initialPreview?: boolean;
   onClose: () => void;
-  onSaved: () => Promise<unknown>;
+  onSaved: (result: { materialId: string }) => Promise<unknown>;
+  initialPlacement?: PdfPlacement;
+  referringExercises?: Array<{ title: string }>;
 }) {
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'pdf-practice']);
   const [title, setTitle] = useState(material?.title ?? '');
   const [placement, setPlacement] = useState<PdfPlacement>(
-    material?.pdfDocument?.placement ?? 'MAIN',
+    material?.pdfDocument?.placement ?? initialPlacement,
   );
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState(false);
@@ -78,7 +82,7 @@ export function PdfAuthorDialog({
           )
         : undefined;
       if (canceledRef.current) return;
-      await pdfApi.save({
+      const result = await pdfApi.save({
         ...target,
         materialId: material?.id,
         revision: material?.pdfDocument?.revision,
@@ -86,7 +90,7 @@ export function PdfAuthorDialog({
         placement,
         assetId: asset?.assetId,
       });
-      await onSaved();
+      await onSaved(result);
       if (!canceledRef.current) onClose();
     } catch (e) {
       if (canceledRef.current) return;
@@ -130,6 +134,7 @@ export function PdfAuthorDialog({
             className="overflow-auto"
           >
             <div className="grid gap-4 p-6">
+              {referringExercises.length ? <div role="status" className="text-sm text-sub"><p>{t("pdf-practice:in_use")}</p><ul className="list-disc pl-5">{referringExercises.map((exercise, index) => <li key={index}>{exercise.title}</li>)}</ul></div> : null}
               <label className="grid gap-1 text-sm font-bold">
                 {t('pdf.title')}
                 <input
@@ -150,7 +155,7 @@ export function PdfAuthorDialog({
                   onChange={(e) => setPlacement(e.target.value as PdfPlacement)}
                 >
                   {(['MAIN', 'SUPPLEMENTARY', 'BOTH'] as const).map((value) => (
-                    <option key={value} value={value}>
+                    <option key={value} value={value} disabled={value === "MAIN" && referringExercises.length > 0}>
                       {t(`pdf.placements.${value}`)}
                     </option>
                   ))}

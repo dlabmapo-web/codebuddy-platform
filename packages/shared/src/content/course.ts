@@ -176,6 +176,7 @@ export const exerciseHintSchema = z.object({
 });
 
 export const programmingExerciseSchema = z.object({
+  referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
   materialId: z.uuid(),
   externalKey: z.string().trim().min(1).max(200),
@@ -650,6 +651,7 @@ export function gradingProfileIssues(input: {
 }
 
 export const exerciseDraftFieldsSchema = z.object({
+  referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
   title: titleSchema,
   difficulty: exerciseDifficultySchema,
@@ -704,6 +706,9 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
       path: ["testCases"],
       message: "Encoded problem data exceed the 20 MB request limit.",
     });
+  }
+  if (value.quiz && value.referencePdfMaterialId) {
+    context.addIssue({ code: "custom", path: ["referencePdfMaterialId"], message: "PDF references require a Python exercise." });
   }
   if (value.quiz) {
     if (value.testCases.length || value.grading.mode !== "LEGACY_STDIO") {

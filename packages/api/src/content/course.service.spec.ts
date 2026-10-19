@@ -52,6 +52,8 @@ function courseRecord() {
 function createService(options?: { duplicate?: boolean }) {
   const created = courseRecord();
   const transaction = {
+    $queryRaw: vi.fn(),
+    programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     course: {
       create: vi.fn().mockResolvedValue(created),
     },
@@ -202,6 +204,8 @@ function createHierarchyService() {
     isVisible: false,
   };
   const transaction = {
+    $queryRaw: vi.fn(),
+    programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     courseModule: { update: vi.fn().mockResolvedValue(module) },
     lecture: { update: vi.fn().mockResolvedValue(lecture) },
     course: {
@@ -421,7 +425,11 @@ function createExerciseService() {
   const current = exerciseRecord();
   const updated = exerciseRecord();
   const transaction = {
+    $queryRaw: vi.fn(),
+
     programmingExercise: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue(current.programmingExercise),
+      findMany: vi.fn().mockResolvedValue([]),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     material: {
@@ -766,6 +774,8 @@ function createBulkVisibilityService() {
   const revocation = { revokeClass: vi.fn().mockResolvedValue(undefined) };
   const audit = { write: vi.fn().mockResolvedValue({ id: "audit-id" }) };
   const transaction = {
+    $queryRaw: vi.fn(),
+    programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     courseModule: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
     lecture: { updateMany: vi.fn().mockResolvedValue({ count: 11 }) },
     material: { updateMany: vi.fn().mockResolvedValue({ count: 96 }) },

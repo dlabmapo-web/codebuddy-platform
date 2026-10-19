@@ -1,4 +1,5 @@
 'use client';
+import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import {VideoResourceLinks} from '@/components/video/video-resource-links';
 
 import { QuizWorkspace } from './quiz-workspace';
@@ -89,6 +90,7 @@ function ProgrammingWorkspace({
   const { t } = useLayoutTranslation('learn');
   // The monitoring copy is mounted by this page for the indicator; the peer
   // labels come from the same namespace.
+  const { t: tp } = useTranslation('pdf-practice');
   const { t: tm } = useTranslation('monitoring');
   const { t: tsample } = useTranslation('sample-check');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
@@ -220,7 +222,7 @@ function ProgrammingWorkspace({
     dividerProps: statementDividerProps,
   } = useSplitPane({
     axis: 'horizontal',
-    initial: STATEMENT_PANE.initialPercent,
+    initial: exercise.hasReferencePdf ? 45 : STATEMENT_PANE.initialPercent,
     min: STATEMENT_PANE.minPercent,
     // While collaborating the statement lays out on a fixed canvas, which
     // cannot be scaled below its floor and stay readable.
@@ -604,7 +606,7 @@ function ProgrammingWorkspace({
             onClick={() => setMobileTab(tab)}
             type="button"
           >
-            {t(`workspace.tab_${tab}`)}
+            {tab === 'problem' && exercise.hasReferencePdf ? tp('materials_tab') : t(`workspace.tab_${tab}`)}
           </button>
         ))}
       </div>
@@ -642,14 +644,15 @@ function ProgrammingWorkspace({
             // property, leaving `flex: none` with an auto basis and crushing
             // the statement against Monaco's intrinsic width.
             style={{ flexBasis: `${statementWidth}%` }}
-            {...surfaceProps('statement')}
           >
+            <ExerciseReferencePane key={exercise.materialId} academyId={academyId} exercise={exercise}>
             <ProblemStatement
               collaborating={monitoring.collaborating}
               exercise={exercise}
               onRevealHint={handleRevealHint}
               revealedHints={revealedHints}
             />
+            </ExerciseReferencePane>
           </section>
 
           <div

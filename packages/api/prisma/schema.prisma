@@ -1602,6 +1602,9 @@ enum InputPromptPolicy {
 }
 
 model ProgrammingExercise {
+  referencePdfMaterialId String? @map("reference_pdf_material_id") @db.Uuid
+  referencePdf PdfDocument? @relation(fields: [referencePdfMaterialId], references: [materialId], onDelete: Restrict)
+
   /// Native single-answer quiz. Null keeps the existing Python exercise path.
   quiz              Json?
   materialId        String             @id @map("material_id") @db.Uuid
@@ -1652,6 +1655,7 @@ model ProgrammingExercise {
 
   @@index([externalKey])
   @@index([legacyProblemNo])
+  @@index([referencePdfMaterialId])
   @@map("programming_exercises")
 }
 
@@ -2396,6 +2400,8 @@ model PdfAsset {
 }
 
 model PdfDocument {
+  referringExercises ProgrammingExercise[]
+
   materialId String       @id @map("material_id") @db.Uuid
   assetId    String       @map("asset_id") @db.Uuid
   placement  PdfPlacement @default(MAIN)

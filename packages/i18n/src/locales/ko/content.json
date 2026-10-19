@@ -288,7 +288,10 @@
       "PDF_NOT_AVAILABLE": "이 PDF를 사용할 수 없습니다.",
       "PDF_UPLOAD_EXPIRED": "저장 전에 파일을 다시 업로드하세요.",
       "PDF_EDIT_STALE": "자료가 변경되었습니다. 새로고침 후 수정하세요.",
-      "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다."
+      "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다.",
+      "PDF_REFERENCE_INVALID": "이 Python 실습과 같은 강의의 보조 PDF를 선택해 주세요.",
+      "PDF_REFERENCE_IN_USE": "이 PDF를 사용하는 코딩 실습이 있습니다. 실습의 참고 PDF 연결을 해제하거나 변경한 후 이동·삭제·배치를 변경해 주세요.",
+      "PDF_REFERENCE_NOT_READY": "실습을 공개하기 전에 참고 PDF와 상위 콘텐츠를 공개해 주세요."
     },
     "remove_selection": "파일 선택 취소",
     "preview": "PDF 미리보기",

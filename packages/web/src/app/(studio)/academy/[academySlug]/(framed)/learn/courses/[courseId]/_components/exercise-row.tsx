@@ -1,4 +1,5 @@
 'use client';
+import { useTranslation } from 'react-i18next';
 
 import { routes } from '@/lib/routes';
 
@@ -41,6 +42,7 @@ export function ExerciseRow({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useLayoutTranslation(['learn', 'courses']);
+  const { t: tp } = useTranslation('pdf-practice');
   const status = statusStyles[exercise.status];
 
   return (
@@ -55,7 +57,7 @@ export function ExerciseRow({
           {label}
         </span>
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold transition-colors group-hover:text-brand">
-          {exercise.title}
+          {exercise.title}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
         </span>
         <span
           className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold sm:inline ${

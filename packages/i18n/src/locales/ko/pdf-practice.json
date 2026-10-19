@@ -1,0 +1,21 @@
+{
+  "label": "참고 PDF",
+  "none": "참고 PDF 없음",
+  "practice": "PDF + 코딩 실습",
+  "theory": "PDF 자료",
+  "code": "코딩 실습",
+  "description": "PDF를 보며 코딩합니다. 기존 실행·제출·채점 설정을 사용합니다.",
+  "same_lecture": "같은 강의의 보조 PDF를 선택하세요. 학습 자료 전용 PDF는 학습 및 보조자료로 변경한 후 연결할 수 있습니다.",
+  "hidden": "비공개 — 실습 공개 전에 PDF를 공개해 주세요",
+  "add": "PDF 자료 추가",
+  "retained": "이 PDF는 실습 작성을 취소해도 강의에 저장되어 있습니다.",
+  "pdf_tab": "참고 PDF",
+  "statement_tab": "문제 설명",
+  "materials_tab": "자료",
+  "unavailable": "참고 PDF를 사용할 수 없습니다. 문제 설명을 보며 실습을 계속할 수 있습니다.",
+  "required": "PDF + 코딩 실습을 만들려면 참고 PDF를 선택해 주세요.",
+  "local_pages": "PDF 페이지 선택은 각 화면에만 적용됩니다.",
+  "main_only": "학습 자료 전용 — 학습 및 보조자료로 변경 후 연결",
+  "retry": "다시 시도",
+  "in_use": "이 PDF를 사용하는 코딩 실습입니다. 실습의 참고 PDF를 먼저 변경하거나 해제해 주세요:"
+}

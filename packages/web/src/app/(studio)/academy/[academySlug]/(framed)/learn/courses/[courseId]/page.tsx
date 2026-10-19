@@ -1,3 +1,6 @@
+import { PageTranslationsProvider } from '@/i18n';
+import { initTranslations } from '@/i18n/init-translations';
+import { getLocale } from '@/i18n/server/get-locale';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnCourseOutlineResult } from '@cove/shared';
@@ -36,7 +39,11 @@ export default async function LearnCoursePage({
   }
   if (!outline) notFound();
 
+  const locale = await getLocale();
+  const namespaces = ["pdf-practice"] as const;
+  const { resources } = await initTranslations(locale, namespaces);
   return (
+    <PageTranslationsProvider locale={locale} namespaces={namespaces} resources={resources}>
     <StudioPage
       back={
         <BackLink
@@ -67,6 +74,7 @@ export default async function LearnCoursePage({
         />
       )}
     </StudioPage>
+    </PageTranslationsProvider>
   );
 }
 

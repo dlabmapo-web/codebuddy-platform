@@ -1,0 +1,21 @@
+{
+  "label": "Reference PDF",
+  "none": "No reference PDF",
+  "practice": "PDF + coding practice",
+  "theory": "PDF material",
+  "code": "Coding practice",
+  "description": "Read the PDF beside your code. Uses the existing Run, Submit and grading settings.",
+  "same_lecture": "Choose a supplementary PDF from this lecture. Main PDFs must be changed to Main and supplementary first.",
+  "hidden": "Hidden — publish before making the practice available",
+  "add": "Add PDF material",
+  "retained": "The PDF is saved in this lecture even if you cancel this exercise.",
+  "pdf_tab": "Reference PDF",
+  "statement_tab": "Problem statement",
+  "materials_tab": "Materials",
+  "unavailable": "The reference PDF is unavailable. You can continue using the problem statement.",
+  "required": "Select a reference PDF to create PDF + coding practice.",
+  "local_pages": "PDF pages are local to your screen.",
+  "main_only": "Main only — change to Main and supplementary to link",
+  "retry": "Retry",
+  "in_use": "Used by coding exercises — change or detach their reference PDF first:"
+}

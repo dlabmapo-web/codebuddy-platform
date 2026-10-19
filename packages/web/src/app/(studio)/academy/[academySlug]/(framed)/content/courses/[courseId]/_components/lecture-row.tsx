@@ -115,7 +115,7 @@ function ExerciseRow({
   parentEffectivelyVisible: boolean;
   siblings: readonly CourseMaterial[];
 }) {
-  const { t } = useTranslation(['content', 'courses']);
+  const { t } = useTranslation(['content', 'courses', 'pdf-practice']);
   // See `ModuleCard`: the flag is inert in a library academy.
   const visibilityIsReal = useContentSurface() !== 'library';
   const router = useRouter();
@@ -180,7 +180,7 @@ function ExerciseRow({
           </button>
         ) : (
           <Link className={titleClass} href={href}>
-            {material.title}
+            {material.title}{material.programmingExercise?.referencePdfMaterialId ? <span className="ml-2 text-xs text-sub">{t('pdf-practice:practice')}</span> : null}
           </Link>
         )}
         {material.pdfDocument ? (
@@ -268,6 +268,7 @@ function ExerciseRow({
         />
       ) : null}
       <DeleteModal
+        dependencyTitles={material.type === "PDF_DOCUMENT" ? siblings.filter(row => row.programmingExercise?.referencePdfMaterialId === material.id).map(row => row.title) : []}
         itemTitle={material.title}
         kind={material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
         onCancel={() => setDeleting(false)}
@@ -283,6 +284,7 @@ function ExerciseRow({
         <PdfAuthorDialog
           target={{ ...builder.target, lectureId }}
           material={material}
+          referringExercises={siblings.filter(row => row.programmingExercise?.referencePdfMaterialId === material.id)}
           initialPreview={pdfPreview}
           editable={builder.editable}
           onClose={() => {
@@ -311,7 +313,7 @@ export function LectureRow({
   moduleNumber: number;
   parentEffectivelyVisible: boolean;
 }) {
-  const { t } = useTranslation(['content', 'courses']);
+  const { t } = useTranslation(['content', 'courses', 'pdf-practice']);
   const visibilityIsReal = useContentSurface() !== 'library';
   const [pdfAdding, setPdfAdding] = useState(false);
   const {t:mt}=useManualTranslation();
@@ -469,13 +471,14 @@ export function LectureRow({
           {builder.editable && publicConfig.multipleChoiceEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setChoiceAdding(true)}><Plus className="size-3.5"/>{mt("add_multiple_choice")}</button> : null}
           {builder.editable && publicConfig.shortAnswerEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setShortAdding(true)}><Plus className="size-3.5"/>{mt('add_short_answer')}</button> : null}
           {builder.editable && !publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setWrittenAdding(true)}><Plus className="size-3.5"/>{mt('written_response')}</button> : null}
+          {builder.editable ? <Link className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" href={`${exercisePath(lecture.id, 'new')}?referencePdf=required`}><Plus className="size-3.5" />{t('pdf-practice:practice')}</Link> : null}
           {builder.exerciseEditable ? (
             <Link
               className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand hover:text-brand-deep"
               href={exercisePath(lecture.id, 'new')}
             >
               <Plus className="size-3.5" />
-              {t('exercise.add')}
+              {t('pdf-practice:code')}
             </Link>
           ) : null}
         </Collapsible.Content>

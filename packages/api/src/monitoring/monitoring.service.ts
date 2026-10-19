@@ -1,3 +1,4 @@
+import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
@@ -656,6 +657,8 @@ export class MonitoringService {
         // answer has exactly one route out of this service, and it is audited.
         programmingExercise: {
           select: {
+            referencePdfMaterialId: true,
+            referencePdf: { include: { asset: true, material: true } },
             quiz: true,
             difficulty: true,
             language: true,
@@ -703,6 +706,8 @@ export class MonitoringService {
         inputFormat: exercise.inputFormat,
         outputFormat: exercise.outputFormat,
         constraints: exercise.constraints,
+        hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
+        referencePdf: referencePdfMetadata(exercise.referencePdf),
         quiz: publicQuiz(exercise.quiz),
         starterCode: exercise.starterCode,
         timeLimitMs: exercise.timeLimitMs,

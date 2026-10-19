@@ -56,6 +56,7 @@ export type HintDraft = {
 };
 
 export type ExerciseDraft = {
+  referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   title: string;
   difficulty: ExerciseDifficulty;
@@ -85,6 +86,7 @@ export function contextToDraft(
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
     return {
+      referencePdfMaterialId: null,
       title: '',
       difficulty: 'EASY',
       description: '',
@@ -102,6 +104,7 @@ export function contextToDraft(
   }
 
   return {
+    referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     quiz: exercise.quiz ?? null,
     title: context.material!.title,
     difficulty: exercise.difficulty,
@@ -143,6 +146,7 @@ export function contextToDraft(
 
 export function draftToPayload(draft: ExerciseDraft) {
   return {
+    referencePdfMaterialId: draft.quiz ? null : draft.referencePdfMaterialId,
     ...(draft.quiz ? { quiz: draft.quiz } : {}),
     title: draft.title.trim(),
     difficulty: draft.difficulty,

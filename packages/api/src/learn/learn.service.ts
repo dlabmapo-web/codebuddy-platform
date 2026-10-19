@@ -1,3 +1,4 @@
+import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable } from "@nestjs/common";
 
@@ -40,6 +41,7 @@ import { LearningClassContextService } from "./learning-class-context.service.js
 const workspaceMaterialInclude = {
   programmingExercise: {
     include: {
+      referencePdf: { include: { asset: true, material: true } },
       testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
       hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
     },
@@ -303,6 +305,8 @@ export class LearnService {
         lecture: { id: material.lecture.id, title: material.lecture.title },
       },
       exercise: {
+        hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
+        referencePdf: referencePdfMetadata(exercise.referencePdf),
         quiz: publicQuiz(exercise.quiz),
         materialId: material.id,
         title: material.title,

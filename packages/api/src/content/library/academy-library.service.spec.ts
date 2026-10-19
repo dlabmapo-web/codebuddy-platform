@@ -72,7 +72,8 @@ const master = {
   ],
 };
 
-function build(source=master) {
+function build(source: unknown = master) {
+  const remapped: unknown[] = [];
   const created: Record<string, unknown[]> = {
     courseModule: [],
     lecture: [],
@@ -80,6 +81,7 @@ function build(source=master) {
     programmingExercise: [],
     manualMaterial: [],
     videoLesson: [],
+    pdfDocument: [],
     exerciseTestCase: [],
     exerciseHint: [],
   };
@@ -87,6 +89,7 @@ function build(source=master) {
 
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([]),
+    pdfAsset: { findUnique: vi.fn().mockResolvedValue({ state: "READY" }) },
     videoAsset: {findUnique: vi.fn().mockResolvedValue({state: "READY"})},
     course: {
       create: vi.fn(({ data }) => {
@@ -98,6 +101,10 @@ function build(source=master) {
       Object.keys(created).map((model) => [
         model,
         {
+          update: vi.fn(({ where, data }) => {
+            if (model === "programmingExercise") remapped.push({ materialId: where.materialId, ...data });
+            return Promise.resolve({});
+          }),
           createMany: vi.fn(({ data }) => {
             created[model]!.push(...data);
             return Promise.resolve({ count: data.length });
@@ -155,7 +162,7 @@ function build(source=master) {
     { write: vi.fn().mockResolvedValue({}) } as never,
   );
 
-  return { service, created, courseValue: () => courseData };
+  return { service, created, remapped, courseValue: () => courseData };
 }
 
 describe('AcademyLibraryService.adopt', () => {
@@ -320,4 +327,24 @@ it("adopts immutable ready video assets with hidden fresh lessons and no watch r
  expect(created.material[0]).toMatchObject({type:"VIDEO_LESSON",isVisible:false});
  expect(created.videoLesson[0]).not.toHaveProperty("progress");
  expect(created.programmingExercise).toHaveLength(0);
+});
+
+
+it('remaps a reference even when the exercise precedes its PDF in the copied tree', async () => {
+  const original = master.modules[0]!.lectures[0]!.materials[0]!;
+  const source = structuredClone(master);
+  const materials = [
+    { ...original, id: 'source-exercise', programmingExercise: { ...original.programmingExercise, referencePdfMaterialId: 'source-pdf' } },
+    { id: 'source-pdf', type: 'PDF_DOCUMENT', title: 'Theory', position: 2, isRequired: false, isVisible: true,
+      programmingExercise: null, pdfDocument: { assetId: 'immutable-asset', placement: 'BOTH' } },
+  ];
+  const input = { ...source, modules: [{ ...source.modules[0], lectures: [{ ...source.modules[0]!.lectures[0], materials }] }] };
+  const { service, created, remapped } = build(input);
+  await service.adopt(identity, { academyId: branchId, libraryCourseId: masterId, title: 'Copy' });
+  const copied = created.material as Array<{ id: string; type: string }>;
+  const exercise = copied.find(m => m.type === 'PROGRAMMING_EXERCISE')!;
+  const document = copied.find(m => m.type === 'PDF_DOCUMENT')!;
+  expect(remapped).toEqual([{ materialId: exercise.id, referencePdfMaterialId: document.id }]);
+  expect(document.id).not.toBe('source-pdf');
+  expect(created.pdfDocument).toEqual([expect.objectContaining({ materialId: document.id, assetId: 'immutable-asset' })]);
 });

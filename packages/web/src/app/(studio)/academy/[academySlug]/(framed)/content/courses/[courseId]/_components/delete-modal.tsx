@@ -13,6 +13,7 @@ import { useLayoutTranslation } from '@/i18n';
  */
 export function DeleteModal({
   cascade,
+  dependencyTitles = [],
   itemTitle,
   kind,
   onCancel,
@@ -20,6 +21,7 @@ export function DeleteModal({
   open,
 }: {
   /** How many children disappear along with this row. */
+  dependencyTitles?: string[];
   cascade?: { lectures?: number; exercises?: number; documents?: number };
   itemTitle: string;
   kind: 'module' | 'lecture' | 'exercise' | 'pdf';
@@ -27,7 +29,7 @@ export function DeleteModal({
   onConfirm: () => void;
   open: boolean;
 }) {
-  const { t } = useTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common', 'pdf-practice']);
   const lectures = cascade?.lectures ?? 0;
   const exercises = cascade?.exercises ?? 0;
   const documents = cascade?.documents ?? 0;
@@ -41,6 +43,7 @@ export function DeleteModal({
             {t('delete.body', { title: itemTitle })}
           </p>
 
+          {dependencyTitles.length ? <div role="alert" className="mt-3 text-sm text-danger"><p>{t("pdf-practice:in_use")}</p><ul className="list-disc pl-5">{dependencyTitles.map((title, index) => <li key={index}>{title}</li>)}</ul></div> : null}
           {losesChildren ? (
             <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger/5 px-4 py-3">
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
@@ -78,6 +81,7 @@ export function DeleteModal({
           </button>
           <button
             className="h-11 rounded-lg bg-danger px-5 text-[14.5px] font-bold text-on-danger transition-colors hover:brightness-95"
+            disabled={dependencyTitles.length > 0}
             onClick={onConfirm}
             type="button"
           >

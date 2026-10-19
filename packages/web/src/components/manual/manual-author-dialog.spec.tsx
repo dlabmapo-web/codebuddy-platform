@@ -32,6 +32,10 @@ describe('manual authoring on platform admin routes', () => {
       expect(markup).toContain('QA activity');
       expect(markup).toContain('/academy/qa-academy/learn/');
       expect(markup).toContain('preview=true');
+      expect(markup).toContain('enable_submit');
+      expect(markup).toContain('exclude_from_score');
+      expect(markup).not.toContain('Enable Submit');
+      expect(markup).not.toContain('Exclude from score');
     });
   }
 });

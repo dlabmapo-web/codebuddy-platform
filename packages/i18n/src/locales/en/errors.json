@@ -156,5 +156,10 @@
   "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
   "PDF_REFERENCE_INVALID": "Choose a supplementary PDF in this lecture.",
   "PDF_REFERENCE_IN_USE": "Change or detach the referring exercises first.",
-  "PDF_REFERENCE_NOT_READY": "Publish the reference PDF and its parents first."
+  "PDF_REFERENCE_NOT_READY": "Publish the reference PDF and its parents first.",
+  "LIBRARY_IMPORT_SOURCE_CHANGED": "The source course changed. Refresh the preview before copying.",
+  "LIBRARY_IMPORT_CONTENT_INVALID": "The source contains invalid content or unavailable assets. Repair it before copying.",
+  "LIBRARY_IMPORT_REQUEST_CONFLICT": "This copy request was already used with different details.",
+  "LIBRARY_IMPORT_BUSY": "The library is busy. Retry this copy request.",
+  "DLAB_LOGIN_REQUIRED": "Use the “Log in with DLAB” button for this account."
 }

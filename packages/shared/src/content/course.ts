@@ -5,7 +5,7 @@ import { z } from "zod";
 import { pdfMetadataSchema } from "./pdf.js";
 import { gradingDataLimits } from "../grading-limits.js";
 
-import { courseProvenanceSchema } from "../platform/library.js";
+import { libraryImportOriginSchema, courseProvenanceSchema } from "../platform/library.js";
 
 export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
@@ -146,6 +146,7 @@ export const courseSummarySchema = z.object({
    * had to fetch provenance separately would render the chips a beat late.
    */
   provenance: courseProvenanceSchema.nullable().default(null),
+  libraryImportOrigin: libraryImportOriginSchema.nullable().optional(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

@@ -3,6 +3,9 @@ import { z } from "zod";
 
 import {
   createLibraryCourseSchema,
+  previewAcademyCourseSchema,
+  importAcademyCourseSchema,
+  academyCourseImportPreviewSchema,
   libraryCopySchema,
   libraryCourseSchema,
   listLibraryCoursesSchema,
@@ -42,16 +45,20 @@ export const platformLibraryContract = {
   academy: oc
     .input(z.object({}))
     .output(z.object({ academyId: z.uuid().nullable() })),
-  courses: oc
-    .input(listLibraryCoursesSchema)
-    .output(
-      z.object({
-        courses: z.array(libraryCourseSchema),
-        total: z.number().int().nonnegative(),
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-      }),
-    ),
+  courses: oc.input(listLibraryCoursesSchema).output(
+    z.object({
+      courses: z.array(libraryCourseSchema),
+      total: z.number().int().nonnegative(),
+      page: z.number().int().positive(),
+      pageSize: z.number().int().positive(),
+    }),
+  ),
+  previewAcademyCourse: oc
+    .input(previewAcademyCourseSchema)
+    .output(academyCourseImportPreviewSchema),
+  importAcademyCourse: oc
+    .input(importAcademyCourseSchema)
+    .output(z.object({ academyId: z.uuid(), course: libraryCourseSchema })),
   create: oc.input(createLibraryCourseSchema).output(libraryCourseSchema),
   retire: oc.input(retireLibraryCourseSchema).output(libraryCourseSchema),
   /**
@@ -62,12 +69,10 @@ export const platformLibraryContract = {
    * *that* a branch changed its copy is what finds a bad master, and knowing
    * *how* they changed it is not head office's to read from here.
    */
-  copies: oc
-    .input(z.object({ courseId: z.uuid() }))
-    .output(
-      z.object({
-        copies: z.array(libraryCopySchema),
-        total: z.number().int().nonnegative(),
-      }),
-    ),
+  copies: oc.input(z.object({ courseId: z.uuid() })).output(
+    z.object({
+      copies: z.array(libraryCopySchema),
+      total: z.number().int().nonnegative(),
+    }),
+  ),
 };

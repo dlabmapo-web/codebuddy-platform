@@ -1,7 +1,7 @@
 {
   "page_title": "엑셀로 가져오기",
   "page_description": "워크북에서 모듈·강의·문제를 추가하거나 수정합니다.",
-  "back_to_course": "{{course}}(으)로 돌아가기",
+  "back_to_course": "{{course}} 편집 화면으로 돌아가기",
   "stage": {
     "prepare": "준비",
     "upload": "업로드",
@@ -10,15 +10,15 @@
   },
   "prepare": {
     "title": "워크북에서 시작하기",
-    "description": "코스를 스프레드시트로 내려받아 편집한 뒤 다시 업로드하세요. 파일의 키가 무엇을 수정할지 결정합니다.",
+    "description": "과목를 스프레드시트로 내려받아 편집한 뒤 다시 업로드하세요. 파일의 키가 무엇을 수정할지 결정합니다.",
     "recommended": "권장",
-    "current_label": "이 코스 내려받기",
+    "current_label": "이 과목 내려받기",
     "current_description": "현재 존재하는 모든 모듈·강의·문제·테스트·힌트를 키와 함께 담습니다. 행을 그 자리에서 고치면 수정됩니다.",
     "blank_label": "빈 서식 내려받기",
-    "blank_description": "예시 행이 들어 있는 같은 네 개의 시트입니다. 코스를 편집하기 전에 형식을 확인할 때 사용하세요.",
-    "too_large": "이 코스에는 문제가 {{total}}개 있어 한 번에 가져올 수 있는 {{limit}}개를 넘습니다. 코스 빌더에서 모듈 단위로 내보내세요.",
+    "blank_description": "예시 행이 들어 있는 같은 네 개의 시트입니다. 과목를 편집하기 전에 형식을 확인할 때 사용하세요.",
+    "too_large": "이 과목에는 문제가 {{total}}개 있어 한 번에 가져올 수 있는 {{limit}}개를 넘습니다. 과목 편집 화면에서 모듈 단위로 내보내세요.",
     "rule_keys": "키를 그대로 두면 수정되고, 새 키를 적으면 새로 만들어집니다.",
-    "rule_no_delete": "행을 지워도 아무것도 삭제되지 않습니다. 삭제는 코스 빌더에서 하세요.",
+    "rule_no_delete": "행을 지워도 아무것도 삭제되지 않습니다. 삭제는 과목 편집 화면에서 하세요.",
     "rule_hidden": "새로 만든 모듈·강의·문제는 학생에게 숨겨진 상태로 추가됩니다.",
     "rule_collections": "문제의 테스트와 힌트 행은 해당 문제의 전체 목록을 대체합니다."
   },
@@ -86,12 +86,12 @@
   },
   "result": {
     "title": "가져오기 완료",
-    "description": "새 내용은 학생에게 숨겨져 있습니다. 코스 빌더에서 검토한 뒤 공개하세요.",
+    "description": "새 내용은 학생에게 숨겨져 있습니다. 과목 편집 화면에서 검토한 뒤 공개하세요.",
     "created": "생성됨",
     "updated": "수정됨",
     "unchanged": "변경 없음",
     "failed": "실패",
-    "return_to_course": "코스로 돌아가기",
+    "return_to_course": "과목로 돌아가기",
     "import_another": "다른 워크북 가져오기",
     "problems_title_other": "검토할 문제 {{count}}개",
     "action": {
@@ -102,10 +102,10 @@
   },
   "unavailable": {
     "denied_title": "가져오기를 사용할 수 없습니다",
-    "denied_body": "코스에 커리큘럼을 가져올 수 있는 것은 팀 리드뿐입니다.",
-    "load_failed_title": "코스를 불러오지 못했습니다",
+    "denied_body": "이 과목에 콘텐츠를 가져올 권한이 없습니다.",
+    "load_failed_title": "과목를 불러오지 못했습니다",
     "load_failed_body": "저희 쪽 문제입니다. 잠시 후 다시 시도해 주세요.",
-    "back": "코스로 돌아가기"
+    "back": "과목로 돌아가기"
   },
   "issue": {
     "sheet_missing": "이 시트가 없거나 비어 있습니다.",
@@ -138,11 +138,11 @@
     "tests_missing": "이 문제에는 테스트가 없습니다. 최소 한 개를 추가하세요.",
     "sample_test_missing": "이 문제에는 SAMPLE 테스트가 최소 한 개 필요합니다.",
     "weighted_tests_not_importable": "이 문제는 가중치 채점을 사용하며, 워크북으로는 표현할 수 없습니다. 테스트는 문제 편집기에서 수정하세요.",
-    "duplicate_key_in_workbook": "두 행이 같은 키를 사용합니다. 키는 코스 안에서 고유해야 합니다.",
-    "parent_conflict": "이미 코스의 다른 위치에 있습니다. 가져오기로는 옮길 수 없습니다.",
+    "duplicate_key_in_workbook": "두 행이 같은 키를 사용합니다. 키는 과목 안에서 고유해야 합니다.",
+    "parent_conflict": "이미 과목의 다른 위치에 있습니다. 가져오기로는 옮길 수 없습니다.",
     "title_conflict": "다른 키를 가진 항목이 이미 이 제목을 사용합니다.",
     "order_conflict": "두 항목이 같은 위치를 차지합니다.",
-    "orphan_lecture_reference": "이 워크북과 코스 어디에도 해당 키의 강의가 없습니다.",
+    "orphan_lecture_reference": "이 워크북과 과목 어디에도 해당 키의 강의가 없습니다.",
     "orphan_problem_reference": "이 워크북에 해당 키의 문제가 없습니다.",
     "structure_contradiction": "같은 모듈의 행들이 서로 다른 내용을 말합니다.",
     "duplicate_order_in_workbook": "두 행이 이 문제에서 같은 순서를 차지합니다.",

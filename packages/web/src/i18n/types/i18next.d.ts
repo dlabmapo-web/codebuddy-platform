@@ -1,4 +1,5 @@
 import type pdfPractice from '@cove/i18n/locales/en/pdf-practice.json';
+import type editor from '@cove/i18n/locales/en/editor.json';
 import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
 import type grading from "@cove/i18n/locales/en/grading.json";
@@ -58,6 +59,7 @@ declare module 'i18next' {
     defaultNS: 'common';
     resources: {
       solutions: typeof import("@cove/i18n/locales/en/solutions.json");
+      editor: typeof editor;
       manual:typeof manual;
       video:typeof video;
       quiz: typeof import("@cove/i18n/locales/en/quiz.json");

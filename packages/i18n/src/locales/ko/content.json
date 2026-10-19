@@ -1,12 +1,12 @@
 {
   "builder": {
-    "fallback_title": "코스 빌더",
+    "fallback_title": "과목 빌더",
     "description": "모듈과 강의를 구성하고 문제를 추가하며 학생에게 보일 내용을 관리하세요.",
-    "unavailable_title": "이 코스를 이용할 수 없습니다",
-    "unavailable_body": "다른 학원의 코스이거나, 현재 소속 권한으로는 열 수 없습니다.",
-    "back_to_courses": "코스 목록으로",
-    "all_courses": "전체 코스",
-    "load_failed_title": "코스를 불러오지 못했습니다",
+    "unavailable_title": "이 과목를 이용할 수 없습니다",
+    "unavailable_body": "다른 학원의 과목이거나, 현재 소속 권한으로는 열 수 없습니다.",
+    "back_to_courses": "과목 목록으로",
+    "all_courses": "전체 과목",
+    "load_failed_title": "과목를 불러오지 못했습니다",
     "load_failed_body": "권한 문제가 아닙니다. 일시적인 오류이거나 서버 설정 문제일 수 있습니다. 잠시 후 다시 시도하고, 계속되면 서버 로그를 확인하세요.",
     "summary": "모듈 {{modules}}개 · 강의 {{lectures}}개",
     "structural_error": "변경 사항을 저장하지 못했습니다. 다시 시도하세요.",
@@ -20,7 +20,7 @@
   },
   "empty": {
     "heading": "모듈부터 만들어 보세요",
-    "body": "모듈은 코스를 나눈 단위입니다. 예를 들어 ‘반복문’, ‘함수’처럼요. 모듈 안에 강의가 들어가고, 강의 안에 실습 문제가 들어갑니다."
+    "body": "모듈은 과목를 나눈 단위입니다. 예를 들어 ‘반복문’, ‘함수’처럼요. 모듈 안에 강의가 들어가고, 강의 안에 실습 문제가 들어갑니다."
   },
   "module": {
     "title_placeholder": "새 모듈 제목 — 예: 조건문",
@@ -36,7 +36,7 @@
   },
   "exercise": {
     "add": "문제 추가",
-    "back": "코스 빌더로 돌아가기",
+    "back": "과목 빌더로 돌아가기",
     "create_title": "문제 만들기",
     "edit_title": "코딩 문제",
     "read_only": "읽기 전용 검토",
@@ -52,10 +52,10 @@
     "preview_close": "미리보기 닫기",
     "section": {
       "basics": "기본 정보",
-      "tests": "정답",
+      "tests": "테스트 케이스",
       "hints": "힌트"
     },
-    "basic_help": "기존 수동 문제 등록과 같은 항목을 숨겨진 단계 없이 한곳에서 작성합니다.",
+    "basic_help": "문제 제목, 난이도, 설명, 입출력 조건을 입력하세요.",
     "code_help": "학생이 문제를 처음 열 때 보게 되는 선택 사항 코드입니다.",
     "solution_code_help": "필수 Python 정답 코드입니다. 권한이 있는 문제 작성자와 배정된 학생을 실시간 모니터링 중인 교사만 볼 수 있습니다.",
     "language_python": "Python 3",
@@ -63,7 +63,7 @@
       "title": "문제 제목",
       "difficulty": "난이도",
       "description": "문제 설명",
-      "test": "공개 예시 1개",
+      "test": "공개 예시 테스트 케이스 1개",
       "solution": "정답 코드"
     },
     "field": {
@@ -71,7 +71,7 @@
       "difficulty": "난이도",
       "language": "언어",
       "ai_feedback": "AI 피드백 사용",
-      "ai_feedback_hint": "현재는 사용 여부만 저장합니다. 피드백 규칙 관리는 다음 마이그레이션 단계에서 추가됩니다.",
+      "ai_feedback_hint": "현재는 이 문제의 AI 피드백 사용 여부 설정만 저장됩니다.",
       "description": "문제 설명",
       "constraints": "조건 및 제약 사항 (선택)",
       "starter_code": "초기 코드 (에디터 기본값)",
@@ -88,12 +88,12 @@
       "output_format": "예) 두 수의 합을 한 줄에 출력합니다."
     },
     "test": {
-      "add": "정답 추가",
-      "help": "각 정답을 학생에게 공개할 예시로 둘지, 채점용으로 숨길지 선택하세요.",
-      "label": "정답 {{number}}",
+      "add": "테스트 케이스 추가",
+      "help": "학생에게 예시로 공개할 테스트 케이스와 채점용으로 숨길 테스트 케이스를 선택하세요. 테스트 케이스 없이 저장할 수 있지만 학생은 문제를 풀 수 없습니다.",
+      "label": "테스트 케이스 {{number}}",
       "input": "입력",
-      "expected": "예상 출력",
-      "remove": "정답 {{number}} 삭제",
+      "expected": "기대 출력",
+      "remove": "테스트 케이스 {{number}} 삭제",
       "sample_badge": "학생에게 공개",
       "hidden_badge": "비공개",
       "toggle_visibility": "공개 여부 전환"
@@ -126,7 +126,7 @@
       "title": "문제 제목을 입력해주세요.",
       "difficulty": "난이도를 선택해주세요.",
       "description": "문제 설명을 입력해주세요.",
-      "test": "학생에게 공개할 예시 정답을 1개 이상 입력해주세요.",
+      "test": "학생에게 공개할 예시 테스트 케이스를 1개 이상 입력해주세요.",
       "solution": "정답 코드를 입력해주세요."
     },
     "location": "문제 위치",
@@ -135,7 +135,7 @@
     "preview_stdin": "입력값",
     "preview_stdout": "출력값",
     "preview_starter": "시작 코드",
-    "no_tests_note": "정답이 없어 학생이 풀 수 없습니다. 나중에 추가해도 됩니다."
+    "no_tests_note": "테스트 케이스가 없어 학생이 문제를 풀 수 없습니다. 먼저 저장한 후 나중에 추가할 수 있습니다."
   },
   "rename": {
     "module_title": "모듈 이름 수정",
@@ -151,7 +151,7 @@
     "kind_module": "모듈",
     "kind_lecture": "강의",
     "kind_exercise": "문제",
-    "kind_course": "코스",
+    "kind_course": "과목",
     "rename": "이름 수정",
     "hide": "학생에게 숨기기",
     "show": "학생에게 보이기",

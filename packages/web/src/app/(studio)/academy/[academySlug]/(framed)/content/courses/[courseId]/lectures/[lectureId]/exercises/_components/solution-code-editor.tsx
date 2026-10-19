@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
+import { useLayoutTranslation } from '@/i18n';
 import { SectionCard } from './authoring-fields';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -16,6 +17,7 @@ export function SolutionCodeEditor({ value, onChange, error }: {
   error: string | null;
 }) {
   const { t } = useTranslation('solutions');
+  const { t: common } = useLayoutTranslation('common');
   const nextKey = useRef(value.length);
   const [keys, setKeys] = useState(() => value.map((_, index) => index));
   const focusNew = useRef(false);
@@ -59,7 +61,7 @@ export function SolutionCodeEditor({ value, onChange, error }: {
           <input className="mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2" maxLength={80} value={entry.title ?? ''} onChange={event => change(keys[index], { title: event.target.value || null })} />
         </label>
         <div className="overflow-hidden rounded-lg border border-border">
-          <MonacoEditor beforeMount={registerPaircodeTheme} height="280px" language="python" theme="paircode-dark" value={entry.code}
+          <MonacoEditor loading={common('state.loading')} beforeMount={registerPaircodeTheme} height="280px" language="python" theme="paircode-dark" value={entry.code}
             onMount={editor => { if (focusNew.current && index === value.length - 1) { editor.focus(); focusNew.current = false; } }}
             onChange={code => change(keys[index], { code: code ?? '' })}
             options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />

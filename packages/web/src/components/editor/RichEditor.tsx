@@ -1,5 +1,6 @@
 'use client';
 
+import { useEditorTranslation } from './use-editor-translation';
 import { usePrivateImageResolver } from './private-image-context';
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
@@ -29,6 +30,7 @@ import {
 // ─── Resizable Image NodeView ─────────────────────────────────────────────────
 
 function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
+  const { t } = useEditorTranslation();
   const { src, alt, width } = node.attrs as { src: string; alt?: string; width?: number };
   const resolvePrivate=usePrivateImageResolver();
   const [resolvedSrc,setResolvedSrc]=useState(src.startsWith('cove-asset:')?'':src);
@@ -90,7 +92,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
               }}
-              title="드래그로 너비 조절"
+              title={t('resize_image')}
             >
               <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {[0,1,2].map(i => (
@@ -183,7 +185,9 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function RichEditor({ value, onChange, onImageUpload, placeholder = '문제 내용을 입력하세요...' }: Props) {
+export function RichEditor({ value, onChange, onImageUpload, placeholder }: Props) {
+  const { t } = useEditorTranslation();
+  const editorPlaceholder = placeholder ?? t('placeholder');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploadError,setUploadError]=useState("");
@@ -211,7 +215,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
         openOnClick: false,
         HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer', style: 'color:#1B64DA;text-decoration:underline;' },
       }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ placeholder: editorPlaceholder }),
     ],
     content: value,
     onUpdate({ editor }) {
@@ -256,9 +260,9 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {try {setUploadError("");await uploadFile(file, true);}catch(e){setUploadError(e instanceof Error?e.message:"Image upload failed");}}
+    if (file) {try {setUploadError("");await uploadFile(file, true);}catch(e){setUploadError(e instanceof Error?e.message:t("image_upload_failed"));}}
     e.target.value = '';
-  }, [uploadFile]);
+  }, [uploadFile, t]);
 
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -267,10 +271,10 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
   }, [uploadFile]);
 
   const setLink = useCallback(() => {
-    const url = window.prompt('링크 URL을 입력하세요');
+    const url = window.prompt(t('link_prompt'));
     if (!url) return;
     editor?.chain().focus().setLink({ href: url }).run();
-  }, [editor]);
+  }, [editor, t]);
 
   const setFontSize = useCallback((size: string) => {
     editor?.chain().focus().setMark('textStyle', { fontSize: `${size}px` }).run();
@@ -286,30 +290,30 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
         className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-card"
         style={{ borderBottom: '1px solid #E5E8EC' }}
       >
-        <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소 (Ctrl+Z)"><Undo size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="다시실행 (Ctrl+Y)"><Redo size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().undo().run()} title={t('undo')}><Undo size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().redo().run()} title={t('redo')}><Redo size={14} /></ToolBtn>
         <Divider />
 
         <select
           onMouseDown={(e) => e.stopPropagation()}
           onChange={(e) => setFontSize(e.target.value)}
           defaultValue=""
-          title="글자 크기"
+          title={t('font_size')}
           className="rounded px-1 text-xs shrink-0"
           style={{ height: 28, border: '1px solid #E5E8EC', color: '#5A6270', fontSize: 12 }}
         >
-          <option value="" disabled>크기</option>
+          <option value="" disabled>{t('size')}</option>
           {FONT_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
         </select>
         <Divider />
 
-        <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게"><Bold size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="기울임"><Italic size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="밑줄"><UnderlineIcon size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="취소선"><Strikethrough size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title={t('bold')}><Bold size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title={t('italic')}><Italic size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title={t('underline')}><UnderlineIcon size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title={t('strikethrough')}><Strikethrough size={14} /></ToolBtn>
         <Divider />
 
-        <div className="flex items-center gap-0.5 shrink-0" title="글자색">
+        <div className="flex items-center gap-0.5 shrink-0" title={t('text_color')}>
           <Type size={12} style={{ color: '#9CA3AF' }} />
           {COLORS.map(c => (
             <button
@@ -324,28 +328,28 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
         </div>
         <Divider />
 
-        <ToolBtn onClick={() => editor.chain().focus().toggleHighlight({ color: '#FEF08A' }).run()} active={editor.isActive('highlight')} title="형광펜"><Highlighter size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleHighlight({ color: '#FEF08A' }).run()} active={editor.isActive('highlight')} title={t('highlight')}><Highlighter size={14} /></ToolBtn>
         <Divider />
 
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="왼쪽 정렬"><AlignLeft size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="가운데 정렬"><AlignCenter size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="오른쪽 정렬"><AlignRight size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title={t('align_left')}><AlignLeft size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title={t('align_center')}><AlignCenter size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title={t('align_right')}><AlignRight size={14} /></ToolBtn>
         <Divider />
 
-        <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="순서 없는 목록"><List size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="번호 목록"><ListOrdered size={14} /></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="구분선"><Minus size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title={t('bullet_list')}><List size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title={t('numbered_list')}><ListOrdered size={14} /></ToolBtn>
+        <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('divider')}><Minus size={14} /></ToolBtn>
         <Divider />
 
         <ToolBtn
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-          title="표 삽입 (3×3) — 표 안에서 행/열 추가·삭제 가능"
+          title={t('insert_table')}
         >
           <TableIcon size={14} />
         </ToolBtn>
-        <ToolBtn onClick={setLink} active={editor.isActive('link')} title="링크 삽입"><LinkIcon size={14} /></ToolBtn>
-        <ToolBtn onClick={() => imageInputRef.current?.click()} title="이미지 첨부 (오른쪽 핸들 드래그로 크기 조절)"><ImageIcon size={14} /></ToolBtn>
-        {!onImageUpload && <ToolBtn onClick={() => fileInputRef.current?.click()} title="파일 첨부"><Paperclip size={14} /></ToolBtn>}
+        <ToolBtn onClick={setLink} active={editor.isActive('link')} title={t('insert_link')}><LinkIcon size={14} /></ToolBtn>
+        <ToolBtn onClick={() => imageInputRef.current?.click()} title={t('attach_image')}><ImageIcon size={14} /></ToolBtn>
+        {!onImageUpload && <ToolBtn onClick={() => fileInputRef.current?.click()} title={t('attach_file')}><Paperclip size={14} /></ToolBtn>}
       </div>
 
       {/* ── Table Context Toolbar ─────────────────────────────────────────── */}
@@ -357,53 +361,53 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder = '문�
           {/* label */}
           <span className="shrink-0 flex items-center gap-1 mr-1" style={{ fontSize: 11, color: '#1B64DA', fontWeight: 700 }}>
             <TableIcon size={12} />
-            표 편집
+            {t('edit_table')}
           </span>
 
           {/* row section */}
-          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>행</span>
-          <ToolBtn onClick={() => editor.chain().focus().addRowBefore().run()} title="위에 행 추가">
+          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>{t('row')}</span>
+          <ToolBtn onClick={() => editor.chain().focus().addRowBefore().run()} title={t('row_before')}>
             <ArrowUpToLine size={13} />
           </ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="아래에 행 추가">
+          <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title={t('row_after')}>
             <ArrowDownToLine size={13} />
           </ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().deleteRow().run()} title="현재 행 삭제" danger>
+          <ToolBtn onClick={() => editor.chain().focus().deleteRow().run()} title={t('delete_row')} danger>
             <Trash2 size={12} />
           </ToolBtn>
 
           <Divider />
 
           {/* col section */}
-          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>열</span>
-          <ToolBtn onClick={() => editor.chain().focus().addColumnBefore().run()} title="왼쪽에 열 추가">
+          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>{t('column')}</span>
+          <ToolBtn onClick={() => editor.chain().focus().addColumnBefore().run()} title={t('column_before')}>
             <ArrowLeftToLine size={13} />
           </ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="오른쪽에 열 추가">
+          <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title={t('column_after')}>
             <ArrowRightToLine size={13} />
           </ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().deleteColumn().run()} title="현재 열 삭제" danger>
+          <ToolBtn onClick={() => editor.chain().focus().deleteColumn().run()} title={t('delete_column')} danger>
             <Trash2 size={12} />
           </ToolBtn>
 
           <Divider />
 
           {/* cell section */}
-          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>셀</span>
-          <ToolBtn onClick={() => editor.chain().focus().mergeCells().run()} title="셀 병합">
+          <span className="shrink-0" style={{ fontSize: 10, color: '#93C5FD', marginRight: 1 }}>{t('cell')}</span>
+          <ToolBtn onClick={() => editor.chain().focus().mergeCells().run()} title={t('merge_cells')}>
             <TableCellsMerge size={13} />
           </ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().splitCell().run()} title="셀 분리">
+          <ToolBtn onClick={() => editor.chain().focus().splitCell().run()} title={t('split_cell')}>
             <TableCellsSplit size={13} />
           </ToolBtn>
 
           <Divider />
 
           {/* delete table */}
-          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="표 전체 삭제" danger>
+          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title={t('delete_table')} danger>
             <Trash2 size={13} />
           </ToolBtn>
-          <span className="shrink-0" style={{ fontSize: 11, color: '#DC2626', fontWeight: 600 }}>표 삭제</span>
+          <span className="shrink-0" style={{ fontSize: 11, color: '#DC2626', fontWeight: 600 }}>{t('delete_table_label')}</span>
         </div>
       )}
 

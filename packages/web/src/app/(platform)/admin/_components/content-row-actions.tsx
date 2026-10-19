@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +58,7 @@ export function ContentRowActions({
   label,
   onDelete,
   onRename,
+  copyAction,
   href,
   statusAction,
 }: {
@@ -66,6 +67,7 @@ export function ContentRowActions({
   onDelete: () => void;
   /** Omitted where the surface has no rename dialog to open. */
   onRename?: () => void;
+  copyAction?: { label: string; onSelect: () => void };
   href: string;
   statusAction?: {
     disabled?: boolean;
@@ -107,6 +109,12 @@ export function ContentRowActions({
             <DropdownMenuItem onSelect={onRename}>
               <Pencil className="text-sub" />
               {content('table.rename')}
+            </DropdownMenuItem>
+          ) : null}
+          {copyAction ? (
+            <DropdownMenuItem onSelect={copyAction.onSelect}>
+              <Copy className="text-sub" />
+              {copyAction.label}
             </DropdownMenuItem>
           ) : null}
           {statusAction && StatusIcon ? (

@@ -249,3 +249,91 @@ export function suggestedCopyTitle(
   }
   return title;
 }
+
+/** Snapshot origin for an independent master imported from an academy. */
+export const libraryImportOriginSchema = z.object({
+  sourceAcademyId: z.uuid(),
+  sourceCourseId: z.uuid(),
+  sourceAcademyName: z.string(),
+  sourceCourseTitle: z.string(),
+  sourceContentRevision: z.number().int().positive(),
+  copiedAt: z.iso.datetime(),
+});
+export type LibraryImportOrigin = z.infer<typeof libraryImportOriginSchema>;
+
+export const previewAcademyCourseSchema = z.object({
+  sourceAcademyId: z.uuid(),
+  sourceCourseId: z.uuid(),
+});
+export const importAcademyCourseSchema = previewAcademyCourseSchema.extend({
+  expectedSourceContentRevision: z.number().int().positive(),
+  title: z.string().trim().min(1).max(200),
+  requestKey: z.uuid(),
+});
+export type ImportAcademyCourseInput = z.infer<
+  typeof importAcademyCourseSchema
+>;
+export type PreviewAcademyCourseInput = z.infer<
+  typeof previewAcademyCourseSchema
+>;
+export const libraryImportMaterialTypes = [
+  "PROGRAMMING_EXERCISE",
+  "PDF_DOCUMENT",
+  "TURTLE_EXERCISE",
+  "WRITTEN_RESPONSE",
+  "MULTIPLE_CHOICE",
+  "VIDEO_LESSON",
+] as const;
+export const libraryImportMaterialTypeSchema = z.enum(
+  libraryImportMaterialTypes,
+);
+export const libraryImportBlockerSchema = z.object({
+  materialId: z.uuid(),
+  materialTitle: z.string(),
+  reason: z.enum([
+    "INVALID_DEFINITION",
+    "ASSET_NOT_READY",
+    "ASSET_MISSING",
+    "CAPTION_INVALID",
+  ]),
+});
+const importOutlineMaterialSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  type: libraryImportMaterialTypeSchema,
+  isVisible: z.boolean(),
+  isRequired: z.boolean(),
+  position: z.number().int(),
+});
+export const academyCourseImportPreviewSchema = z.object({
+  sourceAcademyId: z.uuid(),
+  sourceAcademyName: z.string(),
+  sourceCourseId: z.uuid(),
+  sourceCourseTitle: z.string(),
+  sourceContentRevision: z.number().int().positive(),
+  materialCounts: z.record(
+    libraryImportMaterialTypeSchema,
+    z.number().int().nonnegative(),
+  ),
+  blockers: z.array(libraryImportBlockerSchema),
+  modules: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      isVisible: z.boolean(),
+      position: z.number().int(),
+      lectures: z.array(
+        z.object({
+          id: z.uuid(),
+          title: z.string(),
+          isVisible: z.boolean(),
+          position: z.number().int(),
+          materials: z.array(importOutlineMaterialSchema),
+        }),
+      ),
+    }),
+  ),
+});
+export type AcademyCourseImportPreview = z.infer<
+  typeof academyCourseImportPreviewSchema
+>;

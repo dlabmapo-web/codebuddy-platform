@@ -369,6 +369,9 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  dlabIdentity DlabIdentity?
+
+  libraryCourseImports LibraryCourseImport[]
   manualDrafts      ManualDraft[]
   manualSubmissions ManualSubmission[]
   manualReviews     ManualReview[]
@@ -582,6 +585,8 @@ model Organization {
 }
 
 model Academy {
+  dlabCampus DlabCampus?
+
   helpRequests StudentHelpRequest[]
 
   id             String        @id @default(uuid()) @db.Uuid
@@ -739,6 +744,8 @@ model AcademySlugHistory {
 }
 
 model AcademyMembership {
+  dlabBinding DlabMembershipBinding?
+
   helpRequestsAsStudent StudentHelpRequest[] @relation("HelpRequestStudent")
   helpRequestsAsTeacher StudentHelpRequest[] @relation("HelpRequestTeacher")
 
@@ -1313,6 +1320,7 @@ model PlatformOperationRun {
 }
 
 model Course {
+  libraryImport LibraryCourseImport?
   id              String  @id @default(uuid()) @db.Uuid
   academyId       String  @map("academy_id") @db.Uuid
   title           String
@@ -2656,4 +2664,73 @@ model ProgrammingExerciseSolution {
   code String @db.Text
   @@unique([materialId, position])
   @@map("programming_exercise_solutions")
+}
+
+/// OS source data can arrive before explicit academy mapping.
+model DlabCampus {
+  externalCampusId String @id @map("external_campus_id") @db.VarChar(64)
+  name String
+  campusType String? @map("campus_type")
+  status String
+  sourceUpdatedAt DateTime? @map("source_updated_at") @db.Timestamptz(6)
+  payloadHash String @map("payload_hash")
+  academyId String? @unique @map("academy_id") @db.Uuid
+  mappedByUserId String? @map("mapped_by_user_id") @db.Uuid
+  mappedAt DateTime? @map("mapped_at") @db.Timestamptz(6)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  academy Academy? @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  @@map("dlab_campuses")
+}
+
+model DlabIdentity {
+  externalUserId String @id @map("external_user_id") @db.VarChar(64)
+  userId String? @unique @map("user_id") @db.Uuid
+  reservedUserId String @unique @default(uuid()) @map("reserved_user_id") @db.Uuid
+  name String
+  grade String?
+  userRole String @map("user_role")
+  accountStatus String @map("account_status")
+  externalCampusId String @map("external_campus_id") @db.VarChar(64)
+  externalCampusIds String[] @map("external_campus_ids")
+  sourceUpdatedAt DateTime? @map("source_updated_at") @db.Timestamptz(6)
+  payloadHash String @map("payload_hash")
+  revision Int @default(1)
+  generation Int @default(1)
+  provisioningStatus String @default("PENDING") @map("provisioning_status")
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  bindings DlabMembershipBinding[]
+  @@index([externalCampusId])
+  @@map("dlab_identities")
+}
+
+model DlabMembershipBinding {
+  externalUserId String @map("external_user_id") @db.VarChar(64)
+  externalCampusId String @map("external_campus_id") @db.VarChar(64)
+  membershipId String @unique @map("membership_id") @db.Uuid
+  appliedRevision Int @map("applied_revision")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  identity DlabIdentity @relation(fields: [externalUserId], references: [externalUserId], onDelete: Restrict)
+  membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  @@id([externalUserId, externalCampusId])
+  @@map("dlab_membership_bindings")
+}
+
+/// Independent import origin and durable request receipt; source IDs are snapshots.
+model LibraryCourseImport {
+  id                    String   @id @default(uuid()) @db.Uuid
+  libraryCourseId       String   @unique @map("library_course_id") @db.Uuid
+  requestKey            String   @unique @map("request_key") @db.Uuid
+  actorUserId           String   @map("actor_user_id") @db.Uuid
+  sourceAcademyId       String   @map("source_academy_id") @db.Uuid
+  sourceCourseId        String   @map("source_course_id") @db.Uuid
+  sourceAcademyName     String   @map("source_academy_name")
+  sourceCourseTitle     String   @map("source_course_title")
+  sourceContentRevision Int      @map("source_content_revision")
+  destinationTitle      String   @map("destination_title")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  libraryCourse         Course   @relation(fields: [libraryCourseId], references: [id], onDelete: Cascade)
+  actor                 User     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@map("library_course_imports")
 }

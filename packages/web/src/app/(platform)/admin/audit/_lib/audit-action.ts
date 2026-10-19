@@ -251,6 +251,7 @@ export const auditActionLabels: Record<
   'platform.academy.updated': 'action.platform.academy.updated',
   'platform.admin.granted': 'action.platform.admin.granted',
   'platform.library.course.created': 'action.platform.library.course.created',
+  'platform.library.course.imported_from_academy': 'action.platform.library.course.imported_from_academy',
   'platform.library.course.restored': 'action.platform.library.course.restored',
   'platform.library.course.retired': 'action.platform.library.course.retired',
   'platform.library.created': 'action.platform.library.created',

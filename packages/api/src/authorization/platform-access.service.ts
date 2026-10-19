@@ -31,6 +31,14 @@ export class PlatformAccessService {
     authUserId: string,
     permission: PlatformPermission,
   ): Promise<PlatformAccess> {
+    return this.requirePermissions(authUserId, [permission]);
+  }
+
+  /** Check a set of capabilities against one current account snapshot. */
+  async requirePermissions(
+    authUserId: string,
+    permissions: readonly [PlatformPermission, ...PlatformPermission[]],
+  ): Promise<PlatformAccess> {
     const user = await this.prisma.user.findUnique({
       where: { authUserId },
       select: { id: true, status: true, platformRole: true },
@@ -44,7 +52,7 @@ export class PlatformAccessService {
     if (user.status === "SUSPENDED" || user.status === "DELETED") {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }
-    if (!platformRoleHasPermission(user.platformRole, permission)) {
+    if (!permissions.every((permission) => platformRoleHasPermission(user.platformRole, permission))) {
       // Not `PERMISSION_DENIED`. The web layer answers this one with a 404 so
       // a non-admin never learns the surface exists, and one shared code would
       // make an ordinary member's denial indistinguishable from a probe at the

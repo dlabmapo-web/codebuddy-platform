@@ -13,6 +13,7 @@ export const appErrorCodes = [
   "PDF_EDIT_STALE",
   "PDF_VALIDATION_LIMIT",
 
+  "DLAB_LOGIN_REQUIRED",
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
   "STUDENT_SESSION_EXPIRED",
@@ -153,6 +154,11 @@ export const appErrorCodes = [
   "SUPPORT_GRANT_READ_ONLY",
   "LIBRARY_COURSE_NOT_FOUND",
   "LIBRARY_ADOPTION_CONFLICT",
+  "LIBRARY_IMPORT_SOURCE_CHANGED",
+  "LIBRARY_IMPORT_CONTENT_INVALID",
+  "LIBRARY_IMPORT_REQUEST_CONFLICT",
+  "LIBRARY_IMPORT_BUSY",
+
   /** Deleting a library course some academy has already adopted. The database
    *  refuses it; head office is pointed at Retire instead. */
   "LIBRARY_COURSE_HAS_COPIES",
@@ -207,6 +213,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PDF_REFERENCE_NOT_READY: "Publish the reference PDF before the exercise.",
   POINTS_ACCESS_DENIED: "You do not have access to these points.",
   POINTS_UNAVAILABLE: "This academy does not use points.",
+  DLAB_LOGIN_REQUIRED: "Use the DLAB login button for this account.",
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",
   STUDENT_SESSION_EXPIRED: "Your student session expired. Sign in again.",
@@ -423,6 +430,10 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
     "You already have an open support session for this academy.",
   SUPPORT_GRANT_READ_ONLY:
     "This support session is read-only. Open a new one to make changes.",
+  LIBRARY_IMPORT_SOURCE_CHANGED: "The source course changed. Refresh the preview before copying.",
+  LIBRARY_IMPORT_CONTENT_INVALID: "The source contains invalid content or unavailable assets. Repair it before copying.",
+  LIBRARY_IMPORT_REQUEST_CONFLICT: "This copy request was already used with different details.",
+  LIBRARY_IMPORT_BUSY: "The library is busy. Retry this copy request.",
   LIBRARY_COURSE_NOT_FOUND: "That library course is not available.",
   LIBRARY_ADOPTION_CONFLICT:
     "This academy already has a course with that title.",

@@ -158,6 +158,7 @@ export function MyPageWorkspace({
           // section inherits one hue and the account zone below inherits none.
           <div className="space-y-5" style={accentStyle(academy.context.role)}>
             <AcademySections
+              managed={profile.security.connectedProviders.includes('dlab')}
               academy={academy}
               academySlug={scope!.slug}
               onDirtyChange={setAcademyDirty}

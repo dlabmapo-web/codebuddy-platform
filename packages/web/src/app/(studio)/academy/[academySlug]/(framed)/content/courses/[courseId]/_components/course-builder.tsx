@@ -23,6 +23,7 @@ export function CourseBuilder({
   canImport,
   courseId,
   initialTree,
+  treeStaleTime = 0,
 }: {
   academyId: string;
   canEditCurriculum: boolean;
@@ -30,6 +31,7 @@ export function CourseBuilder({
   canImport: boolean;
   courseId: string;
   initialTree: CourseTree;
+  treeStaleTime?: number;
 }) {
   const contentPaths = useContentBasePath();
   const { t } = useTranslation('content');
@@ -37,6 +39,7 @@ export function CourseBuilder({
   const builder = useCourseBuilder({
     target: { academyId, courseId },
     initialTree,
+    treeStaleTime,
     canEditCurriculum,
     canEditExercises,
   });

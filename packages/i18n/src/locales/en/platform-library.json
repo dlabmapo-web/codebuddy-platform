@@ -1,6 +1,6 @@
 {
   "title": "Content library",
-  "subtitle": "Courses head office publishes. Any academy can take a copy and make it their own.",
+  "subtitle": "Publish courses for academies to copy and customize.",
   "open": "Open",
   "search": {
     "label": "Search library courses",
@@ -16,18 +16,18 @@
     "modules_one": "1 module",
     "lectures": "{{count}} lectures",
     "lectures_one": "1 lecture",
-    "problems": "{{count}} problems",
-    "problems_one": "1 problem",
+    "problems": "{{count}} materials",
+    "problems_one": "1 material",
     "cannot_grade": "{{count}} cannot grade",
     "cannot_grade_one": "1 cannot grade"
   },
   "create": {
     "action": "New course",
-    "heading": "Name the master course",
-    "body": "It starts as a draft. Publish it when it is ready for academies to copy.",
+    "heading": "Create a library course",
+    "body": "Create a draft, then publish it when it is ready for academies to copy.",
     "title_label": "Course title",
     "title_placeholder": "Python Level 1",
-    "description_label": "What academies get",
+    "description_label": "Description",
     "description_placeholder": "Variables, loops and functions across 12 modules",
     "submit": "Create and open",
     "submitting": "Creating…",
@@ -45,8 +45,8 @@
     "count_one": "1 academy",
     "count_zero": "No copies",
     "behind": "{{count}} behind",
-    "heading": "Who is teaching {{title}}",
-    "body": "Which academies took a copy, at which revision, and whether they have edited it since.",
+    "heading": "Academies using {{title}}",
+    "body": "See which academies copied this course, the version they copied, and whether they have edited it.",
     "loading": "Reading copies…",
     "customized": "Customized",
     "at_revision_behind": "Copied at revision {{revision}}",
@@ -59,8 +59,8 @@
     "search_body": "Try a different word, or clear the search to see the whole library."
   },
   "unavailable": {
-    "title": "The library could not be read",
-    "body": "Reload the page. If it keeps failing, the platform API is not answering."
+    "title": "Could not load the library",
+    "body": "Refresh the page and try again."
   },
   "no_description": "No description",
   "row_menu_aria": "Actions for {{title}}",
@@ -69,15 +69,50 @@
     "state": "State",
     "modules": "Modules",
     "lectures": "Lectures",
-    "problems": "Problems",
+    "problems": "Materials",
     "copies": "Academies",
     "updated": "Updated",
     "actions": "Actions"
   },
   "edit": {
-    "heading": "Rename the master course",
+    "heading": "Rename library course",
     "body": "Academies that already copied it keep the name they chose.",
     "submit": "Save changes",
     "submitting": "Saving…"
+  },
+  "import": {
+    "action": "Copy to library",
+    "description": "Copy the course and its hidden content into a separate library draft. Student work and class assignments are excluded.",
+    "title_label": "Library course title",
+    "loading": "Loading course preview…",
+    "revision": "Source revision {{revision}}",
+    "hidden": "(hidden)",
+    "refresh": "Refresh preview",
+    "cancel": "Cancel",
+    "working": "Copying…",
+    "confirm": "Create library draft",
+    "success": "Copied to library as a draft.",
+    "origin": "Copied from {{academy}} · {{course}} · revision {{revision}} on {{date}}. This is an independent copy.",
+    "types": {
+      "PROGRAMMING_EXERCISE": "Programming",
+      "PDF_DOCUMENT": "PDF",
+      "TURTLE_EXERCISE": "Turtle",
+      "WRITTEN_RESPONSE": "Written response",
+      "MULTIPLE_CHOICE": "Multiple choice",
+      "VIDEO_LESSON": "Video"
+    },
+    "blockers": {
+      "INVALID_DEFINITION": "Invalid material definition",
+      "ASSET_NOT_READY": "Asset is not ready",
+      "ASSET_MISSING": "Asset is missing or does not match its manifest",
+      "CAPTION_INVALID": "Caption reference is invalid"
+    }
+  },
+  "picker": {
+    "action": "Copy from academy",
+    "description": "Choose a course from any academy to copy into the library as an independent draft.",
+    "select": "Select course",
+    "retry": "Try again",
+    "search": "Search academy courses"
   }
 }

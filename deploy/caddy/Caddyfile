@@ -35,6 +35,11 @@
 			fields {
 				# The GUI capability is a WebSocket subprotocol, not a URL token.
 				request>headers>Sec-Websocket-Protocol delete
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				request>headers>X-Cove-Bff-Secret delete
+				# Auth codes/state can arrive in a URI; omit all URI values from access logs.
+				request>uri delete
 				resp_headers>Sec-Websocket-Protocol delete
 			}
 		}
@@ -89,6 +94,9 @@ cs.coveedu.com {
 
 api.coveedu.com {
 	import production_common
+	# Only these Phase A contract endpoints are public under /v1.
+	@dlab_identity path /v1/campuses/* /v1/users/*
+	rewrite @dlab_identity /api/integrations/dlab{uri}
 	reverse_proxy api:4000 {
 		transport http {
 			read_timeout 10m

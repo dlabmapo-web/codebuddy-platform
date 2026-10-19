@@ -100,8 +100,10 @@ the `use client` directive. This task changes documentation only.
 - [x] Clarify whether a new Run-only mode is required: user chose existing behavior.
 - [x] Compare approaches and write the explicitly requested draft specification.
 - [x] Review scope, default behavior, copying, visibility and lifecycle consistency.
-- [ ] User approval of the written design before implementation.
+- [x] User approval of the written design before implementation.
 
 No visual companion is needed for this text specification: the user already
 provided the two layout references. No application or production verification
 is claimed by these source and reference inspections.
+
+Implementation was subsequently requested and completed. See the [local verification report](2026-10-19-pdf-practice-local-verification.md) for runtime evidence.

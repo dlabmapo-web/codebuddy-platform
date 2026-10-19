@@ -1,7 +1,8 @@
 # Distinguish PDF theory from PDF-assisted coding practice
 
 Date: 2026-10-19 (Asia/Seoul)
-Status: Proposed specification for review; application implementation has not started.
+Status: Approved by the user on 2026-10-19; implemented and verified locally.
+Verification: [local test results](../../research/2026-10-19-pdf-practice-local-verification.md).
 Branch: `feat/ignore-python-input-prompts` — keep this name.
 Baseline: `f7d9d208`.
 Evidence: [research notes and source map](../../research/2026-10-19-pdf-theory-and-coding-practice.md).
@@ -351,13 +352,17 @@ an approved implementation plan.
 Use targeted schema, API authorization/lifecycle, copy integration and browser
 tests for these invariants. Then run repository-required typecheck, lint,
 tests and production build according to current CI/deployment guidance, using
-development data. No runtime tests are required for this documentation-only
-change, and none are claimed. Production release is separate from spec review.
+development data. Local implementation and test results are recorded in the
+verification report above. Production release is separate from this work.
 
-## 12. Review status
+## 12. Review and implementation status
 
-The user confirmed existing grading/submission behavior. The remaining design
-defaults are one reference per exercise, same-lecture links, linked PDF as the
-initial reference tab, and local teacher/student page state. These defaults
-are concrete proposals for written-spec review. Application code, database
-migrations and deployment must wait for design approval.
+The user confirmed existing grading/submission behavior, then explicitly
+approved implementation and local E2E testing. The design is implemented on
+`feat/ignore-python-input-prompts` with one same-lecture reference per exercise,
+PDF as the initial reference tab and local teacher/student page state.
+
+The [verification report](../../research/2026-10-19-pdf-practice-local-verification.md)
+records seven passing browser tests on the local standalone production build,
+unit/database checks, screenshots and the separate legacy input-prompt browser
+fixture's localhost-database requirement. No production deployment was performed.

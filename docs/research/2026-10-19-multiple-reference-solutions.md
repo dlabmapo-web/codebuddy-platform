@@ -84,7 +84,8 @@ behavior or test execution is claimed by this documentation-only task.
 - [x] Ask the access-scope question: user chose existing teacher-only behavior.
 - [x] Compare structured alternatives, comments-only, and rich explanation.
 - [x] Write and self-review the explicitly requested draft specification.
-- [ ] User reviews the written draft before implementation planning.
+- [x] User approved implementation in the subsequent request.
+- [x] Implemented and locally verified; see the [verification report](2026-10-19-multiple-solutions-local-verification.md).
 
 The supplied screenshot already establishes the requested visual direction;
 no separate visual companion or mockup is needed for this text specification.

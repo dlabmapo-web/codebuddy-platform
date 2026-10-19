@@ -1,9 +1,11 @@
 # Multiple reference solutions for programming exercises
 
 Date: 2026-10-19
-Status: Draft for user review; not approved for implementation
+Status: Approved by user implementation request; implemented and locally verified
 Branch: `feat/ignore-python-input-prompts` (retain its name)
 Evidence: [reference research](../../research/2026-10-19-multiple-reference-solutions.md)
+
+Verification: [local implementation and test report](../../research/2026-10-19-multiple-solutions-local-verification.md)
 
 ## Decision and purpose
 

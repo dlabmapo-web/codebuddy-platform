@@ -31,6 +31,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
+    { name: 'webkit-solutions', testMatch: /multiple-solutions\.spec\.ts/, use: { ...devices['Desktop Safari'] } },
     {
       name: 'webkit-input-prompts',
       testMatch: /input-prompt-policy\.spec\.ts/,

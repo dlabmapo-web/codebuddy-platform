@@ -563,3 +563,11 @@ shows a blue guidance card on the Problem statement tab: instructions are in the
 PDF, with an Open reference PDF action. The action switches tabs and focuses the
 PDF tab without remounting the reader or changing code. Existing hints and grading
 notices remain available below it. Authored statements continue to render normally.
+
+
+## Follow-up grading specification
+
+[PDF + code grading design](2026-10-20-pdf-code-grading-design.md) specifies an
+explicit Practice only/Automatic grading choice, Elice-style STDIO test controls,
+student messages and compatible server enforcement. It is a proposed follow-up,
+not a claim that those controls have already been implemented.

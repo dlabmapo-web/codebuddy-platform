@@ -39,7 +39,7 @@ export const authNamespaces = ["auth"] as const;
  * Mounted by the `(framed)/content` layout, and by the two platform-console
  * surfaces that render the same builder against the shared library.
  */
-export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses"] as const;
+export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses", "material-picker"] as const;
 
 /**
  * The student exercise workspace.

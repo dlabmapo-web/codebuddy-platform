@@ -434,3 +434,24 @@ Teacher, Team Lead, Manager and the platform sidebar. The shared avatar row,
 active state, collapsed tooltip and mobile-close behavior remain intact. A
 separator and safe-area padding distinguish account navigation from the main
 menu without overlaying either region.
+
+
+## Course builder material selection refinement
+
+Each lecture exposes one New material action, including empty and collapsed
+lectures. It opens a focused, Elice-inspired type picker using Cove blue,
+consistent icon tiles, concise descriptions and explicit Next/Cancel controls.
+Selection is required before continuing; closing restores trigger focus and
+continuing hands focus to the existing authoring flow. Native radio controls
+support keyboard selection. The dialog body scrolls on small screens.
+
+The picker preserves the current creation permissions and feature flags:
+coding practice requires exercise-edit access; PDF, PDF + coding practice and
+manual/video activities retain their existing content-edit restrictions.
+Optional activities appear only when enabled. No unsupported types are added.
+The shared academy/library builder uses the same picker and existing routes.
+
+Material rows use consistent type icons, a title and secondary metadata,
+readable B/KB/MB file sizes, and restrained hover states. Ordering, drag targets,
+visibility controls and row menus keep their existing behavior. English and
+Korean picker copy lives in a content-route namespace within the payload budget.

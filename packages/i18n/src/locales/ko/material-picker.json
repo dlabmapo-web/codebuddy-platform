@@ -1,0 +1,42 @@
+{
+  "title": "새 학습 자료",
+  "description": "“{{lecture}}”에 추가할 자료를 선택하세요.",
+  "choose": "학습 자료 유형 선택",
+  "close": "자료 선택 닫기",
+  "cancel": "취소",
+  "next": "다음",
+  "types": {
+    "python": {
+      "title": "코딩 실습",
+      "description": "Python 코드를 작성하고 실행합니다."
+    },
+    "pdfPractice": {
+      "title": "PDF + 코딩 실습",
+      "description": "참고 자료를 보며 코딩합니다."
+    },
+    "pdf": {
+      "title": "PDF 문서",
+      "description": "수업 자료나 참고 문서를 공유합니다."
+    },
+    "written": {
+      "title": "서술형 문제",
+      "description": "생각을 글로 설명하는 문제입니다."
+    },
+    "turtle": {
+      "title": "터틀 실습",
+      "description": "코드로 그림을 그리고 설명합니다."
+    },
+    "multipleChoice": {
+      "title": "객관식 문제",
+      "description": "퀴즈로 이해도를 확인합니다."
+    },
+    "shortAnswer": {
+      "title": "단답형 문제",
+      "description": "짧고 명확한 답을 입력합니다."
+    },
+    "video": {
+      "title": "동영상 수업",
+      "description": "영상이나 녹화 자료로 학습합니다."
+    }
+  }
+}

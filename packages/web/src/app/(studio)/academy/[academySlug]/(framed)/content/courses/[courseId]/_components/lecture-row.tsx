@@ -1,17 +1,15 @@
 import {VideoAuthorDialog} from "@/components/video/video-author-dialog";
 import { publicConfig } from '@/lib/config';
-import { useManualTranslation } from '@/components/manual/use-manual-translation';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
 import { PdfAuthorDialog } from '@/components/pdf/pdf-author-dialog';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { ChevronRight, FileText, Plus, Sparkles } from 'lucide-react';
+import { Braces, ChevronRight, FileCode2, FileText, ListChecks, PenLine, Sparkles, Turtle, Video } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
@@ -22,6 +20,14 @@ import { DeleteModal } from './delete-modal';
 import { MoveAnywhereModal } from './move-anywhere-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
+import { NewMaterialDialog } from './new-material-dialog';
+import { availableMaterialKinds, type MaterialCreationKind } from '../_lib/material-creation';
+
+function formatMaterialSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type CourseMaterial = CourseLecture['materials'][number];
 
@@ -115,7 +121,7 @@ function ExerciseRow({
   parentEffectivelyVisible: boolean;
   siblings: readonly CourseMaterial[];
 }) {
-  const { t } = useTranslation(['content', 'courses', 'pdf-practice']);
+  const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
   // See `ModuleCard`: the flag is inert in a library academy.
   const visibilityIsReal = useContentSurface() !== 'library';
   const router = useRouter();
@@ -154,11 +160,21 @@ function ExerciseRow({
   const href = exercisePath(lectureId, material.id);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
-  const titleClass = `block max-w-full truncate text-left text-[14.5px] font-semibold text-brand hover:text-brand-deep hover:underline ${effectivelyVisible ? '' : 'opacity-55'}`;
+  const materialKind: MaterialCreationKind = material.type === 'PDF_DOCUMENT'
+    ? 'pdf' : material.type === 'VIDEO_LESSON'
+      ? 'video' : material.type === 'TURTLE_EXERCISE'
+        ? 'turtle' : material.type === 'MULTIPLE_CHOICE'
+          ? 'multipleChoice' : material.type === 'WRITTEN_RESPONSE'
+            ? 'written' : exercise?.referencePdfMaterialId ? 'pdfPractice' : 'python';
+  const MaterialIcon = {
+    pdf: FileText, video: Video, turtle: Turtle, multipleChoice: ListChecks,
+    written: PenLine, shortAnswer: PenLine, pdfPractice: FileCode2, python: Braces,
+  }[materialKind];
+  const titleClass = `block max-w-full truncate rounded text-left text-[14px] font-semibold text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand ${effectivelyVisible ? '' : 'opacity-55'}`;
 
   return (
     <li
-      className={`relative flex items-center gap-2.5 px-3 py-2 ${
+      className={`relative flex items-center gap-2.5 px-3 py-3.5 transition-colors hover:bg-canvas/60 ${
         isDragging ? 'opacity-40' : ''
       }`}
       ref={setRowNode}
@@ -166,30 +182,30 @@ function ExerciseRow({
       <DropIndicator edge={dropEdge} />
       <DragHandle className="-ml-1.5 -mr-1" handle={handle} />
       <OutlineNumber>{outlineNumber}</OutlineNumber>
-      {material.pdfDocument ? (
-        <FileText aria-hidden className="size-4 shrink-0 text-brand" />
-      ) : null}
+      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${material.type === 'PDF_DOCUMENT' ? 'bg-warning/10 text-warning' : material.type === 'VIDEO_LESSON' ? 'bg-success/10 text-success' : 'bg-brand-soft text-brand'}`}>
+        <MaterialIcon aria-hidden className="size-4.5" strokeWidth={1.7} />
+      </span>
       <div className="min-w-0 flex-1">
-        {material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{t('content:video.badge')} · {material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.type==='TURTLE_EXERCISE'?'Turtle':material.type==='MULTIPLE_CHOICE'?'Multiple choice':'Written response'} · {material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        {material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={titleClass}
             onClick={() => setPdfOpen(true)}
           >
-            {t('pdf.badge')} · {material.title}
+            {material.title}
           </button>
         ) : (
           <Link className={titleClass} href={href}>
-            {material.title}{material.programmingExercise?.referencePdfMaterialId ? <span className="ml-2 text-xs text-sub">{t('pdf-practice:practice')}</span> : null}
+            {material.title}
           </Link>
         )}
         {material.pdfDocument ? (
           <span className="block truncate text-xs text-sub">
-            {t(`pdf.placements.${material.pdfDocument.placement}`)} ·{' '}
+            {t('pdf.badge')} · {t(`pdf.placements.${material.pdfDocument.placement}`)} ·{' '}
             {material.pdfDocument.originalFilename} ·{' '}
-            {(material.pdfDocument.byteSize / 1e6).toFixed(2)} MB
+            {formatMaterialSize(material.pdfDocument.byteSize)}
           </span>
-        ) : null}
+        ) : <span className="mt-0.5 block text-xs text-sub">{t(`material-picker:types.${materialKind}.title`)}</span>}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {visibilityIsReal ? (
@@ -316,7 +332,20 @@ export function LectureRow({
   const { t } = useTranslation(['content', 'courses', 'pdf-practice']);
   const visibilityIsReal = useContentSurface() !== 'library';
   const [pdfAdding, setPdfAdding] = useState(false);
-  const {t:mt}=useManualTranslation();
+  const router = useRouter();
+  const materialKinds = availableMaterialKinds({ ...publicConfig, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
+  function chooseMaterial(kind: MaterialCreationKind) {
+    switch (kind) {
+      case 'python': router.push(exercisePath(lecture.id, 'new')); break;
+      case 'pdfPractice': router.push(`${exercisePath(lecture.id, 'new')}?referencePdf=required`); break;
+      case 'pdf': setPdfAdding(true); break;
+      case 'written': setWrittenAdding(true); break;
+      case 'turtle': setManualAdding(true); break;
+      case 'multipleChoice': setChoiceAdding(true); break;
+      case 'shortAnswer': setShortAdding(true); break;
+      case 'video': setVideoAdding(true); break;
+    }
+  }
   const [manualAdding,setManualAdding]=useState(false);
   const [choiceAdding,setChoiceAdding] = useState(false);
   const [videoAdding,setVideoAdding]=useState(false);
@@ -366,7 +395,7 @@ export function LectureRow({
         ref={rowRef}
       >
         <div
-          className="relative -mx-2 flex items-center gap-2.5 rounded-lg px-2 py-0.5"
+          className="relative -mx-2 flex flex-wrap items-center gap-2.5 rounded-lg px-2 py-1.5"
           ref={setNodeRef}
         >
           <DropIndicator edge={dropEdge} />
@@ -389,7 +418,7 @@ export function LectureRow({
           </Collapsible.Trigger>
           <OutlineNumber tone="strong">{lectureNumber}</OutlineNumber>
           <div
-            className={`flex min-w-0 flex-1 items-center gap-2 ${
+            className={`flex min-w-32 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 ${
               effectivelyVisible ? '' : 'opacity-55'
             }`}
           >
@@ -410,6 +439,7 @@ export function LectureRow({
                 : ''}
             </span>
           </div>
+          <NewMaterialDialog kinds={materialKinds} lectureTitle={lecture.title} onChoose={chooseMaterial} />
           {visibilityIsReal ? (
             <RowVisibility
               busy={builder.visibilityPending(lecture.id)}
@@ -438,10 +468,9 @@ export function LectureRow({
         </div>
 
         <Collapsible.Content className="cove-collapse">
-          {/* Problems live in their own bordered well, indented and inset from
-              the right, so their menus never line up with the lecture's. */}
+          {/* Keep the reading order and drag targets in one material list. */}
           {hasExercises ? (
-            <ol className="ml-8 mr-9 mt-2.5 divide-y divide-border overflow-hidden rounded-lg border border-border bg-canvas/50">
+            <ol className="ml-0 mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card sm:ml-8">
               {lecture.materials.map((material) => (
                 <ExerciseRow
                   builder={builder}
@@ -456,34 +485,8 @@ export function LectureRow({
               ))}
             </ol>
           ) : null}
-
-          {builder.editable ? (
-            <button
-              type="button"
-              className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand"
-              onClick={() => setPdfAdding(true)}
-            >
-              <Plus className="size-3.5" />
-              {t('pdf.add')}
-            </button>
-          ) : null}
-          {builder.editable && publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setManualAdding(true)}><Plus className="size-3.5"/>{mt('add_turtle_written_response')}</button> : null}
-          {builder.editable && publicConfig.multipleChoiceEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setChoiceAdding(true)}><Plus className="size-3.5"/>{mt("add_multiple_choice")}</button> : null}
-          {builder.editable && publicConfig.shortAnswerEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setShortAdding(true)}><Plus className="size-3.5"/>{mt('add_short_answer')}</button> : null}
-          {builder.editable && !publicConfig.guiEnabled ? <button type="button" className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" onClick={()=>setWrittenAdding(true)}><Plus className="size-3.5"/>{mt('written_response')}</button> : null}
-          {builder.editable ? <Link className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand" href={`${exercisePath(lecture.id, 'new')}?referencePdf=required`}><Plus className="size-3.5" />{t('pdf-practice:practice')}</Link> : null}
-          {builder.exerciseEditable ? (
-            <Link
-              className="ml-8 mt-2 inline-flex items-center gap-1 text-[13.5px] font-bold text-brand hover:text-brand-deep"
-              href={exercisePath(lecture.id, 'new')}
-            >
-              <Plus className="size-3.5" />
-              {t('pdf-practice:code')}
-            </Link>
-          ) : null}
         </Collapsible.Content>
 
-        {publicConfig.videoEnabled && builder.editable ? <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={()=>setVideoAdding(true)}>{t('content:video.add')}</button>:null}
         {videoAdding?<VideoAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setVideoAdding(false)} onSaved={builder.refresh}/>:null}
         {choiceAdding ? <ManualAuthorDialog type="MULTIPLE_CHOICE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setChoiceAdding(false)} onSaved={builder.refresh}/> : null}
         {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}

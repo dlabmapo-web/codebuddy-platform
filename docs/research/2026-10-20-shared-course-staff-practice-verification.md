@@ -285,3 +285,23 @@ scrolling menu. Existing profile/active/collapsed/mobile behavior is reused.
 Sidebar navigation and profile-row tests, web TypeScript and changed-file ESLint
 pass. Browser verification confirmed the Teacher row at the bottom-left of the
 viewport. Screenshot: `/tmp/cove-sidebar-mypage-footer.png`.
+
+
+## Elice-inspired course builder material picker
+
+Replaced the per-type inline add links with one New material action per lecture.
+The reusable picker shows icon tiles, brief descriptions, selected state and
+Next/Cancel controls. Choices preserve content/exercise permissions and optional
+feature flags. Existing author dialogs and exercise routes perform creation.
+Material rows now have consistent spacing, type icons, secondary labels and
+readable file sizes. Picker copy is isolated in the material-picker namespace.
+
+Validation: 58 focused web tests (including picker interaction, creation
+permissions, course tree, drag/drop, move dialogs and library translations),
+136 translation tests, web TypeScript, changed-file ESLint and diff checks pass.
+Browser checks confirmed the PDF editor handoff, PDF + coding practice route,
+written-response editor in an empty lecture, native arrow-key selection,
+Escape/focus restoration and the two-column picker at 390px. No records were
+created during browser verification. Desktop viewport restored afterwards.
+Screenshots: /tmp/cove-course-builder-materials.png and
+/tmp/cove-new-material-picker.png. No migration is required.

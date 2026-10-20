@@ -74,6 +74,7 @@ declare module 'i18next' {
       classes: typeof classes;
       common: typeof common;
       content: typeof content;
+      "material-picker": typeof import("@cove/i18n/locales/en/material-picker.json");
       "pdf-practice": typeof pdfPractice;
       'content-import': typeof contentImport;
       courses: typeof courses;

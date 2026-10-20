@@ -1,0 +1,42 @@
+{
+  "title": "New material",
+  "description": "Choose what to add to “{{lecture}}”.",
+  "choose": "Choose a material type",
+  "close": "Close material picker",
+  "cancel": "Cancel",
+  "next": "Next",
+  "types": {
+    "python": {
+      "title": "Coding practice",
+      "description": "Write and run Python code."
+    },
+    "pdfPractice": {
+      "title": "PDF + coding practice",
+      "description": "Read a reference beside the editor."
+    },
+    "pdf": {
+      "title": "PDF document",
+      "description": "Share a lesson or reference file."
+    },
+    "written": {
+      "title": "Written response",
+      "description": "Ask for a written explanation."
+    },
+    "turtle": {
+      "title": "Turtle exercise",
+      "description": "Draw with code and explain your work."
+    },
+    "multipleChoice": {
+      "title": "Multiple choice",
+      "description": "Check understanding with a quiz."
+    },
+    "shortAnswer": {
+      "title": "Short answer",
+      "description": "Ask for a brief, specific answer."
+    },
+    "video": {
+      "title": "Video lesson",
+      "description": "Teach with a video or recording."
+    }
+  }
+}

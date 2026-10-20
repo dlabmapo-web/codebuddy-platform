@@ -507,3 +507,22 @@ Edit PDF from the reader. Reviewers do not see that action. Reader headers show
 the document title and filename, with localized loading feedback during startup.
 The existing curriculum.review permission protects staff preview; learner
 visibility/enrollment checks remain unchanged.
+
+
+## PDF as the complete coding-practice instructions
+
+PDF + coding practice can be created from a title and a same-lecture PDF without
+writing a duplicate problem statement. The selected PDF satisfies the statement
+requirement; extra written instructions, input/output text and constraints are
+optional and collapsed. Reference solutions, test cases and hints are optional
+for PDF practice and grouped under optional grading settings. Blank unnamed
+solution placeholders serialize as an empty list; partially named/invalid answers
+still fail validation. Normal coding and quiz validation retain their existing
+requirements. The shared create/update contract accepts an empty solution list
+only when a PDF is linked, and existing PDF ownership/placement checks still run.
+
+The workspace opens its PDF pane beside the code editor. Run remains available
+without test cases; Submit stays disabled for PDF practice with no grading cases.
+Adding grading cases restores submission. Existing descriptions, solutions and
+other authoring data remain editable. The audit records PDF versus text as the
+instruction source.

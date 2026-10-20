@@ -1178,6 +1178,7 @@ export class CourseService {
     };
   }
 
+  /** PDF-linked practice can use the PDF as its instructions without a reference answer. */
   async createExercise(
     identity: SupabaseIdentity,
     input: ExerciseWriteInput,
@@ -1778,6 +1779,7 @@ function exerciseAuditFromInput(
 ) {
   return {
     referencePdfMaterialId: input.referencePdfMaterialId,
+    instructionSource: input.referencePdfMaterialId ? "PDF" : "TEXT",
     title: input.title.trim(),
     difficulty: input.difficulty,
     position,

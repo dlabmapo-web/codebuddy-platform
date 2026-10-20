@@ -47,6 +47,33 @@ export function ExerciseWorkspace({
   });
   const { draft, editable, update } = authoring;
 
+  const assessmentEditors = (<>
+        {editable ? (
+          <SolutionCodeEditor
+            error={authoring.errorFor('solution')}
+            onChange={(solutions) => update('solutions', solutions)}
+            value={draft.solutions}
+          />
+        ) : null}
+        <AnswersEditor
+          editable={editable}
+          error={authoring.errorFor('test')}
+          grading={draft.grading}
+          gradingIssues={authoring.gradingIssues}
+          testCases={draft.testCases}
+          update={(testCases) => update('testCases', testCases)}
+          updateGrading={(grading, testCases) => {
+            update('grading', grading);
+            update('testCases', testCases);
+          }}
+        />
+        <HintsEditor
+          editable={editable}
+          hints={draft.hints}
+          update={(hints) => update('hints', hints)}
+        />
+  </>);
+
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <ExerciseHeader authoring={authoring} context={initialContext} />
@@ -77,30 +104,11 @@ export function ExerciseWorkspace({
           onChange={(starterCode) => update('starterCode', starterCode)}
           value={draft.starterCode}
         />
-        {editable ? (
-          <SolutionCodeEditor
-            error={authoring.errorFor('solution')}
-            onChange={(solutions) => update('solutions', solutions)}
-            value={draft.solutions}
-          />
-        ) : null}
-        <AnswersEditor
-          editable={editable}
-          error={authoring.errorFor('test')}
-          grading={draft.grading}
-          gradingIssues={authoring.gradingIssues}
-          testCases={draft.testCases}
-          update={(testCases) => update('testCases', testCases)}
-          updateGrading={(grading, testCases) => {
-            update('grading', grading);
-            update('testCases', testCases);
-          }}
-        />
-        <HintsEditor
-          editable={editable}
-          hints={draft.hints}
-          update={(hints) => update('hints', hints)}
-        />
+        {draft.referencePdfMaterialId ? <details className="rounded-xl border border-border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:grading_optional')}</summary>
+          <p className="mt-3 text-sm leading-6 text-sub">{t('pdf-practice:run_only_help')}</p>
+          <div className="mt-4 space-y-5">{assessmentEditors}</div>
+        </details> : assessmentEditors}
         </>}
         <ExerciseActions authoring={authoring} />
       </main>

@@ -100,6 +100,11 @@ describe("manual programming exercise schemas", () => {
     expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, solutions: [] }).success).toBe(false);
   });
 
+  it("accepts a PDF as the instructions for run-only practice without a reference answer", () => {
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, referencePdfMaterialId: "10000000-0000-4000-8000-000000000001", description: "", solutions: [], testCases: [] }).success).toBe(true);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, referencePdfMaterialId: "10000000-0000-4000-8000-000000000001", solutions: [{ title: "Unfinished", code: "" }] }).success).toBe(false);
+  });
+
   it("requires a nonblank correct answer without trimming valid code", () => {
     expect(createProgrammingExerciseSchema.safeParse({
       ...validExercise,

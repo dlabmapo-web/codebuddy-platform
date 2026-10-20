@@ -14,7 +14,7 @@ export function ExerciseActions({
 }: {
   authoring: ExerciseAuthoring;
 }) {
-  const { t } = useTranslation(['content', 'grading', 'quiz']);
+  const { t } = useTranslation(['content', 'grading', 'quiz', 'pdf-practice']);
   const errorText = useErrorText();
   const {
     editable,
@@ -55,7 +55,7 @@ export function ExerciseActions({
       {editable && !blocked && notGradeable ? (
         <p className="mb-4 flex items-start gap-2 text-[14px] leading-6 text-sub">
           <AlertTriangle className="mt-1 size-4 shrink-0 text-warning" />
-          {t('exercise.no_tests_note')}
+          {t(authoring.draft.referencePdfMaterialId ? 'pdf-practice:run_only_help' : 'exercise.no_tests_note')}
         </p>
       ) : null}
 

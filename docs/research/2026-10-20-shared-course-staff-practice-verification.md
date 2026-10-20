@@ -375,3 +375,29 @@ tests, 33 role permission tests, web TypeScript, changed-file ESLint and diff
 checks pass. Browser verified Manager title-click reading, both document pages,
 and separate Edit PDF action without saving. Reviewer behavior is covered by
 interaction and permission tests. Screenshot: /tmp/cove-pdf-open-for-staff.png.
+
+
+## PDF-only instructions with a runnable editor
+
+Inspected the requested Elice project lecture and one exercise in viewing and
+editing modes without saving or running anything there. The inspected exercise
+uses rich lesson instructions beside the Python editor; its authoring also has
+a supplementary-material selector. This observation supports the side-by-side
+flow, not a claim that Elice stores that particular example as a PDF.
+
+Cove PDF practice now permits a title and linked PDF with no duplicate written
+statement, reference solution or test cases. Optional notes/grading are collapsed.
+The shared API contract was also corrected: its unconditional solution requirement
+had rejected saves after client validation passed. Existing plain coding answer
+requirements, invalid partial-answer checks and PDF reference authorization remain.
+PDF practices without cases keep Run but disable Submit in staff/student editor
+controls. API submission validation still rejects unconfigured grading.
+
+Validation: 23 web draft/workspace/mode tests, 30 shared course-contract tests,
+27 API course-service tests, 136 translation tests, web/API TypeScript, changed
+web ESLint and diff checks pass. Live browser creation succeeded with title/PDF
+only. Left the hidden local example PDF instructions practice, material ID
+ e52cd452-fd09-4304-b19d-a8d787bbea57, in the existing E2E course. Its preview
+showed the PDF next to the editor and running print code produced
+PDF practice is running. No written statement, reference answer or tests were
+stored. Screenshot: /tmp/cove-pdf-only-practice-running.png.

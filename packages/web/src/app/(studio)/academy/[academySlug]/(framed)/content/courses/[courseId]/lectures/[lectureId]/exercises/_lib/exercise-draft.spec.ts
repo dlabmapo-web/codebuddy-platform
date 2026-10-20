@@ -303,3 +303,25 @@ describe('quiz authoring', () => {
     expect(exerciseDraftFieldsSchema.safeParse(draftToPayload(value)).success).toBe(false);
   });
 });
+
+
+describe('PDF instructions without a duplicate problem statement', () => {
+  const pdfId = '10000000-0000-4000-8000-000000000001';
+  it('allows a PDF-only runnable practice without solutions or tests', () => {
+    const value = draft({ referencePdfMaterialId: pdfId, description: '', solutions: [{ title: null, code: '' }], testCases: [] });
+    expect(exerciseCompleteness(value).filter(item => !item.optional).every(item => item.complete)).toBe(true);
+    const payload = draftToPayload(value);
+    expect(payload.description).toBe('');
+    expect(payload.solutions).toEqual([]);
+    expect(exerciseDraftFieldsSchema.safeParse(payload).success).toBe(true);
+  });
+  it('keeps the written statement and solution requirements for ordinary coding', () => {
+    const value = draft({ referencePdfMaterialId: null, description: '', solutions: [{ title: null, code: '' }] });
+    expect(exerciseCompleteness(value).filter(item => !item.optional && !item.complete).map(item => item.id)).toEqual(['description', 'solution']);
+  });
+  it('preserves provided PDF notes and reference solutions and rejects a named incomplete solution', () => {
+    expect(draftToPayload(draft({ referencePdfMaterialId: pdfId })).description).toBe('<p>Add the values.</p>');
+    expect(draftToPayload(draft({ referencePdfMaterialId: pdfId })).solutions).toHaveLength(1);
+    expect(exerciseDraftFieldsSchema.safeParse(draftToPayload(draft({ referencePdfMaterialId: pdfId, solutions: [{ title: 'Incomplete answer', code: '' }] }))).success).toBe(false);
+  });
+});

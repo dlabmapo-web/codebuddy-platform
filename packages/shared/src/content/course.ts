@@ -723,7 +723,7 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     }
     return;
   }
-  if (!value.solutions.length)
+  if (!value.solutions.length && !value.referencePdfMaterialId)
     context.addIssue({
       code: "custom",
       path: ["solutions"],

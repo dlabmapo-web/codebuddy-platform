@@ -158,7 +158,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
-    solutions: draft.quiz ? [] : draft.solutions,
+    solutions: draft.quiz ? [] : draft.referencePdfMaterialId ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
     testCases: (draft.quiz ? [] : draft.testCases)
@@ -199,13 +199,13 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
     { id: 'difficulty', complete: Boolean(draft.difficulty), optional: false },
     {
       id: 'description',
-      complete: richTextToPlainText(draft.description).length > 0,
-      optional: false,
+      complete: Boolean(!draft.quiz && draft.referencePdfMaterialId) || richTextToPlainText(draft.description).length > 0,
+      optional: Boolean(!draft.quiz && draft.referencePdfMaterialId),
     },
     {
       id: 'solution',
       complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.solutions.length > 0 && exerciseSolutionsSchema.safeParse(draft.solutions).success,
-      optional: false,
+      optional: Boolean(!draft.quiz && draft.referencePdfMaterialId),
     },
     {
       id: 'test',

@@ -1,4 +1,5 @@
 'use client';
+import { isPdfRunOnly } from '@/components/pdf/pdf-practice-mode';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import {VideoResourceLinks} from '@/components/video/video-resource-links';
 
@@ -717,6 +718,7 @@ function ProgrammingWorkspace({
               onRunSample={(index) => void handleRunSample(index)}
               serverCheck={serverCheck}
               runner={runner}
+              canSubmit={!isPdfRunOnly(exercise)}
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}
               tab={outputTab}

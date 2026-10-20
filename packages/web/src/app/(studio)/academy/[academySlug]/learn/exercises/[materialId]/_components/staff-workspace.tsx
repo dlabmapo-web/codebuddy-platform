@@ -1,4 +1,5 @@
 'use client';
+import { isPdfRunOnly } from '@/components/pdf/pdf-practice-mode';
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -167,7 +168,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
           <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
             onReset={() => { if (draft.code !== exercise.starterCode && window.confirm(t('reset_confirm'))) { draft.resetTo(exercise.starterCode); runner.clear(); submission.reset(); } }}
-            onSubmit={submit} canSubmit={access?.canSubmit ?? false} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
+            onSubmit={submit} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise)} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
             onRunSample={(index) => { void runSample(index); }} onRunAll={() => { void runAll(); }}
             onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} /></div>
           {selectedStudent ? <StaffStudentPane key={`${selectedStudent.classId}:${selectedStudent.membershipId}`} academyId={academyId} materialId={exercise.materialId} userId={userId} starterCode={exercise.starterCode} student={selectedStudent} beforeChangeRef={beforeStudentChange} close={() => selectStudent(null)} /> : null}

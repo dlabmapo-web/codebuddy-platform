@@ -37,42 +37,16 @@ export function BasicInformation({
   editable: boolean;
   update: ExerciseDraftUpdate;
 }) {
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'pdf-practice']);
   const titleError = authoring.errorFor('title');
   const descriptionError = authoring.errorFor('description');
 
-  return (
-    <SectionCard
-      description={t('exercise.basic_help')}
-      icon={BookOpen}
-      title={t('exercise.section.basics')}
-    >
-      <Field error={titleError} label={t('exercise.field.title')} required>
-        <input
-          aria-invalid={Boolean(titleError)}
-          className={`${inputClass} ${invalidClass(titleError)}`}
-          disabled={!editable}
-          maxLength={200}
-          onChange={(event) => update('title', event.target.value)}
-          placeholder={t('exercise.placeholder.title')}
-          value={draft.title}
-        />
-      </Field>
-      <Field as="group" label={t('exercise.field.difficulty')} required>
-        <DifficultyPicker
-          disabled={!editable}
-          onChange={(difficulty: ExerciseDifficulty) =>
-            update('difficulty', difficulty)
-          }
-          value={draft.difficulty}
-        />
-      </Field>
-
+  const instructions = (<>
       <Field
         as="group"
         error={descriptionError}
         label={t('exercise.field.description')}
-        required
+        required={!draft.referencePdfMaterialId}
       >
         {editable ? (
           <div
@@ -132,6 +106,41 @@ export function BasicInformation({
       </Field>
 
       </> : null}
+  </>);
+
+  return (
+    <SectionCard
+      description={t('exercise.basic_help')}
+      icon={BookOpen}
+      title={t('exercise.section.basics')}
+    >
+      <Field error={titleError} label={t('exercise.field.title')} required>
+        <input
+          aria-invalid={Boolean(titleError)}
+          className={`${inputClass} ${invalidClass(titleError)}`}
+          disabled={!editable}
+          maxLength={200}
+          onChange={(event) => update('title', event.target.value)}
+          placeholder={t('exercise.placeholder.title')}
+          value={draft.title}
+        />
+      </Field>
+      <Field as="group" label={t('exercise.field.difficulty')} required>
+        <DifficultyPicker
+          disabled={!editable}
+          onChange={(difficulty: ExerciseDifficulty) =>
+            update('difficulty', difficulty)
+          }
+          value={draft.difficulty}
+        />
+      </Field>
+
+      {draft.referencePdfMaterialId && !draft.quiz ? <p className="rounded-lg border border-brand/15 bg-brand-soft px-4 py-3 text-sm leading-6 text-brand">{t('pdf-practice:pdf_instructions')}</p> : null}
+      {draft.referencePdfMaterialId && !draft.quiz ? <details className="rounded-xl border border-border p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:extra_notes')}</summary>
+        <div className="mt-4 space-y-5">{instructions}</div>
+      </details> : instructions}
+
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input
           checked={draft.isVisible}

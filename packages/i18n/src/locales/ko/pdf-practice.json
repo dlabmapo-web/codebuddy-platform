@@ -20,5 +20,9 @@
   "in_use": "이 PDF를 사용하는 코딩 실습입니다. 실습의 참고 PDF를 먼저 변경하거나 해제해 주세요:",
   "page_count": "{{count}}쪽",
   "open_statement": "문제 설명 보기",
-  "loading": "PDF 정보를 불러오는 중…"
+  "loading": "PDF 정보를 불러오는 중…",
+  "pdf_instructions": "PDF가 문제 설명이 됩니다. 학생은 코드 편집기 옆에서 PDF를 읽습니다. 별도의 문제 설명을 작성하지 않아도 됩니다.",
+  "extra_notes": "추가 문제 설명 (선택 사항)",
+  "grading_optional": "정답 코드, 채점 및 힌트 (선택 사항)",
+  "run_only_help": "학생은 PDF를 보며 코드를 실행할 수 있습니다. 자동 채점과 제출을 사용하려면 테스트 케이스를 추가하세요."
 }

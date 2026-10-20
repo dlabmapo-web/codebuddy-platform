@@ -51,6 +51,15 @@ export const visibleCurriculumInclude = {
   },
 } as const satisfies Prisma.CourseInclude;
 
+/** Same hierarchy shape, only after a separate curriculum.review authorization. */
+export const previewCurriculumInclude = {
+  modules: { ...visibleCurriculumInclude.modules, where: {}, include: {
+    lectures: { ...visibleCurriculumInclude.modules.include.lectures, where: {}, include: {
+      materials: { ...visibleCurriculumInclude.modules.include.lectures.include.materials, where: {} },
+    } },
+  } },
+} as const satisfies Prisma.CourseInclude;
+
 export type VisibleCourse = Prisma.CourseGetPayload<{
   include: typeof visibleCurriculumInclude;
 }>;
@@ -83,19 +92,20 @@ export class CurriculumOutlineService {
     course: VisibleCourse,
     userId: string,
     classId?: string,
+    staffPractice = false,
   ): Promise<LearnCourseOutline> {
     const modules = nonemptyModules(course);
     const materialIds = exerciseMaterialIds({ ...course, modules });
     // One `userId + materialIds` query for the whole course. A per-row lookup
     // is what made v1's outline scale with the size of the curriculum.
-    const statuses = await this.statusByMaterial(userId, materialIds, classId);
+    const statuses = staffPractice ? new Map() : await this.statusByMaterial(userId, materialIds, classId);
 
     const manualIds = modules.flatMap((module) =>
       module.lectures.flatMap((lecture) =>
         lecture.materials.filter((m) => m.manualMaterial).map((m) => m.id),
       ),
     );
-    const manualAttempts = manualIds.length
+    const manualAttempts = !staffPractice && manualIds.length
       ? await this.prisma.manualSubmission.findMany({
           where: { userId, classId, materialId: { in: manualIds } },
           orderBy: { createdAt: "desc" },
@@ -131,7 +141,7 @@ export class CurriculumOutlineService {
         title: course.title,
         description: course.description,
       },
-      manualAssessment: manualGradeSummaryFor(course, statuses),
+      ...(staffPractice ? {} : { manualAssessment: manualGradeSummaryFor(course, statuses) }),
       progress: countProgress(materialIds, statuses),
       modules: modules.map((courseModule) => ({
         id: courseModule.id,

@@ -31,7 +31,9 @@
     "point_policy": "Points and rewards",
     "maintenance": "Maintenance",
     "resources": "Resources",
-    "lessons": "Lessons"
+    "lessons": "Lessons",
+    "shared_courses": "Courses",
+    "content_management": "Content management"
   },
   "academy_switcher": {
     "select": "Select academy",

@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+import { usePracticeTranslation } from '@/components/workspace/use-practice-translation';
+
 import { ManualGradeSummary } from '@/components/manual/manual-grade-summary';
 import { routes } from '@/lib/routes';
 
@@ -23,14 +26,17 @@ export function CourseOutline({
   classContext,
   courseId,
   initialOutline,
+  canManage = false,
 }: {
   academyId: string;
+  canManage?: boolean;
   classContext: LearningClassContext;
   courseId: string;
   initialOutline: LearnCourseOutlineResult;
 }) {
   const academySlug = useAcademySlug();
   const router = useRouter();
+  const { t: tp } = usePracticeTranslation();
   const { t } = useLayoutTranslation('learn');
   const { markActive, setOpenMaterial } = useStudentPresence();
   // No class means staff are previewing rather than learning: there is no
@@ -67,6 +73,7 @@ export function CourseOutline({
 
   return (
     <div className="flex flex-col gap-5">
+      {isPreview ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"><div><span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand">{tp('label')}</span><p className="mt-2 text-sm text-sub">{tp('notice')}</p></div>{canManage ? <Link href={routes.academyCourse(academySlug, courseId)} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:border-brand hover:text-brand">{tp('manage')}</Link> : null}</div> : null}
       {initialOutline.manualAssessment?<ManualGradeSummary grade={initialOutline.manualAssessment}/>:null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/*

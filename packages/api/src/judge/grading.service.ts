@@ -33,9 +33,32 @@ const gradingInclude = {
 type GradingSubmission = Prisma.SubmissionGetPayload<{
   include: typeof gradingInclude;
 }>;
+export type GradingWork = Pick<GradingSubmission,
+  "id" | "userId" | "materialId" | "courseId" | "code" | "gradingRevision" |
+  "timeLimitMs" | "memoryLimitMb" | "inputPromptPolicy" | "gradingMode" |
+  "gradingSemanticVersion" | "totalTimeLimitMs" | "comparatorTimeLimitMs" |
+  "continuationPolicy" | "exitStatusPolicy" | "materialMaximumHundredths" |
+  "materialScorePolicy"
+> & {
+  quizSnapshot: unknown;
+  gradingPolicySnapshot?: unknown;
+  gradingCases: Array<Omit<GradingSubmission["gradingCases"][number], "id" | "submissionId">>;
+  material?: GradingSubmission["material"];
+  classId?: string | null;
+  regradeRunId?: string | null;
+};
+
+/** A result destination. Staff practice supplies this and cannot reach student writes. */
+export type GradeSink = {
+  complete: (summary: GradeSummary, cases: CaseRow[], weighted: {
+    earnedWeight?: number; possibleWeight?: number; appliedScoreHundredths?: number | null;
+  }) => Promise<void>;
+  fail: (reason: string, cases?: CaseRow[]) => Promise<void>;
+};
+
 type EliceProfile = Extract<ResolvedGradingProfile, { kind: "elice" }>;
 
-type CaseRow = {
+export type CaseRow = {
   position: number;
   isSample: boolean;
   outcome: ExecutionResult["outcome"];
@@ -121,22 +144,34 @@ export class GradingService {
       include: gradingInclude,
     });
 
+    if (!submission) { await this.fail(submissionId, "EXERCISE_UNAVAILABLE"); return; }
+    await this.execute(submission, report, claimedAt);
+  }
+
+  async execute(
+    submission: GradingWork,
+    report: (progress: GradingProgress) => Promise<void>,
+    claimedAt: number,
+    sink?: GradeSink,
+  ): Promise<void> {
+    const submissionId = submission.id;
+    const fail = (reason: string) => sink ? sink.fail(reason) : this.fail(submissionId, reason);
     if (submission?.quizSnapshot) {
       const parsed = quizSnapshotSchema.safeParse(submission.quizSnapshot);
       if (!parsed.success || !parsed.data.definition.choices.some((c) => c.id === submission.code)) {
-        await this.fail(submissionId, "INVALID_QUIZ_SNAPSHOT");
+        await fail("INVALID_QUIZ_SNAPSHOT");
         return;
       }
       const passed = submission.code === parsed.data.definition.correctChoiceId;
       await this.finalize(submission, {
         status: passed ? "PASSED" : "FAILED", passedCount: passed ? 1 : 0,
         score: passed ? 100 : 0, runtimeMs: 0,
-      }, [], {});
+      }, [], {}, sink);
       return;
     }
 
     if (!submission || submission.gradingCases.length === 0) {
-      await this.fail(submissionId, "EXERCISE_UNAVAILABLE");
+      await fail("EXERCISE_UNAVAILABLE");
       return;
     }
 
@@ -151,11 +186,11 @@ export class GradingService {
       this.logger.error(
         `submission ${submissionId} has an unsupported grading profile: ${profile.reason}`,
       );
-      await this.fail(submissionId, "UNSUPPORTED_GRADING_PROFILE");
+      await fail("UNSUPPORTED_GRADING_PROFILE");
       return;
     }
     if (profile.kind === "legacy") {
-      await this.gradeLegacy(submission, report);
+      await this.gradeLegacy(submission, report, sink);
       return;
     }
     // Graded only on the runtimes it was recorded against. Checked before a
@@ -168,16 +203,17 @@ export class GradingService {
       : "no policy snapshot";
     if (mismatch) {
       this.logger.error(`submission ${submissionId} runtime mismatch: ${mismatch}`);
-      await this.fail(submissionId, "RUNTIME_VERSION_MISMATCH");
+      await fail("RUNTIME_VERSION_MISMATCH");
       return;
     }
-    await this.gradeElice(submission, profile, claimedAt, report);
+    await this.gradeElice(submission, profile, claimedAt, report, sink);
   }
 
   /** The original path, unchanged in behaviour: equal cases, legacy rules. */
   private async gradeLegacy(
-    submission: GradingSubmission,
+    submission: GradingWork,
     report: (progress: GradingProgress) => Promise<void>,
+    sink?: GradeSink,
   ): Promise<void> {
     const submissionId = submission.id;
     const results: CaseRow[] = [];
@@ -232,7 +268,7 @@ export class GradingService {
       }
     } catch (error) {
       this.logger.error(`grading ${submissionId} threw: ${String(error)}`);
-      await this.fail(submissionId, "ENGINE_FAILURE");
+      await (sink ? sink.fail("ENGINE_FAILURE") : this.fail(submissionId, "ENGINE_FAILURE"));
       return;
     }
 
@@ -240,7 +276,7 @@ export class GradingService {
       results.filter((item) => item.outcome !== "SKIPPED"),
       submission.gradingCases.length,
     );
-    await this.finalize(submission, summary, results, {});
+    await this.finalize(submission, summary, results, {}, sink);
   }
 
   /**
@@ -254,10 +290,11 @@ export class GradingService {
    * touches no best score, completion or reward.
    */
   private async gradeElice(
-    submission: GradingSubmission,
+    submission: GradingWork,
     profile: EliceProfile,
     claimedAt: number,
     report: (progress: GradingProgress) => Promise<void>,
+    sink?: GradeSink,
   ): Promise<void> {
     const submissionId = submission.id;
     const deadline = claimedAt + profile.totalTimeLimitMs + GRADING_OVERHEAD_MS;
@@ -357,7 +394,7 @@ export class GradingService {
         this.logger.error(`grading ${submissionId} threw: ${String(error)}`);
       }
       try {
-        await this.abort(submission, abort, results);
+        await this.abort(submission, abort, results, sink);
       } finally {
         // In `finally` because recording the abort is itself fallible: a
         // database that refuses the write does not make the program the judge
@@ -381,7 +418,7 @@ export class GradingService {
       earnedWeight: summary.earnedWeight,
       possibleWeight: summary.possibleWeight,
       appliedScoreHundredths: summary.appliedScoreHundredths,
-    });
+    }, sink);
   }
 
   /**
@@ -392,9 +429,10 @@ export class GradingService {
    * as never executed, so none of them reads as a wrong answer.
    */
   private async abort(
-    submission: GradingSubmission,
+    submission: GradingWork,
     abort: GradingAbort,
     executed: CaseRow[],
+    sink?: GradeSink,
   ): Promise<void> {
     const ran = new Set(executed.map((item) => item.position));
     const rows = [
@@ -415,6 +453,7 @@ export class GradingService {
       0,
     );
 
+    if (sink) { await sink.fail(abort.failureReason, rows); return; }
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.submission.updateMany({
         where: { id: submission.id, status: "RUNNING" },
@@ -437,7 +476,7 @@ export class GradingService {
 
   /** Persists a completed verdict and the progress it implies, atomically. */
   private async finalize(
-    submission: GradingSubmission,
+    submission: GradingWork,
     summary: GradeSummary,
     results: CaseRow[],
     weighted: {
@@ -445,7 +484,9 @@ export class GradingService {
       possibleWeight?: number;
       appliedScoreHundredths?: number | null;
     },
+    sink?: GradeSink,
   ): Promise<void> {
+    if (sink) { await sink.complete(summary, results, weighted); return; }
     const submissionId = submission.id;
     // One transaction: a verdict and the progress it implies must never be
     // observable apart.

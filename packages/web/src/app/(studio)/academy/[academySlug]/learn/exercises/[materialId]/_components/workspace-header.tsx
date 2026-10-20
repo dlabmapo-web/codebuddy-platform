@@ -2,7 +2,10 @@
 
 import type { LearnExerciseWorkspace } from '@cove/shared';
 import { formatDateTime } from '@cove/i18n/format';
+import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import {
+  LogOut,
   ChevronLeft,
   ChevronRight,
   History,
@@ -38,6 +41,8 @@ export function WorkspaceHeader({
   indicator,
   feedback,
   helpRequest,
+  participationSwitch,
+  leaveHref,
 }: {
   /**
    * The curriculum trigger, owned by the page so focus can return to it.
@@ -55,6 +60,8 @@ export function WorkspaceHeader({
    */
   feedback?: React.ReactNode;
   helpRequest?: React.ReactNode;
+  participationSwitch?: React.ReactNode;
+  leaveHref?: string;
   saveState: DraftSaveState;
   /**
    * The historical attempt this workspace was opened on, if any. Named in the
@@ -68,13 +75,15 @@ export function WorkspaceHeader({
 }) {
   const { t } = useLayoutTranslation(['learn', 'courses']);
   const locale = useLocale();
+  const { t: tp } = useTranslation("practice");
   const { exercise } = workspace;
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
+    <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
       {curriculum}
 
-      <div className="min-w-40 flex-1">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs text-sub">{workspace.breadcrumb.course.title} / {workspace.breadcrumb.lecture.title}</p>
         <div className="flex items-center gap-2">
           <h1 className="truncate text-[15px] font-bold leading-tight">
             {exercise.title}
@@ -105,8 +114,10 @@ export function WorkspaceHeader({
       {indicator}
       {feedback}
       {helpRequest}
+      {participationSwitch}
 
       <ExerciseTimer startedAt={solveStartedAt} />
+      {leaveHref ? <Link href={leaveHref} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{tp('leave')}</Link> : null}
 
       {saveState === 'idle' ? null : (
         <span

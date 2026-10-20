@@ -49,7 +49,7 @@ export function enrolledClassWhere(
     status: "ACTIVE",
     enrollments: {
       some: {
-        membership: { academyId, userId, status: "ACTIVE", role: "STUDENT" },
+        membership: { academyId, userId, status: "ACTIVE", ...holdsRoleWhere("STUDENT") },
       },
     },
   };
@@ -134,19 +134,24 @@ export type LearningScope = {
 
 export function learningScopeFor(
   academyId: string,
-  actor: { userId: string; role: AcademyRole },
+  actor: { userId: string; role: AcademyRole; roles?: readonly AcademyRole[] },
 ): LearningScope {
-  if (actor.role === "STUDENT") {
-    return {
-      course: assignedCourseWhere(academyId, actor.userId),
-      material: assignedMaterialWhere(academyId, actor.userId),
-    };
+  const roles = actor.roles ?? [actor.role];
+  if (roles.some((role) => role === "MANAGER" || role === "TEAM_LEAD")) {
+    return { course: { academyId }, material: {} };
   }
-  if (actor.role === "TEACHER") {
-    return {
-      course: taughtCourseWhere(academyId, actor.userId),
-      material: taughtMaterialWhere(academyId, actor.userId),
-    };
+  const courses: Prisma.CourseWhereInput[] = [];
+  const materials: Prisma.MaterialWhereInput[] = [];
+  if (roles.includes("TEACHER")) {
+    courses.push(taughtCourseWhere(academyId, actor.userId));
+    materials.push(taughtMaterialWhere(academyId, actor.userId));
   }
-  return { course: { academyId }, material: {} };
+  if (roles.includes("STUDENT")) {
+    courses.push(assignedCourseWhere(academyId, actor.userId));
+    materials.push(assignedMaterialWhere(academyId, actor.userId));
+  }
+  return {
+    course: courses.length === 1 ? courses[0]! : { academyId, OR: courses },
+    material: materials.length === 1 ? materials[0]! : { OR: materials },
+  };
 }

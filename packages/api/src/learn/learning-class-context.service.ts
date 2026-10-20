@@ -1,3 +1,4 @@
+import { holdsRoleWhere } from "../authorization/membership-roles.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type { LearningClassContext } from "@cove/shared";
 
@@ -42,7 +43,7 @@ export class LearningClassContextService {
       where: {
         academyId: input.academyId,
         userId: input.userId,
-        role: "STUDENT",
+        ...holdsRoleWhere("STUDENT"),
         status: "ACTIVE",
       },
       select: {

@@ -308,6 +308,7 @@ export const academyPermissions = [
    * teacher may do with their own classes. It authorizes neither class CRUD
    * nor assignment changes, so holding it never lets a teacher assign one. */
   "classes.assigned.manage",
+  "practice.own.create",
   "submissions.own.create",
   "submissions.assigned.review",
 ] as const;
@@ -327,6 +328,7 @@ export type AcademyPermission = z.infer<typeof academyPermissionSchema>;
  * exception, visibly, instead of appearing as a line somebody forgot to copy.
  */
 const teamLeadPermissions = [
+  "practice.own.create",
   "academy.read",
   "academy.members.read",
   "academy.applications.review",
@@ -376,6 +378,7 @@ const managerOnlyPermissions = [
 export const academyRolePermissions = {
   STUDENT: ["academy.read", "curriculum.read", "submissions.own.create"],
   TEACHER: [
+    "practice.own.create",
     "academy.read",
     "academy.members.read",
     "curriculum.read",

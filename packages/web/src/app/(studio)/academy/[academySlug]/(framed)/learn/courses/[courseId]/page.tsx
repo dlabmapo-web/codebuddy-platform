@@ -1,3 +1,4 @@
+import { canManageExercises } from '@/lib/academy-access-state';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { getLocale } from '@/i18n/server/get-locale';
@@ -22,14 +23,16 @@ export default async function LearnCoursePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { academySlug, courseId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
-  const requestedClassId = single((await searchParams).classId);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
+  const search = await searchParams;
+  const requestedClassId = single(search.classId);
   const { t } = await getServerTranslation(['learn']);
   let outline: LearnCourseOutlineResult | null = null;
   try {
     outline = await createServerORPCClient().learn.getCourseOutline({
       academyId,
       courseId,
+      ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
       ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
     });
   } catch {
@@ -40,7 +43,7 @@ export default async function LearnCoursePage({
   if (!outline) notFound();
 
   const locale = await getLocale();
-  const namespaces = ["pdf-practice"] as const;
+  const namespaces = ["practice", "pdf-practice"] as const;
   const { resources } = await initTranslations(locale, namespaces);
   return (
     <PageTranslationsProvider locale={locale} namespaces={namespaces} resources={resources}>
@@ -68,6 +71,7 @@ export default async function LearnCoursePage({
         // context and the outline renders without progress or presence.
         <CourseOutline
           academyId={academyId}
+          canManage={canManageExercises(roles)}
           classContext={outline.classContext}
           courseId={courseId}
           initialOutline={outline}

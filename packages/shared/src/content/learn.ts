@@ -288,7 +288,7 @@ export const learnExerciseWorkspaceSchema = z.object({
     previous: learnExerciseRefSchema.nullable(),
     next: learnExerciseRefSchema.nullable(),
   }),
-  draft: z.object({ code: z.string(), updatedAt: z.iso.datetime() }).nullable(),
+  draft: z.object({ code: z.string(), updatedAt: z.iso.datetime(), gradingRevision: z.number().int().optional() }).nullable(),
   status: exerciseProgressStatusSchema,
 });
 export type LearnExerciseWorkspace = z.infer<
@@ -390,7 +390,18 @@ export type LearnSelectedSubmission = z.infer<
  * The initial fullscreen entry needs both; an in-place transition inside the
  * same course needs only the first, which is why they stay separable.
  */
+export const workspaceAccessSchema = z.object({
+  mode: z.enum(["student", "staff-practice"]),
+  preview: z.boolean().optional(),
+  canParticipateAsStudent: z.boolean().optional(),
+  canPractice: z.boolean().optional(),
+  canSubmit: z.boolean(), canAuthor: z.boolean(), canReview: z.boolean(),
+  canViewSolutions: z.boolean(), canObserve: z.boolean(),
+});
+export type WorkspaceAccess = z.infer<typeof workspaceAccessSchema>;
+
 export const learnExerciseBootstrapSchema = z.object({
+  access: workspaceAccessSchema.optional(),
   workspace: learnExerciseWorkspaceSchema,
   navigator: workspaceNavigatorContextSchema,
   /**
@@ -421,6 +432,7 @@ export const learnAcademyInputSchema = z.object({ academyId: z.uuid() });
 
 export const learnCourseInputSchema = learnAcademyInputSchema.extend({
   courseId: z.uuid(),
+  mode: z.enum(["student", "staff-practice"]).optional(),
   classId: z.uuid().optional(),
 });
 
@@ -447,6 +459,8 @@ export const learnClassInputSchema = learnAcademyInputSchema.extend({
 export const learnExerciseBootstrapInputSchema =
   learnMaterialInputSchema.extend({
     submissionId: z.uuid().optional(),
+    mode: z.enum(["student", "staff-practice"]).optional(),
+    preview: z.boolean().optional(),
     classId: z.uuid().optional(),
   });
 
@@ -467,6 +481,8 @@ export const saveDraftSchema = learnMaterialInputSchema.extend({
    * write is better than a refusal at that point.
    */
   baseUpdatedAt: z.iso.datetime().nullish(),
+  preview: z.boolean().optional(),
+  gradingRevision: z.number().int().positive().optional(),
 });
 
 /**
@@ -768,4 +784,32 @@ export function progressStatusFromDraft(
   hasDraft: boolean,
 ): ExerciseProgressStatus {
   return hasDraft ? "IN_PROGRESS" : "NOT_STARTED";
+}
+
+
+export const practiceSubmitSchema = learnMaterialInputSchema.extend({
+  requestId: z.uuid(),
+  preview: z.boolean().optional(),
+  gradingRevision: z.number().int().positive().optional(),
+  code: z.string().min(1).max(100_000),
+});
+export const practiceHistorySchema = z.object({
+  attempts: z.array(z.object({
+    submissionId: z.uuid(), code: z.string(), createdAt: z.iso.datetime(),
+    status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
+    score: z.number().nullable(),
+  })),
+});
+
+
+/** Material order shared by the workspace footer and personal-practice navigation. */
+export function workspaceMaterialSequence(context: WorkspaceNavigatorContext | null | undefined): Array<{
+  materialId: string; title: string; position: number; type: string;
+}> {
+  return (context?.course?.modules ?? []).flatMap((module) => module.lectures.flatMap((lecture) => [
+    ...lecture.exercises.map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PROGRAMMING_EXERCISE" })),
+    ...(lecture.videos ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "VIDEO_LESSON" })),
+    ...(lecture.documents ?? []).filter((item) => item.pdf.placement !== "SUPPLEMENTARY").map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PDF_DOCUMENT" })),
+    ...(lecture.manualMaterials ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: item.type })),
+  ].sort((left, right) => left.position - right.position)));
 }

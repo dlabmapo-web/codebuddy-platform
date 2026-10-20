@@ -7,9 +7,9 @@ import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { PdfReader } from './pdf-reader';
 
 /** Only this subtree changes when navigating; the editor and runner remain mounted. */
-export function ExerciseReferencePane({ academyId, exercise, children, teacher = false }: {
+export function ExerciseReferencePane({ academyId, exercise, children, teacher = false, preview = false }: {
   academyId: string; exercise: Pick<LearnExercise, 'materialId' | 'referencePdf' | 'hasReferencePdf'>;
-  children: ReactNode; teacher?: boolean;
+  children: ReactNode; teacher?: boolean; preview?: boolean;
 }) {
   const { t } = useTranslation(['content', 'pdf-practice']);
   const linked = Boolean(exercise.hasReferencePdf || exercise.referencePdf);
@@ -32,7 +32,7 @@ export function ExerciseReferencePane({ academyId, exercise, children, teacher =
     <div role="tabpanel" id={`${exercise.materialId}-pdf-panel`} aria-labelledby={`${exercise.materialId}-pdf-tab`}
       className={`min-h-0 flex-1 ${tab === 'pdf' ? 'block' : 'hidden'}`}>
       {pdf ? <PdfReader key={`${exercise.materialId}:${pdf.materialId}`} academyId={academyId}
-        materialId={pdf.materialId} exerciseMaterialId={exercise.materialId} />
+        materialId={pdf.materialId} exerciseMaterialId={exercise.materialId} preview={preview} />
         : <p role="status" className="p-4 text-sm text-sub">{t('pdf-practice:unavailable')}</p>}
     </div>
     {tab === 'statement' ? <div role="tabpanel" id={`${exercise.materialId}-statement-panel`}

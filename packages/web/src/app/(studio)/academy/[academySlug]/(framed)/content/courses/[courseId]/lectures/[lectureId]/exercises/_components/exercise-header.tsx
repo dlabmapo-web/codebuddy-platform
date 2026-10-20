@@ -1,3 +1,7 @@
+import { useSearchParams } from 'next/navigation';
+import { routes } from '@/lib/routes';
+import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { usePracticeTranslation } from '@/components/workspace/use-practice-translation';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 
@@ -14,6 +18,11 @@ export function ExerciseHeader({
   authoring: ExerciseAuthoring;
 }) {
   const { t } = useTranslation('content');
+  const { t: tp } = usePracticeTranslation();
+  const slug = useAcademySlug();
+  const search = useSearchParams();
+  const fromPractice = search.get("practice") === "true";
+  const preview = search.get("practicePreview") === "true" || !fromPractice;
   const { editable, dirty, isNew, leave, savePending, saveError, saveConflict } =
     authoring;
   const title = authoring.draft.title.trim();
@@ -22,12 +31,14 @@ export function ExerciseHeader({
     <header className="rounded-card border border-border bg-card p-5 sm:p-6">
       <button
         className="inline-flex items-center gap-1.5 text-[14px] font-bold text-sub transition-colors hover:text-ink"
-        onClick={leave}
+        onClick={() => leave()}
         type="button"
       >
         <ArrowLeft className="size-4" />
         {t('exercise.back')}
       </button>
+
+      {context.material ? <button type="button" className="float-right rounded-lg border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-semibold text-brand" onClick={() => leave(routes.academyLearnExercise(slug, context.material!.id, preview ? { preview: true } : undefined))}>{tp(fromPractice ? 'return_problem' : 'preview_problem')}</button> : null}
 
       {/* Where this problem lives: course → module → lecture → problem. */}
       <nav

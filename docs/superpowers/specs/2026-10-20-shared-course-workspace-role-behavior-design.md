@@ -1,7 +1,8 @@
 # Shared course pages and role-aware problem workspaces
 
 Date: 2026-10-20 (Asia/Seoul)
-Status: Proposed specification; implementation is not authorized by this document.
+Status: Implemented on `feat/shared-course-staff-practice` following user approval.
+Validation: [implementation and local verification](../../research/2026-10-20-shared-course-staff-practice-verification.md).
 Request: Study Elice and specify the same shared course/problem experience for Cove.
 
 ## 1. Product decision
@@ -327,6 +328,7 @@ disable staff practice entry without modifying student data; practice tables can
 remain dormant. No production data migration, deployment or application code change
 was performed while preparing this specification.
 
-Review focus: approve the shared-page behavior and the explicit Cove role mapping
-in section 6 before implementation planning. This document is ready for review;
-it is not a claim of full Elice backend parity or an already implemented feature.
+The user approved implementation on 2026-10-20, including Elice-inspired UI with
+Cove colors. Section 6 remains the binding role mapping. The validation report
+records delivered behavior, tests and the existing legacy-version route boundary;
+this is not a claim of full Elice backend parity.

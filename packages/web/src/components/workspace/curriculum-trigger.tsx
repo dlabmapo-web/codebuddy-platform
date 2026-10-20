@@ -20,11 +20,12 @@ export const CurriculumTrigger = React.forwardRef<
   HTMLButtonElement,
   {
     open: boolean;
+    compact?: boolean;
     onToggle: () => void;
     panelId: string;
     path: NavigatorPath | null;
   }
->(function CurriculumTrigger({ open, onToggle, panelId, path }, ref) {
+>(function CurriculumTrigger({ open, onToggle, panelId, path, compact = false }, ref) {
   const { t } = useLayoutTranslation('learn');
   // The complete text, for a reader whose pointer is nowhere near it and for
   // one whose course titles are longer than the header is wide.
@@ -50,9 +51,9 @@ export const CurriculumTrigger = React.forwardRef<
       >
         <Menu aria-hidden className="size-4" />
       </button>
-      <span className="max-w-[8rem] truncate text-[12px] font-semibold text-sub lg:max-w-[12rem] xl:max-w-[16rem]" title={full}>
+      {!compact ? <span className="max-w-[8rem] truncate text-[12px] font-semibold text-sub lg:max-w-[12rem] xl:max-w-[16rem]" title={full}>
         {full}
-      </span>
+      </span> : null}
     </div>
   );
 });

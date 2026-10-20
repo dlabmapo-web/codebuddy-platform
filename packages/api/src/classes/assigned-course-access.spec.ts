@@ -26,7 +26,7 @@ describe("assignedCourseWhere", () => {
                   academyId,
                   userId,
                   status: "ACTIVE",
-                  role: "STUDENT",
+                  OR: [{ role: "STUDENT" }, { extraRoles: { some: { role: "STUDENT" } } }],
                 },
               },
             },
@@ -102,6 +102,14 @@ describe("learningScopeFor", () => {
       { assignedTeacher: teacher },
       { assistantTeachers: { some: { teacher } } },
     ]);
+  });
+
+  it("unions actual student and teacher scopes regardless of the presentation role", () => {
+    const result = learningScopeFor(academyId, { userId, role: "TEACHER", roles: ["STUDENT", "TEACHER"] });
+    expect(result.course.OR).toHaveLength(2);
+    expect(result.material.OR).toHaveLength(2);
+    const manager = learningScopeFor(academyId, { userId, role: "TEACHER", roles: ["MANAGER", "TEACHER"] });
+    expect(manager.course).toEqual({ academyId });
   });
 
   it("leaves curriculum owners on visibility rules alone", () => {

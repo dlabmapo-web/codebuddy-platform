@@ -3,6 +3,7 @@ import { Queue, QueueEvents, Worker, type ConnectionOptions } from "bullmq";
 import { Redis } from "ioredis";
 
 export const GRADING_QUEUE = "cove-grading";
+export const PRACTICE_QUEUE = "cove-staff-practice";
 
 /**
  * Maintenance re-grading, deliberately not `GRADING_QUEUE`.
@@ -32,6 +33,7 @@ export const SAMPLE_QUEUE = "cove-sample-checks";
 export type SampleCheckJob = { checkId: string };
 
 export type GradingJob = { submissionId: string };
+export type PracticeJob = { attemptId: string };
 
 /**
  * One repair, and the run and request it belongs to.
@@ -79,12 +81,18 @@ return 1
 `;
 
 export function redisConnection(url: string): ConnectionOptions {
+  const parsed = new URL(url);
+  if (!["redis:", "rediss:"].includes(parsed.protocol)) throw new Error("Unsupported Redis protocol");
   return {
-    url,
-    // BullMQ blocks on Redis and reconnects itself; capping retries here makes
-    // a blocking command throw instead of hanging a worker forever.
+    host: parsed.hostname.replace(/^\[|\]$/g, ""),
+    port: Number(parsed.port || 6379),
+    ...(parsed.username ? { username: decodeURIComponent(parsed.username) } : {}),
+    ...(parsed.password ? { password: decodeURIComponent(parsed.password) } : {}),
+    db: Number(parsed.pathname.slice(1) || 0),
+    ...(parsed.protocol === "rediss:" ? { tls: {} } : {}),
+    // BullMQ blocking connections own their retry policy.
     maxRetriesPerRequest: null,
-  } as ConnectionOptions;
+  };
 }
 
 /**
@@ -97,6 +105,7 @@ export function redisConnection(url: string): ConnectionOptions {
 export class JudgeQueue implements OnModuleDestroy {
   private readonly logger = new Logger(JudgeQueue.name);
   private queueInstance: Queue<GradingJob> | null = null;
+  private practiceInstance: Queue<PracticeJob> | null = null;
   private regradeInstance: Queue<RegradeJob> | null = null;
   private sampleInstance: Queue<SampleCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
@@ -116,6 +125,15 @@ export class JudgeQueue implements OnModuleDestroy {
       },
     });
     return this.queueInstance;
+  }
+
+  get practiceQueue(): Queue<PracticeJob> {
+    this.practiceInstance ??= new Queue<PracticeJob>(PRACTICE_QUEUE, {
+      connection: redisConnection(this.redisUrl),
+      defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 2_000 },
+        removeOnComplete: { age: 3_600, count: 1_000 }, removeOnFail: { age: 86_400 } },
+    });
+    return this.practiceInstance;
   }
 
   get regradeQueue(): Queue<RegradeJob> {
@@ -177,6 +195,10 @@ export class JudgeQueue implements OnModuleDestroy {
       { submissionId },
       { jobId: submissionId },
     );
+  }
+
+  async enqueuePractice(attemptId: string): Promise<void> {
+    await this.practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
   }
 
   /**
@@ -262,6 +284,14 @@ export class JudgeQueue implements OnModuleDestroy {
     return worker;
   }
 
+  createPracticeWorker(handler: (job: PracticeJob) => Promise<void>, concurrency: number): Worker<PracticeJob> {
+    const worker = new Worker<PracticeJob>(PRACTICE_QUEUE, (job) => handler(job.data), {
+      connection: redisConnection(this.redisUrl), concurrency,
+    });
+    worker.on("failed", (job, error) => this.logger.error(`practice job ${job?.id ?? "unknown"} failed: ${error.message}`));
+    return worker;
+  }
+
   createRegradeWorker(
     handler: (job: { data: RegradeJob }) => Promise<unknown>,
     concurrency: number,
@@ -299,11 +329,13 @@ export class JudgeQueue implements OnModuleDestroy {
 
   async close(): Promise<void> {
     await this.queueInstance?.close();
+    await this.practiceInstance?.close();
     await this.regradeInstance?.close();
     await this.sampleInstance?.close();
     await this.eventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
+    this.practiceInstance = null;
     this.regradeInstance = null;
     this.sampleInstance = null;
     this.eventsInstance = null;

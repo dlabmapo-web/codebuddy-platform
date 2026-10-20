@@ -53,7 +53,7 @@ export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content"
  * split rather than raise the cap.
  */
 export const exerciseNamespaces = [
-  "solutions", "pdf-practice", "content",
+  "practice", "solutions", "pdf-practice", "content",
   "quiz",
   "sample-check",
   "monitoring",
@@ -69,7 +69,7 @@ export const exerciseNamespaces = [
  * the same list because a teacher moves between them through the class header.
  */
 export const teachNamespaces = [
-  "solutions", "pdf-practice", "content",
+  "practice", "solutions", "pdf-practice", "content",
   "quiz",
   "sample-check",
   "monitoring",

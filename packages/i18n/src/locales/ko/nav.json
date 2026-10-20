@@ -31,7 +31,9 @@
     "point_policy": "포인트 지급 기준",
     "maintenance": "유지 보수",
     "resources": "자료실",
-    "lessons": "수업"
+    "lessons": "수업",
+    "shared_courses": "강좌",
+    "content_management": "콘텐츠 관리"
   },
   "academy_switcher": {
     "select": "학원 선택",

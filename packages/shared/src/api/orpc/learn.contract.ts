@@ -1,3 +1,4 @@
+import { practiceSubmitSchema, practiceHistorySchema } from "../../content/learn.js";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
@@ -50,6 +51,10 @@ import {
  * remembered filter.
  */
 export const learnContract = {
+  savePracticeDraft: oc.input(saveDraftSchema).output(saveDraftResultSchema),
+  submitPractice: oc.input(practiceSubmitSchema).output(submissionAcceptedSchema),
+  getPracticeResult: oc.input(submissionInputSchema).output(submissionResultSchema),
+  listPracticeAttempts: oc.input(learnMaterialInputSchema.extend({ preview: z.boolean().optional() })).output(practiceHistorySchema),
   /**
    * The student's own academy overview, as one bounded read.
    *

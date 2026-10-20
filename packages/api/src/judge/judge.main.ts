@@ -1,3 +1,4 @@
+import { PracticeRunner } from "./practice.runner.js";
 import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
 import "dotenv/config";
@@ -98,12 +99,20 @@ async function bootstrap(): Promise<void> {
   // — can never take the slot it reserves for submissions.
   const capacity = new ExecutionCapacity(environment.JUDGE_CONCURRENCY);
 
+  const practice = new PracticeRunner(prisma, grading);
   const worker = queue.createWorker(
     (job) =>
       capacity.runOfficial(() =>
         grading.grade(job.data.submissionId, job.updateProgress),
       ),
     environment.JUDGE_CONCURRENCY,
+  );
+
+  // Separate queue: older judge processes can never consume a staff attempt
+  // as a student submission during a rolling deployment.
+  const practiceWorker = queue.createPracticeWorker(
+    (job) => capacity.runBackground(() => practice.run(job.attemptId)),
+    environment.REGRADE_CONCURRENCY,
   );
 
   // Maintenance re-grading, on its own queue so a run cannot put a live
@@ -138,6 +147,16 @@ async function bootstrap(): Promise<void> {
     : null;
 
   const sweeper = setInterval(() => {
+    void prisma.staffPracticeAttempt.findMany({
+      where: { status: "QUEUED", createdAt: { lt: new Date(Date.now() - QUEUED_STALE_AFTER_MS) } },
+      select: { id: true }, take: 100,
+    }).then((rows) => Promise.all(rows.map((row) => queue.enqueuePractice(row.id))))
+      .catch((error) => logger.error(`practice sweeper failed: ${String(error)}`));
+    void prisma.staffPracticeAttempt.updateMany({
+      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - STALE_AFTER_MS) } },
+      data: { status: "ERRORED", gradedAt: new Date() },
+    }).catch((error) => logger.error(`practice recovery failed: ${String(error)}`));
+
     void grading
       .sweepStale({
         queuedOlderThanMs: QUEUED_STALE_AFTER_MS,
@@ -161,6 +180,7 @@ async function bootstrap(): Promise<void> {
     clearInterval(sweeper);
     // Lets in-flight grading finish so a deploy does not strand submissions.
     await worker.close();
+    await practiceWorker.close();
     // A repair left mid-run is picked up by the queue's own retry on the next
     // boot; the run's counters are advanced only after a verdict lands, so a
     // restart cannot make one report more work than it did.

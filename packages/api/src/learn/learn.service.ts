@@ -1,6 +1,8 @@
+import { rolesHavePermission } from "@cove/shared";
+import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 
 import {
   SOLVE_SESSION_MAX_SECONDS,
@@ -32,6 +34,7 @@ import {
   exerciseMaterialIds,
   nonemptyModules,
   visibleCurriculumInclude,
+  previewCurriculumInclude,
 } from "./curriculum-outline.service.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { SubmissionService } from "./submission.service.js";
@@ -80,20 +83,21 @@ export class LearnService {
     private readonly curriculum: CurriculumOutlineService,
     private readonly submissions: SubmissionService,
     private readonly classContext: LearningClassContextService,
+    @Optional() private readonly practice?: StaffPracticeService,
   ) {}
 
   async listCourses(
     identity: SupabaseIdentity,
     academyId: string,
   ): Promise<{ courses: LearnCourseSummary[] }> {
-    const { userId, scope } = await this.requireLearner(identity, academyId);
+    const { userId, scope, role, roles } = await this.requireLearner(identity, academyId);
     const courses = await this.prisma.course.findMany({
       where: { ...scope.course, isVisible: true },
       include: visibleCurriculumInclude,
       orderBy: [{ title: "asc" }, { id: "asc" }],
     });
     const materialIds = courses.flatMap(exerciseMaterialIds);
-    const statuses = await this.curriculum.statusByMaterial(userId, materialIds);
+    const statuses = rolesHavePermission(roles ?? [role], "practice.own.create") ? new Map() : await this.curriculum.statusByMaterial(userId, materialIds);
 
     return {
       courses: courses.map((course) => courseSummaryFor(course, statuses)),
@@ -102,20 +106,22 @@ export class LearnService {
 
   async getCourseOutline(
     identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; classId?: string },
+    input: { academyId: string; courseId: string; classId?: string; mode?: "student" | "staff-practice" },
   ): Promise<LearnCourseOutlineResult> {
-    const { userId, role, scope } = await this.requireLearner(
+    const { userId, role, roles, scope } = await this.requireLearner(
       identity,
       input.academyId,
     );
+    const student = input.mode === "student" || !rolesHavePermission(roles ?? [role], "practice.own.create");
+    if (student && !(roles ?? [role]).includes("STUDENT")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     const course = await this.requireVisibleCourse(input, scope);
     // Delivery is a student's relationship to a course: the class decides
     // progress, presence and points. Staff reach this course through their
     // own permissions and have no enrollment to deliver against, so they get
     // an empty context and the outline renders as a preview.
     const [outline, classContext] = await Promise.all([
-      this.curriculum.outlineFor(course, userId,input.classId),
-      role === "STUDENT"
+      this.curriculum.outlineFor(course, userId,input.classId, !student),
+      student
         ? this.classContext.resolve({
             academyId: input.academyId,
             userId,
@@ -141,17 +147,21 @@ export class LearnService {
       academyId: string;
       materialId: string;
       submissionId?: string;
+      mode?: "student" | "staff-practice";
+      preview?: boolean;
       classId?: string;
     },
   ): Promise<LearnExerciseBootstrap> {
     const learner = await this.requireLearner(identity, input.academyId);
-    const material = await this.requireWorkspaceMaterial(input, learner.scope);
+    const roles = learner.roles ?? [learner.role];
+    const staff = rolesHavePermission(roles, "practice.own.create") && input.mode !== "student";
+    if (input.mode === "student" && !roles.includes("STUDENT")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    if (input.preview && (!staff || !rolesHavePermission(roles, "curriculum.review"))) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    const material = await this.requireWorkspaceMaterial(input, learner.scope, input.preview);
     const course = material.lecture.courseModule.course;
-    // As in `getCourseOutline`: only a student works through a class. Staff
-    // receive an empty context and the route sends them to the authoring view
-    // rather than into a workspace that would submit on their behalf.
+    // Only student participation needs a delivery class. Staff practice is independent.
     const classContext =
-      learner.role === "STUDENT"
+      !staff && roles.includes("STUDENT")
         ? await this.classContext.resolve({
             academyId: input.academyId,
             userId: learner.userId,
@@ -164,8 +174,8 @@ export class LearnService {
     // it. A submission that does not resolve leaves the ordinary workspace
     // exactly as it was — including whatever draft is already saved.
     const [workspace, outline, selectedSubmission] = await Promise.all([
-      this.buildWorkspace(material, learner.userId),
-      this.curriculum.outlineFor(course, learner.userId),
+      this.buildWorkspace(material, learner.userId, staff),
+      this.curriculum.outlineFor(course, learner.userId, undefined, staff),
       input.submissionId
         ? this.submissions.findSelected(
             {
@@ -184,7 +194,30 @@ export class LearnService {
       // rather than a missing exercise, and it must not render half a page.
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
-    return { workspace, navigator, selectedSubmission, classContext };
+    if (staff && this.practice && learner.via === "membership") {
+      workspace.draft = await this.practice.draft(identity, input);
+      workspace.status = workspace.draft ? "IN_PROGRESS" : "NOT_STARTED";
+    }
+    let canParticipateAsStudent = false;
+    if (staff && roles.includes("STUDENT") && !input.preview) {
+      canParticipateAsStudent = await this.classContext.resolve({ academyId: input.academyId, userId: learner.userId, courseId: course.id }).then(() => true, () => false);
+    }
+    const canAuthor = rolesHavePermission(roles, "exercises.manage") && (
+      learner.via === "membership" || await this.access.requirePermission(identity.authUserId, input.academyId, "exercises.manage").then(() => true, () => false)
+    );
+    return { workspace, navigator, selectedSubmission: staff ? null : selectedSubmission, classContext,
+      access: {
+        mode: staff ? "staff-practice" : "student",
+        preview: Boolean(input.preview),
+        canParticipateAsStudent,
+        canPractice: rolesHavePermission(roles, "practice.own.create") && learner.via === "membership",
+        canSubmit: staff ? learner.via === "membership" : roles.includes("STUDENT"),
+        canAuthor,
+        canReview: rolesHavePermission(roles, "curriculum.review"),
+        canViewSolutions: canAuthor,
+        canObserve: learner.via === "membership" && rolesHavePermission(roles, "submissions.assigned.review"),
+      },
+    };
   }
 
   /**
@@ -241,13 +274,14 @@ export class LearnService {
   private async requireWorkspaceMaterial(
     input: { academyId: string; materialId: string },
     scope: LearningScope,
+    preview = false,
   ) {
     const material = await this.prisma.material.findFirst({
       where: {
         id: input.materialId,
-        ...reachableMaterialWhere(input.academyId, scope),
+        ...(preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)),
       },
-      include: workspaceMaterialInclude,
+      include: preview ? { ...workspaceMaterialInclude, lecture: { include: { courseModule: { include: { course: { include: previewCurriculumInclude } } } } } } : workspaceMaterialInclude,
     });
     if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
@@ -259,16 +293,17 @@ export class LearnService {
   private async buildWorkspace(
     material: WorkspaceMaterial,
     userId: string,
+    staffPractice = false,
   ): Promise<LearnExerciseWorkspace> {
     const exercise = material.programmingExercise;
     const { courseModule } = material.lecture;
     const course = courseModule.course;
     const [draft, progress, sampleChecks] = await Promise.all([
-      this.prisma.exerciseDraft.findUnique({
+      staffPractice ? Promise.resolve(null) : this.prisma.exerciseDraft.findUnique({
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { code: true, updatedAt: true },
       }),
-      this.prisma.studentExerciseProgress.findUnique({
+      staffPractice ? Promise.resolve(null) : this.prisma.studentExerciseProgress.findUnique({
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { status: true, gradingRevision: true },
       }),

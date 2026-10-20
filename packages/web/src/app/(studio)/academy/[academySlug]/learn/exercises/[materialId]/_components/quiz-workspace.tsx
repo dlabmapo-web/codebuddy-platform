@@ -96,6 +96,7 @@ export function QuizWorkspace({
       onKeyDown={markActive}
     >
       <WorkspaceHeader
+        leaveHref={coursePath}
         workspace={workspace}
         saveState={draft.saveState}
         reviewing={selectedSubmission}

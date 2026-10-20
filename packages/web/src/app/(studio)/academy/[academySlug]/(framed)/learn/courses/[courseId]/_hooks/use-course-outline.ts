@@ -38,7 +38,7 @@ export function useCourseOutline({
       orpc.learn.getCourseOutline({
         academyId,
         courseId,
-        ...(classId ? { classId } : {}),
+        ...(classId ? { classId, mode: "student" as const } : {}),
       }),
     initialData: initialOutline,
     retry: false,

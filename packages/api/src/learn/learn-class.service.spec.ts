@@ -238,7 +238,7 @@ describe("LearnClassService list", () => {
                 academyId,
                 userId,
                 status: "ACTIVE",
-                role: "STUDENT",
+                OR: [{ role: "STUDENT" }, { extraRoles: { some: { role: "STUDENT" } } }],
               },
             },
           },

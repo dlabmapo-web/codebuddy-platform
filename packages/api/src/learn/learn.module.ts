@@ -1,3 +1,4 @@
+import { StaffPracticeService } from "./staff-practice.service.js";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -32,6 +33,7 @@ import { SubmissionService } from "./submission.service.js";
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
+    StaffPracticeService,
     LearningClassContextService,
     StudentOverviewAccessService,
     StudentOverviewRepository,
@@ -55,6 +57,7 @@ import { SubmissionService } from "./submission.service.js";
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
+    StaffPracticeService,
     LearningClassContextService,
     StudentOverviewService,
     SubmissionService,

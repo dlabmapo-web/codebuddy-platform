@@ -1,3 +1,4 @@
+import type { StaffPracticeService } from "../learn/staff-practice.service.js";
 import type { HelpRequestService } from "../monitoring/help-request.service.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 
@@ -90,6 +91,7 @@ export type ORPCDeps = {
   answerRecordsService: AnswerRecordsService;
   learnClassService: LearnClassService;
   learnService: LearnService;
+  staffPracticeService: StaffPracticeService;
   studentOverviewService: StudentOverviewService;
   submissionService: SubmissionService;
   sampleCheckService: SampleCheckService;

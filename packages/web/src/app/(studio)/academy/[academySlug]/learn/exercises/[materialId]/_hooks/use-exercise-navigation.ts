@@ -111,7 +111,7 @@ export function useExerciseNavigation({
 
   const exerciseUrl = React.useCallback(
     (materialId: string) =>
-      routes.academyLearnExercise(academySlug, materialId, { classId }),
+      routes.academyLearnExercise(academySlug, materialId, { classId, mode: 'student' }),
     [academySlug, classId],
   );
 
@@ -192,7 +192,7 @@ export function useExerciseNavigation({
           if (tokenRef.current !== token) return;
           beforeTransitionRef.current?.beforeCommit();
           router.push(
-            routes.academyLearnPdf(academySlug, materialId, { classId }),
+            routes.academyLearnPdf(academySlug, materialId, { classId, mode: 'student' }),
           );
           return;
         }

@@ -1,3 +1,4 @@
+import { rolesHavePermission } from '@cove/shared';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnCourseSummary, LearnDraftSummary } from '@cove/shared';
 
@@ -15,8 +16,8 @@ export default async function LearnCoursesPage({
   params: Promise<{ academySlug: string }>;
 }) {
   const { academySlug } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
-  const { t } = await getServerTranslation(['learn', 'errors', 'auth']);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
+  const { t } = await getServerTranslation(['learn', 'errors', 'auth', 'nav']);
 
   let courses: LearnCourseSummary[] | null = null;
   let drafts: LearnDraftSummary[] = [];
@@ -47,7 +48,7 @@ export default async function LearnCoursesPage({
     <StudioPage
       bleed
       description={t('catalog.description')}
-      title={t('catalog.title')}
+      title={rolesHavePermission(roles, 'practice.own.create') ? t('nav:link.shared_courses') : t('catalog.title')}
     >
       {courses ? (
         <CourseCatalog

@@ -250,6 +250,7 @@ export type ManualAttempt = {
   learnerName?: string;
 };
 export type ManualWorkspace = {
+  practice?: boolean;
   definitionLocked?: boolean;
   submissionUnavailable?: boolean;
   classes: Array<{ classId: string; name: string }>;

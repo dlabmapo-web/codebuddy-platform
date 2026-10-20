@@ -425,7 +425,7 @@ export function studioNavGroups({
     const learning: NavLink[] = [
       {
         href: `${base}/learn/courses`,
-        labelKey: 'link.my_courses',
+        labelKey: 'link.shared_courses',
         icon: GraduationCap,
       },
     ];
@@ -465,7 +465,7 @@ export function studioNavGroups({
     if (canManageContent) {
       content.push({
         href: `${base}/content/courses`,
-        labelKey: 'link.courses',
+        labelKey: 'link.content_management',
         icon: BookOpen,
       });
     }

@@ -161,9 +161,9 @@ export function useExerciseAuthoring({
       : null;
   }
 
-  function leave() {
+  function leave(destination = builderPath) {
     if (dirty && !window.confirm(t('exercise.unsaved_confirm'))) return;
-    router.push(builderPath);
+    router.push(destination);
   }
 
   return {

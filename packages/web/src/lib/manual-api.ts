@@ -122,6 +122,7 @@ export const manualApi = {
     request("", "DELETE", data),
   draft: (data: ManualWork) =>
     request<{ revision: number }>("/draft", "POST", data),
+  submitPractice: (data: Omit<ManualSubmit, "classId">) => request("/practice-submit", "POST", data),
   submit: (data: ManualSubmit) =>
     request<{ submissionId: string }>("/submit", "POST", data),
   start: (

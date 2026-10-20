@@ -50,8 +50,14 @@ export function useDraftAutosave({
   serverDraft,
   starterCode,
   historicalCode = null,
+  practice = false,
+  preview = false,
+  gradingRevision,
 }: {
   academyId: string;
+  practice?: boolean;
+  preview?: boolean;
+  gradingRevision?: number;
   /** Authorization and cache context only; never part of a draft's identity. */
   classId: string;
   /** The signed-in learner. A local buffer is addressed by them, not only by the problem. */
@@ -310,11 +316,12 @@ export function useDraftAutosave({
         sessionRef.current.generation === forSession.generation;
       if (onScreen()) setSyncing(true);
       try {
-        const result = await orpc.learn.saveDraft({
+        const result = await (practice ? orpc.learn.savePracticeDraft : orpc.learn.saveDraft)({
           academyId: forSession.academyId,
           materialId: forSession.materialId,
           code: nextCode,
           baseUpdatedAt: base,
+          ...(practice ? { preview, gradingRevision } : {}),
         });
 
         if (result.outcome === 'CONFLICT') {
@@ -362,7 +369,7 @@ export function useDraftAutosave({
         if (onScreen()) setSyncing(false);
       }
     },
-    [classId, queryClient],
+    [classId, gradingRevision, practice, preview, queryClient],
   );
 
   React.useLayoutEffect(() => {
@@ -497,9 +504,10 @@ export function useDraftAutosave({
         // A closing tab cannot wait for an answer, so it cannot recover from a
         // refusal. It says what it was based on and the server decides.
         baseUpdatedAt: revision.base,
+        ...(practice ? { preview, gradingRevision } : {}),
       });
       const sent = navigator.sendBeacon?.(
-        '/api/learn/draft-beacon',
+        practice ? '/api/learn/practice-draft-beacon' : '/api/learn/draft-beacon',
         new Blob([payload], { type: 'application/json' }),
       );
       if (!sent) void sync(session, current);
@@ -512,7 +520,7 @@ export function useDraftAutosave({
       window.removeEventListener('pagehide', onHide);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [queue, sync]);
+  }, [gradingRevision, practice, preview, queue, sync]);
 
   // An untouched reviewed submission is not unsaved work, so the header stays
   // quiet rather than claiming the student has changes they never made.

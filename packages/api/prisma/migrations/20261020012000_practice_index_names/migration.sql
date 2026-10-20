@@ -1,0 +1,2 @@
+ALTER INDEX "staff_practice_attempts_academy_id_user_id_material_id_context_" RENAME TO "staff_practice_attempts_owner_history_idx";
+ALTER INDEX "staff_practice_drafts_academy_id_user_id_material_id_context_ke" RENAME TO "staff_practice_drafts_owner_material_context_key";

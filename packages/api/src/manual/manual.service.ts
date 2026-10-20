@@ -1,3 +1,4 @@
+import { ManualPracticeService } from "./manual-practice.service.js";
 import { randomInt } from "node:crypto";
 import {
   MultipleChoiceService,
@@ -10,6 +11,7 @@ import type { Request } from "express";
 import { ManualAssetsService } from "./manual-assets.service.js";
 import {
   Injectable,
+  Optional,
   NotFoundException,
   BadRequestException,
   ConflictException,
@@ -75,6 +77,7 @@ export class ManualService {
     private readonly points: PointAwardService,
     private readonly shortAnswers: ShortAnswerService,
     private readonly choices: MultipleChoiceService,
+    @Optional() private readonly practice?: ManualPracticeService,
   ) {}
   private async material(
     identity: SupabaseIdentity,
@@ -395,19 +398,21 @@ export class ManualService {
       input,
       preview,
     );
+    const staffPractice = !preview && Boolean(this.practice?.allowed(actor));
+    const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id) : null;
     const [outline, draft, attempts, classes] = await Promise.all([
       this.db.course.findUnique({
         where: { id: row.lecture.courseModule.course.id },
         include: visibleCurriculumInclude,
       }),
-      config.shortAnswer || config.multipleChoice
+      staffPractice || config.shortAnswer || config.multipleChoice
         ? Promise.resolve(null)
         : this.db.manualDraft.findUnique({
             where: {
               materialId_userId: { materialId: row.id, userId: actor.userId },
             },
           }),
-      this.db.manualSubmission.findMany({
+      staffPractice ? Promise.resolve([]) : this.db.manualSubmission.findMany({
         where: {
           materialId: row.id,
           userId: actor.userId,
@@ -526,7 +531,9 @@ export class ManualService {
               revision: draft.revision,
             }
           : null,
-      attempts: attempts.map((attempt) => this.publicAttempt(attempt)),
+      attempts: privatePractice?.attempts ?? attempts.map((attempt) => this.publicAttempt(attempt)),
+      practice: staffPractice,
+      ...(privatePractice ? { draft: privatePractice.draft } : {}),
     };
   }
   private publicAttempt(row: {
@@ -609,6 +616,9 @@ export class ManualService {
   }
   async draft(identity: SupabaseIdentity, input: ManualWork) {
     const { actor, config } = await this.material(identity, input);
+    if (this.practice?.allowed(actor)) return this.practice.draft(actor, input);
+    const writer = await this.access.requirePermission(identity.authUserId, input.academyId, "submissions.own.create");
+    if (writer.via && writer.via !== "membership") throw new ForbiddenException();
     if (config.shortAnswer || config.multipleChoice)
       throw new BadRequestException(
         "Short answers use explicit Submit; drafts are unavailable",
@@ -657,6 +667,12 @@ export class ManualService {
           throw new ConflictException("Draft changed in another workspace");
         throw error;
       });
+  }
+  async submitPractice(identity: SupabaseIdentity, input: Omit<ManualSubmit, "classId">) {
+    const { actor, config } = await this.material(identity, input);
+    if (!this.practice || !this.practice.allowed(actor)) throw new ForbiddenException();
+    if (config.revision !== input.contentRevision) throw new ConflictException("Content changed; reload");
+    return this.practice.submit(actor, input, config);
   }
   async submit(identity: SupabaseIdentity, input: ManualSubmit) {
     const { actor, row, config } = await this.material(identity, input);

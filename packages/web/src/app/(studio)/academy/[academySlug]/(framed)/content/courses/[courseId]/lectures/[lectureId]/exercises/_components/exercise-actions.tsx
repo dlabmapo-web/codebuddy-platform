@@ -62,7 +62,7 @@ export function ExerciseActions({
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           className="inline-flex h-11 items-center gap-2 px-3 text-[14.5px] font-bold text-sub transition-colors hover:text-ink"
-          onClick={leave}
+          onClick={() => leave()}
           type="button"
         >
           {t('exercise.back')}

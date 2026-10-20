@@ -1,3 +1,4 @@
+import { StaffPracticeService } from "../learn/staff-practice.service.js";
 import { HelpRequestService } from "../monitoring/help-request.service.js";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { implement } from "@orpc/server";
@@ -131,6 +132,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     answerRecordsService: app.get(AnswerRecordsService, { strict: false }),
     learnClassService: app.get(LearnClassService, { strict: false }),
     learnService: app.get(LearnService, { strict: false }),
+    staffPracticeService: app.get(StaffPracticeService, { strict: false }),
     studentOverviewService: app.get(StudentOverviewService, { strict: false }),
     submissionService: app.get(SubmissionService, { strict: false }),
     sampleCheckService: app.get(SampleCheckService, { strict: false }),

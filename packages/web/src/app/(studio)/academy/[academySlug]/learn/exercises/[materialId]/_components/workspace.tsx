@@ -4,10 +4,12 @@ import {VideoResourceLinks} from '@/components/video/video-resource-links';
 
 import { QuizWorkspace } from './quiz-workspace';
 import { routes } from '@/lib/routes';
+import Link from 'next/link';
+import { Maximize2 } from 'lucide-react';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
-import { toSharedDocumentText, type LearnExerciseBootstrap } from '@cove/shared';
+import { workspaceMaterialSequence, toSharedDocumentText, type LearnExerciseBootstrap } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -91,6 +93,7 @@ function ProgrammingWorkspace({
   // The monitoring copy is mounted by this page for the indicator; the peer
   // labels come from the same namespace.
   const { t: tp } = useTranslation('pdf-practice');
+  const { t: tpractice } = useTranslation('practice');
   const { t: tm } = useTranslation('monitoring');
   const { t: tsample } = useTranslation('sample-check');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
@@ -534,6 +537,7 @@ function ProgrammingWorkspace({
       <VideoResourceLinks academyId={academyId} materialId={exercise.materialId} classId={classId}/>
       <div className="shrink-0" {...surfaceProps('header')}>
         <WorkspaceHeader
+          leaveHref={returnTo ?? routes.academyLearnCourse(academySlug, workspace.breadcrumb.course.id, { classId, mode: "student" })}
           feedback={
             <FeedbackPanel
               isHighlighted={feedback.isHighlighted}
@@ -543,10 +547,11 @@ function ProgrammingWorkspace({
               unreadCount={feedback.unreadCount}
             />
           }
+          participationSwitch={bootstrap.access?.canPractice ? <Link href={routes.academyLearnExercise(academySlug, exercise.materialId)} className="rounded-lg border border-border px-2 py-1 text-xs text-brand">{tpractice('return_practice')}</Link> : null}
           helpRequest={<RequestHelp key={`${userId}:${academyId}:${classId}`} userId={userId} academyId={academyId} classId={classId} materialId={exercise.materialId} socket={monitoring.socket} onNavigate={handleNavigate} />}
           indicator={<MonitoringIndicator state={monitoring.indicator} />}
           curriculum={
-            <CurriculumTrigger
+            <CurriculumTrigger compact
               onToggle={togglePanel}
               open={panelOpen}
               panelId={panelId}
@@ -719,9 +724,14 @@ function ProgrammingWorkspace({
           </section>
         </div>
       </div>
-      <nav aria-label={t('workspace.tab_problem')} className="flex shrink-0 justify-center gap-3 border-t border-border bg-card px-4 py-2">
+      <nav aria-label={t('workspace.tab_problem')} className="relative flex h-12 shrink-0 items-center justify-center gap-3 border-t border-border bg-card px-4 py-2">
         <NavButton direction="previous" disabled={busy || !workspace.neighbors.previous} label={t('workspace.previous')} onClick={() => workspace.neighbors.previous && handleNavigate(workspace.neighbors.previous.materialId)} />
+        <span className="text-xs font-semibold tabular-nums text-sub">{(() => {
+          const items = workspaceMaterialSequence(navigation.navigator);
+          return `${items.findIndex((item) => item.materialId === exercise.materialId) + 1} / ${items.length}`;
+        })()}</span>
         <NavButton direction="next" disabled={busy || !workspace.neighbors.next} label={t('workspace.next')} onClick={() => workspace.neighbors.next && handleNavigate(workspace.neighbors.next.materialId)} />
+        <button type="button" aria-label={tpractice('fullscreen')} className="absolute right-4 rounded-lg p-2 text-sub hover:bg-accent" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen(); }}><Maximize2 className="size-4" /></button>
       </nav>
     </div>
   );

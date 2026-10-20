@@ -369,6 +369,8 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  staffPracticeDrafts StaffPracticeDraft[]
+  staffPracticeAttempts StaffPracticeAttempt[]
   dlabIdentity DlabIdentity?
 
   libraryCourseImports LibraryCourseImport[]
@@ -585,6 +587,8 @@ model Organization {
 }
 
 model Academy {
+  staffPracticeDrafts StaffPracticeDraft[]
+  staffPracticeAttempts StaffPracticeAttempt[]
   dlabCampus DlabCampus?
 
   helpRequests StudentHelpRequest[]
@@ -1570,6 +1574,8 @@ model Lecture {
 }
 
 model Material {
+  staffPracticeDrafts StaffPracticeDraft[]
+  staffPracticeAttempts StaffPracticeAttempt[]
   videoLesson       VideoLesson?
   videoProgress     VideoWatchProgress[]
   manualMaterial    ManualMaterial?
@@ -2733,4 +2739,45 @@ model LibraryCourseImport {
   actor                 User     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@map("library_course_imports")
+}
+
+/// Private staff work. No class, solve session, student progress or rewards relation.
+model StaffPracticeDraft {
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid()) @db.Uuid
+  academyId String @map("academy_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  materialId String @map("material_id") @db.Uuid
+  context String @default("live")
+  code String
+  gradingRevision Int @default(1) @map("grading_revision")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@unique([academyId, userId, materialId, context], map: "staff_practice_drafts_owner_material_context_key")
+  @@map("staff_practice_drafts")
+}
+
+/// Immutable grading input and private, redacted result. Never a student submission.
+model StaffPracticeAttempt {
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid()) @db.Uuid
+  academyId String @map("academy_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  materialId String @map("material_id") @db.Uuid
+  context String @default("live")
+  requestId String @map("request_id") @db.Uuid
+  code String
+  snapshot Json
+  result Json?
+  status SubmissionStatus @default(QUEUED)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt DateTime? @map("started_at") @db.Timestamptz(6)
+  gradedAt DateTime? @map("graded_at") @db.Timestamptz(6)
+  @@unique([academyId, userId, requestId])
+  @@index([academyId, userId, materialId, context, createdAt(sort: Desc)], map: "staff_practice_attempts_owner_history_idx")
+  @@index([status, createdAt])
+  @@map("staff_practice_attempts")
 }

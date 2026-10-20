@@ -32,6 +32,7 @@ export function EditorPane({
   sampleRunFailed,
   onReset,
   onSubmit,
+  canSubmit = true,
   code,
   onCodeChange,
   runner,
@@ -52,6 +53,7 @@ export function EditorPane({
   sampleRunFailed: boolean;
   onReset: () => void;
   onSubmit: () => void;
+  canSubmit?: boolean;
   code: string;
   onCodeChange: (value: string) => void;
   /** Lets live collaboration bind to the very model the student is typing in. */
@@ -137,7 +139,7 @@ export function EditorPane({
             stopping={Boolean(serverCheck?.stopping)}
             sampleTestCases={sampleTestCases}
           />
-          <button type="button" disabled={testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button>
+          <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button>
         </div>
 
         <div

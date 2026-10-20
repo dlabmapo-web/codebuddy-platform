@@ -414,7 +414,7 @@ describe("LearnService class-assigned access", () => {
           status: "ACTIVE",
           enrollments: {
             some: {
-              membership: { academyId, userId, status: "ACTIVE", role: "STUDENT" },
+              membership: { academyId, userId, status: "ACTIVE", OR: [{ role: "STUDENT" }, { extraRoles: { some: { role: "STUDENT" } } }] },
             },
           },
         }),

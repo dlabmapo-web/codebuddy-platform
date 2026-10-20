@@ -5,6 +5,14 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    savePracticeDraft: os.learn.savePracticeDraft.use(access.authenticated)
+      .handler(({ context, input }) => deps.staffPracticeService.saveDraft(context.identity, input)),
+    submitPractice: os.learn.submitPractice.use(access.authenticated)
+      .handler(({ context, input }) => deps.staffPracticeService.submit(context.identity, input)),
+    getPracticeResult: os.learn.getPracticeResult.use(access.authenticated)
+      .handler(({ context, input }) => deps.staffPracticeService.get(context.identity, input)),
+    listPracticeAttempts: os.learn.listPracticeAttempts.use(access.authenticated)
+      .handler(({ context, input }) => deps.staffPracticeService.history(context.identity, input)),
     /**
      * The student's own overview. Authorized by the same student middleware as
      * every other read here; the subject is resolved from the identity, and no

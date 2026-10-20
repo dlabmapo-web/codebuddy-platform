@@ -218,6 +218,11 @@ export class ManualController {
       parse(manualWorkSchema, body),
     );
   }
+  @Post("practice-submit") async submitPractice(
+    @Body() body: unknown, @Headers("authorization") auth?: string,
+  ) {
+    return this.service.submitPractice(await this.identify(auth), parse(manualSubmitSchema.omit({ classId: true }), body));
+  }
   @Post("submit") async submit(
     @Body() body: unknown,
     @Headers("authorization") auth?: string,

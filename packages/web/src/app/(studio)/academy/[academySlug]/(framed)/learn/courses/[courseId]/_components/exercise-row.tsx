@@ -51,7 +51,7 @@ export function ExerciseRow({
         className="group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:border-brand/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         href={routes.academyLearnExercise(academySlug, exercise.materialId, {
           classId,
-        })}
+          ...(classId ? { mode: "student" } : {}),        })}
       >
         <span className="grid h-7 min-w-11 shrink-0 place-items-center rounded-md bg-canvas px-1.5 font-mono text-[11.5px] font-bold text-sub">
           {label}

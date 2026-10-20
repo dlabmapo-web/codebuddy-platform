@@ -1,3 +1,4 @@
+import { ManualPracticeService } from "./manual-practice.service.js";
 import { MultipleChoiceService } from "./multiple-choice.service.js";
 import { ShortAnswerService } from "./short-answer.service.js";
 import { PointsModule } from "../points/points.module.js";
@@ -16,6 +17,7 @@ import { GuiClientService } from "./gui-client.service.js";
     ShortAnswerService,
     MultipleChoiceService,
     ManualService,
+    ManualPracticeService,
     GuiClientService,
     ManualAssetsService,
   ],

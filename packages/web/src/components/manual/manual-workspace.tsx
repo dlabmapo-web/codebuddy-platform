@@ -1,4 +1,6 @@
-"use client";
+'use client';
+
+import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
 import {
   ChoiceOptions,
@@ -29,6 +31,7 @@ export function ManualWorkspace({
   preview?: boolean;
 }) {
   const { t: mt } = useManualTranslation();
+  const { t: pt } = usePracticeTranslation();
   const slug = useAcademySlug();
   const [deliveryClass, setDeliveryClass] = useState(classId);
   const target = { academyId, materialId };
@@ -252,7 +255,7 @@ export function ManualWorkspace({
     }
   }
   async function submit() {
-    if (!selectedClass) {
+    if (!selectedClass && !data?.practice) {
       setError(mt("open_this_activity_from_your_class_to_submit"));
       return;
     }
@@ -270,7 +273,7 @@ export function ManualWorkspace({
       });
       if (pendingSubmit.current?.content !== content)
         pendingSubmit.current = { content, key: crypto.randomUUID() };
-      await manualApi.submit({
+      await (data?.practice ? manualApi.submitPractice : manualApi.submit)({
         ...target,
         ...latest.current,
         ...(choice
@@ -283,7 +286,7 @@ export function ManualWorkspace({
           ? loadedContentRevision.current!
           : data!.config.revision,
         revision: draftRevision.current,
-        classId: selectedClass,
+        classId: selectedClass!,
         requestKey: pendingSubmit.current.key,
       });
       pendingSubmit.current = null;
@@ -293,7 +296,7 @@ export function ManualWorkspace({
         setAnswer("");
       }
       await query.refetch();
-      setSaved(
+      setSaved(data?.practice ? pt("saved_result") :
         mt(explicit ? "submitted" : "submitted_awaiting_teacher_review"),
       );
     } catch (e) {
@@ -312,7 +315,7 @@ export function ManualWorkspace({
         : routes.academyLearnAssessment(slug, m.materialId, m.type, {
             classId: selectedClass,
           });
-  const latestAttempt = data?.attempts.find((a) => a.classId === selectedClass);
+  const latestAttempt = data?.practice ? data.attempts[0] : data?.attempts.find((a) => a.classId === selectedClass);
   const effective = effectiveManualResult(latestAttempt);
   const explanation = useQuery({
     queryKey: [
@@ -334,6 +337,7 @@ export function ManualWorkspace({
   });
   const resultLabel = (attempt: NonNullable<typeof latestAttempt>) => {
     const result = effectiveManualResult(attempt);
+    if (data?.practice && !attempt.shortAnswerAssessment && !attempt.multipleChoiceAssessment) return pt("saved_result");
     if (attempt.reviews[0])
       return `${result!.scoreHundredths / 100} / ${attempt.maximumHundredths / 100} · ${result!.completed ? mt("completed") : mt("needs_revision")}`;
     const assessment =
@@ -375,7 +379,7 @@ export function ManualWorkspace({
               ? "automatic_graded"
               : "teacher_graded",
           )}{" "}
-          {data.config.includeInScore
+          {data.practice ? pt("label") : data.config.includeInScore
             ? mt("included_in_score")
             : mt("excluded_from_score")}
         </span>
@@ -395,6 +399,7 @@ export function ManualWorkspace({
           {mt("materials")}
         </button>
       </header>
+      {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
       {/* Assigned when a draft loads, alongside state that re-renders. */}
       {/* eslint-disable-next-line react-hooks/refs */}
       {explicit && loadedContentRevision.current !== data.config.revision ? (
@@ -670,7 +675,7 @@ export function ManualWorkspace({
                     disabled={
                       busy ||
                       data.submissionUnavailable ||
-                      !selectedClass ||
+                      (!selectedClass && !data.practice) ||
                       Boolean(short && answer.length === 0) ||
                       Boolean(choice && choiceSelected.length === 0)
                     }

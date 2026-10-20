@@ -300,7 +300,15 @@
     "replacement_notice": "학생은 다음에 자료를 열 때 교체된 PDF를 보게 됩니다.",
     "invalid_page": "1부터 {{total}}까지의 페이지를 입력하세요.",
     "document_count_other": "PDF {{count}}개",
-    "controls": "PDF 보기 도구"
+    "controls": "PDF 보기 도구",
+    "upload_ui": {
+      "browse": "파일 선택",
+      "placements": {
+        "MAIN": "수업 본문에서 읽습니다.",
+        "SUPPLEMENTARY": "수업 참고 자료에서 엽니다.",
+        "BOTH": "수업 본문과 참고 자료 모두에서 볼 수 있습니다."
+      }
+    }
   },
   "video": {
     "add": "동영상 수업 추가",

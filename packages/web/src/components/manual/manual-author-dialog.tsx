@@ -1,4 +1,6 @@
 "use client";
+import { FileCode2, ListChecks, PenLine, Save, X } from "lucide-react";
+import { ChoiceSelector } from "@/components/studio/choice-selector";
 import { PrivateImageContext } from "@/components/editor/private-image-context";
 import { ChoiceFields } from "./choice-fields";
 import { ShortAnswerFields } from "./short-answer-fields";
@@ -35,6 +37,7 @@ export function ManualAuthorDialog({
 }) {
   const { t: mt } = useManualTranslation();
   const slug = useContentAcademySlug();
+  const materialId = material?.id;
   const imageUrls = useRef(new Map<string, string>());
   useEffect(
     () => () => {
@@ -47,17 +50,17 @@ export function ManualAuthorDialog({
     async (src: string) => {
       const cached = imageUrls.current.get(src);
       if (cached) return cached;
-      if (!material) throw new Error("Image is unavailable");
+      if (!materialId) throw new Error("Image is unavailable");
       const { url } = await manualApi.choiceImage({
         academyId: target.academyId,
-        materialId: material.id,
+        materialId,
         assetId: src.slice("cove-asset:".length),
         preview: true,
       });
       imageUrls.current.set(src, url);
       return url;
     },
-    [material?.id, target.academyId],
+    [materialId, target.academyId],
   );
   const [title, setTitle] = useState(material?.title ?? "");
   const [config, setConfig] = useState<ManualConfig>(() => ({
@@ -188,6 +191,7 @@ export function ManualAuthorDialog({
       setBusy(false);
     }
   }
+  const ActivityIcon = kind === "MULTIPLE_CHOICE" ? ListChecks : kind === "TURTLE_EXERCISE" ? FileCode2 : PenLine;
   return (
     <PrivateImageContext.Provider value={resolveImage}>
       <Modal
@@ -197,53 +201,45 @@ export function ManualAuthorDialog({
         }}
       >
         <ModalContent
-          title={material ? mt("edit_activity") : mt("add_activity")}
+          title={material ? mt("edit_activity") : mt(shortAnswer ? "add_short_answer" : kind === "MULTIPLE_CHOICE" ? "add_multiple_choice" : "add_activity")}
+          description={mt("author_description")}
           className="max-w-3xl"
         >
-          <h2 className="text-lg font-bold">
-            {material ? mt("edit_activity") : mt("add_activity")}
-          </h2>
-          <div className="grid max-h-[70vh] gap-4 overflow-auto p-1">
-            <label>
-              {mt("activity_type")}
-              <select
-                className="ml-3 rounded border border-border bg-card p-2"
-                value={kind}
-                disabled={
-                  Boolean(material) ||
-                  busy ||
-                  type === "MULTIPLE_CHOICE" ||
-                  shortAnswer
-                }
-                onChange={(e) => setKind(e.target.value as SaveManual["type"])}
-              >
-                {publicConfig.guiEnabled ? (
-                  <option value="TURTLE_EXERCISE">
-                    {mt("turtle_exercise")}
-                  </option>
-                ) : null}
-                {kind === "MULTIPLE_CHOICE" ? (
-                  <option value="MULTIPLE_CHOICE">
-                    {mt("multiple_choice")}
-                  </option>
-                ) : null}
-                <option value="WRITTEN_RESPONSE">
-                  {mt("written_response")}
-                </option>
-              </select>
-            </label>
-            <label>
+          <button type="button" aria-label={mt("close_author")} disabled={busy} onClick={onClose} className="absolute right-4 top-4 grid size-9 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40">
+            <X aria-hidden className="size-5" />
+          </button>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            <div className="flex items-start gap-3 rounded-xl border border-brand/15 bg-brand-soft/50 p-4">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><ActivityIcon aria-hidden className="size-5" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="mb-2 text-xs font-semibold text-sub">{mt("activity_type")}</p>
+                <ChoiceSelector
+                  label={mt("activity_type")}
+                  className="bg-card"
+                  selectedId={kind}
+                  disabled={Boolean(material) || busy || type === "MULTIPLE_CHOICE" || shortAnswer}
+                  list={[
+                    ...(publicConfig.guiEnabled || kind === "TURTLE_EXERCISE" ? [{ id: "TURTLE_EXERCISE", name: mt("turtle_exercise") }] : []),
+                    ...(kind === "MULTIPLE_CHOICE" ? [{ id: "MULTIPLE_CHOICE", name: mt("multiple_choice") }] : []),
+                    { id: "WRITTEN_RESPONSE", name: shortAnswer ? mt("short_answer") : mt("written_response") },
+                  ]}
+                  onSelect={(item) => setKind(item.id as SaveManual["type"])}
+                />
+              </div>
+            </div>
+            <label className="grid gap-2 text-sm font-semibold">
               {mt("title")}
               <input
-                className="mt-1 block w-full rounded border border-border bg-card p-2"
+                className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={128}
               />
             </label>
-            <div>
-              {mt("instructions")}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">{mt("instructions")}</p>
               <RichEditor
+                minHeight={kind === "MULTIPLE_CHOICE" ? 120 : 200}
                 value={config.description}
                 onChange={(value) => field("description", value)}
                 onImageUpload={
@@ -253,9 +249,10 @@ export function ManualAuthorDialog({
                 }
               />
             </div>
-            <div className="flex gap-5">
+            <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-border bg-canvas/60 p-4 text-sm">
               <label>
                 <input
+                  className="size-4 align-middle accent-brand"
                   type="checkbox"
                   checked={config.submitEnabled}
                   onChange={(e) => field("submitEnabled", e.target.checked)}
@@ -264,6 +261,7 @@ export function ManualAuthorDialog({
               </label>
               <label>
                 <input
+                  className="size-4 align-middle accent-brand"
                   type="checkbox"
                   checked={!config.includeInScore}
                   onChange={(e) => field("includeInScore", !e.target.checked)}
@@ -295,14 +293,14 @@ export function ManualAuthorDialog({
                 locked={locked}
               />
             ) : null}
-            <label>
+            <label className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-canvas/60 p-4 text-sm font-semibold">
               {mt("maximum_score")}
               <input
                 aria-label={mt("maximum_score")}
                 type="number"
                 min={0.01}
                 step={0.01}
-                className="ml-3 rounded border border-border bg-card p-2"
+                className="w-28 rounded-lg border border-border bg-card p-2 text-right font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
                 value={config.maximumHundredths / 100}
                 onChange={(e) =>
                   field(
@@ -325,16 +323,7 @@ export function ManualAuthorDialog({
                   </label>
                   <label>
                     {mt("file")}
-                    <select
-                      aria-label={mt("file")}
-                      className="ml-2 rounded border border-border bg-card p-2"
-                      value={sourceName}
-                      onChange={(e) => setSourceName(e.target.value)}
-                    >
-                      {Object.keys(config.files).map((name) => (
-                        <option key={name}>{name}</option>
-                      ))}
-                    </select>
+                    <ChoiceSelector label={mt("file")} selectedId={sourceName} list={Object.keys(config.files).map((name) => ({ id: name, name }))} onSelect={(item) => setSourceName(item.id)} />
                   </label>
                   <button
                     type="button"
@@ -488,7 +477,7 @@ export function ManualAuthorDialog({
                       <input
                         aria-label={key}
                         type="number"
-                        className="mt-1 block w-full rounded border border-border bg-card p-2"
+                        className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
                         value={config[key]}
                         onChange={(e) => field(key, Number(e.target.value))}
                       />
@@ -497,20 +486,20 @@ export function ManualAuthorDialog({
                 </div>
               </>
             ) : kind === "WRITTEN_RESPONSE" ? (
-              <div>
-                <label>
+              <div className="space-y-4 rounded-xl border border-border bg-canvas/40 p-4">
+                <label className="block text-sm font-semibold">
                   {mt("model_answer_private")}
                   <textarea
                     aria-label={mt("model_answer_private")}
-                    className="mt-1 block w-full rounded border border-border bg-card p-2"
+                    className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
                     value={config.modelAnswer}
                     onChange={(e) => field("modelAnswer", e.target.value)}
                   />
                 </label>
-                <label>
+                <label className="block text-sm font-semibold">
                   {mt("input_hint")}
                   <input
-                    className="mt-1 block w-full rounded border border-border bg-card p-2"
+                    className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
                     value={config.hint}
                     onChange={(e) => field("hint", e.target.value)}
                   />
@@ -528,20 +517,20 @@ export function ManualAuthorDialog({
               </Link>
             ) : null}
             {error ? (
-              <p role="alert" className="text-danger">
+              <p role="alert" className="rounded-lg border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
                 {error}
               </p>
             ) : null}
           </div>
-          <div className="mt-5 flex justify-end gap-4">
-            <button type="button" disabled={busy} onClick={onClose}>
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-canvas/60 px-6 py-4">
+            <button type="button" disabled={busy} onClick={onClose} className="h-10 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-sub hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40">
               {mt("cancel")}
             </button>
             <button
               type="button"
-              className="rounded bg-brand px-4 py-2 text-white"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
               disabled={
-                busy ||
+                busy || !title.trim() ||
                 Boolean(
                   config.multipleChoice &&
                   !saveManualSchema.safeParse({
@@ -556,7 +545,7 @@ export function ManualAuthorDialog({
               }
               onClick={() => void save()}
             >
-              {mt("save_activity")}
+              <Save aria-hidden className="size-4" />{mt("save_activity")}
             </button>
           </div>
         </ModalContent>

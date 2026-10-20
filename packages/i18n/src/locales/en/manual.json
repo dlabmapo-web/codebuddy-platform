@@ -150,5 +150,8 @@
   "choice_unavailable": "Multiple-choice submission is unavailable",
   "preview_question": "Preview question",
   "test_selection": "Test selection",
-  "duplicate_options": "Some options have the same text. Check that this is intentional."
+  "duplicate_options": "Some options have the same text. Check that this is intentional.",
+  "author_description": "Write the instructions, then set how students answer and receive a score.",
+  "close_author": "Close activity editor",
+  "answer_mode": "Answer selection"
 }

@@ -127,3 +127,17 @@ describe("multiple-choice grading and private definition", () => {
     expect(() => service.assertEnabled()).toThrow();
   });
 });
+
+
+describe("multiple-choice rollout configuration", () => {
+  it.each([true, "true"])("accepts enabled configuration: %s", (value) => {
+    const service = new MultipleChoiceService(new ConfigService({ MULTIPLE_CHOICE_ENABLED: value }));
+    expect(service.enabled()).toBe(true);
+    expect(() => service.assertEnabled()).not.toThrow();
+  });
+  it.each([false, "false", undefined])("blocks disabled configuration: %s", (value) => {
+    const service = new MultipleChoiceService(new ConfigService({ MULTIPLE_CHOICE_ENABLED: value }));
+    expect(service.enabled()).toBe(false);
+    expect(() => service.assertEnabled()).toThrow("Multiple-choice submission is unavailable");
+  });
+});

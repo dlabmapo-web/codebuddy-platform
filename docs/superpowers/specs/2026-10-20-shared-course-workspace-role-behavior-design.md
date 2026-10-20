@@ -455,3 +455,26 @@ Material rows use consistent type icons, a title and secondary metadata,
 readable B/KB/MB file sizes, and restrained hover states. Ordering, drag targets,
 visibility controls and row menus keep their existing behavior. English and
 Korean picker copy lives in a content-route namespace within the payload budget.
+
+
+## Activity and PDF authoring dialog refinement
+
+Author dialogs have one heading, a close control, consistent field spacing,
+a scrollable body and a persistent action footer. Activity type is introduced
+with an icon and uses the shared ChoiceSelector. Existing type locks remain in
+force. Instructions and quiz option editors use shorter initial heights while
+retaining rich editing. Score and answer settings remain accessible below the
+instructions.
+
+PDF authoring uses the shared selector with placement descriptions and the
+existing restriction against Main-only placement for referenced documents.
+A styled, keyboard-accessible browse/drop area replaces the exposed native file
+control. File name, readable size and clear-selection action appear separately.
+Upload validation, cancellation, progress and save behavior remain intact.
+Quiz mode, source-file selection and rich-editor font size also use ChoiceSelector;
+font-size selection returns focus to the editor.
+
+Multiple-choice material creation keeps its rollout flag and API capability
+check. The API validates the flag as a boolean and accepts the validated value
+in the quiz service. Local API and web flags are enabled after confirming the
+existing migration; release defaults remain disabled.

@@ -43,6 +43,7 @@ export const apiEnvironmentSchema = z.object({
   VIDEO_LESSONS_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   VIDEO_MAX_UPLOAD_BYTES:z.coerce.number().int().min(1).max(5000000000).default(5000000000),
   VIDEO_COURSE_QUOTA_BYTES:z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(100000000000),
+  MULTIPLE_CHOICE_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   SHORT_ANSWER_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   GUI_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   GUI_SERVICE_URL:httpUrlSchema.optional(),

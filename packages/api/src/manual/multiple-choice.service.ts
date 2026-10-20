@@ -61,7 +61,8 @@ export function choiceAssetIds(html: string) {
 export class MultipleChoiceService {
   constructor(private readonly config: ConfigService) {}
   enabled() {
-    return this.config.get("MULTIPLE_CHOICE_ENABLED") === "true";
+    const enabled = this.config.get<boolean | string>("MULTIPLE_CHOICE_ENABLED");
+    return enabled === true || enabled === "true";
   }
   assertEnabled() {
     if (!this.enabled())

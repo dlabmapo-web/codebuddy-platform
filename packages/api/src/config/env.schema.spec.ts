@@ -21,6 +21,12 @@ describe("validateEnvironment", () => {
     });
   });
 
+  it("preserves and types the multiple-choice rollout flag from environment files", () => {
+    expect(validateEnvironment(validEnvironment).MULTIPLE_CHOICE_ENABLED).toBe(false);
+    expect(validateEnvironment({ ...validEnvironment, MULTIPLE_CHOICE_ENABLED: "true" }).MULTIPLE_CHOICE_ENABLED).toBe(true);
+    expect(validateEnvironment({ ...validEnvironment, MULTIPLE_CHOICE_ENABLED: "false" }).MULTIPLE_CHOICE_ENABLED).toBe(false);
+  });
+
   it("reports invalid variable names without exposing values", () => {
     const secretValue = "do-not-print-this-secret";
 

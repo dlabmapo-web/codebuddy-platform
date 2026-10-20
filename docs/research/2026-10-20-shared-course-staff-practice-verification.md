@@ -305,3 +305,32 @@ Escape/focus restoration and the two-column picker at 390px. No records were
 created during browser verification. Desktop viewport restored afterwards.
 Screenshots: /tmp/cove-course-builder-materials.png and
 /tmp/cove-new-material-picker.png. No migration is required.
+
+
+## Author dialogs, custom dropdowns and missing quiz material
+
+Removed the duplicate activity heading and added consistent padding, a type
+summary, compact initial editor heights, grouped settings and a persistent
+footer. PDF authoring now has a styled browse/drop area, separate file details
+and shared placement dropdown with descriptions. Activity type, turtle source
+file, quiz selection mode and rich-editor font sizes reuse ChoiceSelector.
+Font selection returns keyboard focus to the editor.
+
+The missing quiz tile came from unset local flags. Enabling them exposed an
+API bug: MULTIPLE_CHOICE_ENABLED was absent from environment validation and
+the service expected only a string. Added the validated boolean and support
+for boolean/string enabled values, with regressions for default/off/on cases.
+Confirmed the existing multiple-choice migration is applied. Enabled ignored
+local API/web flags and restarted the local API watch process; release defaults
+remain unchanged. Browser quiz preview now returns Correct from the API.
+No quiz or PDF records were saved during browser verification.
+
+Validation: 28 focused web tests, 17 API configuration/quiz tests, 136 translation
+tests, web/API TypeScript and changed-file scoped ESLint pass. The existing
+editor directory is excluded by the repository ESLint configuration; its
+translation tests and web typecheck pass. Browser checks covered the quiz tile,
+quiz preview, answer-mode dropdown, PDF placement selection, font selection
+with editor focus, and activity layout at 390px. Desktop viewport restored.
+Screenshots: /tmp/cove-activity-author-dialog.png,
+/tmp/cove-pdf-upload-dialog.png, /tmp/cove-pdf-placement-dropdown.png,
+/tmp/cove-material-picker-with-quiz.png and /tmp/cove-quiz-preview-enabled.png.

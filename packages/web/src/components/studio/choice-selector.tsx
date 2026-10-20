@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 
 /** Short, fixed choices share the Studio menus; longer searchable lists use ResponsiveSelector. */
 export function ChoiceSelector<TItem extends SelectorItem & { disabled?: boolean }>({
-  label, list, selectedId, onSelect, className, renderItem, disabled = false,
+  label, list, selectedId, onSelect, className, renderItem, disabled = false, onCloseAutoFocus,
 }: {
   label: string;
   list: readonly TItem[];
@@ -17,6 +17,7 @@ export function ChoiceSelector<TItem extends SelectorItem & { disabled?: boolean
   className?: string;
   renderItem?: (item: TItem) => React.ReactNode;
   disabled?: boolean;
+  onCloseAutoFocus?: React.ComponentProps<typeof DropdownMenuContent>['onCloseAutoFocus'];
 }) {
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const selected = list.find((item) => item.id === selectedId);
@@ -31,7 +32,7 @@ export function ChoiceSelector<TItem extends SelectorItem & { disabled?: boolean
         <ChevronDown aria-hidden className="size-4 shrink-0 text-sub transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" sideOffset={6} portalContainer={container} className="w-(--radix-dropdown-menu-trigger-width) min-w-0 max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto rounded-xl p-1.5 shadow-lg">
+    <DropdownMenuContent onCloseAutoFocus={onCloseAutoFocus} align="start" sideOffset={6} portalContainer={container} className="w-(--radix-dropdown-menu-trigger-width) min-w-0 max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto rounded-xl p-1.5 shadow-lg">
       <DropdownMenuRadioGroup aria-label={label} value={selectedId} onValueChange={(id) => {
         const item = list.find((candidate) => candidate.id === id);
         if (item && !item.disabled) onSelect(item);

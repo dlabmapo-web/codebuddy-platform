@@ -150,5 +150,8 @@
   "choice_unavailable": "객관식 제출을 사용할 수 없습니다",
   "preview_question": "문제 미리보기",
   "test_selection": "선택 확인",
-  "duplicate_options": "동일한 내용의 선택지가 있습니다. 의도한 내용인지 확인하세요."
+  "duplicate_options": "동일한 내용의 선택지가 있습니다. 의도한 내용인지 확인하세요.",
+  "author_description": "안내를 작성하고 학생의 답변 방식과 점수를 설정하세요.",
+  "close_author": "활동 편집기 닫기",
+  "answer_mode": "정답 선택 방식"
 }

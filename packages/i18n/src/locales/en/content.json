@@ -304,7 +304,15 @@
     "invalid_page": "Enter a page between 1 and {{total}}.",
     "document_count_other": "{{count}} PDFs",
     "document_count_one": "{{count}} PDF",
-    "controls": "PDF controls"
+    "controls": "PDF controls",
+    "upload_ui": {
+      "browse": "Browse files",
+      "placements": {
+        "MAIN": "Read as part of the lesson.",
+        "SUPPLEMENTARY": "Open from the lesson resources.",
+        "BOTH": "Available in the lesson and its resources."
+      }
+    }
   },
   "video": {
     "add": "Add video lesson",

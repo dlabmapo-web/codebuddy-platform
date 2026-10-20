@@ -1,5 +1,6 @@
 'use client';
 
+import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useEditorTranslation } from './use-editor-translation';
 import { usePrivateImageResolver } from './private-image-context';
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
@@ -177,6 +178,7 @@ type Props = {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  minHeight?: number;
   onImageUpload?: (file: File) => Promise<string>;
 };
 
@@ -185,7 +187,7 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function RichEditor({ value, onChange, onImageUpload, placeholder }: Props) {
+export function RichEditor({ value, onChange, onImageUpload, placeholder, minHeight = 280 }: Props) {
   const { t } = useEditorTranslation();
   const editorPlaceholder = placeholder ?? t('placeholder');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,7 +229,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder }: Prop
     },
     editorProps: {
       attributes: {
-        style: 'min-height: 280px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: #16181D;',
+        style: `min-height: ${minHeight}px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: #16181D;`,
       },
     },
   });
@@ -294,17 +296,14 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder }: Prop
         <ToolBtn onClick={() => editor.chain().focus().redo().run()} title={t('redo')}><Redo size={14} /></ToolBtn>
         <Divider />
 
-        <select
-          onMouseDown={(e) => e.stopPropagation()}
-          onChange={(e) => setFontSize(e.target.value)}
-          defaultValue=""
-          title={t('font_size')}
-          className="rounded px-1 text-xs shrink-0"
-          style={{ height: 28, border: '1px solid #E5E8EC', color: '#5A6270', fontSize: 12 }}
-        >
-          <option value="" disabled>{t('size')}</option>
-          {FONT_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
-        </select>
+        <ChoiceSelector
+          label={t('font_size')}
+          className="h-8 w-20 shrink-0 bg-card px-2 text-xs"
+          selectedId={editor.getAttributes('textStyle').fontSize?.replace('px', '') ?? ''}
+          list={[{ id: '', name: t('size'), disabled: true }, ...FONT_SIZES.map((size) => ({ id: String(size), name: `${size}px`, disabled: false }))]}
+          onSelect={(item) => setFontSize(item.id)}
+          onCloseAutoFocus={(event) => { event.preventDefault(); editor.commands.focus(); }}
+        />
         <Divider />
 
         <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title={t('bold')}><Bold size={14} /></ToolBtn>

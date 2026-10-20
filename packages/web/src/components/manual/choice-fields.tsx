@@ -7,6 +7,7 @@ import {
 import { RichEditor } from "@/components/editor/RichEditor";
 import { manualApi } from "@/lib/manual-api";
 import { useManualTranslation } from "./use-manual-translation";
+import { ChoiceSelector } from "@/components/studio/choice-selector";
 import { ChoiceOptions } from "./choice-options";
 
 export function ChoiceFields({
@@ -40,13 +41,13 @@ export function ChoiceFields({
     update({ options });
   };
   return (
-    <fieldset className="grid gap-3 rounded border border-border p-4">
-      <legend>{t("multiple_choice")}</legend>
-      <label>
+    <fieldset className="grid gap-4 rounded-xl border border-border p-4">
+      <legend className="px-2 text-sm font-bold text-brand">{t("multiple_choice")}</legend>
+      <label className="grid gap-2 text-sm font-semibold">
         {t("question")}
         <input
           maxLength={1000}
-          className="block w-full rounded border border-border bg-card p-2"
+          className="h-11 w-full rounded-lg border border-border bg-card px-3 font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
           value={value.question}
           onChange={(e) => update({ question: e.target.value })}
         />
@@ -54,37 +55,27 @@ export function ChoiceFields({
       <div>
         {t("problem_description")}
         <RichEditor
+          minHeight={120}
           value={value.problemDescription}
           onChange={(problemDescription) => update({ problemDescription })}
           onImageUpload={uploadImage}
         />
       </div>
       {locked ? <p>{t("definition_locked")}</p> : null}
-      <label>
-        {t("activity_type")}
-        <select
-          aria-label={t("multiple_choice")}
+      <div className="grid gap-2">
+        <p className="text-sm font-semibold">{t("answer_mode")}</p>
+        <ChoiceSelector
+          label={t("answer_mode")}
           disabled={locked}
-          value={value.selectionMode}
-          onChange={(e) =>
-            update({
-              selectionMode: e.target.value as "SINGLE" | "MULTIPLE",
-              correctOptionIds:
-                e.target.value === "SINGLE" &&
-                value.correctOptionIds.length !== 1
-                  ? []
-                  : value.correctOptionIds,
-            })
-          }
-        >
-          <option value="SINGLE">{t("single_answer")}</option>
-          <option value="MULTIPLE">{t("multiple_answers")}</option>
-        </select>
-      </label>
+          selectedId={value.selectionMode}
+          list={[{ id: "SINGLE", name: t("single_answer") }, { id: "MULTIPLE", name: t("multiple_answers") }]}
+          onSelect={(item) => update({ selectionMode: item.id as "SINGLE" | "MULTIPLE", correctOptionIds: item.id === "SINGLE" && value.correctOptionIds.length !== 1 ? [] : value.correctOptionIds })}
+        />
+      </div>
       {value.options.map((option, index) => (
         <section
           key={option.id}
-          className="rounded border border-border p-3"
+          className="space-y-3 rounded-xl border border-border bg-canvas/40 p-3"
           aria-label={`${t("option")} ${index + 1}`}
         >
           <label>
@@ -110,6 +101,7 @@ export function ChoiceFields({
             {t("correct_option")} {index + 1}
           </label>
           <RichEditor
+            minHeight={80}
             value={option.content}
             onChange={(content) =>
               update({
@@ -120,7 +112,7 @@ export function ChoiceFields({
             }
             onImageUpload={uploadImage}
           />
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2 text-xs font-semibold [&>button]:rounded-lg [&>button]:border [&>button]:border-border [&>button]:bg-card [&>button]:px-3 [&>button]:py-2 [&>button:disabled]:opacity-40">
             <button
               type="button"
               disabled={locked || value.options.length <= 2}

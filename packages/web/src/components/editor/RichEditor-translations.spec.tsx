@@ -6,7 +6,7 @@ vi.mock('@tiptap/react', async (original) => ({
   ...await original<typeof import('@tiptap/react')>(),
   useEditor: (options: typeof state.editorOptions) => {
     state.editorOptions = options;
-    return { isActive: () => false };
+    return { isActive: () => false, getAttributes: () => ({}) };
   },
   EditorContent: () => <div />,
 }));

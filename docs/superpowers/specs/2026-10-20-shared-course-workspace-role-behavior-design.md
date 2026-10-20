@@ -556,3 +556,10 @@ PDF title (up to the existing 200-character limit). This works for existing PDFs
 and newly uploaded documents after the course tree refreshes. A custom nonblank
 title and saved exercise titles are preserved. Selecting a PDF alone can enable
 creation with blank instructions, starter code, solutions and test cases.
+
+
+PDF practice with no extra statement, input/output text, constraints or examples
+shows a blue guidance card on the Problem statement tab: instructions are in the
+PDF, with an Open reference PDF action. The action switches tabs and focuses the
+PDF tab without remounting the reader or changing code. Existing hints and grading
+notices remain available below it. Authored statements continue to render normally.

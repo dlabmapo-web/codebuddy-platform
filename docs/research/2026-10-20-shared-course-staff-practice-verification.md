@@ -431,3 +431,12 @@ Create problem enabled without a statement, starter code, solution or test cases
 The form was left ready; no material was created or published during this check.
 21 targeted web tests, web TypeScript and picker ESLint passed. Screenshot:
 /tmp/cove-pdf-editor-create-enabled.png.
+
+
+## Empty PDF statement guidance — 2026-10-20
+
+Verified the user's PDF-only practice now shows instructions guidance instead of
+a blank statement pane. Open reference PDF returns to the reader and focuses its
+tab. Six reference-pane tests cover guidance, authored text, reader page retention
+and keyboard navigation. 136 translation tests, TypeScript, scoped ESLint and
+diff checks pass. Screenshot: /tmp/cove-pdf-statement-guidance.png.

@@ -25,5 +25,8 @@
   "pdf_instructions": "The PDF is your problem statement. Students read it beside the code editor; no separate written statement is required.",
   "extra_notes": "Extra written instructions (optional)",
   "grading_optional": "Solutions, grading and hints (optional)",
-  "run_only_help": "Students can run code using the PDF instructions. Add test cases when you want automatic grading and submission."
+  "run_only_help": "Students can run code using the PDF instructions. Add test cases when you want automatic grading and submission.",
+  "statement_in_pdf": "Your instructions are in the PDF",
+  "statement_in_pdf_help": "Read the reference PDF, then write and run your code in the editor. There are no extra written instructions for this practice.",
+  "open_pdf": "Open reference PDF"
 }

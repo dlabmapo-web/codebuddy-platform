@@ -13,7 +13,7 @@ type ReferenceView = typeof views[number];
 
 /** Switching materials preserves the reader, statement scroll, and surrounding editor. */
 export function ExerciseReferencePane({ academyId, exercise, children, teacher = false, preview = false }: {
-  academyId: string; exercise: Pick<LearnExercise, 'materialId' | 'referencePdf' | 'hasReferencePdf'>;
+  academyId: string; exercise: Pick<LearnExercise, 'materialId' | 'referencePdf' | 'hasReferencePdf'> & Partial<Pick<LearnExercise, 'description' | 'inputFormat' | 'outputFormat' | 'constraints' | 'sampleTestCases'>>;
   children: ReactNode; teacher?: boolean; preview?: boolean;
 }) {
   const { t } = useTranslation(['content', 'pdf-practice']);
@@ -21,6 +21,10 @@ export function ExerciseReferencePane({ academyId, exercise, children, teacher =
   const [tab, setTab] = useState<ReferenceView>(linked ? 'pdf' : 'statement');
   if (!linked) return <div {...surfaceProps('statement')}>{children}</div>;
   const pdf = exercise.referencePdf;
+  const pdfOnly = Boolean(pdf && exercise.description !== undefined &&
+    !exercise.description.trim() && !exercise.inputFormat?.trim() &&
+    !exercise.outputFormat?.trim() && !exercise.constraints?.trim() &&
+    !exercise.sampleTestCases?.length);
   function selectWithKeyboard(event: KeyboardEvent<HTMLButtonElement>, value: ReferenceView) {
     const index = views.indexOf(value);
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? views.length - 1
@@ -62,6 +66,14 @@ export function ExerciseReferencePane({ academyId, exercise, children, teacher =
     <div role="tabpanel" tabIndex={0} id={`${exercise.materialId}-statement-panel`}
       aria-labelledby={`${exercise.materialId}-statement-tab`} hidden={tab !== 'statement'}
       className={`min-h-0 flex-1 overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 ${tab === 'statement' ? 'block' : 'hidden'}`}
-      {...(tab === 'statement' ? surfaceProps('statement') : {})}>{children}</div>
+      {...(tab === 'statement' ? surfaceProps('statement') : {})}>
+      {pdfOnly ? <div className="m-5 rounded-xl border border-brand/15 bg-brand-soft/40 p-6">
+        <span className="mb-4 grid size-11 place-items-center rounded-xl bg-brand-soft text-brand"><FileText aria-hidden className="size-5" /></span>
+        <h2 className="text-base font-bold text-ink">{t('pdf-practice:statement_in_pdf')}</h2>
+        <p className="mt-2 max-w-md text-sm leading-6 text-sub">{t('pdf-practice:statement_in_pdf_help')}</p>
+        <button type="button" onClick={() => { setTab('pdf'); document.getElementById(`${exercise.materialId}-pdf-tab`)?.focus(); }} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"><FileText aria-hidden className="size-4" />{t('pdf-practice:open_pdf')}</button>
+      </div> : null}
+      {children}
+    </div>
   </div>;
 }

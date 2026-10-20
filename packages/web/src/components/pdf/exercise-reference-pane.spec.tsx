@@ -78,3 +78,24 @@ it('supports arrow, Home and End keys with one tab stop and matching focus', asy
     expect(tabs[1 - target]!.tabIndex).toBe(-1);
   }
 });
+
+it.each(['', 'Written instructions'])('guides PDF-only practice back to the reader while retaining authored instructions (%s)', async (description) => {
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host); roots.push(root);
+  await act(() => root.render(<ExerciseReferencePane academyId="academy" exercise={{ materialId: 'exercise', hasReferencePdf: true, description,
+    referencePdf: { materialId: 'pdf', title: 'Lesson', revision: 1, originalFilename: 'lesson.pdf', pageCount: 3, byteSize: 123 } }}><p>{description}</p></ExerciseReferencePane>));
+  const tabs = host.querySelectorAll<HTMLButtonElement>('[role=tab]');
+  await act(() => host.querySelector<HTMLButtonElement>('[data-testid="mock-pdf-page"]')!.click());
+  await act(() => tabs[1]!.click());
+  const action = [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'pdf-practice:open_pdf');
+  if (description) {
+    expect(action).toBeUndefined();
+    expect(host.querySelector('#exercise-statement-panel')?.textContent).toContain(description);
+  } else {
+    expect(host.querySelector('#exercise-statement-panel')?.textContent).toContain('pdf-practice:statement_in_pdf');
+    await act(() => action!.click());
+    expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(tabs[0]);
+    expect(host.querySelector('[data-testid="mock-pdf-page"]')?.textContent).toBe('2');
+  }
+});

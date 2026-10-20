@@ -424,3 +424,13 @@ Cove blue accents identify actionable controls; the active fit mode is filled
 blue and inactive fit modes remain neutral. Percentage is contained in its
 number field. Focus rings, disabled boundary states and icon tooltips clarify
 interaction. Groups wrap as units when the reader pane is narrow.
+
+
+## Account navigation footer (2026-10-20)
+
+My page is a persistent footer below the independently scrolling navigation,
+anchored to the bottom of the viewport-height sidebar. This applies to Student,
+Teacher, Team Lead, Manager and the platform sidebar. The shared avatar row,
+active state, collapsed tooltip and mobile-close behavior remain intact. A
+separator and safe-area padding distinguish account navigation from the main
+menu without overlaying either region.

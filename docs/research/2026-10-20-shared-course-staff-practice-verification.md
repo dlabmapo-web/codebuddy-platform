@@ -273,3 +273,15 @@ Four reference-pane tests, 134 translation tests, web TypeScript and changed-fil
 ESLint pass. Browser verification confirmed equal group heights and active fit
 mode styling in the running PDF workspace. Screenshot:
 `/tmp/cove-pdf-toolbar-refined.png`. No migration is required.
+
+
+## My page sidebar footer
+
+Moved My page from scrolling navigation into SidebarFooter in academy and
+platform rails. Students now receive the same bottom account link. The footer
+does not shrink, includes safe-area padding, and remains separate from the
+scrolling menu. Existing profile/active/collapsed/mobile behavior is reused.
+
+Sidebar navigation and profile-row tests, web TypeScript and changed-file ESLint
+pass. Browser verification confirmed the Teacher row at the bottom-left of the
+viewport. Screenshot: `/tmp/cove-sidebar-mypage-footer.png`.

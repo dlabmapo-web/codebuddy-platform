@@ -34,6 +34,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -194,27 +195,14 @@ export function StudioSidebar({
             pendingApplications={pendingApplications}
           />
         ))}
-        {/*
-         * Last, and outside every group.
-         *
-         * My Page belongs to none of them: it is not part of the academy, of
-         * the curriculum, or of the people — it is the reader. Filed under
-         * Learning it would sit beside "My courses" and read as a student's
-         * page, which it is not; filed under Academy it would read as a
-         * setting of the academy, which it also is not.
-         *
-         * At the end rather than the head because the rail is read top-down as
-         * the academy's own shape, and the reader is not part of that shape.
-         * It also lands in the same place for every role — a student's rail
-         * has three groups above it and a manager's has five, and this is the
-         * row both of them find without counting.
-         */}
-        {!isStudent ? <MyPageRow
+      </SidebarContent>
+      <SidebarFooter className="shrink-0 gap-0 border-t border-border bg-sidebar p-0 pb-[env(safe-area-inset-bottom)]">
+        <MyPageRow
           href={myPageHref}
           isActive={activeHref === myPageHref}
           viewer={viewer}
-        /> : null}
-      </SidebarContent>
+        />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

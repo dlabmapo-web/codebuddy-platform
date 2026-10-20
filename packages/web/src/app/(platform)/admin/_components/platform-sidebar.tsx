@@ -23,6 +23,7 @@ import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-ro
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -287,23 +288,15 @@ export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
             </SidebarMenu>
           </SidebarGroup>
         ))}
-        {/*
-         * Last and outside every group, exactly where the studio puts it: the
-         * groups above describe the platform, and the reader is not part of
-         * the platform's shape.
-         *
-         * `isActive` is hardcoded false rather than computed, and that is not
-         * an oversight. `/account` lives outside `/admin` and renders its own
-         * chrome, so this rail is never on screen while its destination is —
-         * the row cannot light, and asking `activeNavHref` would only add a
-         * href that can never match. Leaving the academy is what the link does.
-         */}
+      </SidebarContent>
+      <SidebarFooter className="shrink-0 gap-0 border-t border-border bg-sidebar p-0 pb-[env(safe-area-inset-bottom)]">
+        {/* Account uses its own shell, so this rail cannot be active there. */}
         <MyPageRow
           href={routes.accountFrom('admin')}
           isActive={false}
           viewer={viewer}
         />
-      </SidebarContent>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

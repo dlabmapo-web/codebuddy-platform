@@ -369,6 +369,7 @@ export class TeamLeadOverviewRepository {
         WHERE crs.academy_id = ${academyId}::uuid
           AND ${EFFECTIVE_VISIBILITY}
           AND pe.quiz IS NULL
+          AND pe.submission_policy = 'AUTOMATIC'
           AND NOT EXISTS (
             SELECT 1 FROM exercise_test_cases tc
             WHERE tc.exercise_material_id = mat.id AND tc.visibility = 'HIDDEN'
@@ -394,6 +395,7 @@ export class TeamLeadOverviewRepository {
         WHERE crs.academy_id = ${academyId}::uuid
           AND ${EFFECTIVE_VISIBILITY}
           AND btrim(pe.description) = ''
+          AND pe.reference_pdf_material_id IS NULL
       `,
       "course",
     );

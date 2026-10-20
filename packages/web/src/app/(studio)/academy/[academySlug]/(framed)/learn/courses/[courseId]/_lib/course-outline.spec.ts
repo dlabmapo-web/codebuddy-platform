@@ -47,6 +47,17 @@ describe('student course outline', () => {
 describe('lectureProgress', () => {
   const exercise = (status: string) => ({ status });
 
+  it('excludes ungraded practice, including its historical solved result', () => {
+    expect(lectureProgress({ exercises: [
+      { status: 'SOLVED', submissionPolicy: 'PRACTICE_ONLY' },
+      { status: 'IN_PROGRESS', submissionPolicy: 'AUTOMATIC' },
+      { status: 'SOLVED', submissionPolicy: 'AUTOMATIC' },
+    ] })).toEqual({ total: 2, solved: 1, percent: 50 });
+    expect(lectureProgress({ exercises: [
+      { status: 'IN_PROGRESS', submissionPolicy: 'PRACTICE_ONLY' },
+    ] })).toEqual({ total: 0, solved: 0, percent: null });
+  });
+
   it('counts solved problems against the visible total', () => {
     expect(
       lectureProgress({

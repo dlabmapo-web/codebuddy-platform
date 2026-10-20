@@ -112,3 +112,60 @@ Grading, switch modes, and confirm saved tests remain. Open the exercise to see
 its PDF/code editor and grading status. Use New material → PDF + coding practice
 for the minimal creation flow. Teacher accounts should see Review details in
 place of Edit and cannot save grading changes.
+
+## Follow-up in the user's Chrome session
+
+Checked on 2026-10-20 with normal browser sign-ins for the seeded Manager,
+Team Lead, Teacher and Student accounts. Cloudflare checks completed normally;
+authentication settings were not changed.
+
+| Scenario | Observed result |
+| --- | --- |
+| Manager Practice only | PDF loads; Run prints output; Submit and Test run are absent. |
+| PDF/statement navigation | Page 2 survives tab switching; an empty statement explains where to find instructions and links back to the PDF. |
+| Team Lead creation | PDF title defaults; no duplicate statement/solution is required; a hidden practice material saves and opens in staff preview. |
+| Automatic setup | A missing expected output blocks creation; adding a second 100-point case shows the cap warning; switching modes and saving preserves both cases. |
+| Staff grading | Team Lead and Manager correct practice submissions receive 100/100. Student grades remain separate. |
+| Student Practice only | Run prints the edited code's output; authoring, solution and Submit controls are absent. |
+| Student Automatic | Incorrect output receives 0/100; `print("hello")` receives 100/100. Hidden case inputs/answers are absent from the result UI. Course progress becomes 1 of 1 solved. |
+| Teacher review | Review details exposes disabled grading controls, with no Save button. |
+| Teacher tutoring | Assigned E2E Cohort roster, search and custom filters work. Offline students disappear from the online filter. Selecting the student shows the saved draft read-only in the current exercise; returning restores personal practice. |
+
+The browser pass found and corrected three integration issues:
+
+- Lecture progress and the student dashboard counted ungraded materials in their
+  solve totals. Lecture calculation now excludes Practice only, and the dashboard
+  uses the catalog's canonical progress projection. Chrome verifies a mixed
+  lesson with three programming materials reports 1 of 1 solved while retaining
+  both ungraded materials in the list.
+- The curriculum audit incorrectly flagged PDF instructions as missing written
+  statements and ungraded materials as missing graders. Those checks now respect
+  PDF linkage and submission policy.
+- A failed PDF response reached the entire page's error boundary. The PDF reader
+  now uses React-PDF's callback-based loading mode, so its existing renewal and
+  inline error UI retain the surrounding code workspace. A regression test checks
+  failed-URL renewal and draft preservation. Subsequent browser navigations loaded
+  PDFs successfully.
+
+Follow-up validation: 30 API tests and 15 web tests pass, API/web TypeScript pass,
+and scoped web ESLint passes. The existing six cross-browser E2E results above
+are from the initial implementation run. The follow-up used the user's Chrome
+session rather than claiming a new full cross-browser run.
+
+One Teacher sign-in initially showed Account unavailable and recovered on refresh;
+subsequent role sign-ins completed. Concurrent live editing between two active
+accounts was not exercised in this sequential browser pass; offline observation
+and online filtering were checked.
+
+The browser was returned to the Manager account on the original exercise, with
+Automatic grading restored. The newly created test material,
+`Browser verification · PDF practice` (`0d6ad14a-e3cb-4e39-b8ce-2d1ccbdaba5a`),
+remains hidden in the dedicated test course. No production changes were made.
+
+Local screenshots:
+
+- `/tmp/cove-student-practice-check.png`
+- `/tmp/cove-student-automatic-check.png`
+- `/tmp/cove-student-progress-check.png`
+- `/tmp/cove-teacher-tutoring-check.png`
+- `/tmp/cove-manager-grading-verified.png`

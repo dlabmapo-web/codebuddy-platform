@@ -31,6 +31,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PrismaService } from "../database/prisma.service.js";
 import {
   CurriculumOutlineService,
+  courseSummaryFor,
   nonemptyModules,
   type ProgressByMaterial,
 } from "./curriculum-outline.service.js";
@@ -354,18 +355,15 @@ export class StudentOverviewService {
         );
         if (modules.length === 0 || exercises.length === 0) return [];
 
-        let solved = 0;
-        let started = 0;
+        const progress = courseSummaryFor(course, statuses).progress;
         let lastLectureLabel: string | null = null;
         let next: StudentExercise | null = null;
 
         for (const exercise of exercises) {
           const status = statuses.get(exercise.materialId)?.status;
           if (status === "SOLVED") {
-            solved += 1;
             lastLectureLabel = exercise.lectureTitle;
           } else if (status === "IN_PROGRESS") {
-            started += 1;
             lastLectureLabel = exercise.lectureTitle;
           }
           if (!next && status !== "SOLVED") next = exercise;
@@ -375,10 +373,10 @@ export class StudentOverviewService {
           {
             courseId: course.id,
             title: course.title,
-            solved,
-            started,
-            total: exercises.length,
-            percent: Math.round((solved / exercises.length) * 100),
+            solved: progress.solved,
+            started: progress.started - progress.solved,
+            total: progress.total,
+            percent: progress.total === 0 ? 0 : Math.round((progress.solved / progress.total) * 100),
             lastLectureLabel,
             nextMaterialId: next?.materialId ?? null,
             nextTitle: next?.title ?? null,

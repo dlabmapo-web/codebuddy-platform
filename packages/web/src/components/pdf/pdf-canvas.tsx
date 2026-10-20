@@ -211,7 +211,9 @@ export function PdfCanvas({
         </p>
       ) : null}
       <div ref={viewport} className="min-h-0 flex-1 overflow-auto p-4">
+        {/* Renew failed URLs here without taking down the surrounding code workspace. */}
         <Document
+          suspense={false}
           file={file}
           options={options}
           error={<p role="alert">{t('pdf.unavailable')}</p>}

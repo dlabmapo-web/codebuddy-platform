@@ -25,6 +25,10 @@ vi.mock('@/components/studio/rich-text-frame', () => ({ RichTextFrame: () => <p>
 vi.mock('./editor-pane', () => ({ EditorPane: (props: unknown) => { mocks.editor(props); return <div>Personal editor</div>; } }));
 vi.mock('./workspace-header', () => ({ NavButton: ({ label }: { label: string }) => <button>{label}</button> }));
 vi.mock('./result-panel', () => ({ ResultPanel: () => null }));
+vi.mock('./staff-workspace-dialogs', () => ({
+  StaffSolutionDialog: () => <button type="button">solutions</button>,
+  StaffObserveDialog: () => <button type="button">observe</button>,
+}));
 function bootstrap(overrides = {}): LearnExerciseBootstrap {
   return {
     access: { mode: 'staff-practice', canSubmit: true, canAuthor: true, canReview: true, canObserve: true, canViewSolutions: true, ...overrides },
@@ -43,11 +47,12 @@ describe('staff workspace participation', () => {
     expect(html).toContain('solutions'); expect(html).toContain('revision_changed');
     expect(mocks.draft).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'owner:staff-practice', practice: true }));
   });
-  it('teachers can read solutions and open their course roster without editing', () => {
+  it('teachers can read solutions and open observation without leaving the workspace', () => {
     const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap({ canAuthor: false, canViewSolutions: true, canObserveAssignedStudents: true })} userId="teacher" />);
     expect(html).toContain('Personal editor'); expect(html).toContain('review');
     expect(html).not.toContain('>edit<'); expect(html).toContain('>solutions<');
-    expect(html).toContain('/teach/students?course=course');
+    expect(html).toContain('>observe</button>');
+    expect(html).not.toContain('/teach/students?course=');
     expect(html).not.toContain('href="/academy/demo/teach/classes"');
   });
   it('platform inspection cannot submit, and preview buffers have a separate local identity', () => {

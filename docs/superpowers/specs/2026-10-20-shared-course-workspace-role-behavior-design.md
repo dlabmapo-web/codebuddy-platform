@@ -141,8 +141,7 @@ Personal code and starter code have independent save paths. Opening Edit must
 not copy personal practice code into curriculum. Returning restores the practice
 draft; authoring Save must not replace it.
 
-Observe students is a separate action. Teachers open the course-filtered student roster in their assigned active classes, with a live-monitoring link for each student. An unassigned or stale course returns an empty roster. Other staff retain the existing class/student selector
-and assignment checks. A staff personal workspace does not join a student room,
+Observe students opens a modal inside the current problem workspace. It shows only students in assigned teaching classes whose synchronized live presence reports SOLVING for this exact course and problem. It does not navigate to a roster or monitoring page. Unassigned courses and classes with no matching online students show an empty state. A staff personal workspace does not join a student room,
 enable help mode, emit student presence or reuse a student's terminal.
 
 ## 6. Scope and capability policy
@@ -339,8 +338,22 @@ this is not a claim of full Elice backend parity.
 Teachers can explicitly open reference solutions while practicing. Reading a solution
 requires curriculum review permission and rechecks the academy, active teaching
 assignment, and visible material ancestors. It grants no exercise editing authority.
-For members who also hold Teacher, Observe students opens the current course's
-roster across their own assigned classes, including students who have not started.
-Each seat links to the existing authorized live-monitoring page. The course filter
-is applied on server and client reads and survives reload. Unassigned courses
-produce no rows, rather than falling back to all classes.
+For members who also hold Teacher, Observe students opens an in-place modal.
+The course-filtered authorized roster supplies enrollment; synchronized presence
+shows only students actively solving this exact problem. Offline, idle, reconnecting,
+other-problem and other-course students are excluded. Rows do not navigate.
+Unassigned courses produce no rows, rather than falling back to all classes.
+
+
+## In-place dialogs correction (2026-10-20)
+
+View solution opens a centered answer modal with all reference answers expanded.
+Answers are fetched only after opening and released from the query cache on close.
+Observe students opens a centered live list in the same workspace; opening it
+starts authorized class-presence subscriptions and closing it releases them.
+Only synchronized SOLVING presence for the exact course and material can appear;
+lost synchronization hides stale rows and offers reconnection. Roster reads
+refresh assignment and enrollment every 15 seconds while open.
+Both dialogs use Cove modal primitives, close with Escape or Close, return focus
+to their triggers, and portal into the fullscreen element when applicable.
+The editor, terminal, PDF, personal draft, and URL remain in place.

@@ -3,7 +3,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Code2, LogOut, Maximize2, Pencil, Users, History } from 'lucide-react';
+import { Code2, LogOut, Maximize2, Pencil, History } from 'lucide-react';
 import { workspaceMaterialSequence, type LearnExerciseBootstrap } from '@cove/shared';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
@@ -16,14 +16,13 @@ import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runn
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { routes } from '@/lib/routes';
-import { orpc } from '@/lib/orpc';
-import type { ExerciseSolutionEntry } from '@cove/shared';
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { usePracticeSubmission } from '../_hooks/use-practice-submission';
 import { usePythonErrorLines } from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { NavButton } from './workspace-header';
 import { ResultPanel } from './result-panel';
+import { StaffSolutionDialog, StaffObserveDialog } from './staff-workspace-dialogs';
 
 /** Personal practice mounts no student sessions, presence, collaboration, feedback or points hooks. */
 export function StaffWorkspace({ academyId, bootstrap, userId }: {
@@ -35,8 +34,6 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const { workspace, access } = bootstrap;
   const { exercise, breadcrumb } = workspace;
   const preview = access?.preview ?? false;
-  const [solutions, setSolutions] = React.useState<ExerciseSolutionEntry[] | null>(null);
-  const [solutionError, setSolutionError] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [tab, setTab] = React.useState<OutputTab>('terminal');
   const [mobile, setMobile] = React.useState<'problem' | 'code'>('problem');
@@ -106,13 +103,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t('label')}</span>
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
       {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={() => draft.flushNow()} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
-      {access?.canViewSolutions ? <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand" onClick={() => {
-        setSolutionError(false);
-        void orpc.academyCourses.getExerciseSolution({ academyId, courseId: breadcrumb.course.id, lectureId: breadcrumb.lecture.id, materialId: exercise.materialId }).then((result) => setSolutions(result.solutions)).catch(() => setSolutionError(true));
-      }}>{t('solutions')}</button> : null}
+      {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} /> : null}
       {access?.canReview && !access.canAuthor ? <Link href={editPath} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand">{t('review')}</Link> : null}
       {access?.canAuthor ? <Link href={editPath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-brand hover:text-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
-      {access?.canObserve ? <Link href={access.canObserveAssignedStudents ? `${routes.academy(slug)}/teach/students?course=${encodeURIComponent(breadcrumb.course.id)}` : `${routes.academy(slug)}/teach/classes`} className="hidden items-center gap-1.5 px-2 text-xs text-sub hover:text-brand md:inline-flex"><Users className="size-4" />{t('observe')}</Link> : null}
+      {access?.canObserve ? <StaffObserveDialog academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} /> : null}
       <Link href={coursePath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
     </header>
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
@@ -124,8 +118,6 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     </div>
     {workspace.draft?.gradingRevision !== undefined && workspace.draft.gradingRevision !== exercise.gradingRevision ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs text-warning">{t('revision_changed')}</p> : null}
     {preview ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs font-semibold text-warning">{t('preview')}</p> : null}
-    {solutionError ? <p role="alert" className="p-3 text-sm text-danger">{t('solution_error')}</p> : null}
-    {solutions ? <section className="max-h-64 shrink-0 overflow-auto border-b border-border bg-card p-4"><div className="flex justify-between"><h2 className="font-bold">{t('solutions')}</h2><button type="button" onClick={() => setSolutions(null)}>{t('close')}</button></div>{solutions.length ? solutions.map((solution, index) => <details key={index} className="mt-2 rounded-lg border border-border p-3"><summary>{solution.title ?? t('solution_n', { number: index + 1 })}</summary><pre className="mt-3 overflow-auto whitespace-pre-wrap font-mono text-xs">{solution.code}</pre></details>) : <p className="mt-2 text-sm text-sub">{t('no_solutions')}</p>}</section> : null}
     {historyOpen ? <section className="max-h-44 shrink-0 overflow-auto border-b border-border bg-card px-4 py-3" aria-label={t('history')}>
       <h2 className="mb-2 text-xs font-bold">{t('history')}</h2>
       {!submission.history.length ? <p className="text-xs text-sub">{t('history_empty')}</p> : submission.history.map((attempt) => <button key={attempt.submissionId} type="button" disabled={busy} onClick={() => { void submission.select(attempt.submissionId); setTab('result'); }} className="mr-2 mb-2 rounded-lg border border-border px-3 py-2 text-xs hover:border-brand disabled:opacity-50">{new Date(attempt.createdAt).toLocaleString()} · {attempt.score ?? '—'}</button>)}

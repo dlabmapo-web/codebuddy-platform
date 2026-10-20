@@ -153,3 +153,26 @@ Validation for this correction: 62 focused API tests, three staff workspace
 tests, and three shared roster schema tests passed. Changed web files pass
 ESLint, and API and web TypeScript checks pass. No database migration is required. These are automated checks; a new
 browser walkthrough of this correction has not been performed.
+
+
+## In-place solution and active-student modals
+
+The later UX correction replaces the inline answer section and observation
+navigation with Cove modal dialogs in the current problem workspace. All
+reference answers are expanded in the answer dialog. The observation dialog
+uses the authorized course roster plus existing class-presence subscriptions,
+showing only SOLVING students on the exact course/material. Offline, idle,
+reconnecting, other-problem and unenrolled presence entries are excluded.
+Subscriptions mount only while open; missing live synchronization hides stale
+rows and shows a reconnection state. No student rows navigate elsewhere.
+
+Validation: 10 focused workspace/dialog/filter tests and 134 translation tests
+passed; web TypeScript and changed-file ESLint pass. Browser verification using
+the existing local teacher session confirmed the real reference answer modal,
+the assigned class live empty state, unchanged exercise URL and editor/PDF,
+Close, Escape, and focus restoration. No active student was connected during
+the browser check; positive live-list filtering is covered by automated tests.
+English and Korean resources were rebuilt for the running local web app.
+
+Screenshots: `/tmp/cove-view-solution-modal.png` and
+`/tmp/cove-observe-students-modal.png`. No migration is required.

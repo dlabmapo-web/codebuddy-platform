@@ -202,13 +202,15 @@ function ModalContent({
   children,
   title,
   description,
+  portalContainer,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   title: string;
   description?: string;
+  portalContainer?: HTMLElement | null;
 }) {
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal container={portalContainer}>
       <DialogPrimitive.Overlay className="cove-overlay fixed inset-0 z-50 bg-ink/45" />
       <DialogPrimitive.Content
         className={cn(

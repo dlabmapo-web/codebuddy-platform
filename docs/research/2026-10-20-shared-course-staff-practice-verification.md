@@ -216,3 +216,19 @@ Screenshots: `/tmp/cove-tutoring-drawer.png`,
 Validation for screenshot alignment: full web suite 1,274 passed; focused
 monitoring API suite 49 passed; shared monitoring schemas 69 passed; translations
 134 passed. API and web TypeScript checks and changed web-file ESLint pass.
+
+
+## Material switch UX refinement
+
+Replaced the loose text tabs with a compact equal-width icon switch. PDF-only
+metadata is absent from statement view. PDF title and page count form one small
+row; the local-page explanation is an info tooltip with its own provider for
+fullscreen pages. Both panels stay mounted to preserve scroll/state, while only
+the active statement exposes collaboration geometry. Keyboard arrows/Home/End
+move selection and focus. An unavailable PDF offers a direct statement action.
+
+Four component tests, 134 translation tests, web TypeScript and changed-file
+ESLint pass. Browser checks confirmed both views, keyboard switching and PDF
+page 2 retained after visiting the statement. Screenshots:
+`/tmp/cove-material-switch-pdf.png` and
+`/tmp/cove-material-switch-statement.png`. No migration is required.

@@ -17,5 +17,8 @@
   "local_pages": "PDF pages are local to your screen.",
   "main_only": "Main only — change to Main and supplementary to link",
   "retry": "Retry",
-  "in_use": "Used by coding exercises — change or detach their reference PDF first:"
+  "in_use": "Used by coding exercises — change or detach their reference PDF first:",
+  "page_count_one": "{{count}} page",
+  "page_count_other": "{{count}} pages",
+  "open_statement": "Open problem statement"
 }

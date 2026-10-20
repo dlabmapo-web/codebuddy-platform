@@ -378,3 +378,16 @@ Teachers cannot submit a student's work through the tutoring pane.
 The answer modal shares the existing highlighted Python answer component,
 including Copy, copied/error feedback, multiple answers and Close. The drawer,
 modal, identity strip, filters and controls retain Cove palette tokens.
+
+
+## Material switch refinement (2026-10-20)
+
+The reference PDF and problem statement use a compact, equal-width segmented
+switch with document/statement icons, clear selected styling, and Cove colors.
+PDF title, page count, and the teacher's local-page explanation appear only in
+PDF view; the explanation is available through an accessible info tooltip.
+The statement header contains only the switch. Both panels remain mounted,
+preserving reader page and statement scroll/state. Only the active statement
+exposes collaboration geometry. Arrow keys, Home/End, one tab stop and focus
+styles support keyboard access. An unavailable PDF offers a direct statement
+action. The editor and runtime remain independent of switching.

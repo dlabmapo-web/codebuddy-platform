@@ -40,3 +40,41 @@ it('keeps the statement available when a previously linked PDF becomes unavailab
   await act(() => host.querySelectorAll<HTMLButtonElement>('[role=tab]')[1]!.click());
   expect(host.textContent).toContain('Fallback statement');
 });
+
+it('shows document details only in PDF view and retains the statement while switching', async () => {
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host); roots.push(root);
+  await act(() => root.render(<ExerciseReferencePane academyId="academy" teacher exercise={{ materialId: 'exercise', hasReferencePdf: true,
+    referencePdf: { materialId: 'pdf', title: 'Lesson reference', revision: 1, originalFilename: 'lesson.pdf', pageCount: 3, byteSize: 123 } }}>
+    <input aria-label="Statement state" defaultValue="kept" />
+  </ExerciseReferencePane>));
+  const tabs = host.querySelectorAll<HTMLButtonElement>('[role=tab]');
+  const statement = host.querySelector<HTMLDivElement>('#exercise-statement-panel')!;
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  expect(host.querySelector('[data-testid=reference-pdf-details]')?.textContent).toContain('Lesson reference');
+  await act(() => tabs[1]!.click());
+  expect(host.querySelector('[data-testid=reference-pdf-details]')).toBeNull();
+  expect(statement.hidden).toBe(false);
+  statement.scrollTop = 120;
+  input.value = 'preserved state';
+  await act(() => tabs[0]!.click());
+  expect(statement.hidden).toBe(true);
+  await act(() => tabs[1]!.click());
+  expect(host.querySelector('#exercise-statement-panel')).toBe(statement);
+  expect(statement.scrollTop).toBe(120);
+  expect(input.value).toBe('preserved state');
+});
+
+it('supports arrow, Home and End keys with one tab stop and matching focus', async () => {
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host); roots.push(root);
+  await act(() => root.render(<ExerciseReferencePane academyId="academy" exercise={{ materialId: 'exercise', hasReferencePdf: true, referencePdf: null }}><p>Problem</p></ExerciseReferencePane>));
+  const tabs = host.querySelectorAll<HTMLButtonElement>('[role=tab]');
+  for (const [key, from, target] of [['ArrowRight', 0, 1], ['Home', 1, 0], ['End', 0, 1], ['ArrowRight', 1, 0]] as const) {
+    await act(() => tabs[from]!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+    expect(document.activeElement).toBe(tabs[target]);
+    expect(tabs[target]!.getAttribute('aria-selected')).toBe('true');
+    expect(tabs[target]!.tabIndex).toBe(0);
+    expect(tabs[1 - target]!.tabIndex).toBe(-1);
+  }
+});

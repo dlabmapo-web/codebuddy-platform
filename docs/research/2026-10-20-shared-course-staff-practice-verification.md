@@ -351,3 +351,12 @@ file ESLint pass. Browser verification confirmed Save becomes enabled after
 only question, two answers and a correct answer; API preview returned Correct.
 Checked desktop and 390px layout, restored desktop and discarded the draft.
 No records were created. Screenshot: /tmp/cove-simple-quiz-authoring.png.
+
+
+## Compact New material button
+
+Reduced the lecture action to 28px high with 12px medium-weight text, a smaller
+blue plus icon and a neutral border/background. Cove blue appears on hover,
+focus and open states. Existing picker tests (2), changed-file ESLint and diff
+checks pass. Browser verification confirmed the compact alignment and opening
+the material picker. Screenshot: /tmp/cove-compact-new-material-button.png.

@@ -36,8 +36,8 @@ export function NewMaterialDialog({ kinds, lectureTitle, onChoose }: {
       setOpen(next);
     }}>
       <ModalTrigger asChild>
-        <button type="button" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand/20 bg-brand-soft px-3 text-[13px] font-semibold text-brand transition-colors hover:border-brand/40 hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-          <Plus aria-hidden className="size-4" />
+        <button type="button" className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs font-medium text-sub transition-colors hover:border-brand/30 hover:bg-brand-soft hover:text-brand data-[state=open]:border-brand/30 data-[state=open]:bg-brand-soft data-[state=open]:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+          <Plus aria-hidden className="size-3.5 text-brand" />
           {t('title')}
         </button>
       </ModalTrigger>

@@ -132,3 +132,24 @@ student records or require deleting practice history.
 
 Temporary local API, judge and web test servers were stopped after verification.
 Unrelated pre-existing untracked documentation was left untouched.
+
+
+## Teacher solution and observation correction
+
+Following the requested correction, teachers may explicitly read reference
+solutions for visible exercises delivered through their active assigned classes.
+The solution endpoint checks review permission and teaching assignment separately
+from editing permission, and pins the requested course to its academy.
+Managers and Team Leads retain their existing solution authority.
+
+Observe students now opens `/teach/students?course=<courseId>` for Teacher
+members, including members with additional roles. Both server rendering and
+client refresh send the course filter. The roster restricts rows and class options
+to assigned classes delivering that course; unknown or unassigned courses return
+an empty roster. Course-context row actions open existing live student monitoring.
+The ordinary unfiltered roster retains its student profile links.
+
+Validation for this correction: 62 focused API tests, three staff workspace
+tests, and three shared roster schema tests passed. Changed web files pass
+ESLint, and API and web TypeScript checks pass. No database migration is required. These are automated checks; a new
+browser walkthrough of this correction has not been performed.

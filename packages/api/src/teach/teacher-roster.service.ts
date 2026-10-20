@@ -58,11 +58,27 @@ export class TeacherRosterService {
     identity: SupabaseIdentity,
     input: TeacherRosterInput,
   ): Promise<TeacherRoster> {
-    const scope = await this.access.requireScope(identity, {
+    const resolved = await this.access.requireScope(identity, {
       academyId: input.academyId,
       ...(input.classId ? { classId: input.classId } : {}),
+      ...(input.courseId ? { courseId: input.courseId } : {}),
     });
 
+    // Never let an invalid/stale course fall back to the full roster.
+    const courseId = input.courseId;
+    const matchingClasses = courseId
+      ? resolved.classes.filter((entry) => entry.courseIds.includes(courseId))
+      : resolved.classes;
+    const students = matchingClasses.flatMap((entry) => entry.students);
+    const membershipIds = [...new Set(students.map((student) => student.membershipId))];
+    const scope = {
+      ...resolved,
+      classes: matchingClasses,
+      membershipIds,
+      students: resolved.students.filter((student) => membershipIds.includes(student.membershipId)),
+      userIds: [...new Set(students.map((student) => student.userId))],
+      classOptions: resolved.classOptions.filter((option) => matchingClasses.some((entry) => entry.classId === option.value)),
+    };
     const now = new Date();
     const generatedAt = now.toISOString();
     const classOptions = scope.classOptions.map((option) => ({

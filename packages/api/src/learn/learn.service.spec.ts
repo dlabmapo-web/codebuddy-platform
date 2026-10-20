@@ -486,6 +486,17 @@ describe("LearnService class-assigned access", () => {
 });
 
 describe("getExerciseBootstrap", () => {
+  it("offers teachers solutions without curriculum editing", async () => {
+    const { service, access } = createService({ role: "TEACHER" });
+    vi.mocked(access.requirePermission).mockResolvedValue({ userId, academyId, role: "TEACHER", roles: ["TEACHER"], via: "membership" } as never);
+    const result = await service.getExerciseBootstrap(identity, { academyId, materialId });
+    expect(result.access).toMatchObject({ canViewSolutions: true, canAuthor: false, canObserveAssignedStudents: true });
+  });
+  it("does not offer private solutions to students", async () => {
+    const { service } = createService();
+    const result = await service.getExerciseBootstrap(identity, { academyId, materialId });
+    expect(result.access).toMatchObject({ canViewSolutions: false, canObserveAssignedStudents: false });
+  });
   it("returns the workspace and its whole course from one entry", async () => {
     const { service } = createService();
 

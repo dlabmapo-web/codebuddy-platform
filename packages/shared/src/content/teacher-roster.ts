@@ -130,6 +130,8 @@ export const teacherRosterInputSchema = z
     academyId: z.uuid(),
     /** One class, or every assigned class when absent. */
     classId: z.uuid().optional(),
+    /** Only seats in assigned classes delivering this course. */
+    courseId: z.uuid().optional(),
     search: z.string().trim().max(120).optional(),
   })
   .strict();

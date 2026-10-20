@@ -43,10 +43,12 @@ describe('staff workspace participation', () => {
     expect(html).toContain('solutions'); expect(html).toContain('revision_changed');
     expect(mocks.draft).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'owner:staff-practice', practice: true }));
   });
-  it('teachers can practice and review while Edit and private solutions stay absent', () => {
-    const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap({ canAuthor: false, canViewSolutions: false })} userId="teacher" />);
+  it('teachers can read solutions and open their course roster without editing', () => {
+    const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap({ canAuthor: false, canViewSolutions: true, canObserveAssignedStudents: true })} userId="teacher" />);
     expect(html).toContain('Personal editor'); expect(html).toContain('review');
-    expect(html).not.toContain('>edit<'); expect(html).not.toContain('>solutions<');
+    expect(html).not.toContain('>edit<'); expect(html).toContain('>solutions<');
+    expect(html).toContain('/teach/students?course=course');
+    expect(html).not.toContain('href="/academy/demo/teach/classes"');
   });
   it('platform inspection cannot submit, and preview buffers have a separate local identity', () => {
     const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap({ canSubmit: false, preview: true })} userId="operator" />);

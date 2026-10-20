@@ -106,13 +106,13 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t('label')}</span>
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
       {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={() => draft.flushNow()} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
-      {access?.canViewSolutions ? <button type="button" className="hidden rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand lg:block" onClick={() => {
+      {access?.canViewSolutions ? <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand" onClick={() => {
         setSolutionError(false);
         void orpc.academyCourses.getExerciseSolution({ academyId, courseId: breadcrumb.course.id, lectureId: breadcrumb.lecture.id, materialId: exercise.materialId }).then((result) => setSolutions(result.solutions)).catch(() => setSolutionError(true));
       }}>{t('solutions')}</button> : null}
       {access?.canReview && !access.canAuthor ? <Link href={editPath} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand">{t('review')}</Link> : null}
       {access?.canAuthor ? <Link href={editPath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-brand hover:text-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
-      {access?.canObserve ? <Link href={`${routes.academy(slug)}/teach/classes`} className="hidden items-center gap-1.5 px-2 text-xs text-sub hover:text-brand md:inline-flex"><Users className="size-4" />{t('observe')}</Link> : null}
+      {access?.canObserve ? <Link href={access.canObserveAssignedStudents ? `${routes.academy(slug)}/teach/students?course=${encodeURIComponent(breadcrumb.course.id)}` : `${routes.academy(slug)}/teach/classes`} className="hidden items-center gap-1.5 px-2 text-xs text-sub hover:text-brand md:inline-flex"><Users className="size-4" />{t('observe')}</Link> : null}
       <Link href={coursePath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
     </header>
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">

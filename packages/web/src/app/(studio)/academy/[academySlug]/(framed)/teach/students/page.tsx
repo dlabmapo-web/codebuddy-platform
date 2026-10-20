@@ -51,6 +51,7 @@ export default async function TeacherStudentsPage({
     roster = await createServerORPCClient().academyTeacherStudents.roster({
       academyId,
       ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.courseId ? { courseId: query.courseId } : {}),
       ...(query.search.trim() ? { search: query.search.trim() } : {}),
     });
   } catch (error) {

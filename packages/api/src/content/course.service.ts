@@ -1,3 +1,6 @@
+import { rolesHavePermission } from "@cove/shared";
+import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
+import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "./exercise-solutions.js";
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
@@ -1147,7 +1150,21 @@ export class CourseService {
       materialId: string;
     },
   ) {
-    await this.requireExerciseManager(identity, input.academyId);
+    const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.review");
+    const canManage = rolesHavePermission(actor.roles ?? [actor.role], "exercises.manage");
+    // Solution reading does not grant editing. Teachers must still teach this
+    // material through an active class in this academy on every request.
+    const permitted = await this.prisma.material.findFirst({
+      where: {
+        id: input.materialId,
+        AND: [
+          { lecture: { courseModule: { course: { id: input.courseId, academyId: input.academyId } } } },
+          ...(canManage ? [] : [taughtMaterialWhere(input.academyId, actor.userId), effectivelyVisibleMaterialWhere(input.academyId)]),
+        ],
+      },
+      select: { id: true },
+    });
+    if (!permitted) throw new AppException("EXERCISE_NOT_FOUND", HttpStatus.NOT_FOUND);
     const material = await this.requireExercise(input);
     // A material that is not a programming exercise answers the same way a
     // missing one does. The non-null assertion this replaces would have been a

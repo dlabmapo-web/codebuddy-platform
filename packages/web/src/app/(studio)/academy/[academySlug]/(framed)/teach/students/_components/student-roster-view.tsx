@@ -101,6 +101,7 @@ export function StudentRosterView({
           joinedAt: student.joinedAt,
           avatar: student.avatar,
           className: entry.name,
+          classId: entry.classId,
           solvedProblems: student.solvedProblems,
           ...(student.points === undefined ? {} : { points: student.points }),
           ...(student.position === undefined
@@ -228,7 +229,7 @@ export function StudentRosterView({
         size: 56,
         cell: ({ row }) => (
           <ProfileLinkCell
-            href={routes.academyStudent(academySlug, row.original.membershipId)}
+            href={query.courseId ? routes.academyTeachStudentLive(academySlug, row.original.classId, row.original.membershipId) : routes.academyStudent(academySlug, row.original.membershipId)}
             label={t('roster.open_student', {
               name: row.original.displayName,
             })}
@@ -236,7 +237,7 @@ export function StudentRosterView({
         ),
       },
     ],
-    [academySlug, i18n.language, numbers, pointsEnabled, t],
+    [academySlug, i18n.language, numbers, pointsEnabled, query.courseId, t],
   );
 
   if (roster.isError && !data) {
@@ -300,6 +301,7 @@ export function StudentRosterView({
  * say the second thing.
  */
 type RosterSeat = {
+  classId: string;
   key: string;
   membershipId: string;
   displayName: string;

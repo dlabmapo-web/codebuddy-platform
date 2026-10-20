@@ -397,6 +397,7 @@ export const workspaceAccessSchema = z.object({
   canPractice: z.boolean().optional(),
   canSubmit: z.boolean(), canAuthor: z.boolean(), canReview: z.boolean(),
   canViewSolutions: z.boolean(), canObserve: z.boolean(),
+  canObserveAssignedStudents: z.boolean().optional(),
 });
 export type WorkspaceAccess = z.infer<typeof workspaceAccessSchema>;
 

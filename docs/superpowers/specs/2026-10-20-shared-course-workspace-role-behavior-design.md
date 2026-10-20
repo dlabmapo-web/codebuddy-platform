@@ -141,7 +141,7 @@ Personal code and starter code have independent save paths. Opening Edit must
 not copy personal practice code into curriculum. Returning restores the practice
 draft; authoring Save must not replace it.
 
-Observe students is a separate action with its existing class/student selector
+Observe students is a separate action. Teachers open the course-filtered student roster in their assigned active classes, with a live-monitoring link for each student. An unassigned or stale course returns an empty roster. Other staff retain the existing class/student selector
 and assignment checks. A staff personal workspace does not join a student room,
 enable help mode, emit student presence or reuse a student's terminal.
 
@@ -157,7 +157,7 @@ enable help mode, emit student presence or reuse a student's terminal.
 | Edit existing curriculum | No | No; existing draft-authoring workflow remains separate | Existing manage authority | Existing manage authority |
 | Publish / reorder / create / archive | No | Existing limited draft workflow only, no new publish authority | Existing permissions | Existing permissions |
 | Review hidden tests | No | Existing review authority within scope | Existing review authority | Existing review authority |
-| Private reference solutions | Existing student reveal policy only | No new grant | Existing exercise-management authority | Existing exercise-management authority |
+| Private reference solutions | Existing student reveal policy only | Read-only for visible exercises taught through assigned active classes | Existing exercise-management authority | Existing exercise-management authority |
 | Observe/review student work | Own records only | Assigned classes | Existing authorized review scope | Existing authorized review scope |
 | Academy settings / membership administration | No | No | Existing restricted administration | Existing manager authority |
 
@@ -250,7 +250,7 @@ Submit error. Resource/rate limits apply to practice as well as student grading.
 - Turtle practice retains canvas, stop/reset and supported runtime behavior.
 - Preserve current language support, input-prompt policy, grading limits, sample
   checks and multiple private reference solutions. This feature introduces no
-  new execution engine or broader solution visibility.
+  new execution engine. Teachers may explicitly read private reference solutions for visible exercises delivered by their assigned active classes; curriculum editing remains restricted.
 - Starter-code changes never silently overwrite a saved personal draft. Surface
   a revision-change notice and an explicit reset action that requires confirmation
   before discarding unsaved personal work.
@@ -332,3 +332,15 @@ The user approved implementation on 2026-10-20, including Elice-inspired UI with
 Cove colors. Section 6 remains the binding role mapping. The validation report
 records delivered behavior, tests and the existing legacy-version route boundary;
 this is not a claim of full Elice backend parity.
+
+
+## Teacher correction (2026-10-20)
+
+Teachers can explicitly open reference solutions while practicing. Reading a solution
+requires curriculum review permission and rechecks the academy, active teaching
+assignment, and visible material ancestors. It grants no exercise editing authority.
+For members who also hold Teacher, Observe students opens the current course's
+roster across their own assigned classes, including students who have not started.
+Each seat links to the existing authorized live-monitoring page. The course filter
+is applied on server and client reads and survives reload. Unassigned courses
+produce no rows, rather than falling back to all classes.

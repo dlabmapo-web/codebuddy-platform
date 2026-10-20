@@ -1,3 +1,4 @@
+import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -488,7 +489,7 @@ function createExerciseService() {
 }
 
 describe("CourseService direct problem editing", () => {
-  it("reads a solution only through the exercises.manage operation", async () => {
+  it("reads a solution through review permission without granting editing", async () => {
     const { service, access } = createExerciseService();
 
     await expect(
@@ -505,8 +506,28 @@ describe("CourseService direct problem editing", () => {
     expect(access.requirePermission).toHaveBeenCalledWith(
       identity.authUserId,
       academyId,
-      "exercises.manage",
+      "curriculum.review",
     );
+  });
+
+  it("checks teacher assignment and the academy before reading private solutions", async () => {
+    const { service, access, prisma } = createExerciseService();
+    vi.mocked(access.requirePermission).mockResolvedValue({ userId: actorUserId, role: "TEACHER", roles: ["TEACHER"] } as never);
+    await service.getExerciseSolution(identity, { academyId, courseId, lectureId, materialId });
+    expect(prisma.material.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ id: materialId, AND: expect.arrayContaining([
+        { lecture: { courseModule: { course: { id: courseId, academyId } } } },
+        taughtMaterialWhere(academyId, actorUserId),
+        expect.objectContaining({ isVisible: true }),
+      ]) }),
+    }));
+  });
+
+  it("refuses solutions when the scoped material is unavailable", async () => {
+    const { service, prisma } = createExerciseService();
+    vi.mocked(prisma.material.findFirst).mockResolvedValueOnce(null);
+    await expect(service.getExerciseSolution(identity, { academyId, courseId, lectureId, materialId })).rejects.toThrow();
+    expect(prisma.material.findFirst).toHaveBeenCalledTimes(1);
   });
 
   it("changes prompt policy as a new grading revision and audits it", async () => {

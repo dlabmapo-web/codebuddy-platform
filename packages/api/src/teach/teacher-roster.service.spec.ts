@@ -29,6 +29,7 @@ function scopeOf(classes: readonly FakeClass[]) {
       displayName: `학생 ${classIndex}-${index}`,
       classIds: [entry.classId],
     })),
+    courseIds: [uuid(classIndex + 1, "5555")],
     exercises: [{ materialId: uuid(1, "4444"), courseId: uuid(1, "5555") }],
   }));
 
@@ -127,6 +128,20 @@ function build(options: {
 const oneClass = [{ classId: uuid(9), className: "월수 파이썬", students: 3 }];
 
 describe("TeacherRosterService.list", () => {
+  it("limits a course roster to assigned classes delivering that course", async () => {
+    const { service } = build({ classes: [...oneClass, { classId: uuid(10), className: "Other course", students: 2 }] });
+    const roster = await service.list(identity, { academyId, courseId: uuid(1, "5555") });
+    expect(roster.classes).toHaveLength(1);
+    expect(roster.classes[0]!.classId).toBe(oneClass[0]!.classId);
+    expect(roster.classes[0]!.students).toHaveLength(3);
+    expect(roster.classOptions).toHaveLength(1);
+  });
+  it("returns no students for a course outside the teacher's assignments", async () => {
+    const { service } = build({ classes: oneClass });
+    const roster = await service.list(identity, { academyId, courseId: uuid(99, "5555") });
+    expect(roster.classes).toEqual([]);
+    expect(roster.classOptions).toEqual([]);
+  });
   it("survives a board that cannot be read, and says so per class", async () => {
     // §4.5 — a failing aggregate costs the teacher two columns in one class,
     // not the page. Before this, the throw escaped `list` and the roster was

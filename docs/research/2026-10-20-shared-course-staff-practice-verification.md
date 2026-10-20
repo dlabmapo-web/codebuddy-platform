@@ -420,3 +420,14 @@ stored. Screenshot: /tmp/cove-pdf-only-practice-running.png.
 - Validation: 27 web navigation/material route tests; 136 translation tests; web
   TypeScript and scoped ESLint. Console/library route contracts remain covered.
 - Visual evidence: /tmp/cove-unified-course.png.
+
+
+## PDF creation title default — 2026-10-20
+
+The reported disabled action was caused by an empty required title. Selected
+PDF titles now populate an empty new exercise title automatically. Browser
+verification with the user's selected Tarix PDF showed the title populated and
+Create problem enabled without a statement, starter code, solution or test cases.
+The form was left ready; no material was created or published during this check.
+21 targeted web tests, web TypeScript and picker ESLint passed. Screenshot:
+/tmp/cove-pdf-editor-create-enabled.png.

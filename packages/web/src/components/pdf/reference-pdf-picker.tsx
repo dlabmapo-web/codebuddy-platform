@@ -2,16 +2,17 @@
 
 import { FileText } from 'lucide-react';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { orpc } from '@/lib/orpc';
 import { courseTreeQueryKey } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/course-tree';
 import { PdfAuthorDialog } from './pdf-author-dialog';
 
-export function ReferencePdfPicker({ target, value, disabled, onChange }: {
+export function ReferencePdfPicker({ target, value, disabled, onChange, onTitleAvailable }: {
   target: { academyId: string; courseId: string; lectureId: string };
   value?: string | null; disabled: boolean; onChange: (id: string | null) => void;
+  onTitleAvailable?: (title: string) => void;
 }) {
   const { t, i18n } = useTranslation(['content', 'pdf-practice']);
   const [adding, setAdding] = useState(false);
@@ -23,6 +24,9 @@ export function ReferencePdfPicker({ target, value, disabled, onChange }: {
   const documents = materials.filter(m => m.pdfDocument);
   const edit = documents.find(m => m.id === editing);
   const selected = documents.find((material) => material.id === value);
+  useEffect(() => {
+    if (selected?.title) onTitleAvailable?.(selected.title);
+  }, [selected?.title, onTitleAvailable]);
   function fileSize(bytes: number) {
     const format = new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 });
     return bytes < 1024 ? `${format.format(bytes)} B` : bytes < 1024 * 1024 ? `${format.format(bytes / 1024)} KB` : `${format.format(bytes / (1024 * 1024))} MB`;

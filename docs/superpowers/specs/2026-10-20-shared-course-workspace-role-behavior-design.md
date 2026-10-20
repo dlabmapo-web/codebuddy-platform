@@ -549,3 +549,10 @@ The Courses rail stays active on authoring/import routes. Course creation, libra
 adoption, class course links, authoring return and import return all lead back to
 the canonical Courses workspace. Console and platform library editing retain
 their existing route maps.
+
+
+PDF + editor creation now defaults an empty new exercise title to the selected
+PDF title (up to the existing 200-character limit). This works for existing PDFs
+and newly uploaded documents after the course tree refreshes. A custom nonblank
+title and saved exercise titles are preserved. Selecting a PDF alone can enable
+creation with blank instructions, starter code, solutions and test cases.

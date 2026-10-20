@@ -90,7 +90,9 @@ export function ExerciseWorkspace({
               ? { choices: Array.from({ length: 4 }, () => ({ id: crypto.randomUUID(), text: '' })), correctChoiceId: '', explanation: '' }
               : null)} />}
         </div>
-        {!draft.quiz ? <ReferencePdfPicker target={{ academyId, courseId, lectureId }} value={draft.referencePdfMaterialId} disabled={!editable} onChange={id => update("referencePdfMaterialId", id)} /> : null}
+        {!draft.quiz ? <ReferencePdfPicker target={{ academyId, courseId, lectureId }} value={draft.referencePdfMaterialId} disabled={!editable} onChange={id => update("referencePdfMaterialId", id)} onTitleAvailable={title => {
+          if (!initialContext.material && !draft.title.trim()) update("title", title.slice(0, 200));
+        }} /> : null}
         {requireReferencePdf && !draft.referencePdfMaterialId ? <p role="status" className="text-sm text-sub">{t("pdf-practice:required")}</p> : null}
         <BasicInformation
           authoring={authoring}

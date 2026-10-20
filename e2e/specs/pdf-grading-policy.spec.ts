@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
 import { signInAs } from '../support/auth';
+import { routes } from '../../packages/web/src/lib/routes';
 
 test.skip(process.env.E2E_PDF_GRADING !== '1', 'Opt-in local PDF grading fixture');
 if (process.env.E2E_PDF_GRADING === '1' && !['localhost','127.0.0.1'].includes(new URL(process.env.E2E_BASE_URL ?? 'http://localhost:3000').hostname)) throw Error('Local only');
 const academyId='20000000-0000-4000-8000-000000000001', courseId='ee090000-0000-4000-8000-000000000001', lectureId='ee090000-0000-4000-8000-000000000020', materialId='ee090000-0000-4000-8000-000000000030', classId='e0000000-0000-4000-8000-000000000040';
-const root='/academy/development-academy', course=`${root}/learn/courses/${courseId}`, edit=`${root}/content/courses/${courseId}/lectures/${lectureId}/exercises/${materialId}`, learn=`${root}/learn/exercises/${materialId}?classId=${classId}`;
+const slug='development-academy', course=routes.academyLearnCourse(slug, courseId), edit=`${routes.academyCourse(slug, courseId)}/lectures/${lectureId}/exercises/${materialId}`, learn=routes.academyLearnExercise(slug, materialId, {classId});
 async function code(page: Page, value: string) {
   await expect(page.locator('.monaco-editor').first()).toBeVisible({timeout:90000});
   await expect.poll(() => page.evaluate(source => {
@@ -75,7 +76,7 @@ test('PDF practice runs without scores; automatic grading checks hidden cases; t
 
 test('creating PDF practice needs no duplicate statement; automatic setup validates cases and preserves advanced data', async ({page}, info) => {
   test.setTimeout(180000);
-  await signInAs({page,identifier:'teamlead@cove.test',password:'CoveDev123!',initialPath:`${root}/content/courses/${courseId}/lectures/${lectureId}/exercises/new?referencePdf=required`});
+  await signInAs({page,identifier:'teamlead@cove.test',password:'CoveDev123!',initialPath:`${routes.academyCourse(slug, courseId)}/lectures/${lectureId}/exercises/new?referencePdf=required`});
   const create=page.getByRole('button',{name:'Create problem',exact:true});
   await expect(create).toBeDisabled();
   await page.getByRole('button',{name:'Reference PDF',exact:true}).click();
@@ -109,7 +110,7 @@ test('creating PDF practice needs no duplicate statement; automatic setup valida
 
 
 test('teacher can inspect grading practice without authoring controls', async ({page}) => {
-  await signInAs({page,identifier:'teacher@cove.test',password:'CoveDev123!',initialPath:`${root}/learn/exercises/${materialId}`});
+  await signInAs({page,identifier:'teacher@cove.test',password:'CoveDev123!',initialPath:routes.academyLearnExercise(slug, materialId)});
   await expect(page.getByRole('banner').getByText('Staff practice',{exact:true})).toBeVisible();
   await expect(page.getByText('Automatically graded · Up to 100 points',{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:'Edit',exact:true})).toHaveCount(0);

@@ -3,7 +3,6 @@
 import type { AcademyRole } from '@cove/shared';
 import {
   BarChart3,
-  BookOpen,
   BriefcaseBusiness,
   ChevronsUpDown,
   ClipboardList,
@@ -378,7 +377,6 @@ export function studioNavGroups({
   canLearn,
   canManageAcademy,
   canManageClasses,
-  canManageContent,
   canRunMaintenance,
   canReadAcademyMembers,
   canReviewApplications,
@@ -415,6 +413,7 @@ export function studioNavGroups({
         href: `${base}/learn/courses`,
         labelKey: 'link.shared_courses',
         icon: GraduationCap,
+        alsoCurrentOn: [`${base}/content/courses`],
       },
     ];
     // My Courses stays first and stays the landing destination: it is the
@@ -448,15 +447,8 @@ export function studioNavGroups({
     groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });
   }
 
-  if (canManageContent || canRunMaintenance) {
+  if (canRunMaintenance) {
     const content: NavLink[] = [];
-    if (canManageContent) {
-      content.push({
-        href: `${base}/content/courses`,
-        labelKey: 'link.content_management',
-        icon: BookOpen,
-      });
-    }
     // Under Curriculum rather than a group of its own: what it repairs is the
     // damage a curriculum edit does to work already answered, and the person
     // who reaches for it has just come from the course they edited. A group

@@ -42,9 +42,9 @@ export function createContentPaths(
   }
   return surface === 'academy'
     ? {
-        courses: () => routes.academyCourses(academySlug),
+        courses: () => routes.academyLearnCourses(academySlug),
         library: () => routes.academyLibrary(academySlug),
-        course: (courseId) => routes.academyCourse(academySlug, courseId),
+        course: (courseId) => routes.academyLearnCourse(academySlug, courseId),
         classes: () => routes.academyClasses(academySlug),
         class: (classId) => routes.academyClass(academySlug, classId),
         exercise: (courseId, lectureId, materialId) =>

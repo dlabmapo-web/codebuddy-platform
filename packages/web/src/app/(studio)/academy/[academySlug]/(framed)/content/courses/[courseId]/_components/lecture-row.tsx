@@ -8,7 +8,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useContentSurface } from '@/components/studio/content-base-path-provider';
+import { routes } from '@/lib/routes';
+import { useContentAcademySlug, useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useTranslation } from 'react-i18next';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -123,7 +124,9 @@ function ExerciseRow({
 }) {
   const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
   // See `ModuleCard`: the flag is inert in a library academy.
-  const visibilityIsReal = useContentSurface() !== 'library';
+  const surface = useContentSurface();
+  const academySlug = useContentAcademySlug();
+  const visibilityIsReal = surface !== 'library';
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [pdfMode, setPdfMode] = useState<'preview' | 'edit' | null>(null);
@@ -157,6 +160,12 @@ function ExerciseRow({
       0,
     ) > 1;
   const href = exercisePath(lectureId, material.id);
+  const viewHref = surface !== 'academy' ? href
+    : material.type === 'VIDEO_LESSON'
+      ? routes.academyLearnVideo(academySlug, material.id, { preview: true })
+      : isManual
+        ? routes.academyLearnAssessment(academySlug, material.id, material.type, { preview: true })
+        : routes.academyLearnExercise(academySlug, material.id);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
   const materialKind: MaterialCreationKind = material.type === 'PDF_DOCUMENT'
@@ -185,7 +194,9 @@ function ExerciseRow({
         <MaterialIcon aria-hidden className="size-4.5" strokeWidth={1.7} />
       </span>
       <div className="min-w-0 flex-1">
-        {material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        {surface === 'academy' && material.type !== 'PDF_DOCUMENT' ? (
+          <Link className={titleClass} href={viewHref}>{material.title}</Link>
+        ) : material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={`${titleClass} text-brand hover:underline`}
@@ -241,7 +252,7 @@ function ExerciseRow({
           kindLabel={
             material.pdfDocument ? t('pdf.badge') : t('row.kind_exercise')
           }
-          renameLabel={material.pdfDocument ? t('pdf.edit_action') : undefined}
+          renameLabel={material.pdfDocument ? t('pdf.edit_action') : t('row.edit')}
           extraItems={
             material.pdfDocument
               ? [
@@ -266,7 +277,7 @@ function ExerciseRow({
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() =>
-            isManual ? setManualOpen(true) : material.type === 'PDF_DOCUMENT'
+            isManual ? setManualOpen(true) : material.type === 'VIDEO_LESSON' ? setVideoOpen(true) : material.type === 'PDF_DOCUMENT'
               ? setPdfMode('edit')
               : router.push(href)
           }

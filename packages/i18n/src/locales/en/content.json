@@ -1,7 +1,7 @@
 {
   "builder": {
     "fallback_title": "Course builder",
-    "description": "Arrange modules and lectures, add problems, and control what students can see.",
+    "description": "Open lesson materials, read PDFs, and practice in the code editor.",
     "unavailable_title": "This course is not available",
     "unavailable_body": "It belongs to another academy, or your membership cannot open it.",
     "back_to_courses": "Back to courses",
@@ -38,7 +38,7 @@
   },
   "exercise": {
     "add": "Add problem",
-    "back": "Back to course builder",
+    "back": "Back to course",
     "create_title": "Create problem",
     "edit_title": "Problem",
     "read_only": "Read-only review",
@@ -166,7 +166,8 @@
     "state_hidden": "Hidden",
     "state_hidden_by_parent": "Parent hidden",
     "visibility_action": "Show “{{title}}” to students",
-    "drag_handle": "Drag to move"
+    "drag_handle": "Drag to move",
+    "edit": "Edit"
   },
   "visibility_confirm": {
     "title": "Hide this {{kind}}?",

@@ -5,6 +5,8 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
+import { routes } from '@/lib/routes';
+import { useContentAcademySlug } from '@/components/studio/content-base-path-provider';
 import { useState } from 'react';
 
 import {
@@ -12,7 +14,6 @@ import {
   useContentSurface,
 } from '@/components/studio/content-base-path-provider';
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
@@ -34,6 +35,7 @@ export function BuilderHeader({
   // from. Two back arrows forty pixels apart, pointing at different places, is
   // a choice nobody asked to make — so under the console the shell's wins.
   const surface = useContentSurface();
+  const academySlug = useContentAcademySlug();
   const shellOwnsBack = surface === 'console';
   const { t } = useTranslation('content');
   const [hiding, setHiding] = useState(false);
@@ -66,7 +68,7 @@ export function BuilderHeader({
         {canImport ? (
           <Link
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
-            href={`${contentPaths.course(courseId)}/imports/new`}
+            href={surface === 'academy' ? routes.academyCourseImport(academySlug, courseId) : `${contentPaths.course(courseId)}/imports/new`}
           >
             <FileSpreadsheet className="size-4" />
             {t('builder.import_excel')}

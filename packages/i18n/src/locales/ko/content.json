@@ -1,7 +1,7 @@
 {
   "builder": {
     "fallback_title": "과목 빌더",
-    "description": "모듈과 강의를 구성하고 문제를 추가하며 학생에게 보일 내용을 관리하세요.",
+    "description": "학습 자료와 PDF를 열고 코드 에디터에서 연습하세요.",
     "unavailable_title": "이 과목를 이용할 수 없습니다",
     "unavailable_body": "다른 학원의 과목이거나, 현재 소속 권한으로는 열 수 없습니다.",
     "back_to_courses": "과목 목록으로",
@@ -36,7 +36,7 @@
   },
   "exercise": {
     "add": "문제 추가",
-    "back": "과목 빌더로 돌아가기",
+    "back": "코스로 돌아가기",
     "create_title": "문제 만들기",
     "edit_title": "코딩 문제",
     "read_only": "읽기 전용 검토",
@@ -164,7 +164,8 @@
     "state_hidden": "숨김",
     "state_hidden_by_parent": "상위 숨김",
     "visibility_action": "“{{title}}” 학생에게 공개",
-    "drag_handle": "끌어서 옮기기"
+    "drag_handle": "끌어서 옮기기",
+    "edit": "편집"
   },
   "visibility_confirm": {
     "title": "이 {{kind}}을(를) 숨길까요?",

@@ -107,9 +107,11 @@ and [multiple solutions verification](../../research/2026-10-19-multiple-solutio
 - The existing exercise learning route renders a workspace for an authorized
   staff member with no student class context. Remove the authoring redirect only
   after staff mode is supported end to end.
-- Content Management remains an explicit staff destination. Existing authoring
-  URLs remain valid and are the targets of Edit; do not silently redirect existing
-  edit bookmarks into practice.
+- Courses is the single academy course destination. Staff course creation and
+  curriculum management live here; remove the duplicate Content Management rail
+  entry. Legacy content list/detail URLs redirect to Courses. Existing exercise
+  authoring and import URLs remain valid explicit actions; edit bookmarks must
+  continue to open authoring.
 - The common outline offers management actions alongside the normal material
   list when permitted. Read-only users see the same titles, hierarchy and Open
   actions without dead management controls.
@@ -526,3 +528,24 @@ without test cases; Submit stays disabled for PDF practice with no grading cases
 Adding grading cases restores submission. Existing descriptions, solutions and
 other authoring data remain editable. The audit records PDF versus text as the
 instruction source.
+
+
+### Unified Courses workspace follow-up — 2026-10-20
+
+Rechecked Elice course 765886: its lecture list exposes New Lecture/Reorder,
+lecture detail exposes New Material/Edit/publication controls, and a material
+title opens the instruction/editor workspace with a separate Edit action.
+Cove follows that interaction within its existing course hierarchy and blue theme.
+
+Staff Courses list reuses the existing role-gated course manager. Staff course
+detail reuses the curriculum builder, with material titles opening the learning
+workspace instead of authoring. PDFs open a reader preview with a separate Edit
+PDF action. Manual/video materials open their authorized preview workspaces;
+programming opens isolated staff practice. Explicit row Edit opens the existing
+authoring workflow. Students retain their delivery/class/progress outline and
+existing learning routes; no permissions or API authorization are widened.
+
+The Courses rail stays active on authoring/import routes. Course creation, library
+adoption, class course links, authoring return and import return all lead back to
+the canonical Courses workspace. Console and platform library editing retain
+their existing route maps.

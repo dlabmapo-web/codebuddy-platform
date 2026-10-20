@@ -53,7 +53,6 @@ describe('curriculum maintenance in the rail', () => {
     expect(
       curriculumLinks({ canManageContent: true, canRunMaintenance: true }),
     ).toEqual([
-      '/academy/cove-development/content/courses',
       '/academy/cove-development/maintenance',
     ]);
   });
@@ -61,7 +60,7 @@ describe('curriculum maintenance in the rail', () => {
   it('hides it from a teacher, who may read curriculum but not repair it', () => {
     expect(
       curriculumLinks({ canManageContent: true, canRunMaintenance: false }),
-    ).toEqual(['/academy/cove-development/content/courses']);
+    ).toEqual([]);
   });
 
   it('leaves the group out entirely when neither row is held', () => {
@@ -164,4 +163,11 @@ describe("whose Students link a rail draws", () => {
       '/academy/cove-development/invitations',
     ]);
   });
+});
+
+it('keeps Courses active while authoring and removes the duplicate content destination', () => {
+  const groups = studioNavGroups({ ...common, canManageContent: true, canManageAcademy: true, canReadAcademyMembers: true, canReviewApplications: true });
+  const links = groups.flatMap(group => group.items);
+  expect(links.find(link => link.href.endsWith('/learn/courses'))?.alsoCurrentOn).toContain('/academy/cove-development/content/courses');
+  expect(links.some(link => link.href.endsWith('/content/courses'))).toBe(false);
 });

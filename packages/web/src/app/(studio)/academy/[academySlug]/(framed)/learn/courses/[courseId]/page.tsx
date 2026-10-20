@@ -1,3 +1,5 @@
+import { rolesHavePermission } from '@cove/shared';
+import { StaffCoursePage } from '../../../content/courses/[courseId]/_components/staff-course-page';
 import { canManageExercises } from '@/lib/academy-access-state';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -25,6 +27,9 @@ export default async function LearnCoursePage({
   const { academySlug, courseId } = await params;
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const search = await searchParams;
+  if (rolesHavePermission(roles, 'practice.own.create') && single(search.mode) !== 'student') {
+    return <StaffCoursePage params={Promise.resolve({ academySlug, courseId })} />;
+  }
   const requestedClassId = single(search.classId);
   const { t } = await getServerTranslation(['learn']);
   let outline: LearnCourseOutlineResult | null = null;

@@ -8,8 +8,10 @@ describe('content editor paths', () => {
     const console = createContentPaths('mapo-dlab', 'console');
 
     expect(academy.course('course-1')).toBe(
-      '/academy/mapo-dlab/content/courses/course-1',
+      '/academy/mapo-dlab/learn/courses/course-1',
     );
+    expect(academy.courses()).toBe('/academy/mapo-dlab/learn/courses');
+    expect(academy.exercise('course-1', 'lecture-1', 'material-1')).toBe('/academy/mapo-dlab/content/courses/course-1/lectures/lecture-1/exercises/material-1');
     expect(console.course('course-1')).toBe(
       '/admin/academies/mapo-dlab/courses/course-1',
     );

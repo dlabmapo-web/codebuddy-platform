@@ -401,3 +401,22 @@ only. Left the hidden local example PDF instructions practice, material ID
 showed the PDF next to the editor and running print code produced
 PDF practice is running. No written statement, reference answer or tests were
 stored. Screenshot: /tmp/cove-pdf-only-practice-running.png.
+
+
+## Unified Courses workspace — 2026-10-20
+
+- Read-only Elice inspection: course lecture list, CH06 lecture material list, and
+  while practice workspace. Confirmed management alongside materials and explicit
+  Edit after opening the solving workspace. No Elice content was changed.
+- Local manager: Courses list includes New course and library adoption; course
+  includes New material, hierarchy controls and visibility. No duplicate Content
+  management navigation entry.
+- Opened PDF practice exercise from its title: PDF + code editor, Run/Submit,
+  View solution, Tutoring and explicit Edit. Edit opened the existing authoring
+  route; Back to course returned to /learn/courses/[courseId]. No content saved.
+- Opened standalone PDF title from that same course: reader loaded page 1, with
+  a separate Edit PDF action.
+- Legacy /content/courses/[courseId] redirects to the canonical course workspace.
+- Validation: 27 web navigation/material route tests; 136 translation tests; web
+  TypeScript and scoped ESLint. Console/library route contracts remain covered.
+- Visual evidence: /tmp/cove-unified-course.png.

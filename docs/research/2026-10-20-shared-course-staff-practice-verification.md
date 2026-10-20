@@ -360,3 +360,18 @@ blue plus icon and a neutral border/background. Cove blue appears on hover,
 focus and open states. Existing picker tests (2), changed-file ESLint and diff
 checks pass. Browser verification confirmed the compact alignment and opening
 the material picker. Screenshot: /tmp/cove-compact-new-material-button.png.
+
+
+## PDF titles open the reader for staff
+
+Changed PDF title clicks from the metadata form to reading mode and added an
+explicit Open PDF icon for every reviewer. Consolidated preview/edit state to
+prevent stale mode after closing. Editors retain row-menu edit/replace actions
+and an Edit PDF button in the reader; read-only reviewers see only the document.
+The reader header shows the document title/filename and startup loading text.
+
+Validation: 10 web PDF/row interaction tests, 6 PDF API authorization/lifecycle
+tests, 33 role permission tests, web TypeScript, changed-file ESLint and diff
+checks pass. Browser verified Manager title-click reading, both document pages,
+and separate Edit PDF action without saving. Reviewer behavior is covered by
+interaction and permission tests. Screenshot: /tmp/cove-pdf-open-for-staff.png.

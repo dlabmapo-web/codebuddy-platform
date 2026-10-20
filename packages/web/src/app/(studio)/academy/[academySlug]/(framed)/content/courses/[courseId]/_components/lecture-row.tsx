@@ -3,7 +3,7 @@ import { publicConfig } from '@/lib/config';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
 import { PdfAuthorDialog } from '@/components/pdf/pdf-author-dialog';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { Braces, ChevronRight, FileCode2, FileText, ListChecks, PenLine, Sparkles, Turtle, Video } from 'lucide-react';
+import { BookOpen, Braces, ChevronRight, FileCode2, FileText, ListChecks, PenLine, Sparkles, Turtle, Video } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -126,8 +126,7 @@ function ExerciseRow({
   const visibilityIsReal = useContentSurface() !== 'library';
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
-  const [pdfPreview, setPdfPreview] = useState(false);
-  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfMode, setPdfMode] = useState<'preview' | 'edit' | null>(null);
   const [manualOpen,setManualOpen]=useState(false);
   const [videoOpen,setVideoOpen]=useState(false);
   const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE'||material.type==='MULTIPLE_CHOICE';
@@ -189,8 +188,8 @@ function ExerciseRow({
         {material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
-            className={titleClass}
-            onClick={() => setPdfOpen(true)}
+            className={`${titleClass} text-brand hover:underline`}
+            onClick={() => setPdfMode('preview')}
           >
             {material.title}
           </button>
@@ -208,6 +207,7 @@ function ExerciseRow({
         ) : <span className="mt-0.5 block text-xs text-sub">{t(`material-picker:types.${materialKind}.title`)}</span>}
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {material.type === 'PDF_DOCUMENT' ? <button type="button" aria-label={`${t('pdf.open')}: ${material.title}`} title={t('pdf.open')} onClick={() => setPdfMode('preview')} className="grid size-7 place-items-center rounded-md text-brand transition-colors hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand"><BookOpen aria-hidden className="size-4" /></button> : null}
         {visibilityIsReal ? (
           <RowVisibility
             busy={builder.visibilityPending(material.id)}
@@ -248,15 +248,13 @@ function ExerciseRow({
                   {
                     label: t('pdf.preview'),
                     onSelect: () => {
-                      setPdfPreview(true);
-                      setPdfOpen(true);
+                      setPdfMode('preview');
                     },
                   },
                   {
                     label: t('pdf.replace_action'),
                     onSelect: () => {
-                      setPdfPreview(false);
-                      setPdfOpen(true);
+                      setPdfMode('edit');
                     },
                   },
                 ]
@@ -269,7 +267,7 @@ function ExerciseRow({
           // opens the problem instead of editing the row in place.
           onRename={() =>
             isManual ? setManualOpen(true) : material.type === 'PDF_DOCUMENT'
-              ? setPdfOpen(true)
+              ? setPdfMode('edit')
               : router.push(href)
           }
         />
@@ -296,16 +294,15 @@ function ExerciseRow({
       />
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
       {videoOpen?<VideoAuthorDialog target={{...builder.target,lectureId}} material={material} editable={rowEditable} onClose={()=>setVideoOpen(false)} onSaved={builder.refresh}/>:null}
-      {pdfOpen ? (
+      {pdfMode ? (
         <PdfAuthorDialog
           target={{ ...builder.target, lectureId }}
           material={material}
           referringExercises={siblings.filter(row => row.programmingExercise?.referencePdfMaterialId === material.id)}
-          initialPreview={pdfPreview}
+          initialPreview={pdfMode === 'preview'}
           editable={builder.editable}
           onClose={() => {
-            setPdfOpen(false);
-            setPdfPreview(false);
+            setPdfMode(null);
           }}
           onSaved={builder.refresh}
         />

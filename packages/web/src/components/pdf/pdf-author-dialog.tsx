@@ -5,7 +5,7 @@ import type { PdfMetadata, PdfPlacement } from '@cove/shared';
 import { pdfMaxUploadBytes } from '@cove/shared';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
-import { CheckCircle2, FileText, UploadCloud, X } from 'lucide-react';
+import { CheckCircle2, FileText, Pencil, UploadCloud, X } from 'lucide-react';
 import { pdfApi } from '@/lib/pdf-api';
 import { PdfReader } from './pdf-reader';
 function formatPdfFileSize(bytes: number) {
@@ -115,18 +115,17 @@ export function PdfAuthorDialog({
     >
       <ModalContent
         className={preview ? 'max-w-5xl h-[90vh]' : 'max-w-lg'}
-        title={t(material ? 'pdf.edit' : 'pdf.add')}
-        description={t('pdf.description')}
+        title={preview && material ? material.title : t(material ? 'pdf.edit' : 'pdf.add')}
+        description={preview && material ? material.pdfDocument?.originalFilename : t('pdf.description')}
       >
         <button type="button" aria-label={t('pdf.cancel')} onClick={cancel} className="absolute right-4 top-4 grid size-9 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"><X aria-hidden className="size-5" /></button>
         {preview && material ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <button
-              className="self-end px-4 py-2 text-brand"
-              onClick={() => setPreview(false)}
-            >
-              {t('pdf.back')}
-            </button>
+            {editable ? <div className="flex shrink-0 justify-end border-b border-border px-4 py-2">
+              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-brand/20 bg-brand-soft px-3 text-xs font-semibold text-brand hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand" onClick={() => setPreview(false)}>
+                <Pencil aria-hidden className="size-3.5" />{t('pdf.edit_action')}
+              </button>
+            </div> : null}
             <PdfReader
               academyId={target.academyId}
               materialId={material.id}

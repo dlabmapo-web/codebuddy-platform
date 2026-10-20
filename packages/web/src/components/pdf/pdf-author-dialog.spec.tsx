@@ -71,3 +71,18 @@ it('disables file and placement changes in read-only mode', async () => {
   expect(document.querySelector<HTMLButtonElement>('button[aria-label="pdf.placement"]')!.disabled).toBe(true);
   expect(document.querySelector('button[type=submit]')).toBeNull();
 });
+
+
+it.each([true, false])('opens the document directly and exposes editing only when permitted (%s)', async (editable) => {
+  await render({ editable, initialPreview: true, material: { id: 'pdf', title: 'Lesson reference' } });
+  expect(document.querySelector('[role=dialog]')?.textContent).toContain('Lesson reference');
+  expect(document.querySelector('form')).toBeNull();
+  const edit = [...document.querySelectorAll<HTMLButtonElement>('button')].find(node => node.textContent === 'pdf.edit_action');
+  if (editable) {
+    expect(edit).toBeDefined();
+    await act(() => edit!.click());
+    expect(document.querySelector('form')).not.toBeNull();
+  } else {
+    expect(edit).toBeUndefined();
+  }
+});

@@ -496,3 +496,14 @@ answers remain in the rich editor. Simple paragraph HTML opens as editable text
 without changing its stored value until the author edits it. Text input escapes
 HTML and preserves line breaks. Adding/removing/reordering options and preview
 remain available.
+
+
+## Read PDFs directly from content management
+
+Selecting a PDF title opens the reader immediately, including for staff who can
+review but cannot edit. Each PDF row also exposes an Open PDF icon. Editing and
+replacement remain explicit row-menu actions; authorized editors can choose
+Edit PDF from the reader. Reviewers do not see that action. Reader headers show
+the document title and filename, with localized loading feedback during startup.
+The existing curriculum.review permission protects staff preview; learner
+visibility/enrollment checks remain unchanged.

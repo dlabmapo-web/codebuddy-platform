@@ -59,3 +59,11 @@ describe('private staff practice boundaries', () => {
     expect(queue.enqueuePractice).not.toHaveBeenCalled();
   });
 });
+
+
+it('rejects staff grading for practice-only exercises before queueing', async () => {
+  const { service, db, queue } = fixture();
+  db.material.findFirst.mockResolvedValue({ id: materialId, programmingExercise: { submissionPolicy: 'PRACTICE_ONLY' }, lecture: { courseModule: {} } });
+  await expect(service.submit(identity, { academyId, materialId, requestId: materialId, code: 'print(1)' })).rejects.toMatchObject({ code: 'EXERCISE_PRACTICE_ONLY' });
+  expect(queue.enqueuePractice).not.toHaveBeenCalled();
+});

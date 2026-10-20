@@ -662,6 +662,8 @@ export class MonitoringService {
         // answer has exactly one route out of this service, and it is audited.
         programmingExercise: {
           select: {
+            submissionPolicy: true,
+            materialMaximumHundredths: true,
             referencePdfMaterialId: true,
             referencePdf: { include: { asset: true, material: true } },
             quiz: true,
@@ -711,6 +713,8 @@ export class MonitoringService {
         inputFormat: exercise.inputFormat,
         outputFormat: exercise.outputFormat,
         constraints: exercise.constraints,
+        submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
+        maximumPoints: (exercise.materialMaximumHundredths ?? 10000) / 100,
         hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
         referencePdf: referencePdfMetadata(exercise.referencePdf),
         quiz: publicQuiz(exercise.quiz),
@@ -725,7 +729,7 @@ export class MonitoringService {
         // Sample cases only, and hidden ones as a count. The teacher surface
         // reuses the student shape precisely so it cannot become the one place
         // a hidden expectation leaks.
-        sampleTestCases: exercise.testCases
+        sampleTestCases: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases)
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({
             position: testCase.position,
@@ -737,7 +741,7 @@ export class MonitoringService {
           position: hint.position,
           content: hint.content,
         })),
-        hiddenTestCaseCount: exercise.testCases.filter(
+        hiddenTestCaseCount: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases).filter(
           (testCase) => testCase.visibility === "HIDDEN",
         ).length,
       },

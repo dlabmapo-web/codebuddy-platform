@@ -72,6 +72,8 @@ export const contentImportErrorCodes = [
   "solution_invalid",
   "description_format_invalid",
   "boolean_invalid",
+  "submission_policy_invalid",
+  "pdf_reference_not_importable",
   "order_missing",
   "order_invalid",
   "visibility_missing",

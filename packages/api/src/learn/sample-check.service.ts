@@ -88,6 +88,7 @@ export class SampleCheckService {
     });
     const exercise = material?.programmingExercise;
     if (!material || !exercise) throw notFound();
+    if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
 
     // An authorized class context, exactly as Submit requires one. Practice
     // is still work done in a class.

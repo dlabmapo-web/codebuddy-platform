@@ -135,6 +135,7 @@ export function gradingSnapshotFor(
 
   return {
     submission: {
+      submissionPolicy: "AUTOMATIC" as const,
       inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE",
       gradingMode: exercise.gradingMode,
       gradingSemanticVersion: exercise.gradingSemanticVersion,

@@ -65,7 +65,7 @@
       "title": "Problem title",
       "difficulty": "Difficulty",
       "description": "Problem description",
-      "test": "One sample test case",
+      "test": "A valid test case",
       "solution": "Correct answer code"
     },
     "field": {
@@ -91,7 +91,7 @@
     },
     "test": {
       "add": "Add test case",
-      "help": "Choose which test cases students can see as examples and which stay hidden for grading. A problem without test cases can be saved, but students cannot attempt it.",
+      "help": "Add input and expected output for each test. Input can be empty. Public examples support Test run; hidden cases are used only for grading.",
       "label": "Test case {{number}}",
       "input": "Input",
       "expected": "Expected output",
@@ -128,7 +128,7 @@
       "title": "Enter a problem title.",
       "difficulty": "Pick a difficulty.",
       "description": "Write the problem description.",
-      "test": "Add at least one sample test case that students can see.",
+      "test": "Add at least one complete test case.",
       "solution": "Add the correct answer code."
     },
     "location": "Problem location",

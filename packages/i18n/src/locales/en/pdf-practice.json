@@ -28,5 +28,20 @@
   "run_only_help": "Students can run code using the PDF instructions. Add test cases when you want automatic grading and submission.",
   "statement_in_pdf": "Your instructions are in the PDF",
   "statement_in_pdf_help": "Read the reference PDF, then write and run your code in the editor. There are no extra written instructions for this practice.",
-  "open_pdf": "Open reference PDF"
+  "open_pdf": "Open reference PDF",
+  "grading_title": "Grading",
+  "practice_only": "Practice only",
+  "automatic": "Automatic grading",
+  "practice_only_help": "Read the PDF and run code. No submission or score.",
+  "automatic_help": "Submit code and receive a score from your test cases.",
+  "retained_grading": "Future submissions are off. Saved test cases and previous results are kept so you can enable grading later.",
+  "solutions_hints": "Reference solutions and hints (optional)",
+  "advanced_grading": "Advanced grading settings",
+  "advanced_case": "More test settings",
+  "points_summary": "Test points: {{total}} · Maximum score: {{maximum}}",
+  "cap_warning": "Test points exceed the maximum. Scores are capped, so one passing case may already earn full marks.",
+  "ungraded": "Ungraded practice",
+  "ungraded_help": "Read the PDF and run your code. This practice has no submission or score.",
+  "automatically_graded": "Automatically graded · Up to {{maximum}} points",
+  "grading_not_ready": "Grading is not ready. You can still run your code."
 }

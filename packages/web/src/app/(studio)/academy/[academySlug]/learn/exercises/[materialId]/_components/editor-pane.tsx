@@ -33,6 +33,7 @@ export function EditorPane({
   onReset,
   onSubmit,
   canSubmit = true,
+  practiceOnly = false,
   code,
   onCodeChange,
   runner,
@@ -54,6 +55,7 @@ export function EditorPane({
   onReset: () => void;
   onSubmit: () => void;
   canSubmit?: boolean;
+  practiceOnly?: boolean;
   code: string;
   onCodeChange: (value: string) => void;
   /** Lets live collaboration bind to the very model the student is typing in. */
@@ -132,14 +134,14 @@ export function EditorPane({
             activeSample={activeSample}
             onRun={onRun}
             onRunSample={onRunSample}
-            onRunAll={onRunAll}
+            onRunAll={!practiceOnly && sampleTestCases.length > 0 ? onRunAll : undefined}
             onStop={onStop}
             ready={runner.ready && !submission.submitting}
             running={runner.running || testingSamples || Boolean(serverCheck?.active)}
             stopping={Boolean(serverCheck?.stopping)}
-            sampleTestCases={sampleTestCases}
+            sampleTestCases={practiceOnly ? [] : sampleTestCases}
           />
-          <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button>
+          {!practiceOnly ? <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button> : null}
         </div>
 
         <div

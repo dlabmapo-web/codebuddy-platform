@@ -1,3 +1,4 @@
+import { inferSubmissionPolicy, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
@@ -152,6 +153,7 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 }>;
 
 type ExerciseWriteInput = {
+  submissionPolicy?: SubmissionPolicy;
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   academyId: string;
@@ -1206,6 +1208,7 @@ export class CourseService {
               // §9.1 — the same canonical form imported keys use, so a
               // generated workbook round-trips a hand-made problem unchanged.
               externalKey: stableKeyFromUuid(randomUUID()),
+              submissionPolicy: inferSubmissionPolicy(input),
               referencePdfMaterialId: input.referencePdfMaterialId ?? null,
               quiz: input.quiz ?? PrismaValues.DbNull,
               difficulty: input.difficulty,
@@ -1274,10 +1277,12 @@ export class CourseService {
     // or migrated problem may not share with the authoring default.
     assertGradingSupported(input, exercise.timeLimitMs);
     const profileColumns = exerciseProfileColumns(input.grading);
-    const gradingChanged =
+    const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
+    const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
+    const gradingChanged = definitionChanged || submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
@@ -1290,6 +1295,7 @@ export class CourseService {
         },
         data: {
           ...(input.referencePdfMaterialId !== undefined ? { referencePdfMaterialId: input.referencePdfMaterialId } : {}),
+          submissionPolicy,
           quiz: input.quiz ?? PrismaValues.DbNull,
           difficulty: input.difficulty,
           description: input.description,
@@ -1302,13 +1308,13 @@ export class CourseService {
           ...(gradingChanged
             ? {
                 gradingRevision: nextRevision,
-                ...profileColumns,
+                ...(definitionChanged ? { ...profileColumns,
                 // A changed profile is authored now, at the version current
                 // now. An unchanged one keeps the version it was authored at.
                 gradingSemanticVersion: semanticVersionForMode(
                   input.grading.mode,
                   input.grading.inputPromptPolicy,
-                ),
+                ), } : {}),
               }
             : {}),
         },
@@ -1342,7 +1348,10 @@ export class CourseService {
         });
       }
       let progressResetCount = 0;
-      if (gradingChanged) {
+      if (gradingChanged && !definitionChanged) {
+        await tx.studentExerciseProgress.updateMany({ where: { materialId: current.id, gradingRevision: exercise.gradingRevision }, data: { gradingRevision: nextRevision } });
+      }
+      if (definitionChanged) {
         const reset = await tx.studentExerciseProgress.updateMany({
           where: { materialId: current.id },
           data: {
@@ -1778,6 +1787,7 @@ function exerciseAuditFromInput(
   gradingRevision: number,
 ) {
   return {
+    submissionPolicy: inferSubmissionPolicy(input),
     referencePdfMaterialId: input.referencePdfMaterialId,
     instructionSource: input.referencePdfMaterialId ? "PDF" : "TEXT",
     title: input.title.trim(),
@@ -1808,6 +1818,7 @@ function exerciseAuditFromInput(
 function exerciseRecordAudit(record: ExerciseRecord) {
   const exercise = record.programmingExercise!;
   return {
+    submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
     referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     title: record.title,
     difficulty: exercise.difficulty,
@@ -2016,6 +2027,7 @@ function serializeExercise(
   return {
     quiz:
       exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz),
+    submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
     referencePdfMaterialId: exercise.referencePdfMaterialId,
     materialId: exercise.materialId,
     externalKey: exercise.externalKey,

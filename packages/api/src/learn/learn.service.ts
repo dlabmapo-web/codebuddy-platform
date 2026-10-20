@@ -1,3 +1,4 @@
+import { resolveGradingProfile } from "../judge/grading-profile.js";
 import { rolesHavePermission } from "@cove/shared";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
@@ -341,6 +342,9 @@ export class LearnService {
         lecture: { id: material.lecture.id, title: material.lecture.title },
       },
       exercise: {
+        submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
+        submissionAvailability: exercise.submissionPolicy === "PRACTICE_ONLY" ? "PRACTICE_ONLY" : exercise.quiz || (exercise.testCases.length && resolveGradingProfile(exercise, exercise.testCases).kind !== "unsupported") ? "READY" : "INVALID_GRADING",
+        maximumPoints: (exercise.materialMaximumHundredths ?? 10000) / 100,
         hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
         referencePdf: referencePdfMetadata(exercise.referencePdf),
         quiz: publicQuiz(exercise.quiz),
@@ -359,7 +363,7 @@ export class LearnService {
         inputPromptPolicy: exercise.inputPromptPolicy,
         gradingRevision: exercise.gradingRevision,
         serverSampleChecks: sampleChecks?.isEnabled ?? false,
-        sampleTestCases: exercise.testCases
+        sampleTestCases: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases)
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({
             position: testCase.position,
@@ -371,7 +375,7 @@ export class LearnService {
           position: hint.position,
           content: hint.content,
         })),
-        hiddenTestCaseCount: exercise.testCases.filter(
+        hiddenTestCaseCount: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases).filter(
           (testCase) => testCase.visibility === "HIDDEN",
         ).length,
       },

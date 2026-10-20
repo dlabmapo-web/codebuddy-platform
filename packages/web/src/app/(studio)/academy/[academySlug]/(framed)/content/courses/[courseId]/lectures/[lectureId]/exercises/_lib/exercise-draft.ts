@@ -1,3 +1,4 @@
+import { defaultEliceGradingProfile, inferSubmissionPolicy, type SubmissionPolicy } from "@cove/shared";
 
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { exerciseSolutionsSchema } from "@cove/shared";
@@ -5,7 +6,6 @@ import {
   quizDefinitionSchema,
   type QuizDefinition,
   gradingProfileIssues,
-  hasSampleTestCase,
   legacyCaseGrading,
   legacyGradingProfile,
   type CaseComparator,
@@ -59,6 +59,7 @@ export type HintDraft = {
 };
 
 export type ExerciseDraft = {
+  submissionPolicy?: SubmissionPolicy;
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   title: string;
@@ -89,6 +90,7 @@ export function contextToDraft(
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
     return {
+      submissionPolicy: 'AUTOMATIC',
       referencePdfMaterialId: null,
       title: '',
       difficulty: 'EASY',
@@ -107,6 +109,7 @@ export function contextToDraft(
   }
 
   return {
+    submissionPolicy: inferSubmissionPolicy(exercise),
     referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     quiz: exercise.quiz ?? null,
     title: context.material!.title,
@@ -147,8 +150,19 @@ export function contextToDraft(
   };
 }
 
+/** Policy toggles preserve cases; only a fresh empty PDF grader gets enhanced defaults. */
+export function withSubmissionPolicy(draft: ExerciseDraft, submissionPolicy: SubmissionPolicy): ExerciseDraft {
+  const fresh = !draft.testCases.length || draft.testCases.every(test => test.key === 'new-sample' && !test.input && !test.expectedOutput && !test.label);
+  if (submissionPolicy === 'AUTOMATIC' && draft.referencePdfMaterialId && fresh && draft.grading.mode === 'LEGACY_STDIO') {
+    return { ...draft, submissionPolicy, grading: { ...defaultEliceGradingProfile, materialScorePolicy: 'ABSOLUTE_CAP', materialMaximumHundredths: 10000 },
+      testCases: [{ ...newTestCaseDraft('new-sample', 'HIDDEN'), weight: 100 }] };
+  }
+  return { ...draft, submissionPolicy };
+}
+
 export function draftToPayload(draft: ExerciseDraft) {
   return {
+    submissionPolicy: draft.quiz ? "AUTOMATIC" as const : draft.submissionPolicy,
     referencePdfMaterialId: draft.quiz ? null : draft.referencePdfMaterialId,
     ...(draft.quiz ? { quiz: draft.quiz } : {}),
     title: draft.title.trim(),
@@ -162,7 +176,9 @@ export function draftToPayload(draft: ExerciseDraft) {
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
     testCases: (draft.quiz ? [] : draft.testCases)
-      .filter((testCase) => testCase.expectedOutput.trim().length > 0)
+      .filter((testCase) => draft.submissionPolicy === 'AUTOMATIC' || (draft.submissionPolicy === 'PRACTICE_ONLY'
+        ? !(testCase.key === 'new-sample' && !testCase.expectedOutput && !testCase.input && !testCase.label)
+        : testCase.expectedOutput.trim().length > 0))
       .map((testCase) => ({
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
@@ -209,8 +225,8 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
     },
     {
       id: 'test',
-      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : hasSampleTestCase(draft.testCases),
-      optional: true,
+      complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.testCases.length > 0 && draft.testCases.every(test => test.expectedOutput.length > 0 || ['STDOUT_REGEX', 'STDOUT_REGEX_NOMATCH'].includes(test.comparator)),
+      optional: draft.submissionPolicy !== 'AUTOMATIC' || Boolean(draft.quiz),
     },
   ] as const;
 }

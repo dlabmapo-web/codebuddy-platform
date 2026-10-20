@@ -107,6 +107,7 @@ export const plannedProblemSchema = z
     solutions: z.array(z.object({ title: z.string().nullable(), code: z.string() }).strict()),
     solutionChanges: z.object({ added: z.number().int().nonnegative(), changed: z.number().int().nonnegative(), removed: z.number().int().nonnegative(), reordered: z.boolean() }),
     aiFeedbackEnabled: z.boolean(),
+    submissionPolicy: z.enum(["PRACTICE_ONLY", "AUTOMATIC"]).optional(),
     /** Explicit order from the workbook, or null to preserve or append. */
     order: z.number().int().positive().nullable(),
     testCases: z.array(plannedTestCaseSchema),
@@ -211,6 +212,8 @@ export type ExistingProblem = {
    * workbook has no columns for, so the plan refuses to replace them.
    */
   gradingMode?: "LEGACY_STDIO" | "ELICE_STDIO";
+  submissionPolicy?: "PRACTICE_ONLY" | "AUTOMATIC";
+  referencePdfMaterialId?: string | null;
   testCases: Array<{
     position: number;
     input: string;
@@ -1050,9 +1053,12 @@ function planProblem(input: {
 
   // §5.5 — every created or updated problem grades against something, and at
   // least one of those cases is one a student can see worked.
-  if (testCases.length === 0) {
+  const referencePdfMaterialId = current?.problem.referencePdfMaterialId;
+  if (row.referencePdfMaterialId && row.referencePdfMaterialId !== referencePdfMaterialId) issues.push(error("pdf_reference_not_importable", problem.key, "Problems", row.rowNumber));
+  const submissionPolicy = row.submissionPolicy ?? current?.problem.submissionPolicy ?? "AUTOMATIC";
+  if (submissionPolicy === "AUTOMATIC" && testCases.length === 0) {
     issues.push(error("tests_missing", problem.key, "Test Cases", row.rowNumber));
-  } else if (
+  } else if (submissionPolicy === "AUTOMATIC" && !referencePdfMaterialId &&
     !testCases.some(
       (test) =>
         test.visibility === "SAMPLE" && test.expectedOutput.trim().length > 0,
@@ -1087,6 +1093,7 @@ function planProblem(input: {
         ["output_format", row.outputFormat, current.problem.outputFormat],
         ["constraints", row.constraints, current.problem.constraints],
         ["starter_code", row.starterCode, current.problem.starterCode],
+        ["submission_policy", submissionPolicy, current.problem.submissionPolicy ?? "AUTOMATIC"],
         ["solutions", JSON.stringify(solutions), JSON.stringify(currentSolutions)],
         [
           "ai_feedback_enabled",
@@ -1123,10 +1130,10 @@ function planProblem(input: {
   // §11 step 16 — only the grading definition advances the revision. A
   // description edit does not invalidate a verdict; a changed expected output
   // does.
-  const gradingChanged = action === "UPDATE" && testsChanged;
+  const gradingChanged = action === "UPDATE" && (testsChanged || submissionPolicy !== (current?.problem.submissionPolicy ?? "AUTOMATIC"));
 
   if (
-    solutions.length === 0 && (!current || currentSolutions.length > 0 || action === "UPDATE")
+    !referencePdfMaterialId && solutions.length === 0 && (!current || currentSolutions.length > 0 || action === "UPDATE")
   ) {
     issues.push(
       error("solution_code_missing", problem.key, "Problems", row.rowNumber),
@@ -1166,6 +1173,7 @@ function planProblem(input: {
     solutions,
     solutionChanges: solutionChanges(currentSolutions, solutions),
     aiFeedbackEnabled,
+    submissionPolicy,
     order: row.problemOrder,
     testCases,
     hints,

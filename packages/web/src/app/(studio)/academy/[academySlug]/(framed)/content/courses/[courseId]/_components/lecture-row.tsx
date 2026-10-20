@@ -165,7 +165,7 @@ function ExerciseRow({
       ? routes.academyLearnVideo(academySlug, material.id, { preview: true })
       : isManual
         ? routes.academyLearnAssessment(academySlug, material.id, material.type, { preview: true })
-        : routes.academyLearnExercise(academySlug, material.id);
+        : routes.academyLearnExercise(academySlug, material.id, !parentEffectivelyVisible || !material.isVisible ? { preview: true } : undefined);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
   const materialKind: MaterialCreationKind = material.type === 'PDF_DOCUMENT'

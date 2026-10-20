@@ -1,3 +1,4 @@
+import { submissionPolicySchema } from "./course.js";
 import {videoMetadataSchema} from "./video.js";
 import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
@@ -65,6 +66,7 @@ export const learnHintSchema = z.object({
 export type LearnHint = z.infer<typeof learnHintSchema>;
 
 export const learnExerciseSummarySchema = z.object({
+  submissionPolicy: submissionPolicySchema.optional(),
   hasReferencePdf: z.boolean().optional(),
   materialId: z.uuid(),
   title: titleSchema,
@@ -237,6 +239,9 @@ export const learnExerciseRefSchema = z.object({
 export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
+  submissionPolicy: submissionPolicySchema.optional(),
+  submissionAvailability: z.enum(["READY", "PRACTICE_ONLY", "INVALID_GRADING"]).optional(),
+  maximumPoints: z.number().nonnegative().optional(),
   hasReferencePdf: z.boolean().optional(),
   referencePdf: z.object({ materialId: z.uuid(), title: z.string(), revision: z.number().int().positive(), originalFilename: z.string(), pageCount: z.number().int().positive(), byteSize: z.number().int().positive() }).nullable().optional(),
   quiz: publicQuizSchema.nullable().optional(),
@@ -314,6 +319,7 @@ export const navigatorPathSchema = z.object({
 export type NavigatorPath = z.infer<typeof navigatorPathSchema>;
 
 export const navigatorExerciseSchema = z.object({
+  submissionPolicy: submissionPolicySchema.optional(),
   hasReferencePdf: z.boolean().optional(),
   materialId: z.uuid(),
   title: titleSchema,
@@ -590,6 +596,7 @@ export function toNavigatorContext(
           documents: lecture.documents,
           manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
+            submissionPolicy: exercise.submissionPolicy,
             hasReferencePdf: exercise.hasReferencePdf,
             materialId: exercise.materialId,
             title: exercise.title,

@@ -90,6 +90,8 @@ export type NormalizedProblemRow = RowLocation & {
   solutions: ExerciseSolutionEntry[];
   /** Null means the cell was blank: create as false, preserve on update. */
   aiFeedbackEnabled: boolean | null;
+  submissionPolicy?: "PRACTICE_ONLY" | "AUTOMATIC";
+  referencePdfMaterialId?: string;
 };
 
 export type NormalizedTestCaseRow = RowLocation & {
@@ -446,7 +448,7 @@ export function readProblemsSheet(grid: SheetGrid): {
     }
 
     const descriptionCell = get("description");
-    if (isBlankCell(descriptionCell)) {
+    if (isBlankCell(descriptionCell) && isBlankCell(get("reference_pdf_material_id"))) {
       issues.push(
         issue(location, "description_missing", "description", null, problemKey),
       );
@@ -486,8 +488,13 @@ export function readProblemsSheet(grid: SheetGrid): {
       }
     }
 
+    const policyCell = String(get("submission_policy") ?? "").trim();
+    const submissionPolicy = policyCell === "PRACTICE_ONLY" || policyCell === "AUTOMATIC" ? policyCell : undefined;
+    if (policyCell && !submissionPolicy) issues.push(issue(location, "submission_policy_invalid", "submission_policy", policyCell, problemKey));
     rows.push({
       ...location,
+      submissionPolicy,
+      referencePdfMaterialId: String(get("reference_pdf_material_id") ?? "").trim() || undefined,
       problemKey,
       lectureKey,
       problemOrder: readOptionalOrder(

@@ -4,6 +4,7 @@ import { defaultEliceGradingProfile, exerciseDraftFieldsSchema, legacyGradingPro
 
 import {
   contextToDraft,
+  withSubmissionPolicy,
   draftGradingIssues,
   draftToPayload,
   exerciseCompleteness,
@@ -129,7 +130,7 @@ describe('exercise draft helpers', () => {
   });
 
   it('reports the four save requirements', () => {
-    expect(exerciseCompleteness(draft()).every((item) => item.complete)).toBe(
+    expect(exerciseCompleteness(draft({ testCases: draft().testCases.slice(0, 1) })).every((item) => item.complete)).toBe(
       true,
     );
     expect(
@@ -139,7 +140,7 @@ describe('exercise draft helpers', () => {
     ).toBe(false);
   });
 
-  it('needs a sample case, not just any expected output, to be saveable', () => {
+  it('accepts hidden-only cases for automatic grading', () => {
     expect(
       exerciseCompleteness(
         draft({
@@ -154,7 +155,7 @@ describe('exercise draft helpers', () => {
           ],
         }),
       ).find((item) => item.id === 'test')?.complete,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('writes back every grading field it read, so a save never resets them', () => {
@@ -324,4 +325,20 @@ describe('PDF instructions without a duplicate problem statement', () => {
     expect(draftToPayload(draft({ referencePdfMaterialId: pdfId })).solutions).toHaveLength(1);
     expect(exerciseDraftFieldsSchema.safeParse(draftToPayload(draft({ referencePdfMaterialId: pdfId, solutions: [{ title: 'Incomplete answer', code: '' }] }))).success).toBe(false);
   });
+});
+
+
+it('retains weighted settings and cases through practice/automatic toggles', () => {
+  const original = draft({ submissionPolicy: 'AUTOMATIC', referencePdfMaterialId: 'pdf', grading: defaultEliceGradingProfile });
+  const practice = withSubmissionPolicy(original, 'PRACTICE_ONLY');
+  const automatic = withSubmissionPolicy(practice, 'AUTOMATIC');
+  expect(automatic).toEqual(original);
+  expect(draftToPayload(practice).testCases).toHaveLength(2);
+});
+it('starts an empty PDF grader at 100 absolute points with a hidden case', () => {
+  const automatic = withSubmissionPolicy(draft({ referencePdfMaterialId: 'pdf', testCases: [] }), 'AUTOMATIC');
+  expect(automatic.grading).toMatchObject({ mode: 'ELICE_STDIO', materialScorePolicy: 'ABSOLUTE_CAP', materialMaximumHundredths: 10000 });
+  expect(automatic.testCases[0]).toMatchObject({ visibility: 'HIDDEN', weight: 100 });
+  expect(draftToPayload(automatic).testCases).toHaveLength(1);
+  expect(exerciseCompleteness(automatic).find(field => field.id === 'test')).toMatchObject({ optional: false, complete: false });
 });

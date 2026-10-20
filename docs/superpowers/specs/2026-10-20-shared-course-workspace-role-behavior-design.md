@@ -524,8 +524,9 @@ requirements. The shared create/update contract accepts an empty solution list
 only when a PDF is linked, and existing PDF ownership/placement checks still run.
 
 The workspace opens its PDF pane beside the code editor. Run remains available
-without test cases; Submit stays disabled for PDF practice with no grading cases.
-Adding grading cases restores submission. Existing descriptions, solutions and
+without test cases. The explicit Practice only policy hides Submit and Test run;
+Automatic grading enables Submit once valid cases exist. Adding retained cases
+does not implicitly change the selected policy. Existing descriptions, solutions and
 other authoring data remain editable. The audit records PDF versus text as the
 instruction source.
 
@@ -569,5 +570,5 @@ notices remain available below it. Authored statements continue to render normal
 
 [PDF + code grading design](2026-10-20-pdf-code-grading-design.md) specifies an
 explicit Practice only/Automatic grading choice, Elice-style STDIO test controls,
-student messages and compatible server enforcement. It is a proposed follow-up,
-not a claim that those controls have already been implemented.
+student messages and compatible server enforcement. This follow-up is implemented
+and verified locally; see [verification](../../research/2026-10-20-pdf-code-grading-local-verification.md).

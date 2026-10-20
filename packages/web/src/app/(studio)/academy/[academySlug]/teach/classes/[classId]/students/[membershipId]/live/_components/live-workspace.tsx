@@ -17,6 +17,7 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
+import { GradingNotice } from '@/components/pdf/grading-notice';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { useLayoutTranslation } from '@/i18n';
@@ -512,6 +513,8 @@ export function LiveWorkspace({
               // deciding which of them this student needs to hear. A preview
               // renders through exactly the same presentation, because a public
               // statement is a public statement whichever mode fetched it.
+              <>
+              <GradingNotice exercise={shown.exercise} />
               <ExerciseReferencePane key={shown.exercise.materialId} academyId={academyId} exercise={shown.exercise} teacher>
               <ProblemStatement
                 collaborating={live.collaborating}
@@ -519,6 +522,7 @@ export function LiveWorkspace({
                 revealedHints={shown.exercise.hints.length}
               />
               </ExerciseReferencePane>
+              </>
             ) : (
               <div className="px-5 py-6">
                 <h2 className="text-[15px] font-bold">

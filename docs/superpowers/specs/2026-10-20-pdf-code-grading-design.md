@@ -1,7 +1,7 @@
 # PDF + code grading design
 
-Date: 2026-10-20  
-Status: Design specification; implementation is not included in this change.  
+Date: 2026-10-20
+Status: Implemented and verified locally on 2026-10-20. See the [verification record](../../research/2026-10-20-pdf-code-grading-local-verification.md).
 Related: [Shared course workspace and role behavior](2026-10-20-shared-course-workspace-role-behavior-design.md)
 
 ## 1. Outcome
@@ -257,3 +257,12 @@ exercise endpoints:
 Use focused shared-contract, API authorization/judge/migration, UI interaction and
 end-to-end tests for the behaviors above. Reuse the established comparator tests;
 do not reinterpret Elice labels as permission to change historical judge behavior.
+
+
+## Implementation notes
+
+The implemented workbook extension round-trips existing PDF references as
+read-only metadata. Uploading or changing a PDF remains a course-editor action;
+workbooks cannot create/relink PDF assets. Policy-only revisions advance only
+current progress rows, preserving valid results without resurrecting stale ones.
+The development migration and local test evidence are in the verification record.

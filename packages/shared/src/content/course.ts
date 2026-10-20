@@ -23,6 +23,15 @@ export const testCaseVisibilities = ["SAMPLE", "HIDDEN"] as const;
 export const testCaseVisibilitySchema = z.enum(testCaseVisibilities);
 export type TestCaseVisibility = z.infer<typeof testCaseVisibilitySchema>;
 
+export const submissionPolicies = ["PRACTICE_ONLY", "AUTOMATIC"] as const;
+export const submissionPolicySchema = z.enum(submissionPolicies);
+export type SubmissionPolicy = z.infer<typeof submissionPolicySchema>;
+
+/** Old create/import clients infer policy; updates must preserve the stored value. */
+export function inferSubmissionPolicy(value: { submissionPolicy?: SubmissionPolicy; referencePdfMaterialId?: string | null; testCases: readonly unknown[] }): SubmissionPolicy {
+  return value.submissionPolicy ?? (value.referencePdfMaterialId && !value.testCases.length ? "PRACTICE_ONLY" : "AUTOMATIC");
+}
+
 /**
  * The five ways a case's output can be judged.
  *
@@ -178,6 +187,7 @@ export const exerciseHintSchema = z.object({
 });
 
 export const programmingExerciseSchema = z.object({
+  submissionPolicy: submissionPolicySchema.optional(),
   referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
   materialId: z.uuid(),
@@ -653,6 +663,7 @@ export function gradingProfileIssues(input: {
 }
 
 export const exerciseDraftFieldsSchema = z.object({
+  submissionPolicy: submissionPolicySchema.optional(),
   referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
   title: titleSchema,
@@ -709,6 +720,11 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
       message: "Encoded problem data exceed the 20 MB request limit.",
     });
   }
+  if (value.quiz && value.submissionPolicy === "PRACTICE_ONLY") context.addIssue({ code: "custom", path: ["submissionPolicy"], message: "Quizzes require automatic grading." });
+  if (!value.quiz && value.submissionPolicy === "AUTOMATIC") value.testCases.forEach((test, index) => {
+    if ((test.comparator === "STDOUT" || test.comparator === "STDOUT_MATCH") && !test.expectedOutput.trim()) context.addIssue({ code: "custom", path: ["testCases", index, "expectedOutput"], message: "Enter expected output for this test case." });
+  });
+  if (!value.quiz && value.submissionPolicy === "AUTOMATIC" && !value.testCases.length) context.addIssue({ code: "custom", path: ["testCases"], message: "Add at least one test case for automatic grading." });
   if (value.quiz && value.referencePdfMaterialId) {
     context.addIssue({ code: "custom", path: ["referencePdfMaterialId"], message: "PDF references require a Python exercise." });
   }

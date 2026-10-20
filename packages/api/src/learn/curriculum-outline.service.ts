@@ -142,7 +142,7 @@ export class CurriculumOutlineService {
         description: course.description,
       },
       ...(staffPractice ? {} : { manualAssessment: manualGradeSummaryFor(course, statuses) }),
-      progress: countProgress(materialIds, statuses),
+      progress: countProgress(gradedMaterialIds({ ...course, modules }), statuses),
       modules: modules.map((courseModule) => ({
         id: courseModule.id,
         title: courseModule.title,
@@ -198,6 +198,7 @@ export class CurriculumOutlineService {
                     title: material.title,
                     position: material.position,
                     difficulty: material.programmingExercise.difficulty,
+                    submissionPolicy: material.programmingExercise.submissionPolicy ?? "AUTOMATIC",
                     hasReferencePdf: Boolean(material.programmingExercise.referencePdfMaterialId),
                     status: statuses.get(material.id)?.status ?? "NOT_STARTED",
                     bestScore: statuses.get(material.id)?.bestScore ?? 0,
@@ -367,7 +368,7 @@ export function courseSummaryFor(
       ),
     },
     manualAssessment: manualGradeSummaryFor(course, statuses),
-    progress: countProgress(exercises, statuses),
+    progress: countProgress(gradedMaterialIds({ modules }), statuses),
   };
 }
 
@@ -400,6 +401,12 @@ export function exerciseMaterialIds(
       ),
     ),
   );
+}
+
+/** Practice remains navigable but never increases the graded-progress denominator. */
+function gradedMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
+  const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY").map(row => row.id))));
+  return exerciseMaterialIds(course).filter(id => !practice.has(id));
 }
 
 export function countProgress(

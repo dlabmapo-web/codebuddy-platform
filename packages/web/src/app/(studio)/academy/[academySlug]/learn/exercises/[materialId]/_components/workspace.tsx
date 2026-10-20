@@ -1,5 +1,6 @@
 'use client';
 import { isPdfRunOnly } from '@/components/pdf/pdf-practice-mode';
+import { GradingNotice } from '@/components/pdf/grading-notice';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import {VideoResourceLinks} from '@/components/video/video-resource-links';
 
@@ -651,7 +652,8 @@ function ProgrammingWorkspace({
             // the statement against Monaco's intrinsic width.
             style={{ flexBasis: `${statementWidth}%` }}
           >
-            <ExerciseReferencePane key={exercise.materialId} academyId={academyId} exercise={exercise}>
+            <GradingNotice exercise={exercise} />
+          <ExerciseReferencePane key={exercise.materialId} academyId={academyId} exercise={exercise}>
             <ProblemStatement
               collaborating={monitoring.collaborating}
               exercise={exercise}
@@ -718,7 +720,7 @@ function ProgrammingWorkspace({
               onRunSample={(index) => void handleRunSample(index)}
               serverCheck={serverCheck}
               runner={runner}
-              canSubmit={!isPdfRunOnly(exercise)}
+              practiceOnly={isPdfRunOnly(exercise)} canSubmit={!isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"}
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}
               tab={outputTab}

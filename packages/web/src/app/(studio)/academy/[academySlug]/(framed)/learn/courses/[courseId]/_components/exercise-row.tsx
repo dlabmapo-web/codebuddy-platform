@@ -29,7 +29,6 @@ const statusStyles: Record<
 };
 
 export function ExerciseRow({
-  academyId,
   classId,
   exercise,
   label,
@@ -57,7 +56,7 @@ export function ExerciseRow({
           {label}
         </span>
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold transition-colors group-hover:text-brand">
-          {exercise.title}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
+          {exercise.title}{exercise.submissionPolicy === 'PRACTICE_ONLY' ? <span className="ml-2 text-xs font-medium text-brand">{tp('ungraded')}</span> : null}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
         </span>
         <span
           className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold sm:inline ${

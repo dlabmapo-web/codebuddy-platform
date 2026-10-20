@@ -4,6 +4,7 @@ import { caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchem
 /** Internal only: this contains hidden expectations and must never cross an API boundary. */
 export const practiceSnapshotSchema = z.object({
   version: z.literal(1),
+  submissionPolicy: z.literal("AUTOMATIC").default("AUTOMATIC"),
   courseId: z.uuid().optional(),
   gradingRevision: z.number().int(),
   timeLimitMs: z.number().int().positive(),

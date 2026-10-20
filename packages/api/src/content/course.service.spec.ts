@@ -920,3 +920,13 @@ describe("CourseService.setContentVisibility", () => {
     expect(transaction.course.update).not.toHaveBeenCalled();
   });
 });
+
+
+it("policy changes retain solved aggregates and stored semantic versions", async () => {
+  const { service, transaction } = createExerciseService();
+  await service.updateExercise(identity, { ...exerciseInput, submissionPolicy: "PRACTICE_ONLY" });
+  const data = transaction.programmingExercise.updateMany.mock.calls[0]![0].data;
+  expect(data).toMatchObject({ submissionPolicy: "PRACTICE_ONLY", gradingRevision: 2 });
+  expect(data).not.toHaveProperty("gradingSemanticVersion");
+  expect(transaction.studentExerciseProgress.updateMany).toHaveBeenCalledWith({ where: { materialId, gradingRevision: 1 }, data: { gradingRevision: 2 } });
+});

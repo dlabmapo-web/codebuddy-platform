@@ -122,6 +122,7 @@ export class SubmissionService {
           },
         });
         const exercise = material?.programmingExercise;
+        if (exercise?.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
         if (!material || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
           throw new AppException(
             "EXERCISE_NOT_AVAILABLE",

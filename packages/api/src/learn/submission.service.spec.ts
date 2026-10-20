@@ -728,3 +728,11 @@ describe("quiz admission", () => {
     expect(queue.enqueue).not.toHaveBeenCalled();
   });
 });
+
+
+it("rejects practice-only submissions even when hidden tests are retained", async () => {
+  const { service, prisma, queue } = createService({ material: materialWith({ submissionPolicy: "PRACTICE_ONLY", testCases: [{ position: 1, visibility: "HIDDEN", input: "", expectedOutput: "hello", ...legacyCase }] }) });
+  await expect(service.submit(identity, { academyId, classId, materialId, code: 'print("hello")' })).rejects.toMatchObject({ code: "EXERCISE_PRACTICE_ONLY" });
+  expect(prisma.submission.create).not.toHaveBeenCalled();
+  expect(queue.enqueue).not.toHaveBeenCalled();
+});

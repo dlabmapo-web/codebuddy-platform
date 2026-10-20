@@ -25,9 +25,9 @@ vi.mock('./move-anywhere-modal', () => ({ MoveAnywhereModal: () => null }));
 vi.mock('./rename-modal', () => ({ RenameModal: () => null }));
 const roots: Array<ReturnType<typeof createRoot>> = [];
 afterEach(async () => { for (const root of roots.splice(0)) await act(() => root.unmount()); document.body.innerHTML = ''; });
-async function render(editable: boolean, coding = false) {
+async function render(editable: boolean, coding = false, visible = true) {
   const lecture = { id: 'lecture', title: 'Lesson', position: 1, isVisible: true, materials: [{ id: 'pdf', title: 'Reference document', type: 'PDF_DOCUMENT', position: 1, isVisible: true, programmingExercise: null, pdfDocument: { placement: 'BOTH', originalFilename: 'lesson.pdf', byteSize: 880 } }] } as unknown as CourseLecture;
-  if (coding) lecture.materials = [{ id: 'problem', title: 'Coding exercise', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true, programmingExercise: { difficulty: 'EASY' } }] as unknown as CourseLecture['materials'];
+  if (coding) lecture.materials = [{ id: 'problem', title: 'Coding exercise', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: visible, programmingExercise: { difficulty: 'EASY' } }] as unknown as CourseLecture['materials'];
   const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { modules: [{ id: 'module', lectures: [lecture] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false } as unknown as CourseBuilderState;
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host); roots.push(root);
@@ -59,4 +59,9 @@ it('opens the solving workspace from the title and keeps authoring behind Edit',
   const edit = [...host.querySelectorAll('button')].find(button => button.textContent === 'row.edit')!;
   await act(() => edit.click());
   expect(push).toHaveBeenCalledWith('/exercise');
+});
+
+it('opens a newly created hidden exercise in authorized staff preview', async () => {
+  const host = await render(true, true, false);
+  expect(host.querySelector('a')?.getAttribute('href')).toBe('/academy/test-academy/learn/exercises/problem?preview=true');
 });

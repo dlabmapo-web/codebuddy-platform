@@ -63,7 +63,7 @@ export function RunControls({
 
   return (
     <>
-      {onRunAll ? (
+      {onRunAll && sampleTestCases.length > 0 ? (
         <button type="button" disabled={!ready || sampleTestCases.length === 0} onClick={onRunAll} className="inline-flex shrink-0 items-center rounded-md bg-white/10 px-2 py-1 text-[12px] font-semibold text-white disabled:opacity-40">{t('workspace.run_tests')}</button>
       ) : sampleTestCases.length > 0 ? (
         <div className="cove-scroll-x flex min-w-0 flex-1 overflow-x-auto py-1">

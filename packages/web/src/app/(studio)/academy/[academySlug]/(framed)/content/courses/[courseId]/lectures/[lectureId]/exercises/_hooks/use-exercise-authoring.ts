@@ -1,5 +1,7 @@
 'use client';
 
+import { withSubmissionPolicy } from '../_lib/exercise-draft';
+
 import type { ExerciseSolutionEntry } from "@cove/shared";
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
@@ -10,7 +12,6 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 
@@ -48,8 +49,8 @@ export function useExerciseAuthoring({
   const router = useRouter();
   const queryClient = useQueryClient();
   const initialDraft = React.useMemo(
-    () => contextToDraft(initialContext, initialSolutions),
-    [initialContext, initialSolutions],
+    () => { const draft = contextToDraft(initialContext, initialSolutions); return !initialContext.material && requireReferencePdf ? { ...draft, submissionPolicy: "PRACTICE_ONLY" as const } : draft; },
+    [initialContext, initialSolutions, requireReferencePdf],
   );
   const [draft, setDraft] = React.useState(initialDraft);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -144,8 +145,8 @@ export function useExerciseAuthoring({
     value: ExerciseDraft[K],
   ) {
     if (!editable) return;
-    setTouched((current) => new Set(current).add(key));
-    setDraft((current) => ({ ...current, [key]: value }));
+    setTouched((current) => { const next = new Set(current).add(key); if (key === "submissionPolicy") next.add("testCases"); return next; });
+    setDraft((current) => key === "submissionPolicy" ? withSubmissionPolicy(current, value as "PRACTICE_ONLY" | "AUTOMATIC") : ({ ...current, [key]: value }));
   }
 
   /** Errors surface per field, next to the input that needs fixing. */

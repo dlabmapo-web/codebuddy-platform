@@ -86,6 +86,7 @@ export class StaffPracticeService {
       Number(this.config.get("SUBMISSION_RATE_LIMIT") ?? 10), 60_000)) {
       throw new AppException("SUBMISSION_RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
     }
+    if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
     const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
     if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);

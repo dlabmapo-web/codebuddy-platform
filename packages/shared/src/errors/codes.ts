@@ -70,6 +70,7 @@ export const appErrorCodes = [
   "CONTENT_EDIT_CONFLICT",
   "CONTENT_HAS_SUBMISSIONS",
   "EXERCISE_NOT_AVAILABLE",
+  "EXERCISE_PRACTICE_ONLY",
   "CLASS_NOT_FOUND",
   "CLASS_ARCHIVED",
   "CLASS_EDIT_CONFLICT",
@@ -270,6 +271,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
     "This problem changed in another session. Reload it before saving again.",
   CONTENT_HAS_SUBMISSIONS:
     "This content has student submissions. Hide it instead of deleting it.",
+  EXERCISE_PRACTICE_ONLY: "This is ungraded practice. Run your code without submitting.",
   EXERCISE_NOT_AVAILABLE: "This problem is not available.",
   CLASS_NOT_FOUND: "The selected class was not found.",
   CLASS_ARCHIVED: "This class is archived. Restore it before changing it.",

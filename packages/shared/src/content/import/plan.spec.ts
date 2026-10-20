@@ -716,3 +716,18 @@ describe('multiple solutions round trips', () => {
     expect(problem.gradingChanged).toBe(false);
   });
 });
+
+it('round-trips a PDF-only practice policy without inventing statements, tests or solutions', () => {
+  const course = structuredClone(existingCourse);
+  const problem = course.modules[0]!.lectures[0]!.problems[0]!;
+  problem.submissionPolicy = 'PRACTICE_ONLY';
+  problem.referencePdfMaterialId = '90000000-0000-4000-8000-000000000001';
+  problem.description = '';
+  problem.solutions = [];
+  problem.testCases = [];
+  const generated = buildCurrentCourseWorkbook({ course, locale: 'en' });
+  const sheet = (name: string) => generated.sheets.find(entry => entry.name === name)?.rows ?? [];
+  const plan = planContentImport({ course, workbook: readWorkbookRows({ Structure: sheet('Structure'), Problems: sheet('Problems'), Solutions: sheet('Solutions'), 'Test Cases': sheet('Test Cases'), Hints: sheet('Hints') }) });
+  expect(plan.counts.errors).toBe(0);
+  expect(plan.modules[0].lectures[0].problems[0]).toMatchObject({ submissionPolicy: 'PRACTICE_ONLY', action: 'UNCHANGED' });
+});

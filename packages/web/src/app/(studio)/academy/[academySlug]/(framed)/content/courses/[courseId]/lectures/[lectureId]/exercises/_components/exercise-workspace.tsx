@@ -11,6 +11,7 @@ import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { useExerciseAuthoring } from '../_hooks/use-exercise-authoring';
+import { SubmissionPolicyEditor } from './submission-policy-editor';
 import { AnswersEditor } from './answers-editor';
 import { BasicInformation } from './basic-information';
 import { ExerciseActions } from './exercise-actions';
@@ -55,18 +56,6 @@ export function ExerciseWorkspace({
             value={draft.solutions}
           />
         ) : null}
-        <AnswersEditor
-          editable={editable}
-          error={authoring.errorFor('test')}
-          grading={draft.grading}
-          gradingIssues={authoring.gradingIssues}
-          testCases={draft.testCases}
-          update={(testCases) => update('testCases', testCases)}
-          updateGrading={(grading, testCases) => {
-            update('grading', grading);
-            update('testCases', testCases);
-          }}
-        />
         <HintsEditor
           editable={editable}
           hints={draft.hints}
@@ -106,11 +95,24 @@ export function ExerciseWorkspace({
           onChange={(starterCode) => update('starterCode', starterCode)}
           value={draft.starterCode}
         />
-        {draft.referencePdfMaterialId ? <details className="rounded-xl border border-border bg-card p-5">
-          <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:grading_optional')}</summary>
-          <p className="mt-3 text-sm leading-6 text-sub">{t('pdf-practice:run_only_help')}</p>
+        <SubmissionPolicyEditor draft={draft} editable={editable} onChange={policy => update('submissionPolicy', policy)} />
+        {draft.submissionPolicy !== 'PRACTICE_ONLY' ? <div data-testid="grading-cases">        <AnswersEditor
+          editable={editable}
+          error={authoring.errorFor('test')}
+          grading={draft.grading}
+          gradingIssues={authoring.gradingIssues}
+          testCases={draft.testCases}
+          update={(testCases) => update('testCases', testCases)}
+          updateGrading={(grading, testCases) => {
+            update('grading', grading);
+            update('testCases', testCases);
+          }}
+        />
+</div> : null}
+        <details className="rounded-xl border border-border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:solutions_hints')}</summary>
           <div className="mt-4 space-y-5">{assessmentEditors}</div>
-        </details> : assessmentEditors}
+        </details>
         </>}
         <ExerciseActions authoring={authoring} />
       </main>

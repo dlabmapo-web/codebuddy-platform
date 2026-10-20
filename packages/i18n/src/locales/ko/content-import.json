@@ -152,6 +152,8 @@
     "grading_revision_advances": "채점 기준이 바뀌어 기존 제출도 새 테스트로 평가됩니다.",
     "unknown_sheet_ignored": "형식에 없는 시트라 무시됩니다.",
     "unknown_column_ignored": "형식에 없는 열이라 무시됩니다.",
-    "solution_invalid": "정답 코드, 이름, 순서 또는 개수를 확인하세요."
+    "solution_invalid": "정답 코드, 이름, 순서 또는 개수를 확인하세요.",
+    "submission_policy_invalid": "PRACTICE_ONLY 또는 AUTOMATIC을 입력하세요.",
+    "pdf_reference_not_importable": "기존 실습의 PDF 연결은 유지됩니다. PDF는 코스 편집기에서 업로드하거나 변경하세요."
   }
 }

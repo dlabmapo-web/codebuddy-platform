@@ -370,3 +370,9 @@ describe("courseHasNoVisibleContent", () => {
     expect(courseHasNoVisibleContent(course(false, 12))).toBe(false);
   });
 });
+
+
+it('requires tests for explicit automatic grading and retains cases for practice', () => {
+  expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, submissionPolicy: 'AUTOMATIC', testCases: [] }).success).toBe(false);
+  expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, submissionPolicy: 'PRACTICE_ONLY', testCases: [] }).success).toBe(true);
+});

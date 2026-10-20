@@ -229,6 +229,7 @@ export async function copyCourseTree(
             exercise.feedbackPolicy == null
               ? Prisma.DbNull
               : exercise.feedbackPolicy,
+          submissionPolicy: exercise.submissionPolicy ?? (exercise.referencePdfMaterialId && !exercise.testCases.length ? "PRACTICE_ONLY" : "AUTOMATIC"),
           gradingMode: exercise.gradingMode,
           inputPromptPolicy: exercise.inputPromptPolicy,
           gradingSemanticVersion: exercise.gradingSemanticVersion,

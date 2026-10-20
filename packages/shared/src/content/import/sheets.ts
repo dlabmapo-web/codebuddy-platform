@@ -84,6 +84,8 @@ export const problemColumns = [
   "constraints",
   "starter_code",
   "ai_feedback_enabled",
+  "submission_policy",
+  "reference_pdf_material_id",
 ] as const;
 export type ProblemColumn = (typeof problemColumns)[number];
 

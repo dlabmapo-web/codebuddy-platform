@@ -27,5 +27,20 @@
   "run_only_help": "학생은 PDF를 보며 코드를 실행할 수 있습니다. 자동 채점과 제출을 사용하려면 테스트 케이스를 추가하세요.",
   "statement_in_pdf": "학습 안내는 PDF에 있어요",
   "statement_in_pdf_help": "참고 PDF를 읽고 코드 에디터에서 코드를 작성하고 실행하세요. 이 실습에는 별도의 추가 안내문이 없습니다.",
-  "open_pdf": "참고 PDF 열기"
+  "open_pdf": "참고 PDF 열기",
+  "grading_title": "채점",
+  "practice_only": "자유 연습",
+  "automatic": "자동 채점",
+  "practice_only_help": "PDF를 읽고 코드를 실행합니다. 제출이나 점수는 없습니다.",
+  "automatic_help": "테스트 케이스로 제출한 코드를 채점합니다.",
+  "retained_grading": "새로운 제출이 중지됩니다. 테스트 케이스와 이전 결과는 유지되어 나중에 채점을 다시 켤 수 있습니다.",
+  "solutions_hints": "참고 정답과 힌트 (선택)",
+  "advanced_grading": "고급 채점 설정",
+  "advanced_case": "추가 테스트 설정",
+  "points_summary": "테스트 배점: {{total}} · 최고 점수: {{maximum}}",
+  "cap_warning": "테스트 배점 합계가 최고 점수를 초과합니다. 한 케이스만 통과해도 만점이 될 수 있습니다.",
+  "ungraded": "점수 없는 연습",
+  "ungraded_help": "PDF를 읽고 코드를 실행하세요. 이 연습에는 제출이나 점수가 없습니다.",
+  "automatically_graded": "자동 채점 · 최대 {{maximum}}점",
+  "grading_not_ready": "채점 준비 중입니다. 코드는 실행할 수 있습니다."
 }

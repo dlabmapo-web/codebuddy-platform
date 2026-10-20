@@ -158,6 +158,8 @@
     "grading_revision_advances": "Grading changes, so past submissions are measured against the new tests.",
     "unknown_sheet_ignored": "This sheet is not part of the format and is ignored.",
     "unknown_column_ignored": "These columns are not part of the format and are ignored.",
-    "solution_invalid": "Invalid solution code, name, order, or count."
+    "solution_invalid": "Invalid solution code, name, order, or count.",
+    "submission_policy_invalid": "Use PRACTICE_ONLY or AUTOMATIC.",
+    "pdf_reference_not_importable": "PDF links are retained on existing exercises. Upload or change the linked PDF in the course editor."
   }
 }

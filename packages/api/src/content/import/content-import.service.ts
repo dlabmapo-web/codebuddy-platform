@@ -933,6 +933,7 @@ export class ContentImportService {
       constraints: planned.constraints,
       starterCode: planned.starterCode,
       aiFeedbackEnabled: planned.aiFeedbackEnabled,
+      submissionPolicy: planned.submissionPolicy ?? existing?.programmingExercise?.submissionPolicy ?? "AUTOMATIC",
     };
 
     if (!existing) {
@@ -977,6 +978,7 @@ export class ContentImportService {
           title: planned.title,
           externalKey: planned.key,
           difficulty: planned.difficulty,
+          submissionPolicy: exerciseFields.submissionPolicy,
           isVisible: false,
           testCaseCount: planned.testCases.length,
           hintCount: planned.hints.length,
@@ -1006,6 +1008,9 @@ export class ContentImportService {
       },
     });
 
+    if (planned.gradingChanged && !planned.changedFields.includes("test_cases")) {
+      await tx.studentExerciseProgress.updateMany({ where: { materialId: existing.id, gradingRevision: currentExercise!.gradingRevision }, data: { gradingRevision: currentExercise!.gradingRevision + 1 } });
+    }
     await replaceExerciseSolutions(tx, existing.id, planned.solutions);
 
     // A weighted problem's cases carry comparators, weights and limits the
@@ -1013,7 +1018,7 @@ export class ContentImportService {
     // them; when it does not, they are left exactly as they are rather than
     // rewritten from rows that would reset every one to equal, exact output.
     if (currentExercise?.gradingMode === "ELICE_STDIO") {
-      if (planned.gradingChanged) {
+      if (planned.changedFields.includes("test_cases")) {
         throw new AppException(
           "CONTENT_IMPORT_VALIDATION_FAILED",
           HttpStatus.CONFLICT,
@@ -1053,6 +1058,7 @@ export class ContentImportService {
       before: {
         title: existing.title,
         difficulty: currentExercise?.difficulty,
+        submissionPolicy: currentExercise?.submissionPolicy,
         testCaseCount: currentExercise?.testCases.length ?? 0,
         hintCount: currentExercise?.hints.length ?? 0,
         solutionCount: currentExercise?.solutions.length ?? 0,
@@ -1060,6 +1066,7 @@ export class ContentImportService {
       after: {
         title: planned.title,
         difficulty: planned.difficulty,
+        submissionPolicy: exerciseFields.submissionPolicy,
         testCaseCount: planned.testCases.length,
         hintCount: planned.hints.length,
           solutionCount: planned.solutions.length,
@@ -1237,6 +1244,8 @@ function toProjection(course: CourseWithContent): CourseProjection {
               starterCode: exercise.starterCode,
               solutions: privateSolutions(exercise.solutions),
               aiFeedbackEnabled: exercise.aiFeedbackEnabled,
+              referencePdfMaterialId: exercise.referencePdfMaterialId,
+              submissionPolicy: exercise.submissionPolicy,
               gradingMode: exercise.gradingMode,
               testCases: exercise.testCases.map((testCase) => ({
                 position: testCase.position,

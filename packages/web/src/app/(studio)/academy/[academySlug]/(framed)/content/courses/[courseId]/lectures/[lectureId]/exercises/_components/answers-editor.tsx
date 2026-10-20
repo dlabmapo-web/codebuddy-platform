@@ -47,7 +47,7 @@ export function AnswersEditor({
   update: (testCases: TestCaseDraft[]) => void;
   updateGrading: (grading: ExerciseGradingProfile, testCases: TestCaseDraft[]) => void;
 }) {
-  const { t } = useTranslation(['content', 'grading']);
+  const { t } = useTranslation(['content', 'grading', 'pdf-practice']);
   const weighted = grading.mode === 'ELICE_STDIO';
 
   return (
@@ -58,7 +58,7 @@ export function AnswersEditor({
             className={`${secondaryButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
             disabled={testCases.length >= MAX_TEST_CASES}
             onClick={() =>
-              update([...testCases, newTestCaseDraft(newClientKey(), 'HIDDEN')])
+              update([...testCases, { ...newTestCaseDraft(newClientKey(), 'HIDDEN'), weight: weighted ? 100 : 1 }])
             }
             type="button"
           >
@@ -71,6 +71,8 @@ export function AnswersEditor({
       icon={ListChecks}
       title={t('exercise.section.tests')}
     >
+      {weighted ? <div className="space-y-2 text-sm"><p className="font-semibold">{t('pdf-practice:points_summary', { total: testCases.reduce((sum, test) => sum + test.weight, 0), maximum: (grading.materialMaximumHundredths ?? 10000) / 100 })}</p>{grading.materialScorePolicy === 'ABSOLUTE_CAP' && testCases.reduce((sum, test) => sum + test.weight, 0) > (grading.materialMaximumHundredths ?? 10000) / 100 ? <p className="rounded-lg bg-warning/10 p-3 text-warning">{t('pdf-practice:cap_warning')}</p> : null}</div> : null}
+      <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:advanced_grading')}</summary><div className="mt-3">
       <GradingSettings
         editable={editable}
         grading={grading}
@@ -78,6 +80,7 @@ export function AnswersEditor({
         onChange={updateGrading}
         testCases={testCases}
       />
+      </div></details>
 
       {error ? (
         <p className="rounded-lg bg-danger/5 px-3.5 py-2.5 text-[13.5px] font-semibold text-danger">
@@ -222,7 +225,7 @@ function CaseGrading({
   testCase: TestCaseDraft;
   onChange: (testCase: TestCaseDraft) => void;
 }) {
-  const { t } = useTranslation(['content', 'grading']);
+  const { t } = useTranslation(['content', 'grading', 'pdf-practice']);
   const seconds = (ms: number | null) => ms === null ? null : ms / 1000;
   const milliseconds = (value: number | null) => value === null ? null : Math.round(value * 1000);
   const usesPattern =
@@ -240,9 +243,10 @@ function CaseGrading({
         />
         <NumberField
           label={t('grading:exercise.grading.points')} disabled={!editable}
-          min={0} max={10000} unit={t('grading:exercise.controls.points')}
+          min={1} max={10000} unit={t('grading:exercise.controls.points')}
           value={testCase.weight} onChange={(weight) => onChange({ ...testCase, weight: weight ?? Number.NaN })}
         />
+        <details className="lg:col-span-3"><summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:advanced_case')}</summary><div className="mt-3 space-y-3">
         <Field label={t('grading:exercise.grading.case_label')}>
           <input
             className={inputClass}
@@ -252,7 +256,6 @@ function CaseGrading({
             value={testCase.label}
           />
         </Field>
-      </div>
       <div className="grid gap-3 lg:grid-cols-3">
         <NumberField
           label={t('grading:exercise.grading.time_limit')} disabled={!editable}
@@ -273,6 +276,8 @@ function CaseGrading({
           value={testCase.softPenalty}
           onChange={(softPenalty) => onChange({ ...testCase, softPenalty })}
         />
+      </div>
+        </div></details>
       </div>
       {usesPattern ? (
         <p className="text-[13px] leading-[1.5] text-sub">

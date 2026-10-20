@@ -8,6 +8,7 @@ import { Code2, LogOut, Maximize2, Pencil, History, ClipboardList } from 'lucide
 import { workspaceMaterialSequence, type LearnExerciseBootstrap } from '@cove/shared';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
+import { GradingNotice } from '@/components/pdf/grading-notice';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
@@ -159,6 +160,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </div>
       </main> : <div ref={containerRef} className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <section className={`@container min-w-0 overflow-y-auto bg-card md:block md:flex-none ${mobile === 'problem' ? 'flex-1' : 'hidden'}`} style={{ flexBasis: `${size}%` }}>
+          <GradingNotice exercise={exercise} />
           <ExerciseReferencePane key={exercise.materialId} academyId={academyId} exercise={exercise} teacher preview={preview}>
             <ProblemStatement exercise={exercise} revealedHints={hints} onRevealHint={() => setHints((count) => Math.min(count + 1, exercise.hints.length))} />
           </ExerciseReferencePane>
@@ -168,7 +170,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
           <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
             onReset={() => { if (draft.code !== exercise.starterCode && window.confirm(t('reset_confirm'))) { draft.resetTo(exercise.starterCode); runner.clear(); submission.reset(); } }}
-            onSubmit={submit} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise)} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
+            onSubmit={submit} practiceOnly={isPdfRunOnly(exercise)} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
             onRunSample={(index) => { void runSample(index); }} onRunAll={() => { void runAll(); }}
             onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} /></div>
           {selectedStudent ? <StaffStudentPane key={`${selectedStudent.classId}:${selectedStudent.membershipId}`} academyId={academyId} materialId={exercise.materialId} userId={userId} starterCode={exercise.starterCode} student={selectedStudent} beforeChangeRef={beforeStudentChange} close={() => selectStudent(null)} /> : null}

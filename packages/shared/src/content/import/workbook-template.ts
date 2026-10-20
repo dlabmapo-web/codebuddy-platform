@@ -265,6 +265,8 @@ export function buildCurrentCourseWorkbook(input: {
           problem.constraints,
           problem.starterCode,
           problem.aiFeedbackEnabled ? "TRUE" : "FALSE",
+          problem.submissionPolicy ?? "AUTOMATIC",
+          problem.referencePdfMaterialId ?? "",
         ]);
 
         problem.solutions.forEach((solution, index) => solutions.push([problem.key, String(index + 1), solution.title ?? "", solution.code]));

@@ -413,3 +413,14 @@ Authoring-only guidance is omitted during read-only review. Editable forms use
 ChoiceSelector, preserving disabled Main-only PDF options and showing document
 metadata within menu rows. View solution and Review details include consistent
 16px icons and aligned toolbar targets.
+
+
+## PDF toolbar consistency (2026-10-20)
+
+PDF page controls, number inputs, zoom controls, fit modes and document actions
+share a 36px control height inside equal-height 42px groups. Page navigation,
+zoom, fit modes, and download/fullscreen have distinct group boundaries.
+Cove blue accents identify actionable controls; the active fit mode is filled
+blue and inactive fit modes remain neutral. Percentage is contained in its
+number field. Focus rings, disabled boundary states and icon tooltips clarify
+interaction. Groups wrap as units when the reader pane is narrow.

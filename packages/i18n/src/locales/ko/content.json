@@ -299,7 +299,8 @@
     "replace_action": "PDF 교체",
     "replacement_notice": "학생은 다음에 자료를 열 때 교체된 PDF를 보게 됩니다.",
     "invalid_page": "1부터 {{total}}까지의 페이지를 입력하세요.",
-    "document_count_other": "PDF {{count}}개"
+    "document_count_other": "PDF {{count}}개",
+    "controls": "PDF 보기 도구"
   },
   "video": {
     "add": "동영상 수업 추가",

@@ -8,6 +8,8 @@ import {
   Maximize,
   Minus,
   Plus,
+  MoveHorizontal,
+  Scan,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -23,7 +25,10 @@ const options = {
   stopAtErrors: true,
 };
 const button =
-  'grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-card text-ink hover:bg-canvas disabled:opacity-40';
+  'grid size-9 shrink-0 place-items-center rounded-md text-brand transition-colors hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:text-sub/35 disabled:hover:bg-transparent';
+const group = 'flex h-[42px] shrink-0 items-center gap-0.5 rounded-lg border border-border bg-card p-0.5 shadow-sm';
+const numberInput = 'h-9 rounded-md border border-brand/15 bg-brand-soft/50 text-center text-[13px] font-semibold tabular-nums text-brand outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+const fitButton = 'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
 export function PdfCanvas({
   academyId,
   materialId,
@@ -138,97 +143,58 @@ export function PdfCanvas({
       }
       data-testid="pdf-reader"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card p-2">
-        <div className="flex flex-wrap items-center gap-1">
-          <button
-            className={button}
-            aria-label={t('pdf.previous_page')}
-            disabled={page <= 1}
-            onClick={() => setPage((n) => n - 1)}
-          >
-            <ChevronLeft className="size-4" />
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-canvas/80 px-3 py-2.5" role="group" aria-label={t('pdf.controls')}>
+        <div className={group}>
+          <button type="button" className={button} title={t('pdf.previous_page')} aria-label={t('pdf.previous_page')}
+            disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
+            <ChevronLeft aria-hidden className="size-4" />
           </button>
-          <label className="flex items-center gap-1 text-sm">
+          <label className="flex h-9 items-center gap-1.5 pr-1 text-xs tabular-nums text-sub">
             <span className="sr-only">{t('pdf.page')}</span>
-            <input
-              aria-label={t('pdf.page')}
-              className="w-14 rounded border border-border bg-card p-1 text-center"
-              type="number"
-              min={1}
-              max={data.pdf.pageCount}
-              value={page}
+            <input aria-label={t('pdf.page')} className={`${numberInput} w-11`} type="number" min={1} max={data.pdf.pageCount} value={page}
               onChange={(e) => {
                 const n = Number(e.target.value);
                 if (n >= 1 && n <= data.pdf.pageCount && Number.isInteger(n)) {
-                  setPage(n);
-                  setInputError(false);
+                  setPage(n); setInputError(false);
                 } else setInputError(true);
-              }}
-            />
-            <span>/ {data.pdf.pageCount}</span>
+              }} />
+            <span className="whitespace-nowrap">/ {data.pdf.pageCount}</span>
           </label>
-          <button
-            className={button}
-            aria-label={t('pdf.next_page')}
-            disabled={page >= data.pdf.pageCount}
-            onClick={() => setPage((n) => n + 1)}
-          >
-            <ChevronRight className="size-4" />
+          <button type="button" className={button} title={t('pdf.next_page')} aria-label={t('pdf.next_page')}
+            disabled={page >= data.pdf.pageCount} onClick={() => setPage((n) => n + 1)}>
+            <ChevronRight aria-hidden className="size-4" />
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <button
-            className={button}
-            aria-label={t('pdf.zoom_out')}
-            onClick={() => changeZoom(shownZoom - 25)}
-          >
-            <Minus className="size-4" />
+        <div className={group}>
+          <button type="button" className={button} title={t('pdf.zoom_out')} aria-label={t('pdf.zoom_out')}
+            disabled={shownZoom <= 25} onClick={() => changeZoom(shownZoom - 25)}>
+            <Minus aria-hidden className="size-4" />
           </button>
-          <input
-            aria-label={t('pdf.zoom')}
-            className="w-16 rounded border border-border bg-card p-1 text-center text-sm"
-            type="number"
-            min={25}
-            max={300}
-            value={shownZoom}
-            onChange={(e) => changeZoom(Number(e.target.value))}
-          />
-          <span className="text-sm">%</span>
-          <button
-            className={button}
-            aria-label={t('pdf.zoom_in')}
-            onClick={() => changeZoom(shownZoom + 25)}
-          >
-            <Plus className="size-4" />
+          <label className="relative flex h-9 items-center">
+            <input aria-label={t('pdf.zoom')} className={`${numberInput} w-[66px] pr-4`} type="number" min={25} max={300} value={shownZoom}
+              onChange={(e) => changeZoom(Number(e.target.value))} />
+            <span aria-hidden className="pointer-events-none absolute right-2 text-[11px] font-medium text-brand/70">%</span>
+          </label>
+          <button type="button" className={button} title={t('pdf.zoom_in')} aria-label={t('pdf.zoom_in')}
+            disabled={shownZoom >= 300} onClick={() => changeZoom(shownZoom + 25)}>
+            <Plus aria-hidden className="size-4" />
           </button>
-          <button
-            className="rounded border border-border px-2 py-1 text-xs"
-            aria-pressed={fit === 'width'}
-            onClick={() => setFit('width')}
-          >
-            {t('pdf.fit_width')}
+        </div>
+        <div className={group}>
+          <button type="button" className={`${fitButton} ${fit === 'width' ? 'bg-brand text-on-brand shadow-sm' : 'text-sub hover:bg-brand-soft hover:text-brand'}`}
+            aria-pressed={fit === 'width'} onClick={() => setFit('width')}>
+            <MoveHorizontal aria-hidden className="size-3.5" />{t('pdf.fit_width')}
           </button>
-          <button
-            className="rounded border border-border px-2 py-1 text-xs"
-            aria-pressed={fit === 'page'}
-            onClick={() => setFit('page')}
-          >
-            {t('pdf.fit_page')}
+          <button type="button" className={`${fitButton} ${fit === 'page' ? 'bg-brand text-on-brand shadow-sm' : 'text-sub hover:bg-brand-soft hover:text-brand'}`}
+            aria-pressed={fit === 'page'} onClick={() => setFit('page')}>
+            <Scan aria-hidden className="size-3.5" />{t('pdf.fit_page')}
           </button>
-          <button
-            className={button}
-            aria-label={t('pdf.download')}
-            onClick={() => void download()}
-          >
-            <Download className="size-4" />
-          </button>
-          <button
-            className={button}
-            aria-label={t('pdf.fullscreen')}
-            onClick={() => void fullscreen()}
-          >
-            <Maximize className="size-4" />
-          </button>
+        </div>
+        <div className={`${group} ml-auto`}>
+          <button type="button" className={`${button} bg-brand-soft hover:bg-brand/15`} title={t('pdf.download')} aria-label={t('pdf.download')}
+            onClick={() => void download()}><Download aria-hidden className="size-4" /></button>
+          <button type="button" className={button} title={t('pdf.fullscreen')} aria-label={t('pdf.fullscreen')}
+            onClick={() => void fullscreen()}><Maximize aria-hidden className="size-4" /></button>
         </div>
       </div>
       {inputError ? (

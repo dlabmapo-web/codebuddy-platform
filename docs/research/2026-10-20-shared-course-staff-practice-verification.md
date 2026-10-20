@@ -260,3 +260,16 @@ and changed-file ESLint pass. Browser verification confirmed the review
 summary, return to the personal workspace, and the new toolbar icons.
 Screenshots: `/tmp/cove-review-pdf-summary.png` and
 `/tmp/cove-problem-toolbar-icons.png`. No migration is required.
+
+
+## Consistent PDF toolbar
+
+Standardized controls to 36px within 42px groups for pages, zoom, fit modes and
+document actions. Added Cove blue states, active fit highlighting, equal-size
+fit buttons with icons, contained percentage field, focus/hover styling and
+disabled zoom-boundary controls. Groups wrap together in narrow panes.
+
+Four reference-pane tests, 134 translation tests, web TypeScript and changed-file
+ESLint pass. Browser verification confirmed equal group heights and active fit
+mode styling in the running PDF workspace. Screenshot:
+`/tmp/cove-pdf-toolbar-refined.png`. No migration is required.

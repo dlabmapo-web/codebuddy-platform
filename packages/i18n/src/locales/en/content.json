@@ -303,7 +303,8 @@
     "replacement_notice": "Students see replacements on their next load.",
     "invalid_page": "Enter a page between 1 and {{total}}.",
     "document_count_other": "{{count}} PDFs",
-    "document_count_one": "{{count}} PDF"
+    "document_count_one": "{{count}} PDF",
+    "controls": "PDF controls"
   },
   "video": {
     "add": "Add video lesson",

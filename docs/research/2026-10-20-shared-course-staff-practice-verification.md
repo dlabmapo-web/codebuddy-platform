@@ -232,3 +232,17 @@ ESLint pass. Browser checks confirmed both views, keyboard switching and PDF
 page 2 retained after visiting the statement. Screenshots:
 `/tmp/cove-material-switch-pdf.png` and
 `/tmp/cove-material-switch-statement.png`. No migration is required.
+
+
+## Tutoring dropdown UI refinement
+
+Replaced the native filter and class dropdowns with a reusable ChoiceSelector
+using existing Studio dropdown/radio-menu primitives. The menu matches its
+trigger width, highlights selection in Cove colors, adds a check and rotates
+the chevron while open. Fullscreen portal support is optional and leaves all
+existing menu call sites compatible.
+
+Nine focused tutoring/filter tests, web TypeScript and changed-file ESLint pass.
+Browser verification confirmed the custom menu, Submitted filtering to one
+fixture student, keyboard opening/selection, and focus restoration. Existing
+filter semantics are retained. Screenshot: `/tmp/cove-tutoring-choice-selector.png`.

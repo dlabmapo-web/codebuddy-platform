@@ -391,3 +391,14 @@ preserving reader page and statement scroll/state. Only the active statement
 exposes collaboration geometry. Arrow keys, Home/End, one tab stop and focus
 styles support keyboard access. An unavailable PDF offers a direct statement
 action. The editor and runtime remain independent of switching.
+
+
+## Tutoring choice selector refinement (2026-10-20)
+
+Tutoring filters and class selection use a reusable ChoiceSelector built from
+the Studio's existing dropdown/radio-menu primitives. Short fixed choices open
+in a trigger-width menu with generous rows, Cove selected-state colors, a check
+indicator, open-state chevron and keyboard/typeahead support. Native OS select
+menus are removed from the drawer. Fullscreen menus portal into the fullscreen
+element. Existing filter choices and authorization are unchanged. Longer
+searchable selectors elsewhere continue using ResponsiveSelector.

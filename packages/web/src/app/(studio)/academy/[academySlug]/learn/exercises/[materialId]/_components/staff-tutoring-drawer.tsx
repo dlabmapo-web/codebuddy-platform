@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, Users, X } from 'lucide-react';
 import type { MonitoringRosterStudent, TeacherProblemStudentRow } from '@cove/shared';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/studio/primitives';
+import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useClassPresence } from '@/lib/monitoring/use-class-presence';
 import { mergeRoster } from '@/lib/monitoring/roster';
@@ -44,9 +45,9 @@ export function StaffTutoringDrawer(props: Props) {
     <SheetContent className="w-[420px] max-w-[100vw] border-r border-border bg-card" portalContainer={container} title={t('tutoring')}>
       <div className="flex items-center justify-between px-5 py-5"><h2 className="text-xl font-bold">{t('tutoring')}</h2><button type="button" onClick={() => setOpen(false)} aria-label={t('close')} className="rounded-lg p-2 text-sub hover:bg-canvas"><X className="size-5" /></button></div>
       <div className="space-y-3 border-b border-border px-5 pb-5">
-        <select aria-label={t('tutoring_filter')} value={filter} onChange={(event) => setFilter(event.target.value as TutoringFilter)} className="h-11 w-full rounded-lg border border-brand/40 bg-canvas px-3 text-sm focus:ring-2 focus:ring-brand/30">
-          {(['all', 'online', 'submitted', 'not-submitted'] as const).map((value) => <option key={value} value={value}>{t(`tutoring_filters.${value}`)}</option>)}
-        </select>
+        <ChoiceSelector label={t('tutoring_filter')} selectedId={filter}
+          list={(['all', 'online', 'submitted', 'not-submitted'] as const).map((id) => ({ id, name: t(`tutoring_filters.${id}`) }))}
+          onSelect={(item) => setFilter(item.id)} />
         <label className="flex items-center gap-2 rounded-lg border border-border bg-canvas px-3"><Search aria-hidden className="size-5 text-sub" /><input aria-label={t('tutoring_search')} placeholder={t('tutoring_search')} value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
       </div>
       {failed ? <p role="alert" className="px-5 py-3 text-sm text-danger">{t('tutoring_switch_failed')}</p> : null}
@@ -65,7 +66,9 @@ function TutoringClasses(props: Props & { search: string; filter: TutoringFilter
   const classes = query.data.classes;
   return <>
     <div className="flex items-center justify-between gap-3 px-5 py-4"><span className="text-sm font-semibold text-sub">{t('tutoring_count', { count: classes.reduce((count, entry) => count + entry.students.length, 0) })}</span>
-      {classes.length > 1 ? <select aria-label={t('tutoring_class')} className="min-w-0 max-w-48 rounded border border-border bg-card px-2 py-1 text-xs" value={props.classId} onChange={(event) => props.changeClass(event.target.value)}><option value="all">{t('tutoring_all_classes')}</option>{classes.map((entry) => <option key={entry.classId} value={entry.classId}>{entry.name}</option>)}</select> : null}
+      {classes.length > 1 ? <ChoiceSelector label={t('tutoring_class')} className="h-8 max-w-48 bg-card text-xs" selectedId={props.classId}
+        list={[{ id: 'all', name: t('tutoring_all_classes') }, ...classes.map((entry) => ({ id: entry.classId, name: entry.name }))]}
+        onSelect={(item) => props.changeClass(item.id)} /> : null}
     </div>
     {query.data.truncated ? <p className="px-5 pb-3 text-sm text-warning">{t('observe_truncated')}</p> : null}
     {classes.length ? classes.filter((entry) => props.classId === 'all' || entry.classId === props.classId).map((entry) => <TutoringClass key={entry.classId} {...props} classId={entry.classId} className={entry.name} />) : <p className="px-5 text-sm text-sub">{t('observe_no_classes')}</p>}

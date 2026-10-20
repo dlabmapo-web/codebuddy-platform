@@ -169,10 +169,11 @@ const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  portalContainer,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & { portalContainer?: HTMLElement | null }) {
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={portalContainer}>
       <DropdownMenuPrimitive.Content
         className={cn(
           'cove-pop z-50 min-w-[10rem] overflow-hidden rounded-card border border-border bg-card p-1 shadow-lg',

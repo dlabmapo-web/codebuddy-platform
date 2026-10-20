@@ -20,5 +20,6 @@
   "in_use": "Used by coding exercises — change or detach their reference PDF first:",
   "page_count_one": "{{count}} page",
   "page_count_other": "{{count}} pages",
-  "open_statement": "Open problem statement"
+  "open_statement": "Open problem statement",
+  "loading": "Loading PDF details…"
 }

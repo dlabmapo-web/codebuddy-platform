@@ -246,3 +246,17 @@ Nine focused tutoring/filter tests, web TypeScript and changed-file ESLint pass.
 Browser verification confirmed the custom menu, Submitted filtering to one
 fixture student, keyboard opening/selection, and focus restoration. Existing
 filter semantics are retained. Screenshot: `/tmp/cove-tutoring-choice-selector.png`.
+
+
+## Read-only review and toolbar cleanup
+
+Read-only question type and PDF reference controls now render clear summaries.
+PDF filename and size are separate from its title; the fixture's size is shown
+as 880 B rather than 0.00 MB. Authoring uses ChoiceSelector with disabled
+Main-only documents preserved. View solution and Review details have icons.
+
+Eight focused workspace/dialog tests, 134 translation tests, web TypeScript
+and changed-file ESLint pass. Browser verification confirmed the review
+summary, return to the personal workspace, and the new toolbar icons.
+Screenshots: `/tmp/cove-review-pdf-summary.png` and
+`/tmp/cove-problem-toolbar-icons.png`. No migration is required.

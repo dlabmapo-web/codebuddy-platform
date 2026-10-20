@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { CircleCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalContent, ModalTrigger } from '@/components/studio/primitives';
@@ -13,13 +14,13 @@ type Context = {
   materialId: string;
   userId: string;
 };
-const actionClass = 'rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+const actionClass = 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
 
 export function StaffSolutionDialog(props: Context & { lectureId: string }) {
   const { t } = useTranslation('practice');
   const { open, setOpen, portalContainer } = useWorkspaceDialog();
   return <Modal open={open} onOpenChange={setOpen}>
-    <ModalTrigger className={actionClass} type="button">{t('solutions')}</ModalTrigger>
+    <ModalTrigger className={actionClass} type="button"><CircleCheck aria-hidden className="size-4 shrink-0" />{t('solutions')}</ModalTrigger>
     <ModalContent title={t('solutions')} description={t('solution_description')} className="max-w-4xl" portalContainer={portalContainer}>
       <div className="min-h-0 flex-1 overflow-y-auto p-6">{open ? <SolutionContents {...props} /> : null}</div>
       <DialogFooter close={() => setOpen(false)} />

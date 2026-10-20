@@ -7,14 +7,15 @@ import type { SelectorItem } from './selector';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './overlays';
 
 /** Short, fixed choices share the Studio menus; longer searchable lists use ResponsiveSelector. */
-export function ChoiceSelector<TItem extends SelectorItem>({
-  label, list, selectedId, onSelect, className, disabled = false,
+export function ChoiceSelector<TItem extends SelectorItem & { disabled?: boolean }>({
+  label, list, selectedId, onSelect, className, renderItem, disabled = false,
 }: {
   label: string;
   list: readonly TItem[];
   selectedId: string;
   onSelect: (item: TItem) => void;
   className?: string;
+  renderItem?: (item: TItem) => React.ReactNode;
   disabled?: boolean;
 }) {
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
@@ -33,10 +34,10 @@ export function ChoiceSelector<TItem extends SelectorItem>({
     <DropdownMenuContent align="start" sideOffset={6} portalContainer={container} className="w-(--radix-dropdown-menu-trigger-width) min-w-0 max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto rounded-xl p-1.5 shadow-lg">
       <DropdownMenuRadioGroup aria-label={label} value={selectedId} onValueChange={(id) => {
         const item = list.find((candidate) => candidate.id === id);
-        if (item) onSelect(item);
+        if (item && !item.disabled) onSelect(item);
       }}>
-        {list.map((item) => <DropdownMenuRadioItem key={item.id} value={item.id} className="min-h-11 gap-3 rounded-lg px-3 py-2.5 text-sm focus:bg-brand-soft focus:text-brand data-[state=checked]:bg-brand-soft data-[state=checked]:text-brand">
-          <span className="min-w-0 flex-1">{item.name}</span>
+        {list.map((item) => <DropdownMenuRadioItem key={item.id} value={item.id} disabled={item.disabled} className="min-h-11 gap-3 rounded-lg px-3 py-2.5 text-sm focus:bg-brand-soft focus:text-brand data-[state=checked]:bg-brand-soft data-[state=checked]:text-brand data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45">
+          <span className="min-w-0 flex-1">{renderItem ? renderItem(item) : item.name}</span>
           {item.id === selectedId ? <Check aria-hidden className="size-4 shrink-0 text-brand" /> : null}
         </DropdownMenuRadioItem>)}
       </DropdownMenuRadioGroup>

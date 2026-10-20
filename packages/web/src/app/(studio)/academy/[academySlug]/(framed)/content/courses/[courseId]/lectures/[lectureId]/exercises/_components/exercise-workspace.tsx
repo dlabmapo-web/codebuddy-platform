@@ -2,6 +2,8 @@
 
 import type { ExerciseSolutionEntry } from "@cove/shared";
 
+import { Code2, ListChecks } from 'lucide-react';
+import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useSearchParams } from 'next/navigation';
 import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
 import { useTranslation } from 'react-i18next';
@@ -50,15 +52,17 @@ export function ExerciseWorkspace({
       <ExerciseHeader authoring={authoring} context={initialContext} />
 
       <main className="min-w-0 space-y-5">
-        <label className="block space-y-2">{tq('type')}
-          <select className="block rounded-lg border border-border bg-card p-3" value={draft.quiz ? 'quiz' : 'python'}
-            disabled={!editable || Boolean(initialContext.material)}
-            onChange={(event) => update('quiz', event.target.value === 'quiz'
+        <div className="max-w-sm space-y-2">
+          <p className="text-sm font-semibold text-sub">{tq('type')}</p>
+          {!editable || initialContext.material ? <div className="flex min-h-11 items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold">
+            {draft.quiz ? <ListChecks aria-hidden className="size-4 text-brand" /> : <Code2 aria-hidden className="size-4 text-brand" />}
+            {tq(draft.quiz ? 'single_answer' : 'programming')}
+          </div> : <ChoiceSelector label={tq('type')} selectedId={draft.quiz ? 'quiz' : 'python'}
+            list={[{ id: 'python', name: tq('programming') }, { id: 'quiz', name: tq('single_answer') }]}
+            onSelect={(item) => update('quiz', item.id === 'quiz'
               ? { choices: Array.from({ length: 4 }, () => ({ id: crypto.randomUUID(), text: '' })), correctChoiceId: '', explanation: '' }
-              : null)}>
-            <option value="python">{tq('programming')}</option><option value="quiz">{tq('single_answer')}</option>
-          </select>
-        </label>
+              : null)} />}
+        </div>
         {!draft.quiz ? <ReferencePdfPicker target={{ academyId, courseId, lectureId }} value={draft.referencePdfMaterialId} disabled={!editable} onChange={id => update("referencePdfMaterialId", id)} /> : null}
         {requireReferencePdf && !draft.referencePdfMaterialId ? <p role="status" className="text-sm text-sub">{t("pdf-practice:required")}</p> : null}
         <BasicInformation

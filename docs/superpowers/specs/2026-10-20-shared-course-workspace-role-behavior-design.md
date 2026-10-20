@@ -402,3 +402,14 @@ indicator, open-state chevron and keyboard/typeahead support. Native OS select
 menus are removed from the drawer. Fullscreen menus portal into the fullscreen
 element. Existing filter choices and authorization are unchanged. Longer
 searchable selectors elsewhere continue using ResponsiveSelector.
+
+
+## Review summary and toolbar icons (2026-10-20)
+
+Read-only review shows question type as an icon summary and the linked PDF as
+a document card, rather than disabled dropdown controls. PDF title, filename,
+page count, readable byte size and placement have distinct visual levels.
+Authoring-only guidance is omitted during read-only review. Editable forms use
+ChoiceSelector, preserving disabled Main-only PDF options and showing document
+metadata within menu rows. View solution and Review details include consistent
+16px icons and aligned toolbar targets.

@@ -334,3 +334,20 @@ with editor focus, and activity layout at 390px. Desktop viewport restored.
 Screenshots: /tmp/cove-activity-author-dialog.png,
 /tmp/cove-pdf-upload-dialog.png, /tmp/cove-pdf-placement-dropdown.png,
 /tmp/cove-material-picker-with-quiz.png and /tmp/cove-quiz-preview-enabled.png.
+
+
+## Simplified quiz creation after UX feedback
+
+Quiz authoring now starts with question, compact options and correct-answer
+selection. Removed the duplicate title/type/instructions/scoring sequence from
+the main flow. The question provides a default material name; a custom name and
+all advanced settings remain under collapsed More settings. Formatting/images
+are optional per answer, with existing rich content preserved.
+
+Validation: 12 focused web tests cover compact fields, answer-key cleanup on
+removal, locks, plain/rich content preservation, escaping, and saving with an
+automatic or custom title. Translation tests (136), web TypeScript and changed
+file ESLint pass. Browser verification confirmed Save becomes enabled after
+only question, two answers and a correct answer; API preview returned Correct.
+Checked desktop and 390px layout, restored desktop and discarded the draft.
+No records were created. Screenshot: /tmp/cove-simple-quiz-authoring.png.

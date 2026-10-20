@@ -1,6 +1,7 @@
 "use client";
 import { FileCode2, ListChecks, PenLine, Save, X } from "lucide-react";
 import { ChoiceSelector } from "@/components/studio/choice-selector";
+import { choiceMaterialTitle } from "./choice-text";
 import { PrivateImageContext } from "@/components/editor/private-image-context";
 import { ChoiceFields } from "./choice-fields";
 import { ShortAnswerFields } from "./short-answer-fields";
@@ -153,6 +154,7 @@ export function ManualAuthorDialog({
       throw e;
     }
   }
+  const effectiveTitle = kind === "MULTIPLE_CHOICE" ? choiceMaterialTitle(title, config.multipleChoice?.question ?? "") : title;
   async function save() {
     setBusy(true);
     setError("");
@@ -177,7 +179,7 @@ export function ManualAuthorDialog({
                   : {}),
               }
             : {}),
-          title,
+          title: effectiveTitle,
           type: kind,
           materialId: material?.id,
           revision,
@@ -202,13 +204,14 @@ export function ManualAuthorDialog({
       >
         <ModalContent
           title={material ? mt("edit_activity") : mt(shortAnswer ? "add_short_answer" : kind === "MULTIPLE_CHOICE" ? "add_multiple_choice" : "add_activity")}
-          description={mt("author_description")}
+          description={mt(kind === "MULTIPLE_CHOICE" ? "quiz_simple.description" : "author_description")}
           className="max-w-3xl"
         >
           <button type="button" aria-label={mt("close_author")} disabled={busy} onClick={onClose} className="absolute right-4 top-4 grid size-9 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40">
             <X aria-hidden className="size-5" />
           </button>
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            {kind !== "MULTIPLE_CHOICE" ? <>
             <div className="flex items-start gap-3 rounded-xl border border-brand/15 bg-brand-soft/50 p-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><ActivityIcon aria-hidden className="size-5" /></span>
               <div className="min-w-0 flex-1">
@@ -220,7 +223,6 @@ export function ManualAuthorDialog({
                   disabled={Boolean(material) || busy || type === "MULTIPLE_CHOICE" || shortAnswer}
                   list={[
                     ...(publicConfig.guiEnabled || kind === "TURTLE_EXERCISE" ? [{ id: "TURTLE_EXERCISE", name: mt("turtle_exercise") }] : []),
-                    ...(kind === "MULTIPLE_CHOICE" ? [{ id: "MULTIPLE_CHOICE", name: mt("multiple_choice") }] : []),
                     { id: "WRITTEN_RESPONSE", name: shortAnswer ? mt("short_answer") : mt("written_response") },
                   ]}
                   onSelect={(item) => setKind(item.id as SaveManual["type"])}
@@ -239,14 +241,9 @@ export function ManualAuthorDialog({
             <div className="space-y-2">
               <p className="text-sm font-semibold">{mt("instructions")}</p>
               <RichEditor
-                minHeight={kind === "MULTIPLE_CHOICE" ? 120 : 200}
+                minHeight={200}
                 value={config.description}
                 onChange={(value) => field("description", value)}
-                onImageUpload={
-                  kind === "MULTIPLE_CHOICE"
-                    ? (file) => uploadImage(file)
-                    : undefined
-                }
               />
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-border bg-canvas/60 p-4 text-sm">
@@ -276,6 +273,7 @@ export function ManualAuthorDialog({
                 )}
               </p>
             ) : null}
+            </> : null}
             {config.multipleChoice ? (
               <ChoiceFields
                 academyId={target.academyId}
@@ -283,6 +281,13 @@ export function ManualAuthorDialog({
                 onChange={(value) => field("multipleChoice", value)}
                 locked={locked}
                 uploadImage={uploadImage}
+                additionalSettings={<div className="space-y-4">
+                  <label className="grid gap-2 text-sm font-semibold">{mt("quiz_simple.material_name")}<input className="h-11 rounded-lg border border-border bg-card px-3 font-normal" value={title} placeholder={config.multipleChoice.question.slice(0, 128)} onChange={(e) => setTitle(e.target.value)} maxLength={128} /></label>
+                  <div className="space-y-2"><p className="text-sm font-semibold">{mt("instructions")}</p><RichEditor minHeight={100} value={config.description} onChange={(value) => field("description", value)} onImageUpload={(file) => uploadImage(file)} /></div>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-brand" checked={config.submitEnabled} onChange={(e) => field("submitEnabled", e.target.checked)} />{mt("enable_submit")}</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-brand" checked={!config.includeInScore} onChange={(e) => field("includeInScore", !e.target.checked)} />{mt("exclude_from_score")}</label>
+                  <label className="flex items-center justify-between gap-3 text-sm">{mt("maximum_score")}<input aria-label={mt("maximum_score")} type="number" min={0.01} step={0.01} className="w-28 rounded-lg border border-border bg-card p-2 text-right" value={config.maximumHundredths / 100} onChange={(e) => field("maximumHundredths", Math.round(Number(e.target.value) * 100))} /></label>
+                </div>}
               />
             ) : null}
             {config.shortAnswer ? (
@@ -293,6 +298,7 @@ export function ManualAuthorDialog({
                 locked={locked}
               />
             ) : null}
+            {kind !== "MULTIPLE_CHOICE" ? (
             <label className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-canvas/60 p-4 text-sm font-semibold">
               {mt("maximum_score")}
               <input
@@ -310,6 +316,7 @@ export function ManualAuthorDialog({
                 }
               />
             </label>
+            ) : null}
             {kind === "TURTLE_EXERCISE" ? (
               <>
                 <div className="flex gap-3">
@@ -530,13 +537,13 @@ export function ManualAuthorDialog({
               type="button"
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
               disabled={
-                busy || !title.trim() ||
+                busy || !effectiveTitle.trim() ||
                 Boolean(
                   config.multipleChoice &&
                   !saveManualSchema.safeParse({
                     ...target,
                     ...config,
-                    title,
+                    title: effectiveTitle,
                     type: kind,
                     materialId: material?.id,
                     revision,

@@ -153,5 +153,15 @@
   "duplicate_options": "Some options have the same text. Check that this is intentional.",
   "author_description": "Write the instructions, then set how students answer and receive a score.",
   "close_author": "Close activity editor",
-  "answer_mode": "Answer selection"
+  "answer_mode": "Answer selection",
+  "quiz_simple": {
+    "description": "Write a question, add options, and mark the correct answer.",
+    "question_placeholder": "What would you like to ask?",
+    "options": "Answer options",
+    "correct_help": "Select the circle beside the correct answer.",
+    "correct_multiple_help": "Select every correct answer.",
+    "format_option": "Formatting / image",
+    "more_settings": "More settings (optional)",
+    "material_name": "Material name (optional)"
+  }
 }

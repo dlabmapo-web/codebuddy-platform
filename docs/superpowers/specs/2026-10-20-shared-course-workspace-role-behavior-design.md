@@ -478,3 +478,21 @@ Multiple-choice material creation keeps its rollout flag and API capability
 check. The API validates the flag as a boolean and accepts the validated value
 in the quiz service. Local API and web flags are enabled after confirming the
 existing migration; release defaults remain disabled.
+
+
+## Simplified multiple-choice authoring
+
+For quizzes, the main dialog starts directly with the question, compact answer
+options and a correct-answer control beside each option. The question supplies
+the material name (trimmed to 128 characters) unless the author enters a custom
+name. Existing material names are preserved. No separate title, activity type,
+instructions editor or score controls precede the question.
+
+More settings is collapsed by default and contains selection mode, supplementary
+question content, shuffle, explanation, material name, instructions and scoring.
+Existing defaults and publication locks remain unchanged. Plain answers use
+small text areas; formatting/image editing is opt-in. Existing rich or image
+answers remain in the rich editor. Simple paragraph HTML opens as editable text
+without changing its stored value until the author edits it. Text input escapes
+HTML and preserves line breaks. Adding/removing/reordering options and preview
+remain available.

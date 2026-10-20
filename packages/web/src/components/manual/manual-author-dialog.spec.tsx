@@ -6,7 +6,7 @@ vi.mock('./use-manual-translation', () => ({ useManualTranslation: () => ({ t: (
 vi.mock('@/lib/config', () => ({ publicConfig: { guiEnabled: true, shortAnswerEnabled: true, multipleChoiceEnabled: true } }));
 vi.mock('@/lib/manual-api', () => ({ manualApi: {} }));
 vi.mock('@/components/editor/RichEditor', () => ({ RichEditor: () => <div /> }));
-vi.mock('./choice-fields', () => ({ ChoiceFields: () => <div /> }));
+vi.mock('./choice-fields', () => ({ ChoiceFields: ({ additionalSettings }: { additionalSettings: React.ReactNode }) => <div>{additionalSettings}</div> }));
 vi.mock('./short-answer-fields', () => ({ ShortAnswerFields: () => <div /> }));
 vi.mock('@/components/studio/primitives', () => ({
   Modal: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

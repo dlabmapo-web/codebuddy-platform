@@ -92,7 +92,7 @@ describe.each(['en', 'ko'])('Library route translations in %s', (locale) => {
 it.each([
   ['library', '/admin/content/library/course'],
   ['console', '/admin/academies/qa/courses/course'],
-  ['academy', '/academy/qa/content/courses/course'],
+  ['academy', '/academy/qa/learn/courses/course'],
 ] as const)('keeps workbook importer links in the %s surface', (surface, href) => {
   const namespaces = [...platformNamespaces, 'content', 'content-import'];
   const client = new QueryClient();

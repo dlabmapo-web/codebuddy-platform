@@ -141,7 +141,15 @@ Personal code and starter code have independent save paths. Opening Edit must
 not copy personal practice code into curriculum. Returning restores the practice
 draft; authoring Save must not replace it.
 
-Observe students opens a modal inside the current problem workspace. It shows only students in assigned teaching classes whose synchronized live presence reports SOLVING for this exact course and problem. It does not navigate to a roster or monitoring page. Unassigned courses and classes with no matching online students show an empty state. A staff personal workspace does not join a student room,
+Tutoring opens a left-side drawer inside the current programming problem workspace.
+The full assigned-class roster is the default, including offline and unsubmitted
+students, with name/email/ID search and submission-status badges. Filters include
+online students solving this exact problem, submitted, and not submitted. Selecting
+a student closes the drawer and replaces only the editor pane; the problem/PDF
+and URL stay in place. The selected pane opens read-only, shows the student's
+saved code and last graded submission, and uses the existing live collaboration
+system for explicit Edit mode when the student is actively on this problem.
+Returning to personal practice restores the mounted personal editor. A staff personal workspace does not join a student room,
 enable help mode, emit student presence or reuse a student's terminal.
 
 ## 6. Scope and capability policy
@@ -338,22 +346,35 @@ this is not a claim of full Elice backend parity.
 Teachers can explicitly open reference solutions while practicing. Reading a solution
 requires curriculum review permission and rechecks the academy, active teaching
 assignment, and visible material ancestors. It grants no exercise editing authority.
-For members who also hold Teacher, Observe students opens an in-place modal.
-The course-filtered authorized roster supplies enrollment; synchronized presence
-shows only students actively solving this exact problem. Offline, idle, reconnecting,
-other-problem and other-course students are excluded. Rows do not navigate.
+Teachers use Tutoring to inspect students within their assigned active classes.
 Unassigned courses produce no rows, rather than falling back to all classes.
 
+## In-place answer dialog
 
-## In-place dialogs correction (2026-10-20)
+View solution opens a centered answer modal. Answers are fetched only after
+opening and released from the query cache on close. Both the answer modal and
+Tutoring drawer use Cove dialog primitives, close with Escape or Close, return
+focus to their triggers, and portal into the fullscreen element when applicable.
+The problem, PDF, personal draft, and URL remain in place.
 
-View solution opens a centered answer modal with all reference answers expanded.
-Answers are fetched only after opening and released from the query cache on close.
-Observe students opens a centered live list in the same workspace; opening it
-starts authorized class-presence subscriptions and closing it releases them.
-Only synchronized SOLVING presence for the exact course and material can appear;
-lost synchronization hides stale rows and offers reconnection. Roster reads
-refresh assignment and enrollment every 15 seconds while open.
-Both dialogs use Cove modal primitives, close with Escape or Close, return focus
-to their triggers, and portal into the fullscreen element when applicable.
-The editor, terminal, PDF, personal draft, and URL remain in place.
+## Elice screenshot alignment (2026-10-20)
+
+The supplied screenshots supersede the earlier online-only centered observation
+list: Tutoring is now a left drawer with the full authorized student roster and
+submission badges. Online solving remains an explicit filter. Students can be
+selected without navigation; their code, identity, last graded submission time
+and score appear in the editor pane. Their saved draft is explicitly requested
+through the existing assigned-class/student/material monitoring gate, and is
+omitted from ordinary monitoring context and public previews.
+
+The student's code is initially read-only. Existing server-confirmed HELPING mode
+is the only path to shared edits, and applies only while synchronized on this
+exact problem. Offline or other-problem states show a labeled read-only saved
+snapshot. Teachers can run their copy locally and read the student's mirrored
+output while live. Feedback uses existing monitoring feedback permissions.
+Switching students or leaving waits for shared edits and guards unsent feedback.
+Teachers cannot submit a student's work through the tutoring pane.
+
+The answer modal shares the existing highlighted Python answer component,
+including Copy, copied/error feedback, multiple answers and Close. The drawer,
+modal, identity strip, filters and controls retain Cove palette tokens.

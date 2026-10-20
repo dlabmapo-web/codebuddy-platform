@@ -22,9 +22,11 @@ import { usePythonErrorLines } from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { NavButton } from './workspace-header';
 import { ResultPanel } from './result-panel';
-import { StaffSolutionDialog, StaffObserveDialog } from './staff-workspace-dialogs';
+import { StaffSolutionDialog } from './staff-workspace-dialogs';
+import { StaffTutoringDrawer, type TutoringStudent } from './staff-tutoring-drawer';
+import { StaffStudentPane, type TutoringTransitionGuard } from './staff-student-pane';
 
-/** Personal practice mounts no student sessions, presence, collaboration, feedback or points hooks. */
+/** Personal practice stays mounted and isolated while explicit tutoring owns a separate student session. */
 export function StaffWorkspace({ academyId, bootstrap, userId }: {
   academyId: string; bootstrap: LearnExerciseBootstrap; userId: string;
 }) {
@@ -35,6 +37,8 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const { exercise, breadcrumb } = workspace;
   const preview = access?.preview ?? false;
   const rootRef = React.useRef<HTMLDivElement>(null);
+  const [selectedStudent, setSelectedStudent] = React.useState<TutoringStudent | null>(null);
+  const beforeStudentChange = React.useRef<TutoringTransitionGuard["current"]>(null);
   const [tab, setTab] = React.useState<OutputTab>('terminal');
   const [mobile, setMobile] = React.useState<'problem' | 'code'>('problem');
   const [hints, setHints] = React.useState(0);
@@ -63,8 +67,24 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const editPath = `${routes.academy(slug)}/content/courses/${breadcrumb.course.id}/lectures/${breadcrumb.lecture.id}/exercises/${exercise.materialId}${preview ? "?practicePreview=true" : "?practice=true"}`;
   const ordered = workspaceMaterialSequence(bootstrap.navigator);
   const position = ordered.findIndex((item) => item.materialId === exercise.materialId) + 1;
+  async function selectStudent(next: TutoringStudent | null) {
+    if (busy) return false;
+    if (next && selectedStudent?.classId === next.classId && selectedStudent.membershipId === next.membershipId) return true;
+    if (beforeStudentChange.current && !await beforeStudentChange.current()) return false;
+    await draft.flushWithoutPromoting();
+    setSelectedStudent(next);
+    return true;
+  }
+  async function leaveTo(href: string, event: React.MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (beforeStudentChange.current && !await beforeStudentChange.current()) return;
+    await draft.flushWithoutPromoting();
+    router.push(href);
+  }
   async function navigate(id: string) {
     if (busy) return;
+    if (beforeStudentChange.current && !await beforeStudentChange.current()) return;
     setNavigating(true);
     await draft.flushWithoutPromoting();
     const destination = ordered.find((item) => item.materialId === id);
@@ -100,17 +120,17 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         <p className="truncate text-xs text-sub">{breadcrumb.course.title} <span className="px-1 text-border">/</span> {breadcrumb.lecture.title}</p>
         <h1 className="truncate text-sm font-bold">{exercise.title}</h1>
       </div>
-      <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t('label')}</span>
+      <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t(selectedStudent ? 'tutoring' : 'label')}</span>
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
-      {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={() => draft.flushNow()} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
+      {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={(event) => void leaveTo(routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' }), event)} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
       {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} /> : null}
-      {access?.canReview && !access.canAuthor ? <Link href={editPath} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand">{t('review')}</Link> : null}
-      {access?.canAuthor ? <Link href={editPath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-brand hover:text-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
-      {access?.canObserve ? <StaffObserveDialog academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} /> : null}
-      <Link href={coursePath} onClick={() => draft.flushNow()} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
+      {access?.canReview && !access.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand">{t('review')}</Link> : null}
+      {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-brand hover:text-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
+      {access?.canObserve && !exercise.quiz ? <StaffTutoringDrawer academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} selected={selectedStudent} onSelect={selectStudent} /> : null}
+      <Link href={coursePath} onClick={(event) => void leaveTo(coursePath, event)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
     </header>
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
-      <span className="font-bold sm:hidden">{t('label')}</span><span>{t('notice')}</span>
+      <span className="font-bold sm:hidden">{t('label')}</span><span>{t(selectedStudent ? 'tutoring_notice' : 'notice')}</span>
       <span className="ml-auto" aria-live="polite">{draft.saveState !== 'idle' ? t(`save.${draft.saveState}`) : null}</span>
       {(draft.saveState === 'error' || draft.saveState === 'conflict') ? <button className="underline" type="button" onClick={() => {
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([draft.code], { type: 'text/plain' })); link.download = 'practice.py'; link.click(); URL.revokeObjectURL(link.href);
@@ -144,12 +164,13 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </section>
         <div aria-hidden className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 md:block" {...dividerProps} />
         <section className={`min-w-0 flex-1 flex-col ${mobile === 'code' ? 'flex' : 'hidden'} md:flex`}>
-          <EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission}
+          <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
             onReset={() => { if (draft.code !== exercise.starterCode && window.confirm(t('reset_confirm'))) { draft.resetTo(exercise.starterCode); runner.clear(); submission.reset(); } }}
             onSubmit={submit} canSubmit={access?.canSubmit ?? false} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
             onRunSample={(index) => { void runSample(index); }} onRunAll={() => { void runAll(); }}
-            onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} />
+            onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} /></div>
+          {selectedStudent ? <StaffStudentPane key={`${selectedStudent.classId}:${selectedStudent.membershipId}`} academyId={academyId} materialId={exercise.materialId} userId={userId} starterCode={exercise.starterCode} student={selectedStudent} beforeChangeRef={beforeStudentChange} close={() => selectStudent(null)} /> : null}
         </section>
       </div>}
     </div>

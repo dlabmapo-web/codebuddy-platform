@@ -27,8 +27,9 @@ vi.mock('./workspace-header', () => ({ NavButton: ({ label }: { label: string })
 vi.mock('./result-panel', () => ({ ResultPanel: () => null }));
 vi.mock('./staff-workspace-dialogs', () => ({
   StaffSolutionDialog: () => <button type="button">solutions</button>,
-  StaffObserveDialog: () => <button type="button">observe</button>,
 }));
+vi.mock('./staff-tutoring-drawer', () => ({ StaffTutoringDrawer: () => <button type="button">tutoring</button> }));
+vi.mock('./staff-student-pane', () => ({ StaffStudentPane: () => null }));
 function bootstrap(overrides = {}): LearnExerciseBootstrap {
   return {
     access: { mode: 'staff-practice', canSubmit: true, canAuthor: true, canReview: true, canObserve: true, canViewSolutions: true, ...overrides },
@@ -51,7 +52,7 @@ describe('staff workspace participation', () => {
     const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap({ canAuthor: false, canViewSolutions: true, canObserveAssignedStudents: true })} userId="teacher" />);
     expect(html).toContain('Personal editor'); expect(html).toContain('review');
     expect(html).not.toContain('>edit<'); expect(html).toContain('>solutions<');
-    expect(html).toContain('>observe</button>');
+    expect(html).toContain('>tutoring</button>');
     expect(html).not.toContain('/teach/students?course=');
     expect(html).not.toContain('href="/academy/demo/teach/classes"');
   });

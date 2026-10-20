@@ -146,6 +146,7 @@ function Tooltip({
 /* ------------------------------------------------------------------ sheet */
 
 const Sheet = DialogPrimitive.Root;
+const SheetTrigger = DialogPrimitive.Trigger;
 
 function SheetContent({
   className,
@@ -153,14 +154,16 @@ function SheetContent({
   side = 'left',
   title,
   description,
+  portalContainer,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   side?: 'left' | 'right';
   title: string;
   description?: string;
+  portalContainer?: HTMLElement | null;
 }) {
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal container={portalContainer}>
       <DialogPrimitive.Overlay className="cove-overlay fixed inset-0 z-50 bg-ink/40" />
       <DialogPrimitive.Content
         className={cn(
@@ -247,6 +250,7 @@ export {
   Separator,
   Sheet,
   SheetContent,
+  SheetTrigger,
   Textarea,
   Tooltip,
   TooltipContent,

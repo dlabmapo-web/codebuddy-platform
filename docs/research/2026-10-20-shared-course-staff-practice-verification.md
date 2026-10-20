@@ -176,3 +176,43 @@ English and Korean resources were rebuilt for the running local web app.
 
 Screenshots: `/tmp/cove-view-solution-modal.png` and
 `/tmp/cove-observe-students-modal.png`. No migration is required.
+
+
+## Elice screenshot alignment
+
+The provided screenshots replace the centered online-only observation list with
+a left-side Tutoring drawer. It lists assigned-course students, including offline
+and unsubmitted students, with avatars, name/email/ID search, class and submission
+filters, and per-problem submission badges. Online solving remains an optional
+filter. Selecting a student replaces only the right editor pane without changing
+the URL or unmounting the teacher's personal editor.
+
+The selected pane shows student identity, saved draft, last graded submission
+time and score. It opens read-only; existing server-confirmed HELPING mode governs
+live shared edits on this exact problem. Offline or other-problem students show
+a labeled read-only saved snapshot. Run is local; student submission is not
+offered. Live output and feedback reuse existing monitoring permissions. Student
+switches and workspace exits wait for pending shared edits.
+
+Saved draft text is an explicit optional selected-student context read through
+the existing teacher/class/student/material gate. Ordinary context and public
+preview reads carry no draft text. No migration is required. The solution dialog
+now shares the existing highlighted Python answer component and Copy feedback.
+
+Browser verification in the existing local Teacher session confirmed 20 assigned
+student seats, submitted/not-submitted badges, in-place student selection, saved
+code and 100/100 history display, local Run output `hello`, return to the original
+personal editor, highlighted answers, and the Copy button changing to Copied.
+The exercise URL and PDF stayed unchanged. No student submission or shared code
+edit was made. A simultaneously online student's shared-edit path was not exercised
+in this browser walkthrough; the existing collaboration hook and server gate are
+reused, with focused tests for synchronized read-only/helping and other-problem
+isolation.
+
+Screenshots: `/tmp/cove-tutoring-drawer.png`,
+`/tmp/cove-tutoring-student-workspace.png`, and
+`/tmp/cove-elice-solution-modal.png`.
+
+Validation for screenshot alignment: full web suite 1,274 passed; focused
+monitoring API suite 49 passed; shared monitoring schemas 69 passed; translations
+134 passed. API and web TypeScript checks and changed web-file ESLint pass.

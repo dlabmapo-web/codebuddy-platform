@@ -195,7 +195,7 @@ function createService(options?: {
   classes?: ReturnType<typeof classRecord>[];
   record?: ReturnType<typeof classRecord>;
   material?: ReturnType<typeof materialRecord> | null;
-  draft?: { id: string } | null;
+  draft?: { id: string; code?: string } | null;
   feedback?: ReturnType<typeof feedbackRow>[];
   readCount?: number;
   studentSelfError?: AppException;
@@ -479,6 +479,20 @@ describe("getClassRoster", () => {
 });
 
 describe("getStudentContext", () => {
+  it("does not read saved student code when the scoped material is unavailable", async () => {
+    const { service, prisma } = createService({ material: null });
+    const context = await service.getStudentContext(identity, { academyId, classId, membershipId: studentMembershipId, materialId, includeDraftCode: true });
+    expect(context.exercise).toBeNull();
+    expect(prisma.exerciseDraft.findUnique).not.toHaveBeenCalled();
+  });
+  it("includes saved code only for an explicit selected-student request", async () => {
+    const { service, prisma } = createService({ draft: { id: "draft-id", code: "student-saved-code" } });
+    const normal = await service.getStudentContext(identity, { academyId, classId, membershipId: studentMembershipId, materialId });
+    expect(normal.exercise).not.toHaveProperty("draftCode");
+    const selected = await service.getStudentContext(identity, { academyId, classId, membershipId: studentMembershipId, materialId, includeDraftCode: true });
+    expect(selected.exercise?.draftCode).toBe("student-saved-code");
+    expect(prisma.exerciseDraft.findUnique).toHaveBeenLastCalledWith(expect.objectContaining({ select: { id: true, code: true } }));
+  });
   it("returns trusted identity without an exercise until one is named", async () => {
     const { service, prisma } = createService();
     const context = await service.getStudentContext(identity, {

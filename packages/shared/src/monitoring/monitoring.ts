@@ -740,6 +740,8 @@ export const monitoringExerciseContextSchema =
   monitoringPublicExerciseSchema.extend({
     /** The collaboration room is derived from this server-side, never named by a client. */
     draftId: z.uuid().nullable(),
+    /** Explicit selected-student read; omitted from ordinary context and previews. */
+    draftCode: z.string().nullable().optional(),
     /** Availability only. The correct answer is fetched through a live visit. */
     hasSolution: z.boolean(),
     /**
@@ -854,6 +856,7 @@ export const monitoringStudentContextInputSchema =
      * ack supplies the material, and the page then asks for it here.
      */
     materialId: z.uuid().optional(),
+    includeDraftCode: z.boolean().optional(),
   });
 
 /**

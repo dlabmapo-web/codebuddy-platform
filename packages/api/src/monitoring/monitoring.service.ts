@@ -271,6 +271,7 @@ export class MonitoringService {
       classId: string;
       membershipId: string;
       materialId?: string;
+      includeDraftCode?: boolean;
     },
   ): Promise<MonitoringStudentContext> {
     const claim = await this.requireClass(identity, input);
@@ -299,7 +300,7 @@ export class MonitoringService {
       },
       class: { classId: classRecord.id, name: classRecord.name },
       exercise: input.materialId
-        ? await this.loadExercise(claim, student.studentUserId, input.materialId)
+        ? await this.loadExercise(claim, student.studentUserId, input.materialId, input.includeDraftCode)
         : null,
     };
   }
@@ -591,6 +592,7 @@ export class MonitoringService {
     claim: MonitoringClassClaim,
     studentUserId: string,
     materialId: string,
+    includeDraftCode = false,
   ) {
     const preview = await this.loadPublicExercise(claim, materialId);
     if (!preview) return null;
@@ -600,7 +602,7 @@ export class MonitoringService {
         where: {
           userId_materialId: { userId: studentUserId, materialId },
         },
-        select: { id: true },
+        select: { id: true, ...(includeDraftCode ? { code: true } : {}) },
       }),
       this.prisma.programmingExercise.findUnique({
         where: { materialId },
@@ -619,6 +621,7 @@ export class MonitoringService {
       // document is created lazily, and naming a room for a draft that does
       // not exist is how a client ends up inventing one.
       draftId: draft?.id ?? null,
+      ...(includeDraftCode ? { draftCode: draft?.code ?? null } : {}),
       hasSolution: Boolean(answer?._count.solutions),
       latestSubmission: latest
         ? { submissionId: latest.id, status: latest.status }

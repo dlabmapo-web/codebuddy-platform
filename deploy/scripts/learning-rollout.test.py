@@ -1,5 +1,6 @@
 """Exercise release/profile selection without credentials or a Docker daemon."""
 import json
+import importlib.util
 import os
 import pathlib
 import shutil
@@ -13,6 +14,17 @@ DIGEST = "b" * 64
 
 
 class LearningRolloutTests(unittest.TestCase):
+    def test_dlab_preflight_matches_manifest_override_without_changing_secrets(self):
+        spec = importlib.util.spec_from_file_location("dlab_config", SCRIPTS / "check-dlab-config.py")
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        api = {"DLAB_OS_BASE_URL": "https://dlab-os.onrender.com/v1", "DLAB_SSO_ENABLED": "false"}
+        before = dict(api)
+        checker.check(api, {"DLAB_SSO_ENABLED": "false"}, {"DLAB_OS_BASE_URL": "https://os.dlabcampus.com/v1"})
+        self.assertEqual(api, before)
+        with self.assertRaisesRegex(ValueError, "DLAB_OS_BASE_URL"):
+            checker.check(api, {"DLAB_SSO_ENABLED": "false"}, {})
+
     def test_release_sync_preserves_server_owned_runtime_data(self):
         workflow = (SCRIPTS.parents[1] / ".github/workflows/release-v2.yml").read_text()
         commands = workflow.split('          rsync ')[1:]
@@ -81,6 +93,7 @@ class LearningRolloutTests(unittest.TestCase):
         for flag in ("GUI", "SHORT_ANSWER", "MULTIPLE_CHOICE", "VIDEO_LESSONS"):
             self.assertIn(f"{flag}_ENABLED=true", candidate)
         self.assertIn(f"MVP_IMAGE=ghcr.io/acme/old:sha-{SHA}", candidate)
+        self.assertIn("DLAB_OS_BASE_URL=https://os.dlabcampus.com/v1", candidate)
         self.assertEqual(self.manifest.read_text(), previous)
 
     def test_invalid_flag_does_not_deploy_or_replace_active_manifest(self):

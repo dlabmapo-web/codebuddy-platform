@@ -6,6 +6,11 @@ x-learning-flags: &learning-flags
   MULTIPLE_CHOICE_ENABLED: ${MULTIPLE_CHOICE_ENABLED:-false}
   VIDEO_LESSONS_ENABLED: ${VIDEO_LESSONS_ENABLED:-false}
 
+# Old manifests need the old origin when rolling back to its pinned API image.
+# Release selection advances this non-secret value alongside the image SHAs.
+x-dlab-origin: &dlab-origin
+  DLAB_OS_BASE_URL: ${DLAB_OS_BASE_URL:-https://dlab-os.onrender.com/v1}
+
 x-application: &application
   restart: unless-stopped
   init: true
@@ -123,7 +128,7 @@ services:
     env_file:
       - ./secrets/api.env
     environment:
-      <<: *learning-flags
+      <<: [*learning-flags, *dlab-origin]
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=1024
       PORT: 4000
@@ -214,6 +219,7 @@ services:
     env_file:
       - ./secrets/api.env
     environment:
+      <<: *dlab-origin
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=512
       JUDGE_HEALTH_PORT: 4101

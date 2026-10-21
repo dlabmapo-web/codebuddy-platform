@@ -227,7 +227,7 @@ cpu_count="$(getconf _NPROCESSORS_ONLN)"
 available_disk_kb="$(df -Pk "$deploy_root" | awk 'NR==2 {print $4}')"
 (( available_disk_kb >= 20 * 1024 * 1024 )) || fail "less than 20 GB disk is currently available"
 
-python3 "$deploy_root/scripts/check-dlab-config.py" "$deploy_root/secrets/api.env" "$deploy_root/secrets/studio.env"
+python3 "$deploy_root/scripts/check-dlab-config.py" "$deploy_root/secrets/api.env" "$deploy_root/secrets/studio.env" "$deployment_env"
 
 docker info >/dev/null
 printf 'Production preflight passed.\n'

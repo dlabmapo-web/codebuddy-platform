@@ -54,6 +54,9 @@ python3 - "$learning_json" <<'PY'
 import json, sys
 configuration = json.loads(sys.argv[1])
 services = configuration["services"]
+for name in ("api", "judge-worker"):
+    if services[name]["environment"]["DLAB_OS_BASE_URL"] != "https://os.dlabcampus.com/v1":
+        raise SystemExit(f"{name} must use the manifest's new DLAB origin")
 broker = services["gui-service"]
 if broker.get("ports") or broker.get("privileged"):
     raise SystemExit("GUI broker must have no public ports or privileged mode")
@@ -64,6 +67,19 @@ if any(volume.get("target") == "/var/run/docker.sock" for volume in services["vi
     raise SystemExit("Video worker must never have Docker access")
 print("Optional learning profiles: private GUI control network and isolated video worker")
 PY
+
+# The previous image's validator pins the Render origin. Restoring its older
+# manifest must restore that origin too, even with the new Compose assets.
+cp "$validation_root/deployment.env" "$validation_root/new-domain.env"
+sed '/^DLAB_OS_BASE_URL=/d' "$validation_root/new-domain.env" > "$validation_root/deployment.env"
+validation_compose config --format json | python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+for name in ("api", "judge-worker"):
+    assert services[name]["environment"]["DLAB_OS_BASE_URL"] == "https://dlab-os.onrender.com/v1", name
+print("Older release manifest restores the legacy DLAB origin")
+'
+mv "$validation_root/new-domain.env" "$validation_root/deployment.env"
 
 # Cloud VPS 6 has 12 GB RAM. Keep the sum of all always-on container limits at
 # or below 9 GiB so Ubuntu, Docker, filesystem cache, and deployments retain

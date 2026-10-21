@@ -34,6 +34,7 @@ updates = {
     "VIDEO_WORKER_IMAGE": f"{namespace}/cove-video-worker:{tag}",
     "GUI_SERVICE_IMAGE": f"{namespace}/cove-gui-service:{tag}",
     "GUI_RUNTIME_IMAGE": f"{namespace}/cove-gui-runtime:{tag}",
+    "DLAB_OS_BASE_URL": "https://os.dlabcampus.com/v1",
 }
 for key, value in zip(
     ("GUI_ENABLED", "SHORT_ANSWER_ENABLED", "MULTIPLE_CHOICE_ENABLED", "VIDEO_LESSONS_ENABLED"),
@@ -52,7 +53,7 @@ for line in path.read_text().splitlines():
         seen.add(key)
     else:
         lines.append(line)
-optional = {"VIDEO_WORKER_IMAGE", "GUI_SERVICE_IMAGE", "GUI_RUNTIME_IMAGE"}
+optional = {"VIDEO_WORKER_IMAGE", "GUI_SERVICE_IMAGE", "GUI_RUNTIME_IMAGE", "DLAB_OS_BASE_URL"}
 optional.update(key for key in updates if key.endswith("_ENABLED"))
 missing = (updates.keys() - optional) - seen
 if missing:

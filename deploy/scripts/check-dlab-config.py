@@ -14,7 +14,11 @@ def read(path):
     return result
 
 
-def check(api, studio):
+def check(api, studio, deployment=None):
+    # Match Compose's release-controlled API/worker origin override. Leave
+    # private credential files unchanged so an old image can still roll back.
+    if deployment is not None:
+        api = {**api, 'DLAB_OS_BASE_URL': deployment.get('DLAB_OS_BASE_URL', 'https://dlab-os.onrender.com/v1')}
     mode = api.get('DLAB_SSO_ROLLOUT_MODE', 'allowlist')
     if mode not in ['allowlist', 'campus']:
         raise ValueError('DLAB_SSO_ROLLOUT_MODE must be allowlist or campus')
@@ -46,7 +50,7 @@ def check(api, studio):
 
 if __name__ == '__main__':
     try:
-        check(read(sys.argv[1]), read(sys.argv[2]))
+        check(read(sys.argv[1]), read(sys.argv[2]), read(sys.argv[3]) if len(sys.argv) > 3 else None)
     except (ValueError, IndexError) as error:
         raise SystemExit(str(error))
     print('DLAB configuration validated (secret values omitted).')

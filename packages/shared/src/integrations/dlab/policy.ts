@@ -12,10 +12,11 @@ export const DLAB_ADMIN_DESTINATION = '/admin/academies';
 
 export function dlabAcademyRole(role: string): AcademyRole | null {
   switch (role) {
-    // Cove role translation confirmed by the platform owner on 2026-10-21.
-    case 'tutor':
-    case 'instructor': return 'TEACHER';
+    // Latest HQ table supplied by the platform owner on 2026-10-21.
+    case 'tutor': return 'TEACHER';
     case 'lab_head': return 'MANAGER';
+    case 'instructor':
+    case 'so_staff':
     case 'edu_manager': return 'TEAM_LEAD';
     case 'hq_admin': return null;
     default: return 'STUDENT';

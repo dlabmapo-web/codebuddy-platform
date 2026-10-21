@@ -64,7 +64,7 @@ Excluded: full course catalog and enrollment APIs, OS class/teacher-assignment i
 
 ## 4. Role mapping and permissions
 
-**Final owner-approved mapping (supersedes the intermediate correction below):** `student` → Student, `instructor`/`tutor` → Teacher, `edu_manager` → Team Lead, `lab_head` → Manager, `hq_admin` → Platform Admin. The final request explicitly authorizes HQ platform administration. Use an exact shared platform-role helper and nullable academy-role helper; do not represent HQ Admin as a Manager membership. Existing schema and transaction-local OS field guards support this without a new migration.
+**Latest owner-approved HQ table (2026-10-21; supersedes previous mappings and the older inline OS-connection notes):** `student` → Student, `tutor` → Teacher, `instructor`/`so_staff`/`edu_manager` → Team Lead, `lab_head` → Manager, `hq_admin` → Platform Admin. The final request explicitly authorizes HQ platform administration. Use an exact shared platform-role helper and nullable academy-role helper; do not represent HQ Admin as a Manager membership. Existing schema and transaction-local OS field guards support this without a new migration.
 
 HQ admins must still pass active identity, local restriction, allowlist/campus-mode admission and at least one verified approved-campus check. Platform authority is global after admission; it is not restricted to that academy's membership. Empty/unapproved/inactive scope grants no admin access. Existing locally suspended bindings also block HQ promotion. Reconciliation derives platform roles, retires old academy bindings and records role transitions. Source demotion/deactivation or campus revocation removes admin status even when it is the last OS admin; retain a separate local operator for recovery.
 
@@ -77,14 +77,15 @@ Use exact, server-verified `user_role` values from `/sso/token` or authenticated
 | OS role | Cove primary academy role | Scope / behavior |
 | --- | --- | --- |
 | `student` | `STUDENT` | Exactly the source primary campus; supplied scope must equal that singleton |
-| `instructor` | `TEACHER` | Approved mapped campuses in the verified scope |
+| `instructor` | `TEAM_LEAD` | Approved mapped campuses in the verified scope |
 | `edu_manager` | `TEAM_LEAD` | Approved mapped campuses in the verified scope |
 | `lab_head` | `MANAGER` | Approved mapped campuses in the verified scope |
 | `tutor` | `TEACHER` | Approved mapped campuses in the verified scope |
 | `hq_admin` | Platform `ADMIN`; no academy role | Same rollout/approved-campus admission; platform console and normal platform permissions |
-| `so_staff` or any unknown value | `STUDENT` fallback | Primary-campus access only, if the primary is in the verified scope and approved; no staff or platform elevation |
+| `so_staff` | `TEAM_LEAD` | Approved mapped campuses in the verified scope |
+| Any unknown value | `STUDENT` fallback | Primary-campus access only, if the primary is in the verified scope and approved; no staff or platform elevation |
 
-The four privileged mappings implement the role table already proposed to the user. Confirm the actual returned values for the supplied teacher and team-leader fixtures during joint testing. If HQ uses a different code, record the evidence and review the mapping; do not silently expand a privileged mapping to make a test pass.
+The explicit staff mappings implement the latest user-supplied HQ table. Confirm the actual returned values for the supplied teacher and team-leader fixtures during joint testing. If HQ uses a different code, record the evidence and review the mapping; do not silently expand a privileged mapping to make a test pass.
 
 The fallback implements the ZIP's narrow/student-like handling and allows account synchronization and login without granting an unreviewed staff role. An unknown role alone is not an authentication error. Normal inactive-account, invalid-scope, unmapped-campus, and local-suspension checks still apply. The fallback does not create class enrollment or expose all academy courses. Other operations/HQ roles must not be guessed to mean a teacher or manager. Additional staff mappings require an explicit permission decision.
 
@@ -269,7 +270,7 @@ Write results under `docs/research/` with build SHA, environment, nonsecret fixt
 This spec establishes the final five-role SSO target. The following are concrete release conditions, not reasons to stop writing or implementing the design:
 
 - HQ's new domain must complete a real code exchange with the registered callback and private credentials. The `/v1` API prefix and credential migration need live verification.
-- Confirm the role codes and campus scopes of the supplied teacher/team-leader fixtures. Obtain a manager fixture before advertising live manager verification. Additional privileged meanings for `so_staff` remain disabled by the fallback policy until separately agreed.
+- Confirm the role codes and campus scopes of the supplied teacher/team-leader fixtures. Obtain a manager fixture before advertising live manager verification. Verify `instructor` and `so_staff` Team Lead fixtures under the latest supplied table.
 - An operator must explicitly map and enable each rollout campus. Expanding to the real Mapo campus requires an account-duplication assessment; never merge existing accounts by email/name or discard learning history.
 - HQ must expose the Cove student card and staff shortcut, both targeting GET `https://cs.coveedu.com/sso/start`. This repository cannot make that change to OS. HQ controls whether its hub requires enrollment/entitlement before displaying the student card; verify that separately from Cove login readiness.
 - Keep the existing provider credential guard. Revalidate passwordless creation, OTP bridge, refresh and blocked password/email/provider changes against the selected Supabase project.
@@ -288,7 +289,7 @@ Cove 연동은 OS 계정으로 최초 접속 시 Cove 계정을 자동 생성하
 
 학생용 Cove 카드와 직원용 바로가기 주소는 모두 https://cs.coveedu.com/sso/start (GET)입니다. callback은 https://cs.coveedu.com/sso/callback 입니다.
 
-제안하는 권한 연결은 student→학생, instructor/tutor→선생님, edu_manager→팀리더, lab_head→매니저, hq_admin→플랫폼 관리자입니다. 전달해 주신 테스트 계정의 실제 user_role, external_user_id, external_campus_id 및 external_campus_ids 확인과 매니저 테스트 계정도 부탁드립니다. 비밀번호는 별도 비공개 경로로 전달 부탁드립니다.
+최신 표 기준 권한 연결은 student→학생, tutor→선생님, instructor/so_staff/edu_manager→팀리더, lab_head→매니저, hq_admin→플랫폼 관리자입니다. 전달해 주신 테스트 계정의 실제 user_role, external_user_id, external_campus_id 및 external_campus_ids 확인과 매니저 테스트 계정도 부탁드립니다. 비밀번호는 별도 비공개 경로로 전달 부탁드립니다.
 
 캠퍼스는 최초 1회 연결하고, 연결 완료된 캠퍼스의 신규 사용자는 별도 Cove 회원가입이나 사용자별 수동 등록 없이 이용하도록 합니다. 로그인 연동과 코스/수강 자동 동기화는 별도로 검증할 예정입니다.
 ```

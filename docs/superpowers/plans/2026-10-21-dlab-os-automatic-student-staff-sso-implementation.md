@@ -3,6 +3,8 @@
 Approved design: [spec](../specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md).
 Branch: `feat/dlab-os-staff-sso`. No production changes in this implementation run.
 
+Latest October 21 HQ-table amendment: `student` → Student; `tutor` → Teacher; `instructor` / `so_staff` / `edu_manager` → Team Lead; `lab_head` → Manager; `hq_admin` → Platform Admin. This supersedes the earlier translations recorded below. See the [mapping amendment and HQ handoff](../../research/2026-10-21-dlab-hq-role-table-amendment.md) for current verification and release status.
+
 1. Add shared exact role/scope policy and new-domain constants; validate rollout modes.
 2. Add additive persistence, restriction provenance, integration events and database guards.
 3. Share transactional reconciliation across login, PUT updates and operator commands. Serialize integration writes through one advisory lock before acquiring any row locks; keep provider/network calls outside transactions.

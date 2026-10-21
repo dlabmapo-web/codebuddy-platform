@@ -30,7 +30,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     redis = new Redis(redisUrl!);
   });
   afterAll(async () => { vi.unstubAllGlobals(); await redis?.quit(); await db?.$disconnect(); });
-  async function fixture(role = 'instructor', mode = 'campus') {
+  async function fixture(role = 'tutor', mode = 'campus') {
     const id = randomUUID(), primary = randomUUID(), secondary = randomUUID(), binding = 'f'.repeat(64);
     const config = new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_SSO_ROLLOUT_MODE: mode, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: mode === 'allowlist' ? [id] : [], DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_CLIENT_SECRET: 'test-only-client-secret-not-a-real-key', DLAB_REDIRECT_URI: 'http://localhost:3000/sso/callback' });
     const state = new DlabStateService(redis), reconciler = new DlabReconcilerService(config as never);
@@ -61,7 +61,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     const record = () => db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: true } } } });
     return { id, primary, secondary, os, config, source, policy, sso, binding, auth, academies, login, record };
   }
-  it.each([['student', 'STUDENT', true, 1], ['instructor', 'TEACHER', false, 2], ['edu_manager', 'TEAM_LEAD', false, 2], ['lab_head', 'MANAGER', false, 2], ['tutor', 'TEACHER', false, 2], ['so_staff', 'STUDENT', true, 1], ['future_role', 'STUDENT', true, 1]])('automatically provisions %s as %s without a user allowlist or prior PUT', async (osRole, localRole, studentLease, campusCount) => {
+  it.each([['student', 'STUDENT', true, 1], ['instructor', 'TEAM_LEAD', false, 2], ['edu_manager', 'TEAM_LEAD', false, 2], ['lab_head', 'MANAGER', false, 2], ['tutor', 'TEACHER', false, 2], ['so_staff', 'TEAM_LEAD', false, 2], ['future_role', 'STUDENT', true, 1]])('automatically provisions %s as %s without a user allowlist or prior PUT', async (osRole, localRole, studentLease, campusCount) => {
     const f = await fixture(osRole as string);
     const first = await f.login();
     expect(first.requiresStudentSession).toBe(studentLease);
@@ -70,6 +70,12 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     expect(saved.bindings).toHaveLength(campusCount as number);
     expect(saved.bindings.every(b => b.membership.role === localRole && b.membership.status === 'ACTIVE')).toBe(true);
     expect(await db.studentAcademyProfile.count({ where: { membershipId: { in: saved.bindings.map(b => b.membershipId) } } })).toBe(studentLease ? 1 : 0);
+    const access = new AcademyAccessService(db, new SupportGrantResolver(db), f.policy);
+    for (const permission of ['curriculum.manage', 'class-teachers.manage', 'class-enrollments.manage'] as const) {
+      const allowed = access.requirePermission(first.claims.authUserId, f.academies[0]!.id, permission);
+      if (localRole === 'TEAM_LEAD' || localRole === 'MANAGER') await expect(allowed).resolves.toMatchObject({ role: localRole });
+      else await expect(allowed).rejects.toThrow();
+    }
     const again = await f.login();
     expect(again.completed.authUserId).toBe(first.completed.authUserId);
     expect((await f.record()).bindings.map(b => b.membershipId).sort()).toEqual(saved.bindings.map(b => b.membershipId).sort());
@@ -129,14 +135,14 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     expect((await restricted.record()).user?.platformRole).toBe('USER');
     await expect(restricted.login()).rejects.toThrow('dlab_access_unavailable');
   });
-  it('reconciles an existing tutor Student membership without replacing its account or history', async () => {
-    const f = await fixture('tutor'); f.os.external_campus_ids = [f.primary];
+  it.each([['tutor', 'STUDENT', 'TEACHER'], ['instructor', 'TEACHER', 'TEAM_LEAD'], ['so_staff', 'STUDENT', 'TEAM_LEAD']] as const)('reconciles an existing %s %s membership to %s without replacing its account or history', async (osRole, previousRole, nextRole) => {
+    const f = await fixture(osRole); f.os.external_campus_ids = [f.primary];
     const initial = await f.login();
     const before = await f.record(), member = before.bindings[0]!;
-    // Model an account provisioned before the confirmed tutor role mapping.
+    // Model a membership provisioned before the latest confirmed mapping.
     await dlabTransaction(db, async tx => {
       await sourceWrite(tx);
-      await tx.academyMembership.update({ where: { id: member.membershipId }, data: { role: 'STUDENT' } });
+      await tx.academyMembership.update({ where: { id: member.membershipId }, data: { role: previousRole } });
       await tx.studentAcademyProfile.create({ data: { membershipId: member.membershipId, academyId: member.membership.academyId, schoolGrade: 'preserved', codingInterests: [] } });
     });
     const actor = await db.user.create({ data: { username: 'op_' + randomUUID().replaceAll('-', '').slice(0, 20), status: 'ACTIVE', platformRole: 'ADMIN' } });
@@ -147,8 +153,8 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     const after = await f.record();
     expect(after.userId).toBe(before.userId);
     expect(after.user?.authUserId).toBe(before.user?.authUserId);
-    expect(after.userRole).toBe('tutor');
-    expect(after.bindings[0]).toMatchObject({ membershipId: member.membershipId, membership: { role: 'TEACHER', status: 'ACTIVE' } });
+    expect(after.userRole).toBe(osRole);
+    expect(after.bindings[0]).toMatchObject({ membershipId: member.membershipId, membership: { role: nextRole, status: 'ACTIVE' } });
     expect((await db.studentAcademyProfile.findUniqueOrThrow({ where: { membershipId: member.membershipId } })).schoolGrade).toBe('preserved');
     await expect(f.policy.assertSession(initial.claims)).rejects.toThrow('session_not_activated');
     const fresh = await f.login();

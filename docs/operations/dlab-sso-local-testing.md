@@ -163,7 +163,7 @@ Expected: `mode: "apply"`. The command records the operator and mapping time. It
 
 1. Open a separate browser profile or an incognito window to keep your teacher/admin session separate.
 2. Visit `http://localhost:3000/login` and click **Log in with DLAB**. Alternatively, open `http://localhost:3000/sso/start` directly.
-3. Confirm the browser goes to `dlab-os.onrender.com`.
+3. Confirm the browser goes to `https://os.dlabcampus.com/v1/sso/authorize`. The old Render domain is not accepted by the current implementation.
 4. Choose **대치캠퍼스**, enter the test student name exactly as HQ supplied it, and enter the six-digit login number from the private message. If DLAB already remembers the account, choose **Continue with** that student.
 5. Complete login promptly. The Cove transaction expires after five minutes; the returned DLAB code is single-use and short-lived.
 6. The browser should return through `/sso/callback` and then open `/academy/<chosen-academy-slug>` on localhost.

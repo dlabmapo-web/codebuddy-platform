@@ -29,7 +29,7 @@ async function enter(page: Page, value: Fixture) {
   });
   await page.goto('/sso/start');
 }
-for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'], ['tutor', 'TEACHER'], ['edu_manager', 'TEAM_LEAD'], ['lab_head', 'MANAGER'], ['future_role', 'STUDENT']] as const) {
+for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEAM_LEAD'], ['tutor', 'TEACHER'], ['so_staff', 'TEAM_LEAD'], ['edu_manager', 'TEAM_LEAD'], ['lab_head', 'MANAGER'], ['future_role', 'STUDENT']] as const) {
   test(`OS ${osRole} automatically enters Cove as ${role} and reuses the account`, async ({ page, request }) => {
     const value = await fixture(request, osRole);
     await enter(page, value);
@@ -134,7 +134,7 @@ test('HQ deactivation blocks live tokens; reactivation requires a fresh SSO logi
   expect((await rpc(page, request, 'auth/me', {})).ok()).toBe(true);
 });
 test('HQ role changes revoke the old session and the next login receives the new role', async ({ page, request }) => {
-  const value = await fixture(request, 'instructor');
+  const value = await fixture(request, 'tutor');
   await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
   const oldToken = await tokenFor(page);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);

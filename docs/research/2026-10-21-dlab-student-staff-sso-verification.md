@@ -1,5 +1,7 @@
 # Automatic DLAB student/staff SSO verification
 
+Latest amendment: [HQ role table and new-domain handoff](2026-10-21-dlab-hq-role-table-amendment.md). It supersedes earlier role mappings below: `instructor` / `so_staff` / `edu_manager` now map to Team Lead. This document retains the chronological verification history; use the amendment for current test results and deployment status.
+
 Date: 2026-10-21 (Asia/Seoul)
 Branch: `feat/dlab-os-staff-sso`
 Baseline: v2 `97953f494cd001dbdf9da499f47696e7e8085c1d`; approved design commit `1de1eead`.

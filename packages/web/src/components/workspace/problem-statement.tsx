@@ -55,7 +55,7 @@ export function ProblemStatement({
 
   const constraintLines = exercise.constraints
     .split('\n')
-    .map((line) => line.replace(/^[•·-]\s*/, '').trim())
+    .map((line) => line.trim().replace(/^(?:[•·]\s*|-\s+)/, ''))
     .filter(Boolean);
   const hasFormat =
     exercise.inputFormat.trim().length > 0 ||

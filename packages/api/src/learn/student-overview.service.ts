@@ -32,6 +32,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import {
   CurriculumOutlineService,
   courseSummaryFor,
+  exerciseMaterialIds,
   nonemptyModules,
   type ProgressByMaterial,
 } from "./curriculum-outline.service.js";
@@ -108,7 +109,12 @@ export class StudentOverviewService {
     ] = await Promise.all([
       settle(
         ["continue", "courses"],
-        () => this.curriculum.statusByMaterial(scope.userId, scope.materialIds),
+        // The course denominator includes scored written/video activities too.
+        // The code-only list remains the scope for code history and its ledger.
+        () => this.curriculum.statusByMaterial(
+          scope.userId,
+          scope.courses.flatMap(exerciseMaterialIds),
+        ),
         new Map() as ProgressByMaterial,
       ),
       settle(

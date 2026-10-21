@@ -1,4 +1,4 @@
-import { isOutputCorrect, type CaseOutcome, type SubmissionResult } from '@cove/shared';
+import { isOutputCorrect, isTerminalStatus, type CaseOutcome, type SubmissionResult } from '@cove/shared';
 
 /**
  * Display helpers for a verdict. The score itself is computed by the judge —
@@ -28,8 +28,9 @@ export function resultPresentation(
   submitting: boolean,
   hasTransportError = false,
 ): ResultPresentation {
-  if (hasTransportError && !result) return 'transport_error';
-  if (!result) return 'grading';
+  if (hasTransportError && (!result || !isTerminalStatus(result.status))) return 'transport_error';
+  // Practice polling returns queued/running snapshots before a final verdict.
+  if (!result || !isTerminalStatus(result.status)) return 'grading';
   if (result.status === 'ERRORED' || result.status === 'CANCELLED') {
     return 'judge_error';
   }

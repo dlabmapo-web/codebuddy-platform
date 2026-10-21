@@ -53,6 +53,15 @@ describe('verdictTone', () => {
 });
 
 describe('resultPresentation', () => {
+  it.each(['QUEUED', 'RUNNING'] as const)('keeps a %s snapshot in grading until a terminal verdict arrives', (status) => {
+    const pending = result({ status, score: 0, cases: [] });
+    expect(resultPresentation(pending, true)).toBe('grading');
+    expect(resultPresentation(pending, false)).toBe('grading');
+    expect(verdictTone(pending, true)).toBe('running');
+    expect(resultPresentation(pending, false, true)).toBe('transport_error');
+    expect(resultPresentation(result({ status: 'PASSED' }), false)).toBe('accepted');
+  });
+
   it.each([
     ['WRONG_OUTPUT', 'wrong_output'],
     ['RUNTIME_ERROR', 'runtime_error'],

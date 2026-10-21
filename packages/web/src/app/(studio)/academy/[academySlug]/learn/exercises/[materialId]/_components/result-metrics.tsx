@@ -54,7 +54,7 @@ export function ResultMetrics({
         label={t('submit.metric_score')}
         testId="result-score"
         value={
-          result ? t('submit.score', { score: result.score }) : '— / 100'
+          result && presentation !== 'grading' ? t('submit.score', { score: result.score }) : '— / 100'
         }
       />
       <Metric

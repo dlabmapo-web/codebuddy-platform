@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowLeft, ChevronLeft, ChevronRight, Expand, Send, Save, BookOpen, Menu, LogOut, History, MessageSquareText, ListChecks } from 'lucide-react';
+import { WrittenAnswerCard, AssessmentDrawer, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
 import {
@@ -61,12 +63,12 @@ export function ManualWorkspace({
   const [saved, setSaved] = useState("");
   const [session, setSession] = useState<ManualSession | null>(null);
   const [input, setInput] = useState("");
-  const [drawer, setDrawer] = useState(false);
   const [executionTab, setExecutionTab] = useState<"drawing" | "terminal">(
     "drawing",
   );
   const [dirty, setDirty] = useState(false);
   const pendingSubmit = useRef<{ key: string; content: string } | null>(null);
+  const resultPanel = useRef<HTMLElement | null>(null);
   const saving = useRef<Promise<void> | null>(null);
   const draftRevision = useRef(0);
   const loaded = useRef(false);
@@ -299,6 +301,7 @@ export function ManualWorkspace({
       setSaved(data?.practice ? pt("saved_result") :
         mt(explicit ? "submitted" : "submitted_awaiting_teacher_review"),
       );
+      requestAnimationFrame(() => resultPanel.current?.scrollIntoView({ block: 'nearest' }));
     } catch (e) {
       setError(e instanceof Error ? e.message : mt("submit_failed"));
     } finally {
@@ -314,6 +317,7 @@ export function ManualWorkspace({
           })
         : routes.academyLearnAssessment(slug, m.materialId, m.type, {
             classId: selectedClass,
+            preview: preview || undefined,
           });
   const latestAttempt = data?.practice ? data.attempts[0] : data?.attempts.find((a) => a.classId === selectedClass);
   const effective = effectiveManualResult(latestAttempt);
@@ -361,102 +365,17 @@ export function ManualWorkspace({
   const index = data.materials.findIndex((m) => m.materialId === materialId);
   const previous = data.materials[index - 1],
     next = data.materials[index + 1];
-  const attempts = data.attempts.filter((a) => a.classId === selectedClass);
+  const attempts = data.practice ? data.attempts : data.attempts.filter((a) => a.classId === selectedClass);
   const attempt = attempts[0],
     review = attempt?.reviews[0];
-  return (
-    <main className="flex min-h-dvh flex-col bg-canvas text-ink md:h-dvh md:overflow-hidden">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border bg-card p-3">
-        <Link
-          href={routes.academyLearnCourse(slug, data.course.id, { classId })}
-        >
-          ← {data.course.title}
-        </Link>
-        <h1 className="flex-1 font-bold">{data.title}</h1>
-        <span className="text-xs">
-          {mt(
-            choice || (short && short.gradingMode !== "MANUAL")
-              ? "automatic_graded"
-              : "teacher_graded",
-          )}{" "}
-          {data.practice ? pt("label") : data.config.includeInScore
-            ? mt("included_in_score")
-            : mt("excluded_from_score")}
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            if (document.fullscreenElement) void document.exitFullscreen?.();
-            else
-              void document.documentElement
-                .requestFullscreen?.()
-                .catch(() => {});
-          }}
-        >
-          {mt("fullscreen")}
-        </button>
-        <button type="button" onClick={() => setDrawer((v) => !v)}>
-          {mt("materials")}
-        </button>
-      </header>
-      {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
-      {/* Assigned when a draft loads, alongside state that re-renders. */}
-      {/* eslint-disable-next-line react-hooks/refs */}
-      {explicit && loadedContentRevision.current !== data.config.revision ? (
-        <p role="alert" className="p-3 text-danger">
-          {mt("content_changed")}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="bg-danger/10 p-3 text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <aside
-          className={
-            choice && !loadedInstructions && !attempt && !drawer
-              ? "hidden"
-              : "max-h-[30vh] overflow-auto border-b border-border bg-card p-5 md:max-h-none md:w-1/3 md:border-r"
-          }
-        >
-          {choice ? (
-            <ChoiceRich
-              content={loadedInstructions}
-              scope={{ ...target, classId: selectedClass, preview }}
-            />
-          ) : (
-            <RichTextFrame
-              content={data.config.description}
-              title={mt("activity_instructions")}
-            />
-          )}
-          {preview && data.config.solutionFiles ? (
-            <details className="mt-4">
-              <summary>{mt("view_solution")}</summary>
-              <pre className="overflow-auto whitespace-pre-wrap">
-                {Object.values(data.config.solutionFiles).join("\n")}
-              </pre>
-              <button
-                type="button"
-                disabled={busy || Boolean(running)}
-                onClick={() => void run(true)}
-              >
-                {mt("run_solution")}
-              </button>
-            </details>
-          ) : null}
-          {preview && data.config.modelAnswer ? (
-            <details>
-              <summary>{mt("model_answer_private")}</summary>
-              <p className="whitespace-pre-wrap">{data.config.modelAnswer}</p>
-            </details>
-          ) : null}
-          {attempt ? (
-            <section className="mt-4 rounded border border-border p-3">
-              <h2 className="font-bold">{mt("last_submission")}</h2>
-              <p>{new Date(attempt.createdAt).toLocaleString()}</p>
-              <p>{resultLabel(attempt)}</p>
+  const drawing = data.type === "TURTLE_EXERCISE";
+  const instructionHtml = choice ? loadedInstructions : data.config.description;
+  const showInstructions = drawing || Boolean(instructionHtml.replace(/<[^>]*>/g, '').trim() || /<(?:img|video|iframe)\b/i.test(instructionHtml) || (preview && data.config.modelAnswer));
+  const submissionPanels = <>{attempt ? (
+            <section ref={resultPanel} className="mx-5 mb-5 rounded-lg border border-border bg-canvas/50 p-4 sm:mx-6">
+              <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-sub"><History aria-hidden className="size-4" />{mt("last_submission")}</h2>
+              <p className="mt-1 text-xs text-sub">{new Date(attempt.createdAt).toLocaleString()}</p>
+              <div className="mt-3"><AssessmentStatus label={resultLabel(attempt)} completed={effective?.completed} /></div>
               {attempt.shortAnswerAssessment?.status === "ERROR" ? (
                 <button
                   type="button"
@@ -478,10 +397,10 @@ export function ManualWorkspace({
                 </button>
               ) : null}
               {review ? (
-                <p className="whitespace-pre-wrap">{review.feedback}</p>
+                <div className="mt-4 border-t border-border pt-4"><h3 className="mb-2 flex items-center gap-2 text-xs font-bold text-sub"><MessageSquareText aria-hidden className="size-4 text-brand" />{mt("feedback")}</h3><p className="whitespace-pre-wrap text-sm leading-7">{review.feedback}</p></div>
               ) : null}
               <details className="mt-3">
-                <summary>
+                <summary className="cursor-pointer text-sm font-semibold text-brand">
                   {mt("submission")} ({attempts.length})
                 </summary>
                 {attempts.map((old) => (
@@ -528,7 +447,7 @@ export function ManualWorkspace({
             </section>
           ) : null}
           {explanation.data?.explanation && effective?.completed ? (
-            <section data-testid="short-answer-explanation" className="mt-4">
+            <section data-testid="short-answer-explanation" className="mx-5 mb-5 rounded-lg border border-success/20 bg-success/5 p-4 sm:mx-6">
               <h2 className="font-bold">{mt("explanation")}</h2>
               {choice ? (
                 <ChoiceRich
@@ -546,25 +465,100 @@ export function ManualWorkspace({
                 />
               )}
             </section>
+          ) : null}</>;
+  return (
+    <main className="flex min-h-dvh flex-col bg-canvas text-ink md:h-dvh md:overflow-hidden">
+      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2.5">
+        <AssessmentDrawer title={mt('materials')} trigger={<button type="button" aria-label={mt('materials')} className={assessmentAction}><Menu aria-hidden className="size-4" /></button>}>
+          <nav aria-label={mt('materials')} className="grid gap-1">
+            <p className="mb-3 px-3 text-xs font-semibold text-sub">{data.course.title}</p>
+            {data.materials.map((m, i) => <Link key={m.materialId} href={path(m)} aria-current={m.materialId === materialId ? 'page' : undefined}
+              className="flex items-start gap-3 rounded-md border border-transparent px-3 py-3 text-sm hover:bg-accent aria-[current=page]:border-brand/20 aria-[current=page]:bg-brand-soft aria-[current=page]:text-brand">
+              <span className="mt-0.5 text-xs tabular-nums text-sub">{i + 1}</span><span className="min-w-0 flex-1">{m.title}</span>
+              {m.type === 'MULTIPLE_CHOICE' ? <ListChecks aria-hidden className="size-4 shrink-0 text-brand" /> : <BookOpen aria-hidden className="size-4 shrink-0 text-sub" />}
+            </Link>)}
+          </nav>
+        </AssessmentDrawer>
+        <Link
+          className="flex min-w-0 max-w-[calc(100%-65px)] items-center gap-2 text-sm font-medium text-sub hover:text-brand sm:max-w-60"
+          href={routes.academyLearnCourse(slug, data.course.id, { classId: selectedClass })}
+        >
+          <ArrowLeft aria-hidden className="size-4 shrink-0" /><span className="truncate">{data.course.title}</span>
+        </Link>
+        <h1 className="min-w-0 w-full text-sm font-bold tracking-tight sm:w-auto sm:flex-1">{data.title}</h1>
+        <span className="hidden items-center gap-2 rounded-md bg-brand-soft px-2.5 py-1.5 text-xs font-medium text-brand lg:inline-flex">
+          <ListChecks aria-hidden className="size-3.5" />
+          {mt(
+            choice || (short && short.gradingMode !== "MANUAL")
+              ? "automatic_graded"
+              : "teacher_graded",
+          ).replace(/\s*·\s*$/, '')}{" · "}
+          {data.practice ? pt("label") : data.config.includeInScore
+            ? mt("included_in_score")
+            : mt("excluded_from_score")}
+        </span>
+        <Link href={routes.academyLearnCourse(slug, data.course.id, { classId: selectedClass })} className="ml-auto inline-flex min-h-9 items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/10"><LogOut aria-hidden className="size-4" />{mt('ui.leave')}</Link>
+      </header>
+      {preview ? <p role="note" className="flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 py-3 text-sm text-brand"><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}
+      {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
+      {/* Assigned when a draft loads, alongside state that re-renders. */}
+      {/* eslint-disable-next-line react-hooks/refs */}
+      {explicit && loadedContentRevision.current !== data.config.revision ? (
+        <p role="alert" className="p-3 text-danger">
+          {mt("content_changed")}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="bg-danger/10 p-3 text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className={`flex min-h-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
+        <aside
+          className={
+            !showInstructions
+              ? "hidden"
+              : drawing ? "shrink-0 overflow-auto border-b border-border bg-card p-5 md:w-[38%] md:max-w-xl md:border-r md:border-b-0 sm:p-7" : "min-h-48 min-w-0 shrink-0 rounded-lg border border-border bg-card p-6 md:min-h-0 md:w-[calc(50%-8px)] md:overflow-y-auto"
+          }
+        >
+          <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sub"><BookOpen aria-hidden className="size-4" />{mt("activity_instructions")}</h2>
+          {choice ? (
+            <ChoiceRich
+              content={loadedInstructions}
+              scope={{ ...target, classId: selectedClass, preview }}
+            />
+          ) : (
+            <RichTextFrame
+              content={data.config.description}
+              title={mt("activity_instructions")}
+            />
+          )}
+          {preview && data.config.solutionFiles ? (
+            <details className="mt-4">
+              <summary>{mt("view_solution")}</summary>
+              <pre className="overflow-auto whitespace-pre-wrap">
+                {Object.values(data.config.solutionFiles).join("\n")}
+              </pre>
+              <button
+                type="button"
+                disabled={busy || Boolean(running)}
+                onClick={() => void run(true)}
+              >
+                {mt("run_solution")}
+              </button>
+            </details>
           ) : null}
+          {preview && data.config.modelAnswer ? (
+            <details className="mt-6 rounded-xl border border-border bg-canvas/60 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-sub">{mt("model_answer_private")}</summary>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{data.config.modelAnswer}</p>
+            </details>
+          ) : null}
+          {drawing ? submissionPanels : null}
       <VideoResourceLinks academyId={academyId} materialId={materialId} classId={selectedClass} preview={preview}/>
-          {drawer ? (
-            <nav className="mt-5 grid gap-2">
-              {data.materials.map((m) => (
-                <Link
-                  key={m.materialId}
-                  href={path(m)}
-                  aria-current={
-                    m.materialId === materialId ? "page" : undefined
-                  }
-                >
-                  {m.title}
-                </Link>
-              ))}
-            </nav>
-          ) : null}
         </aside>
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <section aria-label={mt("ui.answer_workspace")} className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "" : `min-h-[440px] rounded-lg border border-border bg-card md:min-h-0 ${showInstructions ? "" : "mx-auto w-full max-w-3xl"}`}`}>
+          {!showInstructions ? <div className="px-6"><VideoResourceLinks academyId={academyId} materialId={materialId} classId={selectedClass} preview={preview} /></div> : null}
           {data.type === "TURTLE_EXERCISE" ? (
             <>
               <div className="flex gap-2 overflow-auto bg-editor-bg p-2 text-white">
@@ -604,7 +598,7 @@ export function ManualWorkspace({
               </div>
             </>
           ) : loadedChoice ? (
-            <div className="mx-auto w-full max-w-3xl flex-1 overflow-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               <ChoiceOptions
                 definition={loadedChoice}
                 selected={choiceSelected}
@@ -616,28 +610,16 @@ export function ManualWorkspace({
                 disabled={busy}
                 scope={{ ...target, classId: selectedClass, preview }}
               />
+              {submissionPanels}
             </div>
           ) : (
-            <label className="flex flex-1 flex-col p-5">
-              {short
-                ? `Q. ${short.question}`
-                : data.config.hint || mt("your_answer")}
-              <textarea
-                className="mt-3 min-h-[260px] rounded border border-border bg-card p-3"
-                aria-label={mt("your_answer")}
-                placeholder={short ? data.config.hint : undefined}
-                disabled={busy}
-                maxLength={10000}
-                value={answer}
-                onChange={(e) => {
-                  setAnswer(e.target.value);
-                  setDirty(true);
-                  setSaved(mt("unsaved_changes"));
-                }}
-              />
-            </label>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <WrittenAnswerCard question={short?.question} hint={data.config.hint} answer={answer} disabled={busy}
+                onChange={(value) => { setAnswer(value); setDirty(true); setSaved(mt("unsaved_changes")); }} />
+              {submissionPanels}
+            </div>
           )}
-          <div className="flex flex-wrap items-center gap-3 border-y border-border bg-card p-3">
+          <div className={`flex shrink-0 flex-wrap items-center gap-3 ${data.type === "TURTLE_EXERCISE" ? "border-y border-border bg-card p-3" : "mt-auto justify-end border-t border-border bg-canvas/30 px-5 py-4"}`}>
             {data.type === "TURTLE_EXERCISE" ? (
               <>
                 <button
@@ -657,20 +639,22 @@ export function ManualWorkspace({
                 </button>
               </>
             ) : null}
+            {preview && !drawing ? <button type="button" disabled className={assessmentPrimary}><Send aria-hidden className="size-4" />{mt("submit")}</button> : null}
             {!preview ? (
               <>
                 {!explicit ? (
                   <button
                     type="button"
-                    disabled={busy}
+                    className={assessmentAction}
+                    disabled={busy || !dirty}
                     onClick={() => void save()}
                   >
-                    {mt("save_code")}
+                    <Save aria-hidden className="size-4" />{mt(data.type === "WRITTEN_RESPONSE" ? "ui.save_answer" : "save_code")}
                   </button>
                 ) : null}
                 {data.config.submitEnabled ? (
                   <button
-                    className="rounded border border-border px-4 py-2"
+                    className={assessmentPrimary}
                     type="button"
                     disabled={
                       busy ||
@@ -681,7 +665,7 @@ export function ManualWorkspace({
                     }
                     onClick={() => void submit()}
                   >
-                    {mt("submit")}
+                    <Send aria-hidden className="size-4" />{mt(busy ? "ui.submitting" : "submit")}
                   </button>
                 ) : null}
               </>
@@ -706,7 +690,7 @@ export function ManualWorkspace({
                 {mt(choice ? "choice_unavailable" : "short_answer_unavailable")}
               </p>
             ) : null}
-            <span role="status" className="text-xs">
+            <span role="status" className={drawing ? "text-xs" : "order-first mr-auto text-xs text-sub"}>
               {saved} {session?.state}{" "}
               {session?.exitCode !== undefined
                 ? mt("exit_code", { code: session.exitCode })
@@ -798,12 +782,27 @@ export function ManualWorkspace({
           ) : null}
         </section>
       </div>
-      <footer className="flex shrink-0 justify-center gap-5 border-t border-border bg-card p-3">
-        {previous ? <Link href={path(previous)}>{mt("previous")}</Link> : null}
+      <footer className="relative flex shrink-0 flex-wrap items-center justify-center gap-4 border-t border-border bg-card px-4 py-3 text-sm">
+        {previous ? <Link className={assessmentAction} href={path(previous)}><ChevronLeft aria-hidden className="size-4" />{mt("previous")}</Link> : null}
         <span>
           {index + 1} / {data.materials.length}
         </span>
-        {next ? <Link href={path(next)}>{mt("next")}</Link> : null}
+        {next ? <Link className={assessmentPrimary} href={path(next)}>{mt("next")}<ChevronRight aria-hidden className="size-4" /></Link> : null}
+        <div className="ml-auto sm:absolute sm:right-4">        <button
+          className={assessmentAction}
+          aria-label={mt('fullscreen')}
+          type="button"
+          onClick={() => {
+            if (document.fullscreenElement) void document.exitFullscreen?.();
+            else
+              void document.documentElement
+                .requestFullscreen?.()
+                .catch(() => {});
+          }}
+        >
+          <Expand aria-hidden className="size-4" /><span className="hidden sm:inline">{mt("fullscreen")}</span>
+        </button>
+        </div>
       </footer>
     </main>
   );

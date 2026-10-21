@@ -1,4 +1,7 @@
 "use client";
+import { ArrowLeft, Search, Users, FileCheck2, LockKeyhole, History, Clock3, Trophy, UserRound } from 'lucide-react';
+import { RichTextFrame } from '@/components/studio/rich-text-frame';
+import { ReviewGradingPanel, AssessmentDrawer, AssessmentStatus, assessmentAction } from './assessment-ui';
 import { ChoiceAttempt } from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -45,6 +48,9 @@ export function ManualReviewWorkspace({
     [draftFiles, setDraftFiles] = useState<Record<string, string>>({}),
     [draftAnswer, setDraftAnswer] = useState(""),
     [input, setInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [publishedId, setPublishedId] = useState<string | null>(null);
   const active = useRef<string | null>(null);
   const connectionFailed = useRef(false);
   const selectedUser = userId || query.data?.[0]?.userId;
@@ -69,6 +75,16 @@ export function ManualReviewWorkspace({
       learner?.attempts.find((a) => a.id === attemptId) ?? learner?.attempts[0],
     review = attempt?.reviews[0];
   const effective = effectiveManualResult(attempt);
+  const newestAttempt = learner?.attempts[0];
+  const newestResult = effectiveManualResult(newestAttempt);
+  const reviewDirty = Boolean(attempt && (score !== (effective?.scoreHundredths ?? 0) / 100 || completed !== (effective?.completed ?? false) || feedback !== (review?.feedback ?? "")));
+  function allowReviewSwitch() { return !busy && (!reviewDirty || window.confirm(mt('ui.discard_review'))); }
+  useEffect(() => {
+    if (!reviewDirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [reviewDirty]);
   useEffect(() => {
     // Resets the review form to the newly selected attempt's saved result.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -157,6 +173,7 @@ export function ManualReviewWorkspace({
         feedback,
       });
       await Promise.all([query.refetch(), work.refetch()]);
+      setPublishedId(attempt.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : mt("review_failed"));
     } finally {
@@ -226,36 +243,43 @@ export function ManualReviewWorkspace({
   if (!query.data || !content.data || (selectedUser && !work.data))
     return <main className="p-5">{mt("loading_review")}</main>;
   return (
-    <main className="min-h-dvh bg-canvas p-5 text-ink">
-      <header className="mb-4 flex flex-wrap gap-4">
+    <main className="min-h-dvh bg-canvas text-ink">
+      <header className="flex flex-wrap items-center gap-4 border-b border-border bg-card px-5 py-4 sm:px-7">
         <Link
-          className="text-brand"
+          className={assessmentAction}
+          onClick={e => { if (!allowReviewSwitch()) e.preventDefault(); }}
           href={routes.academyTeachClass(slug, classId)}
         >
-          ← Class
+          <ArrowLeft aria-hidden className="size-4" />{mt("ui.back_class")}
         </Link>
-        <h1 className="font-bold">{content.data.title} · Teacher review</h1>
+        <div className="min-w-0 flex-1"><p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand"><FileCheck2 aria-hidden className="size-3.5" />{mt("teacher_review")}</p><h1 className="text-lg font-bold tracking-tight sm:text-xl">{content.data.title}</h1></div>
       </header>
       {error ? (
-        <p role="alert" className="p-3 text-danger">
+        <p role="alert" className="m-5 rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
           {error}
         </p>
       ) : null}
-      <div className="grid gap-5 md:grid-cols-[240px_1fr]">
-        <aside>
-          <ul>
-            {query.data.map((s) => (
+      <div className="flex flex-wrap items-center gap-4 border-b border-border bg-card px-4 py-3 sm:px-8">
+        <AssessmentDrawer title={mt('ui.learners')} open={rosterOpen} onOpenChange={setRosterOpen} trigger={<button type="button" className={assessmentAction}><Users aria-hidden className="size-4 text-brand" />{learner?.learnerName || mt('ui.learners')}<span className="rounded bg-brand-soft px-2 py-0.5 text-xs text-brand">{query.data.length}</span></button>}>
+          <div>
+          <label className="relative mb-3 block"><Search aria-hidden className="absolute left-3 top-3 size-4 text-sub" /><input aria-label={mt('ui.search_learners')} placeholder={mt('ui.search_learners')} value={search} onChange={e => setSearch(e.target.value)} className="min-h-10 w-full rounded-lg border border-border bg-canvas py-2 pr-3 pl-9 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15" /></label>
+          <ul className="grid gap-2">
+            {query.data.filter(s => s.learnerName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())).map((s) => (
               <li key={s.userId}>
                 <button
-                  className="mb-2 w-full rounded border border-border bg-card p-3 text-left"
+                  aria-pressed={selectedUser === s.userId}
+                  disabled={busy}
+                  className="w-full rounded-xl border border-transparent p-3 text-left transition-colors hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand aria-pressed:border-brand/25 aria-pressed:bg-brand-soft aria-pressed:text-brand disabled:opacity-50"
                   onClick={() => {
+                    if (!allowReviewSwitch()) return;
                     setUserId(s.userId);
                     setAttemptId("");
                     setEditing(false);
+                    setRosterOpen(false);
                   }}
                 >
                   <strong>{s.learnerName}</strong>
-                  <span className="block text-xs">
+                  <span className="mt-1 block text-xs text-sub">
                     {!s.attempts.length
                       ? mt("not_submitted")
                       : effectiveManualResult(s.attempts[0])
@@ -266,8 +290,19 @@ export function ManualReviewWorkspace({
               </li>
             ))}
           </ul>
-        </aside>
-        <section className="min-w-0">
+          {!query.data.some(s => s.learnerName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())) ? <p role="status" className="p-3 text-sm text-sub">{mt("ui.no_learners")}</p> : null}
+</div>
+
+        </AssessmentDrawer>
+        <dl className="ml-auto flex flex-wrap gap-5 text-xs sm:gap-8">
+          <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><History aria-hidden className="size-3.5" />{mt('ui.attempt_count')}</dt><dd className="font-semibold tabular-nums">{learner?.attempts.length ?? 0}</dd></div>
+          <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><Clock3 aria-hidden className="size-3.5" />{mt('last_submission')}</dt><dd className="font-semibold">{newestAttempt ? new Date(newestAttempt.createdAt).toLocaleString() : '—'}</dd></div>
+          <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><Trophy aria-hidden className="size-3.5 text-warning" />{mt('ui.latest_score')}</dt><dd className="font-semibold tabular-nums text-brand">{newestResult ? `${newestResult.scoreHundredths / 100} / ${newestAttempt!.maximumHundredths / 100}` : '—'}</dd></div>
+        </dl>
+      </div>
+      <div className="p-4 sm:p-6 md:px-8">
+        <section className="min-w-0 space-y-4">
+          <p className="text-sm leading-relaxed text-sub">{mt("ui.review_description")}</p>
           {content.data.type === "TURTLE_EXERCISE" && learner ? (
             <button
               className="mb-3 text-brand"
@@ -284,10 +319,9 @@ export function ManualReviewWorkspace({
               {mt("view_learner_drawing_read_only")}
             </button>
           ) : null}
-          {attempt?.multipleChoiceAssessment ? <p role="status">{mt(attempt.multipleChoiceAssessment.completed?"correct":"incorrect")}</p> : null}
+          {attempt?.multipleChoiceAssessment ? <AssessmentStatus label={mt(attempt.multipleChoiceAssessment.completed?"correct":"incorrect")} completed={attempt.multipleChoiceAssessment.completed} /> : null}
           {attempt?.shortAnswerAssessment ? (
-            <p role="status">
-              {attempt.shortAnswerAssessment.status === "GRADED"
+            <AssessmentStatus completed={effective?.completed} label={attempt.shortAnswerAssessment.status === "GRADED"
                 ? mt(
                     attempt.shortAnswerAssessment.completed
                       ? "correct"
@@ -299,35 +333,47 @@ export function ManualReviewWorkspace({
                       : attempt.shortAnswerAssessment.status === "MANUAL"
                         ? "awaiting_review"
                         : "evaluating",
-                  )}
-            </p>
+                  )} />
           ) : null}
           {attempt ? (
             <>
-              <label>
+              <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="min-w-0 rounded-lg border border-border bg-card p-5 sm:p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-base font-bold"><UserRound aria-hidden className="size-4 text-brand" />{mt('ui.review_answer')} <span className="ml-2 font-normal text-sub">{learner?.learnerName}</span></h2>
+              <label className="grid gap-2 text-xs font-semibold text-sub">
                 {mt("submission")}
                 <select
                   aria-label={mt("submission")}
-                  className="ml-3 border border-border bg-card p-2"
+                  className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-canvas p-2 text-sm font-normal text-ink outline-none focus:border-brand"
                   value={attempt.id}
-                  onChange={(e) => setAttemptId(e.target.value)}
+                  onChange={(e) => { if (allowReviewSwitch()) setAttemptId(e.target.value); }}
                 >
                   {learner!.attempts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {new Date(a.createdAt).toLocaleString()} ·{" "}
                       {a.reviews.length
                         ? mt("reviewed")
+                        : effectiveManualResult(a)
+                          ? mt(effectiveManualResult(a)!.completed ? "correct" : "incorrect")
                         : mt("awaiting_review")}
                     </option>
                   ))}
                 </select>
               </label>
-              <p className="my-3 text-xs">
-                Immutable submitted work · Read-only ·{" "}
+              <p className="my-4 flex items-center gap-1.5 text-xs text-sub">
+                <LockKeyhole aria-hidden className="size-3.5 shrink-0" />{mt("immutable_submitted_work_read_only")}{" "}
                 {attempt.includeInScore
                   ? mt("included_in_score")
                   : mt("excluded_from_score")}
               </p>
+              <details className="mb-5 rounded-md border border-border bg-canvas/50 p-4">
+                <summary className="cursor-pointer text-sm font-semibold">{mt('ui.question')}</summary>
+                <div className="mt-4 space-y-3 text-sm leading-7">
+                  <p className="font-semibold">{content.data.config.shortAnswer?.question ?? content.data.config.multipleChoice?.question}</p>
+                  <RichTextFrame content={content.data.config.description} title={mt('activity_instructions')} />
+                  {content.data.config.modelAnswer ? <><h3 className="font-semibold text-sub">{mt('model_answer_private')}</h3><p className="whitespace-pre-wrap">{content.data.config.modelAnswer}</p></> : null}
+                </div>
+              </details>
               {content.data.type === "TURTLE_EXERCISE" ? (
                 <>
                   <div className="flex gap-3">
@@ -398,59 +444,18 @@ export function ManualReviewWorkspace({
                   ) : null}
                 </>
               ) : attempt.multipleChoiceAssessment ? <ChoiceAttempt attempt={attempt} scope={{academyId,materialId,classId,preview:true}}/> : (
-                <pre className="my-3 whitespace-pre-wrap rounded border border-border bg-card p-4">
-                  {attempt.answer}
-                </pre>
+                <div className="my-3 min-h-48 break-words whitespace-pre-wrap rounded-xl border border-border bg-canvas/50 p-5 text-base leading-8">
+                  {attempt.answer || mt("ui.empty_answer")}
+                </div>
               )}
-              <form
-                className="my-4 grid gap-3 rounded border border-border bg-card p-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void publish();
-                }}
-              >
-                <label>
-                  {mt("score")}
-                  <input
-                    aria-label={mt("score")}
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    max={attempt.maximumHundredths / 100}
-                    className="ml-3 border border-border bg-card p-2"
-                    value={score}
-                    onChange={(e) => setScore(Number(e.target.value))}
-                  />{" "}
-                  / {attempt.maximumHundredths / 100}
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={completed}
-                    onChange={(e) => setCompleted(e.target.checked)}
-                  />{" "}
-                  Completed
-                </label>
-                <label>
-                  {mt("feedback")}
-                  <textarea
-                    aria-label={mt("feedback")}
-                    className="block w-full border border-border bg-card p-2"
-                    value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
-                  />
-                </label>
-                <button
-                  disabled={busy}
-                  className="rounded bg-brand p-2 text-white"
-                >
-                  {mt("publish_review")}
-                </button>
-              </form>
-              <details>
-                <summary>Review history ({attempt.reviews.length})</summary>
+              </div>
+              <aside className="min-w-0 space-y-4 xl:sticky xl:top-5">
+                <ReviewGradingPanel score={score} maximum={attempt.maximumHundredths / 100} completed={completed} feedback={feedback} busy={busy}
+                  saved={Boolean(review || publishedId === attempt.id)} dirty={reviewDirty} onScore={setScore} onCompleted={setCompleted} onFeedback={setFeedback} onSubmit={() => void publish()} />
+              <details className="rounded-xl border border-border bg-card p-4">
+                <summary className="cursor-pointer text-sm font-semibold">{mt("ui.review_history", { count: attempt.reviews.length })}</summary>
                 {attempt.reviews.map((r) => (
-                  <article key={r.id} className="my-2 border border-border p-3">
+                  <article key={r.id} className="mt-3 border-t border-border pt-3 text-sm leading-6">
                     <p>
                       {mt("version", { version: r.version })} ·{" "}
                       {r.scoreHundredths / 100} ·{" "}
@@ -460,10 +465,12 @@ export function ManualReviewWorkspace({
                   </article>
                 ))}
               </details>
+              </aside>
+              </div>
             </>
           ) : (
             <>
-              <p>{mt("no_submission_from_this_learner")}</p>
+              <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-sub"><FileCheck2 aria-hidden className="mx-auto mb-3 size-8 text-sub/50" />{mt("no_submission_from_this_learner")}</div>
               {session?.readOnly ? (
                 <div className="min-h-[300px]">
                   <GuiViewer session={session} onError={onError} />
@@ -475,10 +482,11 @@ export function ManualReviewWorkspace({
             </>
           )}
           {learner?.draft ? (
-            <details className="mt-5 border border-border bg-card p-4">
+            <details className="rounded-2xl border border-border bg-card p-5">
               <summary>
                 {mt("current_learner_draft_separate_from_submitted_work")}
               </summary>
+              <p className="mt-3 text-sm text-sub">{mt("ui.draft_help")}</p>
               <button
                 className="my-3 text-brand"
                 onClick={() => {

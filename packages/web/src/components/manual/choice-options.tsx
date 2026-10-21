@@ -110,24 +110,25 @@ export function ChoiceOptions({
   const { t } = useManualTranslation();
   const groupName = useId();
   return (
-    <fieldset className="grid min-w-0 gap-3">
-      <legend className="mb-3 font-semibold">Q. {definition.question}</legend>
+    <fieldset className="grid min-w-0 gap-4 p-5 sm:p-6">
+      <legend className="sr-only">{definition.question}</legend>
+      <h2 className="mb-2 flex items-start gap-3 text-base font-bold leading-7"><span aria-hidden className="text-lg font-extrabold text-brand">Q.</span>{definition.question}</h2>
       {definition.problemDescription ? (
         <ChoiceRich content={definition.problemDescription} scope={scope} />
       ) : null}
-      <p className="text-sm text-sub">
+      <p className="mb-1 text-xs text-sub">
         {t(definition.selectionMode === "SINGLE" ? "select_one" : "select_all")}
       </p>
       {definition.options.map((o, i) => (
         <label
           key={o.id}
-          className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-4 has-[:checked]:border-brand has-[:focus-visible]:outline-2"
+          className={`group flex min-h-13 min-w-0 items-start gap-3 rounded-md border px-4 py-3.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand ${selected.includes(o.id) ? 'border-brand bg-brand-soft/60' : 'border-transparent bg-canvas'} ${disabled ? 'cursor-default' : 'cursor-pointer hover:border-brand/50 hover:bg-brand-soft/30'}`}
           onClick={(e) => {
             if ((e.target as Element).closest("a")) e.stopPropagation();
           }}
         >
           <input
-            className="mt-1"
+            className="mt-1 size-4 shrink-0 accent-brand"
             aria-label={`${t("option")} ${i + 1}: ${o.content
               .replace(/<img\b[^>]*\balt=["']([^"']*)["'][^>]*>/gi, " $1 ")
               .replace(/<[^>]*>/g, " ")
@@ -146,7 +147,7 @@ export function ChoiceOptions({
               )
             }
           />
-          <ChoiceRich content={o.content} scope={scope} />
+          <div className="min-w-0 flex-1 pt-0.5 text-base leading-6"><ChoiceRich content={o.content} scope={scope} /></div>
         </label>
       ))}
     </fieldset>

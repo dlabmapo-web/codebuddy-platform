@@ -30,12 +30,12 @@ export function ShortAnswerFields({
     onChange({ ...value, [key]: next });
   };
   return (
-    <fieldset className="grid gap-3 rounded border border-border p-4">
+    <fieldset className="grid gap-5 rounded-xl border border-border bg-canvas/30 p-5 [&>label]:grid [&>label]:gap-2 [&>label]:text-sm [&>label]:font-semibold">
       <legend className="px-2 font-bold">{t("short_answer")}</legend>
       <label>
         {t("question")}
         <input
-          className="mt-1 block w-full rounded border border-border bg-card p-2"
+          className="min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
           maxLength={1000}
           value={value.question}
           onChange={(e) => field("question", e.target.value)}
@@ -58,7 +58,7 @@ export function ShortAnswerFields({
       <div
         role="tablist"
         aria-label={t("matching_mode")}
-        className="flex gap-4"
+        className="flex gap-1 rounded-lg border border-border bg-card p-1 [&>button]:min-h-9 [&>button]:flex-1 [&>button]:rounded-md [&>button]:px-3 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-sub [&>button[aria-selected=true]]:bg-brand-soft [&>button[aria-selected=true]]:text-brand [&>button:disabled]:opacity-40"
       >
         {(["EXACT", "REGEX"] as const).map((next) => (
           <button
@@ -82,7 +82,7 @@ export function ShortAnswerFields({
           <input
             aria-label={t("correct_answer")}
             disabled={locked || value.gradingMode === "MANUAL"}
-            className="mt-1 block w-full rounded border border-border bg-card p-2"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-normal outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
             value={value.expectedAnswer}
             maxLength={10000}
             onChange={(e) => field("expectedAnswer", e.target.value)}

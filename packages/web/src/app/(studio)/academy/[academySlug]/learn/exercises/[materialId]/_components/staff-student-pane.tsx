@@ -3,7 +3,7 @@ import * as React from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, X, MessageSquare, Play, Square, LockKeyhole, Pencil } from 'lucide-react';
 import type { MonitoringStudentContext } from '@cove/shared';
 import { orpc } from '@/lib/orpc';
 import { useLiveWorkspace } from '@/lib/monitoring/use-live-workspace';
@@ -61,16 +61,18 @@ function StudentSession({ academyId, materialId, userId, student, context, start
   const savedCode = context.exercise?.draftCode ?? starterCode;
   const canRun = runner.ready && !runner.running;
   return <div className="flex h-full min-h-0 flex-col bg-card">
-    <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3">
+    <div className="grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card px-4 py-3 sm:flex sm:flex-wrap">
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft font-bold text-brand">{[...student.displayName][0]}</span>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{student.displayName}</p><p className="truncate text-xs text-sub">{student.identifier}</p></div>
-      <div className="text-right text-xs text-sub"><p>{t('tutoring_last_submission')}</p><p className="mt-1 font-semibold text-ink">{latest ? new Date(latest.createdAt).toLocaleString() : t(history.isError ? 'tutoring_status_unknown' : 'tutoring_not_submitted')}</p></div>
-      <div className="border-l border-border pl-3 text-right text-xs text-sub"><p>{t('tutoring_score')}</p><p className="mt-1 font-bold text-ink">{latest ? `${latest.score}/100` : '—'}</p></div>
-      <button type="button" onClick={() => setFeedbackOpen(!feedbackOpen)} className="rounded-lg px-2 py-1 text-xs font-bold text-brand">{t('tutoring_feedback')}</button>
-      <button type="button" onClick={() => void close()} aria-label={t('tutoring_own_code')} className="rounded-lg p-2 text-sub hover:bg-canvas"><X className="size-4" /></button>
+      <button type="button" onClick={() => void close()} aria-label={t('tutoring_own_code')} className="rounded-lg p-2 text-sub hover:bg-canvas sm:order-last"><X className="size-4" /></button>
+      <div className="col-span-3 flex min-w-0 flex-wrap items-center gap-3 sm:contents">
+        <div className="text-xs text-sub sm:text-right"><p>{t('tutoring_last_submission')}</p><p className="mt-1 font-semibold text-ink">{latest ? new Date(latest.createdAt).toLocaleString() : t(history.isError ? 'tutoring_status_unknown' : 'tutoring_not_submitted')}</p></div>
+        <div className="border-l border-border pl-3 text-right text-xs text-sub"><p>{t('tutoring_score')}</p><p className="mt-1 font-bold text-ink">{latest ? `${latest.score}/100` : '—'}</p></div>
+        <button type="button" onClick={() => setFeedbackOpen(!feedbackOpen)} aria-expanded={feedbackOpen} className="inline-flex items-center gap-1.5 rounded-lg border border-brand/20 bg-brand-soft px-3 py-2 text-xs font-bold text-brand"><MessageSquare aria-hidden className="size-3.5" />{t('tutoring_feedback')}</button>
+      </div>
     </div>
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-canvas px-4 py-2">
-      <p className="text-xs text-sub">{t(synchronized && live.helping ? 'tutoring_editing' : 'tutoring_readonly')}</p>
+      <p className="flex items-center gap-2 text-xs text-sub">{synchronized && live.helping ? <Pencil aria-hidden className="size-3.5 text-brand" /> : <LockKeyhole aria-hidden className="size-3.5" />}{t(synchronized && live.helping ? 'tutoring_editing' : 'tutoring_readonly')}</p>
       <HelpModeToggle busy={busy} disabled={!synchronized || Boolean(live.pendingRecovery)} helping={exact && live.helping} onToggle={(next) => void mode(next)} />
     </div>
     {live.pendingRecovery ? <div role="status" className="flex shrink-0 gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs"><span>{tm('workspace.pending_blocked')}</span><button type="button" onClick={live.follow}>{t('dialog_retry')}</button><button type="button" onClick={() => {
@@ -82,8 +84,8 @@ function StudentSession({ academyId, materialId, userId, student, context, start
       {synchronized ? <LiveEditor fontSize={13} onCursor={live.publishCursor} peerName={student.displayName} readOnly={!live.canEditCode} remoteCursor={live.remote.cursor} text={live.text} /> : <MonacoEditor beforeMount={registerPaircodeTheme} language="python" theme="paircode-dark" height="100%" value={savedCode} options={{ ariaLabel: t('tutoring_saved_code'), automaticLayout: true, readOnly: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false }} />}
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-border bg-canvas px-3 py-2">
-      <button type="button" disabled={!canRun} onClick={() => { setTerminal('you'); void runner.run(synchronized ? live.text.toString() : savedCode); }} className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-on-brand disabled:opacity-50">{t('tutoring_run')}</button>
-      {runner.running ? <button type="button" onClick={runner.stop} className="rounded-lg border border-border px-3 py-2 text-xs font-bold">{t('tutoring_stop')}</button> : null}
+      <button type="button" disabled={!canRun} onClick={() => { setTerminal('you'); void runner.run(synchronized ? live.text.toString() : savedCode); }} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-on-brand hover:bg-brand-deep disabled:opacity-50"><Play aria-hidden className="size-3.5" />{t('tutoring_run')}</button>
+      {runner.running ? <button type="button" onClick={runner.stop} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-bold"><Square aria-hidden className="size-3.5" />{t('tutoring_stop')}</button> : null}
       <button type="button" aria-pressed={terminal === 'you'} onClick={() => setTerminal('you')} className="px-2 py-1 text-xs font-semibold text-sub">{t('tutoring_your_output')}</button>
       <button type="button" aria-pressed={terminal === 'student'} disabled={!synchronized} onClick={() => setTerminal('student')} className="px-2 py-1 text-xs font-semibold text-sub disabled:opacity-40">{t('tutoring_student_output')}</button>
       <button type="button" onClick={() => void close()} className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-brand"><ArrowLeft className="size-3.5" />{t('tutoring_own_code')}</button>

@@ -2,11 +2,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import type { DlabSsoUser } from '@cove/shared';
+import { dlabAcademyRoles, type DlabSsoUser } from '@cove/shared';
 import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { PrismaService } from '../../database/prisma.service.js';
 import { AcademyAccessService } from '../../authorization/academy-access.service.js';
+import { TeamLeadOverviewRepository } from '../../lead/team-lead-overview.repository.js';
 import { PlatformAccessService } from '../../authorization/platform-access.service.js';
 import { SupportGrantResolver } from '../../authorization/support-grant.resolver.js';
 import type { SupabaseAuthService } from '../../auth/supabase-auth.service.js';
@@ -58,7 +59,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
       await policy.assertSession(claims);
       return { ...activated, claims, completed, attempt };
     }
-    const record = () => db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: true } } } });
+    const record = () => db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: { include: { extraRoles: true } } } } } });
     return { id, primary, secondary, os, config, source, policy, sso, binding, auth, academies, login, record };
   }
   it.each([['student', 'STUDENT', true, 1], ['instructor', 'TEAM_LEAD', false, 2], ['edu_manager', 'TEAM_LEAD', false, 2], ['lab_head', 'MANAGER', false, 2], ['tutor', 'TEACHER', false, 2], ['so_staff', 'TEAM_LEAD', false, 2], ['future_role', 'STUDENT', true, 1]])('automatically provisions %s as %s without a user allowlist or prior PUT', async (osRole, localRole, studentLease, campusCount) => {
@@ -69,6 +70,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     expect(saved.user?.platformRole).toBe('USER');
     expect(saved.bindings).toHaveLength(campusCount as number);
     expect(saved.bindings.every(b => b.membership.role === localRole && b.membership.status === 'ACTIVE')).toBe(true);
+    for (const entry of saved.bindings) expect([entry.membership.role, ...entry.membership.extraRoles.map(r => r.role)].sort()).toEqual([...dlabAcademyRoles(osRole as string)].sort());
     expect(await db.studentAcademyProfile.count({ where: { membershipId: { in: saved.bindings.map(b => b.membershipId) } } })).toBe(studentLease ? 1 : 0);
     const access = new AcademyAccessService(db, new SupportGrantResolver(db), f.policy);
     for (const permission of ['curriculum.manage', 'class-teachers.manage', 'class-enrollments.manage'] as const) {
@@ -80,6 +82,38 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     expect(again.completed.authUserId).toBe(first.completed.authUserId);
     expect((await f.record()).bindings.map(b => b.membershipId).sort()).toEqual(saved.bindings.map(b => b.membershipId).sort());
     expect(await db.academyJoinRequest.count({ where: { userId: saved.userId! } })).toBe(0);
+  });
+  it('backfills single-role staff in place, remains idempotent, and rejects tampered grants', async () => {
+    const f = await fixture('lab_head'); await f.login();
+    const before = await f.record(); const member = before.bindings[0]!.membership;
+    await dlabTransaction(db, async tx => { await sourceWrite(tx); await tx.academyMembershipRole.deleteMany({ where: { membershipId: member.id } }); });
+    expect((await f.policy.eligible(before.user!.authUserId!))!.bindings.some(b => b.membershipId === member.id)).toBe(false);
+    await dlabTransaction(db, tx => new DlabReconcilerService(f.config as never).reconcile(tx, before));
+    const restored = await f.record();
+    expect(restored.userId).toBe(before.userId);
+    expect(restored.bindings[0]!.membership.id).toBe(member.id);
+    expect(restored.bindings[0]!.membership.extraRoles.map(r => r.role).sort()).toEqual(['TEACHER', 'TEAM_LEAD'].sort());
+    const events = await db.dlabIntegrationEvent.count({ where: { externalUserId: f.id, action: 'academy_roles.reconciled' } });
+    const grantedAt = restored.bindings[0]!.membership.extraRoles.map(r => r.grantedAt.toISOString()).sort();
+    await dlabTransaction(db, tx => new DlabReconcilerService(f.config as never).reconcile(tx, restored));
+    expect(await db.dlabIntegrationEvent.count({ where: { externalUserId: f.id, action: 'academy_roles.reconciled' } })).toBe(events);
+    expect((await f.record()).bindings[0]!.membership.extraRoles.map(r => r.grantedAt.toISOString()).sort()).toEqual(grantedAt);
+    await expect(f.policy.eligible(before.user!.authUserId!)).resolves.toBeTruthy();
+    await dlabTransaction(db, async tx => { await sourceWrite(tx); await tx.academyMembershipRole.create({ data: { membershipId: member.id, role: 'MANAGER' } }); });
+    // The other approved campus remains eligible, but this malformed binding is never accepted.
+    expect((await f.policy.eligible(before.user!.authUserId!))!.bindings.some(b => b.membershipId === member.id)).toBe(false);
+  });
+  it('counts inherited teachers and their homeroom/assistant assignments accurately in management overviews', async () => {
+    const f = await fixture('lab_head'); await f.login(); const saved = await f.record();
+    const member = saved.bindings.find(b => b.externalCampusId === f.primary)!.membership;
+    const classroom = await db.class.create({ data: { academyId: member.academyId, createdByUserId: saved.userId!, name: 'Inherited teacher class', teacherMembershipId: member.id } });
+    const repository = new TeamLeadOverviewRepository(db);
+    expect(await repository.rosterTotals(member.academyId)).toMatchObject({ teachers: 1, idleTeachers: 0, unstaffedClasses: 0 });
+    expect(await repository.classTeacherUnavailable(member.academyId)).toEqual([]);
+    expect((await repository.classRoster(member.academyId, 20))[0]).toMatchObject({ classId: classroom.id, teacherUnavailable: false });
+    await db.class.update({ where: { id: classroom.id }, data: { teacherMembershipId: null } });
+    await db.classAssistantTeacher.create({ data: { classId: classroom.id, membershipId: member.id } });
+    expect(await repository.rosterTotals(member.academyId)).toMatchObject({ teachers: 1, idleTeachers: 0 });
   });
   it('provisions HQ platform admin without academy memberships and reuses the managed identity', async () => {
     const f = await fixture('hq_admin'); const first = await f.login('/academy/not-my-academy');
@@ -192,6 +226,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     await expect(f.policy.assertSession(initial.claims)).rejects.toThrow('session_not_activated');
     const current = await f.record();
     expect(current.bindings.find(b => b.externalCampusId === f.primary)?.membership.role).toBe('STUDENT');
+    expect(current.bindings.find(b => b.externalCampusId === f.primary)?.membership.extraRoles).toEqual([]);
     expect(current.bindings.find(b => b.externalCampusId === f.secondary)?.membership.status).toBe('SUSPENDED');
     expect(await db.dlabIntegrationEvent.count({ where: { externalUserId: f.id, action: 'academy.manager_required' } })).toBeGreaterThan(0);
     expect(await db.academyMembershipRole.count({ where: { membershipId: { in: current.bindings.map(b => b.membershipId) } } })).toBe(0);

@@ -28,7 +28,7 @@ import { ResumePrompt } from '@/lib/session/resume-prompt';
 import { sessionNamespaces, supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
-import { heldRoles, resolveViewRole, viewRoleCookieName } from '@/lib/academy-view-role';
+import { heldRoles } from '@/lib/academy-view-role';
 import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
 
@@ -157,27 +157,8 @@ export async function StudioChrome({
   const cookieStore = await cookies();
   const sidebarState = cookieStore.get('cove_sidebar_state')?.value;
 
-  /*
-   * Which of this member's roles the shell is built for.
-   *
-   * The union decides what they may do; this decides what they are shown. A
-   * member with one role — almost everybody — resolves to it and sees no
-   * switcher at all, so nothing about this is visible until somebody genuinely
-   * holds two.
-   *
-   * Note the sidebar gates below take `shown` and not `held`. Leaving every
-   * role's navigation on screen would make the switcher change the overview
-   * and nothing else, which is not a switcher. The API is unaffected either
-   * way: it authorizes against the full set and has never read this.
-   */
-  const viewRole = primaryRole
-    ? resolveViewRole({
-        academyId,
-        held,
-        primary: primaryRole,
-        cookie: cookieStore.get(viewRoleCookieName)?.value,
-      }).role
-    : null;
+  // Primary identity stays visible; all held grants contribute navigation.
+  const viewRole = primaryRole;
   /*
    * A visiting operator holds no membership, so there is no view role to
    * resolve and `held` is empty. What they are standing in is the role the
@@ -187,7 +168,7 @@ export async function StudioChrome({
    * exists to prevent.
    */
   const shown: readonly AcademyRole[] = viewRole
-    ? [viewRole]
+    ? held
     : role
       ? [role]
       : [];
@@ -258,9 +239,6 @@ export async function StudioChrome({
           ) : null}
           {/* Theme and language sit at the far right of every studio page, in
               the one place a reader already looks for account-level controls. */}
-          {/* The role switcher rides in this menu rather than beside the
-              academy name: which role you are working as is a fact about the
-              reader, and the bar is about the academy. */}
           <HeaderControls
             identityLabel={viewRole === 'STUDENT' ? (
               <span className="mx-2 max-w-48 truncate text-[12px] font-semibold text-sub" title={`${academyName} · ${viewer?.name ?? ''}`}>

@@ -61,10 +61,13 @@ const server = createServer(async (req, res) => {
     if (req.method === 'OPTIONS') return res.end();
     if (path === '/health') return json(res, { ok: true });
     if (path === '/fixtures' && req.method === 'POST') {
-      const input = await body(req), id = randomUUID(), campus = randomUUID();
-      const org = await db.organization.create({ data: { name: 'SSO browser fixture', slug: 'browser-' + id } });
-      const academy = await db.academy.create({ data: { organizationId: org.id, name: 'SSO Browser Academy', slug: 'sso-' + id } });
-      await db.dlabCampus.create({ data: { externalCampusId: campus, name: academy.name, status: 'active', payloadHash: 'fixture', academyId: academy.id, ssoEnabled: input.enabled !== false } });
+      const input = await body(req), id = randomUUID();
+      const parent = input.parentFixtureId ? fixtures.get(input.parentFixtureId) : null;
+      if (input.parentFixtureId && !parent) return json(res, { error: 'unknown_parent' }, 400);
+      const campus = parent?.campus ?? randomUUID();
+      const org = parent ? null : await db.organization.create({ data: { name: 'SSO browser fixture', slug: 'browser-' + id } });
+      const academy = parent?.academy ?? await db.academy.create({ data: { organizationId: org.id, name: 'SSO Browser Academy', slug: 'sso-' + id } });
+      if (!parent) await db.dlabCampus.create({ data: { externalCampusId: campus, name: academy.name, status: 'active', payloadHash: 'fixture', academyId: academy.id, ssoEnabled: input.enabled !== false } });
       const os = { external_user_id: id, external_campus_id: campus, external_campus_ids: [campus], name: 'Browser ' + (input.role ?? 'student'), user_role: input.role ?? 'student', account_status: 'active' };
       fixtures.set(id, { os, academy, campus });
       if (input.legacy) {
@@ -75,6 +78,32 @@ const server = createServer(async (req, res) => {
         return json(res, { id, academy, email, username: 'legacy_' + id.replaceAll('-', '').slice(0, 20) });
       }
       return json(res, { id, academy, campus });
+    }
+    if (/^\/fixtures\/[^/]+\/classroom$/.test(path) && req.method === 'POST') {
+      const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);
+      if (!fixture) return json(res, { error: 'unknown_fixture' }, 404);
+      const owner = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: id } });
+      const studentIdentity = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: input.studentFixtureId } });
+      const student = await db.academyMembership.findUniqueOrThrow({ where: { academyId_userId: { academyId: fixture.academy.id, userId: studentIdentity.userId } } });
+      const course = await db.course.create({ data: { academyId: fixture.academy.id, title: 'SSO Python classroom', isVisible: true, createdByUserId: owner.userId } });
+      const module = await db.courseModule.create({ data: { courseId: course.id, title: 'Python basics', externalKey: randomUUID(), position: 1, isVisible: true } });
+      const lecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Addition lesson', externalKey: randomUUID(), position: 1, isVisible: true } });
+      const material = await db.material.create({ data: { lectureId: lecture.id, title: 'Add two numbers', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
+        programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: 'Read two numbers and print their sum.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
+      } });
+      const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
+        manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
+      } });
+      const classes = [];
+      for (const name of ['Assigned Python class', 'Other Python class']) {
+        const classroom = await db.class.create({ data: { academyId: fixture.academy.id, name, createdByUserId: owner.userId } });
+        await db.classCourse.create({ data: { classId: classroom.id, courseId: course.id, assignedByUserId: owner.userId } });
+        await db.classEnrollment.create({ data: { classId: classroom.id, membershipId: student.id, enrolledByUserId: owner.userId } });
+        classes.push(classroom);
+      }
+      await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
+      await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
+      return json(res, { courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);
@@ -90,10 +119,10 @@ const server = createServer(async (req, res) => {
     }
     if (path.startsWith('/fixtures/') && req.method === 'GET') {
       const id = path.split('/')[2];
-      const identity = await db.dlabIdentity.findUnique({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: true } } } });
+      const identity = await db.dlabIdentity.findUnique({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: { include: { extraRoles: true } } } } } });
       const sessionIds = [...sessions].filter(([, userId]) => userId === identity?.user?.authUserId).map(([id]) => id);
       const leases = await Promise.all(sessionIds.map(id => redis.get('cove:student-session:' + id)));
-      return json(res, identity ? { studentLeaseCount: leases.filter(Boolean).length, userId: identity.userId, role: identity.userRole, generation: identity.generation, platformRole: identity.user?.platformRole, memberships: identity.bindings.map(b => ({ id: b.membershipId, role: b.membership.role, status: b.membership.status })) } : null);
+      return json(res, identity ? { studentLeaseCount: leases.filter(Boolean).length, userId: identity.userId, role: identity.userRole, generation: identity.generation, platformRole: identity.user?.platformRole, memberships: identity.bindings.map(b => ({ id: b.membershipId, role: b.membership.role, roles: [b.membership.role, ...b.membership.extraRoles.map(r => r.role)], status: b.membership.status })) } : null);
     }
     if (path === '/os/authorize') {
       const callback = new URL(url.searchParams.get('redirect_uri'));

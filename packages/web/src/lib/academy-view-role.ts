@@ -1,21 +1,6 @@
 import type { AcademyRole, AuthMeResponse } from '@cove/shared';
 
-/**
- * Which of a member's roles they are currently working as.
- *
- * Deliberately separate from what they are *allowed* to do. Permissions are
- * the union of every role they hold and are decided by the API, which never
- * reads this; the view role decides only which surface the shell builds. A
- * member who reaches a Manager URL while viewing as a Teacher is served it,
- * because they are a Manager — anything else would make a presentation cookie
- * into a security boundary, which §3 of the authorization design refuses in
- * the same words it refuses frontend route protection.
- *
- * Deliberately NOT named `cove_view_role`. That name belongs to the platform
- * console's own "operator standing in an academy role" mechanism; this is a
- * member choosing between roles they actually hold, which is a different
- * actor answering a different question.
- */
+/** Legacy academy view cookie; retained for compatibility, never authority. */
 export const viewRoleCookieName = 'cove_academy_role';
 
 /**
@@ -39,33 +24,20 @@ export function parseViewRole(
   };
 }
 
-/**
- * The role to render this academy as, and whether the cookie should be
- * rewritten.
- *
- * A cookie naming a role the member does not hold is not an error page. It is
- * the ordinary consequence of a role being revoked, of switching academies, or
- * of somebody editing the value by hand, and losing the whole screen over any
- * of those would be absurd — the same reasoning `redirectSlugFor` applies to a
- * stale `?academy=`. It falls back to the primary role, which every member has.
- */
+/** Unified staff presentation always uses primary identity and all held grants. */
 export function resolveViewRole(input: {
   academyId: string;
   held: readonly AcademyRole[];
   primary: AcademyRole;
   cookie: string | undefined;
 }): { role: AcademyRole; stale: boolean } {
+  // Staff work in one capability-based interface. Old presentation cookies
+  // cannot hide inherited actions or change the member's primary identity.
   const parsed = parseViewRole(input.cookie);
-  if (!parsed || parsed.academyId !== input.academyId) {
-    // Not stale. A cookie for a different academy is a correct cookie about a
-    // different page, and rewriting it here would lose the reader's choice
-    // over there.
-    return { role: input.primary, stale: false };
-  }
-  const named = input.held.find((role) => role === parsed.role);
-  return named
-    ? { role: named, stale: false }
-    : { role: input.primary, stale: true };
+  return {
+    role: input.primary,
+    stale: Boolean(parsed?.academyId === input.academyId && parsed.role !== input.primary),
+  };
 }
 
 /** Every role this account holds in one academy, or none if it is not a member. */

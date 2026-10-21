@@ -1,6 +1,6 @@
 import type { AcademyRole } from "@cove/shared";
 
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 
 /**
  * Whether a membership holds a role, counting the ones granted beside its
@@ -12,9 +12,8 @@ import type { Prisma } from "../generated/prisma/client.js";
  * false for them — which is how a Manager who was granted TEACHER ended up
  * locked out of the teaching overview they had just been given.
  *
- * Two forms of the same question: one for a membership already loaded, one for
- * a query that has to find them. Both live here so a third place cannot answer
- * it differently.
+ * Record, ORM, and SQL forms of the same question live here so assignment
+ * pickers and management aggregates agree about who can teach.
  */
 export function membershipHoldsRole(
   membership: {
@@ -39,4 +38,12 @@ export function holdsRoleWhere(
   role: AcademyRole,
 ): Prisma.AcademyMembershipWhereInput {
   return { OR: [{ role }, { extraRoles: { some: { role } } }] };
+}
+
+/** SQL counterpart for aggregate queries. Columns must be static SQL fragments. */
+export function holdsRoleSql(id: Prisma.Sql, primary: Prisma.Sql, role: AcademyRole): Prisma.Sql {
+  return Prisma.sql`(${primary} = ${role}::"AcademyRole" OR EXISTS (
+    SELECT 1 FROM academy_membership_roles held_role
+    WHERE held_role.membership_id = ${id} AND held_role.role = ${role}::"AcademyRole"
+  ))`;
 }

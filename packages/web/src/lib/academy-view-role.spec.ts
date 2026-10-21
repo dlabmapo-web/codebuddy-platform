@@ -28,7 +28,7 @@ describe('view role cookie', () => {
 describe('resolveViewRole', () => {
   const held = ['TEACHER', 'MANAGER'] as const;
 
-  it('uses the remembered role when the member still holds it', () => {
+  it('ignores an old staff mode and retains primary identity', () => {
     expect(
       resolveViewRole({
         academyId,
@@ -36,7 +36,7 @@ describe('resolveViewRole', () => {
         primary: 'MANAGER',
         cookie: encodeViewRole(academyId, 'TEACHER'),
       }),
-    ).toEqual({ role: 'TEACHER', stale: false });
+    ).toEqual({ role: 'MANAGER', stale: true });
   });
 
   it('falls back to the primary role and marks the cookie stale when the role was revoked', () => {

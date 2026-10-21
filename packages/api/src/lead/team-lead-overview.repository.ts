@@ -3,6 +3,7 @@ import { LEAD_MAX_PREVIEW_ROWS } from "@cove/shared";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
+import { holdsRoleSql } from "../authorization/membership-roles.js";
 import type { OverviewAggregateScope } from "../teach/teacher-overview.repository.js";
 
 /**
@@ -446,7 +447,7 @@ export class TeamLeadOverviewRepository {
         JOIN users usr ON usr.id = tm.user_id
         WHERE cls.academy_id = ${academyId}::uuid
           AND cls.status = 'ACTIVE'
-          AND NOT (tm.status = 'ACTIVE' AND tm.role = 'TEACHER' AND usr.status = 'ACTIVE')
+          AND NOT (tm.status = 'ACTIVE' AND ${holdsRoleSql(Prisma.sql`tm.id`, Prisma.sql`tm.role`, "TEACHER")} AND usr.status = 'ACTIVE')
       `,
       "class",
     );
@@ -685,7 +686,7 @@ export class TeamLeadOverviewRepository {
         cls.teacher_membership_id AS "teacherMembershipId",
         usr.display_name AS "teacherName",
         (cls.teacher_membership_id IS NOT NULL
-          AND (tm.id IS NULL OR tm.status <> 'ACTIVE' OR tm.role <> 'TEACHER'))
+          AND (tm.id IS NULL OR tm.status <> 'ACTIVE' OR NOT ${holdsRoleSql(Prisma.sql`tm.id`, Prisma.sql`tm.role`, "TEACHER")}))
           AS "teacherUnavailable",
         COALESCE(s.students, 0) AS students,
         COALESCE(a.courses, 0) AS courses,
@@ -734,18 +735,20 @@ export class TeamLeadOverviewRepository {
           LEFT JOIN academy_memberships tm ON tm.id = cls.teacher_membership_id
           WHERE cls.academy_id = ${academyId}::uuid
             AND cls.status = 'ACTIVE'
-            AND (tm.id IS NULL OR tm.status <> 'ACTIVE' OR tm.role <> 'TEACHER'))
+            AND (tm.id IS NULL OR tm.status <> 'ACTIVE' OR NOT ${holdsRoleSql(Prisma.sql`tm.id`, Prisma.sql`tm.role`, "TEACHER")}))
           AS "unstaffedClasses",
-        (SELECT COUNT(*)::int FROM academy_memberships
-          WHERE academy_id = ${academyId}::uuid
-            AND status = 'ACTIVE' AND role = 'TEACHER')
+        (SELECT COUNT(*)::int FROM academy_memberships am
+          WHERE am.academy_id = ${academyId}::uuid
+            AND am.status = 'ACTIVE' AND ${holdsRoleSql(Prisma.sql`am.id`, Prisma.sql`am.role`, "TEACHER")})
           AS teachers,
         (SELECT COUNT(*)::int FROM academy_memberships am
           WHERE am.academy_id = ${academyId}::uuid
-            AND am.status = 'ACTIVE' AND am.role = 'TEACHER'
+            AND am.status = 'ACTIVE' AND ${holdsRoleSql(Prisma.sql`am.id`, Prisma.sql`am.role`, "TEACHER")}
             AND NOT EXISTS (
               SELECT 1 FROM classes cls
-              WHERE cls.teacher_membership_id = am.id AND cls.status = 'ACTIVE'))
+              WHERE cls.status = 'ACTIVE' AND (cls.teacher_membership_id = am.id OR EXISTS (
+                SELECT 1 FROM class_assistant_teachers assistant
+                WHERE assistant.class_id = cls.id AND assistant.membership_id = am.id))))
           AS "idleTeachers",
         (SELECT COUNT(*)::int FROM academy_memberships
           WHERE academy_id = ${academyId}::uuid

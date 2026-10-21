@@ -3,7 +3,7 @@
 Date: 2026-10-21 (Asia/Seoul)
 Branch: `feat/dlab-os-staff-sso`
 Baseline: `1e7307b4`; production code release `v2.0.38` (`cb793465`).
-Status: Written for owner review. Implementation, deployment, and acceptance testing have not started for this change.
+Status: Implemented on the feature branch. [Isolated API/browser/build verification](../../research/2026-10-21-dlab-unified-staff-workspace-verification.md) passed. Production deployment, hosted-data backfill, and real HQ acceptance are separate and have not been performed for this change.
 Amendment: The owner's Elice screenshot/request replaces role-switching with direct capability-based actions. Their subsequent clarification requires assigned-class teaching scope for Managers as well as Team Leads and Teachers; Manager status alone grants no academy-wide tutoring access.
 
 ## 1. Result in plain English
@@ -279,4 +279,4 @@ Also excluded: automatic class/teacher import from OS, full course/enrollment AP
 
 This feature is complete when a verified OS Manager can directly use management, curriculum, solution, tutoring, grading, and explicit live-code-edit actions without switching roles, with all teaching/student-work access restricted to genuinely assigned classes; a Team Lead can assign a Manager and directly use curriculum and their own assigned teaching actions; assignment removal and source demotion revoke access correctly; Student/Admin separation and campus restrictions hold; ordinary account grants/login remain valid with the unified UI; and the matched policy/data rollout is documented with real and automated evidence distinguished.
 
-Until then, this document describes the intended change and does not claim that the deployed single-role SSO already provides it.
+The feature branch implements this design; the previously deployed single-role SSO does not provide it until the coordinated release/backfill completes.

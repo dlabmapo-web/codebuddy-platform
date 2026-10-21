@@ -65,6 +65,22 @@ function fixture() {
   return { service, db, access, audit, gui, points, row, config };
 }
 describe("manual assessment boundaries", () => {
+  it.each(['MANAGER', 'TEAM_LEAD', 'TEACHER'])('restricts %s written/quiz review to assigned classes', async role => {
+    const { service, db, access } = fixture();
+    access.requirePermission.mockResolvedValue({ role, roles: [role, 'TEACHER'], userId: 'staff', via: 'membership' } as never);
+    db.class.findFirst.mockResolvedValue({ id: 'class', courseAssignments: [] } as never);
+    await service.classMaterials(identity, { academyId: 'academy', classId: 'class' });
+    const where = db.class.findFirst.mock.calls[0]![0].where;
+    expect(JSON.stringify(where)).toContain('staff');
+    expect(JSON.stringify(where)).toContain('assistantTeachers');
+    db.class.findFirst.mockResolvedValue(null as never);
+    await expect(service.classMaterials(identity, { academyId: 'academy', classId: 'unassigned' })).rejects.toThrow();
+  });
+  it('does not infer a teaching grant from legacy management rank', async () => {
+    const { service, access } = fixture();
+    access.requirePermission.mockResolvedValue({ role: 'MANAGER', roles: ['MANAGER'], userId: 'staff', via: 'membership' } as never);
+    await expect(service.classMaterials(identity, { academyId: 'academy', classId: 'class' })).rejects.toThrow();
+  });
   it("projects only public attempt fields and omits private solutions for learners", async () => {
     const { service, db } = fixture();
     db.manualSubmission.findMany.mockResolvedValue([

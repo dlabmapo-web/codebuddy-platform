@@ -116,9 +116,9 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   function submit() { draft.flushNow(); setTab('result'); void submission.submit(draft.code); }
   React.useEffect(() => () => { runningBatch.current = false; }, []);
   return <div ref={rootRef} className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
-    <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4">
+    <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-3 md:min-h-16 md:flex-nowrap md:gap-3">
       <CurriculumTrigger compact ref={triggerRef} onToggle={togglePanel} open={panelOpen} panelId={panelId} path={bootstrap.navigator.path} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-2/3 md:basis-auto">
         <p className="truncate text-xs text-sub">{breadcrumb.course.title} <span className="px-1 text-border">/</span> {breadcrumb.lecture.title}</p>
         <h1 className="truncate text-sm font-bold">{exercise.title}</h1>
       </div>
@@ -126,9 +126,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
       {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={(event) => void leaveTo(routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' }), event)} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
       {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} /> : null}
-      {access?.canReview && !access.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand"><ClipboardList aria-hidden className="size-4 shrink-0" />{t('review')}</Link> : null}
-      {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-brand hover:text-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
       {access?.canObserve && !exercise.quiz ? <StaffTutoringDrawer academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} selected={selectedStudent} onSelect={selectStudent} /> : null}
+      {access?.canReview && !access.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand"><ClipboardList aria-hidden className="size-4 shrink-0" />{t('review')}</Link> : null}
+      {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition-colors hover:border-brand hover:bg-brand-soft hover:text-brand focus-visible:outline-2 focus-visible:outline-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
+
       <Link href={coursePath} onClick={(event) => void leaveTo(coursePath, event)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
     </header>
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
@@ -177,7 +178,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </section>
       </div>}
     </div>
-    <footer className="flex h-12 shrink-0 items-center justify-center gap-4 border-t border-border bg-card px-4">
+    <footer className="flex h-14 shrink-0 items-center justify-center gap-4 border-t border-border bg-card px-4">
       <NavButton direction="previous" disabled={busy || !workspace.neighbors.previous} label={t('previous')} onClick={() => { if (workspace.neighbors.previous) void navigate(workspace.neighbors.previous.materialId); }} />
       <span className="text-xs font-semibold tabular-nums text-sub">{position} / {ordered.length}</span>
       <NavButton direction="next" disabled={busy || !workspace.neighbors.next} label={t('next')} onClick={() => { if (workspace.neighbors.next) void navigate(workspace.neighbors.next.materialId); }} />

@@ -47,7 +47,7 @@
   "observe_error": "Could not load live students. Try again.",
   "observe_connecting": "Connecting to live students…",
   "observe_unavailable": "Live student updates are unavailable. Reconnect to try again.",
-  "observe_no_classes": "No assigned teaching classes are available for this course.",
+  "observe_no_classes": "No assigned teaching classes are available for this course. A Manager or Team Lead can assign you as a teacher.",
   "observe_truncated": "The class roster is incomplete; some active students may not appear.",
   "observe_solving": "Solving now",
   "tutoring": "Tutoring",

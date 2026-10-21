@@ -466,8 +466,8 @@ export function studioNavGroups({
   // One group, two audiences, two routes. `/classes` is the management view a
   // Team Lead or Manager uses to arrange a class; `/teach/classes` is the
   // assigned teacher's own live view, with no class, roster, or assignment
-  // controls on it at all. Nobody sees both entries, because nobody holds both
-  // roles at once.
+  // controls on it at all. Multi-role staff see both destinations together;
+  // only the teaching destination is restricted to their own assignments.
   const teaching: NavLink[] = [];
   if (canManageClasses) {
     teaching.push({

@@ -36,10 +36,13 @@ for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEAM_LEAD'
     await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
     if (role === 'STUDENT') await expect(page.getByRole('heading', { name: 'Hi, Browser ' + osRole, exact: true })).toBeVisible();
     else await expect(page.getByRole('heading', { name: role === 'TEACHER' ? 'Teaching overview' : role === 'MANAGER' ? 'Control tower' : 'What SSO Browser Academy teaches', level: 1, exact: true })).toBeVisible();
-    await page.screenshot({ path: test.info().outputPath('dashboard.png') });
+    await page.screenshot({ path: test.info().outputPath('dashboard.png'), animations: 'disabled', timeout: 15_000 });
     const first = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
     expect(first.studentLeaseCount).toBe(role === 'STUDENT' ? 1 : 0);
     expect(first.platformRole).toBe('USER'); expect(first.memberships).toHaveLength(1); expect(first.memberships[0].role).toBe(role);
+    const expectedRoles = role === 'MANAGER' ? ['MANAGER', 'TEAM_LEAD', 'TEACHER'] : role === 'TEAM_LEAD' ? ['TEAM_LEAD', 'TEACHER'] : [role];
+    expect(first.memberships[0].roles.sort()).toEqual(expectedRoles.sort());
+    if (role === 'MANAGER' || role === 'TEAM_LEAD') await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
     await page.reload(); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
     await page.goto('/sso/start'); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
     const again = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
@@ -57,7 +60,7 @@ test('OS HQ admin enters the platform console without an academy membership and 
   const value = await fixture(request, 'hq_admin'); await enter(page, value);
   await expect(page).toHaveURL(/\/admin\/academies$/);
   await expect(page.getByRole('heading', { name: 'Academies', level: 1, exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('hq-admin-console.png') });
+  await page.screenshot({ path: test.info().outputPath('hq-admin-console.png'), animations: 'disabled', timeout: 15_000 });
   const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json();
   expect(saved.platformRole).toBe('ADMIN'); expect(saved.memberships).toHaveLength(0); expect(saved.studentLeaseCount).toBe(0);
   expect((await rpc(page, request, 'platformAcademies/get', { academyId: value.academy.id })).status()).toBe(200);
@@ -153,4 +156,114 @@ test('Cove logout removes the browser session', async ({ page, request }) => {
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect((await page.context().cookies()).some(c => /auth-token/.test(c.name))).toBe(false);
+});
+
+
+async function manualRequest(page: Page, request: APIRequestContext, path: string, input: Record<string, unknown>, method: 'GET' | 'POST' = 'POST') {
+  return request.fetch('http://127.0.0.1:4319/api/manual' + path, {
+    method, headers: { Authorization: 'Bearer ' + await tokenFor(page) },
+    ...(method === 'GET' ? { params: input as Record<string, string> } : { data: input }),
+  });
+}
+
+async function visibleEditor(page: Page, code?: string) {
+  return page.evaluate((next) => {
+    const monaco = (window as unknown as { monaco?: { editor: { getEditors(): { getDomNode(): HTMLElement | null; getModel(): { setValue(code: string): void; getValue(): string } | null }[] } } }).monaco;
+    const model = monaco?.editor.getEditors().find(editor => editor.getDomNode()?.getClientRects().length)?.getModel();
+    if (!model) return null;
+    if (next !== undefined) model.setValue(next);
+    return model.getValue();
+  }, code);
+}
+
+test('Manager and Team Lead use one workspace, with teaching granted only by real assignments', async ({ page, request, browser }) => {
+  test.setTimeout(180_000);
+  const manager = await fixture(request, 'lab_head'); await enter(page, manager);
+  const student = await fixture(request, 'student', { parentFixtureId: manager.id });
+  const leader = await fixture(request, 'edu_manager', { parentFixtureId: manager.id });
+  const studentContext = await browser.newContext(); const studentPage = await studentContext.newPage();
+  const leaderContext = await browser.newContext(); const leaderPage = await leaderContext.newPage();
+  try {
+    await enter(studentPage, student); await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    await enter(leaderPage, leader); await expect(leaderPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
+    expect(seeded.ok(), await seeded.text()).toBe(true);
+    const classroom = await seeded.json();
+    const [assigned, other] = classroom.classes;
+    const membership = (await (await request.get(fixtureOrigin + '/fixtures/' + manager.id)).json()).memberships[0];
+    const base = { academyId: manager.academy.id, classId: assigned.id };
+    const roster = () => rpc(page, request, 'monitoring/getClassRoster', base);
+    expect((await roster()).status()).toBe(403);
+    const submission = await manualRequest(studentPage, request, '/submit', { ...base, materialId: classroom.writtenMaterialId, files: {}, answer: 'I read two integers and add them with the plus operator.', revision: 0, contentRevision: 1, requestKey: crypto.randomUUID() });
+    expect(submission.ok(), await submission.text()).toBe(true);
+    const review = { academyId: manager.academy.id, materialId: classroom.writtenMaterialId, submissionId: (await submission.json()).submissionId, expectedVersion: 0, scoreHundredths: 9000, completed: true, feedback: 'Clear explanation of addition.' };
+    expect((await manualRequest(page, request, '/review', review)).status()).toBe(404);
+    const picker = await rpc(leaderPage, request, 'academyClasses/listEligibleTeachers', base);
+    expect(picker.ok()).toBe(true);
+    expect((await picker.json()).json.teachers.some((entry: { membershipId: string }) => entry.membershipId === membership.id)).toBe(true);
+    const assignment = await rpc(leaderPage, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: assigned.updatedAt });
+    expect(assignment.ok()).toBe(true);
+    let detail = (await assignment.json()).json;
+    expect((await roster()).ok()).toBe(true);
+    const graded = await manualRequest(page, request, '/review', review);
+    expect(graded.ok(), await graded.text()).toBe(true);
+    const studentResult = await manualRequest(studentPage, request, '', { ...base, materialId: classroom.writtenMaterialId }, 'GET');
+    expect(studentResult.ok(), await studentResult.text()).toBe(true);
+    expect(await studentResult.text()).toContain('Clear explanation of addition.');
+    expect((await rpc(page, request, 'monitoring/getClassRoster', { ...base, classId: other.id })).status()).toBe(403);
+    expect((await rpc(leaderPage, request, 'monitoring/getClassRoster', base)).status()).toBe(403);
+    // A stale role-mode cookie cannot hide Manager identity or inherited actions.
+    await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: 'http://127.0.0.1:3309' }]);
+    await page.goto('/academy/' + manager.academy.slug);
+    await expect(page.getByRole('heading', { name: 'Control tower', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'My page', exact: true }).click();
+    await expect(page.getByRole('menuitemradio')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    const workspace = '/academy/' + manager.academy.slug + '/learn/exercises/' + classroom.materialId;
+    await page.goto(workspace);
+    await expect(page.getByRole('button', { name: 'View solution', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Tutoring', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
+    await studentPage.goto(workspace + '?classId=' + assigned.id);
+    await expect(studentPage.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Tutoring', exact: true }).click();
+    await expect(page.getByText('Browser student', { exact: true })).toBeVisible();
+    await expect(page.getByText('Other Python class', { exact: true })).toHaveCount(0);
+    await page.getByText('Browser student', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Return to my code', exact: true }).first()).toBeVisible();
+    const editMode = page.getByRole('button', { name: 'Edit code · Off', exact: true });
+    await expect(editMode).toBeEnabled({ timeout: 30_000 });
+    await expect(editMode).toHaveAttribute('aria-pressed', 'false');
+    await editMode.click();
+    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => visibleEditor(page, 'print(40 + 2)')).toBe('print(40 + 2)');
+    await expect.poll(() => visibleEditor(studentPage), { timeout: 30_000 }).toBe('print(40 + 2)');
+    const run = page.getByRole('button', { name: 'Run', exact: true });
+    await expect(run).toBeEnabled({ timeout: 60_000 });
+    await run.click();
+    await expect(page.getByText('42', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring.png'), animations: 'disabled', timeout: 15_000 });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Code', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toBeVisible();
+    expect(await page.getByRole('paragraph').filter({ hasText: /^Browser student$/ }).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring-mobile.png'), animations: 'disabled', timeout: 15_000 });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const contextInput = { ...base, membershipId: classroom.studentMembershipId, materialId: classroom.materialId, includeDraftCode: true };
+    expect((await rpc(page, request, 'monitoring/getStudentContext', contextInput)).ok()).toBe(true);
+    const removal = await rpc(leaderPage, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: null, expectedUpdatedAt: detail.updatedAt });
+    expect(removal.ok()).toBe(true); detail = (await removal.json()).json;
+    expect((await roster()).status()).toBe(403);
+    expect((await rpc(page, request, 'monitoring/getStudentContext', contextInput)).status()).toBe(403);
+    expect((await manualRequest(page, request, '/review', { ...review, expectedVersion: 1 })).status()).toBe(404);
+    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveCount(0, { timeout: 30_000 });
+    // Manager self-assignment is a class operation, not a managed-role edit.
+    const self = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: detail.updatedAt });
+    expect(self.ok()).toBe(true);
+    expect((await roster()).ok()).toBe(true);
+    const studentAssignment = await rpc(studentPage, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: (await self.json()).json.updatedAt });
+    expect(studentAssignment.status()).toBe(403);
+  } finally { await studentContext.close(); await leaderContext.close(); }
 });

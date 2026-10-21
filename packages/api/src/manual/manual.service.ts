@@ -1,4 +1,5 @@
 import { ManualPracticeService } from "./manual-practice.service.js";
+import type { AcademyAccess } from "../authorization/academy-access.service.js";
 import { randomInt } from "node:crypto";
 import {
   MultipleChoiceService,
@@ -1059,6 +1060,16 @@ export class ManualService {
     });
     return { submissionId: input.submissionId };
   }
+  private reviewScope(actor: AcademyAccess, academyId: string) {
+    // Management authority does not make somebody this class's teacher.
+    // All real members, including Managers holding Teacher, need assignment.
+    if (actor.via === "membership" && !actor.roles.includes("TEACHER")) {
+      throw new NotFoundException();
+    }
+    return actor.via === "membership" || actor.role === "TEACHER"
+      ? taughtClassWhere(academyId, actor.userId)
+      : { academyId, status: "ACTIVE" as const };
+  }
   private async reviewer(
     identity: SupabaseIdentity,
     target: Target,
@@ -1069,10 +1080,7 @@ export class ManualService {
       target.academyId,
       "submissions.assigned.review",
     );
-    const where =
-      actor.role === "TEACHER"
-        ? taughtClassWhere(target.academyId, actor.userId)
-        : { academyId: target.academyId, status: "ACTIVE" as const };
+    const where = this.reviewScope(actor, target.academyId);
     if (
       !(await this.db.class.findFirst({
         where: {
@@ -1106,10 +1114,7 @@ export class ManualService {
       input.academyId,
       "submissions.assigned.review",
     );
-    const where =
-      actor.role === "TEACHER"
-        ? taughtClassWhere(input.academyId, actor.userId)
-        : { academyId: input.academyId, status: "ACTIVE" as const };
+    const where = this.reviewScope(actor, input.academyId);
     const row = await this.db.class.findFirst({
       where: { id: input.classId, ...where },
       include: {

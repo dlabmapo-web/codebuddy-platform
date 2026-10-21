@@ -23,6 +23,24 @@ export function dlabAcademyRole(role: string): AcademyRole | null {
   }
 }
 
+/** Derived staff grants are always active together; they are not UI modes. */
+export function dlabAcademyRoles(role: string): readonly AcademyRole[] {
+  switch (dlabAcademyRole(role)) {
+    case 'MANAGER': return ['TEACHER', 'TEAM_LEAD', 'MANAGER'];
+    case 'TEAM_LEAD': return ['TEACHER', 'TEAM_LEAD'];
+    case 'TEACHER': return ['TEACHER'];
+    case 'STUDENT': return ['STUDENT'];
+    default: return [];
+  }
+}
+
+/** Reject missing grants as well as unexpected privilege; row order is irrelevant. */
+export function dlabMembershipRolesMatch(role: string, primary: AcademyRole, extras: readonly AcademyRole[]): boolean {
+  const expected = dlabAcademyRoles(role).filter(value => value !== primary);
+  return primary === dlabAcademyRole(role) && extras.length === expected.length
+    && new Set(extras).size === extras.length && expected.every(value => extras.includes(value));
+}
+
 export function canonicalDlabScope(primary: string, supplied?: readonly string[]): string[] {
   return [...new Set(supplied ?? [primary])].sort();
 }

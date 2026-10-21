@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { dlabAcademyRole, dlabEffectiveScope, dlabPlatformRole } from '@cove/shared';
+import { dlabAcademyRole, dlabAcademyRoles, dlabMembershipRolesMatch, dlabEffectiveScope, dlabPlatformRole } from '@cove/shared';
 import type { ApiEnvironment } from '../../config/env.schema.js';
 import type { DlabIdentity, Prisma } from '../../generated/prisma/client.js';
 import { bumpPeopleRevision } from '../../manage/people-revision.js';
@@ -30,7 +30,7 @@ export class DlabReconcilerService {
     const user = await tx.user.findUniqueOrThrow({ where: { id: identity.userId } });
     const desired = await desiredDlabCampuses(tx, this.config, identity);
     const role = dlabAcademyRole(identity.userRole);
-    const bindings = await tx.dlabMembershipBinding.findMany({ where: { externalUserId: identity.externalUserId }, include: { membership: true } });
+    const bindings = await tx.dlabMembershipBinding.findMany({ where: { externalUserId: identity.externalUserId }, include: { membership: { include: { extraRoles: true } } } });
     const platformRole = dlabPlatformRole(identity.userRole) === 'ADMIN'
       && user.status === 'ACTIVE' && desired.length > 0 && !bindings.some(b => b.localSuspendedAt)
       ? 'ADMIN' : 'USER';
@@ -46,9 +46,15 @@ export class DlabReconcilerService {
       if (!membership) membership = await tx.academyMembership.create({ data: { academyId, userId: user.id, role, status: user.status === 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED', joinedAt: new Date() }, include: { dlabBinding: true, extraRoles: true } });
       const active = user.status === 'ACTIVE' && !membership.dlabBinding?.localSuspendedAt;
       const status = active ? 'ACTIVE' : 'SUSPENDED';
-      const isChanged = !membership.dlabBinding || membership.role !== role || membership.status !== status || membership.extraRoles.length > 0;
+      const extraRoles = dlabAcademyRoles(identity.userRole).filter(value => value !== role);
+      const rolesChanged = !dlabMembershipRolesMatch(identity.userRole, membership.role, membership.extraRoles.map(entry => entry.role));
+      const isChanged = !membership.dlabBinding || rolesChanged || membership.status !== status;
       if (isChanged) {
-        await tx.academyMembershipRole.deleteMany({ where: { membershipId: membership.id } });
+        if (rolesChanged) {
+          await tx.academyMembershipRole.deleteMany({ where: { membershipId: membership.id } });
+          if (extraRoles.length) await tx.academyMembershipRole.createMany({ data: extraRoles.map(value => ({ membershipId: membership.id, role: value })) });
+          await tx.dlabIntegrationEvent.create({ data: { externalUserId: identity.externalUserId, action: 'academy_roles.reconciled', revision: identity.revision, details: { membershipId: membership.id, sourceRole: identity.userRole, before: [membership.role, ...membership.extraRoles.map(entry => entry.role)], after: dlabAcademyRoles(identity.userRole) } } });
+        }
         await tx.academyMembership.update({ where: { id: membership.id }, data: { role, status, suspendedAt: active ? null : membership.suspendedAt ?? new Date() } });
         await bumpPeopleRevision(tx, academyId);
         changed.push(membership.id);
@@ -62,6 +68,15 @@ export class DlabReconcilerService {
     }
     for (const binding of bindings) {
       if (role && desired.some(c => c.externalCampusId === binding.externalCampusId)) continue;
+      // Retired bindings retain history, never inherited staff grants.
+      if (binding.membership.extraRoles.length) {
+        await tx.academyMembershipRole.deleteMany({ where: { membershipId: binding.membershipId } });
+        await tx.dlabIntegrationEvent.create({ data: { externalUserId: identity.externalUserId, action: 'academy_roles.reconciled', revision: identity.revision, details: { membershipId: binding.membershipId, sourceRole: identity.userRole, before: [binding.membership.role, ...binding.membership.extraRoles.map(entry => entry.role)], after: [] } } });
+        if (binding.membership.status !== 'ACTIVE') {
+          await bumpPeopleRevision(tx, binding.membership.academyId);
+          changed.push(binding.membershipId);
+        }
+      }
       await tx.dlabMembershipBinding.update({ where: { membershipId: binding.membershipId }, data: { sourceAccessStatus: 'BLOCKED', appliedRevision: identity.revision } });
       if (binding.membership.status === 'ACTIVE') {
         await tx.academyMembership.update({ where: { id: binding.membershipId }, data: { status: 'SUSPENDED', suspendedAt: new Date() } });

@@ -8,6 +8,24 @@ HQ creates the account in OS. The person signs into `https://os.dlabcampus.com/`
 
 OS role mappings from the latest HQ table supplied on 2026-10-21: `student` → Student; `tutor` → Teacher; `instructor` / `so_staff` / `edu_manager` → Team Lead; `lab_head` → Manager; `hq_admin` → Platform Admin. The aligned rows in the new table supersede the older inline OS-connection notes and previous mappings. Unknown roles retain primary-campus Student fallback. Staff class assignments and student course enrollment remain separate from login.
 
+## Candidate inherited staff roles and unified workspace
+
+The [inherited-role design](../superpowers/specs/2026-10-21-dlab-sso-inherited-staff-roles-design.md) is implemented on the feature branch; it is **not included in the previously deployed v2.0.38** until a separate release and data cutover complete.
+
+The new runtime derives Manager + Team Lead + Teacher for `lab_head`, Team Lead + Teacher for `instructor`/`so_staff`/`edu_manager`, and Teacher only for `tutor`. Primary role remains Manager/Team Lead. All permitted actions and navigation appear together; an ordinary academy role-mode switch is no longer needed. Existing platform/support inspection controls are separate.
+
+Teaching remains assignment-bound for every staff role. A Manager can assign themselves, or a Team Lead can assign that Manager as homeroom/assistant teacher. My classes, tutoring, student drafts, written/quiz review, grading, and live code editing require that assignment. Administrative assignment screens retain their separate management permissions. No assignment means an empty teaching list, not all academy students. Removing assignment revokes ongoing teaching access while preserving Manager authority.
+
+### Release/backfill order
+
+1. Pass the candidate isolated SSO/browser suite and ordinary-account regression checks. Confirm the exact target database and preserve private before-state evidence of managed IDs, grants, restrictions, mappings, and session generations.
+2. Disable new SSO entry temporarily. Deploy matching API/Studio images. The old API rejects inherited extra roles, so do not mix old/new API instances during backfill.
+3. Under the new runtime and explicit target environment, preview `dlab:invalidate-sessions <platform-operator-uuid>`, then apply it with `--apply`. The existing audited operator command reconciles source roles into the exact derived grant sets and advances managed session generations. No schema migration is introduced by this feature.
+4. Verify primary/additional roles, unchanged user/auth/membership IDs and ordinary-account grants. Re-enable entry and require fresh managed login.
+5. Verify Manager/Team Lead unified controls, assignment by self/Team Lead, assigned access, unassigned denial, live-edit revocation on assignment removal, and ordinary username/password login. Confirm real HQ source roles separately from provider-double tests.
+
+Rollback must restore a matched policy/data state: disable entry, invalidate managed sessions, reconcile back to the prior single-role sets through authorized source-write transactions, and only then re-enable the previous single-role runtime. Preserve identity/history/restriction rows and provider guards. Reverting images alone after multi-role backfill is insufficient.
+
 HQ admins retain the same verified active-campus/rollout admission gate, but receive `User.platformRole=ADMIN` rather than an academy role. They land at the fixed `/admin/academies` destination without an academy membership or student lease. Their normal platform inspection, library and audited support rules apply; platform authority does not invent Manager memberships. Source demotion/deactivation, loss of the last admitted campus and existing local restrictions revoke eligibility and reconcile the platform role. Other OS roles never receive platform Admin. Managed profiles, credentials and platform roles remain OS-controlled.
 
 ## Runtime configuration

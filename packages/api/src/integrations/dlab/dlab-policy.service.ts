@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { dlabAcademyRole, dlabPlatformRole } from '@cove/shared';
+import { dlabAcademyRole, dlabMembershipRolesMatch, dlabPlatformRole } from '@cove/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { ApiEnvironment } from '../../config/env.schema.js';
 import { desiredDlabCampuses } from './dlab-reconciler.service.js';
@@ -52,7 +52,8 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
       const bindings = identity.bindings.filter(b => {
         const campus = campuses.find(c => c.externalCampusId === b.externalCampusId);
         return campus && b.membership.academyId === campus.academyId && b.membership.userId === identity.userId
-          && b.membership.status === 'ACTIVE' && b.membership.role === role && !b.membership.extraRoles.length
+          && b.membership.status === 'ACTIVE' && b.membership.role === role
+          && dlabMembershipRolesMatch(identity.userRole, b.membership.role, b.membership.extraRoles.map(entry => entry.role))
           && b.sourceAccessStatus === 'ALLOWED' && !b.localSuspendedAt;
       });
       if (identity.user.platformRole !== 'USER' || !bindings.length) throw new DlabError('dlab_access_unavailable', 403);

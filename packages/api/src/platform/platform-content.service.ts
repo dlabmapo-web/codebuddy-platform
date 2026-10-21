@@ -17,6 +17,7 @@ import {
   courseTreeCounts,
 } from "./course-tree-counts.js";
 import { tenantAcademies } from "./library-academy.js";
+import { membershipHoldsRole } from "../authorization/membership-roles.js";
 
 /**
  * What every academy teaches, read across all of them at once.
@@ -171,6 +172,7 @@ export class PlatformContentService {
           assignedTeacher: {
             select: {
               role: true,
+              extraRoles: { select: { role: true } },
               status: true,
               user: {
                 select: {
@@ -204,7 +206,7 @@ export class PlatformContentService {
         // operator and a manager looking at the same class must not disagree
         // about whether anybody is running it.
         const teacher = record.assignedTeacher;
-        const usable = teacher?.role === "TEACHER" && teacher.status === "ACTIVE";
+        const usable = teacher && membershipHoldsRole(teacher, "TEACHER") && teacher.status === "ACTIVE";
         return {
           id: record.id,
           name: record.name,

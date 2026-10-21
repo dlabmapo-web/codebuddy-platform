@@ -33,6 +33,8 @@ const deploymentId = process.env.DEPLOYMENT_VERSION?.replace(
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The isolated SSO suite must not stop or reuse a developer's normal server.
+  distDir: process.env.COVE_DLAB_E2E === "1" ? ".next-dlab" : ".next",
   // The app consumes workspace packages outside packages/web. Next's default
   // tracing root is the app directory, which would omit those files from a
   // standalone Docker image.

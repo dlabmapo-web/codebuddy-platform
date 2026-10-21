@@ -5,6 +5,7 @@ import { safeDlabReturnTo, DLAB_ADMIN_DESTINATION } from '@cove/shared';
 import { dlabEnabled, dlabCookieName, parseAttempt, dlabPost, dlabFailure, dlabCookie, authResponse, clearDlabContext } from '@/lib/dlab-sso';
 import { createClient } from '@/lib/supabase/server';
 import { createServerORPCClient } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
 
 export async function GET(request: NextRequest) {
   let issuedSession = false;
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (activated.requiresStudentSession) await client.studentSession.begin({});
     const account = await client.auth.me({});
     const target = account.user.memberships.find(m => {
-      const root = `/academy/${m.academy.slug}`;
+      const root = routes.academy(m.academy.slug);
       return m.status === 'ACTIVE' && (destination === root || destination.startsWith(root + '/'));
     });
     if (account.user.authUserId !== bridge.authUserId) throw new Error('Invalid session identity');

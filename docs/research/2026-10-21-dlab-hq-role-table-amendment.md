@@ -56,6 +56,12 @@ The live OS accounts previously checked return `student`, `tutor` and `lab_head`
 
 Reproduction: the checked-in `pnpm test:dlab` creates disposable services and runs focused suites plus Chromium. This amendment used the same script through the focused Studio suite, omitting only its final browser command to avoid the running manual Studio server's shared Next dev lock. Test logs: `/tmp/cove-dlab-role-tests.log` and `/tmp/cove-dlab-role-e2e-types.log` (local, not committed).
 
+### Subsequent release preparation
+
+For the requested production release, the manual local servers were stopped and the complete `pnpm test:dlab` rerun passed: all 67 migrations, 234 focused tests and **21 Chromium browser cases**, including every OS role and all five legacy login roles. The servers were restarted afterward. Deployment validation and nine release/rollback-selection tests also passed. The general GitHub E2E workflow completed but skipped its browser suite because development database secrets are not configured; the 21 browser passes came from the local isolated suite.
+
+The first CI run caught a hand-built academy root in the callback's membership check. It was replaced with the established `routes.academy()` helper, retaining the same identity/role/campus validation. CI must pass on this corrected commit before release tagging. The domain cutover is now part of the release manifest, preserving the private API file and restoring the legacy domain with the previous image on rollback.
+
 ## Information to coordinate with HQ
 
 - Add the Cove card/shortcut for student and staff accounts at **GET `https://cs.coveedu.com/sso/start`**. The registered production callback is **`https://cs.coveedu.com/sso/callback`**. OS login alone does not navigate to Cove.

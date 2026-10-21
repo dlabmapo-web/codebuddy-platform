@@ -1,5 +1,7 @@
 # DLAB OS student SSO
 
+The next release is specified in [automatic student and staff SSO](../superpowers/specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md). It covers the new `os.dlabcampus.com` domain, four academy roles, and campus-based automatic provisioning. That design is not yet implemented; the student-only instructions below describe the existing release.
+
 Implementation branch: `feat/dlab-os-sso`. Design: [SSO connection spec](../superpowers/specs/2026-10-16-dlab-os-sso-connection-design.md).
 
 For startup commands, campus mapping, browser steps, expected results, and troubleshooting, use the [local testing guide](dlab-sso-local-testing.md).

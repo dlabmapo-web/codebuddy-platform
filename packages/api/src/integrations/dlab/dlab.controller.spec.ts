@@ -47,7 +47,7 @@ describe('DLAB incoming trust boundaries', () => {
     const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key }) as never, source as unknown as DlabSourceService);
     const payload = { external_campus_id: 'campus', name: 'Test', user_role: 'future-role', account_status: 'active' };
     expect(await controller.user(request(`Bearer ${key}`), 'student', payload)).toEqual({ ok: true });
-    expect(source.user).toHaveBeenCalledWith('student', payload);
+    expect(source.user).toHaveBeenCalledWith('student', payload, undefined, uuid);
   });
   it('does not let the inbound OS key mint sessions', async () => {
     const start = vi.fn();

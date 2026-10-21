@@ -271,6 +271,7 @@ export function PeopleDirectory({
         size: 140,
         cell: ({ row }) => (
           <RoleCell
+            managed={row.original.managedBy === 'dlab'}
             disabled={mutations.pending}
             onGrant={(role) =>
               mutations.grantRole.mutate({
@@ -348,6 +349,8 @@ export function PeopleDirectory({
         size: 64,
         cell: ({ row }) => (
           <RowActions
+            managed={row.original.managedBy === 'dlab'}
+            locallySuspended={row.original.dlabLocalSuspended}
             academyId={academyId}
             membershipId={row.original.membershipId}
             mutations={mutations}
@@ -508,6 +511,9 @@ export function PeopleDirectory({
         open={importing}
       />
 
+      {mutations.restoreBlocked ? (
+        <p role="status" className="mt-3 text-sm text-sub">{t('people.action.restore_os_blocked')}</p>
+      ) : null}
       {mutations.error ? (
         <p
           className="rounded-lg border border-danger/25 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger"
@@ -641,6 +647,7 @@ function SelectAllOnPage({
  * of the same fact.
  */
 function RoleCell({
+  managed,
   disabled,
   onGrant,
   onRevoke,
@@ -648,6 +655,7 @@ function RoleCell({
   roles,
   status,
 }: {
+  managed?: boolean;
   disabled: boolean;
   onGrant: (role: AcademyRole) => void;
   onRevoke: (role: AcademyRole) => void;
@@ -675,6 +683,7 @@ function RoleCell({
   // A role only changes while the membership is active. Rendering the plain
   // badge — not a disabled button — is the honest form: there is nothing here
   // to press, so nothing offers to be pressed.
+  if (managed) return <span title={t('people.action.managed_by_os')}>{badge}<span className="ml-1 text-xs text-sub">{t('people.action.managed_label')}</span></span>;
   if (status !== 'ACTIVE') return badge;
 
   return (
@@ -759,6 +768,8 @@ function RoleCell({
  * would be wrong the moment a second manager was added in another tab.
  */
 function RowActions({
+  managed,
+  locallySuspended,
   academyId,
   membershipId,
   mutations,
@@ -768,6 +779,8 @@ function RowActions({
   membershipId: string;
   mutations: ReturnType<typeof usePeopleMutations>;
   status: MembershipStatus;
+  managed?: boolean;
+  locallySuspended?: boolean;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('manager');
@@ -795,7 +808,7 @@ function RowActions({
             </Link>
           </DropdownMenuItem>
 
-          {status === 'ACTIVE' ? (
+          {status === 'ACTIVE' || (managed && status === 'SUSPENDED' && !locallySuspended) ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem

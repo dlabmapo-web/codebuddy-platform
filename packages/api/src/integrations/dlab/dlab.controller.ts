@@ -85,7 +85,7 @@ export class DlabInboundController {
     this.authorize(req);
     const input = dlabCampusSchema.safeParse(body);
     if (!dlabExternalId.safeParse(id).success || !input.success) throw new DlabError('invalid_campus');
-    const record = await this.source.campus(id, input.data);
+    const record = await this.source.campus(id, input.data, uniqueHeader(req, 'x-request-id')!);
     return { ok: true, ...(record.academyId ? { id: record.academyId } : {}) };
   }
   @Put('users/:id')
@@ -93,7 +93,7 @@ export class DlabInboundController {
     this.authorize(req);
     const input = dlabUserSchema.safeParse(body);
     if (!dlabExternalId.safeParse(id).success || !input.success) throw new DlabError('invalid_user');
-    const record = await this.source.user(id, input.data);
+    const record = await this.source.user(id, input.data, undefined, uniqueHeader(req, 'x-request-id')!);
     return { ok: true, ...(record.userId ? { id: record.userId } : {}) };
   }
 }

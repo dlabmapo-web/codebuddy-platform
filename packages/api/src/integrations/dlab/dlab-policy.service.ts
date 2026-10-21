@@ -1,4 +1,10 @@
 import { Injectable, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { dlabAcademyRole } from '@cove/shared';
+import type { Prisma } from '../../generated/prisma/client.js';
+import type { ApiEnvironment } from '../../config/env.schema.js';
+import { desiredDlabCampuses } from './dlab-reconciler.service.js';
+import { dlabTransaction } from './dlab-transaction.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { SupabaseIdentity } from '../../auth/auth.types.js';
 import { DlabStateService } from './dlab-state.service.js';
@@ -18,7 +24,7 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() { await this.subscriber?.quit().catch(() => undefined); }
   watch(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
-  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService) {}
+  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly config: ConfigService<ApiEnvironment, true>) {}
   async managed(authUserId: string) {
     return this.prisma.dlabIdentity.findFirst({ where: { user: { authUserId } } });
   }
@@ -26,17 +32,31 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
     if (await this.managed(authUserId)) throw new DlabError('dlab_managed_identity', 403);
   }
   async eligible(authUserId: string) {
-    const identity = await this.prisma.dlabIdentity.findFirst({
-      where: { user: { authUserId } },
-      include: { user: true, bindings: { include: { membership: { include: { academy: true } } } } },
-    });
-    if (!identity) return null;
-    const campus = await this.prisma.dlabCampus.findUnique({ where: { externalCampusId: identity.externalCampusId } });
-    const validBinding = identity.bindings.find(b => b.externalCampusId === identity.externalCampusId && b.membership.academyId === campus?.academyId && b.membership.status === 'ACTIVE' && b.membership.role === 'STUDENT' && b.membership.academy.status === 'ACTIVE');
-    if (identity.accountStatus !== 'active' || identity.userRole !== 'student' || identity.user?.status !== 'ACTIVE' || campus?.status !== 'active' || !validBinding || identity.externalCampusIds.length !== 1 || identity.externalCampusIds[0] !== identity.externalCampusId) {
-      throw new DlabError('dlab_access_unavailable', 403);
-    }
-    return { identity, academy: validBinding.membership.academy };
+    // Ordinary logins never contend on the integration write lock.
+    if (!await this.managed(authUserId)) return null;
+    return this.prisma.$transaction(tx => this.snapshot(tx, authUserId), { isolationLevel: 'RepeatableRead' });
+  }
+  private async snapshot(tx: Prisma.TransactionClient, authUserId: string) {
+      const identity = await tx.dlabIdentity.findFirst({
+        where: { user: { authUserId } },
+        include: { user: true, bindings: { include: { membership: { include: { academy: true, extraRoles: true } } } } },
+      });
+      if (!identity) return null;
+      const campuses = await desiredDlabCampuses(tx, this.config, identity);
+      const role = dlabAcademyRole(identity.userRole);
+      const bindings = identity.bindings.filter(b => {
+        const campus = campuses.find(c => c.externalCampusId === b.externalCampusId);
+        return campus && b.membership.academyId === campus.academyId && b.membership.userId === identity.userId
+          && b.membership.status === 'ACTIVE' && b.membership.role === role && !b.membership.extraRoles.length
+          && b.sourceAccessStatus === 'ALLOWED' && !b.localSuspendedAt;
+      });
+      if (identity.user?.status !== 'ACTIVE' || identity.user.platformRole !== 'USER' || !bindings.length) throw new DlabError('dlab_access_unavailable', 403);
+      const primary = bindings.find(b => b.externalCampusId === identity.externalCampusId) ?? bindings.sort((a, b) => a.externalCampusId.localeCompare(b.externalCampusId))[0]!;
+      return { identity, bindings, academy: primary.membership.academy, requiresStudentSession: role === 'STUDENT' };
+  }
+  async assertAcademy(authUserId: string, academyId: string) {
+    const allowed = await this.eligible(authUserId);
+    if (allowed && !allowed.bindings.some(b => b.membership.academyId === academyId)) throw new DlabError('dlab_campus_not_allowed', 403);
   }
   async assertSession(identity: SupabaseIdentity) {
     const allowed = await this.eligible(identity.authUserId);
@@ -46,7 +66,7 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
     if (recorded !== `${allowed.identity.externalUserId}:${allowed.identity.generation}`) throw new DlabError('session_not_activated', 401);
   }
   async activate(identity: SupabaseIdentity, generation: number) {
-    const allowed = await this.eligible(identity.authUserId);
+    const allowed = await dlabTransaction(this.prisma, tx => this.snapshot(tx, identity.authUserId));
     if (!allowed || !identity.sessionId || allowed.identity.generation !== generation) throw new DlabError('identity_changed', 403);
     // Access checks always re-read source status; this registry survives ordinary refresh.
     await this.state.requireRedis().set(`cove:dlab:session:${identity.sessionId}`, `${allowed.identity.externalUserId}:${generation}`, 'EX', 60 * 60 * 24 * 30);

@@ -152,6 +152,8 @@ export type ListPeopleInput = z.infer<typeof listPeopleInputSchema>;
 export const peopleRowSchema = z
   .object({
     membershipId: z.uuid(),
+    managedBy: z.literal('dlab').optional(),
+    dlabLocalSuspended: z.boolean().optional(),
     userId: z.uuid(),
     /** The academy-scoped override if one exists, else the account name. */
     displayName: z.string().min(1).max(200),

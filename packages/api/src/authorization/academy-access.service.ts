@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import {
   effectiveAcademyRoles,
   grantHasPermission,
@@ -19,6 +19,7 @@ import {
 } from "../common/request-context.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { AcademyStatus } from "../generated/prisma/client.js";
+import { DlabPolicyService } from '../integrations/dlab/dlab-policy.service.js';
 import { SupportGrantResolver } from "./support-grant.resolver.js";
 
 export type AcademyAccess = {
@@ -55,6 +56,7 @@ export class AcademyAccessService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supportGrants: SupportGrantResolver,
+    @Optional() private readonly dlab?: DlabPolicyService,
   ) {}
 
   /**
@@ -107,6 +109,7 @@ export class AcademyAccessService {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }
 
+    await this.dlab?.assertAcademy(authUserId, academyId);
     const membership = await this.prisma.academyMembership.findUnique({
       where: { academyId_userId: { academyId, userId: user.id } },
       include: {

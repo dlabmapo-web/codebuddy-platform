@@ -18,11 +18,17 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.verifyOtp({ token_hash: bridge.tokenHash, type: 'email' });
     issuedSession = Boolean(data.session);
     if (error || !data.session || data.session.user.id !== bridge.authUserId) throw new Error('Invalid session');
-    const activated = z.object({ destination: z.string() }).parse(await dlabPost<unknown>('activate', { binding: attempt.binding, ticket: bridge.ticket }, data.session.access_token));
+    const activated = z.object({ destination: z.string(), requiresStudentSession: z.boolean() }).parse(await dlabPost<unknown>('activate', { binding: attempt.binding, ticket: bridge.ticket }, data.session.access_token));
     const destination = safeDlabReturnTo(activated.destination);
     if (!destination) throw new Error('Invalid destination');
-    await createServerORPCClient(data.session.access_token).studentSession.begin({});
-    await createServerORPCClient(data.session.access_token).auth.me({});
+    const client = createServerORPCClient(data.session.access_token);
+    if (activated.requiresStudentSession) await client.studentSession.begin({});
+    const account = await client.auth.me({});
+    const target = account.user.memberships.find(m => {
+      const root = `/academy/${m.academy.slug}`;
+      return m.status === 'ACTIVE' && (destination === root || destination.startsWith(root + '/'));
+    });
+    if (!target || account.user.authUserId !== bridge.authUserId || (target.role === 'STUDENT') !== activated.requiresStudentSession) throw new Error('Invalid academy session');
     await clearDlabContext();
     const response = authResponse(destination);
     response.cookies.set({ ...dlabCookie(''), maxAge: 0 });

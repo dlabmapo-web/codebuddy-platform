@@ -291,7 +291,10 @@
       "actions": "Actions",
       "update_failed": "That change did not apply. Try again.",
       "menu": "More actions",
-      "change_role_for": "Change role, currently {{role}}"
+      "change_role_for": "Change role, currently {{role}}",
+      "restore_os_blocked": "The Cove restriction was cleared. DLAB OS or campus access still blocks this account.",
+      "managed_by_os": "This role is managed by DLAB OS.",
+      "managed_label": "DLAB OS"
     }
   },
   "role": {

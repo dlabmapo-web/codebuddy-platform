@@ -154,6 +154,7 @@ export function usePeopleMutations(academyId: string) {
     revokeRole,
     suspend,
     restore,
+    restoreBlocked: restore.isSuccess && restore.data.status !== 'ACTIVE',
     pending:
       changeRole.isPending ||
       grantRole.isPending ||

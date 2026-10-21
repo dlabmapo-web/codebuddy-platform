@@ -27,7 +27,7 @@
   "OAUTH_ONBOARDING_INTENT_CONSUMED": "이미 사용된 소셜 회원가입 요청입니다.",
   "OAUTH_PROVIDER_MISMATCH": "이 회원가입 요청과 소셜 로그인 제공자가 일치하지 않습니다.",
   "LAST_MANAGER_REQUIRED": "학원에는 활성 관리자가 최소 한 명 있어야 합니다.",
-  "IDENTITY_LINK_CONFLICT": "이 계정은 자동으로 연결할 수 없습니다.",
+  "IDENTITY_LINK_CONFLICT": "자동 연결할 수 없습니다.",
   "USERNAME_TAKEN": "이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.",
   "USERNAME_ALREADY_SET": "이 계정에는 이미 아이디가 설정되어 있습니다.",
   "LEGACY_ACCOUNT_ALREADY_MIGRATED": "이미 이전이 완료된 기존 계정입니다.",
@@ -134,7 +134,7 @@
   "STUDENT_CREDENTIAL_NOT_STORED": "학생이 직접 변경했습니다. 새로 설정하세요.",
   "STUDENT_CREDENTIAL_STORAGE_UNAVAILABLE": "저장된 비밀번호가 없습니다. 새로 설정하세요.",
   "STUDENT_PASSWORD_REJECTED": "더 길거나 덜 흔한 비밀번호를 입력하세요.",
-  "STUDENT_PASSWORD_CHARACTERS": "영문, 숫자, 기호만 사용할 수 있으며 공백은 쓸 수 없습니다.",
+  "STUDENT_PASSWORD_CHARACTERS": "영문·숫자·기호만 가능하며 공백은 사용할 수 없습니다.",
   "SIGNUP_STUDENT_FAILED": "학생 계정을 만들지 못했습니다.",
   "CAPTCHA_FAILED": "보안 확인에 실패했습니다. 다시 시도하세요.",
   "OPERATION_RUN_NOT_FOUND": "해당 유지 보수 실행을 찾을 수 없습니다.",
@@ -145,7 +145,7 @@
   "UNKNOWN": "문제가 발생했습니다. 다시 시도해 주세요.",
   "MONITORING_HELP_KEY_REUSED": "이미 다른 작업에 사용된 요청입니다. 새로고침 후 다시 시도해 주세요.",
   "PROFILE_SECURITY_CHANGE_FAILED": "계정 보안 설정을 변경하지 못했습니다. 다시 시도해주세요.",
-  "PROFILE_LAST_IDENTITY_REQUIRED": "계정에 로그인 수단을 하나 이상 유지해야 합니다.",
+  "PROFILE_LAST_IDENTITY_REQUIRED": "로그인 수단을 유지하세요.",
   "PDF_TOO_LARGE": "95 MB 이하의 PDF를 선택하세요.",
   "PDF_INVALID": "암호가 없는 올바른 PDF를 선택하세요.",
   "PDF_BUSY": "PDF 검증이 진행 중입니다. 잠시 후 다시 시도하세요.",
@@ -162,5 +162,6 @@
   "LIBRARY_IMPORT_REQUEST_CONFLICT": "복사 요청 불일치",
   "LIBRARY_IMPORT_BUSY": "사용 중: 재시도하세요.",
   "DLAB_LOGIN_REQUIRED": "디랩 로그인 버튼을 이용하세요.",
-  "EXERCISE_PRACTICE_ONLY": "점수 없는 연습입니다."
+  "EXERCISE_PRACTICE_ONLY": "점수 없는 연습입니다.",
+  "DLAB_MANAGED_FIELDS": "DLAB OS에서 관리합니다."
 }

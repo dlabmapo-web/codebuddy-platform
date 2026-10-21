@@ -14,6 +14,7 @@ export const appErrorCodes = [
   "PDF_VALIDATION_LIMIT",
 
   "DLAB_LOGIN_REQUIRED",
+  "DLAB_MANAGED_FIELDS",
   "AUTHENTICATION_REQUIRED",
   "TOKEN_INVALID",
   "STUDENT_SESSION_EXPIRED",
@@ -214,6 +215,7 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PDF_REFERENCE_NOT_READY: "Publish the reference PDF before the exercise.",
   POINTS_ACCESS_DENIED: "You do not have access to these points.",
   POINTS_UNAVAILABLE: "This academy does not use points.",
+  DLAB_MANAGED_FIELDS: "DLAB OS manages this account’s identity and role.",
   DLAB_LOGIN_REQUIRED: "Use the DLAB login button for this account.",
   AUTHENTICATION_REQUIRED: "Authentication is required.",
   TOKEN_INVALID: "The session is invalid or expired.",

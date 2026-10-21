@@ -15,6 +15,11 @@ def read(path):
 
 
 def check(api, studio):
+    mode = api.get('DLAB_SSO_ROLLOUT_MODE', 'allowlist')
+    if mode not in ['allowlist', 'campus']:
+        raise ValueError('DLAB_SSO_ROLLOUT_MODE must be allowlist or campus')
+    if api.get('DLAB_OS_BASE_URL', 'https://os.dlabcampus.com/v1') != 'https://os.dlabcampus.com/v1':
+        raise ValueError('DLAB_OS_BASE_URL must use https://os.dlabcampus.com/v1')
     enabled = api.get('DLAB_SSO_ENABLED') == 'true'
     if enabled != (studio.get('DLAB_SSO_ENABLED') == 'true'):
         raise ValueError('API and Studio DLAB_SSO_ENABLED must agree')
@@ -25,9 +30,9 @@ def check(api, studio):
             raise ValueError(f'{key} must be configured privately')
     if api['DLAB_INBOUND_SERVER_KEY'] in [api['DLAB_CLIENT_SECRET'], api.get('BFF_SHARED_SECRET')]:
         raise ValueError('DLAB inbound key must be independent from client and BFF secrets')
-    if not api.get('DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS', '').strip():
+    if mode == 'allowlist' and not api.get('DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS', '').strip():
         raise ValueError('An explicit DLAB test user allowlist is required')
-    if api.get('DLAB_OS_BASE_URL') != 'https://dlab-os.onrender.com/v1':
+    if api.get('DLAB_OS_BASE_URL') != 'https://os.dlabcampus.com/v1':
         raise ValueError('DLAB_OS_BASE_URL must use the registered production OS')
     if api.get('DLAB_CLIENT_ID') != 'cove':
         raise ValueError('DLAB_CLIENT_ID must be cove')

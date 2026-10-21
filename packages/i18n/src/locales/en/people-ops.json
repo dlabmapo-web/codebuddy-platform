@@ -125,7 +125,8 @@
     "result_summary": "{{succeeded}} changed, {{failed}} unchanged.",
     "replayed": "This change had already been applied. Nothing ran a second time.",
     "result_download": "Download results as CSV",
-    "close": "Close"
+    "close": "Close",
+    "os_restricted": "DLAB OS manages these roles and access. Clearing a Cove restriction does not clear an OS restriction."
   },
   "delivery": {
     "title": "Invitations",

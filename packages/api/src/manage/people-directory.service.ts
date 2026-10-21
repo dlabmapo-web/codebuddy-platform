@@ -116,6 +116,7 @@ export class PeopleDirectoryService {
         userId: true,
         role: true,
         extraRoles: { select: { role: true } },
+        dlabBinding: { select: { externalUserId: true, localSuspendedAt: true } },
         status: true,
         joinedAt: true,
         suspendedAt: true,
@@ -154,6 +155,8 @@ export class PeopleDirectoryService {
 
     const rows: PeopleRow[] = memberships.map((membership) => ({
       membershipId: membership.id,
+      managedBy: membership.dlabBinding ? 'dlab' : undefined,
+      dlabLocalSuspended: membership.dlabBinding ? Boolean(membership.dlabBinding.localSuspendedAt) : undefined,
       userId: membership.userId,
       displayName:
         membership.memberProfile?.academyDisplayName?.trim() ||

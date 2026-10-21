@@ -1,3 +1,4 @@
+import { restoreDlabMembership, assertDlabRoleEditable } from '../integrations/dlab/dlab-local-restriction.js';
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   canCombineAcademyRoles,
@@ -103,6 +104,7 @@ export class AcademyMembershipService {
         input.academyId,
         input.membershipId,
       );
+      await assertDlabRoleEditable(transaction, membership.id);
       if (membership.status !== "ACTIVE") {
         throw new AppException("MEMBERSHIP_STATE_CONFLICT", HttpStatus.CONFLICT);
       }
@@ -167,6 +169,7 @@ export class AcademyMembershipService {
           input.academyId,
           input.membershipId,
         );
+        await assertDlabRoleEditable(transaction, membership.id);
         const held = effectiveAcademyRoles(
           membership.role,
           membership.extraRoles.map((extra) => extra.role),
@@ -237,13 +240,10 @@ export class AcademyMembershipService {
         input.academyId,
         input.membershipId,
       );
-      if (membership.status !== "ACTIVE") {
-        throw new AppException(
-          "MEMBERSHIP_STATE_CONFLICT",
-          HttpStatus.CONFLICT,
-        );
+      if (membership.status !== "ACTIVE" && !await transaction.dlabMembershipBinding?.findUnique({ where: { membershipId: membership.id } })) {
+        throw new AppException("MEMBERSHIP_STATE_CONFLICT", HttpStatus.CONFLICT);
       }
-      if (membership.role === "MANAGER") {
+      if (membership.role === "MANAGER" && membership.status === "ACTIVE") {
         await assertAnotherActiveManager(
           transaction,
           input.academyId,
@@ -283,7 +283,7 @@ export class AcademyMembershipService {
     input: { academyId: string; membershipId: string },
   ) {
     const actor = await this.requireManager(identity, input.academyId);
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const membership = await lockMembershipForUpdate(
         transaction,
         input.academyId,
@@ -295,11 +295,10 @@ export class AcademyMembershipService {
           HttpStatus.CONFLICT,
         );
       }
-      const updated = await transaction.academyMembership.update({
-        where: { id: membership.id },
-        data: { status: "ACTIVE", suspendedAt: null },
-        include: membershipInclude,
-      });
+      const managed = await restoreDlabMembership(transaction, membership.id);
+      const updated = managed
+        ? await transaction.academyMembership.findUniqueOrThrow({ where: { id: membership.id }, include: membershipInclude })
+        : await transaction.academyMembership.update({ where: { id: membership.id }, data: { status: "ACTIVE", suspendedAt: null }, include: membershipInclude });
       await this.audit.write(transaction, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -316,6 +315,8 @@ export class AcademyMembershipService {
       await bumpPeopleRevision(transaction, input.academyId);
       return toAcademyMember(updated);
     });
+    await this.revocation.revokeMembership(input.membershipId, "MEMBERSHIP_INACTIVE");
+    return result;
   }
 
   private requireManager(identity: SupabaseIdentity, academyId: string) {

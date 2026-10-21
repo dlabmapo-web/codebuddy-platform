@@ -1,3 +1,4 @@
+import { assertDlabRoleEditable } from '../integrations/dlab/dlab-local-restriction.js';
 import { HttpStatus } from "@nestjs/common";
 import {
   displayableEmail,
@@ -66,6 +67,7 @@ export async function applyMembershipRoleChange(
     input.academyId,
     input.membershipId,
   );
+  await assertDlabRoleEditable(tx, membership.id);
   if (membership.status !== "ACTIVE") {
     throw new AppException("MEMBERSHIP_STATE_CONFLICT", HttpStatus.CONFLICT);
   }

@@ -16,16 +16,16 @@ beforeEach(() => {
   m.get.mockReturnValue({ value: `${binding}.${state}` });
   m.verify.mockResolvedValue({ data: { session: { access_token: 'fake-access', user: { id: uid } } }, error: null });
   m.signOut.mockResolvedValue({ error: null });
-  m.begin.mockResolvedValue({}); m.me.mockResolvedValue({});
+  m.begin.mockResolvedValue({}); m.me.mockResolvedValue({ user: { authUserId: uid, memberships: [{ academy: { slug: 'dlab-mapo' }, status: 'ACTIVE', role: 'STUDENT' }] } });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe('DLAB browser start and callback', () => {
   it('starts via GET and sets a bound HttpOnly cookie without exposing server credentials', async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ state, authorizeUrl: `https://dlab-os.onrender.com/v1/sso/authorize?state=${state}` })));
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ state, authorizeUrl: `https://os.dlabcampus.com/v1/sso/authorize?state=${state}` })));
     vi.stubGlobal('fetch', fetcher);
     const result = await start(new NextRequest('https://internal.test/sso/start'));
     expect(result.status).toBe(302);
-    expect(result.headers.get('location')).toContain('https://dlab-os.onrender.com/v1/sso/authorize');
+    expect(result.headers.get('location')).toContain('https://os.dlabcampus.com/v1/sso/authorize');
     expect(result.headers.get('set-cookie')).toContain('HttpOnly');
     expect(result.headers.get('set-cookie')).toContain('SameSite=lax');
     expect(result.headers.get('cache-control')).toBe('no-store');
@@ -45,7 +45,7 @@ describe('DLAB browser start and callback', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('bridges server-side, activates the session, begins inactivity policy, and redirects cleanly', async () => {
-    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo' })));
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo', requiresStudentSession: true })));
     vi.stubGlobal('fetch', fetcher);
     const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
     expect(m.verify).toHaveBeenCalledWith({ token_hash: 'private-hash', type: 'email' });
@@ -64,7 +64,7 @@ describe('DLAB browser start and callback', () => {
     expect(result.headers.get('location')).toBe('https://cs.coveedu.com/sso/error');
   });
   it('fails closed when the required student lease cannot be started', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo' }))));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo', requiresStudentSession: true }))));
     m.begin.mockRejectedValue(new Error('Redis unavailable'));
     const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
     expect(m.signOut).toHaveBeenCalledOnce(); expect(result.headers.get('location')).toContain('/sso/error');
@@ -75,4 +75,22 @@ describe('DLAB browser start and callback', () => {
     const result = await start(new NextRequest('https://internal.test/sso/start'));
     expect(result.headers.get('location')).toContain('/sso/error'); expect(fetcher).not.toHaveBeenCalled();
   });
+  it('activates staff without starting a student lease', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo', requiresStudentSession: false }))));
+    m.me.mockResolvedValue({ user: { authUserId: uid, memberships: [{ academy: { slug: 'dlab-mapo' }, status: 'ACTIVE', role: 'TEACHER' }] } });
+    const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
+    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo');
+    expect(m.begin).not.toHaveBeenCalled();
+  });
+  it('rejects a trusted response selecting an academy absent from the activated account', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/other-campus', requiresStudentSession: false }))));
+    const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
+    expect(result.headers.get('location')).toContain('/sso/error'); expect(m.signOut).toHaveBeenCalledOnce();
+  });
+  it('does not redirect to the retired OS hostname', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ state, authorizeUrl: 'https://dlab-os.onrender.com/v1/sso/authorize' }))));
+    const result = await start(new NextRequest('https://internal.test/sso/start'));
+    expect(result.headers.get('location')).toContain('/sso/error');
+  });
+
 });

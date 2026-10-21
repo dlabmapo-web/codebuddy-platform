@@ -242,9 +242,12 @@ export type BulkResult = z.infer<typeof bulkResultSchema>;
  * in the service, where it can hold a lock while it counts.
  */
 export function bulkEligibility(
-  member: { role: string; status: string },
+  member: { role: string; status: string; dlabManaged?: boolean; localSuspended?: boolean; sourceBlocked?: boolean },
   options: BulkOptions,
 ): { eligible: boolean; code: string } {
+  if (member.dlabManaged && options.kind === 'ROLE_CHANGE') return { eligible: false, code: 'managed_by_os' };
+  if (member.dlabManaged && options.kind === 'SUSPEND' && member.status === 'SUSPENDED' && !member.localSuspended) return { eligible: true, code: 'ok' };
+  if (member.dlabManaged && options.kind === 'RESTORE' && member.sourceBlocked && !member.localSuspended) return { eligible: false, code: 'source_blocked' };
   switch (options.kind) {
     case "ENROLL":
       // §12 — active Students only. A Teacher enrolled as a pupil in their own

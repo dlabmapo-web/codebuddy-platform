@@ -125,7 +125,8 @@
     "result_summary": "변경 {{succeeded}}명, 변경되지 않음 {{failed}}명.",
     "replayed": "이미 적용된 변경입니다. 다시 실행되지 않았습니다.",
     "result_download": "결과를 CSV로 내려받기",
-    "close": "닫기"
+    "close": "닫기",
+    "os_restricted": "이 계정의 역할과 이용 권한은 DLAB OS에서 관리합니다. Cove 제한을 해제해도 OS 제한은 유지됩니다."
   },
   "delivery": {
     "title": "초대",

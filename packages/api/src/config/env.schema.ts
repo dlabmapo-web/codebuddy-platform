@@ -1,3 +1,4 @@
+import { DLAB_OS_BASE_URL } from '@cove/shared';
 import { z } from "zod";
 
 function usesProtocol(value: string, protocols: string[]): boolean {
@@ -35,7 +36,8 @@ const postgresUrlSchema = z
 export const apiEnvironmentSchema = z.object({
   DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: z.string().default('').transform(v => v.split(',').map(s => s.trim()).filter(Boolean)),
   DLAB_SSO_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
-  DLAB_OS_BASE_URL: z.literal('https://dlab-os.onrender.com/v1').default('https://dlab-os.onrender.com/v1'),
+  DLAB_OS_BASE_URL: z.literal(DLAB_OS_BASE_URL).default(DLAB_OS_BASE_URL),
+  DLAB_SSO_ROLLOUT_MODE: z.enum(['allowlist', 'campus']).default('allowlist'),
   DLAB_CLIENT_ID: z.literal('cove').default('cove'),
   DLAB_CLIENT_SECRET: z.string().min(32).optional(),
   DLAB_INBOUND_SERVER_KEY: z.string().min(32).optional(),
@@ -203,6 +205,7 @@ export const apiEnvironmentSchema = z.object({
     .optional(),
 }).superRefine((environment, context) => {
   if (environment.DLAB_SSO_ENABLED) {
+    if (environment.DLAB_SSO_ROLLOUT_MODE === 'allowlist' && !environment.DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS.length) context.addIssue({ code: 'custom', path: ['DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS'], message: 'must be nonempty in allowlist mode' });
     for (const key of ['DLAB_CLIENT_SECRET', 'DLAB_INBOUND_SERVER_KEY', 'DLAB_REDIRECT_URI', 'BFF_SHARED_SECRET'] as const) {
       if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required when DLAB SSO is enabled' });
     }

@@ -16,4 +16,12 @@ describe('DLAB environment validation', () => {
   it('accepts a configured local callback only when it matches the local site', () => {
     expect(validateEnvironment({ ...base, DLAB_SSO_ENABLED: 'true', DLAB_CLIENT_SECRET: 'a'.repeat(32), DLAB_INBOUND_SERVER_KEY: 'b'.repeat(32), DLAB_REDIRECT_URI: 'http://localhost:3000/sso/callback', BFF_SHARED_SECRET: 'c'.repeat(32), REDIS_URL: 'redis://localhost:6379', DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: 'student-1, student-2' })).toMatchObject({ DLAB_SSO_ENABLED: true, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: ['student-1', 'student-2'] });
   });
+  it('requires explicit rollout mode and never treats an empty allowlist as open admission', () => {
+    const configured = { ...base, DLAB_SSO_ENABLED: 'true', DLAB_CLIENT_SECRET: 'a'.repeat(32), DLAB_INBOUND_SERVER_KEY: 'b'.repeat(32), DLAB_REDIRECT_URI: 'http://localhost:3000/sso/callback', BFF_SHARED_SECRET: 'c'.repeat(32), REDIS_URL: 'redis://localhost:6379' };
+    expect(() => validateEnvironment(configured)).toThrow(/DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS/);
+    expect(validateEnvironment({ ...configured, DLAB_SSO_ROLLOUT_MODE: 'campus' })).toMatchObject({ DLAB_SSO_ROLLOUT_MODE: 'campus', DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1' });
+    expect(() => validateEnvironment({ ...configured, DLAB_SSO_ROLLOUT_MODE: 'all' })).toThrow(/DLAB_SSO_ROLLOUT_MODE/);
+    expect(() => validateEnvironment({ ...configured, DLAB_OS_BASE_URL: 'https://dlab-os.onrender.com/v1' })).toThrow(/DLAB_OS_BASE_URL/);
+  });
+
 });

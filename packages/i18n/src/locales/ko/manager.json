@@ -291,7 +291,10 @@
       "actions": "작업",
       "update_failed": "변경하지 못했습니다. 다시 시도하세요.",
       "menu": "추가 작업",
-      "change_role_for": "역할 변경, 현재 {{role}}"
+      "change_role_for": "역할 변경, 현재 {{role}}",
+      "restore_os_blocked": "Cove 이용 제한을 해제했습니다. DLAB OS 또는 캠퍼스 이용 제한은 남아 있습니다.",
+      "managed_by_os": "이 역할은 DLAB OS에서 관리합니다.",
+      "managed_label": "DLAB OS"
     }
   },
   "role": {

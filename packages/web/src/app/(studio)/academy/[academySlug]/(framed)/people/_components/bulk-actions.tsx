@@ -494,6 +494,9 @@ function BulkResultBody({
         </p>
       </div>
 
+      {result.rows.some(row => row.code === 'source_blocked' || row.code === 'managed_by_os') ? (
+        <p role="status" className="mt-3 text-sm text-sub">{t('bulk.os_restricted')}</p>
+      ) : null}
       {/* §14 — a replayed retry says so. "Nothing happened, and that is
           correct" is otherwise indistinguishable from a bug. */}
       {result.replayed ? (

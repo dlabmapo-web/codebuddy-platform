@@ -1,5 +1,7 @@
 # DLAB SSO local testing guide
 
+This guide records the October 16 controlled student setup. For the October 21 student/staff expansion, use the [current SSO runbook](dlab-sso.md). Run `pnpm test:dlab` for the isolated automated suite; the new hosted migration and real HQ role tests are separate release steps. The historical readiness statements below do not certify the expanded implementation.
+
 Test the DLAB student login flow from your local Cove website through the real DLAB OS and back into Cove.
 
 Branch: `feat/dlab-os-sso`. Last updated: 2026-10-16.
@@ -24,7 +26,7 @@ Do not replace the private env files with `.env.example`; examples disable SSO a
 | Cove API | `http://localhost:4000` |
 | Login start | `http://localhost:3000/sso/start` |
 | Callback | `http://localhost:3000/sso/callback` |
-| DLAB OS API base | `https://dlab-os.onrender.com/v1` |
+| DLAB OS API base | `https://os.dlabcampus.com/v1` |
 | DLAB client ID | `cove` |
 
 The localhost callback worked in the real test. HQ cannot send incoming campus/user requests to your localhost API. Those requests require a public test API address or the local simulation below.

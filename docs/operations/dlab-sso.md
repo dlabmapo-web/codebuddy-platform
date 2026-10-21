@@ -1,109 +1,80 @@
-# DLAB OS student SSO
+# DLAB OS SSO: students and staff
+Design: [automatic student/staff SSO](../superpowers/specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md).
+Implementation branch: `feat/dlab-os-staff-sso`. Deployment and real HQ testing must be recorded separately from local test results.
 
-The next release is specified in [automatic student and staff SSO](../superpowers/specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md). It covers the new `os.dlabcampus.com` domain, four academy roles, and campus-based automatic provisioning. That design is not yet implemented; the student-only instructions below describe the existing release.
+## What happens
 
-Implementation branch: `feat/dlab-os-sso`. Design: [SSO connection spec](../superpowers/specs/2026-10-16-dlab-os-sso-connection-design.md).
+HQ creates the account in OS. The person signs into `https://os.dlabcampus.com/`, then opens the Cove card or staff shortcut. GET `https://cs.coveedu.com/sso/start` redirects to OS authorization. Cove's callback exchanges the one-use code on the API server using Basic client authentication and creates/reuses the managed Cove account, memberships and normal Supabase session. No Cove signup, application or password copying is required.
 
-For startup commands, campus mapping, browser steps, expected results, and troubleshooting, use the [local testing guide](dlab-sso-local-testing.md).
+OS role mappings: `student` → Student; `instructor` → Teacher; `edu_manager` → Team Lead; `lab_head` → Manager. Other roles are stored and receive only primary-campus Student fallback access. No OS role becomes Cove platform Admin. Staff class assignments and student course enrollment remain separate from login.
 
-The [demo and production connection guide](dlab-sso-demo-rollout.md) records the working Daechi development mapping, team demonstration steps, and remaining production/HQ setup.
+## Runtime configuration
 
-## Release scope
-
-Phase A implements controlled student login, campus/user PUT updates, managed identity provisioning, Supabase session activation, and account eligibility checks. It does not implement `GET /v1/courses`, enrollment import, automatic staff privileges, or existing-account conversion. Do not tell OS that the full v1.2.1 contract is ready.
-
-The feature defaults to disabled. An empty `DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS` permits no login. Use one new controlled OS student for our first joint test; never guess an external campus ID, merge by name, or silently convert an existing password account.
-
-## Before enabling
-
-1. Confirm Finn registered `https://cs.coveedu.com/sso/callback` and request a controlled test student plus its external user and campus IDs. The OS base is `https://dlab-os.onrender.com/v1`; the host-only message does not remove `/v1`.
-2. Reissue the credentials shared in conversation and store replacements privately. Never put them in this runbook, tickets, screenshots, commands pasted into shared threads, or Git.
-3. Apply the additive migration with the existing release workflow, not against a database selected implicitly from a local shell.
-4. Review and install `deploy/sql/dlab-auth-guard.sql` in the Supabase project as the project owner. This is a separate provider-side guard, deliberately not part of the normal application migration. It prevents local password/email/alternate-provider changes for managed auth identities. Supabase may generate an unknown internal password hash during passwordless admin creation; the guard permits that initial value and blocks subsequent changes. Cove never supplies a password when provisioning a DLAB user. Validate its behavior against the actual project before real students use SSO. Do not remove it while managed sessions are active.
-5. Resolve the cookie-contract decision with Finn: the reference requests HttpOnly session cookies, while Cove's existing Supabase browser integration requires JS-readable session cookies. The transaction cookie is HttpOnly, Secure in production, SameSite=Lax. This implementation preserves normal Supabase session cookies. A stricter session-only HttpOnly requirement needs a separate BFF redesign; do not claim compatibility without agreement.
-6. Validate the actual Supabase bridge with the controlled student: passwordless admin creation, admin magic-link generation without email dispatch, server-side OTP token-hash verification, session ID, refresh, and browser session compatibility. Local OS/Supabase mocks do not prove this live behavior.
-
-## Server configuration
-
-API private env file:
+API private environment (never commit values):
 
 ```dotenv
 DLAB_SSO_ENABLED=true
-DLAB_OS_BASE_URL=https://dlab-os.onrender.com/v1
+DLAB_OS_BASE_URL=https://os.dlabcampus.com/v1
 DLAB_CLIENT_ID=cove
 DLAB_REDIRECT_URI=https://cs.coveedu.com/sso/callback
-DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS=<verified-test-external-user-id>
+DLAB_SSO_ROLLOUT_MODE=allowlist
+DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS=<controlled-fixture-ids>
 DLAB_CLIENT_SECRET=<private-issued-secret>
 DLAB_INBOUND_SERVER_KEY=<private-independent-inbound-key>
 ```
 
-Studio private env file:
+Studio private environment: `DLAB_SSO_ENABLED=true`. Preserve the matching BFF secret and authenticated Redis settings. DLAB client and inbound secrets belong only on the API. No `NEXT_PUBLIC_*` secret is needed. The API and Studio must run the compatible new version together: activation now returns the role-aware student-session flag.
 
-```dotenv
-DLAB_SSO_ENABLED=true
-```
+The new fixed OS base is required; the old Render hostname is refused. Before deploying, stage this environment change for the new image and validate with `deploy/scripts/check-dlab-config.py`. Do not restart an old image with the new pinned-domain settings. Verify that HQ migrated the client registration and that a real code exchange works; a reachable home page is insufficient.
 
-Keep the existing matching `BFF_SHARED_SECRET` and Redis configuration. DLAB secrets live on the API server only. No new `NEXT_PUBLIC_*` setting is required. This is a runtime server flag; ordinary social/password login remains available for external users.
+`allowlist` keeps controlled per-user admission and defaults closed. `campus` removes the per-user requirement but only admits active users through explicitly enabled, mapped, active campuses. An empty list does not switch modes. No enabled campus means no access in campus mode.
 
-`deploy/scripts/check-dlab-config.py` validates flag agreement and required values without printing credentials; production preflight calls it. The allowlist is a controlled rollout boundary, not proof that the remaining production gates have passed.
+## Connect a campus once
 
-## Campus registration and verified mapping
+Authenticated HQ campus PUTs store source data without creating or selecting an academy. Verify the external campus ID and the exact Cove academy UUID/slug/kind/status. Never match by name or silently remap a campus. Keep the existing isolated Daechi demo separate from real Mapo users until their identity-linking approach is agreed.
 
-DLAB OS sends a Bearer-authenticated campus PUT to `https://api.coveedu.com/v1/campuses/{external_campus_id}` with the v1.2.1 body and UUID `X-Request-Id`. Campus upsert stores source information without creating a Cove academy. It is safe for a user PUT to arrive before mapping; login is refused until mapping exists.
-
-Select a verified existing active academy of kind `ACADEMY` (an isolated test academy is preferred until the user chooses otherwise), then run the mapping command with IDs, using an appropriately configured operator shell:
+Run operator commands in a shell/container with an **explicitly exported target `DATABASE_URL`**, rollout mode, private Redis configuration and the required runtime values. The tools do not implicitly read dotenv files. Dry-run output includes database host/name and affected identity count but no passwords or tokens. In a local API directory, `node --env-file=.env.local --import tsx src/integrations/dlab/scripts/operator.ts ...` can explicitly select the configured environment.
 
 ```bash
-pnpm --filter @cove/api dlab:map-campus <external-campus-id> <academy-uuid> <platform-operator-user-uuid>
-pnpm --filter @cove/api dlab:map-campus <external-campus-id> <academy-uuid> <platform-operator-user-uuid> --apply
+pnpm --filter @cove/api dlab:map-campus <external-campus-id> <academy-uuid> <platform-operator-uuid>
+pnpm --filter @cove/api dlab:map-campus <external-campus-id> <academy-uuid> <platform-operator-uuid> --apply
+pnpm --filter @cove/api dlab:set-campus-access <external-campus-id> enabled <platform-operator-uuid>
+pnpm --filter @cove/api dlab:set-campus-access <external-campus-id> enabled <platform-operator-uuid> --apply
 ```
 
-The first command is a dry run. The second records the actor and mapping time. Reassigning an already-mapped campus to a different academy is refused.
+Mapping and enabling are separate audited actions. The operator must be an active Cove platform Admin. Campus mode allows new users automatically after this one-time setup. Multi-campus staff get only the approved intersection of their verified OS scope. Unmapped secondary campuses receive no invented membership.
 
-## Browser flow
+## Updates and restrictions
 
-- Start: `GET https://cs.coveedu.com/sso/start`.
-- Callback: `GET https://cs.coveedu.com/sso/callback`.
-- Login page: runtime-enabled “Log in with DLAB” anchor.
-- Invalid/expired/cancelled attempts: clean `/sso/error` destination, with no code or token in the URL.
-- Latest login tab wins for a shared browser cookie. Start again after a failed attempt; do not reuse an OS code.
+Public `PUT /v1/campuses/:id` and `PUT /v1/users/:id` require the independent exact Bearer key and a UUID `X-Request-Id`. Wrong/missing keys return 401 before body validation. Only narrow Caddy rewrites reach these controllers. Ordinary RPC is unchanged.
 
-Studio calls trusted API endpoints for transaction creation, code exchange, and session activation. These require the existing BFF secret; the inbound OS key cannot invoke them. The Supabase token hash and activation ticket never appear in browser JSON, redirect URLs, or logs.
+User PUTs can arrive before login and remain staged. For provisioned users, PUTs reconcile roles and memberships immediately, preserving IDs and history. Unknown roles remain stored without staff privilege. Inactive users and removed campuses lose access. Source version conflicts/stale events cannot overwrite newer source data. Reactivation after a known OS suspension requires a newer active source update and fresh login.
 
-A new DLAB student receives an internal username, a placeholder email, and an academy membership. No password, signup form, or ordinary join request is required. Login alone does not enroll the student in a class or expose courses.
+Local suspensions are tracked independently from OS restrictions. A local restore clears only the Cove restriction and cannot override OS/campus restrictions. The directory reports when access is still blocked. Source role changes never preserve a last manager's revoked OS privilege; operators receive a bounded event that the academy needs a manager. Local last-manager protections continue for ordinary operations.
 
-## Identity updates and access
+All managed HTTP requests validate current eligibility and session generation. Academy access is checked separately for each requested campus. Role/status/scope and local restrictions invalidate old generations. Token-bound socket watchers receive change notifications and have a ten-second periodic backstop. Redis/source failure fails managed access closed. No ordinary password/social account is converted by this feature.
 
-`PUT /v1/users/{external_user_id}` and the campus endpoint require exact Bearer authentication and a UUID request ID. Missing or wrong credentials return 401. These public paths are narrowly rewritten by Caddy to internal integration controllers; normal `/api/rpc` is unchanged.
+## Migrations and provider guard
 
-Only explicitly allowlisted students receive login sessions. Other roles can be stored by synchronization but do not automatically acquire staff or platform access. Changes to active status or scope invalidate older session generations. An OS reactivation requires a fresh login; old tokens are not resurrected.
+Apply the additive `20261021100000_dlab_staff_sso` migration through the normal reviewed release workflow. It adds campus rollout/revision fields, binding restriction provenance, integration events, scope indexing and guards. Historical inactive managed memberships remain locally restricted until explicitly restored; do not guess why they were suspended.
 
-HTTP token verification consults current source eligibility. Source updates publish a Redis notification for sockets to recheck across API instances, with a ten-second periodic backstop. Redis or source database failure fails managed access closed. Repeated status updates are idempotent; timestamped stale events cannot overwrite newer source data.
+Retain the previously installed `deploy/sql/dlab-auth-guard.sql` provider guard. Validate passwordless creation, token-hash bridge, refresh and blocked password/email/provider changes against the selected Supabase project. Managed name, grade, role and identity fields remain protected through API and database guards, including bulk/platform paths. Local preferences remain editable.
 
-OS-owned name, grade, role, and identity fields are protected through policy checks and database triggers, including bulk/admin paths. Local security suspension still works. Managed accounts cannot receive a manager-issued password, recovery delivery, or a local email/provider change. User preferences and existing learning history remain local.
+The reference asks for HttpOnly session cookies. Cove currently uses normal Supabase browser session cookies; the SSO transaction cookie is HttpOnly. Obtain explicit HQ acceptance or complete a separately reviewed server-session redesign before claiming full contract compliance.
 
-## Joint test checklist
+## Test and roll out
 
-- [ ] OS callback registration confirmed; test IDs and academy mapping verified.
-- [ ] Provider bridge and credential guard verified against the configured Supabase project.
-- [ ] Cookie policy resolved before production use.
-- [ ] Login starts through Cove's button and the OS hub's Cove card.
-- [ ] Correct academy landing with no password/signup prompt.
-- [ ] Exactly one Cove user and membership after repeated logins.
-- [ ] Refresh, authenticated API calls, inactivity lease, and logout work.
-- [ ] Replay/mismatched state fails; no token/code values recorded.
-- [ ] Wrong/missing Bearer key returns 401.
-- [ ] Inactive PUT immediately blocks subsequent HTTP calls and disconnects sockets; reactivation requires a new login.
-- [ ] Other academies remain inaccessible.
-- [ ] If learning is tested, explicitly prepare a normal test class/course assignment first.
-- [ ] Ordinary external-user and Google login regression checks pass.
+Use the [local testing guide](dlab-sso-local-testing.md) for historical manual setup, and the [approved spec's joint test order](../superpowers/specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md#12-verification-and-acceptance) for this expansion. Automated isolated testing is documented in the implementation verification report; test doubles do not certify real HQ credentials or role codes.
 
-Record actual results separately. The code being built and local tests passing do not mark these live checks as complete.
+1. Validate locally with disposable PostgreSQL/Redis and OS/provider doubles. Preserve ordinary login regression coverage.
+2. Stage the new domain and matching API/Studio versions, apply the migration, and deploy with controlled allowlist admission.
+3. Verify actual student, teacher, team-leader and manager responses and campus mappings with HQ. Do not publish fixture passwords or callback query strings.
+4. Enable only the verified demo campus. Temporarily disable new SSO entry, select campus mode on the API, and run `dlab:invalidate-sessions <platform-operator-uuid>` dry run then `--apply` with the new mode in its environment. The command also reconciles existing managed identities. Re-enable matching API/Studio flags.
+5. A newly created OS fixture with no per-user allowlist entry must create exactly one Cove user automatically. Check correct role, campus isolation, refresh, logout, source deactivation/reactivation and old-session denial.
+6. HQ exposes the student Cove card and staff shortcut at GET `https://cs.coveedu.com/sso/start`. Signing into OS alone does not automatically navigate to Cove.
 
-## Logs and rollback
+`GET /v1/courses`, `PUT /v1/enrollments`, automatic class assignment and existing-account conversion remain outside this release. Do not promise the full v1.2.1 contract is complete.
 
-Caddy access logs omit request URIs and redact Authorization, Cookie, and the BFF header to prevent auth material from being persisted. Do not enable request/response body capture on SSO endpoints. Existing logs from before this change are outside its scope.
+## Rollback
 
-Disable the flag on API and Studio to stop new login and inbound acceptance. Existing managed identity eligibility and session-generation checks remain active even when the feature is disabled. To invalidate every session for an affected managed identity, advance its generation through an audited operator action; never delete learning records or remove the binding to bypass restrictions.
-
-A return to a pre-SSO application build requires explicitly invalidating managed Supabase sessions first: that old build has no managed-session gate. Do not roll back to it while leaving usable managed sessions behind. Keep the additive schema and provider guard until reviewed cleanup is safe.
+Disable the affected campus with `dlab:set-campus-access ... disabled ... --apply`, or disable new SSO entry and invalidate managed sessions with the operator command. Keep managed policy and provider guards active and preserve all source/binding/history rows. Do not remove the migration or blindly restore the student-only image after staff memberships exist. Restore only a compatible role-aware build. Ordinary non-managed login remains available.

@@ -8,6 +8,7 @@ import type { SupabaseIdentity } from '../../auth/auth.types.js';
 import { DlabStateService, digest } from './dlab-state.service.js';
 import { DlabPolicyService } from './dlab-policy.service.js';
 import { DlabSourceService } from './dlab-source.service.js';
+import { DlabReconcilerService } from './dlab-reconciler.service.js';
 import { DlabSsoService } from './dlab-sso.service.js';
 
 const databaseUrl = process.env.COVE_DLAB_TEST_DATABASE_URL;
@@ -23,14 +24,15 @@ describe.skipIf(!databaseUrl || !redisUrl)('DLAB with isolated PostgreSQL and Re
   beforeAll(async () => {
     const url = new URL(databaseUrl!);
     if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.pathname !== '/cove_dlab_test') throw new Error('An isolated local cove_dlab_test database is required');
-    const config = new ConfigService({ DATABASE_URL: databaseUrl, DLAB_SSO_ENABLED: true, DLAB_OS_BASE_URL: 'https://dlab-os.onrender.com/v1', DLAB_REDIRECT_URI: 'https://cs.coveedu.com/sso/callback', DLAB_CLIENT_SECRET: 'fake-client-secret-for-tests-only', DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: [id] });
+    const config = new ConfigService({ DATABASE_URL: databaseUrl, DLAB_SSO_ENABLED: true, DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_REDIRECT_URI: 'https://cs.coveedu.com/sso/callback', DLAB_CLIENT_SECRET: 'fake-client-secret-for-tests-only', DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: [id] });
     prisma = new PrismaService(config as never);
     redis = new Redis(redisUrl!);
     state = new DlabStateService(redis);
-    policy = new DlabPolicyService(prisma, state);
+    policy = new DlabPolicyService(prisma, state, config as never);
     await policy.onModuleInit();
-    source = new DlabSourceService(prisma, state);
-    sso = new DlabSsoService(config as never, prisma, state, source, policy, bridgeAuth as unknown as SupabaseAuthService);
+    const reconciler = new DlabReconcilerService(config as never);
+    source = new DlabSourceService(prisma, state, reconciler);
+    sso = new DlabSsoService(config as never, prisma, state, source, policy, bridgeAuth as unknown as SupabaseAuthService, reconciler);
     const org = await prisma.organization.create({ data: { name: 'Isolated SSO test', slug: `sso-${randomUUID()}` } });
     const academy = await prisma.academy.create({ data: { organizationId: org.id, name: 'SSO test academy', slug: `test-${randomUUID()}` } });
     academyId = academy.id;

@@ -1,5 +1,7 @@
 # DLAB SSO demo and production connection
 
+Historical controlled student demo. The [current SSO runbook](dlab-sso.md) describes the new domain, staff roles, campus rollout and migration. Do not treat the original demo credentials or mapping as proof that newer HQ fixtures share that campus.
+
 The controlled Daechi test student can now use the DLAB account to sign in to local Cove. Cove creates its own linked account automatically; the student does not register or choose a second password. Existing Mapo accounts continue through the normal login options.
 
 ## Current working demo

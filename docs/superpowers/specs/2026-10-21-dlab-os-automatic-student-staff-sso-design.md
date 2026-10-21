@@ -3,7 +3,7 @@
 Date: 2026-10-21 (Asia/Seoul)
 Branch: `feat/dlab-os-staff-sso`
 Baseline: `origin/feat/cove-studio-v2` at `97953f494cd001dbdf9da499f47696e7e8085c1d`
-Status: Design for review; no application, database, private environment, or production changes have been made for this expansion.
+Status: Approved and implemented on the branch above. [Local verification](../../research/2026-10-21-dlab-student-staff-sso-verification.md) passed; production and the live-HQ release gates remain unchanged.
 
 ## 1. Intended result
 
@@ -298,4 +298,4 @@ References:
 - [Demo rollout](../../operations/dlab-sso-demo-rollout.md)
 - [Production deployment](../../operations/production-deployment.md)
 
-Implementation must update the active runbooks and add a new implementation plan after written-spec review. This file records a design and acceptance criteria; it does not claim that the expansion is deployed or tested.
+The implementation plan, current runbook and verification report now record the branch changes and passing local tests. Production deployment and live HQ acceptance remain separate from this design and its local test evidence.

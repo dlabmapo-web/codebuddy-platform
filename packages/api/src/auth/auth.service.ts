@@ -476,6 +476,9 @@ export class AuthService {
    * costs nothing and only a person who chose a photo pays for it.
    */
   private async present(user: AuthUserRecord): Promise<AuthMeResponse> {
+    const allowed = user.authUserId ? await this.supabaseAuth.dlabAcademyIds?.(user.authUserId) : null;
+    if (allowed) user = { ...user, memberships: user.memberships.filter(m => allowed.includes(m.academyId)) };
+
     const assets = [
       user.avatarAsset,
       ...user.memberships.map(

@@ -2681,6 +2681,10 @@ model ProgrammingExerciseSolution {
 
 /// OS source data can arrive before explicit academy mapping.
 model DlabCampus {
+  ssoEnabled Boolean @default(false) @map("sso_enabled")
+  ssoEnabledByUserId String? @map("sso_enabled_by_user_id") @db.Uuid
+  ssoEnabledAt DateTime? @map("sso_enabled_at") @db.Timestamptz(6)
+  accessRevision Int @default(1) @map("access_revision")
   externalCampusId String @id @map("external_campus_id") @db.VarChar(64)
   name String
   campusType String? @map("campus_type")
@@ -2714,10 +2718,13 @@ model DlabIdentity {
   user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
   bindings DlabMembershipBinding[]
   @@index([externalCampusId])
+  @@index([externalCampusIds], type: Gin)
   @@map("dlab_identities")
 }
 
 model DlabMembershipBinding {
+  sourceAccessStatus String @default("BLOCKED") @map("source_access_status")
+  localSuspendedAt DateTime? @map("local_suspended_at") @db.Timestamptz(6)
   externalUserId String @map("external_user_id") @db.VarChar(64)
   externalCampusId String @map("external_campus_id") @db.VarChar(64)
   membershipId String @unique @map("membership_id") @db.Uuid
@@ -2727,6 +2734,19 @@ model DlabMembershipBinding {
   membership AcademyMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
   @@id([externalUserId, externalCampusId])
   @@map("dlab_membership_bindings")
+}
+
+/// Source-driven changes have no fabricated human actor and contain no credentials.
+model DlabIntegrationEvent {
+  id String @id @default(uuid()) @db.Uuid
+  externalUserId String? @map("external_user_id") @db.VarChar(64)
+  requestId String? @map("request_id") @db.Uuid
+  action String
+  revision Int?
+  details Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@index([externalUserId, createdAt])
+  @@map("dlab_integration_events")
 }
 
 /// Independent import origin and durable request receipt; source IDs are snapshots.

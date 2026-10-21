@@ -1,3 +1,4 @@
+import { restoreDlabMembership } from '../integrations/dlab/dlab-local-restriction.js';
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import {
   BULK_MAX_TARGETS,
@@ -331,6 +332,7 @@ export class PeopleBulkService {
         user: { select: { displayName: true, username: true, email: true } },
         memberProfile: { select: { academyDisplayName: true } },
         extraRoles: { select: { role: true } },
+        dlabBinding: { select: { localSuspendedAt: true, sourceAccessStatus: true } },
         assignedClasses: {
           where: { status: "ACTIVE" },
           select: { id: true },
@@ -364,6 +366,9 @@ export class PeopleBulkService {
       role: member.role,
       status: member.status,
       displayName: memberDisplayName(member),
+      dlabManaged: Boolean(member.dlabBinding),
+      localSuspended: Boolean(member.dlabBinding?.localSuspendedAt),
+      sourceBlocked: member.dlabBinding?.sourceAccessStatus === 'BLOCKED',
       extraRoles: member.extraRoles.map((entry) => entry.role),
       teachesClassIds: [
         ...member.assignedClasses.map((entry) => entry.id),
@@ -551,12 +556,12 @@ export class PeopleBulkService {
         });
         break;
 
-      case "RESTORE":
-        await transaction.academyMembership.updateMany({
-          where: { id: { in: ids }, academyId: input.academyId },
-          data: { status: "ACTIVE", suspendedAt: null },
-        });
+      case "RESTORE": {
+        const ordinary: string[] = [];
+        for (const id of ids) if (!await restoreDlabMembership(transaction, id)) ordinary.push(id);
+        if (ordinary.length) await transaction.academyMembership.updateMany({ where: { id: { in: ordinary }, academyId: input.academyId }, data: { status: "ACTIVE", suspendedAt: null } });
         break;
+      }
 
       case "ROLE_CHANGE": {
         await transaction.academyMembership.updateMany({
@@ -638,7 +643,7 @@ export class PeopleBulkService {
           membershipId: member.id,
           displayName: member.displayName,
           outcome: "changed",
-          code: "ok",
+          code: options.kind === 'RESTORE' && member.sourceBlocked ? 'source_blocked' : 'ok',
         }),
       ),
       ...input.blocked.map(
@@ -674,6 +679,9 @@ type TargetMember = {
    * the wrong thing to ask about a director who also teaches.
    */
   extraRoles: string[];
+  dlabManaged?: boolean;
+  localSuspended?: boolean;
+  sourceBlocked?: boolean;
   /** Classes they teach, as homeroom teacher or as an assistant. */
   teachesClassIds: string[];
   enrolledClassIds: string[];

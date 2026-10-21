@@ -93,6 +93,10 @@ export class SupabaseAuthService {
     return () => { clearInterval(timer); unwatch?.(); };
   }
 
+  async dlabAcademyIds(authUserId: string): Promise<string[] | null> {
+    const allowed = await this.dlab?.eligible(authUserId);
+    return allowed ? allowed.bindings.map(b => b.membership.academyId) : null;
+  }
   async isDlabManaged(authUserId: string) { return Boolean(await this.dlab?.managed(authUserId)); }
   async assertLocalIdentity(authUserId: string) { await this.dlab?.forbidMutation(authUserId); }
 

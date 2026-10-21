@@ -1,3 +1,4 @@
+import { validDlabAuthorizeUrl } from '@cove/shared';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -12,8 +13,7 @@ export async function GET(request: NextRequest) {
     const returnTo = request.nextUrl.searchParams.getAll('return_to');
     const result = await dlabPost<unknown>('transactions', { binding, ...(previous ? { previousState: previous.state } : {}), ...(returnTo.length === 1 ? { returnTo: returnTo[0] } : {}) });
     const data = z.object({ state: z.string().regex(/^[a-f0-9]{64}$/), authorizeUrl: z.url() }).parse(result);
-    const url = new URL(data.authorizeUrl);
-    if (url.origin !== 'https://dlab-os.onrender.com' || url.pathname !== '/v1/sso/authorize') return dlabFailure();
+    if (!validDlabAuthorizeUrl(data.authorizeUrl)) return dlabFailure();
     const response = authResponse(data.authorizeUrl);
     response.cookies.set(dlabCookie(`${binding}.${data.state}`));
     return response;

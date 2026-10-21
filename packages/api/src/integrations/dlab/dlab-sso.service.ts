@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { buildPlaceholderEmail, dlabSsoUserSchema, safeDlabReturnTo } from '@cove/shared';
+import { buildPlaceholderEmail, dlabSsoUserSchema, safeDlabReturnTo, DLAB_ADMIN_DESTINATION } from '@cove/shared';
 import type { ApiEnvironment } from '../../config/env.schema.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { SupabaseAuthService } from '../../auth/supabase-auth.service.js';
@@ -55,7 +55,7 @@ export class DlabSsoService {
         const current = await tx.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: saved.externalUserId } });
         if (current.revision !== saved.revision || current.accountStatus !== 'active') throw new DlabError('identity_changed', 409);
         const user = await tx.user.upsert({ where: { id: saved.reservedUserId }, create: { id: saved.reservedUserId, authUserId, email, emailIsPlaceholder: true, username: `dlab_${saved.reservedUserId.replaceAll('-', '').slice(0, 24)}`, displayName: saved.name, status: 'ACTIVE', platformRole: 'USER' }, update: { displayName: saved.name, lastSignInAt: new Date() } });
-        if (user.status !== 'ACTIVE' || user.platformRole !== 'USER' || user.authUserId !== authUserId) throw new DlabError('local_account_restricted', 403);
+        if (user.status !== 'ACTIVE' || user.authUserId !== authUserId) throw new DlabError('local_account_restricted', 403);
         await tx.dlabIdentity.update({ where: { externalUserId: saved.externalUserId }, data: { userId: user.id, provisioningStatus: 'READY' } });
         return this.reconciler.reconcile(tx, { ...current, userId: user.id });
       });
@@ -73,11 +73,12 @@ export class DlabSsoService {
     const identity = await this.auth.verifyTokenClaims(token);
     if (identity.authUserId !== info.authUserId) throw new DlabError('session_identity_mismatch', 403);
     const allowed = await this.policy.activate(identity, info.generation);
+    if (allowed.isPlatformAdmin) return { destination: DLAB_ADMIN_DESTINATION, requiresStudentSession: false };
     const path = safeDlabReturnTo(info.returnTo);
     const requested = path && allowed.bindings.find(b => {
       const root = `/academy/${b.membership.academy.slug}`;
       return path === root || path.startsWith(root + '/');
     });
-    return { destination: requested ? path! : `/academy/${allowed.academy.slug}`, requiresStudentSession: allowed.requiresStudentSession };
+    return { destination: requested ? path! : `/academy/${allowed.academy!.slug}`, requiresStudentSession: allowed.requiresStudentSession };
   }
 }

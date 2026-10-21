@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { safeDlabReturnTo } from '@cove/shared';
+import { safeDlabReturnTo, DLAB_ADMIN_DESTINATION } from '@cove/shared';
 import { dlabEnabled, dlabCookieName, parseAttempt, dlabPost, dlabFailure, dlabCookie, authResponse, clearDlabContext } from '@/lib/dlab-sso';
 import { createClient } from '@/lib/supabase/server';
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -19,8 +19,10 @@ export async function GET(request: NextRequest) {
     issuedSession = Boolean(data.session);
     if (error || !data.session || data.session.user.id !== bridge.authUserId) throw new Error('Invalid session');
     const activated = z.object({ destination: z.string(), requiresStudentSession: z.boolean() }).parse(await dlabPost<unknown>('activate', { binding: attempt.binding, ticket: bridge.ticket }, data.session.access_token));
-    const destination = safeDlabReturnTo(activated.destination);
+    const adminDestination = activated.destination === DLAB_ADMIN_DESTINATION;
+    const destination = adminDestination ? DLAB_ADMIN_DESTINATION : safeDlabReturnTo(activated.destination);
     if (!destination) throw new Error('Invalid destination');
+    if (adminDestination && activated.requiresStudentSession) throw new Error('Invalid admin session');
     const client = createServerORPCClient(data.session.access_token);
     if (activated.requiresStudentSession) await client.studentSession.begin({});
     const account = await client.auth.me({});
@@ -28,7 +30,10 @@ export async function GET(request: NextRequest) {
       const root = `/academy/${m.academy.slug}`;
       return m.status === 'ACTIVE' && (destination === root || destination.startsWith(root + '/'));
     });
-    if (!target || account.user.authUserId !== bridge.authUserId || (target.role === 'STUDENT') !== activated.requiresStudentSession) throw new Error('Invalid academy session');
+    if (account.user.authUserId !== bridge.authUserId) throw new Error('Invalid session identity');
+    if (adminDestination) {
+      if (account.user.platformRole !== 'ADMIN') throw new Error('Invalid admin session');
+    } else if (!target || account.user.platformRole === 'ADMIN' || (target.role === 'STUDENT') !== activated.requiresStudentSession) throw new Error('Invalid academy session');
     await clearDlabContext();
     const response = authResponse(destination);
     response.cookies.set({ ...dlabCookie(''), maxAge: 0 });

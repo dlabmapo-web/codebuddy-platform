@@ -29,7 +29,7 @@ async function enter(page: Page, value: Fixture) {
   });
   await page.goto('/sso/start');
 }
-for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'], ['tutor', 'TEACHER'], ['edu_manager', 'MANAGER'], ['lab_head', 'TEAM_LEAD'], ['future_role', 'STUDENT']] as const) {
+for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'], ['tutor', 'TEACHER'], ['edu_manager', 'TEAM_LEAD'], ['lab_head', 'MANAGER'], ['future_role', 'STUDENT']] as const) {
   test(`OS ${osRole} automatically enters Cove as ${role} and reuses the account`, async ({ page, request }) => {
     const value = await fixture(request, osRole);
     await enter(page, value);
@@ -53,12 +53,46 @@ for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'],
 
   });
 }
-test('an unapproved campus receives no Cove account or session', async ({ page, request }) => {
-  const value = await fixture(request, 'instructor', { enabled: false });
+test('OS HQ admin enters the platform console without an academy membership and reuses its account', async ({ page, request }) => {
+  const value = await fixture(request, 'hq_admin'); await enter(page, value);
+  await expect(page).toHaveURL(/\/admin\/academies$/);
+  await expect(page.getByRole('heading', { name: 'Academies', level: 1, exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('hq-admin-console.png') });
+  const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json();
+  expect(saved.platformRole).toBe('ADMIN'); expect(saved.memberships).toHaveLength(0); expect(saved.studentLeaseCount).toBe(0);
+  expect((await rpc(page, request, 'platformAcademies/get', { academyId: value.academy.id })).status()).toBe(200);
+  await page.reload(); await expect(page).toHaveURL(/\/admin\/academies$/);
+  await page.goto('/sso/start'); await expect(page).toHaveURL(/\/admin\/academies$/);
+  const again = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json(); expect(again.userId).toBe(saved.userId);
+});
+test('HQ admin demotion revokes console access and the fresh login receives only the source academy role', async ({ page, request }) => {
+  const value = await fixture(request, 'hq_admin'); await enter(page, value); await expect(page).toHaveURL(/\/admin\/academies$/);
+  const oldToken = await tokenFor(page);
+  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
+  expect((await request.post('http://127.0.0.1:4319/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: { academyId: value.academy.id } } })).status()).toBe(401);
+  await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json();
+  expect(saved.platformRole).toBe('USER'); expect(saved.memberships[0].role).toBe('TEAM_LEAD');
+  expect((await rpc(page, request, 'platformAcademies/get', { academyId: value.academy.id })).status()).toBe(403);
+});
+test('HQ admin deactivation revokes live platform access', async ({ page, request }) => {
+  const value = await fixture(request, 'hq_admin'); await enter(page, value); await expect(page).toHaveURL(/\/admin\/academies$/);
+  const token = await tokenFor(page);
+  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { status: 'inactive' } })).ok()).toBe(true);
+  const denied = await request.post('http://127.0.0.1:4319/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + token }, data: { json: { academyId: value.academy.id } } });
+  expect(denied.status()).toBe(403);
+  const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json(); expect(saved.platformRole).toBe('USER');
+});
+for (const osRole of ['instructor', 'hq_admin']) {
+test(`an unapproved campus gives OS ${osRole} no Cove account or session`, async ({ page, request }) => {
+  const value = await fixture(request, osRole, { enabled: false });
   await enter(page, value); await expect(page).toHaveURL(/\/sso\/error$/);
   const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
   expect(saved.userId).toBeNull(); expect(saved.memberships).toHaveLength(0);
 });
+}
 test('a forged callback is rejected without creating a session', async ({ page }) => {
   await page.goto('/sso/callback?code=forged&state=forged');
   await expect(page).toHaveURL(/\/sso\/error$/);
@@ -103,7 +137,7 @@ test('HQ role changes revoke the old session and the next login receives the new
   const value = await fixture(request, 'instructor');
   await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
   const oldToken = await tokenFor(page);
-  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'lab_head' } })).ok()).toBe(true);
+  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
   expect((await request.post('http://127.0.0.1:4319/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } })).status()).toBe(401);
   // Let the revoked protected layout unmount before starting another login.
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();

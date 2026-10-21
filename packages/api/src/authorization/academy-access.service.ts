@@ -109,8 +109,9 @@ export class AcademyAccessService {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }
 
-    await this.dlab?.assertAcademy(authUserId, academyId);
-    const membership = await this.prisma.academyMembership.findUnique({
+    const managed = await this.dlab?.assertAcademy(authUserId, academyId);
+    // HQ admins use normal platform inspection/support rules, not historic OS memberships.
+    const membership = managed?.isPlatformAdmin ? null : await this.prisma.academyMembership.findUnique({
       where: { academyId_userId: { academyId, userId: user.id } },
       include: {
         academy: { select: { status: true } },

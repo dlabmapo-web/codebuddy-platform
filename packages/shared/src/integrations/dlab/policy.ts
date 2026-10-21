@@ -1,16 +1,23 @@
-import type { AcademyRole } from '../../auth/roles.js';
+import type { AcademyRole, PlatformRole } from '../../auth/roles.js';
 
 export const DLAB_OS_ORIGIN = 'https://os.dlabcampus.com';
 export const DLAB_OS_BASE_URL = `${DLAB_OS_ORIGIN}/v1`;
 
 /** OS codes are authoritative; unknown codes never acquire staff permissions. */
-export function dlabAcademyRole(role: string): AcademyRole {
+export function dlabPlatformRole(role: string): PlatformRole {
+  return role === 'hq_admin' ? 'ADMIN' : 'USER';
+}
+
+export const DLAB_ADMIN_DESTINATION = '/admin/academies';
+
+export function dlabAcademyRole(role: string): AcademyRole | null {
   switch (role) {
     // Cove role translation confirmed by the platform owner on 2026-10-21.
     case 'tutor':
     case 'instructor': return 'TEACHER';
-    case 'lab_head': return 'TEAM_LEAD';
-    case 'edu_manager': return 'MANAGER';
+    case 'lab_head': return 'MANAGER';
+    case 'edu_manager': return 'TEAM_LEAD';
+    case 'hq_admin': return null;
     default: return 'STUDENT';
   }
 }

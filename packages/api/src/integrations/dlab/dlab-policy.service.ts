@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { dlabAcademyRole } from '@cove/shared';
+import { dlabAcademyRole, dlabPlatformRole } from '@cove/shared';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { ApiEnvironment } from '../../config/env.schema.js';
 import { desiredDlabCampuses } from './dlab-reconciler.service.js';
@@ -44,19 +44,25 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
       if (!identity) return null;
       const campuses = await desiredDlabCampuses(tx, this.config, identity);
       const role = dlabAcademyRole(identity.userRole);
+      if (identity.user?.status !== 'ACTIVE') throw new DlabError('dlab_access_unavailable', 403);
+      if (dlabPlatformRole(identity.userRole) === 'ADMIN') {
+        if (identity.user.platformRole !== 'ADMIN' || !campuses.length || identity.bindings.some(b => b.localSuspendedAt)) throw new DlabError('dlab_access_unavailable', 403);
+        return { identity, bindings: [], academy: null, isPlatformAdmin: true, requiresStudentSession: false };
+      }
       const bindings = identity.bindings.filter(b => {
         const campus = campuses.find(c => c.externalCampusId === b.externalCampusId);
         return campus && b.membership.academyId === campus.academyId && b.membership.userId === identity.userId
           && b.membership.status === 'ACTIVE' && b.membership.role === role && !b.membership.extraRoles.length
           && b.sourceAccessStatus === 'ALLOWED' && !b.localSuspendedAt;
       });
-      if (identity.user?.status !== 'ACTIVE' || identity.user.platformRole !== 'USER' || !bindings.length) throw new DlabError('dlab_access_unavailable', 403);
+      if (identity.user.platformRole !== 'USER' || !bindings.length) throw new DlabError('dlab_access_unavailable', 403);
       const primary = bindings.find(b => b.externalCampusId === identity.externalCampusId) ?? bindings.sort((a, b) => a.externalCampusId.localeCompare(b.externalCampusId))[0]!;
-      return { identity, bindings, academy: primary.membership.academy, requiresStudentSession: role === 'STUDENT' };
+      return { identity, bindings, academy: primary.membership.academy, isPlatformAdmin: false, requiresStudentSession: role === 'STUDENT' };
   }
   async assertAcademy(authUserId: string, academyId: string) {
     const allowed = await this.eligible(authUserId);
-    if (allowed && !allowed.bindings.some(b => b.membership.academyId === academyId)) throw new DlabError('dlab_campus_not_allowed', 403);
+    if (allowed && !allowed.isPlatformAdmin && !allowed.bindings.some(b => b.membership.academyId === academyId)) throw new DlabError('dlab_campus_not_allowed', 403);
+    return allowed;
   }
   async assertSession(identity: SupabaseIdentity) {
     const allowed = await this.eligible(identity.authUserId);

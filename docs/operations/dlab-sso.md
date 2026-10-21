@@ -6,7 +6,9 @@ Implementation branch: `feat/dlab-os-staff-sso`. Deployment and real HQ testing 
 
 HQ creates the account in OS. The person signs into `https://os.dlabcampus.com/`, then opens the Cove card or staff shortcut. GET `https://cs.coveedu.com/sso/start` redirects to OS authorization. Cove's callback exchanges the one-use code on the API server using Basic client authentication and creates/reuses the managed Cove account, memberships and normal Supabase session. No Cove signup, application or password copying is required.
 
-OS role mappings: `student` → Student; `instructor` / `tutor` → Teacher; `lab_head` → Team Lead; `edu_manager` → Manager. This Cove permission translation was explicitly confirmed by the platform owner on October 21; OS titles alone do not determine Cove permissions. Other roles are stored and receive only primary-campus Student fallback access. No OS role becomes Cove platform Admin. Staff class assignments and student course enrollment remain separate from login.
+OS role mappings: `student` → Student; `instructor` / `tutor` → Teacher; `edu_manager` → Team Lead; `lab_head` → Manager; `hq_admin` → Platform Admin. This is the owner's final approved mapping and supersedes the earlier reversed staff mapping. Other roles, including `so_staff`, retain primary-campus Student fallback. Staff class assignments and student course enrollment remain separate from login.
+
+HQ admins retain the same verified active-campus/rollout admission gate, but receive `User.platformRole=ADMIN` rather than an academy role. They land at the fixed `/admin/academies` destination without an academy membership or student lease. Their normal platform inspection, library and audited support rules apply; platform authority does not invent Manager memberships. Source demotion/deactivation, loss of the last admitted campus and existing local restrictions revoke eligibility and reconcile the platform role. Other OS roles never receive platform Admin. Managed profiles, credentials and platform roles remain OS-controlled.
 
 ## Runtime configuration
 
@@ -72,7 +74,7 @@ Use the [local testing guide](dlab-sso-local-testing.md) for historical manual s
 
 1. Validate locally with disposable PostgreSQL/Redis and OS/provider doubles. Preserve ordinary login regression coverage.
 2. Stage the new domain and matching API/Studio versions, apply the migration, and deploy with controlled allowlist admission.
-3. Verify actual student, teacher, team-leader and manager responses and campus mappings with HQ. Do not publish fixture passwords or callback query strings.
+3. Verify actual student, teacher, team-leader, manager and HQ-admin responses and campus mappings with HQ. Do not publish fixture passwords or callback query strings.
 4. Enable only the verified demo campus. Temporarily disable new SSO entry, select campus mode on the API, and run `dlab:invalidate-sessions <platform-operator-uuid>` dry run then `--apply` with the new mode in its environment. The command also reconciles existing managed identities. Re-enable matching API/Studio flags.
 5. A newly created OS fixture with no per-user allowlist entry must create exactly one Cove user automatically. Check correct role, campus isolation, refresh, logout, source deactivation/reactivation and old-session denial.
 6. HQ exposes the student Cove card and staff shortcut at GET `https://cs.coveedu.com/sso/start`. Signing into OS alone does not automatically navigate to Cove.

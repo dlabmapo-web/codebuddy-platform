@@ -15,8 +15,8 @@ Each `pnpm test:dlab` run creates a new disposable PostgreSQL/Redis pair on loop
 ## Implemented behavior
 
 - The fixed OS base is `https://os.dlabcampus.com/v1`; the old Render domain and arbitrary authorize origins are rejected.
-- The owner-confirmed mappings are `student → STUDENT`, `instructor/tutor → TEACHER`, `lab_head → TEAM_LEAD`, and `edu_manager → MANAGER`. This supersedes the initially inferred mapping.
-- Other roles are stored and get only primary-campus Student fallback access. No OS account becomes a Cove platform Admin.
+- The final owner-confirmed mappings are `student → STUDENT`, `instructor/tutor → TEACHER`, `edu_manager → TEAM_LEAD`, `lab_head → MANAGER`, and `hq_admin → platform ADMIN`. The later final-mapping section supersedes the intermediate mapping recorded below.
+- Other roles are stored and get only primary-campus Student fallback access. Only the exact eligible `hq_admin` source role becomes a Cove platform Admin.
 - Campus mode creates or reuses accounts automatically in approved, enabled campuses. Allowlist mode remains available for controlled rollout and defaults closed.
 - Staff can have multiple verified campus memberships. Removed, disabled, or unapproved campuses do not grant access, including when a stale membership row still looks active.
 - Source role changes replace old permissions. Independent local suspensions survive OS reactivation. Local restoration cannot override OS, campus, or local account restrictions.
@@ -123,3 +123,28 @@ After verifying both database URLs and Supabase settings still targeted the user
 ### Real teacher acceptance after the correction
 
 A fresh Chrome authorization through the real OS reused the supplied teacher's existing session. The callback completed and opened local `/academy/daechi-sso-demo`; the academy selector showed **Teacher**, the page heading was **Teaching overview**, and navigation exposed My classes, Student analytics and Students. Refresh preserved the same Teacher dashboard. The empty state correctly says no class is assigned; automatic class assignment remains outside login scope. The successful tab was left open for the user. This confirms real tutor-to-Teacher authentication and UI behavior on the development target, not production or live acceptance of the other staff role fixtures. Local evidence image: `/tmp/cove-dlab-teacher-corrected-role.png` (not committed).
+
+### Real Team Lead acceptance
+
+A subsequent fresh Chrome authorization used the supplied HQ team-leader account's existing OS session. OS returned **`user_role=lab_head`**, active status and the approved Daechi campus. Cove automatically provisioned an active **TEAM_LEAD** membership in `daechi-sso-demo`. The browser showed **Team Lead** in the academy selector and the curriculum overview headed **What Daechi SSO Demo Academy teaches**, with curriculum, classes, student and teacher navigation. Refresh preserved that dashboard. No per-user allowlist addition, manual user creation or OS database access was used. Local screenshot: `/tmp/cove-dlab-team-lead-live-result.png` (not committed); the successful tab was left open.
+
+Teacher (`tutor`) and Team Lead (`lab_head`) now have real OS-to-local-Cove acceptance evidence. Manager (`edu_manager`) is implemented and passed automated database/browser dashboard and permission tests, but a real active OS `edu_manager` fixture has not been provided or tested. Existing Cove admin/manager password accounts do not establish real OS Manager acceptance. The student mapping and legacy login regressions passed the automated suite; the previously provisioned student retained its Student membership during reconciliation. `so_staff`, `hq_admin` and unreviewed codes continue to receive only the documented Student fallback, never platform Admin access. Production remains unchanged.
+
+## Final approved mapping: academy roles and HQ Platform Admin
+
+The user's final explicit role table supersedes both earlier staff-role translations: `student` → Student; `instructor`/`tutor` → Teacher; `edu_manager` → Team Lead; `lab_head` → Manager; `hq_admin` → Platform Admin. OS role labels remain separate from Cove permissions. The supplied account described as a team-leader fixture actually returns `lab_head`, so its final Cove role is Manager.
+
+The shared policy now derives platform and academy roles separately. An eligible HQ admin receives `User.platformRole=ADMIN`, no academy-role membership and no student lease, with a fixed `/admin/academies` destination. Admission retains active source/local-account checks and the existing allowlist or enabled/mapped-campus rollout policy. HQ administrators use normal Cove platform permissions, inspection/library access and support-operation rules. Historical academy bindings are retained but suspended/source-blocked, and local restrictions are preserved. Role transitions are recorded as integration events. Demotion/deactivation and loss of the last admitted campus revoke admin eligibility and remove the derived platform role. Managed profile, credential and platform-role DB guards remain enabled. No new migration or OS database access was needed.
+
+Final verification:
+
+- Complete isolated `pnpm test:dlab`: all 67 migrations, **156 API tests + 55 shared tests + 16 Studio tests = 227 focused tests**, and **20 Chromium browser cases**, passed; browser duration 1.7 minutes. New coverage includes HQ creation/reuse without academy memberships, promotion/demotion, deactivation, campus rejection, local restrictions, platform access after a historical academy membership, safe callback destinations, and all five legacy password-login roles.
+- A subsequent focused run of `pnpm test:dlab --grep 'OS HQ admin enters'` repeated the 227 focused checks and passed the strengthened console case, asserting the visible **Academies** heading and capturing the actual platform UI. [Automated HQ console screenshot](../../test-results/dlab-sso-OS-HQ-admin-enter-ff44e-ship-and-reuses-its-account/hq-admin-console.png). This is an isolated OS/provider double, not a real HQ-admin credential test.
+- API, Studio and E2E TypeScript checks passed; the API build ran successfully in both isolated runs. Disposable containers/services were cleaned up.
+- The verified development target was previewed and reconciled through `operator.ts invalidate --apply`, affecting three existing managed identities. Before/after comparisons confirmed identical user/auth/membership IDs and higher session generations. The actual student remains Student, the tutor remains Teacher, and the existing `lab_head` changed from Team Lead to Manager. Both manual servers were restarted with the compatible build. Production and private credentials were unchanged.
+
+A real OS `hq_admin` fixture and a real `edu_manager` fixture are still required for those live acceptance checks. Existing local/admin password credentials do not prove either OS role. This release does not enable `so_staff` as a staff role or complete course/enrollment synchronization.
+
+### Real Manager acceptance under the final mapping
+
+A fresh real OS login with the existing `lab_head` fixture completed the code/session bridge and landed at local `/academy/daechi-sso-demo`. The selector displayed **Manager**, the heading displayed **Control tower**, the roster showed one Student, one Teacher and one Manager, and manager navigation exposed Members, Invitations and Academy settings. Refresh retained the Manager dashboard. The page was left open for the user. Screenshot: `/tmp/cove-dlab-final-manager-live.png` (not committed). This supersedes the earlier Team Lead landing for the same source account, without changing its OS role, account ID or membership ID.

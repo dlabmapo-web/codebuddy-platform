@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { PrismaService } from '../../database/prisma.service.js';
 import { AcademyAccessService } from '../../authorization/academy-access.service.js';
+import { PlatformAccessService } from '../../authorization/platform-access.service.js';
 import { SupportGrantResolver } from '../../authorization/support-grant.resolver.js';
 import type { SupabaseAuthService } from '../../auth/supabase-auth.service.js';
 import type { SupabaseIdentity } from '../../auth/auth.types.js';
@@ -60,7 +61,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     const record = () => db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: true } } } });
     return { id, primary, secondary, os, config, source, policy, sso, binding, auth, academies, login, record };
   }
-  it.each([['student', 'STUDENT', true, 1], ['instructor', 'TEACHER', false, 2], ['edu_manager', 'MANAGER', false, 2], ['lab_head', 'TEAM_LEAD', false, 2], ['tutor', 'TEACHER', false, 2], ['so_staff', 'STUDENT', true, 1], ['hq_admin', 'STUDENT', true, 1], ['future_role', 'STUDENT', true, 1]])('automatically provisions %s as %s without a user allowlist or prior PUT', async (osRole, localRole, studentLease, campusCount) => {
+  it.each([['student', 'STUDENT', true, 1], ['instructor', 'TEACHER', false, 2], ['edu_manager', 'TEAM_LEAD', false, 2], ['lab_head', 'MANAGER', false, 2], ['tutor', 'TEACHER', false, 2], ['so_staff', 'STUDENT', true, 1], ['future_role', 'STUDENT', true, 1]])('automatically provisions %s as %s without a user allowlist or prior PUT', async (osRole, localRole, studentLease, campusCount) => {
     const f = await fixture(osRole as string);
     const first = await f.login();
     expect(first.requiresStudentSession).toBe(studentLease);
@@ -73,6 +74,60 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     expect(again.completed.authUserId).toBe(first.completed.authUserId);
     expect((await f.record()).bindings.map(b => b.membershipId).sort()).toEqual(saved.bindings.map(b => b.membershipId).sort());
     expect(await db.academyJoinRequest.count({ where: { userId: saved.userId! } })).toBe(0);
+  });
+  it('provisions HQ platform admin without academy memberships and reuses the managed identity', async () => {
+    const f = await fixture('hq_admin'); const first = await f.login('/academy/not-my-academy');
+    expect(first).toMatchObject({ destination: '/admin/academies', requiresStudentSession: false });
+    const saved = await f.record();
+    expect(saved.user?.platformRole).toBe('ADMIN'); expect(saved.bindings).toHaveLength(0);
+    const platform = new PlatformAccessService(db, f.policy);
+    await expect(platform.requirePermission(first.claims.authUserId, 'platform.academies.create')).resolves.toMatchObject({ userId: saved.userId });
+    const academy = new AcademyAccessService(db, new SupportGrantResolver(db), f.policy);
+    await expect(academy.requirePermission(first.claims.authUserId, f.academies[1]!.id, 'academy.read')).resolves.toMatchObject({ via: 'platform' });
+    await expect(academy.requirePermission(first.claims.authUserId, f.academies[1]!.id, 'submissions.own.create')).rejects.toThrow();
+    const again = await f.login(); expect(again.completed.authUserId).toBe(first.completed.authUserId);
+    expect((await f.record()).userId).toBe(saved.userId);
+    await expect(db.user.update({ where: { id: saved.userId! }, data: { platformRole: 'USER' } })).rejects.toThrow();
+  });
+  it('revokes HQ privilege and tokens on demotion, then upgrades again without restoring old academy access', async () => {
+    const f = await fixture('lab_head'); const manager = await f.login(); const before = await f.record();
+    f.os.user_role = 'hq_admin'; await f.source.user(f.id, { ...f.os, updated_at: '2027-01-01T00:00:00Z' });
+    await expect(f.policy.assertSession(manager.claims)).rejects.toThrow('session_not_activated');
+    const admin = await f.login(); expect(admin.destination).toBe('/admin/academies');
+    const hq = await f.record(); expect(hq.user?.platformRole).toBe('ADMIN');
+    expect(hq.bindings.every(b => b.membership.status === 'SUSPENDED' && b.sourceAccessStatus === 'BLOCKED')).toBe(true);
+    const academy = new AcademyAccessService(db, new SupportGrantResolver(db), f.policy);
+    await expect(academy.requirePermission(admin.claims.authUserId, f.academies[0]!.id, 'academy.read')).resolves.toMatchObject({ via: 'platform' });
+    f.os.user_role = 'edu_manager'; await f.source.user(f.id, { ...f.os, updated_at: '2027-01-02T00:00:00Z' });
+    await expect(f.policy.assertSession(admin.claims)).rejects.toThrow('session_not_activated');
+    await expect(new PlatformAccessService(db, f.policy).requirePermission(admin.claims.authUserId, 'platform.academies.read')).rejects.toThrow();
+    const after = await f.record(); expect(after.user?.platformRole).toBe('USER');
+    expect(after.bindings.every(b => b.membership.role === 'TEAM_LEAD')).toBe(true);
+    expect(after.userId).toBe(before.userId);
+    expect(after.bindings.map(b => b.membershipId).sort()).toEqual(before.bindings.map(b => b.membershipId).sort());
+    expect((await f.login()).destination).toBe('/academy/' + f.academies[0]!.slug);
+  });
+  it('blocks HQ admins outside rollout and revokes admin authority when the last approved campus is disabled', async () => {
+    const f = await fixture('hq_admin'); f.os.external_campus_ids = [f.primary];
+    await db.dlabCampus.update({ where: { externalCampusId: f.primary }, data: { ssoEnabled: false } });
+    await expect(f.login()).rejects.toThrow('campus_mapping_required'); expect(f.auth.createDlabUser).not.toHaveBeenCalled();
+    await db.dlabCampus.update({ where: { externalCampusId: f.primary }, data: { ssoEnabled: true } });
+    const first = await f.login();
+    await f.source.campus(f.primary, { name: 'Fixture', status: 'inactive', updated_at: '2027-01-01T00:00:00Z' });
+    expect((await f.record()).user?.platformRole).toBe('USER');
+    await expect(f.policy.assertSession(first.claims)).rejects.toThrow();
+    await expect(new PlatformAccessService(db, f.policy).requirePermission(first.claims.authUserId, 'platform.academies.read')).rejects.toThrow();
+  });
+  it('revokes HQ admin on OS deactivation and keeps a local membership suspension during promotion', async () => {
+    const f = await fixture('hq_admin'); const first = await f.login();
+    f.os.account_status = 'inactive'; await f.source.user(f.id, { ...f.os, updated_at: '2027-01-01T00:00:00Z' });
+    expect((await f.record()).user?.platformRole).toBe('USER');
+    await expect(f.policy.assertSession(first.claims)).rejects.toThrow();
+    const restricted = await fixture('instructor'); await restricted.login(); const saved = await restricted.record();
+    await db.academyMembership.update({ where: { id: saved.bindings[0]!.membershipId }, data: { status: 'SUSPENDED' } });
+    restricted.os.user_role = 'hq_admin'; await restricted.source.user(restricted.id, { ...restricted.os, updated_at: '2027-01-01T00:00:00Z' });
+    expect((await restricted.record()).user?.platformRole).toBe('USER');
+    await expect(restricted.login()).rejects.toThrow('dlab_access_unavailable');
   });
   it('reconciles an existing tutor Student membership without replacing its account or history', async () => {
     const f = await fixture('tutor'); f.os.external_campus_ids = [f.primary];
@@ -125,7 +180,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     await expect(f.login()).resolves.toMatchObject({ requiresStudentSession: false });
   });
   it('reconciles role changes immediately, including last-manager demotion, without accumulating roles', async () => {
-    const f = await fixture('edu_manager'); const initial = await f.login();
+    const f = await fixture('lab_head'); const initial = await f.login();
     f.os.user_role = 'student'; f.os.external_campus_ids = [f.primary];
     await f.source.user(f.id, { ...f.os, updated_at: '2027-01-01T00:00:00Z' });
     await expect(f.policy.assertSession(initial.claims)).rejects.toThrow('session_not_activated');

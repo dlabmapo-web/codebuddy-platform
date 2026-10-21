@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { dlabAcademyRole, dlabEffectiveScope } from '@cove/shared';
+import { dlabAcademyRole, dlabEffectiveScope, dlabPlatformRole } from '@cove/shared';
 import type { ApiEnvironment } from '../../config/env.schema.js';
 import type { DlabIdentity, Prisma } from '../../generated/prisma/client.js';
 import { bumpPeopleRevision } from '../../manage/people-revision.js';
@@ -28,12 +28,18 @@ export class DlabReconcilerService {
     if (!identity.userId) return [] as string[];
     await sourceWrite(tx);
     const user = await tx.user.findUniqueOrThrow({ where: { id: identity.userId } });
-    if (user.platformRole !== 'USER') throw new DlabError('local_account_restricted', 403);
     const desired = await desiredDlabCampuses(tx, this.config, identity);
     const role = dlabAcademyRole(identity.userRole);
     const bindings = await tx.dlabMembershipBinding.findMany({ where: { externalUserId: identity.externalUserId }, include: { membership: true } });
+    const platformRole = dlabPlatformRole(identity.userRole) === 'ADMIN'
+      && user.status === 'ACTIVE' && desired.length > 0 && !bindings.some(b => b.localSuspendedAt)
+      ? 'ADMIN' : 'USER';
+    if (user.platformRole !== platformRole) {
+      await tx.user.update({ where: { id: user.id }, data: { platformRole } });
+      await tx.dlabIntegrationEvent.create({ data: { externalUserId: identity.externalUserId, action: 'platform_role.reconciled', revision: identity.revision, details: { before: user.platformRole, after: platformRole } } });
+    }
     const changed: string[] = [];
-    for (const campus of desired) {
+    if (role) for (const campus of desired) {
       const academyId = campus.academy!.id;
       let membership = await tx.academyMembership.findUnique({ where: { academyId_userId: { academyId, userId: user.id } }, include: { dlabBinding: true, extraRoles: true } });
       if (membership && (!membership.dlabBinding || membership.dlabBinding.externalUserId !== identity.externalUserId || membership.dlabBinding.externalCampusId !== campus.externalCampusId)) throw new DlabError('membership_conflict', 409);
@@ -55,7 +61,7 @@ export class DlabReconcilerService {
       }
     }
     for (const binding of bindings) {
-      if (desired.some(c => c.externalCampusId === binding.externalCampusId)) continue;
+      if (role && desired.some(c => c.externalCampusId === binding.externalCampusId)) continue;
       await tx.dlabMembershipBinding.update({ where: { membershipId: binding.membershipId }, data: { sourceAccessStatus: 'BLOCKED', appliedRevision: identity.revision } });
       if (binding.membership.status === 'ACTIVE') {
         await tx.academyMembership.update({ where: { id: binding.membershipId }, data: { status: 'SUSPENDED', suspendedAt: new Date() } });

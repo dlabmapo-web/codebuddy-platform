@@ -82,6 +82,24 @@ describe('DLAB browser start and callback', () => {
     expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo');
     expect(m.begin).not.toHaveBeenCalled();
   });
+  it('admits a verified platform admin to the fixed console destination without an academy membership', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/admin/academies', requiresStudentSession: false }))));
+    m.me.mockResolvedValue({ user: { authUserId: uid, platformRole: 'ADMIN', memberships: [] } });
+    const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
+    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/admin/academies');
+    expect(m.begin).not.toHaveBeenCalled(); expect(m.signOut).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['USER', '/admin/academies', false],
+    ['ADMIN', '/admin/users', false],
+    ['ADMIN', '/admin/academies', true],
+    ['ADMIN', '/academy/dlab-mapo', false],
+  ])('rejects an invalid console activation for %s at %s', async (platformRole, destination, requiresStudentSession) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination, requiresStudentSession }))));
+    m.me.mockResolvedValue({ user: { authUserId: uid, platformRole, memberships: [{ academy: { slug: 'dlab-mapo' }, status: 'ACTIVE', role: 'TEACHER' }] } });
+    const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
+    expect(result.headers.get('location')).toContain('/sso/error'); expect(m.signOut).toHaveBeenCalledOnce();
+  });
   it('rejects a trusted response selecting an academy absent from the activated account', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/other-campus', requiresStudentSession: false }))));
     const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));

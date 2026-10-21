@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
+import { DlabPolicyService } from '../integrations/dlab/dlab-policy.service.js';
 import {
   platformRoleHasPermission,
   type PlatformPermission,
@@ -25,7 +26,7 @@ export type PlatformAccess = { userId: string };
  */
 @Injectable()
 export class PlatformAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly dlab?: DlabPolicyService) {}
 
   async requirePermission(
     authUserId: string,
@@ -39,6 +40,7 @@ export class PlatformAccessService {
     authUserId: string,
     permissions: readonly [PlatformPermission, ...PlatformPermission[]],
   ): Promise<PlatformAccess> {
+    await this.dlab?.eligible(authUserId);
     const user = await this.prisma.user.findUnique({
       where: { authUserId },
       select: { id: true, status: true, platformRole: true },

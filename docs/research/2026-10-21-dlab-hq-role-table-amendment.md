@@ -2,6 +2,8 @@
 
 Date: 2026-10-21. Branch: `feat/dlab-os-staff-sso`.
 
+Subsequent production release: [v2.0.38 live verification](2026-10-21-v2.0.38-production-sso-verification.md). The preparation-stage observations below are retained chronologically; the new domain and campus-mode SSO are now deployed, with real Student/Teacher/Manager acceptance recorded there.
+
 ## Current role mapping
 
 The platform owner requested implementation of the newly supplied HQ screenshot. Its aligned right-column rows are the current mapping; the smaller inline “OS 연결” notes show the previous mapping. Earlier reports describe historical behavior, not this amendment.

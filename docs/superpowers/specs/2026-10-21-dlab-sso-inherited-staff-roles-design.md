@@ -1,9 +1,10 @@
-# DLAB SSO staff role inheritance
+# DLAB SSO staff inheritance and unified staff workspace
 
 Date: 2026-10-21 (Asia/Seoul)
 Branch: `feat/dlab-os-staff-sso`
 Baseline: `1e7307b4`; production code release `v2.0.38` (`cb793465`).
 Status: Written for owner review. Implementation, deployment, and acceptance testing have not started for this change.
+Amendment: The owner's subsequent Elice screenshot/request replaces the initial role-switching workflow with direct capability-based actions. Sections 7–11 include the resulting Manager tutoring-scope change.
 
 ## 1. Result in plain English
 
@@ -15,20 +16,20 @@ One DLAB OS account can manage an academy and teach without signing in again or 
 - Student remains a separate role.
 - Platform Admin remains a separate platform authority.
 
-For example, an OS `lab_head` enters Cove as Manager, creates a class, assigns themselves as its teacher, switches to the Teacher view, and reviews that class's answers. Switching back to Manager restores the management navigation without another login. Their account, academy membership, class assignment, and history remain the same records.
+For example, an OS `lab_head` enters Cove as Manager, opens a coding activity, views its solution, edits the lesson, opens Tutoring, selects a student in that academy, and reviews their work or helps edit their live code. They can then manage a class or academy settings while remaining Manager. No role selection, self-assignment as teacher, or second login is required for those Manager operations.
 
-This matches the Elice-style staff behavior requested by the owner, using Cove's existing role switcher and design. It does not promise Elice feature parity, an identical interface, automatic assignment to every class, or student impersonation.
+The staff workspace exposes all authorized actions together, like the supplied Elice example. Derived roles are internal grants, not modes the user must activate. This changes the first draft's requirement to switch to Teacher before teaching. It does not promise every Elice feature, an identical interface, cross-academy authority, or student impersonation.
 
 ## 2. Decision and alternatives
 
-**Selected: derive multiple Cove staff roles from one verified OS role, and store them through the existing membership-role model.** The owner accepted this direction in the conversation preceding this specification.
+**Selected: derive staff grants from one verified OS role, retain the existing membership-role storage, and expose their capabilities in one unified staff workspace.** A real academy Manager also receives explicit academy-wide tutoring authority; Team Leads and Teachers retain assigned-class tutoring scope.
 
-This reuses the system already implemented for ordinary Cove members: one primary `AcademyMembership.role`, additional `AcademyMembershipRole` rows, union-based authorization, and a per-academy role-view switcher.
+This reuses one primary `AcademyMembership.role`, additional `AcademyMembershipRole` rows, union-based authorization, the shared course/workspace, staff practice, solution dialog, tutoring drawer, and live editor. It replaces role-dependent operating modes with server-derived actions and scope. Primary role still identifies the person and selects the default overview; it does not hide otherwise permitted work.
 
 Alternatives considered:
 
-1. Introduce a global hierarchy in every authorization check. This would change ordinary Cove account behavior and require broad changes to teaching and assignment queries. It is unnecessary for this SSO requirement.
-2. Manually grant additional roles after SSO login. Existing managed-account reconciliation removes those grants, and manual grants could survive source demotion if protection were relaxed. This would not provide automatic new-user access.
+1. Make users switch among Manager, Team Lead, and Teacher views. Reuses the old interface but conflicts with the owner's clarified request to act directly inside the activity.
+2. Replace all permissions with a global role-rank comparison or manually add roles after login. The former broadens unrelated access; the latter conflicts with managed synchronization. Neither is needed. Keep explicit capabilities and scope instead.
 
 No new role names, OS credentials, or OS database access are needed. This is a Cove authorization/provisioning change; the agreed OS-to-Cove primary-role translation remains unchanged.
 
@@ -44,13 +45,18 @@ Relevant implementation:
 - `packages/api/src/classes/assigned-class-access.ts`: teaching access requires a held Teacher role and an eligible class assignment.
 - `packages/api/src/classes/classes.service.ts`: teacher-assignment queries already use `holdsRoleWhere('TEACHER')` in relevant paths.
 - `packages/web/src/lib/academy-view-role.ts`: the selected view changes presentation; the API authorizes the union of held roles.
+- `packages/api/src/learn/learn.service.ts`: returns workspace capabilities such as authoring, solutions, and observation; its assigned-student flag currently depends on holding Teacher.
+- Exercise `staff-workspace.tsx` and `staff-tutoring-drawer.tsx`: already render solution/tutoring/edit actions together, but roster access is gated by assigned-teacher behavior.
+- `packages/api/src/monitoring/monitoring-access.service.ts`: gates HTTP and socket monitoring; its existing platform/support academy scope is read-only and cannot simply be reused for Manager live editing.
 - `packages/api/prisma/migrations/20261021100000_dlab_staff_sso/migration.sql`: managed extra-role writes are allowed only through transaction-local `cove.dlab_sync` source writes.
 
 Manager already has Team Lead permissions, but neither role automatically holds Teacher. Some teaching features explicitly require Teacher membership, not only a permission string. Ordinary Cove accounts can already hold multiple staff roles. The current SSO single-role invariant prevents that behavior for managed accounts.
 
 The Elice reference at `https://dlab.elice.io/courses/765886/lectures/all`, inspected on 2026-10-21, showed the owner's Manager role with lecture creation, content management, and member-management controls. This supports the requested interaction model; inspecting that page does not establish Elice's complete internal authorization policy.
 
-This design changes the single-role sections of the [automatic student/staff SSO design](2026-10-21-dlab-os-automatic-student-staff-sso-design.md) only when implemented and released. Existing production behavior remains single-role until that cutover. The [ordinary multi-role design](2026-09-03-student-accounts-and-role-switching-design.md) remains the basis for UI and authorization.
+The supplied follow-up screenshot shows View Solution, Tutoring, Edit, a selected person's code pane, and a separate Edit mode switch. It clarifies that the requested parity is direct activity actions, including explicit live-code help, rather than switching the account's role from the top corner. The screenshot does not prove which unrelated classes Elice would authorize; the Manager academy scope below is an explicit Cove product decision.
+
+This design changes the single-role sections of the [automatic student/staff SSO design](2026-10-21-dlab-os-automatic-student-staff-sso-design.md) only when implemented and released. Existing production behavior remains single-role until that cutover. The [ordinary multi-role design](2026-09-03-student-accounts-and-role-switching-design.md) remains the storage/permission foundation; its role-switching UI is superseded for the unified academy staff flow. Extend the existing [shared workspace design](2026-10-20-shared-course-workspace-role-behavior-design.md) instead of building another code editor. This amendment broadens real Manager tutoring scope while preserving existing platform/support restrictions.
 
 ## 4. Authoritative role table
 
@@ -120,36 +126,66 @@ Deactivation, local suspension, campus removal, and disabled campus mappings den
 
 ## 7. Teaching capability and class scope
 
-Having Teacher in the derived role set makes an active SSO Manager or Team Lead eligible to be selected as a class teacher. It does not assign that person automatically.
+Having Teacher in the derived role set makes an active SSO Manager or Team Lead eligible to be selected as a class teacher. Assignment remains useful for responsibility, scheduling, and teacher-specific views; it is not a prerequisite for Manager tutoring authority.
+
+| Actor | Tutoring, answer review, grading, and monitoring scope |
+| --- | --- |
+| Active academy member holding Manager | Eligible active classes/students throughout that academy, including classes taught by somebody else |
+| Team Lead holding inherited or explicitly granted Teacher | Assigned homeroom/assistant classes |
+| Teacher | Assigned homeroom/assistant classes |
+| Student | Own learning and records only; no tutoring |
+| Platform/support actor | Existing separate inspection/support policy; no new live editing authority |
 
 - Reuse role-set-aware teacher candidate queries, homeroom assignment, assistant assignment, and assigned-class predicates.
 - A Manager or Team Lead may assign themselves through their existing class-teacher management permission.
-- A Teacher without class-teacher management permission cannot self-assign by changing the view or request payload.
-- Teacher views, manual grading, answer review, student analytics, live monitoring, and help requests retain their existing class-assignment boundaries.
-- Staff who can manage academy-wide classes keep those management permissions; switching to Teacher does not expand assigned teaching data to every class.
+- A Teacher without class-teacher management permission cannot self-assign by changing a cookie or request payload.
+- Managers may tutor/review/grade within their academy without creating a fake class assignment. Team Lead/Teacher tutoring and teaching analytics remain assignment-bound. Existing academy-management analytics remain available under their separate permissions.
+- Preserve active-class, student enrollment, material/course relationship, feature-flag, local restriction, and source-eligibility checks. Academy-wide tutoring does not make an unrelated material available to the selected student.
 - Cross-academy classes remain inaccessible unless the source identity has a separate eligible binding for that academy.
 
-Audit teacher-only consumers for comparisons against the primary role alone. Change only the consumers needed to recognize a held Teacher role, using the existing shared/query helpers. Do not replace assignment checks with a role-rank comparison.
+Resolve an explicit server-side tutoring scope from the authorized actor: no access, assigned classes, or real academy-member Manager scope. Use the same scope in class/roster queries, progress/answer/grade APIs, live-watch authorization, and every socket command. Never accept scope from a client field or infer it from a view cookie. A platform/support actor's existing read-only academy scope is not a Manager live-write grant.
+
+Audit teacher-only consumers for primary-role comparisons. Preserve the assigned branch for Teacher/Team Lead, and add the narrowly identified Manager branch where required. Do not fix this only by showing a Tutoring button or by accepting every staff role in `roleCanMonitor`.
+
+Remove academy-wide tutoring authority immediately on Manager demotion. A demoted Team Lead may retain tutoring only for classes genuinely assigned to their own membership. Revalidate open watches/edit sessions on source, local restriction, assignment, and scope changes using existing session-generation and socket backstops. Existing help-request notification routing stays unchanged; this feature does not broadcast every student's help request to every Manager.
 
 Class assignment is an academy operation, not an edit to OS-managed identity fields. Allow legitimate class assignments while retaining the prohibition on locally changing the managed user's identity, source role, credentials, or derived grant set.
 
 ## 8. Studio behavior
 
-Reuse the existing academy role switcher:
+### 8.1 One identity and navigation
 
-- Manager: Manager, Team Lead, and Teacher views.
-- Team Lead: Team Lead and Teacher views.
-- Teacher: Teacher view only.
-- Student: Student view only.
-- HQ Admin: existing platform console and existing platform inspection controls.
+Use one academy staff interface. A Manager remains labelled Manager; a Team Lead remains Team Lead. Build navigation and workspace actions from the union of held permissions and server tutoring scope. Do not require an academy role picker to reveal teaching, curriculum, or management actions.
 
-Default to the existing valid saved view for that academy; otherwise use the primary role. A saved view no longer held after demotion must fall back safely to the new primary role. Preserve independent academy selection and its campus eligibility checks.
+The primary role selects the default overview. Navigation includes the permitted management sections and teaching/tutoring destinations together. Label assignment-specific lists as My classes and Manager-wide lists as Academy classes; do not mislabel all academy classes as the Manager's own assignments.
 
-View selection does not grant, revoke, or narrow API permissions. A Manager viewing Teacher still holds management permissions, as in ordinary multi-role Cove accounts. The view determines navigation and overview presentation only.
+Retire the ordinary academy staff role selector as an operating-mode control. Ignore/expire the old `cove_academy_role` selection for this unified layout; old bookmarks and stale Teacher/Team Lead cookies must not hide Manager controls or grant unavailable actions. Keep the account menu, academy switcher, and platform/support role-inspection controls, which serve different purposes. Direct teaching URLs use the same capability/scope policy as activity buttons.
 
-Show the primary role prominently in directories and identify inherited staff roles as derived from DLAB OS when additional roles are displayed. Do not expose editable role checkboxes for managed accounts. Use existing Korean/English translation patterns for any new copy.
+### 8.2 Activity actions, like the Elice example
 
-Role filters and teacher-assignment lists must recognize inherited Teacher membership. A member may match more than one role filter, but an unfiltered people list or total member count must count the person once. A Manager with no assigned class sees the Teacher empty state, not a Student dashboard.
+- View solution opens the existing authorized reference-solution dialog.
+- Edit opens the existing content-authoring route, with Return to activity; it edits instructions/starter code/tests/settings under existing authoring permissions.
+- Tutoring opens the existing student drawer in the activity. A Manager can select eligible classes/students throughout that academy for the current course; Teacher/Team Lead receive assigned-class results.
+- Student selection changes the inspected code/work pane while keeping the activity, material navigator, and PDF visible. Name and class context identify whose work is shown.
+- Feedback and grading use the selected student's authorized record and retain the actual staff actor for attribution.
+- Run/Submit in personal practice use the existing isolated staff-practice model, preserving student scores and points.
+- Existing share, materials, Previous/Next, fullscreen, and editor features remain available according to their existing capabilities. Reuse them; no parallel workspace or duplicate sharing engine is introduced.
+
+Show permitted actions together on the initial page without a role switch. A Manager gets View solution, Tutoring, and Edit. A Team Lead gets existing authoring/solution actions plus assigned teaching. A Teacher gets solutions/tutoring within their scope; this request does not grant Teachers curriculum-management writes. Student does not receive staff actions.
+
+### 8.3 Editing a student's code
+
+Edit content and Edit student code are different operations. Tutoring first opens the selected draft read-only. Reuse the existing explicit live Edit mode handshake, synchronization, presence, reconnect behavior, and server-confirmed write authorization. Enable student-code editing only when the selected student is live on that material and the existing collaboration prerequisites pass; show a clear reason when they do not.
+
+An authorized Manager can use this live-edit mode for an eligible student in the academy even without a teacher assignment. Reconnect/student changes reset edit mode to read-only. Every write remains subject to current scope. Student history/submitted snapshots are immutable; live edits affect the draft and are attributed to staff. Tutoring does not grant a student login session or silently submit a graded answer as the student. Execution commands follow the existing tutoring protocol, not the personal staff-practice save path.
+
+Returning to personal practice restores the Manager's own code. Entering content authoring must not overwrite the student's draft, copy their code into starter code, or lose the personal practice buffer. Query caches and socket subscriptions must be separated by actor, academy, class, student, and material as appropriate, and cleared/revalidated on identity or scope changes.
+
+### 8.4 Directory and empty states
+
+Show the primary role prominently and identify inherited grants as derived from DLAB OS when shown. Do not expose editable role checkboxes for managed accounts. Use existing Korean/English translation patterns for new copy.
+
+Role filters and teacher-assignment lists recognize inherited Teacher membership. A member may match multiple role filters, but total member counts count the person once. A Manager with no personal teaching assignment can still use Academy classes/Tutoring. If no eligible class/student exists, show that empty state rather than a Student dashboard or a request to switch role.
 
 No automatic switch to Teacher, separate login, second user record, separate academy membership, or student inactivity lease is introduced for staff.
 
@@ -159,7 +195,7 @@ Use existing `AcademyMembershipRole` rows and existing source-write database gua
 
 The security model is unchanged: OS controls the source role and campus scope; Cove derives the agreed permissions. Local administrators cannot add or remove derived roles through ordinary member-management endpoints, bulk operations, platform edits, or direct unmarked database writes.
 
-Ordinary username/password and social accounts keep their existing explicitly granted role sets. Do not automatically expand all legacy Managers or Team Leads, convert ordinary accounts to OS identities, merge accounts by email/name, or modify Mapo memberships during the backfill.
+Ordinary username/password and social accounts keep their existing explicitly granted role sets. The unified UI and explicit academy-wide Manager tutoring capability apply consistently to eligible ordinary and SSO Managers. This is an intentional scope/UI change; it does not add stored roles to ordinary users. Legacy Team Lead/Teacher assignment boundaries remain intact. Do not convert ordinary accounts to OS identities, merge accounts by email/name, or modify Mapo membership grants during backfill.
 
 No additional environment variable, client registration, key rotation, callback URL, OS host change, or inbound API contract change is required. Retain `https://os.dlabcampus.com/v1`, the existing callback, and the existing campus rollout configuration.
 
@@ -171,11 +207,13 @@ No additional environment variable, client registration, key rotation, callback 
 | DLAB reconciler | Idempotent persisted roles and source-driven transitions |
 | DLAB policy service | Exact role-set eligibility with existing status/scope/session checks |
 | Auth/account response | Return all held roles through the existing role-set contract |
-| Class/teaching authorization | Accept eligible held Teacher roles while enforcing assignment scope |
-| Studio role switcher/directory | Display derived views and managed grant provenance |
+| Class/teaching/monitoring authorization | Resolve Manager academy scope versus assigned teaching scope consistently across HTTP and sockets |
+| Shared workspace capabilities | Return explicit authorized tutoring scope and authoring/solution capabilities; do not overload an assigned-teacher boolean to mean Manager access |
+| Studio navigation/directory | Unified permitted actions, primary-role identity, managed grant provenance, and obsolete view-cookie handling |
+| Existing workspace/tutoring/editor | Reuse solution/edit actions, scoped roster, read-only inspection, explicit live-edit handshake, and separate staff practice |
 | Operator tool/runbook | Preview, backfill, invalidate, verify, and roll back existing managed identities |
 
-Prefer focused changes to these existing boundaries. Do not redesign SSO code exchange, introduce a second permission engine, or broaden global role permissions for this feature. Before any Next.js code changes, read the relevant installed guides required by `AGENTS.md`.
+Prefer focused changes to these existing boundaries. Do not redesign SSO code exchange, introduce a second permission engine, or broaden unrelated global permissions. Manager academy-wide tutoring is the explicit change above; platform/support monitoring authority remains separate. Before any Next.js code changes, read the relevant installed guides required by `AGENTS.md`.
 
 ## 11. Acceptance tests
 
@@ -192,20 +230,24 @@ Extend the existing `pnpm test:dlab` disposable-database/provider-double suite a
 - Local suspension, inactive source, campus disable/removal, and wrong-campus requests remain denied.
 - Managed role changes remain blocked through ordinary API, bulk, platform, and database paths; transaction-local integration writes succeed.
 - Ordinary account role sets and existing login options are unchanged.
+- Manager scope is verified against active real membership and managed eligibility; cookies, forged scope fields, and platform/support inspection cannot mint Manager live-write authority.
+- Manager demotion revokes unassigned-class access and any open live-edit watch; genuine assigned access remains available only after valid reauthorization.
+- HTTP roster/review/grading gates and socket watch/edit gates agree. Tutor scope never bypasses student enrollment, course/material association, or live-monitoring feature flags.
 
 ### Browser workflow tests
 
-1. Sign in as an OS Manager; verify Manager is primary and all three staff views are available.
+1. Sign in as an OS Manager; verify Manager remains the identity and management/teaching actions are available together, with no role-selection step.
 2. Create a test class and attach a course containing coding, quiz, short-answer, and PDF activities using existing workflows.
-3. Assign the Manager as a homeroom/assistant teacher; verify they appear in teacher choices despite their primary Manager role.
-4. Switch to Teacher without another login; open the assigned class, review a student submission, and save feedback/manual grading.
-5. Verify monitoring/help access for the assigned class and denial for an unassigned class and a different academy.
-6. Switch to Team Lead to manage curriculum/classes, then back to Manager for academy settings. Refresh preserves a valid selected view.
-7. Repeat with an OS Team Lead: Team Lead and Teacher views work; Manager view and manager-only settings/member operations remain denied.
+3. Keep a class assigned to another teacher. Open its activity as Manager and use View solution, Tutoring, and Edit directly; no self-assignment or role switch is allowed as a test workaround.
+4. Select an eligible student in that class, review their answer, and save feedback/manual grading. Verify the student later sees the result.
+5. Verify Manager monitoring/live editing in that unassigned class, default read-only mode, server-confirmed edit mode, synchronized draft updates, reconnect reset, and denial in a different academy.
+6. Return to personal practice and content editing; verify each code buffer, starter code, and submitted snapshot stays separate. Manage curriculum/classes and academy settings without changing role. Refresh and stale old view cookies preserve the unified capability set.
+7. Repeat with an OS Team Lead: authoring and assigned teaching actions coexist; manager-only settings/member operations and unassigned-class tutoring remain denied.
 8. Repeat with an OS Teacher: assigned teaching works; role self-promotion, class self-assignment, and management operations remain denied.
 9. Sign in as Student: see only assigned learning, submit work, and receive the saved grade/feedback; no staff view is available.
-10. Demote an account with a saved higher view and open teacher socket/session; verify old sessions lose access and fresh login has only the newly derived roles.
-11. Verify ordinary Mapo Manager/Teacher/Student logins and existing explicitly granted role switching still work.
+10. Demote a Manager with an open unassigned-student live-edit session; verify the watch/session loses access and fresh login has only the newly derived roles and assigned scope.
+11. Verify ordinary Mapo Manager/Teacher/Student logins and explicit grants remain valid. A local Manager gets direct authorized actions; a legacy view cookie is not required to reveal them.
+12. Verify actual teacher assignment still works for an inherited-Teacher Manager/Team Lead, without making that assignment mandatory for Manager-wide tutoring.
 
 Use isolated test data for creation/grading checks. Test PDF/coding/quiz/short-answer access here as integration regressions; unrelated activity UI redesign or grading-engine work is outside this feature.
 
@@ -218,7 +260,7 @@ The old runtime rejects additional managed roles. Deploying mixed old/new API wo
 3. Capture a bounded private before-state of managed IDs, roles, generation, mappings, restrictions, class assignments, and unaffected legacy account counts. Retain a local recovery operator.
 4. Temporarily disable new SSO entry; deploy matching API/Studio/worker images through the existing deployment guide. Keep campus approvals unchanged.
 5. Preview and apply the existing audited reconciliation/session-invalidation command under the new runtime. Verify it derives the exact roles for existing managed identities and preserves IDs/restrictions/history.
-6. Re-enable SSO entry, require fresh managed login, and test actual Manager and Team Lead view switching, class assignment, teacher review, Student access, campus isolation, and ordinary login.
+6. Re-enable SSO entry, require fresh managed login, and test actual Manager/Team Lead unified actions, Manager unassigned-class tutoring, explicit live editing, class assignment, teacher review, Student access, campus isolation, and ordinary login.
 7. Record actual test outcomes and unverified external dependencies; do not label mock-provider coverage as real HQ acceptance.
 
 For rollback, disable new SSO entry and invalidate managed sessions using a compatible runtime. Restore the previous exact single-role policy and reconcile managed extra-role rows under an integration source-write transaction before re-enabling the previous single-role API. Preserve IDs, assignments, restrictions, and history; do not replay a blind full-database backup or remove managed-account guards. Validate a matched policy/data state before enabling login again.
@@ -233,6 +275,6 @@ Also excluded: automatic class/teacher import from OS, full course/enrollment AP
 
 ## 14. Completion criteria
 
-This feature is complete when a verified OS Manager can use Manager, Team Lead, and assigned Teacher workflows on the same Cove identity; a Team Lead can use Team Lead and assigned Teacher workflows; source demotion removes inherited privileges; Student/Admin separation and campus restrictions hold; existing local account behavior is preserved; and the matched policy/data rollout is documented with real and automated evidence distinguished.
+This feature is complete when a verified OS Manager can directly use management, curriculum, solution, tutoring, grading, and explicit live-code-edit actions in one workspace without switching roles or self-assigning to each class; a Team Lead can directly use curriculum and assigned teaching actions; source demotion removes inherited privileges and Manager-wide scope; Student/Admin separation and campus restrictions hold; ordinary account grants/login remain valid with the unified UI; and the matched policy/data rollout is documented with real and automated evidence distinguished.
 
 Until then, this document describes the intended change and does not claim that the deployed single-role SSO already provides it.

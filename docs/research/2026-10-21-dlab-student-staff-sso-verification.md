@@ -6,16 +6,16 @@ Baseline: v2 `97953f494cd001dbdf9da499f47696e7e8085c1d`; approved design commit 
 
 ## Result and environment
 
-The automatic-account SSO implementation passes the isolated database tests and all 15 Chromium browser E2E cases. The browser tests run the actual Cove Nest API, Studio routes, session bridge, authorization, and role dashboards. DLAB OS and Supabase are local service doubles; this is not evidence that HQ's live registration, supplied accounts, or provider-side SQL guard work on the new domain.
+The initial automatic-account SSO verification passed the isolated database tests and 15 Chromium browser E2E cases. The owner-approved role correction below subsequently passed 16 browser cases. The browser tests run the actual Cove Nest API, Studio routes, session bridge, authorization, and role dashboards. DLAB OS and Supabase are local service doubles; this is not evidence that HQ's live registration, supplied accounts, or provider-side SQL guard work on the new domain.
 
-No production deployment, hosted development migration, campus remapping, private environment-file edit, or message to HQ was performed. Real user passwords, OS login numbers, client secrets, and inbound keys are not included in this report or fixtures. All committed test credentials are clearly local stand-ins.
+The initial isolated run made no hosted changes. Later user-authorized development setup and real-HQ checks are recorded below. No production deployment, campus remapping or message to HQ was performed. Real user passwords, OS login numbers, client secrets, and inbound keys are not included in this report or fixtures. All committed test credentials are clearly local stand-ins.
 
 Each `pnpm test:dlab` run creates a new disposable PostgreSQL/Redis pair on loopback ports, applies all 67 migrations, builds the API, runs the focused tests, then starts the real API and Studio with external-service doubles. The supplied development and production database settings are never selected as test targets. Test containers are cleaned up afterward. The initial failed fixtures were kept and stopped; no existing database was reset.
 
 ## Implemented behavior
 
 - The fixed OS base is `https://os.dlabcampus.com/v1`; the old Render domain and arbitrary authorize origins are rejected.
-- The mappings are `student → STUDENT`, `instructor → TEACHER`, `edu_manager → TEAM_LEAD`, and `lab_head → MANAGER`.
+- The owner-confirmed mappings are `student → STUDENT`, `instructor/tutor → TEACHER`, `lab_head → TEAM_LEAD`, and `edu_manager → MANAGER`. This supersedes the initially inferred mapping.
 - Other roles are stored and get only primary-campus Student fallback access. No OS account becomes a Cove platform Admin.
 - Campus mode creates or reuses accounts automatically in approved, enabled campuses. Allowlist mode remains available for controlled rollout and defaults closed.
 - Staff can have multiple verified campus memberships. Removed, disabled, or unapproved campuses do not grant access, including when a stale membership row still looks active.
@@ -101,3 +101,25 @@ The database suites additionally cover concurrent first logins, provider provisi
 Course catalog/enrollment import, OS class assignment, global OS logout and automatic conversion of existing Cove accounts are excluded from this release. An empty course/class list after successful login is expected until ordinary enrollment or assignment is configured.
 
 Use the [current SSO runbook](../operations/dlab-sso.md) for configuration, dry-run mapping/access commands, rollout and rollback. No release gate above was silently marked complete by a local fake-provider test.
+
+## Follow-up: initial real HQ teacher fixture against local Cove
+
+On October 21, local private configuration was updated to `https://os.dlabcampus.com/v1` and campus rollout mode. The additive staff migration was applied only to the user-confirmed development Supabase project. The existing Daechi-to-demo-academy mapping was enabled through the audited operator command. Production was unchanged.
+
+A fresh Chrome SSO attempt using the supplied, already authenticated HQ teacher fixture completed authorization, server-side token exchange, automatic provisioning and activation, then opened `/academy/daechi-sso-demo`. The browser displayed the Daechi demo academy and the account name. The persisted source identity reports active status, the mapped Daechi campus, and **`user_role=tutor`**, not `instructor`. At the time of that initial attempt, its active Cove membership was **Student**, following the then-current fallback policy. This verifies real authentication and campus mapping, but **does not verify the intended Teacher permissions**. The reference contract describes `tutor` as an assistant instructor; The platform owner subsequently explicitly confirmed `tutor` → Teacher and the other corrected translations, as recorded in the spec. The initial attempt alone did not validate Teacher permissions; the correction requires separate verification below. Roles remain derived from verified OS codes, never email/name.
+
+The user's earlier callback failure was not reproduced with the fresh attempt; no API integration exception was recorded for the earlier request. A missing, expired or replaced transaction cookie/state is a possible explanation, not a confirmed root cause. Use a fresh `/sso/start` attempt in one tab; do not reuse old authorization links. Separately, `/sso/start.` (with a trailing period) was confirmed to return 404, while `/sso/start` returns the expected authorization redirect.
+
+The new OS serves the authorization frontend for browser HTML requests; a default non-browser `Accept: */*` probe can return 404. Browser-style authorization and the OS registration check accepted the local callback. No secrets, login credentials or authorization codes are recorded here. Real team-leader/manager role checks, production rollout, refresh/logout regression and the remaining release gates above are still separate work.
+
+## Approved role correction and development reconciliation
+
+The platform owner explicitly confirmed `tutor`/`instructor` → Teacher, `lab_head` → Team Lead, and `edu_manager` → Manager, including ordinary academy settings/member-management permissions. The shared policy, database expectations, manager-demotion regression and browser role cases now use this mapping. Other role fallbacks, campus restrictions and the separation from platform Admin remain unchanged. No OS database access or new schema migration is required.
+
+The final isolated `pnpm test:dlab` run passed all 67 migrations, **153 API tests**, **44 shared tests**, **11 Studio tests** and **16 Chromium browser cases** (1.1 minutes). `pnpm typecheck:e2e` also passed. New coverage includes tutor Teacher landing without a student lease, the corrected Team Lead/Manager dashboards and permission boundaries, and audited reconciliation of an existing tutor Student membership. The latter retains user/auth/membership IDs and historical profile data, invalidates the old session, and allows a fresh Teacher login. All five legacy password-login role cases still pass. The first browser run encountered the manual Studio dev-server lock; both manual servers were stopped and the complete isolated run then passed with exit code 0. Temporary test containers were cleaned up.
+
+After verifying both database URLs and Supabase settings still targeted the user-confirmed development project, `operator.ts invalidate` was previewed and applied with the private local environment explicitly loaded. It affected exactly two managed development identities. Comparison before/after confirmed unchanged user/auth/membership IDs and advanced generations. The existing tutor membership changed from Student to Teacher; the actual student remained Student. The Daechi demo mapping and production were unchanged. The local API/Studio servers were restarted with the corrected shared build. Old managed sessions require a fresh SSO attempt.
+
+### Real teacher acceptance after the correction
+
+A fresh Chrome authorization through the real OS reused the supplied teacher's existing session. The callback completed and opened local `/academy/daechi-sso-demo`; the academy selector showed **Teacher**, the page heading was **Teaching overview**, and navigation exposed My classes, Student analytics and Students. Refresh preserved the same Teacher dashboard. The empty state correctly says no class is assigned; automatic class assignment remains outside login scope. The successful tab was left open for the user. This confirms real tutor-to-Teacher authentication and UI behavior on the development target, not production or live acceptance of the other staff role fixtures. Local evidence image: `/tmp/cove-dlab-teacher-corrected-role.png` (not committed).

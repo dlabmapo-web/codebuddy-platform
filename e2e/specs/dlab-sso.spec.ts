@@ -29,7 +29,7 @@ async function enter(page: Page, value: Fixture) {
   });
   await page.goto('/sso/start');
 }
-for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'], ['edu_manager', 'TEAM_LEAD'], ['lab_head', 'MANAGER'], ['future_role', 'STUDENT']] as const) {
+for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEACHER'], ['tutor', 'TEACHER'], ['edu_manager', 'MANAGER'], ['lab_head', 'TEAM_LEAD'], ['future_role', 'STUDENT']] as const) {
   test(`OS ${osRole} automatically enters Cove as ${role} and reuses the account`, async ({ page, request }) => {
     const value = await fixture(request, osRole);
     await enter(page, value);
@@ -103,7 +103,7 @@ test('HQ role changes revoke the old session and the next login receives the new
   const value = await fixture(request, 'instructor');
   await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
   const oldToken = await tokenFor(page);
-  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
+  expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'lab_head' } })).ok()).toBe(true);
   expect((await request.post('http://127.0.0.1:4319/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } })).status()).toBe(401);
   // Let the revoked protected layout unmount before starting another login.
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();

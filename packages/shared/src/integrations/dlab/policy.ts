@@ -6,9 +6,11 @@ export const DLAB_OS_BASE_URL = `${DLAB_OS_ORIGIN}/v1`;
 /** OS codes are authoritative; unknown codes never acquire staff permissions. */
 export function dlabAcademyRole(role: string): AcademyRole {
   switch (role) {
+    // Cove role translation confirmed by the platform owner on 2026-10-21.
+    case 'tutor':
     case 'instructor': return 'TEACHER';
-    case 'edu_manager': return 'TEAM_LEAD';
-    case 'lab_head': return 'MANAGER';
+    case 'lab_head': return 'TEAM_LEAD';
+    case 'edu_manager': return 'MANAGER';
     default: return 'STUDENT';
   }
 }

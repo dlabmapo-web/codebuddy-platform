@@ -6,7 +6,7 @@ Implementation branch: `feat/dlab-os-staff-sso`. Deployment and real HQ testing 
 
 HQ creates the account in OS. The person signs into `https://os.dlabcampus.com/`, then opens the Cove card or staff shortcut. GET `https://cs.coveedu.com/sso/start` redirects to OS authorization. Cove's callback exchanges the one-use code on the API server using Basic client authentication and creates/reuses the managed Cove account, memberships and normal Supabase session. No Cove signup, application or password copying is required.
 
-OS role mappings: `student` → Student; `instructor` → Teacher; `edu_manager` → Team Lead; `lab_head` → Manager. Other roles are stored and receive only primary-campus Student fallback access. No OS role becomes Cove platform Admin. Staff class assignments and student course enrollment remain separate from login.
+OS role mappings: `student` → Student; `instructor` / `tutor` → Teacher; `lab_head` → Team Lead; `edu_manager` → Manager. This Cove permission translation was explicitly confirmed by the platform owner on October 21; OS titles alone do not determine Cove permissions. Other roles are stored and receive only primary-campus Student fallback access. No OS role becomes Cove platform Admin. Staff class assignments and student course enrollment remain separate from login.
 
 ## Runtime configuration
 
@@ -43,6 +43,10 @@ pnpm --filter @cove/api dlab:set-campus-access <external-campus-id> enabled <pla
 ```
 
 Mapping and enabling are separate audited actions. The operator must be an active Cove platform Admin. Campus mode allows new users automatically after this one-time setup. Multi-campus staff get only the approved intersection of their verified OS scope. Unmapped secondary campuses receive no invented membership.
+
+## Applying a role-mapping change
+
+Run matching API/Studio builds with the updated shared policy. Temporarily disable new SSO entry, then run the existing `dlab:invalidate-sessions` command in the explicitly selected target environment, first dry run then `--apply`. It reconciles provisioned memberships under the new mapping and invalidates old managed sessions. Re-enable SSO entry and require a fresh `/sso/start` login. Existing user/auth/membership IDs and learning history remain; do not manually edit protected managed roles or modify OS roles to compensate for a local translation change. No new schema migration is needed for this mapping correction.
 
 ## Updates and restrictions
 

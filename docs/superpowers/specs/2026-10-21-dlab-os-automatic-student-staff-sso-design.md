@@ -58,11 +58,13 @@ Alternatives considered:
 1. Pre-provision every account only from HQ pushes. This makes availability depend on queue delivery and requires creating auth identities for people who may never visit Cove.
 2. Retain manual user approval indefinitely. This keeps the current controlled demo but does not meet the user's requirement for automatic new-user access.
 
-Included: new OS hostname; four role mappings; campus-controlled rollout; multi-campus staff; repeated-login reuse; source updates and revocation; managed-account restrictions; explicit Mapo isolation; local and production verification procedures.
+Included: new OS hostname; five explicit OS role mappings to four Cove roles; campus-controlled rollout; multi-campus staff; repeated-login reuse; source updates and revocation; managed-account restrictions; explicit Mapo isolation; local and production verification procedures.
 
 Excluded: full course catalog and enrollment APIs, OS class/teacher-assignment import, OS account creation, OS hub implementation, global cross-application logout, automatic academy creation, existing-account conversion, and new global administrator grants. The Supabase session-cookie compatibility question is retained as a release gate in section 13, not silently resolved by this design.
 
 ## 4. Role mapping and permissions
+
+**October 21 approved correction:** The platform owner confirmed `tutor` means Cove Teacher, `lab_head` means Team Lead, and `edu_manager` has full academy Manager permissions. This supersedes the initial inferred role translations. The [Google Sheet’s Cove `user_role` row (90)](https://docs.google.com/spreadsheets/d/1HsH5lAN9uLEUF0b-eUJmFeRBztiSrq1jZasvKO6cp2s/edit#gid=2068191818&range=A90:L90) is marked as requiring discussion and does not itself finalize this mapping. The live teacher fixture returned `tutor` with the verified Daechi campus. Apply the confirmed mapping through the existing shared policy and audited reconciliation/session-invalidation tool; preserve source roles, account/membership IDs, historical records and campus restrictions. No new schema is needed. Update unit, database and browser tests, including an existing tutor account upgraded from Student.
 
 Use exact, server-verified `user_role` values from `/sso/token` or authenticated user PUTs. Do not infer the role from the email address, a display name, browser parameters, or OS navigation labels.
 
@@ -70,13 +72,14 @@ Use exact, server-verified `user_role` values from `/sso/token` or authenticated
 | --- | --- | --- |
 | `student` | `STUDENT` | Exactly the source primary campus; supplied scope must equal that singleton |
 | `instructor` | `TEACHER` | Approved mapped campuses in the verified scope |
-| `edu_manager` | `TEAM_LEAD` | Approved mapped campuses in the verified scope |
-| `lab_head` | `MANAGER` | Approved mapped campuses in the verified scope |
-| `tutor`, `so_staff`, `hq_admin`, or any unknown value | `STUDENT` fallback | Primary-campus access only, if the primary is in the verified scope and approved; no staff or platform elevation |
+| `edu_manager` | `MANAGER` | Approved mapped campuses in the verified scope |
+| `lab_head` | `TEAM_LEAD` | Approved mapped campuses in the verified scope |
+| `tutor` | `TEACHER` | Approved mapped campuses in the verified scope |
+| `so_staff`, `hq_admin`, or any unknown value | `STUDENT` fallback | Primary-campus access only, if the primary is in the verified scope and approved; no staff or platform elevation |
 
 The four privileged mappings implement the role table already proposed to the user. Confirm the actual returned values for the supplied teacher and team-leader fixtures during joint testing. If HQ uses a different code, record the evidence and review the mapping; do not silently expand a privileged mapping to make a test pass.
 
-The fallback implements the ZIP's narrow/student-like handling and allows account synchronization and login without granting an unreviewed staff role. An unknown role alone is not an authentication error. Normal inactive-account, invalid-scope, unmapped-campus, and local-suspension checks still apply. The fallback does not create class enrollment or expose all academy courses. A known assistant/operations/HQ role must not be guessed to mean a teacher or manager. Adding their proper staff permissions is a separate mapping change.
+The fallback implements the ZIP's narrow/student-like handling and allows account synchronization and login without granting an unreviewed staff role. An unknown role alone is not an authentication error. Normal inactive-account, invalid-scope, unmapped-campus, and local-suspension checks still apply. The fallback does not create class enrollment or expose all academy courses. Other operations/HQ roles must not be guessed to mean a teacher or manager. Additional staff mappings require an explicit permission decision.
 
 Every managed account retains `User.platformRole = USER`. OS `hq_admin` never becomes Cove platform `ADMIN` or receives library/support privileges. Each managed membership holds exactly one derived role and no extra roles. Preserve the raw OS role separately on `DlabIdentity`.
 
@@ -86,7 +89,7 @@ Reuse `packages/shared/src/auth/roles.ts`, `AcademyAccessService`, and the exist
 
 Keep `DLAB_SSO_ENABLED` as the API/Studio switch. Add API-only `DLAB_SSO_ROLLOUT_MODE=allowlist|campus`, defaulting to `allowlist` for backward compatibility.
 
-- `allowlist`: retain the existing nonempty `DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS` requirement. The four role mappings still apply, but only specifically listed identities may enter a mapped active campus. This is for controlled fixture tests.
+- `allowlist`: retain the existing nonempty `DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS` requirement. The confirmed role mappings still apply, but only specifically listed identities may enter a mapped active campus. This is for controlled fixture tests.
 - `campus`: individual identity IDs are not admission requirements. A person may receive access only through a mapped active campus whose new `ssoEnabled` flag is true and whose academy is active and of kind `ACADEMY`.
 - An empty allowlist never implicitly means allow everyone. Setting `campus` without enabling any campuses admits nobody. Existing allowlist values are ignored for admission in campus mode and must not obscure the selected mode in diagnostics.
 
@@ -242,7 +245,7 @@ Implementation validation includes targeted API/web/shared tests, Prisma validat
 ### Real OS joint test order
 
 1. Verify the local/test database and production target independently. Use the already approved isolated Daechi demo mapping only after confirming these new fixtures actually belong to its external campus. Do not reuse the old student's external user ID for a new account.
-2. Keep supplied student, teacher and team-leader login credentials in private test input only. Obtain the student's campus selection and verify the actual external IDs, status, role code and scope from trusted source results. A real `lab_head` fixture is needed before claiming manager live verification; an automated manager test alone is not real OS evidence.
+2. Keep supplied student, teacher and team-leader login credentials in private test input only. Obtain the student's campus selection and verify the actual external IDs, status, role code and scope from trusted source results. A real `edu_manager` fixture is needed before claiming manager live verification; an automated manager test alone is not real OS evidence.
 3. HQ confirms the new `/v1` endpoints, client registration, and exact production callback; confirm a separately registered local callback if using localhost.
 4. Deploy first in allowlist mode with controlled fixtures. Validate new-domain authorize and token exchange; record sanitized stage/request IDs, not callback query strings or response bodies.
 5. Student enters the demo academy, no signup/password prompt; refresh and repeat login reuse their account. Assign a normal test class/course only if testing learning access.
@@ -259,7 +262,7 @@ Write results under `docs/research/` with build SHA, environment, nonsecret fixt
 This spec establishes the four-role SSO target. The following are concrete release conditions, not reasons to stop writing or implementing the design:
 
 - HQ's new domain must complete a real code exchange with the registered callback and private credentials. The `/v1` API prefix and credential migration need live verification.
-- Confirm the role codes and campus scopes of the supplied teacher/team-leader fixtures. Obtain a manager fixture before advertising live manager verification. Additional privileged meanings for `tutor`, `so_staff`, or `hq_admin` remain disabled by the fallback policy until separately agreed.
+- Confirm the role codes and campus scopes of the supplied teacher/team-leader fixtures. Obtain a manager fixture before advertising live manager verification. Additional privileged meanings for `so_staff` or `hq_admin` remain disabled by the fallback policy until separately agreed.
 - An operator must explicitly map and enable each rollout campus. Expanding to the real Mapo campus requires an account-duplication assessment; never merge existing accounts by email/name or discard learning history.
 - HQ must expose the Cove student card and staff shortcut, both targeting GET `https://cs.coveedu.com/sso/start`. This repository cannot make that change to OS. HQ controls whether its hub requires enrollment/entitlement before displaying the student card; verify that separately from Cove login readiness.
 - Keep the existing provider credential guard. Revalidate passwordless creation, OTP bridge, refresh and blocked password/email/provider changes against the selected Supabase project.
@@ -278,7 +281,7 @@ Cove 연동은 OS 계정으로 최초 접속 시 Cove 계정을 자동 생성하
 
 학생용 Cove 카드와 직원용 바로가기 주소는 모두 https://cs.coveedu.com/sso/start (GET)입니다. callback은 https://cs.coveedu.com/sso/callback 입니다.
 
-제안하는 권한 연결은 student→학생, instructor→선생님, edu_manager→팀리더, lab_head→매니저입니다. 전달해 주신 테스트 계정의 실제 user_role, external_user_id, external_campus_id 및 external_campus_ids 확인과 매니저 테스트 계정도 부탁드립니다. 비밀번호는 별도 비공개 경로로 전달 부탁드립니다.
+제안하는 권한 연결은 student→학생, instructor/tutor→선생님, lab_head→팀리더, edu_manager→매니저입니다. 전달해 주신 테스트 계정의 실제 user_role, external_user_id, external_campus_id 및 external_campus_ids 확인과 매니저 테스트 계정도 부탁드립니다. 비밀번호는 별도 비공개 경로로 전달 부탁드립니다.
 
 캠퍼스는 최초 1회 연결하고, 연결 완료된 캠퍼스의 신규 사용자는 별도 Cove 회원가입이나 사용자별 수동 등록 없이 이용하도록 합니다. 로그인 연동과 코스/수강 자동 동기화는 별도로 검증할 예정입니다.
 ```

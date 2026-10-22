@@ -44,8 +44,7 @@ describe("rolesHavePermission", () => {
   });
 
   it("is the union, not the highest role", () => {
-    // A Manager holds no teaching monitor permission of their own; the point
-    // of granting TEACHER beside it is that they gain one.
+    // Adding Teacher never removes the Manager's administration permissions.
     expect(rolesHavePermission(["MANAGER"], "academy.settings.manage")).toBe(
       true,
     );

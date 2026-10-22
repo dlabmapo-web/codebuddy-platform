@@ -339,14 +339,8 @@ export function canManageClassTeachers(
   return rolesHavePermission(roles, 'class-teachers.manage');
 }
 
-/**
- * Who sees the teacher's own monitoring surface.
- *
- * Deliberately not `classes.assigned.manage` on its own: a Team Lead holds
- * that permission for later operational reasons, and the shared predicate is
- * what keeps the nav in step with what the server will actually allow. Seeing
- * the link still proves nothing — every page and every socket event
- * re-checks the assignment itself.
+/** Show teaching surfaces for Managers, Team Leads and Teachers.
+ * The server scopes Managers/Team Leads to their academy and Teachers to assignments.
  */
 export function canMonitorClasses(roles: readonly AcademyRole[]): boolean {
   return roles.some((role) => roleCanMonitor(role));

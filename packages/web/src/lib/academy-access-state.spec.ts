@@ -231,13 +231,11 @@ describe('resolveAcademyAccessState', () => {
     expect(canPublishContent(['MANAGER'])).toBe(true);
   });
 
-  // The line that does not move. A manager authors the curriculum now, but
-  // monitoring is not a curriculum capability: it belongs to the teacher a
-  // class is assigned to, and every page and socket re-checks that assignment.
-  it('keeps live monitoring with the assigned teacher', () => {
+  // Managers and Team Leads monitor their academy; Teachers need assignments.
+  it('shows live monitoring to Managers, Team Leads and Teachers', () => {
     expect(canMonitorClasses(['TEACHER'])).toBe(true);
-    expect(canMonitorClasses(['MANAGER'])).toBe(false);
-    expect(canMonitorClasses(['TEAM_LEAD'])).toBe(false);
+    expect(canMonitorClasses(['MANAGER'])).toBe(true);
+    expect(canMonitorClasses(['TEAM_LEAD'])).toBe(true);
   });
 
   it('exposes content authoring to team leads', () => {

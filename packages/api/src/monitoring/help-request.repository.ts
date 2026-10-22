@@ -3,7 +3,7 @@ import type { HelpRequest } from '@cove/shared';
 import { holdsRoleWhere } from '../authorization/membership-roles.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, StudentHelpRequest } from '../generated/prisma/client.js';
-import { classStudentWhere, classTaughtMaterialWhere } from '../classes/assigned-class-access.js';
+import { academyTeachingRoleWhere, classStudentWhere, classTaughtMaterialWhere } from '../classes/assigned-class-access.js';
 
 export type HelpScope = { academyId?: string; classId?: string; studentMembershipRef?: string; teacherMembershipRef?: string };
 export const activeHelpStates = ['WAITING', 'IN_PROGRESS'] as const;
@@ -41,8 +41,13 @@ export class HelpRequestRepository {
         where: { id: { in: group.map(row => row.materialRef) }, ...classTaughtMaterialWhere(academyId, classId) }, select: { id: true },
       })).map(row => row.id) : []);
       const assignedIds = cls ? [cls.teacherMembershipId, ...cls.assistantTeachers.map(row => row.membershipId)].filter((id): id is string => !!id) : [];
-      const teacherIds = new Set(assignedIds.length ? (await tx.academyMembership.findMany({
-        where: { id: { in: assignedIds }, academyId, status: 'ACTIVE', ...holdsRoleWhere('TEACHER'), user: { status: 'ACTIVE' } }, select: { id: true },
+      // Managers and Team Leads can retain a help claim without an assignment. Revalidate
+      // their role too, so demotion/suspension returns the claim to the queue.
+      const teacherIds = new Set(cls ? (await tx.academyMembership.findMany({
+        where: { academyId, status: 'ACTIVE', user: { status: 'ACTIVE' }, OR: [
+          academyTeachingRoleWhere(),
+          { id: { in: assignedIds }, ...holdsRoleWhere('TEACHER') },
+        ] }, select: { id: true },
       })).map(row => row.id) : []);
       for (const row of group) {
         let data: Prisma.StudentHelpRequestUpdateInput | null = null;

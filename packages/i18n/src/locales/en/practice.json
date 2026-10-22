@@ -47,7 +47,7 @@
   "observe_error": "Could not load live students. Try again.",
   "observe_connecting": "Connecting to live students…",
   "observe_unavailable": "Live student updates are unavailable. Reconnect to try again.",
-  "observe_no_classes": "No assigned teaching classes are available for this course. A Manager or Team Lead can assign you as a teacher.",
+  "observe_no_classes": "No classes are available for tutoring in this course.",
   "observe_truncated": "The class roster is incomplete; some active students may not appear.",
   "observe_solving": "Solving now",
   "tutoring": "Tutoring",
@@ -62,7 +62,7 @@
   "tutoring_count_one": "{{count}} student",
   "tutoring_count_other": "{{count}} students",
   "tutoring_class": "Class",
-  "tutoring_all_classes": "All assigned classes",
+  "tutoring_all_classes": "All classes",
   "tutoring_submitted": "Submit completed",
   "tutoring_not_submitted": "Not submitted",
   "tutoring_status_unknown": "Status unavailable",
@@ -84,7 +84,7 @@
   "tutoring_your_output": "Your output",
   "tutoring_student_output": "Student output",
   "tutoring_notice": "You are viewing a student’s workspace. Your personal practice code is preserved.",
-  "pdf_tutoring_help": "Open an assigned class to view learners and their activity. PDF lessons do not have answers to grade.",
-  "video_tutoring_help": "Open an assigned class to review video viewing progress.",
+  "pdf_tutoring_help": "Open a class to view learners and their activity. PDF lessons do not have answers to grade.",
+  "video_tutoring_help": "Open a class to review video viewing progress.",
   "retry": "Try again"
 }

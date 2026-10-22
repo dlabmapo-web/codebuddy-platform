@@ -71,14 +71,14 @@ describe("manual assessment boundaries", () => {
     ['TEACHER', ['TEACHER'], false],
     ['TEAM_LEAD', ['TEAM_LEAD', 'TEACHER'], true],
     ['MANAGER', ['MANAGER', 'TEAM_LEAD', 'TEACHER'], true],
-  ])('returns held-role assessment actions and only assigned classes for %s', async (role, roles, canAuthor) => {
+  ])('returns held-role assessment actions and the authorized class scope for %s', async (role, roles, canAuthor) => {
     const { service, db, access } = fixture();
     access.requirePermission.mockResolvedValue({ role, roles, userId: 'staff', via: 'membership' } as never);
     db.class.findMany.mockResolvedValue([{ id: 'assigned', name: 'Assigned class' }] as never);
     const result = await service.workspace(identity, target);
     expect(result.staff).toEqual({ canAuthor, canViewSolutions: true, canTutor: true, lectureId: 'lecture', classes: [{ classId: 'assigned', name: 'Assigned class' }] });
     const where = db.class.findMany.mock.calls[0]![0].where;
-    expect(JSON.stringify(where)).toContain('assistantTeachers');
+    expect(JSON.stringify(where)).toContain(role === 'TEACHER' ? 'assistantTeachers' : role);
     expect(JSON.stringify(where)).toContain('staff');
     expect(JSON.stringify(where)).toContain('course');
     expect(result.config.modelAnswer).toBe('');
@@ -93,29 +93,30 @@ describe("manual assessment boundaries", () => {
     expect((await service.workspace(identity, target)).staff).toMatchObject({ canAuthor: false, canViewSolutions: true, canTutor: false, classes: [] });
     expect(db.class.findMany).not.toHaveBeenCalled();
   });
-  it('does not advertise staff actions to students or infer tutoring from management rank', async () => {
+  it.each(['MANAGER', 'TEAM_LEAD'])('hides student actions and grants %s tutoring without a Teacher grant', async role => {
     const { service, db, access } = fixture();
     expect((await service.workspace(identity, target)).staff).toBeUndefined();
-    access.requirePermission.mockResolvedValue({ role: 'MANAGER', roles: ['MANAGER'], userId: 'staff', via: 'membership' } as never);
+    access.requirePermission.mockResolvedValue({ role, roles: [role], userId: 'staff', via: 'membership' } as never);
     db.class.findMany.mockClear();
-    expect((await service.workspace(identity, target)).staff).toMatchObject({ canAuthor: true, canTutor: false, classes: [] });
-    expect(db.class.findMany).not.toHaveBeenCalled();
+    expect((await service.workspace(identity, target)).staff).toMatchObject({ canAuthor: true, canTutor: true, classes: [] });
+    expect(db.class.findMany).toHaveBeenCalled();
   });
-  it.each(['MANAGER', 'TEAM_LEAD', 'TEACHER'])('restricts %s written/quiz review to assigned classes', async role => {
+  it.each(['MANAGER', 'TEAM_LEAD', 'TEACHER'])('checks the current class scope for %s written/quiz review', async role => {
     const { service, db, access } = fixture();
     access.requirePermission.mockResolvedValue({ role, roles: [role, 'TEACHER'], userId: 'staff', via: 'membership' } as never);
     db.class.findFirst.mockResolvedValue({ id: 'class', courseAssignments: [] } as never);
     await service.classMaterials(identity, { academyId: 'academy', classId: 'class' });
     const where = db.class.findFirst.mock.calls[0]![0].where;
     expect(JSON.stringify(where)).toContain('staff');
-    expect(JSON.stringify(where)).toContain('assistantTeachers');
+    expect(JSON.stringify(where)).toContain(role === 'TEACHER' ? 'assistantTeachers' : role);
     db.class.findFirst.mockResolvedValue(null as never);
     await expect(service.classMaterials(identity, { academyId: 'academy', classId: 'unassigned' })).rejects.toThrow();
   });
-  it('does not infer a teaching grant from legacy management rank', async () => {
-    const { service, access } = fixture();
-    access.requirePermission.mockResolvedValue({ role: 'MANAGER', roles: ['MANAGER'], userId: 'staff', via: 'membership' } as never);
-    await expect(service.classMaterials(identity, { academyId: 'academy', classId: 'class' })).rejects.toThrow();
+  it.each(['MANAGER', 'TEAM_LEAD'])('allows %s to review without a separate teaching grant', async role => {
+    const { service, access, db } = fixture();
+    db.class.findFirst.mockResolvedValue({ id: 'class', courseAssignments: [] } as never);
+    access.requirePermission.mockResolvedValue({ role, roles: [role], userId: 'staff', via: 'membership' } as never);
+    await expect(service.classMaterials(identity, { academyId: 'academy', classId: 'class' })).resolves.toBeDefined();
   });
   it("projects only public attempt fields and omits private solutions for learners", async () => {
     const { service, db } = fixture();

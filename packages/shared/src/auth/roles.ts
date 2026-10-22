@@ -345,14 +345,8 @@ const teamLeadPermissions = [
   "classes.manage",
   "class-teachers.manage",
   "class-enrollments.manage",
-  /*
-   * Inherited deliberately, and inert for both roles. The teaching surfaces
-   * that read these also demand an exact active `TEACHER` — `roleCanMonitor`,
-   * `requireAssignedTeacherActor` — so holding them grants a Manager no more
-   * than it grants a Team Lead today. They stay in the shared set because the
-   * property worth keeping is that Manager is a true superset: a permission
-   * that is inert now must not become the one line that silently is not.
-   */
+  // Managers and Team Leads use these academy-wide. Teachers need an actual
+  // class assignment; every surface still checks its academy and student scope.
   "classes.assigned.manage",
   "submissions.assigned.review",
 ] as const satisfies readonly AcademyPermission[];
@@ -400,9 +394,7 @@ export const academyRolePermissions = {
     "submissions.assigned.review",
   ],
   TEAM_LEAD: teamLeadPermissions,
-  // A superset, not a hierarchy. The actor stays a `MANAGER`: they keep the
-  // control tower, and the surfaces that ask for an exact role — the Team Lead
-  // curriculum overview, every teaching page — still refuse them.
+  // Managers retain their identity and cover their academy's teaching surfaces.
   MANAGER: [...teamLeadPermissions, ...managerOnlyPermissions],
 } as const satisfies Record<AcademyRole, readonly AcademyPermission[]>;
 

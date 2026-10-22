@@ -19,7 +19,7 @@ describe.skipIf(!databaseUrl)('durable student help requests (PostgreSQL)', () =
   let service: HelpRequestService;
   let academyId: string, classId: string, materialId: string, otherMaterialId: string;
   let student: { identity: SupabaseIdentity; membershipId: string; userId: string };
-  let teacher: typeof student, assistant: typeof student, stranger: typeof student;
+  let teacher: typeof student, assistant: typeof student, stranger: typeof student, manager: typeof student;
   const changed = vi.fn().mockResolvedValue(undefined);
   const create = (overrides = {}) => service.requestHelp(student.identity, { academyId, classId, materialId, idempotencyKey: randomUUID(), ...overrides });
   const change = (row: HelpRequest, action: 'claim' | 'return' | 'resolve' | 'cancel', who = teacher) => service.change(who.identity, { academyId, requestId: row.id, expectedVersion: row.version, idempotencyKey: randomUUID() }, action);
@@ -30,13 +30,13 @@ describe.skipIf(!databaseUrl)('durable student help requests (PostgreSQL)', () =
     const organization = await db.organization.create({ data: { name: 'Help tests', slug: `help-${randomUUID()}` } });
     const academy = await db.academy.create({ data: { organizationId: organization.id, name: 'Help tests', slug: `help-${randomUUID()}`, status: 'ACTIVE' } });
     academyId = academy.id;
-    async function member(role: 'TEACHER' | 'STUDENT') {
+    async function member(role: 'TEACHER' | 'STUDENT' | 'MANAGER') {
       const authUserId = randomUUID();
       const user = await db.user.create({ data: { authUserId, displayName: role, email: `${authUserId}@test.invalid`, status: 'ACTIVE' } });
       const membership = await db.academyMembership.create({ data: { academyId, userId: user.id, role, status: 'ACTIVE' } });
       return { identity: { authUserId, email: user.email } as SupabaseIdentity, membershipId: membership.id, userId: user.id };
     }
-    student = await member('STUDENT'); teacher = await member('TEACHER'); assistant = await member('TEACHER'); stranger = await member('TEACHER');
+    student = await member('STUDENT'); teacher = await member('TEACHER'); assistant = await member('TEACHER'); stranger = await member('TEACHER'); manager = await member('MANAGER');
     const cls = await db.class.create({ data: { academyId, name: 'Help class', createdByUserId: teacher.userId, teacherMembershipId: teacher.membershipId } });
     classId = cls.id;
     await db.classAssistantTeacher.create({ data: { classId, membershipId: assistant.membershipId } });
@@ -53,14 +53,33 @@ describe.skipIf(!databaseUrl)('durable student help requests (PostgreSQL)', () =
     service = new HelpRequestService(db, new HelpRequestRepository(db), access, new LearningClassContextService(db), { changed } as unknown as HelpRequestBroadcaster, { onHelpScopeChanged: vi.fn() } as unknown as MonitoringRevocationService);
   }, 60_000);
   beforeEach(async () => {
-    await db.helpRequestReceipt.deleteMany({ where: { actorRef: { in: [student, teacher, assistant, stranger].map(item => item.membershipId) } } });
+    await db.helpRequestReceipt.deleteMany({ where: { actorRef: { in: [student, teacher, assistant, stranger, manager].map(item => item.membershipId) } } });
     await db.studentHelpRequest.deleteMany({ where: { academyId } });
     await db.material.update({ where: { id: materialId }, data: { isVisible: true } });
     await db.academyMembership.update({ where: { id: teacher.membershipId }, data: { status: 'ACTIVE' } });
     await db.academyFeatureFlag.update({ where: { academyId_feature: { academyId, feature: 'TEACHER_LIVE_MONITORING' } }, data: { isEnabled: true } });
+    await db.academyMembership.update({ where: { id: manager.membershipId }, data: { role: 'MANAGER', status: 'ACTIVE' } });
     changed.mockClear();
   });
   afterAll(async () => { await db?.$disconnect(); });
+
+  it.each(['MANAGER', 'TEAM_LEAD'] as const)('lets unassigned %s claim, retain and resolve help; demotion releases the claim', async role => {
+    await db.academyMembership.update({ where: { id: manager.membershipId }, data: { role } });
+    const created = await create();
+    const claimed = await change(created.request!, 'claim', manager);
+    expect(claimed.request).toMatchObject({ status: 'IN_PROGRESS', teacherMembershipRef: manager.membershipId });
+    const queue = await service.listClassHelpRequests(manager.identity, { academyId, classId, status: 'IN_PROGRESS', limit: 50 });
+    expect(queue.requests).toHaveLength(1);
+    expect(queue.requests[0]).toMatchObject({ status: 'IN_PROGRESS', teacherMembershipRef: manager.membershipId });
+    const resolved = await change(queue.requests[0]!, 'resolve', manager);
+    expect(resolved.request?.status).toBe('RESOLVED');
+    const second = await create();
+    await change(second.request!, 'claim', manager);
+    await db.academyMembership.update({ where: { id: manager.membershipId }, data: { role: 'TEACHER' } });
+    const waiting = await list();
+    expect(waiting.requests.find(row => row.id === second.request!.id)).toMatchObject({ status: 'WAITING', teacherMembershipRef: null });
+    await expect(service.listClassHelpRequests(manager.identity, { academyId, classId, status: 'WAITING', limit: 50 })).rejects.toMatchObject({ code: 'MONITORING_ACCESS_DENIED' });
+  });
 
   it('handles 15 simultaneous students, retries, queue reads and teacher transitions', async () => {
     const members = Array.from({ length: 15 }, (_, index) => ({

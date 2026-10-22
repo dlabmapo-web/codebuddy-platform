@@ -1,4 +1,4 @@
-import { rolesHavePermission } from '@cove/shared';
+import { rolesHavePermission, roleCanMonitor } from '@cove/shared';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -25,7 +25,7 @@ export default async function PdfLessonPage({
     >
       <PdfLesson
         academyId={academyId}
-        permissions={{ canAuthor: identity.via !== 'platform' && rolesHavePermission(identity.roles, 'curriculum.manage'), canTutor: identity.via === 'membership' && identity.roles.includes('TEACHER') }}
+        permissions={{ canAuthor: identity.via !== 'platform' && rolesHavePermission(identity.roles, 'curriculum.manage'), canTutor: identity.via === 'membership' && identity.roles.some(roleCanMonitor) }}
         materialId={materialId}
         classId={(await searchParams).classId}
       />

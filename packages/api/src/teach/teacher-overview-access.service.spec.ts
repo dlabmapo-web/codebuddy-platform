@@ -69,8 +69,8 @@ function createService(overrides?: {
 }
 
 describe("TeacherOverviewAccessService", () => {
-  it("refuses a role that is not TEACHER, whatever permission it holds", async () => {
-    const { service } = createService({ role: "TEAM_LEAD" });
+  it("refuses a Student, whatever permission the caller supplies", async () => {
+    const { service } = createService({ role: "STUDENT" });
     await expect(
       service.requireScope(identity, { academyId }),
     ).rejects.toMatchObject({ code: "TEACHER_OVERVIEW_ACCESS_DENIED" });
@@ -82,10 +82,10 @@ describe("TeacherOverviewAccessService", () => {
    * overview the grant exists to give — the page rendered
    * "This section could not load".
    */
-  it("admits a manager who also holds teacher", async () => {
+  it.each(["MANAGER", "TEAM_LEAD"] as const)("admits %s without a Teacher grant", async role => {
     const { service } = createService({
-      role: "MANAGER",
-      roles: ["TEACHER", "MANAGER"],
+      role,
+      roles: [role],
     });
     await expect(
       service.requireScope(identity, { academyId }),

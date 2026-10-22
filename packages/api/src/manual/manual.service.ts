@@ -34,6 +34,8 @@ import {
   sourceFilesSchema,
   manualConfigSchema,
   rolesHavePermission,
+  roleCanMonitor,
+  roleCanTeachAcademy,
 } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { Prisma } from "../generated/prisma/client.js";
@@ -44,6 +46,7 @@ import {
   enrolledClassWhere,
   taughtClassWhere,
 } from "../classes/assigned-course-access.js";
+import { academyTeachingClassWhere } from "../classes/assigned-class-access.js";
 import {
   bumpContentRevision,
   nextMaterialPosition,
@@ -404,7 +407,7 @@ export class ManualService {
     const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id) : null;
     const roles = actor.roles ?? [actor.role];
     const canViewSolutions = rolesHavePermission(roles, "curriculum.review");
-    const canTutor = actor.via === "membership" && roles.includes("TEACHER") &&
+    const canTutor = actor.via === "membership" && roles.some(roleCanMonitor) &&
       rolesHavePermission(roles, "submissions.assigned.review");
     const canAuthor = rolesHavePermission(roles, "curriculum.manage") &&
       (actor.via === "membership" || await this.access.requirePermission(
@@ -449,7 +452,7 @@ export class ManualService {
         : Promise.resolve([]),
       canTutor ? this.db.class.findMany({
         where: {
-          ...taughtClassWhere(input.academyId, actor.userId),
+          ...this.reviewScope(actor, input.academyId),
           courseAssignments: { some: { courseId: row.lecture.courseModule.course.id } },
         },
         select: { id: true, name: true },
@@ -1082,8 +1085,9 @@ export class ManualService {
     return { submissionId: input.submissionId };
   }
   private reviewScope(actor: AcademyAccess, academyId: string) {
-    // Management authority does not make somebody this class's teacher.
-    // All real members, including Managers holding Teacher, need assignment.
+    if (actor.via === "membership" && actor.roles.some(roleCanTeachAcademy)) {
+      return academyTeachingClassWhere({ academyId, userId: actor.userId });
+    }
     if (actor.via === "membership" && !actor.roles.includes("TEACHER")) {
       throw new NotFoundException();
     }

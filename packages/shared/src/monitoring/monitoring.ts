@@ -345,19 +345,22 @@ export function isCollaborationSurface(
 
 /* -------------------------------------------------- access predicates */
 
-/**
- * Every permission live monitoring requires. Both, not either: `Team Lead`
- * holds `classes.assigned.manage` for later operational reasons, and the pair
- * plus the `TEACHER` role below is what keeps that from becoming monitoring.
- */
+/** Managers and Team Leads cover their academy; Teachers need assignments. */
 export const monitoringPermissions = [
   "classes.assigned.manage",
   "submissions.assigned.review",
 ] as const satisfies readonly AcademyPermission[];
 
+export const academyTeachingRoles = ["TEAM_LEAD", "MANAGER"] as const satisfies readonly AcademyRole[];
+
+/** Academy-wide teaching authority; it does not grant academy administration. */
+export function roleCanTeachAcademy(role: AcademyRole): boolean {
+  return academyTeachingRoles.some(held => held === role);
+}
+
 export function roleCanMonitor(role: AcademyRole): boolean {
   return (
-    role === "TEACHER" &&
+    (role === "TEACHER" || roleCanTeachAcademy(role)) &&
     monitoringPermissions.every((permission) =>
       roleHasPermission(role, permission)
     )
@@ -377,11 +380,7 @@ export type MonitoringTeacherFacts = {
   membershipId: string;
   academyId: string;
   userId: string;
-  /**
-   * Every role the membership holds, not only the highest. A director who also
-   * teaches stores `role = MANAGER`, and asking the primary role alone refused
-   * them the monitoring their `TEACHER` grant exists to give.
-   */
+  /** Held roles determine academy-wide versus assigned-class teaching scope. */
   roles: readonly AcademyRole[];
   membershipStatus: MembershipStatus;
   userStatus: UserStatus;
@@ -392,14 +391,9 @@ export type MonitoringSessionFacts = {
   userId: string;
 };
 
-/**
- * The canonical effective-assignment predicate.
- *
- * An assignment id alone never proves access: the class must be active, the
- * stored membership must still be an active teacher of that same academy, the
- * signed-in session must own that membership in that academy, and the role
- * must still carry both monitoring permissions. Database queries mirror these
- * facts in their joins; this function is what the mirror is checked against.
+/** Canonical live-access rule: active same-academy Manager/Team Lead, or assigned Teacher.
+ * Both require a current membership, active user and matching session owner.
+ * Database class predicates mirror these facts, including on socket rechecks.
  */
 export function grantsLiveMonitoring(input: {
   class: MonitoringClassFacts;
@@ -410,7 +404,7 @@ export function grantsLiveMonitoring(input: {
   if (!teacher) return false;
   return (
     classFacts.status === "ACTIVE" &&
-    teachesClass(classFacts, teacher.membershipId) &&
+    (teacher.roles.some(roleCanTeachAcademy) || teachesClass(classFacts, teacher.membershipId)) &&
     teacher.academyId === classFacts.academyId &&
     teacher.membershipStatus === "ACTIVE" &&
     teacher.userStatus === "ACTIVE" &&

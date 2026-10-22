@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import { roleCanMonitor } from "@cove/shared";
+import { roleCanMonitor, roleCanTeachAcademy } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
@@ -7,6 +7,7 @@ import {
   assignedClassWhere,
   classStudentWhere,
   classTaughtMaterialWhere,
+  type AssignedClassActor,
 } from "../classes/assigned-class-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -26,27 +27,8 @@ import type { Prisma } from "../generated/prisma/client.js";
  * trusting a decision made half an hour ago.
  */
 
-export type MonitoringTeacherActor = {
-  userId: string;
-  academyId: string;
-  /** The teacher's own membership, which is what a class assignment stores.
-   *  Empty for a platform operator, who holds none. */
-  membershipId: string;
-  /**
-   * Which classes this actor's teaching surfaces cover.
-   *
-   * `assigned` is every teacher: the classes their membership is named on.
-   * `academy` is somebody standing in the Teacher role without a membership —
-   * a platform operator, or an operator inside a support session. Neither has
-   * a membership for a class to be assigned to, so the assignment joins would
-   * select nothing and "My classes" would be permanently empty.
-   *
-   * It widens *reading* only — the class list and a class's roster. The live
-   * socket refuses it outright (`requireLiveWatch`), so watching a student's
-   * screen still needs a real assignment.
-   */
-  scope?: 'assigned' | 'academy';
-};
+/** Academy-staff scope permits live work; platform/support academy inspection does not. */
+export type MonitoringTeacherActor = AssignedClassActor;
 
 export type MonitoringClassClaim = MonitoringTeacherActor & {
   classId: string;
@@ -87,14 +69,7 @@ export class MonitoringAccessService {
     }
   }
 
-  /**
-   * Resolves the acting teacher, or refuses.
-   *
-   * `classes.assigned.manage` alone is not enough. Team Leads hold it for
-   * later operational reasons, so monitoring additionally requires the actor
-   * to be an active `TEACHER` — the explicit conjunction that stops a change
-   * to the role map from quietly handing monitoring to another role.
-   */
+  /** Active Managers and Team Leads cover their academy; Teachers need actual assignments. */
   async requireTeacher(
     identity: SupabaseIdentity,
     academyId: string,
@@ -128,7 +103,11 @@ export class MonitoringAccessService {
         HttpStatus.FORBIDDEN,
       );
     }
-    return { userId: actor.userId, academyId, membershipId: membership.id };
+    return {
+      userId: actor.userId, academyId, membershipId: membership.id,
+      ...(actor.roles.some(roleCanTeachAcademy) && actor.via !== "platform" && actor.via !== "support"
+        ? { scope: "academy-staff" as const } : {}),
+    };
   }
 
   /**
@@ -158,15 +137,7 @@ export class MonitoringAccessService {
     return { ...actor, classId, grantedAt: Date.now() };
   }
 
-  /**
-   * The gate in front of the live socket, and nothing else.
-   *
-   * Reading a class — who is in it, what it teaches — is a read, and a platform
-   * operator standing in the Teacher role does it academy-wide. Watching a
-   * student work is not: it is a live channel into one named child's screen,
-   * and it belongs to the teacher responsible for them. An academy-wide actor
-   * has no such responsibility, so this is where the platform's reach stops.
-   */
+  /** Keep platform/support inspection read-only; active academy Managers and Team Leads may watch. */
   requireLiveWatch(actor: MonitoringTeacherActor): void {
     if (actor.scope === "academy") {
       throw new AppException("MONITORING_ACCESS_DENIED", HttpStatus.FORBIDDEN);

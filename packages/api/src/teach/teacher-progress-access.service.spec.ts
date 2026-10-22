@@ -136,20 +136,12 @@ describe("TeacherProgressAccessService", () => {
     });
   });
 
-  it("refuses a Team Lead who holds the same permission", async () => {
-    // `classes.assigned.manage` is not the whole rule: reading one class's
-    // student history requires actually being its teacher.
-    const { service } = createService({ role: "TEAM_LEAD" });
-    await expect(
-      service.requireClassScope(identity, { academyId, classId }),
-    ).rejects.toMatchObject({ code: "TEACHER_PROGRESS_ACCESS_DENIED" });
-  });
 
-  it("refuses a Manager", async () => {
-    const { service } = createService({ role: "MANAGER" });
+  it.each(["MANAGER", "TEAM_LEAD"] as const)("allows %s without a Teacher grant", async role => {
+    const { service } = createService({ role });
     await expect(
       service.requireClassScope(identity, { academyId, classId }),
-    ).rejects.toBeInstanceOf(AppException);
+    ).resolves.toMatchObject({ className: "Level 1" });
   });
 
   it("gives one answer for every class-access failure", async () => {

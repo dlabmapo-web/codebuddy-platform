@@ -189,9 +189,10 @@ async function visibleEditor(page: Page, code?: string) {
   }, code);
 }
 
-test('Manager and Team Lead use one workspace, with teaching granted only by real assignments', async ({ page, request, browser }) => {
+for (const staffRole of ['lab_head', 'edu_manager'] as const) {
+test(`OS ${staffRole} covers academy classes without teaching assignments`, async ({ page, request, browser }) => {
   test.setTimeout(180_000);
-  const manager = await fixture(request, 'lab_head'); await enter(page, manager);
+  const manager = await fixture(request, staffRole); await enter(page, manager);
   const student = await fixture(request, 'student', { parentFixtureId: manager.id });
   const leader = await fixture(request, 'edu_manager', { parentFixtureId: manager.id });
   const studentContext = await browser.newContext(); const studentPage = await studentContext.newPage();
@@ -206,29 +207,30 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     const membership = (await (await request.get(fixtureOrigin + '/fixtures/' + manager.id)).json()).memberships[0];
     const base = { academyId: manager.academy.id, classId: assigned.id };
     const roster = () => rpc(page, request, 'monitoring/getClassRoster', base);
-    expect((await roster()).status()).toBe(403);
+    await page.goto('/academy/' + manager.academy.slug + '/teach/classes');
+    await expect(page.getByRole('heading', { name: 'Assigned Python class', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Other Python class', exact: true })).toBeVisible();
+    expect((await roster()).ok()).toBe(true);
     const submission = await manualRequest(studentPage, request, '/submit', { ...base, materialId: classroom.writtenMaterialId, files: {}, answer: 'I read two integers and add them with the plus operator.', revision: 0, contentRevision: 1, requestKey: crypto.randomUUID() });
     expect(submission.ok(), await submission.text()).toBe(true);
     const review = { academyId: manager.academy.id, materialId: classroom.writtenMaterialId, submissionId: (await submission.json()).submissionId, expectedVersion: 0, scoreHundredths: 9000, completed: true, feedback: 'Clear explanation of addition.' };
-    expect((await manualRequest(page, request, '/review', review)).status()).toBe(404);
+    expect((await rpc(leaderPage, request, 'monitoring/getClassRoster', base)).ok()).toBe(true);
     const picker = await rpc(leaderPage, request, 'academyClasses/listEligibleTeachers', base);
     expect(picker.ok()).toBe(true);
     expect((await picker.json()).json.teachers.some((entry: { membershipId: string }) => entry.membershipId === membership.id)).toBe(true);
-    const assignment = await rpc(leaderPage, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: assigned.updatedAt });
-    expect(assignment.ok()).toBe(true);
-    let detail = (await assignment.json()).json;
+    let detail = { updatedAt: assigned.updatedAt }; // No teaching assignment grants Manager access.
     expect((await roster()).ok()).toBe(true);
     const graded = await manualRequest(page, request, '/review', review);
     expect(graded.ok(), await graded.text()).toBe(true);
     const studentResult = await manualRequest(studentPage, request, '', { ...base, materialId: classroom.writtenMaterialId }, 'GET');
     expect(studentResult.ok(), await studentResult.text()).toBe(true);
     expect(await studentResult.text()).toContain('Clear explanation of addition.');
-    expect((await rpc(page, request, 'monitoring/getClassRoster', { ...base, classId: other.id })).status()).toBe(403);
-    expect((await rpc(leaderPage, request, 'monitoring/getClassRoster', base)).status()).toBe(403);
+    expect((await rpc(page, request, 'monitoring/getClassRoster', { ...base, classId: other.id })).ok()).toBe(true);
+    expect((await rpc(leaderPage, request, 'monitoring/getClassRoster', base)).ok()).toBe(true);
     // A stale role-mode cookie cannot hide Manager identity or inherited actions.
     await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: 'http://127.0.0.1:3309' }]);
     await page.goto('/academy/' + manager.academy.slug);
-    await expect(page.getByRole('heading', { name: 'Control tower', exact: true })).toBeVisible();
+    if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Control tower', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'My page', exact: true }).click();
     await expect(page.getByRole('menuitemradio')).toHaveCount(0);
@@ -246,9 +248,10 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     await expect(page.getByText('1 solving', { exact: true })).toBeVisible();
     await page.goto(workspace);
     await page.getByRole('button', { name: 'Tutoring', exact: true }).click();
-    await expect(page.getByText('Browser student', { exact: true })).toBeVisible();
-    await expect(page.getByText('Other Python class', { exact: true })).toHaveCount(0);
-    await page.getByText('Browser student', { exact: true }).click();
+    const tutoringClass = page.getByRole('region', { name: 'Assigned Python class', exact: true });
+    await expect(tutoringClass.getByText('Browser student', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Other Python class', exact: true })).toBeVisible();
+    await tutoringClass.getByText('Browser student', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Return to my code', exact: true }).first()).toBeVisible();
     const editMode = page.getByRole('button', { name: 'Edit code · Off', exact: true });
     await expect(editMode).toBeEnabled({ timeout: 30_000 });
@@ -273,10 +276,9 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     expect((await rpc(page, request, 'monitoring/getStudentContext', contextInput)).ok()).toBe(true);
     const removal = await rpc(leaderPage, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: null, expectedUpdatedAt: detail.updatedAt });
     expect(removal.ok()).toBe(true); detail = (await removal.json()).json;
-    expect((await roster()).status()).toBe(403);
-    expect((await rpc(page, request, 'monitoring/getStudentContext', contextInput)).status()).toBe(403);
-    expect((await manualRequest(page, request, '/review', { ...review, expectedVersion: 1 })).status()).toBe(404);
-    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveCount(0, { timeout: 30_000 });
+    expect((await roster()).ok()).toBe(true);
+    expect((await rpc(page, request, 'monitoring/getStudentContext', contextInput)).ok()).toBe(true);
+    expect((await manualRequest(page, request, '/review', { ...review, expectedVersion: 1 })).ok()).toBe(true);
     // Manager self-assignment is a class operation, not a managed-role edit.
     const self = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: detail.updatedAt });
     expect(self.ok()).toBe(true);
@@ -285,6 +287,8 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     expect(studentAssignment.status()).toBe(403);
   } finally { await studentContext.close(); await leaderContext.close(); }
 });
+
+}
 
 for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
   test(`OS ${osRole} tutors short answers and quizzes with held-role authoring`, async ({ page, request, browser }) => {
@@ -306,7 +310,7 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
       const staffMembership = (await (await request.get(fixtureOrigin + '/fixtures/' + member.id)).json()).memberships[0];
       const unassigned = await manualRequest(staffPage, request, '', { academyId: base.academyId, materialId: classroom.shortMaterialId }, 'GET');
       if (osRole === 'tutor') expect(unassigned.status()).toBe(404);
-      else expect((await unassigned.json()).staff.classes).toEqual([]);
+      else expect((await unassigned.json()).staff.classes).toHaveLength(2);
       const assignment = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: staffMembership.id, expectedUpdatedAt: assigned.updatedAt });
       expect(assignment.ok(), await assignment.text()).toBe(true);
       const assignedDetail = (await assignment.json()).json;
@@ -360,7 +364,7 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
         if (osRole === 'lab_head') await staffPage.screenshot({ path: test.info().outputPath(kind + '-staff-actions.png'), animations: 'disabled', timeout: 15_000 });
         await staffPage.getByRole('button', { name: 'Tutoring', exact: true }).click();
         const tutoring = staffPage.getByRole('dialog', { name: 'Tutoring', exact: true });
-        await expect(tutoring.getByRole('link', { name: 'Other Python class', exact: true })).toHaveCount(0);
+        await expect(tutoring.getByRole('link', { name: 'Other Python class', exact: true })).toHaveCount(osRole === 'tutor' ? 0 : 1);
         await tutoring.getByRole('link', { name: 'Assigned Python class', exact: true }).click();
         await expect(staffPage.getByRole('heading', { name: 'Grade and feedback', exact: true })).toBeVisible();
         await expect(staffPage.getByRole('button', { name: 'Tutoring', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -384,15 +388,15 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
           await staffPage.screenshot({ path: test.info().outputPath(kind + '-tutoring-mobile.png'), fullPage: true, animations: 'disabled', timeout: 15_000 });
           await staffPage.setViewportSize({ width: 1280, height: 720 });
         }
-        expect((await manualRequest(staffPage, request, '/roster', { ...base, classId: other.id, materialId }, 'GET')).status()).toBe(404);
+        expect((await manualRequest(staffPage, request, '/roster', { ...base, classId: other.id, materialId }, 'GET')).status()).toBe(osRole === 'tutor' ? 404 : 200);
         expect((await manualRequest(studentPage, request, '/roster', { ...base, materialId }, 'GET')).status()).toBe(403);
       }
       const removed = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: null, expectedUpdatedAt: assignedDetail.updatedAt });
       expect(removed.ok()).toBe(true);
-      expect((await manualRequest(staffPage, request, '/roster', { ...base, materialId: classroom.quizMaterialId }, 'GET')).status()).toBe(404);
+      expect((await manualRequest(staffPage, request, '/roster', { ...base, materialId: classroom.quizMaterialId }, 'GET')).status()).toBe(osRole === 'tutor' ? 404 : 200);
       const refreshed = await manualRequest(staffPage, request, '', { ...base, materialId: classroom.quizMaterialId }, 'GET');
       if (osRole === 'tutor') expect(refreshed.status()).toBe(404);
-      else expect((await refreshed.json()).staff.classes).toEqual([]);
+      else expect((await refreshed.json()).staff.classes).toHaveLength(2);
     } finally { await staffContext.close(); await studentContext.close(); }
   });
 }
@@ -414,9 +418,7 @@ test('Manager class cards receive student presence over WebSocket across coding,
     const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
     expect(seeded.ok(), await seeded.text()).toBe(true);
     const classroom = await seeded.json(), [assigned] = classroom.classes;
-    const membership = (await (await request.get(fixtureOrigin + '/fixtures/' + manager.id)).json()).memberships[0];
     const base = { academyId: manager.academy.id, classId: assigned.id };
-    expect((await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: assigned.updatedAt })).ok()).toBe(true);
     const root = '/academy/' + manager.academy.slug;
     await page.goto(root + '/teach/classes');
     const card = page.getByRole('link').filter({ has: page.getByRole('heading', { name: 'Assigned Python class', exact: true }) });
@@ -460,7 +462,8 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
     }
     const staff = await staffContext.newPage(), learner = await studentContext.newPage();
     try {
-      const manager = await fixture(request, 'lab_head');
+      const staffRole = engine === 'WebKit' ? 'edu_manager' : 'lab_head';
+      const manager = await fixture(request, staffRole);
       await enter(staff, manager);
       await expect(staff).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
       const student = await fixture(request, 'student', { parentFixtureId: manager.id });
@@ -474,7 +477,7 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
       const root = '/academy/' + manager.academy.slug;
       await learner.goto(root + '/learn/classes');
       const card = learner.getByRole('link').filter({ has: learner.getByRole('heading', { name: 'Assigned Python class', exact: true }) });
-      await expect(card.getByText('Browser lab_head', { exact: true })).toBeVisible();
+      await expect(card.getByText('Browser ' + staffRole, { exact: true })).toBeVisible();
       await expect(card.getByText('1 student', { exact: true })).toBeVisible();
       await expect(learner.getByText(/Development demo:/)).toHaveCount(0);
       await learner.goto(root + '/learn/courses/' + classroom.courseId + '?classId=' + assigned.id);
@@ -504,7 +507,7 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
       await expect(resource.getByRole('complementary', { name: 'Course', exact: true })).toBeVisible();
       await resource.getByRole('button', { name: 'Tutoring', exact: true }).click();
       await expect(resource.getByRole('dialog').getByRole('link', { name: 'Assigned Python class', exact: true })).toBeVisible();
-      await expect(resource.getByRole('dialog').getByText('Other Python class', { exact: true })).toHaveCount(0);
+      await expect(resource.getByRole('dialog').getByRole('link', { name: 'Other Python class', exact: true })).toBeVisible();
       await resource.getByRole('button', { name: 'Close panel', exact: true }).click();
       await resource.getByRole('button', { name: 'Edit', exact: true }).click();
       await expect(resource.getByRole('dialog', { name: 'PDF material', exact: true })).toBeVisible();

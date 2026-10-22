@@ -147,15 +147,15 @@ describe("requireTeacher", () => {
     );
   });
 
-  it("refuses a team lead, who holds the permission but is not a teacher", async () => {
+  it("allows a Team Lead without a Teacher grant", async () => {
     const { service } = createService({ role: "TEAM_LEAD" });
-    await expect(service.requireTeacher(identity, academyId)).rejects.toMatchObject({
-      code: "PERMISSION_DENIED",
+    await expect(service.requireTeacher(identity, academyId)).resolves.toMatchObject({
+      scope: "academy-staff",
     });
   });
 
-  it("refuses a manager and a student", async () => {
-    for (const role of ["MANAGER", "STUDENT"] as const) {
+  it("refuses a student", async () => {
+    for (const role of ["STUDENT"] as const) {
       const { service } = createService({ role });
       await expect(service.requireTeacher(identity, academyId)).rejects
         .toMatchObject({ code: "PERMISSION_DENIED" });
@@ -168,6 +168,29 @@ describe("requireTeacher", () => {
     });
     await expect(service.requireTeacher(identity, academyId)).rejects
       .toMatchObject({ code: "ACADEMY_MEMBERSHIP_SUSPENDED" });
+  });
+});
+
+describe("Manager academy scope", () => {
+  it.each(["MANAGER", "TEAM_LEAD"] as const)("grants active %s academy scope and live access without assignment", async role => {
+    const { service, prisma } = createService({ role });
+    const manager = await service.requireTeacher(identity, academyId);
+    expect(manager.scope).toBe("academy-staff");
+    expect(() => service.requireLiveWatch(manager)).not.toThrow();
+    await service.requireAssignedClass(manager, classId);
+    const where = prisma.class.findFirst.mock.calls[0]![0].where;
+    expect(where).toMatchObject({ academyId, status: "ACTIVE", academy: { status: "ACTIVE", memberships: { some: {
+      id: teacherMembershipId, userId: teacherUserId, academyId, status: "ACTIVE", user: { status: "ACTIVE" },
+      OR: [
+        { OR: [{ role: "TEAM_LEAD" }, { extraRoles: { some: { role: "TEAM_LEAD" } } }] },
+        { OR: [{ role: "MANAGER" }, { extraRoles: { some: { role: "MANAGER" } } }] },
+      ],
+    } } } });
+    expect(where).not.toHaveProperty("OR");
+  });
+  it("keeps platform inspection out of live monitoring", () => {
+    const { service } = createService();
+    expect(() => service.requireLiveWatch({ ...actor, scope: "academy" })).toThrow();
   });
 });
 

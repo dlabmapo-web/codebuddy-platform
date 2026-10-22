@@ -71,17 +71,26 @@ describe("roleCanMonitor", () => {
     expect(roleCanMonitor("TEACHER")).toBe(true);
   });
 
-  it("rejects a team lead even though they hold classes.assigned.manage", () => {
-    expect(roleCanMonitor("TEAM_LEAD")).toBe(false);
+  it("accepts a Team Lead without a separate Teacher grant", () => {
+    expect(roleCanMonitor("TEAM_LEAD")).toBe(true);
   });
 
-  it("rejects managers and students", () => {
-    expect(roleCanMonitor("MANAGER")).toBe(false);
+  it("accepts Managers and rejects students", () => {
+    expect(roleCanMonitor("MANAGER")).toBe(true);
     expect(roleCanMonitor("STUDENT")).toBe(false);
   });
 });
 
 describe("grantsLiveMonitoring", () => {
+  it.each(["MANAGER", "TEAM_LEAD"] as const)("allows %s across their academy without an assignment", role => {
+    const input = accessInput({ class: { teacherMembershipId: null }, teacher: { roles: [role] } });
+    expect(grantsLiveMonitoring(input)).toBe(true);
+    expect(grantsLiveMonitoring({ ...input, class: { ...input.class, academyId: otherAcademyId } })).toBe(false);
+    expect(grantsLiveMonitoring({ ...input, class: { ...input.class, status: "ARCHIVED" } })).toBe(false);
+    expect(grantsLiveMonitoring({ ...input, teacher: { ...input.teacher!, membershipStatus: "SUSPENDED" } })).toBe(false);
+    expect(grantsLiveMonitoring({ ...input, teacher: { ...input.teacher!, userStatus: "SUSPENDED" } })).toBe(false);
+    expect(grantsLiveMonitoring({ ...input, teacher: { ...input.teacher!, roles: ["TEACHER"] } })).toBe(false);
+  });
   it("grants the current effective assigned teacher", () => {
     expect(grantsLiveMonitoring(accessInput())).toBe(true);
   });
@@ -139,10 +148,7 @@ describe("grantsLiveMonitoring", () => {
 
   it("denies a member moved off the teacher role while still assigned", () => {
     expect(
-      grantsLiveMonitoring(accessInput({ teacher: { roles: ["TEAM_LEAD"] } })),
-    ).toBe(false);
-    expect(
-      grantsLiveMonitoring(accessInput({ teacher: { roles: ["MANAGER"] } })),
+      grantsLiveMonitoring(accessInput({ teacher: { roles: ["STUDENT"] } })),
     ).toBe(false);
   });
 

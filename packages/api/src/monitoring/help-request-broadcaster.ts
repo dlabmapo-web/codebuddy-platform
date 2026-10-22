@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { monitoringRooms, monitoringServerEvents } from '@cove/shared';
+import { academyTeachingRoles, monitoringRooms, monitoringServerEvents } from '@cove/shared';
 import type { Server } from 'socket.io';
 import { PrismaService } from '../database/prisma.service.js';
 import { assignedClassWhere, classStudentWhere } from '../classes/assigned-class-access.js';
+import { membershipHoldsRole } from '../authorization/membership-roles.js';
 
 @Injectable()
 export class HelpRequestBroadcaster {
@@ -17,8 +18,10 @@ export class HelpRequestBroadcaster {
     for (const socket of sockets) {
       const teacher = socket.data.teacher as { membershipId?: string } | undefined;
       if (!teacher?.membershipId) continue;
-      const member = await this.prisma.academyMembership.findUnique({ where: { id: teacher.membershipId }, select: { userId: true } });
-      if (member && await this.prisma.class.findFirst({ where: { id: scope.classId, ...assignedClassWhere({ academyId: scope.academyId, membershipId: teacher.membershipId, userId: member.userId }) }, select: { id: true } })) {
+      const member = await this.prisma.academyMembership.findUnique({ where: { id: teacher.membershipId }, select: { userId: true, role: true, extraRoles: { select: { role: true } } } });
+      if (member && await this.prisma.class.findFirst({ where: { id: scope.classId, ...assignedClassWhere({ academyId: scope.academyId, membershipId: teacher.membershipId, userId: member.userId,
+        ...(academyTeachingRoles.some(role => membershipHoldsRole(member, role)) ? { scope: 'academy-staff' as const } : {}),
+      }) }, select: { id: true } })) {
         socket.emit(monitoringServerEvents.helpRequestChanged, { academyId: scope.academyId, classId: scope.classId });
       }
     }

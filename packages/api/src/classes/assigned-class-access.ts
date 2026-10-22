@@ -1,4 +1,4 @@
-import type { AcademyRole } from "@cove/shared";
+import { academyTeachingRoles, roleCanTeachAcademy, roleCanMonitor, type AcademyRole } from "@cove/shared";
 
 import { holdsRoleWhere } from "../authorization/membership-roles.js";
 import { HttpStatus } from "@nestjs/common";
@@ -8,17 +8,9 @@ import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 
-/**
- * What "a class this teacher is responsible for" means, once.
- *
- * Live monitoring and Solution status are different features with different
- * data, but they answer this question identically, and two near-copies of an
- * authorization predicate is how one of them quietly keeps granting access
- * after the other is fixed. Both compose these.
- *
- * The joins are the check. A class in another academy, an archived one, one
- * assigned to somebody else, or one whose assigned membership has been
- * suspended or demoted is not merely rejected — it is never selected.
+/** Shared class scope for monitoring, Solution status and student analytics.
+ * Managers and Team Leads cover active classes in their own academy; Teachers
+ * need a homeroom or assistant assignment. Queries recheck the relevant grant.
  */
 
 export type AssignedClassActor = {
@@ -30,7 +22,8 @@ export type AssignedClassActor = {
   /**
    * Which classes this actor's teaching surfaces cover.
    *
-   * `assigned` is every teacher: the classes their own membership is named on.
+   * `assigned` is a Teacher's actual teaching assignments.
+   * `academy-staff` is an active Manager/Team Lead's academy, including live work.
    * `academy` is a platform operator standing in the Teacher role, who has no
    * membership to be named on — "what does a teacher see here" cannot mean one
    * teacher's classes when the person asking is not one of them, so it means
@@ -39,21 +32,12 @@ export type AssignedClassActor = {
    * Defaulted at every existing call site, so a teacher's reach is unchanged
    * and widening it stays a thing a caller has to ask for by name.
    */
-  scope?: 'assigned' | 'academy';
+  scope?: 'assigned' | 'academy' | 'academy-staff';
 };
 
-/**
- * The acting teacher, or a refusal — once, for every teacher-facing read.
- *
- * `classes.assigned.manage` alone is not enough: Team Leads hold it for other
- * operational reasons. The explicit `TEACHER` conjunction is what stops a
- * future change to the role map from quietly handing one class's student
- * history to another role.
- *
- * The denial code is a parameter because each surface answers with its own,
- * and every surface uses one code for every failure — not assigned, archived,
- * wrong academy, suspended membership, no such class — so a caller cannot map
- * another academy by reading which error came back.
+/** Resolve a current teaching actor. Managers and Team Leads have academy-wide scope;
+ * Teachers need an actual class assignment.
+ * Surface-specific denial codes avoid disclosing foreign class identifiers.
  */
 export async function requireAssignedTeacherActor(input: {
   prisma: {
@@ -87,10 +71,8 @@ export async function requireAssignedTeacherActor(input: {
     }
     throw error;
   }
-  // The role set, not the primary role. A Manager who also teaches holds
-  // `role = MANAGER`, and comparing the primary role refused them the very
-  // surface the second grant exists to give.
-  if (!actor.roles.includes("TEACHER")) {
+  // Manager and Team Lead access does not require a separate Teacher grant.
+  if (!actor.roles.some(roleCanMonitor)) {
     throw new AppException(input.deniedCode, HttpStatus.FORBIDDEN);
   }
   const membership = await input.prisma.academyMembership.findUnique({
@@ -121,6 +103,8 @@ export async function requireAssignedTeacherActor(input: {
     userId: actor.userId,
     academyId: input.academyId,
     membershipId: membership.id,
+    ...(actor.roles.some(roleCanTeachAcademy) && actor.via !== "platform" && actor.via !== "support"
+      ? { scope: "academy-staff" as const } : {}),
   };
 }
 
@@ -154,6 +138,7 @@ export function assignedClassWhere(
   // the assignment joins below would select nothing at all. Their Teacher view
   // covers the academy's active classes instead.
   if (actor.scope === "academy") return base;
+  if (actor.scope === "academy-staff") return academyTeachingClassWhere(actor);
 
   return {
     academyId: actor.academyId,
@@ -169,6 +154,29 @@ export function assignedClassWhere(
       status: "ACTIVE",
       user: { status: "ACTIVE" },
     }),
+  };
+}
+
+/** ORM counterpart to the shared academy-wide teaching-role policy. */
+export function academyTeachingRoleWhere(): Prisma.AcademyMembershipWhereInput {
+  return { OR: academyTeachingRoles.map(role => holdsRoleWhere(role)) };
+}
+
+/** Rechecks academy-wide teaching authority inside the class query, including on long-lived sockets. */
+export function academyTeachingClassWhere(actor: {
+  academyId: string; userId: string; membershipId?: string;
+}): Prisma.ClassWhereInput {
+  return {
+    academyId: actor.academyId,
+    status: "ACTIVE",
+    academy: {
+      status: "ACTIVE",
+      memberships: { some: {
+        ...(actor.membershipId ? { id: actor.membershipId } : {}),
+        academyId: actor.academyId, userId: actor.userId,
+        status: "ACTIVE", user: { status: "ACTIVE" }, ...academyTeachingRoleWhere(),
+      } },
+    },
   };
 }
 

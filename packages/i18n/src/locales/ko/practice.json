@@ -47,7 +47,7 @@
   "observe_error": "실시간 학생 목록을 불러오지 못했습니다. 다시 시도하세요.",
   "observe_connecting": "실시간 학생 목록에 연결 중…",
   "observe_unavailable": "실시간 학생 정보를 확인할 수 없습니다. 다시 연결해 주세요.",
-  "observe_no_classes": "이 코스에 담당 반이 없습니다. 매니저 또는 팀리더가 반에 강사로 배정하면 학생 지도를 시작할 수 있습니다.",
+  "observe_no_classes": "이 코스에서 학생을 지도할 수 있는 반이 없습니다.",
   "observe_truncated": "반 명단이 완전하지 않아 일부 학습 중인 학생이 표시되지 않을 수 있습니다.",
   "observe_solving": "문제 풀이 중",
   "tutoring": "튜터링",
@@ -61,7 +61,7 @@
   "tutoring_search": "이름, 이메일 또는 아이디로 검색",
   "tutoring_count": "학생 {{count}}명",
   "tutoring_class": "반",
-  "tutoring_all_classes": "담당 반 전체",
+  "tutoring_all_classes": "전체 반",
   "tutoring_submitted": "제출 완료",
   "tutoring_not_submitted": "미제출",
   "tutoring_status_unknown": "상태 확인 불가",
@@ -83,7 +83,7 @@
   "tutoring_your_output": "내 실행 결과",
   "tutoring_student_output": "학생 실행 결과",
   "tutoring_notice": "학생의 작업 공간을 보고 있습니다. 내 연습 코드는 유지됩니다.",
-  "pdf_tutoring_help": "담당 수업을 열어 학생과 학습 활동을 확인하세요. PDF 자료에는 채점할 답안이 없습니다.",
-  "video_tutoring_help": "담당 수업을 열어 동영상 학습 현황을 확인하세요.",
+  "pdf_tutoring_help": "수업을 열어 학생과 학습 활동을 확인하세요. PDF 자료에는 채점할 답안이 없습니다.",
+  "video_tutoring_help": "수업을 열어 동영상 학습 현황을 확인하세요.",
   "retry": "다시 시도"
 }

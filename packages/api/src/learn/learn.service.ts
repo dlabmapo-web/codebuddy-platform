@@ -1,5 +1,5 @@
 import { resolveGradingProfile } from "../judge/grading-profile.js";
-import { rolesHavePermission } from "@cove/shared";
+import { rolesHavePermission, roleCanMonitor } from "@cove/shared";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
@@ -216,7 +216,7 @@ export class LearnService {
         canAuthor,
         canReview: rolesHavePermission(roles, "curriculum.review"),
         canViewSolutions: rolesHavePermission(roles, "curriculum.review"),
-        canObserveAssignedStudents: learner.via === "membership" && roles.includes("TEACHER"),
+        canObserveAssignedStudents: learner.via === "membership" && roles.some(roleCanMonitor),
         canObserve: learner.via === "membership" && rolesHavePermission(roles, "submissions.assigned.review"),
       },
     };

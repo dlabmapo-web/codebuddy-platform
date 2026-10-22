@@ -5,7 +5,7 @@ import type { SupabaseIdentity } from '../auth/auth.types.js';
 import { AppException } from '../common/app-exception.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, StudentHelpRequest } from '../generated/prisma/client.js';
-import { assignedClassWhere, classStudentWhere, classTaughtMaterialWhere, taughtByWhere } from '../classes/assigned-class-access.js';
+import { academyTeachingRoleWhere, assignedClassWhere, classStudentWhere, classTaughtMaterialWhere, taughtByWhere } from '../classes/assigned-class-access.js';
 import { holdsRoleWhere } from '../authorization/membership-roles.js';
 import { LearningClassContextService } from '../learn/learning-class-context.service.js';
 import { MonitoringAccessService, type MonitoringTeacherActor } from './monitoring-access.service.js';
@@ -71,7 +71,10 @@ export class HelpRequestService implements OnModuleInit {
       const where = { ...input, studentMembershipRef: self.membershipId };
       const request = await tx.studentHelpRequest.findFirst({ where: { ...where, status: { in: [...activeHelpStates] } } });
       const latestClosed = await tx.studentHelpRequest.findFirst({ where: { ...where, status: { in: ['RESOLVED', 'CANCELLED'] } }, orderBy: [{ closedAt: 'desc' }, { id: 'desc' }] });
-      const teacherAssigned = !!await tx.class.findFirst({ where: { id: input.classId, ...taughtByWhere({ status: 'ACTIVE', ...holdsRoleWhere('TEACHER'), user: { status: 'ACTIVE' } }) }, select: { id: true } });
+      const teacherAssigned = !!await tx.class.findFirst({ where: { id: input.classId, academyId: input.academyId, status: 'ACTIVE', OR: [
+        taughtByWhere({ academyId: input.academyId, status: 'ACTIVE', ...holdsRoleWhere('TEACHER'), user: { status: 'ACTIVE' } }),
+        { academy: { status: 'ACTIVE', memberships: { some: { academyId: input.academyId, status: 'ACTIVE', ...academyTeachingRoleWhere(), user: { status: 'ACTIVE' } } } } },
+      ] }, select: { id: true } });
       return { changed, value: { request: request ? await this.repository.project(tx, request) : null, latestClosed: latestClosed ? await this.repository.project(tx, latestClosed) : null, teacherAssigned, serverTime: new Date().toISOString() } };
     });
     await this.notify(result.changed);

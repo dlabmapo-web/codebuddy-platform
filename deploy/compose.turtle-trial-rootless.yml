@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     init: true
     read_only: true
+    # Match the socket owner; no DAC override or root privileges are needed.
+    user: "${TURTLE_TRIAL_DOCKER_UID:?set the rootless daemon user UID}:${TURTLE_TRIAL_DOCKER_GID:?set the rootless daemon user GID}"
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     env_file: [./secrets/turtle-trial.env]
@@ -17,13 +19,14 @@ services:
       GUI_REQUIRE_ROOTLESS: "true"
       GUI_SESSION_CAPACITY: "1"
       NODE_OPTIONS: --max-old-space-size=160
+      DOCKER_CONFIG: /tmp/docker
     volumes:
       - type: bind
         source: ${TURTLE_TRIAL_DOCKER_SOCKET:?set the dedicated rootless socket path}
         target: /var/run/docker.sock
         bind: { create_host_path: false }
     networks: [gui-control]
-    tmpfs: [/tmp:rw,noexec,nosuid,size=32m]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,uid=${TURTLE_TRIAL_DOCKER_UID},gid=${TURTLE_TRIAL_DOCKER_GID}"]
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 64

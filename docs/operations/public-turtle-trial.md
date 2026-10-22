@@ -131,6 +131,8 @@ Prepare a private `turtle-trial-rootless.env` manifest (mode 600):
 ```dotenv
 TURTLE_TRIAL_BROKER_IMAGE=ghcr.io/dlabmapo-web/cove-gui-service@sha256:APPROVED_DIGEST
 TURTLE_TRIAL_DOCKER_SOCKET=/run/user/DEPLOYMENT_USER_UID/cove-turtle/docker.sock
+TURTLE_TRIAL_DOCKER_UID=DEPLOYMENT_USER_UID
+TURTLE_TRIAL_DOCKER_GID=DEPLOYMENT_USER_GID
 TURTLE_TRIAL_CONTROL_NETWORK=cove-production_gui-control
 ```
 
@@ -145,7 +147,8 @@ docker compose --env-file turtle-trial-rootless.env \
   -f compose.turtle-trial-rootless.yml up -d --wait
 ```
 
-The broker has no published ports, joins only the existing internal control
+The broker runs as the socket owner's UID/GID with all capabilities dropped.
+It has no published ports, joins only the existing internal control
 network, and mounts only the rootless socket. Its startup refuses rootful
 Docker, missing resource controllers, or any capacity other than one. Configure
 the API's guest URL as `http://trial-broker:4010`, the display upstream as

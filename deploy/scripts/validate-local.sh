@@ -72,6 +72,7 @@ PY
 # the same private control network as the API/Caddy, never course Docker.
 TURTLE_TRIAL_BROKER_IMAGE="ghcr.io/dlabmapo-web/cove-gui-service@sha256:$(printf '0%.0s' {1..64})" \
 TURTLE_TRIAL_DOCKER_SOCKET=/run/user/1001/cove-turtle/docker.sock \
+TURTLE_TRIAL_DOCKER_UID=1001 TURTLE_TRIAL_DOCKER_GID=1001 \
 TURTLE_TRIAL_CONTROL_NETWORK=cove-production_gui-control \
 docker compose --project-directory "$validation_root" \
   -f "$validation_root/compose.turtle-trial-rootless.yml" config --format json | python3 -c '
@@ -79,6 +80,7 @@ import json, sys
 config = json.load(sys.stdin)
 broker = config["services"]["trial-broker"]
 assert not broker.get("ports") and not broker.get("privileged")
+assert broker["user"] == "1001:1001"
 assert broker["environment"]["GUI_REQUIRE_ROOTLESS"] == "true"
 assert broker["environment"]["GUI_TRIAL_ONLY"] == "true"
 assert broker["environment"]["GUI_SESSION_CAPACITY"] == "1"

@@ -117,6 +117,13 @@ def CircleTurtle():
 export const turtleRunnerSource = String.raw`import runpy
 import sys
 import turtle
+# The guest page presents a drawing surface, without desktop window borders.
+screen = turtle.Screen()
+screen.setup(1.0, 1.0)
+canvas = screen.getcanvas()
+canvas.winfo_toplevel().overrideredirect(True)
+canvas._canvas.configure(borderwidth=0, highlightthickness=0, relief="flat")
+canvas._canvas.grid_configure(padx=0, pady=0)
 runpy.run_path("/work/main.py", run_name="__main__")
 if turtle.TurtleScreen._RUNNING and turtle._Screen._root is not None:
     turtle.update()

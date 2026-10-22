@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import Image from 'next/image';
-import { ArrowRight, BookOpen, Download, Eraser, Maximize2, Play, RotateCcw, Square, Turtle, X } from 'lucide-react';
+import { ArrowRight, MoreHorizontal, Play, Square, Turtle, X } from 'lucide-react';
 import { turtleHelperVersion, turtleRunning, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { GuiViewer } from '@/components/manual/gui-viewer';
@@ -53,12 +53,15 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
   const [showHelp, setShowHelp] = useState(false);
   const [mobileTab, setMobileTab] = useState('code');
   const [split, setSplit] = useState(50);
-  const [consoleSize, setConsoleSize] = useState(20);
+  const [consoleSize, setConsoleSize] = useState(30);
+  const [theme, setTheme] = useState<'paircode-dark' | 'light'>('paircode-dark');
   const [input, setInput] = useState('');
   const workspace = useRef<HTMLDivElement>(null);
   const drawing = useRef<HTMLDivElement>(null);
-  const editor = useRef<HTMLDivElement>(null);
+  const lastFrame = useRef('');
+  const keepFrame = useCallback((frame: string) => { lastFrame.current = frame; }, []);
   const pendingRun = useRef<{ source: string; starterId: TurtleStarterId; helperVersion: typeof turtleHelperVersion; requestKey: string } | null>(null);
+  const runGeneration = useRef(0);
   const mounted = useRef(false);
   const source = draft.buffers[draft.starter];
   const running = turtleRunning(session);
@@ -93,7 +96,8 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
   async function bootstrap() {
     setLoading(true);
     try {
-      const result = await turtleRequest<TurtleBootstrap>('bootstrap');
+      const result = await turtleRequest<TurtleBootstrap | null>('bootstrap');
+      if (!result) { await challenge(); return; }
       setAccess(true); setSession(result.session); setError('');
     } catch (e) {
       if (!(e instanceof TurtleRequestError && e.status === 401)) handleError(e);
@@ -120,22 +124,28 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
   }, [draft, hydrated]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   useEffect(() => {
-    if (!session?.id || !running) return;
-    let cancelled = false; let inFlight = false;
+    if (!session?.id || !running || busy) return;
+    const generation = runGeneration.current;
+    let cancelled = false; let inFlight = false; let failed = false;
     const timer = setInterval(() => {
       if (inFlight) return;
       inFlight = true;
       void turtleRequest<TurtleSession>('runs/' + session.id).then(next => {
-        if (!cancelled) setSession(next);
+        if (!cancelled && generation === runGeneration.current) {
+          if (failed) { setError(''); failed = false; }
+          if (!turtleRunning(next)) snapshot();
+          setSession(next);
+        }
       }).catch(e => {
-        if (!cancelled) {
+        if (!cancelled && generation === runGeneration.current) {
+          failed = true;
           handleError(e);
           if (e instanceof TurtleRequestError && [401, 404].includes(e.status)) setSession(old => old ? { ...old, state: 'DISCONNECTED' } : null);
         }
       }).finally(() => { inFlight = false; });
     }, 1000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [session?.id, running, handleError]);
+  }, [session?.id, running, busy, handleError]);
 
   async function enter(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError('');
@@ -143,24 +153,32 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
     catch (e) { handleError(e); } finally { setBusy(false); }
   }
   function snapshot() {
-    try { const canvas = drawing.current?.querySelector('canvas'); if (canvas) setRetainedFrame(canvas.toDataURL()); } catch { /* Keep the previous frame if the viewer has already gone. */ }
+    try { const canvas = drawing.current?.querySelector('canvas'); if (canvas) lastFrame.current = canvas.toDataURL(); } catch { /* Keep the last frame if the viewer has already gone. */ }
+    if (lastFrame.current) setRetainedFrame(lastFrame.current);
   }
   async function stop(clear = false) {
+    runGeneration.current++;
     snapshot(); setBusy(true); setError('');
     try {
       if (session) await turtleRequest('runs/' + session.id, 'DELETE');
       setSession(old => clear ? null : old ? { ...old, state: 'STOPPED' } : null);
       pendingRun.current = null;
-      if (clear) setRetainedFrame('');
+      if (clear) { setRetainedFrame(''); lastFrame.current = ''; }
     } catch (e) { handleError(e); } finally { setBusy(false); }
   }
   async function run() {
-    if (busy || running) return;
-    setBusy(true); setError(''); setRetainedFrame('');
+    if (busy) return;
+    runGeneration.current++;
+    snapshot();
+    setBusy(true); setError('');
     pendingRun.current ??= { source, starterId: draft.starter, helperVersion: turtleHelperVersion, requestKey: crypto.randomUUID() };
     try {
+      // Run starts a fresh drawing, including when the previous drawing is still open.
+      if (running && session) await turtleRequest('runs/' + session.id, 'DELETE');
       const next = await turtleRequest<TurtleSession>('runs', 'POST', pendingRun.current);
-      if (mounted.current) { setSession(next); setMobileTab('drawing'); }
+      if (mounted.current) {
+        lastFrame.current = ''; setRetainedFrame(''); setSession(next); setMobileTab('drawing');
+      }
       pendingRun.current = null;
     } catch (e) {
       handleError(e);
@@ -168,6 +186,7 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
     } finally { setBusy(false); }
   }
   async function exit() {
+    runGeneration.current++;
     setBusy(true);
     try {
       await turtleRequest('access', 'DELETE');
@@ -203,7 +222,6 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
     } catch (e) { handleError(e); }
   }
   const retry = Math.max(0, Math.ceil((retryUntil - now) / 1000));
-  const remaining = session ? Math.max(0, Math.ceil((session.expiresAt - now) / 1000)) : 0;
   const status = session ? ({ QUEUED: t('그림 공간을 기다리고 있어요', 'Waiting for a drawing space'), STARTING: t('거북이를 준비하고 있어요', 'Preparing your turtle'), RUNNING: t('코드를 실행하고 있어요', 'Running your code'), DISPLAYING: t('그림을 확인하고 있어요', 'Your drawing is ready'), WAITING_INPUT: t('입력할 값을 기다리고 있어요', 'Waiting for your input'), STOPPED: t('실행을 멈췄어요', 'Stopped'), TIMED_OUT: t('실행 시간이 끝났어요. 다시 실행할 수 있어요.', 'Time is up. You can run again.'), ERROR: t('코드를 확인해 보세요', 'Check your code'), OUTPUT_LIMIT: t('출력이 너무 많아 실행을 멈췄어요', 'Stopped because output was too large'), QUEUE_EXPIRED: t('대기 시간이 끝났어요. 다시 실행해 주세요.', 'The queue expired. Please run again.'), DISCONNECTED: t('연결이 끝났어요. 다시 실행해 주세요.', 'Disconnected. Please run again.') } as Record<string, string>)[session.state] ?? session.state : t('코드를 쓰고 실행해 보세요', 'Write some code and press Run');
 
   if (!access) return <main className={styles.gate}>
@@ -232,41 +250,51 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
   </main>;
 
   return <main className={styles.workspace} ref={workspace}>
-    <header className={styles.header}><div className={styles.wordmark}><Turtle size={25} /><strong>Cove Turtle</strong></div>
-      <select aria-label={t('기본 코드 선택', 'Choose a starter')} value={draft.starter} onChange={e => setDraft(d => ({ ...d, starter: e.target.value as TurtleStarterId }))}>
-        <option value="drawing">{t('도형 그리기', 'Draw shapes')}</option><option value="race">{t('거북이 경주', 'Turtle race')}</option><option value="free">{t('자유 연습', 'Free practice')}</option>
-      </select>
-      <div className={styles.headerActions}><label>{t('글자', 'Text')} <select aria-label={t('글자 크기', 'Font size')} value={draft.font} onChange={e => setDraft(d => ({ ...d, font: Number(e.target.value) }))}>{[14, 16, 18, 20, 22, 24, 26, 28].map(n => <option value={n} key={n}>{n}px</option>)}</select></label>
-      <button type="button" onClick={() => void fullscreen(workspace.current)} title={t('전체 화면', 'Fullscreen')} aria-label={t('전체 화면', 'Fullscreen')}><Maximize2 size={17} /></button><button type="button" onClick={() => void exit()} disabled={busy}>{t('나가기', 'Exit')}</button></div>
+    <header className={styles.header}>
+      <div className={styles.wordmark}><Turtle size={22} /><strong>Cove Turtle</strong></div>
+      <details className={styles.options}>
+        <summary aria-label={t('더 보기', 'More options')}><MoreHorizontal size={22} /></summary>
+        <div className={styles.optionsPanel}>
+          <label>{t('예제', 'Example')}<select aria-label={t('기본 코드 선택', 'Choose a starter')} value={draft.starter} onChange={e => setDraft(d => ({ ...d, starter: e.target.value as TurtleStarterId }))}>
+            <option value="drawing">{t('도형 그리기', 'Draw shapes')}</option><option value="race">{t('거북이 경주', 'Turtle race')}</option><option value="free">{t('자유 연습', 'Free practice')}</option>
+          </select></label>
+          <label>{t('글자 크기', 'Font size')}<select aria-label={t('글자 크기', 'Font size')} value={draft.font} onChange={e => setDraft(d => ({ ...d, font: Number(e.target.value) }))}>{[14, 16, 18, 20, 22, 24, 26, 28].map(n => <option value={n} key={n}>{n}px</option>)}</select></label>
+          <button type="button" onClick={reset} disabled={busy}>{t('코드 초기화', 'Reset code')}</button>
+          <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}>{t('명령어 도움말', 'Commands')}</button>
+          <button type="button" onClick={() => download(source, 'main.py', 'text/x-python')}>{t('코드 다운로드 (.py)', 'Download code (.py)')}</button>
+          <button type="button" onClick={() => void project()}>{t('전체 프로젝트 (.zip)', 'Project with helpers (.zip)')}</button>
+          <button type="button" onClick={() => void fullscreen(workspace.current)}>{t('전체 화면', 'Fullscreen')}</button>
+          <button type="button" onClick={() => void exit()} disabled={busy}>{t('나가기', 'Exit')}</button>
+          <p className={saved ? '' : styles.unsaved}>{saved ? t('이 탭에 임시 저장됨', 'Saved in this tab') : t('다운로드로 코드를 보관하세요.', 'Download to keep your code.')}</p>
+        </div>
+      </details>
     </header>
     <nav className={styles.toolbar} aria-label={t('실행 도구', 'Execution controls')}>
-      <button type="button" className={running ? styles.stop : styles.primary} disabled={busy || retry > 0} onClick={() => running ? void stop() : void run()}>{running ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}{busy ? t('잠시만요', 'Please wait') : running ? t('중지', 'Stop') : t('실행', 'Run')}</button>
-      <button type="button" onClick={reset} disabled={busy}><RotateCcw size={16} />{t('코드 초기화', 'Reset code')}</button>
-      <button type="button" onClick={() => void stop(true)} disabled={busy}><Eraser size={16} />{t('그림 지우기', 'Clear drawing')}</button>
-      <div className={styles.toolbarEnd}><button type="button" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><BookOpen size={17} />{t('명령어 도움말', 'Commands')}</button>
-      <details className={styles.download}><summary><Download size={16} />{t('다운로드', 'Download')}</summary><div><button type="button" onClick={() => download(source, 'main.py', 'text/x-python')}>main.py</button><button type="button" onClick={() => void project()}>{t('전체 프로젝트 (.zip)', 'Project with helpers (.zip)')}</button></div></details></div>
+      <button type="button" className={styles.run} disabled={busy || retry > 0} onClick={() => void run()}><Play size={13} fill="currentColor" />{busy ? t('잠시만요', 'Please wait') : t('실행', 'Run')}</button>
+      <button type="button" onClick={() => setTheme(value => value === 'light' ? 'paircode-dark' : 'light')}>{theme === 'light' ? t('어둡게', 'Dark') : t('밝게', 'Light')}</button>
+      <button type="button" onClick={() => void stop(true)} disabled={busy}>{t('지우기', 'Clear')}</button>
+      {running && <button type="button" className={styles.stop} disabled={busy} onClick={() => void stop()}><Square size={11} fill="currentColor" />{t('중지', 'Stop')}</button>}
+      <span className={styles.runStatus} role="status">{busy ? t('거북이를 준비하고 있어요…', 'Preparing your turtle…') : session && session.state !== 'DISPLAYING' && session.state !== 'STOPPED' ? status : ''}</span>
     </nav>
     {error && <div className={styles.errorBar} role="alert">{error}{retry > 0 && ` (${retry}s)`}<button type="button" aria-label={t('닫기', 'Dismiss')} onClick={() => setError('')}><X size={16} /></button></div>}
     <nav className={styles.mobileTabs} aria-label={t('작업 공간', 'Workspace')} role="tablist">{[['code', t('코드', 'Code')], ['drawing', t('그림', 'Drawing')], ['output', t('출력', 'Output')]].map(([id, name]) => <button key={id} type="button" role="tab" aria-selected={mobileTab === id} onClick={() => setMobileTab(id!)}>{name}</button>)}</nav>
     <div className={styles.panes} style={{ '--editor': split + '%' } as CSSProperties}>
-      <section ref={editor} className={styles.editor} data-visible={mobileTab === 'code'} aria-label={t('파이썬 코드', 'Python code')}><div className={styles.paneTitle}><span><span className={styles.pythonDot} />main.py</span><button type="button" onClick={() => void fullscreen(editor.current)} aria-label={t('코드 전체 화면', 'Fullscreen code')}><Maximize2 size={14} /></button></div>
-        <CodeEditor code={source} fontSize={draft.font} onChange={value => { setSaved(false); setDraft(d => ({ ...d, buffers: { ...d.buffers, [d.starter]: value } })); }} />
+      <section className={styles.editor} data-visible={mobileTab === 'code'} aria-label={t('파이썬 코드', 'Python code')}>
+        <CodeEditor code={source} fontSize={draft.font} theme={theme} onChange={value => { setSaved(false); setDraft(d => ({ ...d, buffers: { ...d.buffers, [d.starter]: value } })); }} />
       </section>
       <SplitHandle value={split} onChange={n => setSplit(Math.min(70, Math.max(30, n)))} label={t('코드와 그림 크기 조절', 'Resize code and drawing')} />
       <div className={styles.results} style={{ gridTemplateRows: `minmax(0,${100 - consoleSize}fr) 6px minmax(0,${consoleSize}fr)` }}>
         <section className={styles.drawing} data-visible={mobileTab === 'drawing'} aria-label={t('그림', 'Drawing')} ref={drawing}>
-          <div className={styles.paneTitle}><span>{t('그림', 'Drawing')}</span><span className={styles.statusDot}>{running && <i />}{running ? t('실행 중', 'Live') : t('결과', 'Result')}</span></div>
-          {retainedFrame ? <Image src={retainedFrame} width={1024} height={640} unoptimized alt={t('마지막 거북이 그림', 'Last turtle drawing')} className={styles.frame} /> : session && session.state !== 'QUEUED' ? <GuiViewer session={session} onError={viewerError} /> : <div className={styles.empty}><Turtle size={62} strokeWidth={1.2} /><h2>{session?.state === 'QUEUED' ? t('조금만 기다려 주세요', 'Your turn is coming') : t('거북이가 기다리고 있어요', 'Your turtle is waiting')}</h2><p>{session?.state === 'QUEUED' ? t('그림 공간이 준비되면 자동으로 시작해요.', 'Your code starts when a drawing space is ready.') : t('왼쪽에 코드를 쓰고 실행을 눌러 보세요.', 'Write code on the left, then press Run.')}</p></div>}
+          {retainedFrame ? <Image src={retainedFrame} width={1024} height={640} unoptimized alt={t('마지막 거북이 그림', 'Last turtle drawing')} className={styles.frame} /> : !busy && running && session && session.state !== 'QUEUED' ? <GuiViewer session={session} minimal onFrame={keepFrame} onError={viewerError} /> : <div className={styles.empty}><span className="sr-only">{session?.state === 'QUEUED' ? t('그림 공간이 준비되면 자동으로 시작해요.', 'Your code starts when a drawing space is ready.') : t('왼쪽에 코드를 쓰고 실행을 눌러 보세요.', 'Write code on the left, then press Run.')}</span></div>}
         </section>
         <SplitHandle vertical value={consoleSize} onChange={setConsoleSize} label={t('출력 창 크기 조절', 'Resize output')} />
-        <section className={styles.console} data-visible={mobileTab === 'output'} aria-label={t('출력', 'Output')}><div className={styles.paneTitle}><span>{t('출력', 'Output')}</span>{session?.state === 'WAITING_INPUT' && <span>{t('입력 대기', 'Input requested')}</span>}</div>
+        <section className={styles.console} data-visible={mobileTab === 'output'} aria-label={t('출력', 'Output')}>
           {hint.message && <p className={styles.hint}>{hint.line && `${t('줄', 'Line')} ${hint.line} · `}{hint.message}</p>}
-          {hint.message ? <details><summary>{t('파이썬 오류 자세히 보기', 'Python error details')}</summary><pre>{session?.output}</pre></details> : <pre aria-live="polite">{session?.output || t('print()의 결과가 여기에 나타나요.', 'Output from print() appears here.')}</pre>}
+          {hint.message ? <details><summary>{t('파이썬 오류 자세히 보기', 'Python error details')}</summary><pre>{session?.output}</pre></details> : <pre aria-live="polite">{session?.output}</pre>}
           {session?.state === 'WAITING_INPUT' && <form onSubmit={sendInput}><input aria-label={t('입력할 값', 'Program input')} value={input} onChange={e => setInput(e.target.value)} /><button type="submit">{t('입력', 'Send')}</button></form>}
         </section>
       </div>
     </div>
-    <footer className={styles.status}><span className={saved ? '' : styles.unsaved}>{saved ? t('이 탭에 임시 저장됨', 'Saved in this tab') : t('임시 저장 안 됨 · 다운로드로 보관하세요', 'Not saved · Download to keep your code')}</span><span role="status">{status}{running && session?.state !== 'QUEUED' && ` · ${remaining}s`}</span></footer>
     {showHelp && <aside className={styles.help} aria-label={t('명령어 도움말', 'Command reference')}><header><h2>{t('작은 명령어 사전', 'Your command reference')}</h2><button type="button" onClick={() => setShowHelp(false)} aria-label={t('도움말 닫기', 'Close help')}><X size={20} /></button></header><p>{t('명령어의 대소문자와 괄호를 확인해 보세요.', 'Command names are case-sensitive. Remember the parentheses.')}</p>{help.map(([command, ko, en]) => <div key={command}><code>{command}</code><p>{english ? en : ko}</p></div>)}<p><code>TForward(100)</code> → <code>turtle.forward(100)</code></p></aside>}
   </main>;
 }

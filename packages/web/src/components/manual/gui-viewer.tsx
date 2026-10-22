@@ -13,15 +13,22 @@ type Remote = {
 export function GuiViewer({
   session,
   onError,
+  minimal = false,
+  onFrame,
 }: {
   session: ManualSession;
   onError: (text: string) => void;
+  minimal?: boolean;
+  onFrame?: (frame: string) => void;
 }) {
   const { t: mt } = useManualTranslation();
   const state = useRef(session.state);
   // Latest-value ref read only by socket callbacks, never by render output.
   // eslint-disable-next-line react-hooks/refs
   state.current = session.state;
+  const latest = useRef({ expiresAt: session.expiresAt, onFrame });
+  // eslint-disable-next-line react-hooks/refs
+  latest.current = { expiresAt: session.expiresAt, onFrame };
   const admitted = session.state !== "QUEUED";
   const [connection, setConnection] = useState("connecting");
   const [frame, setFrame] = useState<string>();
@@ -47,6 +54,7 @@ export function GuiViewer({
           rfb.viewOnly = session.readOnly ?? false;
           rfb.scaleViewport = true;
           rfb.resizeSession = false;
+          if (minimal) rfb.background = "#fff";
           rfb.addEventListener("connect", () => {
             if (disposed) return;
             canvas.current = target.current?.querySelector("canvas") ?? null;
@@ -56,18 +64,21 @@ export function GuiViewer({
             if (disposed) return;
             if (canvas.current) {
               try {
-                setFrame(canvas.current.toDataURL());
+                const image = canvas.current.toDataURL();
+                setFrame(image);
+                latest.current.onFrame?.(image);
               } catch {}
             }
             setConnection("disconnected");
             if (
-              ["RUNNING", "STARTING", "WAITING_INPUT", "DISPLAYING"].includes(state.current)
+              ["RUNNING", "STARTING", "WAITING_INPUT", "DISPLAYING"].includes(state.current) &&
+              (!minimal || latest.current.expiresAt > Date.now())
             ) {
               reconnect = setTimeout(() => {
                 if (
                   ["RUNNING", "STARTING", "WAITING_INPUT", "DISPLAYING"].includes(
                     state.current,
-                  )
+                  ) && (!minimal || latest.current.expiresAt > Date.now())
                 )
                   connect();
               }, 2000);
@@ -89,7 +100,7 @@ export function GuiViewer({
       remote.current = null;
       socket?.close();
     };
-  }, [session.id, session.displayUrl, session.token, onError, mt, admitted]);
+  }, [session.id, session.displayUrl, session.token, session.readOnly, onError, mt, admitted, minimal]);
   return (
     <section
       className="flex min-h-0 flex-1 flex-col"
@@ -99,7 +110,8 @@ export function GuiViewer({
         ref={target}
         data-testid="turtle-display"
         className={
-          "h-[240px] min-h-[160px] flex-none md:h-auto md:min-h-0 md:flex-1 overflow-hidden bg-white focus-within:ring-2 focus-within:ring-brand " +
+          (minimal ? "min-h-0 flex-1 " : "h-[240px] min-h-[160px] flex-none md:h-auto md:min-h-0 md:flex-1 ") +
+          "overflow-hidden bg-white focus-within:ring-2 focus-within:ring-brand " +
           (frame ? "hidden" : "")
         }
         tabIndex={0}
@@ -108,7 +120,8 @@ export function GuiViewer({
             e.preventDefault();
             e.stopPropagation();
             remote.current?.blur();
-            release.current?.focus();
+            if (minimal) target.current?.blur();
+            else release.current?.focus();
           }
         }}
       />
@@ -119,10 +132,10 @@ export function GuiViewer({
           className="min-h-0 flex-1 object-contain"
         />
       ) : null}
-      <p className="px-2 text-xs" role="status">
+      <p className={minimal ? "sr-only" : "px-2 text-xs"} role="status">
         {mt(connection as "connecting" | "ready" | "disconnected")}
       </p>
-      <div className="flex flex-wrap gap-2 border-t border-border p-2 text-xs">
+      {!minimal && <div className="flex flex-wrap gap-2 border-t border-border p-2 text-xs">
         <span>
           {session.readOnly
             ? mt("read_only")
@@ -166,7 +179,7 @@ export function GuiViewer({
         >
           {mt("fullscreen_drawing")}
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

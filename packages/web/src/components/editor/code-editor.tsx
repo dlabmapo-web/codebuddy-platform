@@ -63,12 +63,14 @@ export function CodeEditor({
   onChange,
   onMount,
   readOnly = false,
+  theme = 'paircode-dark',
 }: {
   code: string;
   fontSize: number;
   onChange: (value: string) => void;
   onMount?: OnMount;
   readOnly?: boolean;
+  theme?: 'paircode-dark' | 'light';
 }) {
   const handleMount = React.useMemo(() => pinLfOnMount(onMount), [onMount]);
 
@@ -99,7 +101,7 @@ export function CodeEditor({
           tabSize: 4,
           wordWrap: 'off',
         }}
-        theme="paircode-dark"
+        theme={theme}
         value={code}
       />
     </div>

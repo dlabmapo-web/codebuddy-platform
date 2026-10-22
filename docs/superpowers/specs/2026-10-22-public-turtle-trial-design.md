@@ -83,25 +83,24 @@ Version one shares engine code and image builds with course turtle, while guest 
 ### 5.2 Workspace
 
 ```text
-Cove Turtle     [도형 그리기 ▾]                  [글자 크기] [전체 화면] [나가기]
-[실행 / 중지]  [코드 초기화] [그림 지우기] [명령어 도움말] [다운로드]
+Cove Turtle                                                [⋯]
+[Run] [Light / Dark] [Clear] [Stop while a run is active]
 ┌──────────────────────────────┬──────────────────────────────────┐
-│ main.py                      │ Drawing                          │
 │                              │                                  │
 │ Editable Python              │ White drawing / prepared race    │
-│                              │                                  │
+│                              │ Animated turtle cursor           │
 │                              ├──────────────────────────────────┤
-│                              │ Output / error / input           │
+│                              │ Text output / error / input      │
 └──────────────────────────────┴──────────────────────────────────┘
-  Saved on this device                         Runtime / queue status
 ```
 
-- At widths ≥1024px, editor and result start at 50/50 and resize from 30/70 to 70/30. The right pane has a vertically resizable console, initially about 20% of its height and expandable for `print` lessons.
+- At widths ≥1024px, editor and result start at 50/50 and resize from 30/70 to 70/30. The right pane has a vertically resizable console, initially about 30% of its height and expandable for `print` lessons.
 - At 768–1023px retain the split when usable; below 768px use Code/Drawing/Output tabs, with Run/Stop always reachable. Do not shrink the entire race to an unreadable strip.
 - Font defaults to 18px, adjustable 14–28px. Editor has Python highlighting, line numbers, four-space indentation, normal copy/paste, and no mandatory file-tree interaction.
-- Run executes the current saved-in-memory code snapshot; changes during execution apply to the next run. While queued/starting/running, the main control is Stop and duplicate Run is disabled.
-- A finished drawing remains visible. Code and drawing are independently fullscreen-capable, and resizing scales the viewport without changing turtle coordinates.
-- `코드 초기화` replaces only the current starter's editable code after confirmation. `그림 지우기` stops/removes the current run and clears its drawing/output, retaining code. A new Run always starts from fresh Python/turtle state.
+- Run executes the current saved-in-memory code snapshot; changes during execution apply to the next run. Run remains available after startup. Pressing it stops the previous owned run before starting a fresh drawing with the current code. A separate Stop control is present while a run is active. Controls are disabled during an in-flight start/stop request.
+- A finished drawing remains visible. The canvas is white with no desktop border, keyboard toolbar, live badge, or visible connection labels. Resizing scales the viewport without changing turtle coordinates. Workspace fullscreen is available in More options.
+- Examples, font size, reset code, command help, downloads, fullscreen, Exit, and the tab-save indicator live in the More options menu. The normal workspace shows only the compact brand bar and Run/Light/Clear toolbar.
+- `코드 초기화` replaces only the current starter's editable code after confirmation. `지우기` (Clear) stops/removes the current run and clears its drawing/output, retaining code. A new Run always starts from fresh Python/turtle state.
 - `나가기` revokes the guest grant, stops its active/queued run, clears trial drafts and transient viewer data, and returns to the PIN form. It does not sign the visitor out of Cove Studio.
 - The help drawer lists lesson commands, arguments, one-line Korean explanations, and examples. Opening help never replaces code. Include a short bridge from `TForward(100)` to standard `turtle.forward(100)`.
 - Errors show a concise Korean explanation and the editable `main.py` line when known, with expandable original Python details. Missing colon, indentation, wrong helper case, and missing race setup receive targeted deterministic hints. Do not send student code to an AI service.
@@ -112,13 +111,13 @@ Provide three explicit choices, not an entire mission/course system:
 
 | Starter | Editable initial code | Purpose |
 | --- | --- | --- |
-| 도형 그리기 | Teaching imports and `# 여기에 코드를 작성해 보세요.` | Teacher-led movement, polygons, loops, color, and random values |
+| 도형 그리기 | Teaching imports, red pen, `speed(3)`, and a four-sided square loop | Teacher-led movement, polygons, loops, color, and random values |
 | 거북이 경주 | Same imports, `ReadyToRace()`, and a comment inviting movement code | Race setup without giving away its loop or finish checks |
 | 자유 연습 | Same imports and an empty coding area | Experiments or teacher-provided code |
 
 Import preamble is visible in `main.py`, matching the PPT. Students may edit the entire file; provide a `기본 코드 복원` action if imports are deleted. Helpers themselves are bundled read-only resources, not extra editable tabs students must manage.
 
-Store each starter's code and editor preferences in this tab's `sessionStorage`, debounced at about 500ms, under a versioned turtle-only key. Preserve it across refresh and grant expiry in that tab; switching starters retains each buffer. Do not store the PIN, grant token, display capability, or terminal transcript there. Closing the tab or Exit ends this local retention. Show `이 탭에 임시 저장됨`; storage failure leaves editing usable with a clear unsaved indication.
+Store each starter's code and editor preferences in this tab's `sessionStorage`, debounced at about 500ms, under a versioned turtle-only key. Preserve it across refresh and grant expiry in that tab; switching starters retains each buffer. Do not store the PIN, grant token, display capability, or terminal transcript there. Closing the tab or Exit ends this local retention. Show `이 탭에 임시 저장됨` inside More options; storage failure leaves editing usable with an unsaved indication in that menu.
 
 Provide `main.py` download for deliberate export, plus a project ZIP option containing the helper bundle/version and a short README so code using `custom`/`shape` is reproducible outside Cove with Python/Tk. Never include platform secrets or another visitor's content.
 
@@ -140,9 +139,9 @@ Implement Cove-owned `custom.py` and `shape.py`, versioned as `cove-trial-v1`. `
 
 `TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
 
-The guest API assembles fixed helper files and a fixed entry runner with submitted `main.py`. The runner executes `main.py` at its actual filename, flushes the screen, and enters `turtle.mainloop()` after normal completion when a screen remains open. An explicit student `done()`/`mainloop()` continues to work. Exceptions remain errors and do not become successful completed programs. On an error, retain the latest delivered drawing as best effort alongside the traceback.
+The guest API assembles fixed helper files and a fixed entry runner with submitted `main.py`. The runner prepares a full-size borderless white screen and the helpers select a turtle-shaped cursor for movement. It executes `main.py` at its actual filename, flushes the screen, and enters `turtle.mainloop()` after normal completion when a screen remains open. An explicit student `done()`/`mainloop()` continues to work. Exceptions remain errors and do not become successful completed programs. On an error, retain the latest delivered drawing as best effort alongside the traceback.
 
-Finite drawings therefore remain in the running/display phase until Stop or the run deadline; label this state `그림을 확인하고 있어요` when the runner signals source completion. Capture the displayed frame before deliberate Stop so it remains visible after resources are released. Do not claim that the current broker captures a server-side final screenshot; it does not.
+Finite drawings therefore remain in the running/display phase until Stop or the run deadline; keep the canvas visible when the runner signals source completion; omit a persistent status label for this normal ready state. Capture the displayed frame before deliberate Stop so it remains visible after resources are released. Do not claim that the current broker captures a server-side final screenshot; it does not.
 
 ### 6.2 Function contract
 
@@ -231,7 +230,7 @@ Use same-origin Next Route Handlers under `/turtle/api/*` as a small backend-for
 | --- | --- |
 | `GET /turtle/api/challenge` | Issue the short-lived pre-access nonce cookie before form submission; rate-limit issuance by trusted IP and deployment. This is not a CAPTCHA or guest grant. |
 | `POST /turtle/api/access` | Validate `{ pin }`, nonce, origin and limits; issue cookie after API verification; return expiry and allowed starter IDs. |
-| `GET /turtle/api/bootstrap` | Validate grant/version; return helper version, starter code, safe execution limits, and this grant's existing run when present. |
+| `GET /turtle/api/bootstrap` | Validate grant/version; return helper version, starter code, safe execution limits, and this grant's existing run when present. Without a grant or with an expired grant, return HTTP 204 and show the PIN gate without a console authorization error. Protected execution endpoints still reject missing grants. |
 | `DELETE /turtle/api/access` | Revoke grant, cancel active/queued run, clear cookie; safe to repeat. |
 | `POST /turtle/api/runs` | Accept only `{ source, starterId, helperVersion, requestKey }`; validate and create or recover an idempotent run. |
 | `GET /turtle/api/runs/:id` | Validate grant and run ownership; return state, bounded output, expiry, and display capability for its owner; renew the execution lease. |

@@ -18,6 +18,8 @@ async function handler(request: Request, context: Context) {
   const production = process.env.NODE_ENV === 'production'; const jar = await cookies();
   const token = jar.get(trialCookieName(production))?.value ?? '';
   const nonce = jar.get(trialNonceName(production))?.value ?? '';
+  // Opening the public page without a grant is an ordinary signed-out state.
+  if (path === 'bootstrap' && !token) return new NextResponse(null, { status: 204, headers });
   try {
     const body = await trialBody(request);
     // Caddy overwrites this header. The studio port stays on the private
@@ -37,6 +39,11 @@ async function handler(request: Request, context: Context) {
     });
     const data = await upstream.json();
     if (!upstream.ok) {
+      if (path === 'bootstrap' && upstream.status === 401) {
+        const response = new NextResponse(null, { status: 204, headers });
+        response.cookies.set(trialCookieName(production), '', { ...cookieOptions(), maxAge: 0 });
+        return response;
+      }
       const retryAfter = Number(data.retryAfter ?? 0);
       return NextResponse.json({ message: typeof data.message === 'string' ? data.message : 'REQUEST_FAILED', ...(retryAfter > 0 ? { retryAfter } : {}) }, {
         status: upstream.status, headers: { ...headers, ...(retryAfter > 0 ? { 'Retry-After': String(retryAfter) } : {}) },

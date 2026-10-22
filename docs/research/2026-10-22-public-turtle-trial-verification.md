@@ -25,6 +25,41 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Simplified workspace follow-up
+
+After the user's visual review, the workspace follows the reference's compact
+Run/Light/Clear toolbar and plain split editor/canvas/output layout. Stop is
+available during an active run; examples, font size, reset, help, downloads,
+fullscreen and Exit move into More options. The guest viewer hides desktop
+keyboard controls, connection labels, pane headings and live badges, and uses a
+white background. The fixed guest runner removes the Tk canvas bevel. New tabs
+start with a small square at animated speed 3; existing drafts are preserved.
+
+Run stops the previous owned session before starting a fresh one. Polling pauses
+while this happens, and a generation guard rejects responses from an older run.
+This fixes an intermittent WebKit failure where a late STOPPED response replaced
+the new run and hid Stop. A captured frame survives Stop or expiry; expired
+viewers do not attempt to reconnect. Opening without a guest grant now uses a
+204 bootstrap response to show the PIN gate without expected 401 console noise.
+Execution endpoints still require a valid grant.
+
+Follow-up validation: seven focused web/boundary tests, shared build, web/E2E
+TypeScript checks, and six Chromium/WebKit browser scenarios. Browser coverage
+includes actual animated frames and green turtle pixels with standard Python,
+lesson square/race helpers, direct rerun into an infinite loop, Stop/frame
+retention, Clear preserving code, theme changes, downloads, PIN access and mobile.
+The real Docker helper geometry/race checks also pass. Targeted lint reports no
+errors; the pre-existing no-img-element warning remains in the shared viewer.
+
+Updated captures:
+
+- [Simplified desktop workspace](assets/2026-10-22-public-turtle-trial/workspace-simple.png)
+- [Animated standard turtle example](assets/2026-10-22-public-turtle-trial/animated-turtle.png)
+- [Simplified mobile controls](assets/2026-10-22-public-turtle-trial/mobile-simple.png)
+
+The original checks below describe the initial implementation, before the visual
+simplification.
+
 ## Local checks
 
 The dedicated fixture uses Redis port 6397 (browser DB 0, unit-test DB 1),

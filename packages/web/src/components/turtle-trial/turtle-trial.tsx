@@ -26,6 +26,14 @@ const help = [
   ["BlueX()", "help_racer_x"],
 ] as const;
 
+function TurtleBrand({ campus }: { campus: string }) {
+  return <div className={styles.brand}>
+    {/* The supplied Coveedu lockup, also used by the home site. */}
+    <Image src="/brand/coveedu-logo.svg" width={894} height={281} alt="COVE edu" className={styles.brandLogo} loading="eager" />
+    <span className={styles.campus}>{campus}</span>
+  </div>;
+}
+
 function SplitHandle({ vertical = false, value, onChange, label }: { vertical?: boolean; value: number; onChange: (n: number) => void; label: string }) {
   return <div role="separator" aria-label={label} aria-orientation={vertical ? 'horizontal' : 'vertical'} aria-valuenow={value} aria-valuemin={20} aria-valuemax={80}
     tabIndex={0} className={vertical ? styles.horizontalHandle : styles.handle}
@@ -238,12 +246,12 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
   const status = session ? ({ QUEUED: t('waiting_for_a_drawing_space'), STARTING: t('preparing_your_turtle'), RUNNING: t('running_your_code'), DISPLAYING: t('your_drawing_is_ready'), WAITING_INPUT: t('waiting_for_your_input'), STOPPED: t('stopped'), TIMED_OUT: t('time_is_up_you_can_run_again'), ERROR: t('check_your_code'), OUTPUT_LIMIT: t('stopped_because_output_was_too_large'), QUEUE_EXPIRED: t('the_queue_expired_please_run_again'), DISCONNECTED: t('disconnected_please_run_again') } as Record<string, string>)[session.state] ?? session.state : t('write_some_code_and_press_run');
 
   if (access === null || (loading && !access)) return <main className={styles.workspace} aria-busy={loading} data-testid="turtle-restoring">
-    <header className={styles.header}><div className={styles.wordmark}><Turtle size={22} /><strong>Cove Turtle</strong></div></header>
+    <header className={styles.header}><TurtleBrand campus={t('mapo_campus')} /></header>
     <div className={styles.restoring} role="status">{error ? <div><p className={styles.error}>{error}</p><button type="button" className={styles.textButton} disabled={loading} onClick={() => void bootstrap()}>{t('refresh_access')}</button></div> : t('connecting_loading')}</div>
   </main>;
 
   if (!access) return <main className={styles.gate}>
-    <div className={styles.gateHeader}><div className={styles.gateBrand}><Turtle size={27} /> <strong>Cove Turtle</strong><span>PYTHON PLAYGROUND</span></div><LanguageControl /></div>
+    <div className={styles.gateHeader}><TurtleBrand campus={t('mapo_campus')} /><LanguageControl /></div>
     <div className={styles.gateGrid}>
       <section className={styles.intro}>
         <span className={styles.eyebrow}>{t('your_first_drawing_with_code')}</span>
@@ -269,7 +277,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
 
   return <main className={styles.workspace} ref={workspace}>
     <header className={styles.header}>
-      <div className={styles.wordmark}><Turtle size={22} /><strong>Cove Turtle</strong></div>
+      <TurtleBrand campus={t('mapo_campus')} />
       <div className={styles.headerActions}>
         <LanguageControl />
         <TurtleOptions starter={draft.starter} font={draft.font} saved={saved} busy={busy}

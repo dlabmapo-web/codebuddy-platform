@@ -25,6 +25,22 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Mapo Campus branding
+
+The workspace, access gate and temporary access-restoration header now reuse
+the official Coveedu SVG supplied by the home site, with a localized campus
+label: Mapo Campus / 마포캠퍼스. On narrow screens the campus label sits below
+the logo, leaving room for the language and options controls.
+
+A real Chromium check verified the logo loads on the PIN screen and workspace,
+the English label appears after switching language, and the header fits at
+320px and 390px without overlap or horizontal scrolling. Desktop and mobile
+captures were visually inspected. Web types, targeted lint and all 115 locale
+parity/budget checks pass. The PIN and guest-access implementation is unchanged.
+
+- [Desktop branding](assets/2026-10-22-public-turtle-trial/mapo-campus-desktop.png)
+- [Mobile branding](assets/2026-10-22-public-turtle-trial/mapo-campus-mobile.png)
+
 ## Switching examples
 
 Changing between Draw shapes, Turtle race and Free practice now stops/removes

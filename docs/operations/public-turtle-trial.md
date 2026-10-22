@@ -6,6 +6,23 @@ The PPT stays with the teacher; it is not uploaded or published by this feature.
 
 ## Admission and secrets
 
+### Who manages the classroom code
+
+The developer/operator generates one shared six-digit code during setup and
+gives it privately to the teacher. The teacher shares that code with trial
+students. Students enter it at `/turtle`; a correct code gives that browser
+two hours of access without creating an account. Refreshing the page or
+changing language keeps that access. Exit ends it immediately. The shared
+code remains usable until the operator rotates it; the two-hour limit applies
+to each browser's access, not to the code itself. Incorrect attempts are limited.
+
+There is currently no teacher-facing code-generation or change-code screen.
+Generate, deploy and activate a replacement through the operator steps below;
+activating it invalidates access granted with the old code on the next check.
+The local test setup uses `012345` only as a disposable fixture.
+
+### Operator configuration
+
 The API and web flags default off. Set GitHub's build variable
 `NEXT_PUBLIC_TURTLE_TRIAL_ENABLED=true` only for a release that is ready to admit
 guests. Release selection writes the matching `TURTLE_TRIAL_ENABLED` runtime

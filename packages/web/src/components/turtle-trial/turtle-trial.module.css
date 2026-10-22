@@ -25,21 +25,24 @@
   flex-direction:column;
   padding:36px clamp(24px,6vw,96px)
 }
-.gateBrand,.wordmark {
+.brand {
   display:flex;
   align-items:center;
-  gap:10px;
-  color:var(--trial-blue)
+  gap:14px;
+  flex-shrink:0
 }
-.gateBrand strong {
-  font-size:24px;
-  letter-spacing:-1px
+.brandLogo {
+  width:auto;
+  height:36px
 }
-.gateBrand span {
-  margin-left:16px;
-  font-size:10px;
-  letter-spacing:2px;
-  color:#6e8195
+.campus {
+  border-left:1px solid #d6dce3;
+  padding-left:14px;
+  color:var(--trial-ink);
+  font-size:14px;
+  font-weight:600;
+  line-height:20px;
+  white-space:nowrap
 }
 .gateGrid {
   display:grid;
@@ -204,15 +207,6 @@
   min-height:52px;
   padding:0 16px;
   background:#f8f8f8
-}
-.wordmark {
-  color:#555;
-  gap:8px
-}
-.wordmark strong {
-  font-size:19px;
-  font-weight:500;
-  letter-spacing:-.6px
 }
 .gateHeader,.headerActions {
   display:flex;
@@ -484,15 +478,23 @@
     margin:0 auto;
     padding:28px
   }
-  .gateBrand span {
-    display:none
+  .brand {
+    flex-direction:column;
+    align-items:flex-start;
+    gap:0
+  }
+  .brandLogo {
+    height:26px
+  }
+  .campus {
+    border:0;
+    padding:0;
+    font-size:10px;
+    line-height:14px
   }
   .header {
-    min-height:44px;
+    min-height:52px;
     padding:0 12px
-  }
-  .wordmark strong {
-    font-size:17px
   }
   .toolbar button {
     padding:0 12px

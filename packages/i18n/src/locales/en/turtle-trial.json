@@ -1,4 +1,5 @@
 {
+  "mapo_campus": "Mapo Campus",
   "help_forward": "Move forward 100 steps.",
   "help_left": "Turn left 90 degrees. Use the exterior angle.",
   "help_color": "Change the pen and turtle color.",

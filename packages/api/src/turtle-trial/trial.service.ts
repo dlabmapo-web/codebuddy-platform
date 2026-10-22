@@ -1,4 +1,4 @@
-import { HttpException, Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
@@ -10,10 +10,14 @@ import {
 import { TrialStore, type TrialGrant } from './trial-store.js';
 import { TrialRuntime } from './trial-runtime.js';
 import { trialDigest, trialEqual, trialHash } from './trial-security.js';
+import { TrialPins } from './trial-pins.js';
+import { PrismaService } from '../database/prisma.service.js';
 
 @Injectable()
 export class TrialService {
-  constructor(@Inject(ConfigService) private readonly config: ConfigService, @Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialRuntime) private readonly runtime: TrialRuntime) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService, @Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialRuntime) private readonly runtime: TrialRuntime,
+    @Optional() @Inject(TrialPins) private readonly pins?: TrialPins,
+    @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService) {}
   enabled() { if (!this.config.get('TURTLE_TRIAL_ENABLED')) throw new ServiceUnavailableException('TRIAL_UNAVAILABLE'); }
   private version() { return this.config.get<string>('TURTLE_TRIAL_PIN_VERSION')!; }
   private owner(g: TrialGrant) { return 'trial:' + g.hash; }
@@ -36,6 +40,13 @@ export class TrialService {
       ['access:ip:' + this.ipHash(ip), 120, 600000], ['access:all', 600, 60000],
     ]);
     const normalized = typeof pin === 'string' ? pin.trim() : '';
+    const managed = await this.pins?.resolve(normalized);
+    if (managed) {
+      await this.academy(managed.academyId);
+      await this.runtime.ready();
+      return this.store.issue(managed.version, managed.academyId);
+    }
+    if (this.config.get('TURTLE_TRIAL_LEGACY_PIN_ENABLED') !== true) throw new UnauthorizedException('INVALID_PIN');
     if (!/^[0-9]{6}$/.test(normalized) || !trialEqual(
       trialDigest(normalized, this.config.get<string>('TURTLE_TRIAL_PIN_PEPPER')!),
       this.config.get<string>('TURTLE_TRIAL_PIN_DIGEST'),
@@ -48,13 +59,20 @@ export class TrialService {
     this.enabled();
     const g = await this.store.grant(token, this.version());
     if (!g) throw new UnauthorizedException('ACCESS_EXPIRED');
+    if (g.academyId) await this.academy(g.academyId);
+    else if (this.config.get('TURTLE_TRIAL_LEGACY_PIN_ENABLED') !== true) throw new UnauthorizedException('ACCESS_EXPIRED');
     return g;
+  }
+  private async academy(id: string) {
+    const academy = await this.prisma?.academy.findUnique({ where: { id }, select: { id: true, name: true, status: true } });
+    if (!academy || academy.status !== 'ACTIVE') throw new UnauthorizedException('ACCESS_EXPIRED');
+    return { id: academy.id, name: academy.name };
   }
   async bootstrap(token: string) {
     const g = await this.grant(token);
     let session: TurtleSession | null = null;
     if (g.active) session = await this.recover(g, g.active);
-    return { expiresAt: g.expiresAt, helperVersion: turtleHelperVersion, starters: turtleStarters, session };
+    return { expiresAt: g.expiresAt, helperVersion: turtleHelperVersion, starters: turtleStarters, session, academy: g.academyId ? await this.academy(g.academyId) : null };
   }
   private async finish(g: TrialGrant, key: string, s: TurtleSession) {
     if (turtleRunning(s)) return;

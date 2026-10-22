@@ -15,13 +15,16 @@ const validEnvironment = {
 describe("validateEnvironment", () => {
   it('keeps public turtle disabled by default and requires an independent guest pool', () => {
     expect(validateEnvironment(validEnvironment).TURTLE_TRIAL_ENABLED).toBe(false);
-    expect(() => validateEnvironment({ ...validEnvironment, TURTLE_TRIAL_ENABLED: 'true' })).toThrow(/TURTLE_TRIAL_PIN_DIGEST/);
+    expect(() => validateEnvironment({ ...validEnvironment, TURTLE_TRIAL_ENABLED: 'true' })).toThrow(/TURTLE_TRIAL_PIN_PEPPER/);
     const trial = { ...validEnvironment, TURTLE_TRIAL_ENABLED: 'true',
       TURTLE_TRIAL_PIN_DIGEST: 'a'.repeat(64), TURTLE_TRIAL_PIN_PEPPER: 'p'.repeat(43),
       TURTLE_TRIAL_PIN_VERSION: 'v1', TURTLE_TRIAL_SERVICE_URL: 'http://guest:4010',
       TURTLE_TRIAL_SERVICE_SECRET: 'g'.repeat(43), TURTLE_TRIAL_PUBLIC_WS_URL: 'ws://localhost:4017',
       BFF_SHARED_SECRET: 'b'.repeat(43), REDIS_URL: 'redis://localhost:6379' };
     expect(validateEnvironment(trial).TURTLE_TRIAL_ENABLED).toBe(true);
+    expect(validateEnvironment(trial).TURTLE_TRIAL_LEGACY_PIN_ENABLED).toBe(false);
+    expect(validateEnvironment({ ...trial, TURTLE_TRIAL_PIN_DIGEST: undefined, TURTLE_TRIAL_PIN_VERSION: undefined }).TURTLE_TRIAL_ENABLED).toBe(true);
+    expect(() => validateEnvironment({ ...trial, TURTLE_TRIAL_LEGACY_PIN_ENABLED: 'true', TURTLE_TRIAL_PIN_DIGEST: undefined })).toThrow(/TURTLE_TRIAL_PIN_DIGEST/);
     expect(() => validateEnvironment({ ...trial, GUI_SERVICE_URL: trial.TURTLE_TRIAL_SERVICE_URL })).toThrow(/separate guest broker/);
     expect(() => validateEnvironment({ ...trial, GUI_SERVICE_SECRET: trial.TURTLE_TRIAL_SERVICE_SECRET })).toThrow(/independent/);
   });

@@ -12,3 +12,4 @@ export * from "./orpc/points.contract.js";
 export * from "./orpc/profile.contract.js";
 export * from "./orpc/student-session.contract.js";
 export * from "./orpc-contract.js";
+export * from './orpc/academy-turtle.contract.js';

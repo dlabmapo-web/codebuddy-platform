@@ -14,6 +14,20 @@ export function createManageRouters(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    academyTurtle: {
+      state: os.academyTurtle.state.use(access.authenticated).handler(({ context, input }) => {
+        context.req.res?.setHeader('Cache-Control', 'private, no-store');
+        return deps.academyTurtleService.state(context.identity, input);
+      }),
+      reveal: os.academyTurtle.reveal.use(access.authenticated).handler(({ context, input }) => {
+        context.req.res?.setHeader('Cache-Control', 'private, no-store');
+        return deps.academyTurtleService.reveal(context.identity, input);
+      }),
+      generate: os.academyTurtle.generate.use(access.authenticated).handler(({ context, input }) => {
+        context.req.res?.setHeader('Cache-Control', 'private, no-store');
+        return deps.academyTurtleService.generate(context.identity, input);
+      }),
+    },
     academyOperationsOverview: {
       get: os.academyOperationsOverview.get
         .use(access.authenticated)

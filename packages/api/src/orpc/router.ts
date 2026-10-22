@@ -40,6 +40,7 @@ import { createLobbyRouter } from "../lobby/lobby.router.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { createNotificationsRouter } from "../notifications/notifications.router.js";
 import { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import { AcademyTurtleService } from '../manage/academy-turtle.service.js';
 import { PointPolicyService } from "../manage/point-policy.service.js";
 import { createAcademyFeaturesRouter } from "../manage/academy-features.router.js";
 import { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
@@ -98,6 +99,7 @@ import { toORPCError } from "./error-mapping.js";
 
 export function registerORPCRoutes(app: NestExpressApplication): void {
   const router = createORPCRouter({
+    academyTurtleService: app.get(AcademyTurtleService, { strict: false }),
     academyAccessService: app.get(AcademyAccessService, { strict: false }),
     authService: app.get(AuthService, { strict: false }),
     oauthOnboardingIntentService: app.get(OAuthOnboardingIntentService, {

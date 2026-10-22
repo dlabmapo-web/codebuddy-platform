@@ -25,6 +25,40 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Academy manager PIN controls
+
+The user confirmed one shared PIN per academy. Academy settings now includes
+manager-only Generate, Show/Hide, Copy, Replace (confirmed), Open Turtle and
+Copy link actions. PINs are six-character strings, globally unique while active,
+with two-hour reservations after retirement. The same `/turtle` page resolves
+the academy from the PIN and shows its current name after access is granted.
+No class, account or enrollment is required for visitors.
+
+The existing AOF-backed Redis now also holds an encrypted long-lived PIN
+registry. A separate HKDF-derived AES-GCM key seals values with academy/version
+AAD; lookup indices contain keyed digests. Manager endpoints independently
+authenticate and enforce live manager permission and active academy status.
+Every secret reveal/generation has an audit intent written first, without the
+PIN; audit failure prevents the operation. Redis CAS rejects stale/concurrent
+replacement. Version checks revoke only the changed academy's guests, and live
+academy status checks reject suspended/archived academies. Legacy operator
+codes require an explicit flag (off by default, on in the isolated fixture).
+
+Validation: 28 API/config/Redis/oRPC tests pass, including forced leading-zero
+and colliding candidates, concurrent replacement, selective guest revocation,
+inactive academies, audit failure, unauthenticated/wrong-role/foreign-academy
+denials, legacy opt-in and private no-store responses. The new registry suite uses dedicated
+Redis DB 2, separate from grant tests in DB 1 and browsers in DB 0. Eleven
+web tests pass, including four real React/Cove-dialog manager component cases.
+All 115 locale checks, targeted lint, shared build and API/web/E2E types pass.
+Six Chromium/WebKit public-page regressions pass against the restarted fixture.
+
+The manager controls are covered by component and oRPC tests; a live login to
+the real academy app was not part of the isolated guest browser harness. No
+production PIN was generated, production settings changed or migration needed.
+See [manager design](../superpowers/specs/2026-10-22-academy-turtle-pin-management.md)
+and [operations](../operations/public-turtle-trial.md) for setup and recovery.
+
 ## Beginner custom module
 
 Reviewed all 76 slides' text and embedded teaching/code screenshots again.

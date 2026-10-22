@@ -28,6 +28,7 @@ export type TurtleSession = {
   expiresAt: number; startedAt?: number; endedAt?: number; exitCode?: number;
 };
 export type TurtleBootstrap = {
+  academy?: { id: string; name: string } | null;
   expiresAt: number; helperVersion: string; starters: typeof turtleStarters;
   session: TurtleSession | null;
 };

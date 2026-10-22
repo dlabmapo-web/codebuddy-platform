@@ -31,7 +31,7 @@ function TurtleBrand({ campus }: { campus: string }) {
   return <div className={styles.brand}>
     {/* The supplied Coveedu lockup, also used by the home site. */}
     <Image src="/brand/coveedu-logo.svg" width={894} height={281} alt="COVE edu" className={styles.brandLogo} loading="eager" />
-    <span className={styles.campus}>{campus}</span>
+    <span className={styles.campus} title={campus}>{campus}</span>
   </div>;
 }
 
@@ -61,6 +61,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
   const [retryUntil, setRetryUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [session, setSession] = useState<TurtleSession | null>(null);
+  const [academyName, setAcademyName] = useState('');
   const [retainedFrame, setRetainedFrame] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [mobileTab, setMobileTab] = useState('code');
@@ -109,7 +110,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
     try {
       const result = await turtleRequest<TurtleBootstrap | null>('bootstrap');
       if (!result) { setAccess(false); await challenge(); return; }
-      setAccess(true); setSession(result.session); setError('');
+      setAccess(true); setSession(result.session); setAcademyName(result.academy?.name ?? ''); setError('');
     } catch (e) {
       if (e instanceof TurtleRequestError && e.status === 401) {
         setAccess(false); await challenge();
@@ -278,7 +279,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
 
   return <main className={styles.workspace} ref={workspace}>
     <header className={styles.header}>
-      <TurtleBrand campus={t('mapo_campus')} />
+      <TurtleBrand campus={academyName || t('mapo_campus')} />
       <div className={styles.headerActions}>
         <LanguageControl />
         <TurtleOptions starter={draft.starter} font={draft.font} saved={saved} busy={busy}

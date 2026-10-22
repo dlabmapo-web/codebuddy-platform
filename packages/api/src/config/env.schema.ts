@@ -53,6 +53,7 @@ export const apiEnvironmentSchema = z.object({
   GUI_PUBLIC_WS_URL:z.string().url().optional(),
   TURTLE_TRIAL_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   TURTLE_TRIAL_PIN_DIGEST: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  TURTLE_TRIAL_LEGACY_PIN_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   TURTLE_TRIAL_PIN_PEPPER: z.string().min(32).optional(),
   TURTLE_TRIAL_PIN_VERSION: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/).optional(),
   TURTLE_TRIAL_SERVICE_URL: httpUrlSchema.optional(),
@@ -212,8 +213,10 @@ export const apiEnvironmentSchema = z.object({
     .optional(),
 }).superRefine((environment, context) => {
   if (environment.TURTLE_TRIAL_ENABLED) {
-    for (const key of ['TURTLE_TRIAL_PIN_DIGEST', 'TURTLE_TRIAL_PIN_PEPPER', 'TURTLE_TRIAL_PIN_VERSION', 'TURTLE_TRIAL_SERVICE_URL', 'TURTLE_TRIAL_SERVICE_SECRET', 'TURTLE_TRIAL_PUBLIC_WS_URL', 'REDIS_URL', 'BFF_SHARED_SECRET'] as const)
+    for (const key of ['TURTLE_TRIAL_PIN_PEPPER', 'TURTLE_TRIAL_SERVICE_URL', 'TURTLE_TRIAL_SERVICE_SECRET', 'TURTLE_TRIAL_PUBLIC_WS_URL', 'REDIS_URL', 'BFF_SHARED_SECRET'] as const)
       if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for turtle trial' });
+    if (environment.TURTLE_TRIAL_LEGACY_PIN_ENABLED) for (const key of ['TURTLE_TRIAL_PIN_DIGEST', 'TURTLE_TRIAL_PIN_VERSION'] as const)
+      if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for legacy turtle trial PINs' });
     if (environment.TURTLE_TRIAL_SERVICE_URL === environment.GUI_SERVICE_URL)
       context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_SERVICE_URL'], message: 'must use a separate guest broker and Docker daemon' });
     if (environment.TURTLE_TRIAL_SERVICE_SECRET === environment.GUI_SERVICE_SECRET)

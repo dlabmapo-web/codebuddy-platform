@@ -8,6 +8,7 @@ import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { FeatureSettings } from './_components/feature-settings';
+import { AcademyTurtleSettings } from '@/components/turtle-trial/academy-turtle-settings';
 
 /**
  * What this academy has switched on.
@@ -40,6 +41,7 @@ export default async function AcademySettingsPage({
       title={t('settings.title')}
     >
       <FeatureSettings academyId={academyId} initialFeatures={features} />
+      <AcademyTurtleSettings key={academyId} academyId={academyId} />
     </StudioPage>
   );
 }

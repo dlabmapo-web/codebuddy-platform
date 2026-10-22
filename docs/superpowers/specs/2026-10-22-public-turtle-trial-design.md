@@ -7,7 +7,7 @@ Status: approved for implementation by the user on 2026-10-22; implemented on `f
 
 Provide `https://cs.coveedu.com/turtle` for introductory Python classes. A visitor enters a six-digit access code, then writes Python on the left and sees a turtle drawing on the right. No signup, login, academy membership, student enrollment, or personal information is required.
 
-**Confirmed with the user:** version one uses one shared code for all trial students. The team can rotate it. Separate class codes are outside version one.
+**Updated with the user:** each academy has its own shared code, generated/replaced by academy managers in Settings. Students enter only the six digits at `/turtle`; no class or enrollment is required. See [academy PIN management](2026-10-22-academy-turtle-pin-management.md). The original operator-configured platform-wide code is now an explicitly enabled legacy option.
 
 Use the existing CPython/Tk turtle engine and noVNC viewer, a separate guest workspace, and a bounded guest execution pool. Supply beginner functions matching the provided lesson. Students still write real Python, including loops, conditions, random numbers, and `break`.
 

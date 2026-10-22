@@ -14,6 +14,7 @@ const url = process.env.TURTLE_TRIAL_TEST_REDIS_URL;
 const local = url && ['localhost', '127.0.0.1'].includes(new URL(url).hostname) && new URL(url).port === '6397' && new URL(url).pathname === '/1';
 describe.skipIf(!local)('guest authorization with shared Redis', () => {
   const config = new ConfigService({ TURTLE_TRIAL_ENABLED: true, REDIS_URL: url,
+    TURTLE_TRIAL_LEGACY_PIN_ENABLED: true,
     BFF_SHARED_SECRET: 'test-bff-secret-with-at-least-32-characters',
     TURTLE_TRIAL_PIN_PEPPER: 'test-pepper-with-at-least-32-characters', TURTLE_TRIAL_PIN_VERSION: 'test-v1',
     TURTLE_TRIAL_PIN_DIGEST: trialDigest('012345', 'test-pepper-with-at-least-32-characters') });

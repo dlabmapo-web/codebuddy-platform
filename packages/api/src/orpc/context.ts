@@ -32,6 +32,7 @@ import type { StudentOverviewService } from "../learn/student-overview.service.j
 import type { SampleCheckService } from "../learn/sample-check.service.js";
 import type { SubmissionService } from "../learn/submission.service.js";
 import type { AcademyFeaturesService } from "../manage/academy-features.service.js";
+import type { AcademyTurtleService } from '../manage/academy-turtle.service.js';
 import type { PointPolicyService } from "../manage/point-policy.service.js";
 import type { AcademyOperationsProfileService } from "../manage/academy-profile.service.js";
 import type { InvitationDeliveryService } from "../manage/invitation-delivery.service.js";
@@ -71,6 +72,7 @@ export type ORPCImplementer = ReturnType<
 >;
 
 export type ORPCDeps = {
+  academyTurtleService: AcademyTurtleService;
   academyAccessService: AcademyAccessService;
   authService: AuthService;
   oauthOnboardingIntentService: OAuthOnboardingIntentService;

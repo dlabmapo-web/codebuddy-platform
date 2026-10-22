@@ -6,48 +6,57 @@ The PPT stays with the teacher; it is not uploaded or published by this feature.
 
 ## Admission and secrets
 
-### Who manages the classroom code
+### Academy manager controls
 
-The developer/operator generates one shared six-digit code during setup and
-gives it privately to the teacher. The teacher shares that code with trial
-students. Students enter it at `/turtle`; a correct code gives that browser
-two hours of access without creating an account. Refreshing the page or
-changing language keeps that access. Exit ends it immediately. The shared
-code remains usable until the operator rotates it; the two-hour limit applies
-to each browser's access, not to the code itself. Incorrect attempts are limited.
+Managers open **Academy settings → Public Turtle access** to generate their
+academy's shared six-digit code, show/hide it, copy it, or replace it. New
+visitors open `/turtle` and enter only that code. Codes identify the academy;
+visitors never need accounts, classes or enrollment. Each browser gets two
+hours of access. The workspace header uses the admitted academy's name.
 
-There is currently no teacher-facing code-generation or change-code screen.
-Generate, deploy and activate a replacement through the operator steps below;
-activating it invalidates access granted with the old code on the next check.
-The local test setup uses `012345` only as a disposable fixture.
+Only live `academy.settings.manage` authority can read or change a code.
+Replacement requires confirmation and invalidates that academy's existing
+guest grants on their next request; display leases expire within 30 seconds
+without renewal. Other academies are unaffected. A stale manager view gets a
+conflict and must refresh. The UI never writes the PIN to browser storage,
+URLs or shared query caches. Secret read/generation intents are audited without
+PIN values. A failed audit write refuses the operation.
 
 ### Operator configuration
 
-The API and web flags default off. Set GitHub's build variable
-`NEXT_PUBLIC_TURTLE_TRIAL_ENABLED=true` only for a release that is ready to admit
-guests. Release selection writes the matching `TURTLE_TRIAL_ENABLED` runtime
-flag to `deployment.env`. Setting it false stops API lease renewal and new Run
-admission without changing the logged-in course turtle flags.
+Enable the matching web build/runtime flags and `TURTLE_TRIAL_ENABLED` only
+when the dedicated guest runtime is ready. Configure a stable random
+`TURTLE_TRIAL_PIN_PEPPER` privately on every API replica (at least 32 characters;
+for example generate it with `openssl rand -base64 32` in a private terminal).
+It keys the lookup digest and derives a separate AES-GCM encryption key.
+Academy codes no longer require per-code environment changes or deployments.
+Keep `BFF_SHARED_SECRET` identical in web and API configuration, and use an
+independent guest-broker secret.
 
-Generate a code locally in a private operator terminal:
+Back up Redis's AOF data together with a protected copy of the pepper. The
+academy PIN registry is long-lived, while visitor grants expire. Production
+Redis already uses AOF and noeviction. After Redis loss, managed codes and
+access fail closed; restore the backup or have managers generate new codes.
+Changing the pepper requires replacing academy codes. Retired lookup digests
+remain reserved for two hours to avoid immediate reuse by another academy.
+
+### Optional legacy operator code
+
+`TURTLE_TRIAL_LEGACY_PIN_ENABLED` defaults to false. Enable it only when
+intentionally retaining the older platform-wide code or running the dedicated
+local fixture. Academy-generated codes are kept distinct from that code.
+When legacy support is enabled, the API also requires the old digest/version:
 
 ```bash
 pnpm --filter @cove/api exec tsx scripts/turtle-trial-pin.mts
 ```
 
-The utility prints the teacher's code once, plus API-only digest, pepper, and
-version. Do not capture its output in CI, paste it into git, or pass the PIN as
-a shell argument. Put those settings in private API configuration. Use a
-separate random `TURTLE_TRIAL_SERVICE_SECRET` for the guest broker. Keep
-`BFF_SHARED_SECRET` identical in web and API configuration.
-
-For rotation, deploy the new digest/pepper/version first, then run the operator
-utility with `--activate-version <new-version>` and an operator-provided
-`REDIS_URL` environment variable. Only the active Redis version can issue or
-renew grants; older API replicas fail closed during the transition. Existing
-grants are revoked on their next request, and their display/container leases
-expire within 30 seconds after the last successful renewal. Grants expire
-absolutely after two hours and never create Supabase identities.
+The utility prints a legacy code and its API-only digest, pepper and version.
+Never replace a live academy pepper with the utility's new one just to create
+a legacy code: changing the pepper makes stored academy codes unreadable.
+Do not collect its output in CI or commit it. Legacy version activation remains
+`--activate-version <version>` with an operator-provided `REDIS_URL`. This
+version does not control academy-generated grants.
 
 The fixed guest cookie is HttpOnly, Secure, SameSite=Lax, host-only. The PIN is
 never returned to the browser after verification. Access, runtime output and

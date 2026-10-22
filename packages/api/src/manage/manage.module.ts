@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { AcademyTurtleService } from './academy-turtle.service.js';
+import { TurtleTrialModule } from '../turtle-trial/trial.module.js';
 
 import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthModule } from "../auth/auth.module.js";
@@ -43,6 +45,7 @@ import { PeopleImportService } from "./people-import.service.js";
  */
 @Module({
   imports: [
+    TurtleTrialModule,
     // `AcademiesModule` for the audit writer and the rate limiter, both of
     // which must be one instance per process: the limiter holds its windows in
     // memory, and a second copy would silently double every quota the moment
@@ -64,6 +67,7 @@ import { PeopleImportService } from "./people-import.service.js";
   ],
   controllers: [AcademyMediaController, PeopleImportController, DeliveryWebhookController],
   providers: [
+    AcademyTurtleService,
     ManagerScopeService,
     ManagerOverviewRepository,
     ManagerOverviewService,
@@ -84,6 +88,7 @@ import { PeopleImportService } from "./people-import.service.js";
     },
   ],
   exports: [
+    AcademyTurtleService,
     ManagerOverviewService,
     AcademyFeaturesService,
     PointPolicyService,

@@ -13,6 +13,7 @@ if (!redisUrl || !['localhost', '127.0.0.1'].includes(new URL(redisUrl).hostname
 const pepper = 'local-trial-pin-pepper-never-production';
 const config = {
   TURTLE_TRIAL_ENABLED: true, REDIS_URL: redisUrl,
+  TURTLE_TRIAL_LEGACY_PIN_ENABLED: true,
   TURTLE_TRIAL_PIN_PEPPER: pepper, TURTLE_TRIAL_PIN_VERSION: 'e2e-v1',
   TURTLE_TRIAL_PIN_DIGEST: createHmac('sha256', pepper).update('012345').digest('hex'),
   BFF_SHARED_SECRET: 'local-trial-bff-secret-never-production',

@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { trialHash, trialPrefix } from './trial-security.js';
 import type { OnModuleDestroy } from '@nestjs/common';
 
-export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string };
+export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string };
 export type TrialRun = { requestKey: string; fingerprint: string; id?: string; settled?: string; reservedAt: string };
 const rateScript = `local wait=0
 for i,key in ipairs(KEYS) do
@@ -70,10 +70,10 @@ export class TrialStore implements OnModuleDestroy {
     await r.set(trialPrefix + 'version', expected, 'NX');
     return await r.get(trialPrefix + 'version') === expected;
   }
-  async issue(version: string) {
+  async issue(version: string, academyId = '') {
     const r = await this.client(); const token = randomBytes(32).toString('hex');
     const hash = trialHash(token); const expiresAt = Date.now() + 7200000;
-    await r.multi().hset(this.grantKey(hash), { version, expiresAt, active: '', used: 0 })
+    await r.multi().hset(this.grantKey(hash), { version, academyId, expiresAt, active: '', used: 0 })
       .expireat(this.grantKey(hash), Math.ceil(expiresAt / 1000) + 600).exec();
     return { token, expiresAt };
   }
@@ -81,8 +81,12 @@ export class TrialStore implements OnModuleDestroy {
     if (!/^[a-f0-9]{64}$/.test(token)) return null;
     const r = await this.client(); const hash = trialHash(token);
     const g = await r.hgetall(this.grantKey(hash));
-    if (g.version !== version || Number(g.expiresAt) <= Date.now() || !await this.version(version)) return null;
-    return { hash, version, expiresAt: Number(g.expiresAt), active: g.active ?? '' };
+    if (!g.version || Number(g.expiresAt) <= Date.now()) return null;
+    if (g.academyId) {
+      const raw = await r.get(trialPrefix + 'academy-pin:' + g.academyId);
+      if (!raw || JSON.parse(raw).version !== g.version) return null;
+    } else if (g.version !== version || !await this.version(version)) return null;
+    return { hash, version: g.version, academyId: g.academyId || undefined, expiresAt: Number(g.expiresAt), active: g.active ?? '' };
   }
   async run(g: TrialGrant, key: string): Promise<TrialRun | null> {
     const r = await this.client(); const data = await r.hgetall(this.runKey(g.hash, key));

@@ -1,5 +1,7 @@
 # DLAB SSO staff inheritance and unified staff workspace
 
+> Policy update (2026-10-22): the assigned-only Manager and Team Lead restrictions below are superseded by [academy-wide teaching access for Managers and Team Leads](2026-10-22-team-lead-academy-teaching-access-design.md). Teachers still require actual assignments.
+
 Date: 2026-10-21 (Asia/Seoul)
 Branch: `feat/dlab-os-staff-sso`
 Baseline: `1e7307b4`; production code release `v2.0.38` (`cb793465`).

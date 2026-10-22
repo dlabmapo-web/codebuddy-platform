@@ -124,6 +124,7 @@ function studentClass(overrides: Record<string, unknown> = {}) {
     id: classId,
     name: "Algorithms A",
     description: "Weekly problem solving.",
+    _count: { enrollments: 12 },
     assignedTeacher: activeTeacher(),
     courseAssignments: [{ course: visibleCourse() }],
     ...overrides,
@@ -313,6 +314,8 @@ describe("LearnClassService list", () => {
     // `.strict()` means a roster, membership id, or timestamp that reached the
     // projection would fail here rather than be silently dropped.
     expect(learnClassSummarySchema.parse(classes[0])).toEqual(classes[0]);
+    expect(classes[0]!.studentCount).toBe(12);
+    expect(classes[0]).not.toHaveProperty('students');
   });
 });
 

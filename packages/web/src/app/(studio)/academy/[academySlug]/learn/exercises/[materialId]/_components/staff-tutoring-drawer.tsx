@@ -1,4 +1,5 @@
 'use client';
+import { lessonAction } from '@/components/workspace/lesson-chrome';
 
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -41,7 +42,7 @@ export function StaffTutoringDrawer(props: Props) {
     finally { setSelecting(false); }
   }
   return <Sheet open={open} onOpenChange={(next) => { if (next) setContainer(document.fullscreenElement as HTMLElement | null); setOpen(next); }}>
-    <SheetTrigger aria-pressed={Boolean(props.selected)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-xs font-bold text-brand transition-colors hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand data-[state=open]:bg-brand data-[state=open]:text-on-brand aria-pressed:bg-brand aria-pressed:text-on-brand" type="button"><Users aria-hidden className="size-4" />{t('tutoring')}</SheetTrigger>
+    <SheetTrigger aria-pressed={Boolean(props.selected)} className={`${lessonAction} aria-pressed:bg-brand-soft aria-pressed:text-brand`} type="button"><Users aria-hidden className="size-4" />{t('tutoring')}</SheetTrigger>
     <SheetContent className="w-[420px] max-w-[100vw] border-r border-border bg-card" portalContainer={container} title={t('tutoring')}>
       <div className="flex items-center justify-between px-5 py-5"><h2 className="text-xl font-bold">{t('tutoring')}</h2><button type="button" onClick={() => setOpen(false)} aria-label={t('close')} className="rounded-lg p-2 text-sub hover:bg-canvas"><X className="size-5" /></button></div>
       <div className="space-y-3 border-b border-border px-5 pb-5">

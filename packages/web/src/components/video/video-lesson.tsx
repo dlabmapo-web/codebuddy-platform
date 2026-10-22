@@ -1,4 +1,11 @@
 "use client";
+import { LessonHeader, LessonFooter, lessonAction } from '@/components/workspace/lesson-chrome';
+import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
+import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
+import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
+import { useMaterialNavigation } from '@/components/workspace/use-material-navigation';
+import { MediaStaffActions, type MediaStaffPermissions } from '@/components/workspace/media-staff-actions';
+import { useLayoutTranslation } from '@/i18n';
 import { PrivateImageContext } from "@/components/editor/private-image-context";
 import { videoMediaBase } from "@/lib/video-api";
 
@@ -20,17 +27,18 @@ export function VideoLesson({
   materialId,
   classId,
   preview = false,
+  permissions,
 }: {
   academyId: string;
   materialId: string;
   classId?: string;
   preview?: boolean;
+  permissions?: MediaStaffPermissions;
 }) {
   const { t } = useVideoTranslation(),
     slug = useAcademySlug(),
     router = useRouter();
   const [chosen, setChosen] = useState(classId),
-    [drawer, setDrawer] = useState(false),
     [showHistory, setShowHistory] = useState(false),
     [countdown, setCountdown] = useState<number | null>(null);
   const query = useQuery({
@@ -41,6 +49,9 @@ export function VideoLesson({
     retryDelay: videoReadRetryDelay,
   });
   const data = query.data;
+  const { t: lt } = useLayoutTranslation('learn');
+  const navigation = useMaterialNavigation({ academyId, materialId, classId: chosen, preview, courseId: data?.course.id, materials: data?.materials });
+  const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
   useEffect(() => {
     if (!chosen && data?.classes.length === 1)
       // A single-class learner has nothing to choose; adopt it once the read arrives.
@@ -49,7 +60,6 @@ export function VideoLesson({
   }, [chosen, data?.classes]);
   const index =
       data?.materials.findIndex((m) => m.materialId === materialId) ?? -1,
-    previous = data?.materials[index - 1],
     next = data?.materials[index + 1];
   const path = (row: { materialId: string; type: string }) =>
     routes.academyLearnMaterial(slug, row.materialId, row.type, {
@@ -83,27 +93,15 @@ export function VideoLesson({
         ) : null}
       </main>
     );
-  const lecture = data.materials.filter((m) => m.lectureId === data.lecture.id),
-    position = lecture.findIndex((m) => m.materialId === materialId) + 1;
   return (
-    <main className="flex min-h-dvh flex-col bg-canvas text-ink">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card p-4">
-        <div>
-          <Link
-            className="text-sm text-brand"
-            href={routes.academyLearnCourse(slug, data.course.id, {
-              classId: chosen,
-            })}
-          >
-            {data.course.title}
-          </Link>
-          <h1 className="font-semibold">{data.title}</h1>
-        </div>
-        <div className="flex flex-wrap gap-3">
+    <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+      <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}
+        curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
           {data.classes.length > 1 ? (
-            <label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-sub">
               {t("class")}{" "}
               <select
+                className="min-h-9 rounded-lg border border-border bg-card px-2 text-xs text-ink"
                 value={chosen ?? ""}
                 onChange={(e) => setChosen(e.target.value)}
               >
@@ -117,30 +115,18 @@ export function VideoLesson({
             </label>
           ) : null}
           {data.canReview && chosen ? (
-            <Link href={routes.academyTeachVideo(slug, chosen, materialId)}>
+            <Link className={lessonAction} href={routes.academyTeachVideo(slug, chosen, materialId)}>
               {t("history")}
             </Link>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setDrawer(!drawer)}
-            aria-expanded={drawer}
-          >
-            {t("materials")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void document.documentElement
-                .requestFullscreen?.()
-                .catch(() => undefined);
-            }}
-          >
-            {t("lesson_fullscreen")}
-          </button>
-        </div>
-      </header>
-      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-6 p-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <MediaStaffActions academyId={academyId} type="VIDEO_LESSON" data={data} permissions={permissions} />
+      </LessonHeader>
+      <div className="relative flex min-h-0 flex-1">
+        <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
+          onClose={closePanel} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry}
+          footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto grid w-full max-w-7xl gap-6 p-4">
         <section className="min-w-0 self-center">
           {data.asset.state === "READY" ? (
             <VideoPlayer
@@ -236,34 +222,10 @@ export function VideoLesson({
             </aside>
           ) : null}
         </section>
-        {drawer ? (
-          <aside className="w-full lg:w-72">
-            <h2 className="font-semibold">{t("materials")}</h2>
-            <ul className="grid gap-2">
-              {data.materials.map((m) => (
-                <li key={m.materialId}>
-                  <Link
-                    className="block rounded border border-border p-2"
-                    aria-current={
-                      m.materialId === materialId ? "page" : undefined
-                    }
-                    href={path(m)}
-                  >
-                    {m.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        ) : null}
       </div>
-      <footer className="flex items-center justify-center gap-5 border-t border-border bg-card p-4">
-        {previous ? <Link href={path(previous)}>{t("previous")}</Link> : null}
-        <span>
-          {position} / {lecture.length}
-        </span>
-        {next ? <Link href={path(next)}>{t("next")}</Link> : null}
-      </footer>
+      </div>
+      </div>
+      <LessonFooter previous={navigation.previous} next={navigation.next} index={navigation.index} total={navigation.total} />
     </main>
   );
 }

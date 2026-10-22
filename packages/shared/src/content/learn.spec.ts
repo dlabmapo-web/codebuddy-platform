@@ -270,6 +270,14 @@ describe("student class schemas", () => {
     ).toBe(false);
   });
 
+  it('allows only an aggregate student count, including during a rolling API update', () => {
+    expect(learnClassSummarySchema.parse({ ...summary, studentCount: 12 }).studentCount).toBe(12);
+    expect(learnClassSummarySchema.safeParse(summary).success).toBe(true);
+    for (const studentCount of [-1, 1.5]) {
+      expect(learnClassSummarySchema.safeParse({ ...summary, studentCount }).success).toBe(false);
+    }
+  });
+
   // §11: the student shapes are allowlists. A field added to the management
   // schemas later must fail here rather than reach a student surface.
   it.each([
@@ -299,7 +307,6 @@ describe("student class schemas", () => {
     ],
     ["a membership id", { teacherMembershipId: "m1" }],
     ["a roster", { students: [{ displayName: "Student" }] }],
-    ["a student count", { studentCount: 12 }],
     ["a class status", { status: "ACTIVE" }],
     ["an archived timestamp", { archivedAt: "2026-08-11T00:00:00.000Z" }],
     ["a management timestamp", { updatedAt: "2026-08-11T00:00:00.000Z" }],

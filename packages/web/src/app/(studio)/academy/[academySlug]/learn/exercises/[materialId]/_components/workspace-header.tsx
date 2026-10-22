@@ -1,5 +1,6 @@
 'use client';
 
+import { LessonHeader, lessonPrimary } from '@/components/workspace/lesson-chrome';
 import type { LearnExerciseWorkspace } from '@cove/shared';
 import { formatDateTime } from '@cove/i18n/format';
 import Link from 'next/link';
@@ -79,15 +80,8 @@ export function WorkspaceHeader({
   const { exercise } = workspace;
 
   return (
-    <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
-      {curriculum}
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs text-sub">{workspace.breadcrumb.course.title} / {workspace.breadcrumb.lecture.title}</p>
-        <div className="flex items-center gap-2">
-          <h1 className="truncate text-[15px] font-bold leading-tight">
-            {exercise.title}
-          </h1>
+    <LessonHeader curriculum={curriculum} courseTitle={workspace.breadcrumb.course.title} lectureTitle={workspace.breadcrumb.lecture.title} title={exercise.title}
+      badge={<>
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
               difficultyStyles[exercise.difficulty]
@@ -105,8 +99,8 @@ export function WorkspaceHeader({
               })}
             </span>
           ) : null}
-        </div>
-      </div>
+      </>}>
+
 
       {/* Kept beside the indicator: both say something about the teacher, and
           a note is easiest to connect to "somebody is watching" when the two
@@ -117,7 +111,7 @@ export function WorkspaceHeader({
       {participationSwitch}
 
       <ExerciseTimer startedAt={solveStartedAt} />
-      {leaveHref ? <Link href={leaveHref} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{tp('leave')}</Link> : null}
+      {leaveHref ? <Link href={leaveHref} className={lessonPrimary}><LogOut className="size-3.5" />{tp('leave')}</Link> : null}
 
       {saveState === 'idle' ? null : (
         <span
@@ -128,7 +122,7 @@ export function WorkspaceHeader({
         </span>
       )}
 
-    </header>
+    </LessonHeader>
   );
 }
 /**

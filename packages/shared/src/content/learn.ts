@@ -178,6 +178,8 @@ export const learnClassSummarySchema = z
     classId: z.uuid(),
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(2_000),
+    /** Aggregate only: classmates' identities never enter the student response. */
+    studentCount: z.number().int().nonnegative().optional(),
     /** A class may run unassigned; the card says so rather than hiding it. */
     teacher: learnClassTeacherSchema.nullable(),
     /**
@@ -566,7 +568,7 @@ export function resolveExerciseNeighbors(
 /**
  * The outline as one course the navigator can draw, positioned at a material.
  *
- * Returns `null` when the material is not a visible programming exercise of
+ * Returns `null` when the material is not a visible learning material of
  * this course. That is not an error shape — it is how a caller learns that a
  * remembered id no longer belongs here, and it is the only way this function
  * refuses.
@@ -647,7 +649,8 @@ export function navigatorPathFor(
 ): NavigatorPath | null {
   for (const courseModule of outline.modules) {
     for (const lecture of courseModule.lectures) {
-      const exercise = lecture.exercises.find(
+      const exercise = [...lecture.exercises, ...(lecture.manualMaterials ?? []), ...(lecture.videos ?? []),
+        ...(lecture.documents ?? [])].find(
         (candidate) => candidate.materialId === materialId,
       );
       if (!exercise) continue;

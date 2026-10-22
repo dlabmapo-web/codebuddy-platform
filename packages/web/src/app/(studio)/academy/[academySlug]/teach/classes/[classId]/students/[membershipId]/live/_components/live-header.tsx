@@ -75,60 +75,25 @@ export function LiveHeader({
 
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2">
-      <Link
-        data-monitoring-class-exit
-        aria-label={t('workspace.back')}
-        className="grid size-8 shrink-0 place-items-center rounded-lg text-sub transition-colors hover:bg-canvas hover:text-ink"
-        href={`${routes.academy(academySlug)}/teach/classes/${classId}`}
-      >
-        <ArrowLeft className="size-4" />
-      </Link>
-
-      {curriculum}
-
-      {studentSwitcher}
-
-      {exercise ? (
-        <div className="hidden min-w-0 flex-1 border-l border-border pl-3 xl:block">
-          {/* Where the student is, which the path above deliberately does not
-              say: during a preview those are two different exercises. */}
-          <p aria-live="polite" className="truncate text-[11.5px] text-sub">
-            {liveStatus ?? exercise.breadcrumb.course.title}
-          </p>
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-[14px] font-bold leading-tight">
-              {exercise.exercise.title}
-            </h1>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                difficultyStyles[exercise.exercise.difficulty]
-              }`}
-            >
-              {tc(`exercise.difficulty.${exercise.exercise.difficulty}`)}
-            </span>
+    <header className="shrink-0 border-b border-border bg-card px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <Link data-monitoring-class-exit aria-label={t('workspace.back')}
+          className="grid size-9 shrink-0 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink"
+          href={`${routes.academy(academySlug)}/teach/classes/${classId}`}><ArrowLeft aria-hidden className="size-4" /></Link>
+        {curriculum}
+        <div className="min-w-0 flex-1">{studentSwitcher}</div>
+        <span aria-live="polite" role="status" className={`shrink-0 text-xs font-semibold ${unsaved ? 'text-draft' : 'text-success'}`}>{unsaved ? t('workspace.unsaved') : t('workspace.saved')}</span>
+        <ConnectionBadge state={connection} />
+      </div>
+      <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border pt-2.5">
+        <div className="min-w-0 flex-1 basis-52">
+          <p aria-live="polite" className="truncate text-xs text-sub">{liveStatus ?? exercise?.breadcrumb.course.title}</p>
+          <div className="mt-1 flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-base font-bold leading-6">{exercise?.exercise.title ?? t('workspace.not_solving_title')}</h1>
+            {exercise ? <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${difficultyStyles[exercise.exercise.difficulty]}`}>{tc(`exercise.difficulty.${exercise.exercise.difficulty}`)}</span> : null}
           </div>
         </div>
-      ) : (
-        <p className="hidden flex-1 truncate border-l border-border pl-3 text-[12.5px] text-sub xl:block">
-          {t('workspace.not_solving_title')}
-        </p>
-      )}
-
-      <div className="ml-auto flex shrink-0 items-center gap-3">
-        {helpQueue}
-        {helpMode}
-        {answer}
-        <span
-          aria-live="polite"
-          className={`text-[12px] font-semibold ${
-            unsaved ? 'text-draft' : 'text-success'
-          }`}
-          role="status"
-        >
-          {unsaved ? t('workspace.unsaved') : t('workspace.saved')}
-        </span>
-        <ConnectionBadge state={connection} />
+        <div className="flex max-w-full flex-wrap items-center gap-2">{helpQueue}{helpMode}{answer}</div>
       </div>
     </header>
   );

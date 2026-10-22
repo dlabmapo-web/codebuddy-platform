@@ -1,161 +1,49 @@
 'use client';
-import {VideoResourceLinks} from '@/components/video/video-resource-links';
-import { useState } from 'react';
+
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import type { PdfReadResult } from '@cove/shared';
 import { useTranslation } from 'react-i18next';
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
-import { routes } from '@/lib/routes';
+import { useLayoutTranslation } from '@/i18n';
 import { pdfApi } from '@/lib/pdf-api';
+import { VideoResourceLinks } from '@/components/video/video-resource-links';
+import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
+import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
+import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
+import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
+import { useMaterialNavigation } from '@/components/workspace/use-material-navigation';
+import { MediaStaffActions, type MediaStaffPermissions } from '@/components/workspace/media-staff-actions';
 import { PdfResourceLink } from './pdf-resource-link';
 import { PdfReader } from './pdf-reader';
-export function PdfLesson({
-  academyId,
-  materialId,
-  classId,
-}: {
-  academyId: string;
-  materialId: string;
-  classId?: string;
+
+export function PdfLesson({ academyId, materialId, classId, permissions }: {
+  academyId: string; materialId: string; classId?: string; permissions?: MediaStaffPermissions;
 }) {
-  const slug = useAcademySlug();
   const { t } = useTranslation('content');
+  const { t: lt } = useLayoutTranslation('learn');
   const query = useQuery({
     queryKey: ['pdf', academyId, materialId, false],
-    queryFn: () => pdfApi.read({ academyId, materialId }),
-    retry: false,
-    staleTime: 0,
+    queryFn: () => pdfApi.read({ academyId, materialId }), retry: false, staleTime: 0,
   });
   const data = query.data;
-  const failed = query.isError;
-  const [drawer, setDrawer] = useState(false);
-  const path = (row: PdfReadResult['materials'][number]) =>
-    row.type === 'PDF_DOCUMENT'
-      ? routes.academyLearnPdf(slug, row.materialId, { classId })
-      : row.type === 'PROGRAMMING_EXERCISE' ? routes.academyLearnExercise(slug,row.materialId,{classId}) : routes.academyLearnAssessment(slug,row.materialId,row.type,{classId});
-  if (!data)
-    return (
-      <main className="p-6" role={failed ? 'alert' : 'status'}>
-        {t(failed ? 'pdf.unavailable' : 'pdf.loading')}
-      </main>
-    );
-  const index = data.materials.findIndex((m) => m.materialId === materialId);
-  const lectureMaterials = data.materials.filter(
-    (m) => m.lectureId === data.lecture.id,
-  );
-  const lectureIndex = lectureMaterials.findIndex(
-    (m) => m.materialId === materialId,
-  );
-  const previous = data.materials[index - 1];
-  const next = index >= 0 ? data.materials[index + 1] : undefined;
-  return (
-    <main className="flex h-dvh flex-col bg-canvas text-ink">
-      <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
-        <div className="min-w-0">
-          <Link
-            className="text-xs text-brand"
-            href={routes.academyLearnCourse(slug, data.course.id, {
-              classId,
-              lecture: data.lecture.id,
-            })}
-          >
-            {t('pdf.course')}
-          </Link>
-          <h1 className="truncate text-sm font-bold">
-            {data.lecture.title} · {data.title}
-          </h1>
-        </div>
-        <button
-          type="button"
-          aria-expanded={drawer}
-          className="rounded-lg border border-border px-3 py-2 text-sm"
-          onClick={() => setDrawer((v) => !v)}
-        >
-          {t('pdf.contents')}
-        </button>
-      </header>
-      <VideoResourceLinks academyId={academyId} materialId={materialId} classId={classId}/>
-      <div className="relative flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
-          <PdfReader
-            key={materialId}
-            academyId={academyId}
-            materialId={materialId}
-          />
-        </div>
-        {drawer ? (
-          <aside className="absolute inset-y-0 right-0 z-20 w-72 overflow-auto border-l border-border bg-card p-4 shadow-lg sm:static">
-            <h2 className="mb-3 font-bold">{data.course.title}</h2>
-            <ul className="grid gap-2">
-              {data.materials.map((row, i) => (
-                <li key={row.materialId}>
-                  <Link
-                    aria-current={
-                      row.materialId === materialId ? 'page' : undefined
-                    }
-                    className="block rounded-lg border border-border p-2 text-sm hover:text-brand"
-                    href={path(row)}
-                  >
-                    {i + 1}.{' '}
-                    {row.type === 'PDF_DOCUMENT' ? `${t('pdf.badge')} · ` : ''}
-                    {row.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {data.resources.length ? (
-              <>
-                <h2 className="my-3 font-bold">{t('pdf.resources')}</h2>
-                <ul className="grid gap-2">
-                  {data.resources.map((document) => (
-                    <PdfResourceLink
-                      key={document.materialId}
-                      academyId={academyId}
-                      classId={classId ?? ''}
-                      document={document}
-                    />
-                  ))}
-                </ul>
-              </>
-            ) : null}
-          </aside>
-        ) : null}
+  const navigation = useMaterialNavigation({ academyId, materialId, classId, courseId: data?.course.id, materials: data?.materials });
+  const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
+  if (!data) return <main className="p-6" role={query.isError ? 'alert' : 'status'}>{t(query.isError ? 'pdf.unavailable' : 'pdf.loading')}</main>;
+  return <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+    <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}
+      curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
+      <MediaStaffActions academyId={academyId} type="PDF_DOCUMENT" data={data} permissions={permissions} />
+    </LessonHeader>
+    <div className="relative flex min-h-0 flex-1">
+      <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
+        onClose={closePanel} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry}
+        footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <VideoResourceLinks academyId={academyId} materialId={materialId} classId={classId} />
+        <div className="min-h-0 flex-1"><PdfReader key={materialId} academyId={academyId} materialId={materialId} /></div>
+        {data.resources.length ? <div className="shrink-0 border-t border-border bg-card px-4 py-2"><details><summary className="cursor-pointer text-xs font-semibold text-sub">{t('pdf.resources')}</summary>
+          <ul className="mt-2 grid gap-2">{data.resources.map(document => <PdfResourceLink key={document.materialId} academyId={academyId} classId={classId ?? ''} document={document} />)}</ul>
+        </details></div> : null}
       </div>
-      <footer className="flex items-center justify-between border-t border-border bg-card px-4 py-3">
-        {previous ? (
-          <Link className="text-sm text-brand" href={path(previous)}>
-            {t('pdf.previous_lesson')}
-            {previous.lectureId !== data.lecture.id ? (
-              <span className="block max-w-36 truncate text-xs text-sub">
-                {previous.title}
-              </span>
-            ) : null}
-          </Link>
-        ) : (
-          <span />
-        )}
-        <span className="text-xs text-sub">
-          {index >= 0
-            ? t('pdf.lesson', {
-                current: lectureIndex + 1,
-                total: lectureMaterials.length,
-              })
-            : t('pdf.resources')}
-        </span>
-        {next ? (
-          <Link className="text-sm text-brand" href={path(next)}>
-            {t('pdf.next_lesson')}
-            {next.lectureId !== data.lecture.id ? (
-              <span className="block max-w-36 truncate text-xs text-sub">
-                {next.title}
-              </span>
-            ) : null}
-          </Link>
-        ) : (
-          <span />
-        )}
-      </footer>
-    </main>
-  );
+    </div>
+    <LessonFooter previous={navigation.previous} next={navigation.next} index={navigation.index} total={navigation.total} />
+  </main>;
 }

@@ -1,4 +1,5 @@
-import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { test, expect, webkit, type Page, type APIRequestContext } from '@playwright/test';
+import { resolve } from 'node:path';
 test.beforeEach(async ({ context }) => { await context.route('https://os.dlabcampus.com/**', route => route.abort()); });
 const fixtureOrigin = 'http://127.0.0.1:4320';
 type Fixture = { id: string; academy: { slug: string; id: string }; username?: string };
@@ -15,6 +16,18 @@ async function rpc(page: Page, request: APIRequestContext, path: string, input: 
   return request.post('http://127.0.0.1:4319/api/rpc/' + path, { headers: { Authorization: 'Bearer ' + await tokenFor(page) }, data: { json: input } });
 }
 async function enter(page: Page, value: Fixture) {
+  if (page.context().browser()?.browserType().name() === 'webkit') {
+    // WebKit cannot fulfill intercepted redirects. The context's request client
+    // shares cookies with its page, so Cove still creates and validates the real
+    // HttpOnly state cookie before we visit the local authorization double.
+    const response = await page.request.get('/sso/start', { maxRedirects: 0 });
+    expect(response.status()).toBe(302);
+    const target = new URL(response.headers().location!);
+    expect(target.origin + target.pathname).toBe('https://os.dlabcampus.com/v1/sso/authorize');
+    target.searchParams.set('fixture', value.id);
+    await page.goto(fixtureOrigin + '/os/authorize?' + target.searchParams);
+    return;
+  }
   // Intercept the first navigation: Chromium routing does not reroute the
   // subsequent Location hop of an already-routed navigation. Fetch Cove's real
   // handler without following redirects, assert its production OS URL, and send
@@ -430,3 +443,115 @@ test('Manager class cards receive student presence over WebSocket across coding,
     await expect(card.getByText('0 solving', { exact: true })).toBeVisible();
   } finally { await studentContext.close(); }
 });
+
+for (const engine of ['Chromium', 'WebKit'] as const) {
+  test(`${engine} learning UI identifies materials, opens PDF rows and keeps student and monitor statements consistent`, async ({ browser, request }) => {
+    test.setTimeout(180_000);
+    const ownedBrowser = engine === 'WebKit' ? await webkit.launch() : null;
+    const current = ownedBrowser ?? browser;
+    const staffContext = await current.newContext({ baseURL: 'http://127.0.0.1:3309' });
+    const studentContext = await current.newContext({ baseURL: 'http://127.0.0.1:3309' });
+    for (const context of [staffContext, studentContext]) {
+      await context.route('https://os.dlabcampus.com/**', route => route.abort());
+      await context.route('https://dlab-sso-provider.invalid/storage/**', route => route.fulfill({
+        path: resolve('e2e/fixtures/lecture-material.pdf'), contentType: 'application/pdf',
+        headers: { 'access-control-allow-origin': '*' },
+      }));
+    }
+    const staff = await staffContext.newPage(), learner = await studentContext.newPage();
+    try {
+      const manager = await fixture(request, 'lab_head');
+      await enter(staff, manager);
+      await expect(staff).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      const student = await fixture(request, 'student', { parentFixtureId: manager.id });
+      await enter(learner, student);
+      await expect(learner).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id, includePdf: true } });
+      expect(seeded.ok(), await seeded.text()).toBe(true);
+      const classroom = await seeded.json(), [assigned] = classroom.classes;
+      const membership = (await (await request.get(fixtureOrigin + '/fixtures/' + manager.id)).json()).memberships[0];
+      expect((await rpc(staff, request, 'academyClasses/setTeacher', { academyId: manager.academy.id, classId: assigned.id, teacherMembershipId: membership.id, expectedUpdatedAt: assigned.updatedAt })).ok()).toBe(true);
+      const root = '/academy/' + manager.academy.slug;
+      await learner.goto(root + '/learn/classes');
+      const card = learner.getByRole('link').filter({ has: learner.getByRole('heading', { name: 'Assigned Python class', exact: true }) });
+      await expect(card.getByText('Browser lab_head', { exact: true })).toBeVisible();
+      await expect(card.getByText('1 student', { exact: true })).toBeVisible();
+      await expect(learner.getByText(/Development demo:/)).toHaveCount(0);
+      await learner.goto(root + '/learn/courses/' + classroom.courseId + '?classId=' + assigned.id);
+      await learner.getByRole('button', { name: 'Expand or collapse Addition lesson', exact: true }).click();
+      for (const label of ['Coding exercise', 'Written response', 'Multiple-choice quiz', 'PDF document']) await expect(learner.getByText(label, { exact: true }).first()).toBeVisible();
+      await learner.screenshot({ path: test.info().outputPath(engine + '-material-list.png'), fullPage: true });
+      await learner.getByRole('link').filter({ hasText: 'Add two numbers' }).click();
+      await expect(learner.getByRole('heading', { name: 'Add two numbers', exact: true })).toBeVisible();
+      const studentStatement = learner.getByTestId('problem-statement');
+      await expect(studentStatement.frameLocator('iframe').getByText('Read two numbers and print their sum.', { exact: true })).toBeVisible();
+      await expect.poll(() => studentStatement.locator('iframe').evaluate(frame => frame.getBoundingClientRect().height)).toBeLessThan(160);
+      for (const text of ['Two integers separated by a space.', 'One integer: their sum.', 'Each integer is between 0 and 100.']) await expect(studentStatement.getByText(text, { exact: true })).toBeVisible();
+      await staff.goto(root + '/teach/classes');
+      await expect(staff.getByText('1 solving', { exact: true })).toBeVisible();
+      await staff.goto(root + '/teach/classes/' + assigned.id + '/students/' + classroom.studentMembershipId + '/live');
+      const monitorStatement = staff.getByTestId('problem-statement');
+      await expect(monitorStatement.frameLocator('iframe').getByText('Read two numbers and print their sum.', { exact: true })).toBeVisible();
+      for (const text of ['Two integers separated by a space.', 'One integer: their sum.', 'Each integer is between 0 and 100.']) await expect(monitorStatement.getByText(text, { exact: true })).toBeVisible();
+      await expect.poll(() => monitorStatement.locator('iframe').evaluate(frame => frame.getBoundingClientRect().height)).toBeLessThan(160);
+      const monitorPdf = staff.getByRole('complementary', { name: 'Course', exact: true }).getByRole('link').filter({ hasText: 'Lesson reference PDF' });
+      await expect(monitorPdf).toHaveAttribute('target', '_blank');
+      const note = staff.getByPlaceholder('Write one short note for this student on this exercise');
+      await note.fill('Keep this feedback while reading the lesson.');
+      const [resource] = await Promise.all([staffContext.waitForEvent('page'), monitorPdf.click()]);
+      await expect(resource).toHaveURL(new RegExp('/learn/documents/' + classroom.pdfMaterialId));
+      await expect(resource.locator('.react-pdf__Page__canvas')).toBeVisible({ timeout: 30_000 });
+      await expect(resource.getByRole('complementary', { name: 'Course', exact: true })).toBeVisible();
+      await resource.getByRole('button', { name: 'Tutoring', exact: true }).click();
+      await expect(resource.getByRole('dialog').getByRole('link', { name: 'Assigned Python class', exact: true })).toBeVisible();
+      await expect(resource.getByRole('dialog').getByText('Other Python class', { exact: true })).toHaveCount(0);
+      await resource.getByRole('button', { name: 'Close panel', exact: true }).click();
+      await resource.getByRole('button', { name: 'Edit', exact: true }).click();
+      await expect(resource.getByRole('dialog', { name: 'PDF material', exact: true })).toBeVisible();
+      await resource.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).filter({ hasText: 'Cancel' }).click();
+      await resource.screenshot({ path: test.info().outputPath(engine + '-unified-staff-pdf.png') });
+      await resource.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Explain your addition' }).click();
+      await expect(resource.getByRole('heading', { name: 'Explain your addition', exact: true })).toBeVisible();
+      await expect(resource.getByRole('button', { name: 'Tutoring', exact: true })).toBeVisible();
+      await expect(resource.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+      await resource.screenshot({ path: test.info().outputPath(engine + '-unified-staff-written.png') });
+      await resource.close();
+      await expect(note).toHaveValue('Keep this feedback while reading the lesson.');
+      await staff.screenshot({ path: test.info().outputPath(engine + '-monitor-statement.png') });
+      const tree = learner.getByRole('complementary', { name: 'Course', exact: true });
+      await expect(tree.getByRole('button').filter({ hasText: 'Lesson reference PDF' })).toBeVisible();
+      await tree.getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/documents/' + classroom.pdfMaterialId));
+      await expect(learner.locator('.react-pdf__Page__canvas')).toBeVisible({ timeout: 30_000 });
+      await learner.screenshot({ path: test.info().outputPath(engine + '-pdf-navigation.png') });
+      await learner.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Choose the operator' }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/quizzes/' + classroom.quizMaterialId));
+      await expect(learner.getByRole('radio', { name: 'Option 1: +', exact: true })).toBeVisible();
+      await expect(learner.getByRole('button', { name: 'Tutoring', exact: true })).toHaveCount(0);
+      await expect(learner.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+      await expect(learner.locator('footer').getByText('Previous', { exact: true })).toBeVisible();
+      await expect(learner.locator('footer').getByText('Next', { exact: true })).toBeVisible();
+      await learner.getByRole('radio', { name: 'Option 1: +', exact: true }).check();
+      learner.once('dialog', dialog => dialog.dismiss());
+      await learner.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/quizzes/' + classroom.quizMaterialId));
+      await expect(learner.getByRole('radio', { name: 'Option 1: +', exact: true })).toBeChecked();
+      learner.once('dialog', dialog => dialog.accept());
+      await learner.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson video' }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/videos/' + classroom.videoMaterialId));
+      await expect(learner.getByRole('heading', { name: 'Lesson video', exact: true })).toBeVisible();
+      await expect(learner.getByRole('complementary', { name: 'Course', exact: true })).toBeVisible();
+      await learner.locator('footer').getByText('Previous', { exact: true }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/quizzes/' + classroom.quizMaterialId));
+      await learner.locator('footer').getByText('Previous', { exact: true }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/turtle/' + classroom.shortMaterialId));
+      await learner.locator('footer').getByText('Next', { exact: true }).click();
+      await expect(learner).toHaveURL(new RegExp('/learn/quizzes/' + classroom.quizMaterialId));
+      await learner.screenshot({ path: test.info().outputPath(engine + '-unified-student-quiz.png') });
+      await learner.setViewportSize({ width: 390, height: 844 });
+      expect(await learner.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    } finally {
+      await staffContext.close(); await studentContext.close(); await ownedBrowser?.close();
+    }
+  });
+}

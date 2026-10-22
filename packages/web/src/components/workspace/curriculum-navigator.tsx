@@ -1,9 +1,8 @@
 'use client';
-import { useTranslation } from 'react-i18next';
+import { MaterialIdentity } from './material-identity';
 
 import type {
   ExerciseProgressStatus,
-  NavigatorRow,
   WorkspaceNavigatorContext,
 } from '@cove/shared';
 import { flattenNavigatorExercises } from '@cove/shared';
@@ -14,6 +13,9 @@ import {
   Circle,
   Clock3,
   LoaderCircle,
+  Folder,
+  FolderOpen,
+  ExternalLink,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -52,6 +54,7 @@ const statusIcons: Record<
 export function WorkspaceCurriculumNavigator({
   context,
   allowPdfNavigation = true,
+  resourceHref,
   displayedMaterialId,
   liveMaterialId,
   busyMaterialId,
@@ -68,6 +71,8 @@ export function WorkspaceCurriculumNavigator({
   /** Null while the course is still loading or failed to load. */
   context: WorkspaceNavigatorContext | null;
   allowPdfNavigation?: boolean;
+  /** Staff can read non-code resources in a new tab without abandoning a live student. */
+  resourceHref?: (materialId: string) => string | null;
   displayedMaterialId: string;
   /** The exercise the watched student has open. Teacher surfaces only. */
   liveMaterialId?: string | null;
@@ -114,8 +119,9 @@ export function WorkspaceCurriculumNavigator({
   }, [context, allowPdfNavigation]);
 
   const displayedBranch = React.useMemo(
-    () => rows.find((row) => row.materialId === displayedMaterialId),
-    [displayedMaterialId, rows],
+    () => rows.find((row) => row.materialId === displayedMaterialId) ?? (context?.path.exercise.materialId === displayedMaterialId
+      ? { moduleId: context.path.module.id, lectureId: context.path.lecture.id } : undefined),
+    [displayedMaterialId, rows, context],
   );
 
   /**
@@ -224,11 +230,12 @@ export function WorkspaceCurriculumNavigator({
             {t('navigator.loading')}
           </p>
         ) : (
-          <ul className="px-2 py-2">
+          <ul className="space-y-3 px-2 py-3">
             {context.course.modules.map((courseModule) => (
               <ModuleBranch
                 courseModule={courseModule}
                 allowPdfNavigation={allowPdfNavigation}
+                resourceHref={resourceHref}
                 displayedMaterialId={displayedMaterialId}
                 busyMaterialId={busyMaterialId ?? null}
                 disabled={disabled ?? false}
@@ -237,7 +244,6 @@ export function WorkspaceCurriculumNavigator({
                 liveMaterialId={liveMaterialId ?? null}
                 onSelect={onSelect}
                 onToggle={toggle}
-                rows={rows}
                 materialNumbers={materialNumbers}
               />
             ))}
@@ -263,6 +269,7 @@ export function WorkspaceCurriculumNavigator({
 
 function ModuleBranch({
   allowPdfNavigation,
+  resourceHref,
   busyMaterialId,
   courseModule,
   disabled,
@@ -271,10 +278,10 @@ function ModuleBranch({
   liveMaterialId,
   onSelect,
   onToggle,
-  rows,
   materialNumbers,
 }: {
   allowPdfNavigation: boolean;
+  resourceHref?: (materialId: string) => string | null;
   busyMaterialId: string | null;
   courseModule: WorkspaceNavigatorContext['course']['modules'][number];
   disabled: boolean;
@@ -283,7 +290,6 @@ function ModuleBranch({
   liveMaterialId: string | null;
   onSelect: (materialId: string) => void;
   onToggle: (id: string) => void;
-  rows: NavigatorRow[];
   materialNumbers: ReadonlyMap<string, number>;
 }) {
   const { t } = useLayoutTranslation('learn');
@@ -299,11 +305,11 @@ function ModuleBranch({
         title={courseModule.title}
       />
       {open ? (
-        <ul className="ml-2 border-l border-border pl-1.5">
+        <ul className="ml-3 space-y-2 border-l border-border pl-2">
           {courseModule.lectures.map((lecture) => {
             const lectureOpen = expanded.has(lecture.id);
             return (
-              <li className="mb-0.5" key={lecture.id}>
+              <li className="mb-2" key={lecture.id}>
                 <Branch
                   anchorKey={`lecture:${lecture.id}`}
                   label={t('outline.lecture_label', {
@@ -334,37 +340,32 @@ function ModuleBranch({
                     ]
                       .sort((a, b) => a.position - b.position)
                       .map((row) =>
-                        row.kind === 'video' ? (<li key={row.video.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.video.materialId)}>{materialNumbers.get(row.video.materialId)}. {row.video.title}</button></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><button type="button" disabled={disabled} className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40" onClick={()=>onSelect(row.manual.materialId)}>{materialNumbers.get(row.manual.materialId)}. {row.manual.title}</button></li>) : row.kind === 'pdf' ? (
-                          <li key={row.doc.materialId}>
-                            <button
-                              type="button"
-                              disabled={disabled}
-                              className="w-full px-3 py-2 text-left text-sm text-brand disabled:opacity-40"
-                              onClick={() => onSelect(row.doc.materialId)}
-                            >
-                              {materialNumbers.get(row.doc.materialId)}. PDF ·{' '}
-                              {row.doc.title}
-                            </button>
-                          </li>
+                        row.kind === 'exercise' ? (
+                          <ExerciseRow key={row.exercise.materialId} busy={busyMaterialId === row.exercise.materialId}
+                            disabled={disabled} exercise={row.exercise} live={liveMaterialId === row.exercise.materialId}
+                            number={materialNumbers.get(row.exercise.materialId) ?? row.exercise.position}
+                            onSelect={onSelect} selected={displayedMaterialId === row.exercise.materialId} />
                         ) : (
-                          <ExerciseRow
-                            key={row.exercise.materialId}
-                            busy={busyMaterialId === row.exercise.materialId}
-                            disabled={disabled}
-                            exercise={row.exercise}
-                            live={liveMaterialId === row.exercise.materialId}
-                            number={
-                              materialNumbers.get(row.exercise.materialId) ??
-                              rows.find(
-                                (r) => r.materialId === row.exercise.materialId,
-                              )?.number ??
-                              row.exercise.position
-                            }
-                            onSelect={onSelect}
-                            selected={
-                              displayedMaterialId === row.exercise.materialId
-                            }
-                          />
+                          <li key={(row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual).materialId} className="my-1">
+                            {(() => {
+                              const item = row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual;
+                              const selected = displayedMaterialId === item.materialId;
+                              const busy = busyMaterialId === item.materialId;
+                              const href = resourceHref?.(item.materialId);
+                              if (href) return <Link href={href} target="_blank" rel="noopener noreferrer"
+                                className="flex min-h-16 w-full items-center gap-2 rounded-xl border border-transparent px-2 py-2.5 hover:border-border hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                <ExternalLink aria-hidden className="size-3.5 shrink-0 text-sub" /><span className="sr-only">{t('materials.new_tab')}</span>
+                              </Link>;
+                              return <button type="button" {...anchorProps(`material:${item.materialId}`)}
+                                aria-current={selected ? 'page' : undefined} disabled={disabled || busy}
+                                className={`flex min-h-16 w-full items-center gap-2 rounded-xl border px-2 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-brand/20 bg-brand-soft' : 'border-transparent hover:border-border hover:bg-canvas'}`}
+                                onClick={() => onSelect(item.materialId)}>
+                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                {busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <ChevronRight aria-hidden className="size-3.5 shrink-0 text-sub" />}
+                              </button>;
+                            })()}
+                          </li>
                         ),
                       )}
                   </ul>
@@ -402,21 +403,17 @@ function Branch({
     <button
       {...anchorProps(anchorKey)}
       aria-expanded={open}
-      className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+      className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
         small ? 'text-[12.5px]' : 'text-[13px]'
       }`}
       onClick={onToggle}
       type="button"
     >
       <Icon aria-hidden className="size-3.5 shrink-0 text-sub" />
-      <span className="shrink-0 font-mono text-[10.5px] font-bold text-sub">
-        {label}
-      </span>
-      <span
-        className={`min-w-0 flex-1 truncate ${small ? 'font-semibold' : 'font-bold'}`}
-        title={title}
-      >
-        {title}
+      {open ? <FolderOpen aria-hidden className="size-4 shrink-0 text-brand" /> : <Folder aria-hidden className="size-4 shrink-0 text-brand" />}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-sub">{label}</span>
+        <span className={`mt-0.5 block truncate ${small ? 'font-semibold' : 'font-bold'}`} title={title}>{title}</span>
       </span>
     </button>
   );
@@ -440,45 +437,24 @@ function ExerciseRow({
   selected: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
-  const { t: tp } = useTranslation('pdf-practice');
   const status = statusIcons[exercise.status];
 
   return (
-    <li>
+    <li className="my-1">
       <button
         {...anchorProps(`exercise:${exercise.materialId}`)}
         // The row the workspace is currently rendering, which on a teacher's
         // screen is not necessarily the one the student is on.
         aria-current={selected ? 'true' : undefined}
-        className={`group flex w-full items-center gap-2 rounded-md py-1.5 pl-1.5 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`group flex min-h-16 w-full items-center gap-2 rounded-xl border border-transparent px-2 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 ${
           selected ? 'bg-brand-soft' : 'hover:bg-canvas'
         }`}
         disabled={disabled || busy}
         onClick={() => onSelect(exercise.materialId)}
         type="button"
       >
-        <span className="w-6 shrink-0 text-right font-mono text-[11px] font-bold text-sub">
-          {number}
-        </span>
-        {busy ? (
-          <LoaderCircle
-            aria-hidden
-            className="size-3.5 shrink-0 animate-spin text-brand"
-          />
-        ) : (
-          <status.Icon
-            aria-hidden
-            className={`size-3.5 shrink-0 ${status.className}`}
-          />
-        )}
-        <span
-          className={`min-w-0 flex-1 truncate text-[12.5px] ${
-            selected ? 'font-bold text-brand' : 'font-medium'
-          }`}
-          title={exercise.title}
-        >
-          {exercise.title}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
-        </span>
+        <MaterialIdentity compact title={exercise.title} number={number} type="PROGRAMMING_EXERCISE" hasReferencePdf={exercise.hasReferencePdf} />
+        {busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <status.Icon aria-hidden className={`size-3.5 shrink-0 ${status.className}`} />}
         {/* Status is a word as well as a colour: a red and a green dot are the
             same dot to a large share of readers. */}
         <span className="sr-only">{t(`status.${exercise.status}`)}</span>

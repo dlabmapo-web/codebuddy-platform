@@ -1,7 +1,7 @@
 'use client';
 
 import type { LearnClassSummary } from '@cove/shared';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Users } from 'lucide-react';
 import Link from 'next/link';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -13,29 +13,12 @@ import { splitSchedule } from '../_lib/class-schedule';
 import { ClassScheduleChip } from './class-schedule-chip';
 import { ClassTeacher } from './class-teacher';
 
-/**
- * One class, as the record it is: when it meets, what it is called, what it is
- * for, who runs it, and how much it currently opens up.
- *
- * The schedule leads. It used to be the first few words of the grey paragraph
- * — `토 10:00 — 기초 과정을...` — which buried the single fact a student
- * recognises a class by. Lifted into its own chip, three classes stop being
- * three paragraphs to read and become Saturday, Monday-Wednesday-Friday, and
- * Tuesday-Thursday.
- *
- * It still carries no class glyph of its own: on a page of classes a class
- * icon repeats what the reader already knows. The two marks here both identify
- * something — a time, and a person.
- *
- * Nothing on the card comes from the management surface: it receives a
- * `LearnClassSummary` and builds one URL, so there is no roster, status, or
- * edit action it could render even by mistake.
- */
+/** Student-facing class facts: schedule, assigned teacher, courses and headcount. */
 export function ClassCard({ summary }: { summary: LearnClassSummary }) {
   const academySlug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
   const count = summary.availableCourseCount;
-  const { schedule, description } = splitSchedule(summary.description);
+  const { schedule } = splitSchedule(summary.description);
 
   return (
     <Link
@@ -67,15 +50,9 @@ export function ClassCard({ summary }: { summary: LearnClassSummary }) {
         {summary.name}
       </h2>
 
-      {description ? (
-        <p className="mt-1 line-clamp-2 text-[13px] leading-[1.6] text-sub">
-          {description}
-        </p>
-      ) : null}
+      {summary.studentCount !== undefined ? <p className="mt-3 mb-4 flex items-center gap-2 text-[13px] font-medium text-sub"><Users aria-hidden className="size-4" />{t('classes.student_count', { count: summary.studentCount })}</p> : null}
 
-      {/* `mt-auto` rather than a reserved description height: cards in a row
-          stretch to the tallest, and pinning the footer keeps them level
-          without padding short copy out with a blank line. */}
+      {/* Keep teacher and action aligned across cards with different schedules. */}
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
         <ClassTeacher teacher={summary.teacher} />
         <span className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-bold text-brand">

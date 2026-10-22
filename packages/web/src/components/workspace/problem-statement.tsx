@@ -1,7 +1,7 @@
 'use client';
 
 import type { LearnExercise } from '@cove/shared';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, BookOpen, ArrowDownUp, FlaskConical, ShieldCheck, type LucideIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
@@ -14,14 +14,16 @@ import { StatementCanvas } from './statement-canvas';
 function Section({
   children,
   title,
+  icon: Icon = BookOpen,
 }: {
   children: React.ReactNode;
   title: string;
+  icon?: LucideIcon;
 }) {
   return (
     <section>
-      <h3 className="border-b border-border pb-1.5 text-[13px] font-bold uppercase tracking-[0.06em] text-sub">
-        {title}
+      <h3 className="flex items-center gap-2.5 border-b border-border pb-3 text-[12px] font-bold uppercase tracking-wide text-sub">
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><Icon aria-hidden className="size-4" /></span>{title}
       </h3>
       <div className="mt-3">{children}</div>
     </section>
@@ -87,7 +89,7 @@ export function ProblemStatement({
         ) : null}
 
         {hasFormat ? (
-          <Section title={t('learn:workspace.format')}>
+          <Section title={t('learn:workspace.format')} icon={ArrowDownUp}>
             <dl className="grid min-w-0 gap-4">
               {exercise.inputFormat.trim() ? (
                 <div className="min-w-0 rounded-lg border border-border px-4 py-3">
@@ -114,7 +116,7 @@ export function ProblemStatement({
         ) : null}
 
         {exercise.sampleTestCases.length > 0 ? (
-          <Section title={t('learn:workspace.examples')}>
+          <Section title={t('learn:workspace.examples')} icon={FlaskConical}>
             <div className="space-y-4">
               {exercise.sampleTestCases.map((testCase, index) => (
                 <ExampleCard
@@ -128,7 +130,7 @@ export function ProblemStatement({
         ) : null}
 
         {constraintLines.length > 0 ? (
-          <Section title={t('learn:workspace.constraints')}>
+          <Section title={t('learn:workspace.constraints')} icon={ShieldCheck}>
             <ul className="space-y-2">
               {constraintLines.map((line, index) => (
                 <li className="flex items-start gap-2.5" key={index}>

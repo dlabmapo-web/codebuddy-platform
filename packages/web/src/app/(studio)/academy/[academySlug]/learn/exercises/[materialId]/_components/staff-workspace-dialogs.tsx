@@ -1,4 +1,5 @@
 'use client';
+import { lessonAction } from '@/components/workspace/lesson-chrome';
 
 import * as React from 'react';
 import { CircleCheck } from 'lucide-react';
@@ -14,7 +15,7 @@ type Context = {
   materialId: string;
   userId: string;
 };
-const actionClass = 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+const actionClass = lessonAction;
 
 export function StaffSolutionDialog(props: Context & { lectureId: string }) {
   const { t } = useTranslation('practice');

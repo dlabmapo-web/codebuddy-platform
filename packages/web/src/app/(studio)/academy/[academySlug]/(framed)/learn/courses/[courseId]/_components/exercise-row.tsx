@@ -11,6 +11,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { TrackedExerciseLink } from '@/components/workspace/tracked-exercise-link';
+import { MaterialIdentity, materialRowClass } from '@/components/workspace/material-identity';
 
 /** Matches the difficulty scale the course builder and exercise preview use. */
 const difficultyStyles = {
@@ -47,17 +48,14 @@ export function ExerciseRow({
   return (
     <li>
       <TrackedExerciseLink
-        className="group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:border-brand/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        className={materialRowClass}
         href={routes.academyLearnExercise(academySlug, exercise.materialId, {
           classId,
           ...(classId ? { mode: "student" } : {}),        })}
       >
-        <span className="grid h-7 min-w-11 shrink-0 place-items-center rounded-md bg-canvas px-1.5 font-mono text-[11.5px] font-bold text-sub">
-          {label}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold transition-colors group-hover:text-brand">
-          {exercise.title}{exercise.submissionPolicy === 'PRACTICE_ONLY' ? <span className="ml-2 text-xs font-medium text-brand">{tp('ungraded')}</span> : null}{exercise.hasReferencePdf ? <span className="ml-2 text-xs text-sub">{tp('practice')}</span> : null}
-        </span>
+        <MaterialIdentity title={exercise.title} type="PROGRAMMING_EXERCISE" hasReferencePdf={exercise.hasReferencePdf} />
+        <span className="sr-only">{label}</span>
+        {exercise.submissionPolicy === 'PRACTICE_ONLY' ? <span className="text-xs font-medium text-sub">{tp('ungraded')}</span> : null}
         <span
           className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold sm:inline ${
             difficultyStyles[exercise.difficulty]

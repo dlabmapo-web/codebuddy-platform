@@ -1,3 +1,4 @@
+import { rolesHavePermission } from '@cove/shared';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -11,9 +12,10 @@ export default async function PdfLessonPage({
   searchParams: Promise<{ classId?: string }>;
 }) {
   const { academySlug, materialId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const identity = await requireAcademyRoute(academySlug);
+  const { academyId } = identity;
   const locale = await getLocale();
-  const namespaces = ['content', 'errors'] as const;
+  const namespaces = ['content', 'errors', 'practice', 'manual', 'learn', 'pdf-practice'] as const;
   const { resources } = await initTranslations(locale, namespaces);
   return (
     <PageTranslationsProvider
@@ -23,6 +25,7 @@ export default async function PdfLessonPage({
     >
       <PdfLesson
         academyId={academyId}
+        permissions={{ canAuthor: identity.via !== 'platform' && rolesHavePermission(identity.roles, 'curriculum.manage'), canTutor: identity.via === 'membership' && identity.roles.includes('TEACHER') }}
         materialId={materialId}
         classId={(await searchParams).classId}
       />

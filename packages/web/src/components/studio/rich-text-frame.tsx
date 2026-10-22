@@ -70,11 +70,11 @@ export function RichTextFrame({
     };
 
     const measure = () => {
-      const body = frame.contentDocument?.body;
+      const body = frame.contentDocument?.getElementById('cove-rich-text-root');
       // An about:blank document reports 0 before srcDoc swaps in; ignore it so
       // the frame doesn't lock to an empty measurement.
       if (!body || cancelled) return false;
-      const height = Math.ceil(body.scrollHeight);
+      const height = Math.ceil(body.getBoundingClientRect().height);
       if (height <= 0) return false;
       setMeasured(Math.max(minHeight, height));
       return true;
@@ -84,10 +84,11 @@ export function RichTextFrame({
       if (cancelled) return;
       measure();
       bridgePointer();
-      const body = frame.contentDocument?.body;
-      if (!body || observer) return;
+      const body = frame.contentDocument?.getElementById('cove-rich-text-root');
+      if (!body) return;
       // Late-loading images change the height after the initial measure.
-      observer = new ResizeObserver(() => measure());
+      observer ??= new ResizeObserver(() => measure());
+      observer.disconnect();
       observer.observe(body);
     };
 
@@ -175,9 +176,10 @@ export function previewDocument(
 :root{color-scheme:${palette.scheme}}
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent}
-body{padding:${padding}px;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;color:${palette.text};font-size:14.5px;line-height:1.75;letter-spacing:-0.006em;word-break:break-word}
-body>:first-child{margin-top:0}
-body>:last-child{margin-bottom:0}
+body{padding:0;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;color:${palette.text};font-size:14.5px;line-height:1.75;letter-spacing:-0.006em;word-break:break-word}
+#cove-rich-text-root{display:flow-root;padding:${padding}px;min-width:0}
+#cove-rich-text-root>:first-child{margin-top:0}
+#cove-rich-text-root>:last-child{margin-bottom:0}
 p{margin:0 0 0.75em}
 h1,h2,h3,h4{margin:1.25em 0 0.5em;font-weight:700;line-height:1.35}
 h1{font-size:1.4em}h2{font-size:1.2em}h3{font-size:1.05em}h4{font-size:1em}
@@ -196,5 +198,5 @@ table{border-collapse:collapse;width:100%;margin:0 0 0.75em;font-size:0.95em}
 th,td{border:1px solid ${palette.rule};padding:6px 9px;text-align:left}
 th{background:${palette.tableHeader};font-weight:700}
 hr{border:0;border-top:1px solid ${palette.rule};margin:1.2em 0}
-</style></head><body>${body}</body></html>`;
+</style></head><body><div id="cove-rich-text-root">${body}</div></body></html>`;
 }

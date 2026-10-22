@@ -33,7 +33,7 @@
     "empty_body": "Courses reach you through a class. Once a manager enrolls you in one, it appears here.",
     "unavailable_title": "Your classes could not be loaded",
     "unavailable_body": "Reload the page, or try again in a moment.",
-    "taught_by": "Taught by",
+    "taught_by": "Teacher",
     "teacher_unassigned": "Teacher not assigned",
     "course_count_zero": "No courses yet",
     "course_count_one": "{{count}} course",
@@ -42,7 +42,9 @@
     "back": "Back to my classes",
     "courses_title": "Available courses",
     "courses_empty_title": "No courses in this class yet",
-    "courses_empty_body": "Nothing has been made available through this class. It shows up here when it is."
+    "courses_empty_body": "Nothing has been made available through this class. It shows up here when it is.",
+    "student_count_one": "{{count}} student",
+    "student_count_other": "{{count}} students"
   },
   "continue": {
     "title": "Continue solving",
@@ -326,5 +328,16 @@
     "documents_one": "{{count}} PDF",
     "documents_other": "{{count}} PDFs",
     "unavailable": "This PDF is not available."
+  },
+  "materials": {
+    "coding": "Coding exercise",
+    "pdf_coding": "PDF + coding exercise",
+    "pdf": "PDF document",
+    "video": "Video lesson",
+    "quiz": "Multiple-choice quiz",
+    "written": "Written response",
+    "turtle": "Turtle / graphics exercise",
+    "material": "Learning material",
+    "new_tab": "Opens in a new tab"
   }
 }

@@ -83,5 +83,8 @@
   "tutoring_stop": "Stop",
   "tutoring_your_output": "Your output",
   "tutoring_student_output": "Student output",
-  "tutoring_notice": "You are viewing a student’s workspace. Your personal practice code is preserved."
+  "tutoring_notice": "You are viewing a student’s workspace. Your personal practice code is preserved.",
+  "pdf_tutoring_help": "Open an assigned class to view learners and their activity. PDF lessons do not have answers to grade.",
+  "video_tutoring_help": "Open an assigned class to review video viewing progress.",
+  "retry": "Try again"
 }

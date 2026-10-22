@@ -10,7 +10,7 @@ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 
 const mocks = vi.hoisted(() => ({ runSample: vi.fn(), publishRun: vi.fn(), submit: vi.fn() }));
 vi.mock('@/components/studio/academy-route-provider', () => ({ useAcademySlug: () => 'test' }));
-vi.mock('@/i18n', () => ({ useLayoutTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('@/i18n', () => ({ useLocale: () => 'en', useLayoutTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/lib/workspace/use-sample-runner', () => ({ useSampleRunner: () => ({ runSample: mocks.runSample, serverCheck: {} }) }));
 vi.mock('@/lib/workspace/use-python-runner', () => ({ usePythonRunner: () => ({ ready: true, lines: [] }) }));

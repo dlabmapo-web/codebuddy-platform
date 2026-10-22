@@ -1,9 +1,16 @@
 'use client';
 
-import { ArrowLeft, ChevronLeft, ChevronRight, Expand, Send, Save, BookOpen, Menu, LogOut, History, MessageSquareText, ListChecks } from 'lucide-react';
+import { Send, Save, BookOpen, History, MessageSquareText, ListChecks } from 'lucide-react';
 import { useStudentPresence } from '@/lib/monitoring/student-presence';
+import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
+import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
+import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
+import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
+import { useMaterialNavigation } from '@/components/workspace/use-material-navigation';
+import { useLayoutTranslation } from '@/i18n';
+import { useRouter } from 'next/navigation';
 import { ManualStaffActions } from './manual-staff-actions';
-import { WrittenAnswerCard, AssessmentDrawer, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
+import { WrittenAnswerCard, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
 import {
@@ -14,12 +21,9 @@ import {
 } from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { effectiveManualResult, type ManualSession } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
-import { routes } from "@/lib/routes";
-import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
 import { GuiViewer } from "./gui-viewer";
@@ -36,7 +40,8 @@ export function ManualWorkspace({
 }) {
   const { t: mt } = useManualTranslation();
   const { t: pt } = usePracticeTranslation();
-  const slug = useAcademySlug();
+  const router = useRouter();
+  const { t: lt } = useLayoutTranslation('learn');
   const [deliveryClass, setDeliveryClass] = useState(classId);
   const target = { academyId, materialId };
   const query = useQuery({
@@ -71,7 +76,7 @@ export function ManualWorkspace({
   const [dirty, setDirty] = useState(false);
   const pendingSubmit = useRef<{ key: string; content: string } | null>(null);
   const resultPanel = useRef<HTMLElement | null>(null);
-  const saving = useRef<Promise<void> | null>(null);
+  const saving = useRef<Promise<boolean> | null>(null);
   const draftRevision = useRef(0);
   const loaded = useRef(false);
   const loadedContentRevision = useRef<number | undefined>(undefined);
@@ -189,7 +194,7 @@ export function ManualWorkspace({
     session &&
     ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT"].includes(session.state);
   async function save() {
-    if (preview || explicit) return;
+    if (preview || explicit) return true;
     if (saving.current) return saving.current;
     const snapshot = latest.current;
     const operation = (async () => {
@@ -207,8 +212,10 @@ export function ManualWorkspace({
         )
           setDirty(false);
         setSaved(mt("saved"));
+        return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : mt("could_not_save"));
+        return false;
       } finally {
         saving.current = null;
       }
@@ -224,6 +231,14 @@ export function ManualWorkspace({
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
+  const navigation = useMaterialNavigation({ academyId, materialId, classId: selectedClass, preview, courseId: data?.course.id, materials: data?.materials });
+  const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
+  async function navigateMaterial(id?: string, href?: string) {
+    if (busy || running) return;
+    if (dirty && explicit && !window.confirm(mt('discard_answer'))) return;
+    if (dirty && !explicit && !await save()) return;
+    if (href) router.push(href); else if (id) navigation.navigate(id);
+  }
   const { setOpenMaterial } = useStudentPresence();
   const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
   useEffect(() => {
@@ -317,17 +332,6 @@ export function ManualWorkspace({
       setBusy(false);
     }
   }
-  const path = (m: { type: string; materialId: string }) =>
-    m.type === "PDF_DOCUMENT"
-      ? routes.academyLearnPdf(slug, m.materialId, { classId: selectedClass })
-      : m.type === "PROGRAMMING_EXERCISE"
-        ? routes.academyLearnExercise(slug, m.materialId, {
-            classId: selectedClass,
-          })
-        : routes.academyLearnAssessment(slug, m.materialId, m.type, {
-            classId: selectedClass,
-            preview: preview || undefined,
-          });
   const latestAttempt = data?.practice ? data.attempts[0] : data?.attempts.find((a) => a.classId === selectedClass);
   const effective = effectiveManualResult(latestAttempt);
   const explanation = useQuery({
@@ -371,9 +375,6 @@ export function ManualWorkspace({
           : mt("loading_activity")}
       </main>
     );
-  const index = data.materials.findIndex((m) => m.materialId === materialId);
-  const previous = data.materials[index - 1],
-    next = data.materials[index + 1];
   const attempts = data.practice ? data.attempts : data.attempts.filter((a) => a.classId === selectedClass);
   const attempt = attempts[0],
     review = attempt?.reviews[0];
@@ -476,39 +477,13 @@ export function ManualWorkspace({
             </section>
           ) : null}</>;
   return (
-    <main className="flex min-h-dvh flex-col bg-canvas text-ink md:h-dvh md:overflow-hidden">
-      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2.5">
-        <AssessmentDrawer title={mt('materials')} trigger={<button type="button" aria-label={mt('materials')} className={assessmentAction}><Menu aria-hidden className="size-4" /></button>}>
-          <nav aria-label={mt('materials')} className="grid gap-1">
-            <p className="mb-3 px-3 text-xs font-semibold text-sub">{data.course.title}</p>
-            {data.materials.map((m, i) => <Link key={m.materialId} href={path(m)} aria-current={m.materialId === materialId ? 'page' : undefined}
-              className="flex items-start gap-3 rounded-md border border-transparent px-3 py-3 text-sm hover:bg-accent aria-[current=page]:border-brand/20 aria-[current=page]:bg-brand-soft aria-[current=page]:text-brand">
-              <span className="mt-0.5 text-xs tabular-nums text-sub">{i + 1}</span><span className="min-w-0 flex-1">{m.title}</span>
-              {m.type === 'MULTIPLE_CHOICE' ? <ListChecks aria-hidden className="size-4 shrink-0 text-brand" /> : <BookOpen aria-hidden className="size-4 shrink-0 text-sub" />}
-            </Link>)}
-          </nav>
-        </AssessmentDrawer>
-        <Link
-          className="flex min-w-0 max-w-[calc(100%-65px)] items-center gap-2 text-sm font-medium text-sub hover:text-brand sm:max-w-60"
-          href={routes.academyLearnCourse(slug, data.course.id, { classId: selectedClass })}
-        >
-          <ArrowLeft aria-hidden className="size-4 shrink-0" /><span className="truncate">{data.course.title}</span>
-        </Link>
-        <h1 className="min-w-0 w-full text-sm font-bold tracking-tight sm:w-auto sm:flex-1">{data.title}</h1>
-        <span className="hidden items-center gap-2 rounded-md bg-brand-soft px-2.5 py-1.5 text-xs font-medium text-brand lg:inline-flex">
-          <ListChecks aria-hidden className="size-3.5" />
-          {mt(
-            choice || (short && short.gradingMode !== "MANUAL")
-              ? "automatic_graded"
-              : "teacher_graded",
-          ).replace(/\s*·\s*$/, '')}{" · "}
-          {data.practice ? pt("label") : data.config.includeInScore
-            ? mt("included_in_score")
-            : mt("excluded_from_score")}
-        </span>
+    <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+      <LessonHeader courseTitle={data.course.title} lectureTitle={navigation.context?.path.lecture.title} title={data.title}
+        leaveHref={navigation.courseHref}
+        curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
+        {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} />
-        <Link href={routes.academyLearnCourse(slug, data.course.id, { classId: selectedClass })} className="ml-auto inline-flex min-h-9 items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/10"><LogOut aria-hidden className="size-4" />{mt('ui.leave')}</Link>
-      </header>
+      </LessonHeader>
       {preview ? <p role="note" className="flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 py-3 text-sm text-brand"><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}
       {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
       {/* Assigned when a draft loads, alongside state that re-renders. */}
@@ -523,7 +498,15 @@ export function ManualWorkspace({
           {error}
         </p>
       ) : null}
-      <div className={`flex min-h-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
+      <div className="relative flex min-h-0 flex-1">
+        <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
+          onClose={closePanel} onSelect={id => void navigateMaterial(id)} disabled={busy || Boolean(running)} error={navigation.failed} onRetry={navigation.retry}
+          footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-brand-soft/40 px-4 py-2 text-xs font-semibold text-brand">
+        <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
+      </div>
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
         <aside
           className={
             !showInstructions
@@ -792,28 +775,12 @@ export function ManualWorkspace({
           ) : null}
         </section>
       </div>
-      <footer className="relative flex shrink-0 flex-wrap items-center justify-center gap-4 border-t border-border bg-card px-4 py-3 text-sm">
-        {previous ? <Link className={assessmentAction} href={path(previous)}><ChevronLeft aria-hidden className="size-4" />{mt("previous")}</Link> : null}
-        <span>
-          {index + 1} / {data.materials.length}
-        </span>
-        {next ? <Link className={assessmentPrimary} href={path(next)}>{mt("next")}<ChevronRight aria-hidden className="size-4" /></Link> : null}
-        <div className="ml-auto sm:absolute sm:right-4">        <button
-          className={assessmentAction}
-          aria-label={mt('fullscreen')}
-          type="button"
-          onClick={() => {
-            if (document.fullscreenElement) void document.exitFullscreen?.();
-            else
-              void document.documentElement
-                .requestFullscreen?.()
-                .catch(() => {});
-          }}
-        >
-          <Expand aria-hidden className="size-4" /><span className="hidden sm:inline">{mt("fullscreen")}</span>
-        </button>
-        </div>
-      </footer>
+      </div>
+      </div>
+      <LessonFooter
+        previous={navigation.previous ? { onClick: () => void navigateMaterial(undefined, navigation.previous!.href) } : null}
+        next={navigation.next ? { onClick: () => void navigateMaterial(undefined, navigation.next!.href) } : null}
+        index={navigation.index} total={navigation.total} disabled={busy || Boolean(running)} />
     </main>
   );
 }

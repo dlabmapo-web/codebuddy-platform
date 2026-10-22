@@ -22,7 +22,7 @@ Object.assign(process.env, {
   DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_SSO_ROLLOUT_MODE: 'campus',
   DLAB_CLIENT_ID: 'cove', DLAB_CLIENT_SECRET: clientSecret,
   DLAB_INBOUND_SERVER_KEY: 'local-e2e-inbound-key-only-never-production', DLAB_REDIRECT_URI: studio + '/sso/callback',
-  GUI_ENABLED: 'false', VIDEO_LESSONS_ENABLED: 'false', SHORT_ANSWER_ENABLED: 'true', MULTIPLE_CHOICE_ENABLED: 'true',
+  GUI_ENABLED: 'false', VIDEO_LESSONS_ENABLED: 'true', SHORT_ANSWER_ENABLED: 'true', MULTIPLE_CHOICE_ENABLED: 'true',
 });
 const db = new PrismaService(new ConfigService({ DATABASE_URL: dbUrl }));
 const redis = new Redis(process.env.COVE_DLAB_TEST_REDIS_URL);
@@ -59,6 +59,7 @@ const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'authorization, apikey, content-type, x-client-info, x-supabase-api-version');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     if (req.method === 'OPTIONS') return res.end();
+    if (path.startsWith('/storage/v1/object/sign/') && req.method === 'POST') return json(res, { signedURL: '/object/sign/fixture.pdf?token=local-test-only' });
     if (path === '/health') return json(res, { ok: true });
     if (path === '/fixtures' && req.method === 'POST') {
       const input = await body(req), id = randomUUID();
@@ -89,7 +90,7 @@ const server = createServer(async (req, res) => {
       const module = await db.courseModule.create({ data: { courseId: course.id, title: 'Python basics', externalKey: randomUUID(), position: 1, isVisible: true } });
       const lecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Addition lesson', externalKey: randomUUID(), position: 1, isVisible: true } });
       const material = await db.material.create({ data: { lectureId: lecture.id, title: 'Add two numbers', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
-        programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: 'Read two numbers and print their sum.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
+        programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Read two numbers and print their sum.</p>', inputFormat: 'Two integers separated by a space.', outputFormat: 'One integer: their sum.', constraints: 'Each integer is between 0 and 100.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
       } });
       const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
         manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
@@ -101,16 +102,42 @@ const server = createServer(async (req, res) => {
       const quiz = await db.material.create({ data: { lectureId: lecture.id, title: 'Choose the operator', type: 'MULTIPLE_CHOICE', position: 4, isVisible: true,
         manualMaterial: { create: { description: 'Choose the addition operator.', includeInScore: true, files: {}, multipleChoice: { version: 1, question: 'Which operator adds numbers?', problemDescription: '', selectionMode: 'SINGLE', options: [{ id: correctId, content: '+' }, { id: incorrectId, content: '-' }], correctOptionIds: [correctId], shuffleOptions: false, explanationEnabled: true, explanation: 'The plus operator adds two values.' } } },
       } });
+      let pdfMaterialId, videoMaterialId;
+      if (input.includePdf) {
+        // Move from the end first to preserve the unique lecture/position index.
+        await db.material.update({ where: { id: quiz.id }, data: { position: 5 } });
+        await db.material.update({ where: { id: short.id }, data: { position: 4 } });
+        const asset = await db.pdfAsset.create({ data: {
+          objectKey: 'fixture-' + randomUUID() + '.pdf', originalFilename: 'lecture-material.pdf',
+          byteSize: 880, checksumSha256: 'fixture-checksum', pageCount: 1, state: 'READY',
+          uploaderUserId: owner.userId, academyId: fixture.academy.id, courseId: course.id, lectureId: lecture.id,
+        } });
+        const document = await db.material.create({ data: { lectureId: lecture.id, title: 'Lesson reference PDF', type: 'PDF_DOCUMENT', position: 3,
+          isVisible: true, pdfDocument: { create: { assetId: asset.id, placement: 'MAIN' } },
+        } });
+        // Deliberately third, matching the reported sidebar click.
+        pdfMaterialId = document.id;
+        const video = await db.videoAsset.create({ data: {
+          requestKey: randomUUID(), objectKey: 'fixture-video-' + randomUUID(), uploaderUserId: owner.userId,
+          academyId: fixture.academy.id, courseId: course.id, lectureId: lecture.id,
+          filename: 'lesson.mp4', byteSize: 100n, durationMs: 10000, state: 'READY', outputs: [],
+        } });
+        const videoMaterial = await db.material.create({ data: {
+          lectureId: lecture.id, title: 'Lesson video', type: 'VIDEO_LESSON', position: 6, isVisible: true,
+          videoLesson: { create: { assetId: video.id, requestKey: randomUUID(), description: 'A video lesson about addition.' } },
+        } });
+        videoMaterialId = videoMaterial.id;
+      }
       const classes = [];
       for (const name of ['Assigned Python class', 'Other Python class']) {
-        const classroom = await db.class.create({ data: { academyId: fixture.academy.id, name, createdByUserId: owner.userId } });
+        const classroom = await db.class.create({ data: { academyId: fixture.academy.id, name, description: 'Development demo: Browser tutor teaches Browser student.', createdByUserId: owner.userId } });
         await db.classCourse.create({ data: { classId: classroom.id, courseId: course.id, assignedByUserId: owner.userId } });
         await db.classEnrollment.create({ data: { classId: classroom.id, membershipId: student.id, enrolledByUserId: owner.userId } });
         classes.push(classroom);
       }
       await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
       await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
-      return json(res, { courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
+      return json(res, { pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);

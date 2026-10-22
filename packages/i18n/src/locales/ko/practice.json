@@ -82,5 +82,8 @@
   "tutoring_stop": "중지",
   "tutoring_your_output": "내 실행 결과",
   "tutoring_student_output": "학생 실행 결과",
-  "tutoring_notice": "학생의 작업 공간을 보고 있습니다. 내 연습 코드는 유지됩니다."
+  "tutoring_notice": "학생의 작업 공간을 보고 있습니다. 내 연습 코드는 유지됩니다.",
+  "pdf_tutoring_help": "담당 수업을 열어 학생과 학습 활동을 확인하세요. PDF 자료에는 채점할 답안이 없습니다.",
+  "video_tutoring_help": "담당 수업을 열어 동영상 학습 현황을 확인하세요.",
+  "retry": "다시 시도"
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, GraduationCap, Pencil, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, Users, Pencil, ArrowLeft } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -9,7 +9,8 @@ import type { ManualConfig, ManualWorkspace } from '@cove/shared';
 import { manualApi } from '@/lib/manual-api';
 import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
-import { AssessmentDrawer, assessmentAction } from './assessment-ui';
+import { AssessmentDrawer } from './assessment-ui';
+import { lessonAction as assessmentAction } from '@/components/workspace/lesson-chrome';
 import { ChoiceRich } from './choice-options';
 import { useManualTranslation } from './use-manual-translation';
 
@@ -92,7 +93,7 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
     {staff.canViewSolutions ? <AssessmentDrawer
       title={t('view_solution')} open={solutionOpen} onOpenChange={setSolutionOpen}
       trigger={<button type="button" className={assessmentAction}>
-        <CheckCircle2 aria-hidden className="size-4 text-brand" />{t('view_solution')}
+        <CheckCircle2 aria-hidden className="size-3.5" />{t('view_solution')}
       </button>}
     >
       <p className="mb-4 rounded-lg border border-brand/20 bg-brand-soft p-3 text-sm text-brand">{t('ui.staff_reference_notice')}</p>
@@ -104,7 +105,7 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
       title={t('ui.tutoring')}
       trigger={<button type="button" aria-pressed={reviewing}
         className={`${assessmentAction} aria-pressed:border-brand/30 aria-pressed:bg-brand-soft aria-pressed:text-brand`}>
-        <GraduationCap aria-hidden className="size-4 text-brand" />{t('ui.tutoring')}
+        <Users aria-hidden className="size-3.5" />{t('ui.tutoring')}
       </button>}
     >
       <p className="mb-4 text-sm leading-6 text-sub">{t('ui.tutoring_help')}</p>
@@ -115,14 +116,14 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
           onClick={event => { if (!allowNavigate()) event.preventDefault(); }}
           className="flex items-center gap-3 rounded-lg border border-border p-4 text-sm font-semibold hover:border-brand/30 hover:bg-brand-soft aria-[current=page]:bg-brand-soft aria-[current=page]:text-brand"
         >
-          <GraduationCap aria-hidden className="size-4 shrink-0 text-brand" />{c.name}
+          <Users aria-hidden className="size-4 shrink-0 text-brand" />{c.name}
         </Link>)}
       </nav>
       {!staff.classes.length ? <p role="status" className="rounded-lg border border-border bg-canvas p-4 text-sm leading-6 text-sub">{t('ui.no_assigned_classes')}</p> : null}
     </AssessmentDrawer> : null}
     {staff.canAuthor ? <button type="button" className={assessmentAction}
       onClick={() => { if (allowNavigate()) setEditing(true); }}>
-      <Pencil aria-hidden className="size-4 text-brand" />{t('ui.edit')}
+      <Pencil aria-hidden className="size-3.5" />{t('ui.edit')}
     </button> : null}
     {reviewing ? <Link href={activity} className={assessmentAction}
       onClick={event => { if (!allowNavigate()) event.preventDefault(); }}>

@@ -56,6 +56,9 @@ function studentClassSelect(academyId: string) {
     id: true,
     name: true,
     description: true,
+    _count: { select: { enrollments: { where: {
+      membership: { academyId, role: "STUDENT", status: "ACTIVE", user: { status: "ACTIVE" } },
+    } } } },
     assignedTeacher: {
       select: {
         academyId: true,
@@ -202,6 +205,7 @@ function projectClass(
     classId: record.id,
     name: record.name,
     description: record.description,
+    studentCount: record._count.enrollments,
     teacher: effectiveTeacher(
       record.assignedTeacher,
       academyId,

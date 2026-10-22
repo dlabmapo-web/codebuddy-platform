@@ -7,6 +7,7 @@ import { StaffWorkspace } from './staff-workspace';
 const mocks = vi.hoisted(() => ({ draft: vi.fn(), editor: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock('@/i18n', () => ({ useLocale: () => 'en', useLayoutTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/studio/academy-route-provider', () => ({ useAcademySlug: () => 'demo' }));
 vi.mock('@/lib/orpc', () => ({ orpc: {} }));

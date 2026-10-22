@@ -6,6 +6,7 @@ import {
   navigatorPathFor,
   toNavigatorContext,
   workspaceNavigatorContextSchema,
+  workspaceMaterialSequence,
   type LearnCourseOutline,
 } from "./learn.js";
 
@@ -84,6 +85,22 @@ const outline: LearnCourseOutline = {
 };
 
 describe("toNavigatorContext", () => {
+  it('positions PDF, video and assessment pages in the same hierarchy', () => {
+    const course = structuredClone(outline);
+    const lecture = course.modules[0].lectures[0];
+    lecture.manualMaterials = [{ materialId: id('written'), title: 'Written answer', type: 'WRITTEN_RESPONSE', position: 2, includeInScore: true, maximumHundredths: 10000 } as never];
+    lecture.videos = [{ materialId: id('video'), title: 'Video', position: 3 } as never];
+    lecture.documents = [{ materialId: id('pdf'), title: 'PDF', position: 4, pdf: { placement: 'MAIN' } } as never];
+    for (const materialId of [id('written'), id('video'), id('pdf')]) {
+      const context = toNavigatorContext(course, materialId);
+      expect(context?.path.lecture.id).toBe(lecture.id);
+      expect(context?.path.exercise.materialId).toBe(materialId);
+    }
+    lecture.documents[0].pdf.placement = 'SUPPLEMENTARY';
+    const resourceContext = toNavigatorContext(course, id('pdf'));
+    expect(resourceContext?.path.exercise.materialId).toBe(id('pdf'));
+    expect(workspaceMaterialSequence(resourceContext).some(item => item.materialId === id('pdf'))).toBe(false);
+  });
   it("produces a payload the contract accepts", () => {
     const context = toNavigatorContext(outline, id("e1"));
     expect(workspaceNavigatorContextSchema.safeParse(context).success).toBe(true);

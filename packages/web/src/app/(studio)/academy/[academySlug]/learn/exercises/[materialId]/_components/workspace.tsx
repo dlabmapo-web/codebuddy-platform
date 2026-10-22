@@ -7,7 +7,6 @@ import {VideoResourceLinks} from '@/components/video/video-resource-links';
 import { QuizWorkspace } from './quiz-workspace';
 import { routes } from '@/lib/routes';
 import Link from 'next/link';
-import { Maximize2 } from 'lucide-react';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
@@ -54,7 +53,8 @@ import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
 import { MonitoringIndicator } from './monitoring-indicator';
 import { RequestHelp } from '@/components/monitoring/request-help';
-import { WorkspaceHeader, NavButton } from './workspace-header';
+import { WorkspaceHeader } from './workspace-header';
+import { LessonFooter } from '@/components/workspace/lesson-chrome';
 
 export function Workspace(props: React.ComponentProps<typeof ProgrammingWorkspace>) {
   return props.bootstrap.workspace.exercise.quiz
@@ -728,15 +728,10 @@ function ProgrammingWorkspace({
           </section>
         </div>
       </div>
-      <nav aria-label={t('workspace.tab_problem')} className="relative flex h-12 shrink-0 items-center justify-center gap-3 border-t border-border bg-card px-4 py-2">
-        <NavButton direction="previous" disabled={busy || !workspace.neighbors.previous} label={t('workspace.previous')} onClick={() => workspace.neighbors.previous && handleNavigate(workspace.neighbors.previous.materialId)} />
-        <span className="text-xs font-semibold tabular-nums text-sub">{(() => {
-          const items = workspaceMaterialSequence(navigation.navigator);
-          return `${items.findIndex((item) => item.materialId === exercise.materialId) + 1} / ${items.length}`;
-        })()}</span>
-        <NavButton direction="next" disabled={busy || !workspace.neighbors.next} label={t('workspace.next')} onClick={() => workspace.neighbors.next && handleNavigate(workspace.neighbors.next.materialId)} />
-        <button type="button" aria-label={tpractice('fullscreen')} className="absolute right-4 rounded-lg p-2 text-sub hover:bg-accent" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen(); }}><Maximize2 className="size-4" /></button>
-      </nav>
+      <LessonFooter previous={workspace.neighbors.previous ? { onClick: () => handleNavigate(workspace.neighbors.previous!.materialId) } : null}
+        next={workspace.neighbors.next ? { onClick: () => handleNavigate(workspace.neighbors.next!.materialId) } : null}
+        index={workspaceMaterialSequence(navigation.navigator).findIndex(item => item.materialId === exercise.materialId) + 1}
+        total={workspaceMaterialSequence(navigation.navigator).length} disabled={busy} />
     </div>
   );
 }

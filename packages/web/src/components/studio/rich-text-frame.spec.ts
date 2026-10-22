@@ -33,7 +33,7 @@ describe('previewDocument', () => {
 
   it('still carries the authored content through', () => {
     expect(previewDocument('<p>Echo the input</p>', 16, 'dark')).toContain(
-      '<body><p>Echo the input</p></body>',
+      '<body><div id="cove-rich-text-root"><p>Echo the input</p></div></body>',
     );
   });
 });

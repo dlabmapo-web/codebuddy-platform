@@ -38,7 +38,8 @@
     "back": "내 반 목록으로",
     "courses_title": "수강 가능한 코스",
     "courses_empty_title": "아직 코스가 없습니다",
-    "courses_empty_body": "이 반에 공개된 코스가 아직 없습니다. 공개되면 여기에 표시됩니다."
+    "courses_empty_body": "이 반에 공개된 코스가 아직 없습니다. 공개되면 여기에 표시됩니다.",
+    "student_count": "학생 {{count}}명"
   },
   "continue": {
     "title": "이어서 풀기",
@@ -313,5 +314,16 @@
     "download": "다운로드",
     "documents_other": "{{count}} PDF",
     "unavailable": "이 PDF를 사용할 수 없습니다."
+  },
+  "materials": {
+    "coding": "코딩 실습",
+    "pdf_coding": "PDF + 코딩 실습",
+    "pdf": "PDF 문서",
+    "video": "동영상 강의",
+    "quiz": "객관식 퀴즈",
+    "written": "서술형 답안",
+    "turtle": "터틀 / 그래픽 실습",
+    "material": "학습 자료",
+    "new_tab": "새 탭에서 열기"
   }
 }

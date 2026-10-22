@@ -83,11 +83,7 @@ export function TeachingClasses({
             >
               <div className="min-w-0">
                 <h2 className="truncate text-[15.5px] font-bold">{item.name}</h2>
-                {item.description ? (
-                  <p className="mt-1 line-clamp-2 text-[13.5px] leading-6 text-sub">
-                    {item.description}
-                  </p>
-                ) : null}
+
               </div>
 
               <dl className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-sub">

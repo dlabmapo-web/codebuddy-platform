@@ -1,10 +1,11 @@
 'use client';
+import { useTranslation } from 'react-i18next';
 import {useVideoTranslation} from "@/components/video/use-video-translation";
 
 
 import { useManualTranslation } from '@/components/manual/use-manual-translation';
 import { PdfResourceLink } from '@/components/pdf/pdf-resource-link';
-import Link from 'next/link';
+import { MaterialLink } from '@/components/workspace/material-identity';
 import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import type { LearnCourseOutline } from '@cove/shared';
@@ -40,6 +41,7 @@ export function ModuleSection({
   onToggleLecture: (lectureId: string) => void;
   requestedLectureId: string | null;
 }) {
+  const { t: pdfT } = useTranslation('pdf-practice');
   const {t:mt}=useManualTranslation();
   const {t:vt}=useVideoTranslation();
   const slug = useAcademySlug();
@@ -189,7 +191,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'video' ? (<li key={row.video.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}><span>{row.video.title}</span><span className="ml-auto text-xs text-sub">{vt('badge')} · {row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</span></Link></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><Link className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand" href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}><span>{row.manual.title}</span><span className="ml-auto text-xs text-sub">{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</span></Link></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}
@@ -203,20 +205,16 @@ export function ModuleSection({
                               />
                             ) : (
                               <li key={row.doc.materialId}>
-                                <Link
-                                  className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-sm font-semibold text-brand"
+                                <MaterialLink
+                                  title={row.doc.title} type="PDF_DOCUMENT"
                                   href={routes.academyLearnPdf(
                                     slug,
                                     row.doc.materialId,
                                     { classId },
                                   )}
                                 >
-                                  <span className="font-mono text-xs">PDF</span>
-                                  {row.doc.title}
-                                  <span className="ml-auto text-xs text-sub">
-                                    {row.doc.pdf.pageCount}
-                                  </span>
-                                </Link>
+                                  {row.doc.pdf.pageCount ? pdfT('page_count', { count: row.doc.pdf.pageCount }) : null}
+                                </MaterialLink>
                               </li>
                             ),
                           )}

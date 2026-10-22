@@ -1,4 +1,3 @@
-import { ManualClassMaterials } from '@/components/manual/manual-class-materials';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { MonitoringClassRoster } from '@cove/shared';
 import { notFound } from 'next/navigation';
@@ -47,10 +46,8 @@ export default async function LiveClassPage({
         />
       }
       bleed
-      description={roster.class.description || undefined}
       title={roster.class.name}
     >
-      <ManualClassMaterials academyId={academyId} classId={classId}/>
       <LiveRoster academyId={academyId} initialRoster={roster} />
     </StudioPage>
   );

@@ -2,7 +2,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import type { LearnExerciseBootstrap } from "@cove/shared";
+import { workspaceMaterialSequence, type LearnExerciseBootstrap } from "@cove/shared";
+import { CurriculumTrigger } from "@/components/workspace/curriculum-trigger";
+import { useNavigatorPanel } from "@/lib/workspace/use-navigator-panel";
+import { LessonFooter } from "@/components/workspace/lesson-chrome";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { WorkspaceCurriculumNavigator } from "@/components/workspace/curriculum-navigator";
@@ -56,7 +59,7 @@ export function QuizWorkspace({
   const [dismissedResult, setDismissedResult] = React.useState<string | null>(
     null,
   );
-  const [outlineOpen, setOutlineOpen] = React.useState(false);
+  const { open: panelOpen, triggerRef, panelId, toggle: togglePanel, close: closePanel } = useNavigatorPanel('quiz-outline');
   const presence = useStudentPresence();
   const { markActive, setOpenMaterial } = presence;
   React.useEffect(() => {
@@ -87,7 +90,8 @@ export function QuizWorkspace({
   async function navigate(materialId: string) {
     if (submission.submitting) return;
     await draft.flushWithoutPromoting();
-    router.push(routes.academyLearnExercise(slug, materialId, { classId }));
+    const target = workspaceMaterialSequence(bootstrap.navigator).find(item => item.materialId === materialId);
+    if (target) router.push(routes.academyLearnMaterial(slug, materialId, target.type, { classId }));
   }
   return (
     <div
@@ -101,18 +105,9 @@ export function QuizWorkspace({
         saveState={draft.saveState}
         reviewing={selectedSubmission}
         solveStartedAt={session.startedAt}
-        curriculum={
-          <button
-            type="button"
-            aria-expanded={outlineOpen}
-            aria-controls="quiz-outline"
-            className="rounded-lg border border-border px-3 py-2"
-            onClick={() => setOutlineOpen(!outlineOpen)}
-          >
-            {t("menu")}
-          </button>
-        }
+        curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={bootstrap.navigator.path} />}
       />
+      <div className="relative flex min-h-0 flex-1">
       <WorkspaceCurriculumNavigator
         context={bootstrap.navigator}
         displayedMaterialId={exercise.materialId}
@@ -120,10 +115,10 @@ export function QuizWorkspace({
         busyMaterialId={null}
         error={false}
         footer={{ href: coursePath, label: t("course") }}
-        onClose={() => setOutlineOpen(false)}
+        onClose={closePanel}
         onRetry={() => router.refresh()}
         onSelect={(id) => void navigate(id)}
-        open={outlineOpen}
+        open={panelOpen}
         panelId="quiz-outline"
       />
       <main className="min-h-0 flex-1 overflow-auto p-5">
@@ -223,28 +218,11 @@ export function QuizWorkspace({
           ) : null}
         </div>
       </main>
-      <footer className="flex justify-center gap-5 border-t border-border bg-card p-3">
-        <button
-          type="button"
-          disabled={!workspace.neighbors.previous || submission.submitting}
-          onClick={() =>
-            workspace.neighbors.previous &&
-            void navigate(workspace.neighbors.previous.materialId)
-          }
-        >
-          {t("previous")}
-        </button>
-        <button
-          type="button"
-          disabled={!workspace.neighbors.next || submission.submitting}
-          onClick={() =>
-            workspace.neighbors.next &&
-            void navigate(workspace.neighbors.next.materialId)
-          }
-        >
-          {t("next")}
-        </button>
-      </footer>
+      </div>
+      <LessonFooter previous={workspace.neighbors.previous ? { onClick: () => void navigate(workspace.neighbors.previous!.materialId) } : null}
+        next={workspace.neighbors.next ? { onClick: () => void navigate(workspace.neighbors.next!.materialId) } : null}
+        index={workspaceMaterialSequence(bootstrap.navigator).findIndex(item => item.materialId === workspace.exercise.materialId) + 1}
+        total={workspaceMaterialSequence(bootstrap.navigator).length} disabled={submission.submitting} />
     </div>
   );
 }

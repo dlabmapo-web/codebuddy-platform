@@ -1,9 +1,6 @@
 'use client';
-import {videoApi} from "@/lib/video-api";
 
-import { manualApi } from '@/lib/manual-api';
 
-import { pdfApi } from '@/lib/pdf-api';
 import { routes } from '@/lib/routes';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -178,22 +175,18 @@ export function useExerciseNavigation({
       try {
         // Resolves from cache when the neighbour was prefetched, so the common
         // case costs no request at all.
-        const isPdf = navigatorRef.current.course.modules.some((m) =>
-          m.lectures.some((l) =>
-            l.documents?.some((d) => d.materialId === materialId),
-          ),
-        );
-        const isVideo=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.videos?.some(v=>v.materialId===materialId)));
-        if(isVideo){await videoApi.read({academyId,materialId,classId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnVideo(academySlug,materialId,{classId}));return;}
-        const isManual=navigatorRef.current.course.modules.some(m=>m.lectures.some(l=>l.manualMaterials?.some(a=>a.materialId===materialId)));
-        if(isManual){const activity=await manualApi.read({academyId,materialId});if(tokenRef.current!==token)return;beforeTransitionRef.current?.beforeCommit();router.push(routes.academyLearnAssessment(academySlug,materialId,activity.type,{classId}));return;}
-        if (isPdf) {
-          await pdfApi.read({ academyId, materialId });
-          if (tokenRef.current !== token) return;
+        // Non-code materials have their own authenticated server routes.
+        // Avoid signing/fetching them twice before the destination can render.
+        let materialType: string | undefined;
+        for (const courseModule of navigatorRef.current.course.modules) for (const lecture of courseModule.lectures) {
+          if (lecture.documents?.some(item => item.materialId === materialId)) materialType = 'PDF_DOCUMENT';
+          if (lecture.videos?.some(item => item.materialId === materialId)) materialType = 'VIDEO_LESSON';
+          const manual = lecture.manualMaterials?.find(item => item.materialId === materialId);
+          if (manual) materialType = manual.type;
+        }
+        if (materialType) {
           beforeTransitionRef.current?.beforeCommit();
-          router.push(
-            routes.academyLearnPdf(academySlug, materialId, { classId, mode: 'student' }),
-          );
+          router.push(routes.academyLearnMaterial(academySlug, materialId, materialType, { classId }));
           return;
         }
         const next = await fetchWorkspace(materialId);

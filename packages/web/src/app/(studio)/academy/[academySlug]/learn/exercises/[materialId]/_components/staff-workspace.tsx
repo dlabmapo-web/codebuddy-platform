@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Code2, LogOut, Maximize2, Pencil, History, ClipboardList } from 'lucide-react';
+import { Code2, LogOut, Pencil, History, ClipboardList } from 'lucide-react';
 import { workspaceMaterialSequence, type LearnExerciseBootstrap } from '@cove/shared';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
@@ -22,7 +22,7 @@ import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { usePracticeSubmission } from '../_hooks/use-practice-submission';
 import { usePythonErrorLines } from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
-import { NavButton } from './workspace-header';
+import { LessonHeader, LessonFooter, lessonAction, lessonPrimary } from '@/components/workspace/lesson-chrome';
 import { ResultPanel } from './result-panel';
 import { StaffSolutionDialog } from './staff-workspace-dialogs';
 import { StaffTutoringDrawer, type TutoringStudent } from './staff-tutoring-drawer';
@@ -53,7 +53,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const formatError = usePythonErrorLines();
   const runner = usePythonRunner({ formatError });
   const sampleRunner = useSampleRunner(runner);
-  const { open: panelOpen, toggle: togglePanel, close: closePanel, panelId, triggerRef } = useNavigatorPanel('staff-practice-curriculum', false);
+  const { open: panelOpen, toggle: togglePanel, close: closePanel, panelId, triggerRef } = useNavigatorPanel('staff-practice-curriculum');
   const { size, containerRef, dividerProps } = useSplitPane({
     axis: 'horizontal', initial: exercise.hasReferencePdf ? 45 : 40, min: 25, max: 65,
   });
@@ -116,22 +116,18 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   function submit() { draft.flushNow(); setTab('result'); void submission.submit(draft.code); }
   React.useEffect(() => () => { runningBatch.current = false; }, []);
   return <div ref={rootRef} className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
-    <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-3 md:min-h-16 md:flex-nowrap md:gap-3">
-      <CurriculumTrigger compact ref={triggerRef} onToggle={togglePanel} open={panelOpen} panelId={panelId} path={bootstrap.navigator.path} />
-      <div className="min-w-0 flex-1 basis-2/3 md:basis-auto">
-        <p className="truncate text-xs text-sub">{breadcrumb.course.title} <span className="px-1 text-border">/</span> {breadcrumb.lecture.title}</p>
-        <h1 className="truncate text-sm font-bold">{exercise.title}</h1>
-      </div>
+    <LessonHeader courseTitle={breadcrumb.course.title} lectureTitle={breadcrumb.lecture.title} title={exercise.title}
+      curriculum={<CurriculumTrigger compact ref={triggerRef} onToggle={togglePanel} open={panelOpen} panelId={panelId} path={bootstrap.navigator.path} />}>
       <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t(selectedStudent ? 'tutoring' : 'label')}</span>
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
       {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={(event) => void leaveTo(routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' }), event)} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
       {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} /> : null}
       {access?.canObserve && !exercise.quiz ? <StaffTutoringDrawer academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} selected={selectedStudent} onSelect={selectStudent} /> : null}
       {access?.canReview && !access.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand"><ClipboardList aria-hidden className="size-4 shrink-0" />{t('review')}</Link> : null}
-      {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition-colors hover:border-brand hover:bg-brand-soft hover:text-brand focus-visible:outline-2 focus-visible:outline-brand"><Pencil className="size-3.5" />{t('edit')}</Link> : null}
+      {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className={lessonAction}><Pencil className="size-3.5" />{t('edit')}</Link> : null}
 
-      <Link href={coursePath} onClick={(event) => void leaveTo(coursePath, event)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-deep"><LogOut className="size-3.5" />{t('leave')}</Link>
-    </header>
+      <Link href={coursePath} onClick={(event) => void leaveTo(coursePath, event)} className={lessonPrimary}><LogOut className="size-3.5" />{t('leave')}</Link>
+    </LessonHeader>
     <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
       <span className="font-bold sm:hidden">{t('label')}</span><span>{t(selectedStudent ? 'tutoring_notice' : 'notice')}</span>
       <span className="ml-auto" aria-live="polite">{draft.saveState !== 'idle' ? t(`save.${draft.saveState}`) : null}</span>
@@ -178,11 +174,9 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </section>
       </div>}
     </div>
-    <footer className="flex h-14 shrink-0 items-center justify-center gap-4 border-t border-border bg-card px-4">
-      <NavButton direction="previous" disabled={busy || !workspace.neighbors.previous} label={t('previous')} onClick={() => { if (workspace.neighbors.previous) void navigate(workspace.neighbors.previous.materialId); }} />
-      <span className="text-xs font-semibold tabular-nums text-sub">{position} / {ordered.length}</span>
-      <NavButton direction="next" disabled={busy || !workspace.neighbors.next} label={t('next')} onClick={() => { if (workspace.neighbors.next) void navigate(workspace.neighbors.next.materialId); }} />
-      <button type="button" className="absolute right-4 rounded-lg p-2 text-sub hover:bg-accent" aria-label={t('fullscreen')} onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen(); }}><Maximize2 className="size-4" /></button>
-    </footer>
+    <LessonFooter previous={workspace.neighbors.previous ? { onClick: () => void navigate(workspace.neighbors.previous!.materialId) } : null}
+      next={workspace.neighbors.next ? { onClick: () => void navigate(workspace.neighbors.next!.materialId) } : null}
+      index={position} total={ordered.length} disabled={busy}
+      onFullscreen={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen(); }} />
   </div>;
 }

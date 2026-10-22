@@ -475,7 +475,15 @@ export function LiveWorkspace({
           width from the workspace rather than covering it. */}
       <div className={navigatorRow}>
         <WorkspaceCurriculumNavigator
-          allowPdfNavigation={false}
+          resourceHref={(id) => {
+            for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
+              const type = lecture.documents?.some(item => item.materialId === id) ? 'PDF_DOCUMENT'
+                : lecture.videos?.some(item => item.materialId === id) ? 'VIDEO_LESSON'
+                : lecture.manualMaterials?.find(item => item.materialId === id)?.type;
+              if (type) return routes.academyLearnMaterial(academySlug, id, type, { classId });
+            }
+            return null;
+          }}
           busyMaterialId={display.pendingMaterialId}
           context={display.navigator}
           // A follow in progress owns the display; a second selection during

@@ -1,5 +1,8 @@
 {
   "mapo_campus": "Mapo Campus",
+  "help_import": "Make the lesson commands available. Keep this line at the top.",
+  "beginner_commands_intro": "The turtle is created for you. Use TForward and TLeft directly; you do not need to create an object.",
+  "spiral_example": "Try a spiral",
   "help_forward": "Move forward 100 steps.",
   "help_left": "Turn left 90 degrees. Use the exterior angle.",
   "help_color": "Change the pen and turtle color.",

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import Image from 'next/image';
 import { ArrowRight, Play, Square, Turtle, X } from 'lucide-react';
-import { turtleHelperVersion, turtleRunning, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
+import { turtleHelperVersion, turtleRunning, turtleSpiralExample, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { GuiViewer } from '@/components/manual/gui-viewer';
 import { turtleRequest, TurtleRequestError } from '@/lib/turtle-trial/client';
@@ -14,6 +14,7 @@ import { TurtleOptions } from './turtle-options';
 import styles from './turtle-trial.module.css';
 
 const help = [
+  ["from custom import *", "help_import"],
   ["TForward(100)", "help_forward"],
   ["TLeft(90)", "help_left"],
   ["color(\"red\")", "help_color"],
@@ -314,6 +315,6 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
         </section>
       </div>
     </div>
-    {showHelp && <aside className={styles.help} aria-label={t('command_reference')}><header><h2>{t('your_command_reference')}</h2><button type="button" onClick={() => setShowHelp(false)} aria-label={t('close_help')}><X size={20} /></button></header><p>{t('command_names_are_case_sensitive_remember_the_parentheses')}</p>{help.map(([command, key]) => <div key={command}><code>{command}</code><p>{t(key)}</p></div>)}<p><code>TForward(100)</code> → <code>turtle.forward(100)</code></p></aside>}
+    {showHelp && <aside className={styles.help} aria-label={t('command_reference')}><header><h2>{t('your_command_reference')}</h2><button type="button" onClick={() => setShowHelp(false)} aria-label={t('close_help')}><X size={20} /></button></header><p>{t('beginner_commands_intro')}</p><p>{t('command_names_are_case_sensitive_remember_the_parentheses')}</p>{help.map(([command, key]) => <div key={command}><code>{command}</code><p>{t(key)}</p></div>)}<h3>{t('spiral_example')}</h3><pre className={styles.exampleCode}><code>{turtleSpiralExample}</code></pre></aside>}
   </main>;
 }

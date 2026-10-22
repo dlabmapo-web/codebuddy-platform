@@ -9,10 +9,12 @@ export const turtleStarterIds = ['drawing', 'race', 'free'] as const;
 export type TurtleStarterId = typeof turtleStarterIds[number];
 export const turtlePreamble = 'from random import *\nfrom shape import *\nfrom custom import *\n\n';
 export const turtleStarters: Record<TurtleStarterId, string> = {
-  drawing: turtlePreamble + 'color("red")\nspeed(1)\n\nfor i in range(4):\n    TForward(100)\n    TLeft(90)\n',
+  // The lesson introduces direct commands before teaching loops.
+  drawing: turtlePreamble + 'TForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\n',
   race: turtlePreamble + 'ReadyToRace()\n\n# 거북이를 움직여 보세요. / Move the turtles.\n',
   free: turtlePreamble,
 };
+export const turtleSpiralExample = 'from custom import *\n\ncolor("blue")\nspeed(3)\n\nfor i in range(45):\n    TForward(i * 4)\n    TLeft(59)\n';
 export const turtleAccessSchema = z.object({ pin: z.string().trim().regex(/^[0-9]{6}$/) }).strict();
 export const turtleRunSchema = z.object({
   source: z.string().refine(s => new TextEncoder().encode(s).length <= turtleSourceBytes, 'Source exceeds 64 KiB'),

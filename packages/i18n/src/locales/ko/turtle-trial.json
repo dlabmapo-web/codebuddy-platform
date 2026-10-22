@@ -1,5 +1,8 @@
 {
   "mapo_campus": "마포캠퍼스",
+  "help_import": "수업에서 사용할 명령어를 불러와요. 맨 위의 이 줄은 지우지 마세요.",
+  "beginner_commands_intro": "거북이는 자동으로 준비돼요. 객체를 만들 필요 없이 TForward와 TLeft를 바로 사용하세요.",
+  "spiral_example": "나선 그리기 예제",
   "help_forward": "앞으로 100만큼 이동해요.",
   "help_left": "왼쪽으로 90도 돌아요. 내각이 아닌 외각이에요.",
   "help_color": "선과 거북이 색을 바꿔요.",

@@ -105,7 +105,7 @@ Cove Turtle                                                [⋯]
 - `코드 초기화` replaces only the current starter's editable code after confirmation. `지우기` (Clear) stops/removes the current run and clears its drawing/output, retaining code. A new Run always starts from fresh Python/turtle state.
 - Switching examples stops/removes the previous run and clears its drawing, retained frame, output and pending input before selecting the new buffer. Preserve each example's code and return mobile users to Code. Disable example selection during start/stop requests; if cleanup fails, keep the current example and show the error so the user can retry. Selecting the current example leaves its results intact.
 - `나가기` revokes the guest grant, stops its active/queued run, clears trial drafts and transient viewer data, and returns to the PIN form. It does not sign the visitor out of Cove Studio.
-- The help drawer lists lesson commands, arguments, one-line Korean explanations, and examples. Opening help never replaces code. Include a short bridge from `TForward(100)` to standard `turtle.forward(100)`.
+- The help drawer lists lesson commands, arguments, one-line Korean explanations, and examples. Opening help never replaces code. Teach `from custom import *`, direct `TForward`/`TLeft` calls and an executable spiral using those helpers. Beginner guidance does not require turtle object construction or method calls.
 - Errors show a concise Korean explanation and the editable `main.py` line when known, with expandable original Python details. Missing colon, indentation, wrong helper case, and missing race setup receive targeted deterministic hints. Do not send student code to an AI service.
 
 A visible Cove language control appears on the PIN screen and workspace header.
@@ -146,6 +146,13 @@ from custom import *
 ```
 
 Implement Cove-owned `custom.py` and `shape.py`, versioned as `cove-trial-v1`. `custom` exports the lesson helpers plus standard `speed` and `color`. `shape` exports `CircleTurtle`; neither wildcard import exports implementation internals. Importing modules must not start the race, draw a welcome animation, or redefine `randint`/`print`.
+
+The initial square starter uses four explicit forward/left pairs, matching the
+lesson before loops are introduced. All beginner examples use the custom
+functions directly; the module creates the shared turtle internally. Retain
+normal Python loops and arithmetic for later examples. `speed()` reads the
+current speed; `speed(0)` through `speed(10)` set it. Preserve existing student
+buffers; loading a revised starter uses the confirmed Reset code action.
 
 `TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. New helper drawing turtles use a 5-pixel pen, a double-size cursor and speed 1; the guest screen defaults to a 30 ms animation delay so movement is visible. Explicit speed and standard turtle pen settings remain adjustable. Race turtles also use a 5-pixel pen, a double-size cursor and speed 1 after their instant setup. The guest runner applies the same pen/cursor defaults to standard Turtle/RawTurtle construction and reset, regardless of color or helper imports. Explicit pensize()/shapesize() calls remain available. For legibility in the scaled guest display, rendered line widths are max(6, 2 × the requested pen width); Python reports the requested pen value unchanged. This adaptation runs only inside the guest process and preserves the standard turtle class identities. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
 

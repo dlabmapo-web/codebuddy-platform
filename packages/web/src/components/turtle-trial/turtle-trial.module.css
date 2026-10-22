@@ -462,6 +462,18 @@
   font-size:13px;
   color:var(--trial-blue)
 }
+.help h3 {
+  margin-top:24px;
+  font-size:15px;
+  font-weight:600
+}
+.exampleCode {
+  margin-top:12px;
+  padding:14px;
+  background:var(--trial-pale);
+  overflow-x:auto;
+  line-height:1.7
+}
 @media(max-width:767px) {
   .gate {
     padding:24px

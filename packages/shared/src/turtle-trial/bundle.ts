@@ -1,6 +1,11 @@
 // The same source is executed in the isolated runtime and exported in projects.
 // No student code is evaluated by the application processes.
-export const turtleCustomSource = String.raw`"""Cove introductory turtle commands, cove-trial-v1."""
+export const turtleCustomSource = String.raw`"""Cove introductory turtle commands, cove-trial-v1.
+
+Students use from custom import * and call TForward(100), TLeft(90),
+color("blue") and speed(3). The shared drawing turtle is created internally.
+ReadyToRace() prepares four turtles controlled by the color-named functions.
+"""
 import turtle as _t
 import math as _math
 
@@ -37,12 +42,16 @@ def _pen():
     return pen
 
 def TForward(distance):
+    """Move the shared drawing turtle forward; negative distances move back."""
     _pen().forward(_number(distance, "TForward"))
 
 def TLeft(angle):
+    """Turn left by degrees, including fractional and negative angles."""
     _pen().left(_number(angle, "TLeft"))
 
-def speed(value):
+def speed(value=None):
+    if value is None:
+        return _pen().speed()
     value = _number(value, "speed")
     if not isinstance(value, int) or not 0 <= value <= 10:
         raise ValueError("speed: use an integer from 0 to 10 / 0~10 정수를 입력해 주세요.")
@@ -172,6 +181,19 @@ if turtle.TurtleScreen._RUNNING and turtle._Screen._root is not None:
 `;
 
 export const turtleProjectReadme = `Cove Turtle — cove-trial-v1
+
+Start with the lesson's custom module. No turtle object is needed:
+from custom import *
+
+TForward(100)
+TLeft(90)
+
+TForward and TLeft control one shared drawing turtle. color("blue") and
+speed(3) change that same turtle. Use for/range for repeated commands.
+ReadyToRace() prepares Blue, Pink, Yellow and Green; move them with
+BlueForward/PinkForward/YellowForward/GreenForward and turn them with
+BlueLeft/PinkLeft/YellowLeft/GreenLeft. BlueX/PinkX/YellowX/GreenX report
+each racer's horizontal position. Keep the parentheses, e.g. BlueX().
 
 Install Python 3 with Tk support (python.org; Linux: python3-tk).
 Keep main.py, custom.py and shape.py together, then run: python3 main.py

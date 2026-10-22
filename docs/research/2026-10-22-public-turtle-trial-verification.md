@@ -25,6 +25,35 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Beginner custom module
+
+Reviewed all 76 slides' text and embedded teaching/code screenshots again.
+The [page-by-page module review](2026-10-22-turtle-lesson-module-review.md)
+records the teaching sequence, exact helper names and source limitations.
+`custom.py` already implements the direct calls requested by the team; object
+creation remains internal. The square starter now introduces direct commands
+before loops, and Commands explains the import and shows the requested blue
+spiral using TForward/TLeft. The standard-method bridge was removed from
+beginner help. Existing student buffers are preserved; Reset code loads the
+new starter after confirmation. The module also supports the lesson's speed()
+getter alongside speed(value).
+
+Real CPython/Tk verification runs both shipped beginner programs unchanged
+without exposing the turtle module in student globals. It checks geometry,
+one shared turtle, color/speed, fractional turns, star/nested-loop closure and
+a complete seeded four-racer race using the lesson's wildcard imports and
+while/if/break syntax. The project README explains the same custom API.
+
+Eight targeted Chromium/WebKit checks pass: the custom-only spiral, helper
+animation/Clear, race/Stop and localized settings. The animated race assertion
+allows 60 seconds rather than 20 so its long movement and celebration can
+finish on a busy local fixture. Shared build, E2E types, targeted lint, four
+draft/boundary tests and all 115 locale checks pass. Browser and Docker checks
+were run separately after concurrent work slowed the first browser attempts.
+Web type checking also passes when run separately with a 2 GiB Node heap;
+the 1 GiB attempt exhausted its heap and the unrestricted concurrent attempt
+was interrupted to release local memory.
+
 ## Mapo Campus branding
 
 The workspace, access gate and temporary access-restoration header now reuse

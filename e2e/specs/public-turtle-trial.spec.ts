@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { turtleSpiralExample } from '../../packages/shared/src/turtle-trial/index';
 
 async function enter(page: Page) {
   await page.goto('/turtle');
@@ -82,7 +83,8 @@ test('race helpers and infinite loops run in isolated stoppable sessions', async
   await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await code(page, 'from custom import *\nReadyToRace()\nBlueForward(740)\nassert BlueX() > 330\nassert PinkX() == -400\nPinkForward(-10)\nassert PinkX() == -410\nfor i in range(36):\n    BlueLeft(10)\nprint("RACE_OK")\n');
   await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
-  await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('RACE_OK');
+  // The long forward movement and celebration animate at classroom speed.
+  await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('RACE_OK', { timeout: 60000 });
   await expect(page.getByRole('button', { name: /^(실행|Run)$/ })).toBeEnabled();
   await code(page, 'while True:\n    pass\n');
   await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
@@ -192,7 +194,7 @@ test('switching examples clears live and stopped results while preserving each c
 
 test('the turtle cursor animates on a white canvas and Clear keeps the code', async ({ page }, testInfo) => {
   await enter(page);
-  const source = 'import turtle\nt = turtle.Turtle("turtle")\nt.color("green")\nt.speed(1)\nt.forward(200)\nt.left(90)\nt.forward(160)\nprint("ANIMATION_DONE")\n';
+  const source = 'from custom import *\ncolor("green")\nspeed(1)\nTForward(200)\nTLeft(90)\nTForward(160)\nprint("ANIMATION_DONE")\n';
   await code(page, source);
   await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
   const canvas = page.locator('[data-testid="turtle-display"] canvas');
@@ -213,7 +215,32 @@ test('the turtle cursor animates on a white canvas and Clear keeps the code', as
   await page.getByRole('button', { name: /^(지우기|Clear)$/ }).click();
   await expect(canvas).toHaveCount(0);
   await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toBeEmpty();
-  await expect(page.locator('.monaco-editor .view-lines')).toContainText('t.forward(200)');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('TForward(200)');
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});
+
+test('the custom module draws the beginner spiral without creating an object', async ({ page }, testInfo) => {
+  await enter(page);
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /^(명령어 도움말|Commands)$/ }).click();
+  const help = page.getByRole('complementary', { name: /명령어 도움말|Command reference/ });
+  await expect(help).toContainText('from custom import *');
+  await expect(help).toContainText('TForward(i * 4)');
+  await expect(help).not.toContainText('turtle.forward');
+  await page.getByRole('button', { name: /도움말 닫기|Close help/ }).click();
+  await code(page, turtleSpiralExample + '\nassert speed() == 3\nprint("CUSTOM_SPIRAL_OK")\n');
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('CUSTOM_SPIRAL_OK', { timeout: 60000 });
+  const canvas = page.locator('[data-testid="turtle-display"] canvas');
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => {
+    const pixels = element.getContext('2d')!.getImageData(0, 0, element.width, element.height).data;
+    let blue = 0;
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i]! < 80 && pixels[i + 1]! < 80 && pixels[i + 2]! > 160) blue++;
+    return blue;
+  })).toBeGreaterThan(2000);
+  await page.screenshot({ path: testInfo.outputPath('custom-module-spiral.png') });
   await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
 });

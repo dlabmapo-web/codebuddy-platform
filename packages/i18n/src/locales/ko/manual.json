@@ -201,6 +201,16 @@
     "selected": "선택됨",
     "instructions_help": "안내를 읽고 답안을 작성하세요.",
     "review_history": "평가 기록 ({{count}})",
-    "draft_help": "현재 초안만 수정됩니다. 이미 제출한 답안은 변경되지 않습니다."
+    "draft_help": "현재 초안만 수정됩니다. 이미 제출한 답안은 변경되지 않습니다.",
+    "tutoring": "튜터링",
+    "edit": "편집",
+    "my_answer": "내 답안으로 돌아가기",
+    "assigned_classes": "담당 수업",
+    "tutoring_help": "담당 수업을 선택한 후 학생의 답안을 확인하고 피드백을 게시하세요. 제출된 답안은 변경되지 않습니다.",
+    "no_assigned_classes": "이 활동의 담당 수업이 없습니다. 팀리더 또는 매니저에게 이 코스를 사용하는 수업의 강사 배정을 요청하세요.",
+    "staff_reference_notice": "교직원 전용 참고 답안입니다. 학생에게 정답이 공개되지 않습니다.",
+    "reference_unavailable": "참고 답안을 불러올 수 없습니다. 패널을 닫고 다시 시도하세요.",
+    "no_reference": "등록된 참고 답안이 없습니다.",
+    "answer_pattern": "정답 패턴"
   }
 }

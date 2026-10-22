@@ -1,5 +1,6 @@
 "use client";
 import { ArrowLeft, Search, Users, FileCheck2, LockKeyhole, History, Clock3, Trophy, UserRound } from 'lucide-react';
+import { ManualStaffActions } from './manual-staff-actions';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
 import { ReviewGradingPanel, AssessmentDrawer, AssessmentStatus, assessmentAction } from './assessment-ui';
 import { ChoiceAttempt } from "./choice-options";
@@ -252,7 +253,8 @@ export function ManualReviewWorkspace({
         >
           <ArrowLeft aria-hidden className="size-4" />{mt("ui.back_class")}
         </Link>
-        <div className="min-w-0 flex-1"><p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand"><FileCheck2 aria-hidden className="size-3.5" />{mt("teacher_review")}</p><h1 className="text-lg font-bold tracking-tight sm:text-xl">{content.data.title}</h1></div>
+        <div className="order-first min-w-0 w-full sm:order-none sm:w-auto sm:flex-1"><p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-brand"><FileCheck2 aria-hidden className="size-3.5" />{mt("teacher_review")}</p><h1 className="text-lg font-bold tracking-tight sm:text-xl">{content.data.title}</h1></div>
+        <ManualStaffActions academyId={academyId} data={content.data} classId={classId} reviewing allowNavigate={allowReviewSwitch} />
       </header>
       {error ? (
         <p role="alert" className="m-5 rounded-xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
@@ -366,7 +368,7 @@ export function ManualReviewWorkspace({
                   ? mt("included_in_score")
                   : mt("excluded_from_score")}
               </p>
-              <details className="mb-5 rounded-md border border-border bg-canvas/50 p-4">
+              <details open className="mb-5 rounded-md border border-border bg-canvas/50 p-4">
                 <summary className="cursor-pointer text-sm font-semibold">{mt('ui.question')}</summary>
                 <div className="mt-4 space-y-3 text-sm leading-7">
                   <p className="font-semibold">{content.data.config.shortAnswer?.question ?? content.data.config.multipleChoice?.question}</p>

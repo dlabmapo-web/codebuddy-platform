@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, ChevronLeft, ChevronRight, Expand, Send, Save, BookOpen, Menu, LogOut, History, MessageSquareText, ListChecks } from 'lucide-react';
+import { ManualStaffActions } from './manual-staff-actions';
 import { WrittenAnswerCard, AssessmentDrawer, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
@@ -497,6 +498,7 @@ export function ManualWorkspace({
             ? mt("included_in_score")
             : mt("excluded_from_score")}
         </span>
+        <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} />
         <Link href={routes.academyLearnCourse(slug, data.course.id, { classId: selectedClass })} className="ml-auto inline-flex min-h-9 items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/10"><LogOut aria-hidden className="size-4" />{mt('ui.leave')}</Link>
       </header>
       {preview ? <p role="note" className="flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 py-3 text-sm text-brand"><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}

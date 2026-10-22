@@ -201,6 +201,16 @@
     "selected": "Selected",
     "instructions_help": "Read the instructions before answering.",
     "review_history": "Review history ({{count}})",
-    "draft_help": "Changes here affect the current draft only. Submitted answers stay unchanged."
+    "draft_help": "Changes here affect the current draft only. Submitted answers stay unchanged.",
+    "tutoring": "Tutoring",
+    "edit": "Edit",
+    "my_answer": "Return to my answer",
+    "assigned_classes": "Assigned classes",
+    "tutoring_help": "Choose a class you teach, then select a learner to review answers and publish feedback. Submitted answers stay unchanged.",
+    "no_assigned_classes": "No assigned classes for this activity. Ask a Team Lead or Manager to assign you as a teacher to a class using this course.",
+    "staff_reference_notice": "Private staff reference. Students cannot see this answer key.",
+    "reference_unavailable": "The reference is unavailable. Close this panel and try again.",
+    "no_reference": "No reference answer has been added.",
+    "answer_pattern": "Answer pattern"
   }
 }

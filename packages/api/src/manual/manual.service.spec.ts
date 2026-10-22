@@ -20,6 +20,8 @@ function fixture() {
   };
   const row = {
     id: "material",
+    lectureId: "lecture",
+    isVisible: true,
     type: "TURTLE_EXERCISE",
     title: "Turtle",
     manualMaterial: config,
@@ -65,6 +67,40 @@ function fixture() {
   return { service, db, access, audit, gui, points, row, config };
 }
 describe("manual assessment boundaries", () => {
+  it.each([
+    ['TEACHER', ['TEACHER'], false],
+    ['TEAM_LEAD', ['TEAM_LEAD', 'TEACHER'], true],
+    ['MANAGER', ['MANAGER', 'TEAM_LEAD', 'TEACHER'], true],
+  ])('returns held-role assessment actions and only assigned classes for %s', async (role, roles, canAuthor) => {
+    const { service, db, access } = fixture();
+    access.requirePermission.mockResolvedValue({ role, roles, userId: 'staff', via: 'membership' } as never);
+    db.class.findMany.mockResolvedValue([{ id: 'assigned', name: 'Assigned class' }] as never);
+    const result = await service.workspace(identity, target);
+    expect(result.staff).toEqual({ canAuthor, canViewSolutions: true, canTutor: true, lectureId: 'lecture', classes: [{ classId: 'assigned', name: 'Assigned class' }] });
+    const where = db.class.findMany.mock.calls[0]![0].where;
+    expect(JSON.stringify(where)).toContain('assistantTeachers');
+    expect(JSON.stringify(where)).toContain('staff');
+    expect(JSON.stringify(where)).toContain('course');
+    expect(result.config.modelAnswer).toBe('');
+    expect((await service.workspace(identity, target, true)).config.modelAnswer).toBe('PRIVATE_MODEL_ANSWER');
+  });
+  it('keeps platform inspection read-only without an authoring grant', async () => {
+    const { service, access, db } = fixture();
+    access.requirePermission.mockImplementation(async (_auth, _academy, permission) => {
+      if (permission === 'curriculum.manage') throw new Error('Read-only inspection');
+      return { role: 'MANAGER', roles: ['MANAGER', 'TEAM_LEAD', 'TEACHER'], userId: 'operator', via: 'platform' } as never;
+    });
+    expect((await service.workspace(identity, target)).staff).toMatchObject({ canAuthor: false, canViewSolutions: true, canTutor: false, classes: [] });
+    expect(db.class.findMany).not.toHaveBeenCalled();
+  });
+  it('does not advertise staff actions to students or infer tutoring from management rank', async () => {
+    const { service, db, access } = fixture();
+    expect((await service.workspace(identity, target)).staff).toBeUndefined();
+    access.requirePermission.mockResolvedValue({ role: 'MANAGER', roles: ['MANAGER'], userId: 'staff', via: 'membership' } as never);
+    db.class.findMany.mockClear();
+    expect((await service.workspace(identity, target)).staff).toMatchObject({ canAuthor: true, canTutor: false, classes: [] });
+    expect(db.class.findMany).not.toHaveBeenCalled();
+  });
   it.each(['MANAGER', 'TEAM_LEAD', 'TEACHER'])('restricts %s written/quiz review to assigned classes', async role => {
     const { service, db, access } = fixture();
     access.requirePermission.mockResolvedValue({ role, roles: [role, 'TEACHER'], userId: 'staff', via: 'membership' } as never);

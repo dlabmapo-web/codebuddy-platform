@@ -33,6 +33,7 @@ import {
   effectiveManualResult,
   sourceFilesSchema,
   manualConfigSchema,
+  rolesHavePermission,
 } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { Prisma } from "../generated/prisma/client.js";
@@ -401,7 +402,15 @@ export class ManualService {
     );
     const staffPractice = !preview && Boolean(this.practice?.allowed(actor));
     const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id) : null;
-    const [outline, draft, attempts, classes] = await Promise.all([
+    const roles = actor.roles ?? [actor.role];
+    const canViewSolutions = rolesHavePermission(roles, "curriculum.review");
+    const canTutor = actor.via === "membership" && roles.includes("TEACHER") &&
+      rolesHavePermission(roles, "submissions.assigned.review");
+    const canAuthor = rolesHavePermission(roles, "curriculum.manage") &&
+      (actor.via === "membership" || await this.access.requirePermission(
+        identity.authUserId, input.academyId, "curriculum.manage",
+      ).then(() => true, () => false));
+    const [outline, draft, attempts, classes, tutoringClasses] = await Promise.all([
       this.db.course.findUnique({
         where: { id: row.lecture.courseModule.course.id },
         include: visibleCurriculumInclude,
@@ -438,6 +447,14 @@ export class ManualService {
             select: { id: true, name: true },
           })
         : Promise.resolve([]),
+      canTutor ? this.db.class.findMany({
+        where: {
+          ...taughtClassWhere(input.academyId, actor.userId),
+          courseAssignments: { some: { courseId: row.lecture.courseModule.course.id } },
+        },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+      }) : Promise.resolve([]),
     ]);
     const materials: ManualWorkspace["materials"] = [];
     for (const module of outline?.modules ?? [])
@@ -498,6 +515,10 @@ export class ManualService {
     )
       throw new NotFoundException();
     return {
+      ...(canViewSolutions ? { staff: {
+        canAuthor, canViewSolutions, canTutor, lectureId: row.lectureId,
+        classes: tutoringClasses.map(c => ({ classId: c.id, name: c.name })),
+      } } : {}),
       definitionLocked: preview
         ? row.isVisible ||
           Boolean(

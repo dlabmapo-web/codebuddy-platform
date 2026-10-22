@@ -22,7 +22,7 @@ Object.assign(process.env, {
   DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_SSO_ROLLOUT_MODE: 'campus',
   DLAB_CLIENT_ID: 'cove', DLAB_CLIENT_SECRET: clientSecret,
   DLAB_INBOUND_SERVER_KEY: 'local-e2e-inbound-key-only-never-production', DLAB_REDIRECT_URI: studio + '/sso/callback',
-  GUI_ENABLED: 'false', VIDEO_LESSONS_ENABLED: 'false', SHORT_ANSWER_ENABLED: 'false', MULTIPLE_CHOICE_ENABLED: 'false',
+  GUI_ENABLED: 'false', VIDEO_LESSONS_ENABLED: 'false', SHORT_ANSWER_ENABLED: 'true', MULTIPLE_CHOICE_ENABLED: 'true',
 });
 const db = new PrismaService(new ConfigService({ DATABASE_URL: dbUrl }));
 const redis = new Redis(process.env.COVE_DLAB_TEST_REDIS_URL);
@@ -94,6 +94,13 @@ const server = createServer(async (req, res) => {
       const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
         manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
       } });
+      const short = await db.material.create({ data: { lectureId: lecture.id, title: 'Name the language', type: 'WRITTEN_RESPONSE', position: 3, isVisible: true,
+        manualMaterial: { create: { description: 'Name the language used in this lesson.', includeInScore: true, files: {}, shortAnswer: { version: 1, question: 'Which language adds these numbers?', gradingMode: 'EXACT', expectedAnswer: 'Python', pattern: '', explanationEnabled: false, explanation: '' } } },
+      } });
+      const correctId = randomUUID(), incorrectId = randomUUID();
+      const quiz = await db.material.create({ data: { lectureId: lecture.id, title: 'Choose the operator', type: 'MULTIPLE_CHOICE', position: 4, isVisible: true,
+        manualMaterial: { create: { description: 'Choose the addition operator.', includeInScore: true, files: {}, multipleChoice: { version: 1, question: 'Which operator adds numbers?', problemDescription: '', selectionMode: 'SINGLE', options: [{ id: correctId, content: '+' }, { id: incorrectId, content: '-' }], correctOptionIds: [correctId], shuffleOptions: false, explanationEnabled: true, explanation: 'The plus operator adds two values.' } } },
+      } });
       const classes = [];
       for (const name of ['Assigned Python class', 'Other Python class']) {
         const classroom = await db.class.create({ data: { academyId: fixture.academy.id, name, createdByUserId: owner.userId } });
@@ -103,7 +110,7 @@ const server = createServer(async (req, res) => {
       }
       await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
       await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
-      return json(res, { courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, studentMembershipId: student.id, classes });
+      return json(res, { courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);

@@ -267,3 +267,114 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     expect(studentAssignment.status()).toBe(403);
   } finally { await studentContext.close(); await leaderContext.close(); }
 });
+
+for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
+  test(`OS ${osRole} tutors short answers and quizzes with held-role authoring`, async ({ page, request, browser }) => {
+    test.setTimeout(180_000);
+    const manager = await fixture(request, 'lab_head');
+    await enter(page, manager);
+    await expect(page).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    const member = osRole === 'lab_head' ? manager : await fixture(request, osRole, { parentFixtureId: manager.id });
+    const student = await fixture(request, 'student', { parentFixtureId: manager.id });
+    const staffContext = await browser.newContext(), studentContext = await browser.newContext();
+    const staffPage = await staffContext.newPage(), studentPage = await studentContext.newPage();
+    try {
+      await enter(staffPage, member); await expect(staffPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      await enter(studentPage, student); await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
+      expect(seeded.ok(), await seeded.text()).toBe(true);
+      const classroom = await seeded.json(), [assigned, other] = classroom.classes;
+      const base = { academyId: manager.academy.id, classId: assigned.id };
+      const staffMembership = (await (await request.get(fixtureOrigin + '/fixtures/' + member.id)).json()).memberships[0];
+      const unassigned = await manualRequest(staffPage, request, '', { academyId: base.academyId, materialId: classroom.shortMaterialId }, 'GET');
+      if (osRole === 'tutor') expect(unassigned.status()).toBe(404);
+      else expect((await unassigned.json()).staff.classes).toEqual([]);
+      const assignment = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: staffMembership.id, expectedUpdatedAt: assigned.updatedAt });
+      expect(assignment.ok(), await assignment.text()).toBe(true);
+      const assignedDetail = (await assignment.json()).json;
+      for (const [kind, materialId] of [['short', classroom.shortMaterialId], ['quiz', classroom.quizMaterialId]] as const) {
+        const activity = '/academy/' + manager.academy.slug + '/learn/' + (kind === 'quiz' ? 'quizzes/' : 'turtle/') + materialId;
+        await studentPage.goto(activity + '?classId=' + assigned.id);
+        await expect(studentPage.getByRole('button', { name: 'Tutoring', exact: true })).toHaveCount(0);
+        await expect(studentPage.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+        await expect(studentPage.getByRole('button', { name: 'View solution', exact: true })).toHaveCount(0);
+        const studentRead = await manualRequest(studentPage, request, '', { ...base, materialId }, 'GET');
+        const publicData = await studentRead.json();
+        expect(publicData.staff).toBeUndefined();
+        expect(publicData.config.shortAnswer?.expectedAnswer ?? '').toBe('');
+        expect(publicData.config.multipleChoice?.correctOptionIds).toBeUndefined();
+        expect((await manualRequest(studentPage, request, '', { ...base, materialId, preview: true }, 'GET')).status()).toBe(403);
+        if (kind === 'short') await studentPage.getByRole('textbox', { name: 'Your answer', exact: true }).fill('Python');
+        else await studentPage.getByRole('radio', { name: 'Option 1: +', exact: true }).check();
+        await studentPage.getByRole('button', { name: 'Submit', exact: true }).click();
+        await expect(studentPage.getByText('100 / 100', { exact: false }).first()).toBeVisible({ timeout: 30_000 });
+
+        await staffPage.goto(activity);
+        await expect(staffPage.getByRole('button', { name: 'View solution', exact: true })).toBeVisible();
+        await expect(staffPage.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(osRole === 'tutor' ? 0 : 1);
+        await staffPage.getByRole('button', { name: 'View solution', exact: true }).click();
+        const solution = staffPage.getByRole('dialog', { name: 'View solution', exact: true });
+        await expect(solution.getByText(kind === 'short' ? 'Python' : '+', { exact: true })).toBeVisible();
+        await solution.getByRole('button', { name: 'Close panel', exact: true }).click();
+        const privateRead = await manualRequest(staffPage, request, '', { ...base, materialId, preview: true }, 'GET');
+        const privateData = await privateRead.json();
+        const authorInput = { ...privateData.config, academyId: base.academyId, courseId: classroom.courseId, lectureId: classroom.lectureId, materialId, title: privateData.title, type: privateData.type };
+        expect((await manualRequest(studentPage, request, '', authorInput)).status()).toBe(403);
+        if (osRole === 'tutor') expect((await manualRequest(staffPage, request, '', authorInput)).status()).toBe(403);
+        if (osRole !== 'tutor') {
+          await staffPage.getByRole('button', { name: 'Edit', exact: true }).click();
+          const editor = staffPage.getByRole('dialog', { name: 'Edit activity', exact: true });
+          await expect(editor).toBeVisible();
+          await expect(editor.getByRole('button', { name: 'Save activity', exact: true })).toBeEnabled();
+          if (kind === 'short') {
+            const hint = editor.getByLabel('Input hint', { exact: true });
+            await hint.fill('Use the language name.');
+            // The workspace polls every three seconds; it must not reset the open editor.
+            await staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            await expect(hint).toHaveValue('Use the language name.');
+          }
+          await editor.getByRole('button', { name: 'Save activity', exact: true }).click();
+          await expect(editor).toHaveCount(0);
+          // Load the new revision before returning to personal practice.
+          await staffPage.reload();
+          await expect(staffPage.getByRole('button', { name: 'Tutoring', exact: true })).toBeVisible();
+        }
+        if (osRole === 'lab_head') await staffPage.screenshot({ path: test.info().outputPath(kind + '-staff-actions.png'), animations: 'disabled', timeout: 15_000 });
+        await staffPage.getByRole('button', { name: 'Tutoring', exact: true }).click();
+        const tutoring = staffPage.getByRole('dialog', { name: 'Tutoring', exact: true });
+        await expect(tutoring.getByRole('link', { name: 'Other Python class', exact: true })).toHaveCount(0);
+        await tutoring.getByRole('link', { name: 'Assigned Python class', exact: true }).click();
+        await expect(staffPage.getByRole('heading', { name: 'Grade and feedback', exact: true })).toBeVisible();
+        await expect(staffPage.getByRole('button', { name: 'Tutoring', exact: true })).toHaveAttribute('aria-pressed', 'true');
+        await expect(staffPage.getByRole('link', { name: 'Return to my answer', exact: true })).toBeVisible();
+        const feedback = `Helpful ${kind} feedback from ${osRole}.`;
+        await staffPage.getByRole('spinbutton', { name: 'Score', exact: true }).fill('90');
+        await staffPage.getByRole('textbox', { name: 'Feedback', exact: true }).fill(feedback);
+        await staffPage.getByRole('button', { name: 'Publish review', exact: true }).click();
+        await expect(staffPage.getByText('Review published to the learner', { exact: true })).toBeVisible();
+        await studentPage.reload();
+        await expect(studentPage.getByText(feedback, { exact: true }).first()).toBeVisible();
+        const unchanged = await manualRequest(studentPage, request, '', { ...base, materialId }, 'GET');
+        const history = (await unchanged.json()).attempts;
+        expect(history).toHaveLength(1);
+        if (kind === 'short') expect(history[0].answer).toBe('Python');
+        else expect(history[0].multipleChoiceAssessment.selectedOptionIds).toEqual([privateData.config.multipleChoice.correctOptionIds[0]]);
+        if (osRole === 'lab_head') {
+          await staffPage.screenshot({ path: test.info().outputPath(kind + '-tutoring.png'), fullPage: true, animations: 'disabled', timeout: 15_000 });
+          await staffPage.setViewportSize({ width: 390, height: 844 });
+          expect(await staffPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+          await staffPage.screenshot({ path: test.info().outputPath(kind + '-tutoring-mobile.png'), fullPage: true, animations: 'disabled', timeout: 15_000 });
+          await staffPage.setViewportSize({ width: 1280, height: 720 });
+        }
+        expect((await manualRequest(staffPage, request, '/roster', { ...base, classId: other.id, materialId }, 'GET')).status()).toBe(404);
+        expect((await manualRequest(studentPage, request, '/roster', { ...base, materialId }, 'GET')).status()).toBe(403);
+      }
+      const removed = await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: null, expectedUpdatedAt: assignedDetail.updatedAt });
+      expect(removed.ok()).toBe(true);
+      expect((await manualRequest(staffPage, request, '/roster', { ...base, materialId: classroom.quizMaterialId }, 'GET')).status()).toBe(404);
+      const refreshed = await manualRequest(staffPage, request, '', { ...base, materialId: classroom.quizMaterialId }, 'GET');
+      if (osRole === 'tutor') expect(refreshed.status()).toBe(404);
+      else expect((await refreshed.json()).staff.classes).toEqual([]);
+    } finally { await staffContext.close(); await studentContext.close(); }
+  });
+}

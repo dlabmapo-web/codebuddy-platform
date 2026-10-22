@@ -93,6 +93,102 @@ test('race helpers and infinite loops run in isolated stoppable sessions', async
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
 });
 
+test('switching examples clears live and stopped results while preserving each code buffer', async ({ page }) => {
+  await enter(page);
+  const shapeSource = 'from custom import *\nspeed(0)\nTForward(80)\nprint("SHAPE_BUFFER")\n';
+  await code(page, shapeSource);
+  const choose = async (name: RegExp) => {
+    await page.getByRole('button', { name: /더 보기|More options/ }).click();
+    await page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ }).click();
+    await page.getByRole('menuitemradio', { name }).click();
+  };
+  const closeOptions = () => page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await choose(/거북이 경주|Turtle race/);
+  await closeOptions();
+  const raceSource = 'from custom import *\nReadyToRace()\nBlueForward(30)\nprint("RACE_BUFFER")\n';
+  await code(page, raceSource);
+  const creation = page.waitForResponse(response => response.url().endsWith('/turtle/api/runs') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  const race = await (await creation).json();
+  const output = page.getByRole('region', { name: /^(출력|Output)$/ });
+  const canvas = page.locator('[data-testid="turtle-display"] canvas');
+  const retained = page.getByAltText(/마지막 거북이 그림|Last turtle drawing/);
+  await expect(output).toContainText('RACE_BUFFER');
+  await expect(canvas).toBeVisible();
+  await choose(/거북이 경주|Turtle race/);
+  await closeOptions();
+  await expect(output).toContainText('RACE_BUFFER');
+  await expect(canvas).toBeVisible();
+
+  // A failed cleanup must keep the old example selected and allow a retry.
+  const raceUrl = '**/turtle/api/runs/' + race.id;
+  await page.route(raceUrl, route => route.request().method() === 'DELETE'
+    ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"REQUEST_FAILED"}' })
+    : route.continue());
+  await choose(/도형 그리기|Draw shapes/);
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ })).toHaveText(/거북이 경주|Turtle race/);
+  await closeOptions();
+  await expect(output).toContainText('RACE_BUFFER');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('RACE_BUFFER');
+  await page.unroute(raceUrl);
+
+  // A late status response from the old race must not restore its results.
+  let releasePoll!: () => void;
+  let pollHeld = false;
+  const pollReleased = new Promise<void>(resolve => { releasePoll = resolve; });
+  await page.route(raceUrl, async route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    pollHeld = true;
+    await pollReleased;
+    await route.fulfill({ response });
+  });
+  try {
+    await expect.poll(() => pollHeld).toBe(true);
+    const stopped = page.waitForResponse(response => response.url().endsWith('/runs/' + race.id) && response.request().method() === 'DELETE', { timeout: 20000 });
+    await choose(/도형 그리기|Draw shapes/);
+    expect((await stopped).ok()).toBe(true);
+    await expect(page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ })).toHaveText(/도형 그리기|Draw shapes/);
+    await closeOptions();
+    const oldStatus = page.waitForResponse(response => response.url().endsWith('/runs/' + race.id) && response.request().method() === 'GET');
+    releasePoll();
+    await oldStatus;
+    await expect(canvas).toHaveCount(0);
+    await expect(retained).toHaveCount(0);
+    await expect(output).toBeEmpty();
+    await expect(page.getByRole('button', { name: /^(중지|Stop)$/ })).toHaveCount(0);
+    await expect(page.locator('.monaco-editor .view-lines')).toContainText('SHAPE_BUFFER');
+  } finally {
+    releasePoll();
+    await page.unroute(raceUrl);
+  }
+
+  await choose(/거북이 경주|Turtle race/);
+  await closeOptions();
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('RACE_BUFFER');
+  await expect(output).toBeEmpty();
+  await choose(/자유 연습|Free practice/);
+  await closeOptions();
+  await code(page, 'from custom import *\nspeed(0)\nTForward(60)\nprint("FREE_BUFFER")\n');
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  await expect(output).toContainText('FREE_BUFFER');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: /^(중지|Stop)$/ }).click();
+  await expect(retained).toBeVisible();
+  await choose(/도형 그리기|Draw shapes/);
+  await closeOptions();
+  await expect(retained).toHaveCount(0);
+  await expect(canvas).toHaveCount(0);
+  await expect(output).toBeEmpty();
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('SHAPE_BUFFER');
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  await expect(output).toContainText('SHAPE_BUFFER');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});
+
 
 test('the turtle cursor animates on a white canvas and Clear keeps the code', async ({ page }, testInfo) => {
   await enter(page);

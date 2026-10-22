@@ -25,6 +25,22 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Switching examples
+
+Changing between Draw shapes, Turtle race and Free practice now stops/removes
+the previous run before selecting the new code buffer. The drawing, retained
+frame, console output, error and pending input are cleared. Each example keeps
+its own edited code, and mobile users return to Code. Selecting the current
+example leaves its results intact. The selector is disabled during start/stop;
+if cleanup fails, the previous example remains selected with retryable feedback.
+
+The Chromium/WebKit regression covers a live race, an already stopped drawing,
+per-example code recovery, selecting the same example, a failed cleanup followed
+by retry, and a delayed old status response arriving after the switch. It then
+executes the restored shape code to verify that new runs still work. All twelve
+Chromium/WebKit turtle checks pass, alongside web/E2E type checks, targeted lint
+and ten focused web tests.
+
 ## Thin-pen rendering and access restoration
 
 The spiral explicitly called pensize(3), overriding the five-unit default.

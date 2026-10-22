@@ -160,14 +160,24 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
     if (lastFrame.current) setRetainedFrame(lastFrame.current);
   }
   async function stop(clear = false) {
+    if (busy) return false;
     runGeneration.current++;
     snapshot(); setBusy(true); setError('');
     try {
       if (session) await turtleRequest('runs/' + session.id, 'DELETE');
       setSession(old => clear ? null : old ? { ...old, state: 'STOPPED' } : null);
       pendingRun.current = null;
-      if (clear) { setRetainedFrame(''); lastFrame.current = ''; }
-    } catch (e) { handleError(e); } finally { setBusy(false); }
+      if (clear) { setRetainedFrame(''); lastFrame.current = ''; setInput(''); }
+      return true;
+    } catch (e) { handleError(e); return false; } finally { setBusy(false); }
+  }
+  async function changeStarter(starter: TurtleStarterId) {
+    if (busy || starter === draft.starter) return;
+    // Retire the previous example before associating the editor with another
+    // buffer. stop also invalidates in-flight polls and clears retained frames.
+    if (!await stop(true)) return;
+    setDraft(d => ({ ...d, starter }));
+    setMobileTab('code');
   }
   async function run() {
     if (busy) return;
@@ -263,7 +273,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
       <div className={styles.headerActions}>
         <LanguageControl />
         <TurtleOptions starter={draft.starter} font={draft.font} saved={saved} busy={busy}
-          onStarterChange={starter => setDraft(d => ({ ...d, starter }))}
+          onStarterChange={starter => void changeStarter(starter)}
           onFontChange={font => setDraft(d => ({ ...d, font }))}
           onReset={reset} onHelp={() => setShowHelp(true)}
           onDownload={() => download(source, 'main.py', 'text/x-python')}

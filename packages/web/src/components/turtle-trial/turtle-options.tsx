@@ -34,7 +34,7 @@ export function TurtleOptions({ starter, font, saved, busy, onStarterChange, onF
     <PopoverContent align="end" portalContainer={container} className={styles.optionsPanel} aria-label={t('more_options')}>
       <div className={styles.settingsField}>
         <span>{t('example')}</span>
-        <ChoiceSelector label={t('choose_a_starter')} list={starters} selectedId={starter} onSelect={item => onStarterChange(item.id as TurtleStarterId)} />
+        <ChoiceSelector label={t('choose_a_starter')} list={starters} selectedId={starter} disabled={busy} onSelect={item => onStarterChange(item.id as TurtleStarterId)} />
       </div>
       <div className={styles.settingsField}>
         <span>{t('font_size')}</span>

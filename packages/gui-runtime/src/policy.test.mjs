@@ -11,7 +11,7 @@ const run = {
   owner: "test",
 };
 test("accept bounded source and reject paths and quota bypass", () => {
-  assert.deepEqual(validateRun(run), { ...run, assets: [] });
+  assert.deepEqual(validateRun(run), { ...run, assets: [], outputLimitBytes: 1048576 });
   for (const files of [
     { "../main.py": "" },
     { "/main.py": "" },
@@ -21,6 +21,15 @@ test("accept bounded source and reject paths and quota bypass", () => {
     assert.throws(() => validateRun({ ...run, files }));
   for (const memoryLimitMb of [0, 1024, NaN])
     assert.throws(() => validateRun({ ...run, memoryLimitMb }));
+});
+test('trusted output caps are bounded and source completion survives stream fragmentation', async () => {
+  assert.equal(validateRun({ ...run, outputLimitBytes: 262144 }).outputLimitBytes, 262144);
+  for (const outputLimitBytes of [0, -1, 1048577, '262144']) assert.throws(() => validateRun({ ...run, outputLimitBytes }));
+  const { terminalParser } = await import('./policy.mjs');
+  const states = []; const parser = terminalParser(state => states.push(state));
+  assert.equal(parser.push('finished\x1eCOVE_DIS'), 'finished');
+  assert.equal(parser.push('PLAYING\x1f'), '');
+  assert.deepEqual(states, ['DISPLAYING']);
 });
 test("capability comparison rejects absent and different secrets", () => {
   assert.equal(equalSecret("token", "token"), true);

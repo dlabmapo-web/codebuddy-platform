@@ -58,6 +58,7 @@ async function stop(s, state = "STOPPED") {
   s.data = null;
   s.pendingBytes = 0;
   s.state = state;
+  s.endedAt = Date.now();
   console.log(JSON.stringify({ event: "gui.ended", sessionId: s.id, state }));
   clearTimeout(s.deadline);
   clearTimeout(s.reconnect);
@@ -72,6 +73,14 @@ async function stop(s, state = "STOPPED") {
 }
 async function start(body) {
   const data = validateRun(body);
+  if (process.env.GUI_TRIAL_ONLY === "true" && (
+    data.timeLimitSeconds !== 120 || data.memoryLimitMb !== 512 ||
+    data.width !== 1024 || data.height !== 640 || data.outputLimitBytes !== 262144 ||
+    data.assets.length || data.entryPoint !== "_cove_trial_runner.py" ||
+    !data.owner.startsWith("trial:") || !data.requestKey || !data.authorizationExpiresAt
+  )) throw Object.assign(new Error("Invalid trial execution profile"), { status: 400 });
+  const previous = [...sessions.values()].find((s) => s.owner === data.owner && s.requestKey === data.requestKey && data.requestKey);
+  if (previous) return previous;
   const runtimeImage = selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion);
   const pendingBytes = Buffer.byteLength(JSON.stringify(data));
   if (
@@ -107,6 +116,9 @@ async function start(body) {
     id,
     container,
     owner: data.owner,
+    requestKey: data.requestKey,
+    outputLimitBytes: data.outputLimitBytes,
+    authorizationExpiresAt: data.authorizationExpiresAt,
     runtimeImage,
     token: randomBytes(32).toString("hex"),
     state: busy ? "QUEUED" : "STARTING",
@@ -128,8 +140,13 @@ async function start(body) {
 }
 async function launch(s) {
   const { data, container } = s;
+  if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now()) {
+    await stop(s, 'DISCONNECTED');
+    return s;
+  }
   s.state = "STARTING";
   s.expiresAt = Date.now() + data.timeLimitSeconds * 1000;
+  s.startedAt = Date.now();
   s.deadline = setTimeout(
     () => void stop(s, "TIMED_OUT"),
     data.timeLimitSeconds * 1000,
@@ -143,6 +160,8 @@ async function launch(s) {
       container,
       "--label",
       "cove.gui=true",
+      "--label",
+      `cove.gui.pool=${process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course'}`,
       "--network",
       "none",
       "--read-only",
@@ -253,7 +272,7 @@ async function launch(s) {
     const output = (text, rawBytes = 0) => {
       if (s.closed) return;
       s.outputBytes += Math.max(rawBytes, Buffer.byteLength(text));
-      if (s.outputBytes > 1048576) {
+      if (s.outputBytes > s.outputLimitBytes) {
         s.output += "\nOutput limit exceeded";
         void stop(s, "OUTPUT_LIMIT");
       } else s.output += text;
@@ -275,6 +294,7 @@ async function launch(s) {
     s.program.on("close", (code) => {
       if (s.closed) return;
       s.state = code === 0 ? "FINISHED" : "ERROR";
+      s.endedAt = Date.now();
       s.exitCode = code;
       clearTimeout(s.deadline);
       s.deadline = setTimeout(() => void stop(s, s.state), 30000);
@@ -295,6 +315,8 @@ function view(s) {
     output: s.output,
     expiresAt: s.expiresAt,
     exitCode: s.exitCode,
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
     runtimeImage: s.runtimeImage,
   };
 }
@@ -324,6 +346,7 @@ const server = createServer(async (req, res) => {
         JSON.stringify({
           ready: true,
           runtimeVersion,
+          pool: process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course',
           capacity,
           active: [...sessions.values()].filter((s) => !s.closed).length,
         }),
@@ -334,6 +357,14 @@ const server = createServer(async (req, res) => {
       const session = await start(await read(req));
       res.writeHead(201);
       res.end(JSON.stringify(view(session)));
+      return;
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/owners/")) {
+      const owner = decodeURIComponent(url.pathname.slice("/owners/".length));
+      const requestKey = url.searchParams.get("requestKey");
+      const found = [...sessions.values()].find((s) => s.owner === owner && s.requestKey === requestKey);
+      res.writeHead(found ? 200 : 404);
+      res.end(JSON.stringify(found ? view(found) : {}));
       return;
     }
     const match = url.pathname.match(
@@ -383,6 +414,10 @@ const server = createServer(async (req, res) => {
     res.writeHead(405);
     res.end("{}");
   } catch (error) {
+    // Fixed policy failures are safe operational diagnostics. Never log the
+    // request manifest, source, capabilities or arbitrary parser messages.
+    if (/^Invalid (trial execution profile|files|entry point or source size|owner|request key|authorization expiry|output limit|source path|assets|asset size|asset)$/.test(error.message) || error.message === 'Sandbox isolation verification failed')
+      console.warn(JSON.stringify({ event: 'gui.rejected', status: error.status || 400, reason: error.message }));
     res.writeHead(error.status || 400);
     res.end(JSON.stringify({ message: error.message }));
   }
@@ -462,7 +497,14 @@ server.on("upgrade", (req, socket, head) => {
 });
 // Containers left by a crashed service cannot survive into a new service generation.
 const previous = await docker("ps", "-aq", "--filter", "label=cove.gui=true");
-for (const id of previous.stdout.trim().split("\n").filter(Boolean))
+const previousIds = previous.stdout.trim().split('\n').filter(Boolean);
+const pool = process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course';
+for (const id of previousIds) {
+  const info = JSON.parse((await docker('inspect', id)).stdout)[0];
+  const previousPool = info.Config.Labels?.['cove.gui.pool'] ?? 'course';
+  if (previousPool !== pool) throw new Error('Guest and course brokers require separate Docker daemons; refusing cross-pool cleanup');
+}
+for (const id of previousIds)
   await docker("rm", "-f", id);
 setInterval(() => {
   for (const s of sessions.values()) {
@@ -475,7 +517,9 @@ setInterval(() => {
         (s.viewers.get(socket.viewerToken) ?? 0) < Date.now()
       )
         socket.close();
-    if (s.state !== "STARTING" && s.lease < Date.now())
+    if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now())
+      void stop(s, 'DISCONNECTED');
+    else if (s.state !== "STARTING" && s.lease < Date.now())
       void stop(s, "DISCONNECTED");
     else if (s.state === "QUEUED") {
       if (Date.now() - s.queuedAt > 60000) void stop(s, "QUEUE_EXPIRED");

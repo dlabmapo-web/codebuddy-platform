@@ -1,7 +1,7 @@
 # Public turtle trial classroom
 
 Date: 2026-10-22 (Asia/Seoul)
-Status: proposed specification for review; application changes and deployment are outside this document task.
+Status: approved for implementation by the user on 2026-10-22; implemented on `feat/public-turtle-trial`. See [local verification](../../research/2026-10-22-public-turtle-trial-verification.md). Production admission remains disabled.
 
 ## 1. Product decision
 

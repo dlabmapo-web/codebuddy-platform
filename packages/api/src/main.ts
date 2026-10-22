@@ -48,6 +48,10 @@ async function bootstrap(): Promise<void> {
   );
 
   app.use("/api/manual", manualJsonBodyParser());
+  app.use('/api/turtle-trial', (_req: unknown, res: { setHeader: (name: string, value: string) => void }, next: () => void) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    next();
+  });
   app.use("/api/videos", manualJsonBodyParser());
   app.setGlobalPrefix("api");
   app.enableCors({

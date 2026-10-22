@@ -51,6 +51,13 @@ export const apiEnvironmentSchema = z.object({
   GUI_SERVICE_URL:httpUrlSchema.optional(),
   GUI_SERVICE_SECRET:z.string().min(32).optional(),
   GUI_PUBLIC_WS_URL:z.string().url().optional(),
+  TURTLE_TRIAL_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  TURTLE_TRIAL_PIN_DIGEST: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  TURTLE_TRIAL_PIN_PEPPER: z.string().min(32).optional(),
+  TURTLE_TRIAL_PIN_VERSION: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/).optional(),
+  TURTLE_TRIAL_SERVICE_URL: httpUrlSchema.optional(),
+  TURTLE_TRIAL_SERVICE_SECRET: z.string().min(32).optional(),
+  TURTLE_TRIAL_PUBLIC_WS_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4_000),
   WEB_ORIGIN: httpUrlSchema,
@@ -204,6 +211,18 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if (environment.TURTLE_TRIAL_ENABLED) {
+    for (const key of ['TURTLE_TRIAL_PIN_DIGEST', 'TURTLE_TRIAL_PIN_PEPPER', 'TURTLE_TRIAL_PIN_VERSION', 'TURTLE_TRIAL_SERVICE_URL', 'TURTLE_TRIAL_SERVICE_SECRET', 'TURTLE_TRIAL_PUBLIC_WS_URL', 'REDIS_URL', 'BFF_SHARED_SECRET'] as const)
+      if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for turtle trial' });
+    if (environment.TURTLE_TRIAL_SERVICE_URL === environment.GUI_SERVICE_URL)
+      context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_SERVICE_URL'], message: 'must use a separate guest broker and Docker daemon' });
+    if (environment.TURTLE_TRIAL_SERVICE_SECRET === environment.GUI_SERVICE_SECRET)
+      context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_SERVICE_SECRET'], message: 'must be independent of the course runtime secret' });
+    const ws = environment.TURTLE_TRIAL_PUBLIC_WS_URL;
+    if (ws && (!usesProtocol(ws, environment.NODE_ENV === 'production' ? ['wss:'] : ['ws:', 'wss:']) ||
+      (environment.NODE_ENV === 'production' && ws !== environment.WEB_ORIGIN.replace(/^https:/, 'wss:').replace(/\/$/, '') + '/turtle-display')))
+      context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_PUBLIC_WS_URL'], message: 'must use the isolated turtle-display WebSocket gateway' });
+  }
   if (environment.DLAB_SSO_ENABLED) {
     if (environment.DLAB_SSO_ROLLOUT_MODE === 'allowlist' && !environment.DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS.length) context.addIssue({ code: 'custom', path: ['DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS'], message: 'must be nonempty in allowlist mode' });
     for (const key of ['DLAB_CLIENT_SECRET', 'DLAB_INBOUND_SERVER_KEY', 'DLAB_REDIRECT_URI', 'BFF_SHARED_SECRET'] as const) {

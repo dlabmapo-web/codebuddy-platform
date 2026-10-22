@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { getQueryClient } from '@/lib/query';
 import { ThemeProvider } from '@/lib/theme/theme-provider';
+import { routes } from '@/lib/routes';
 import type { Theme } from '@/lib/theme/settings';
 
 export function Providers({
@@ -19,7 +20,7 @@ export function Providers({
   const pathname = usePathname();
   // Floating debug controls otherwise cover Previous/Next in fullscreen lessons.
   const fullscreenLesson =
-    /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname);
+    pathname === routes.turtle || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname);
   const [queryClient] = useState(() => getQueryClient());
 
   return (

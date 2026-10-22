@@ -57,6 +57,7 @@ supabase/.temp/
 # !docs/design/**
 test-results/
 packages/web/.next-dlab/
+packages/web/.next-turtle/
 playwright-report/
 
 # Local Superpowers design-preview sessions

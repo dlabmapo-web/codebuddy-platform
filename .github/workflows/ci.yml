@@ -131,6 +131,7 @@ jobs:
             NEXT_PUBLIC_STUDIO_URL=https://cs.coveedu.com
             NEXT_PUBLIC_MVP_URL=https://mvp.coveedu.com
             NEXT_PUBLIC_GUI_ENABLED=true
+            NEXT_PUBLIC_TURTLE_TRIAL_ENABLED=true
             NEXT_PUBLIC_SHORT_ANSWER_ENABLED=true
             NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED=true
             NEXT_PUBLIC_VIDEO_LESSONS_ENABLED=true

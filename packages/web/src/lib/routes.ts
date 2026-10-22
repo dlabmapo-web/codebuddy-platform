@@ -39,6 +39,7 @@ export function isAccountOrigin(
 /** The only public URL policy for Cove Studio. */
 export const routes = {
   home: '/',
+  turtle: '/turtle',
   login: '/login',
   signup: '/signup',
   forgotPassword: '/forgot-password',

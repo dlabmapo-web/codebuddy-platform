@@ -43,6 +43,13 @@ export function validateRun(body) {
   }
   if (typeof body.owner !== "string" || body.owner.length > 200)
     throw new Error("Invalid owner");
+  if (body.requestKey !== undefined && !/^[a-f0-9-]{36}$/.test(body.requestKey))
+    throw new Error("Invalid request key");
+  if (body.authorizationExpiresAt !== undefined && (!Number.isSafeInteger(body.authorizationExpiresAt) || body.authorizationExpiresAt <= 0))
+    throw new Error('Invalid authorization expiry');
+  const outputLimitBytes = body.outputLimitBytes ?? 1048576;
+  if (!Number.isInteger(outputLimitBytes) || outputLimitBytes < 16384 || outputLimitBytes > 1048576)
+    throw new Error("Invalid output limit");
   const assets = body.assets ?? [];
   if (
     !Array.isArray(assets) ||
@@ -65,7 +72,7 @@ export function validateRun(body) {
   if (assetBytes > 20971520) throw new Error("Assets exceed 20 MiB");
   if (entries.some(([name]) => name === "assets" || name.startsWith("assets/")))
     throw new Error("Reserved asset path");
-  return { ...body, assets };
+  return { ...body, assets, outputLimitBytes };
 }
 
 // Parse only new stream data, retaining at most a partial control marker.
@@ -74,6 +81,7 @@ export function terminalParser(onState) {
   const markers = [
     ["\x1eCOVE_WAITING_INPUT\x1f", "WAITING_INPUT"],
     ["\x1eCOVE_RUNNING\x1f", "RUNNING"],
+    ["\x1eCOVE_DISPLAYING\x1f", "DISPLAYING"],
   ];
   let pending = "";
   return {

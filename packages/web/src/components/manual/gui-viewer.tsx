@@ -61,11 +61,11 @@ export function GuiViewer({
             }
             setConnection("disconnected");
             if (
-              ["RUNNING", "STARTING", "WAITING_INPUT"].includes(state.current)
+              ["RUNNING", "STARTING", "WAITING_INPUT", "DISPLAYING"].includes(state.current)
             ) {
               reconnect = setTimeout(() => {
                 if (
-                  ["RUNNING", "STARTING", "WAITING_INPUT"].includes(
+                  ["RUNNING", "STARTING", "WAITING_INPUT", "DISPLAYING"].includes(
                     state.current,
                   )
                 )

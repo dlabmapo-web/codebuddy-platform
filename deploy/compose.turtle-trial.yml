@@ -1,0 +1,26 @@
+# Run ONLY on the dedicated guest execution host/daemon, never alongside the
+# course broker. Restrict port 4010 to the API and Caddy's private VPN addresses.
+name: cove-turtle-trial
+services:
+  trial-broker:
+    image: ${TURTLE_TRIAL_BROKER_IMAGE:?use the approved cove-gui-service image digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    env_file: [./secrets/turtle-trial.env]
+    environment:
+      NODE_ENV: production
+      GUI_BIND_ADDRESS: 0.0.0.0
+      GUI_TRIAL_ONLY: "true"
+      NODE_OPTIONS: --max-old-space-size=160
+    ports: ["${TURTLE_TRIAL_BIND_IP:?private VPN address}:4010:4010"]
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    tmpfs: [/tmp:rw,noexec,nosuid,size=32m]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: { max-size: 20m, max-file: "3" }

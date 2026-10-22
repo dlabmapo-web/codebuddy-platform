@@ -36,6 +36,7 @@ services:
       - NET_BIND_SERVICE
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deployment.env}
+      TURTLE_TRIAL_DISPLAY_UPSTREAM: ${TURTLE_TRIAL_DISPLAY_UPSTREAM:-127.0.0.1:9}
     ports:
       - "80:80"
       - "443:443"
@@ -106,6 +107,7 @@ services:
       NODE_OPTIONS: --max-old-space-size=1024
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      TURTLE_TRIAL_ENABLED: ${TURTLE_TRIAL_ENABLED:-false}
     networks:
       - edge
       - backend
@@ -132,6 +134,7 @@ services:
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=1024
       PORT: 4000
+      TURTLE_TRIAL_ENABLED: ${TURTLE_TRIAL_ENABLED:-false}
     networks:
       - edge
       - backend

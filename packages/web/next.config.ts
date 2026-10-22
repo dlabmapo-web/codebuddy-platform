@@ -34,7 +34,7 @@ const deploymentId = process.env.DEPLOYMENT_VERSION?.replace(
 const nextConfig: NextConfig = {
   output: "standalone",
   // The isolated SSO suite must not stop or reuse a developer's normal server.
-  distDir: process.env.COVE_DLAB_E2E === "1" ? ".next-dlab" : ".next",
+  distDir: process.env.COVE_DLAB_E2E === "1" ? ".next-dlab" : process.env.COVE_TURTLE_E2E === '1' ? '.next-turtle' : ".next",
   // The app consumes workspace packages outside packages/web. Next's default
   // tracing root is the app directory, which would omit those files from a
   // standalone Docker image.
@@ -48,6 +48,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      { source: '/turtle/:path*', headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }, { key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       // 전 경로에 cross-origin isolation 적용 → 어느 진입 경로(SPA 네비게이션 포함)에서도
       // crossOriginIsolated 가 유지되어 워커+SharedArrayBuffer 대화식 입력이 동작한다.
       {

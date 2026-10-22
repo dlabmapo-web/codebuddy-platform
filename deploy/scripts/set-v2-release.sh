@@ -8,6 +8,7 @@ gui="${3:-}"
 short_answer="${4:-}"
 choice="${5:-}"
 video="${6:-}"
+trial="${7:-false}"
 [[ "$namespace" =~ ^ghcr\.io/[a-z0-9_.-]+$ ]] || fail "invalid GHCR namespace"
 assert_safe_tag "$tag"
 require_file "$deployment_env"
@@ -18,7 +19,7 @@ candidate="$(mktemp "$deploy_root/state/v2-release.XXXXXX")"
 cp "$deployment_env" "$candidate"
 chmod 600 "$candidate"
 
-python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" <<'PY'
+python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" "$trial" <<'PY'
 import pathlib
 import sys
 
@@ -37,8 +38,8 @@ updates = {
     "DLAB_OS_BASE_URL": "https://os.dlabcampus.com/v1",
 }
 for key, value in zip(
-    ("GUI_ENABLED", "SHORT_ANSWER_ENABLED", "MULTIPLE_CHOICE_ENABLED", "VIDEO_LESSONS_ENABLED"),
-    sys.argv[4:8],
+    ("GUI_ENABLED", "SHORT_ANSWER_ENABLED", "MULTIPLE_CHOICE_ENABLED", "VIDEO_LESSONS_ENABLED", "TURTLE_TRIAL_ENABLED"),
+    sys.argv[4:9],
 ):
     if value:
         if value not in ("true", "false"):

@@ -1,4 +1,5 @@
 import { DlabModule } from "./integrations/dlab/dlab.module.js";
+import { TurtleTrialModule } from './turtle-trial/trial.module.js';
 import { ManualModule } from "./manual/manual.module.js";
 import { VideosModule } from "./videos/videos.module.js";
 import { DocumentsModule } from "./documents/documents.module.js";
@@ -38,6 +39,7 @@ import { TeachModule } from "./teach/teach.module.js";
     DocumentsModule,
     VideosModule,
     ManualModule,
+    TurtleTrialModule,
     DraftsModule,
     AcademiesModule,
     AuthModule,

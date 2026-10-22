@@ -64,6 +64,25 @@ www.coveedu.com {
 
 cs.coveedu.com {
 	import production_common
+	@trial_display {
+		path_regexp trial ^/turtle-display/sessions/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/display$
+		method GET
+		header Upgrade websocket
+	}
+	handle @trial_display {
+		uri strip_prefix /turtle-display
+		reverse_proxy {$TURTLE_TRIAL_DISPLAY_UPSTREAM:127.0.0.1:9} {
+			header_up -Cookie
+			header_up -Authorization
+			transport http {
+				read_timeout 3m
+				write_timeout 3m
+			}
+		}
+	}
+	handle /turtle-display/* {
+		respond 404
+	}
 	@turtle_display {
 		path_regexp turtle ^/gui/sessions/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/display$
 		method GET
@@ -84,6 +103,7 @@ cs.coveedu.com {
 	}
 	handle {
 		reverse_proxy studio:3000 {
+			header_up X-Cove-Client-IP {remote_host}
 			transport http {
 				read_timeout 10m
 				write_timeout 10m

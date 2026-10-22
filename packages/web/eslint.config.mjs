@@ -37,6 +37,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Isolated Turtle and SSO verification use their own generated build dirs.
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

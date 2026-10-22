@@ -1,0 +1,42 @@
+# Small shared-VPS pilot: broker uses only the independent rootless daemon.
+# Student containers never run on the application's rootful Docker daemon.
+name: cove-turtle-trial-rootless
+services:
+  trial-broker:
+    image: ${TURTLE_TRIAL_BROKER_IMAGE:?pin the approved broker digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    env_file: [./secrets/turtle-trial.env]
+    environment:
+      NODE_ENV: production
+      GUI_BIND_ADDRESS: 0.0.0.0
+      GUI_TRIAL_ONLY: "true"
+      GUI_REQUIRE_ROOTLESS: "true"
+      GUI_SESSION_CAPACITY: "1"
+      NODE_OPTIONS: --max-old-space-size=160
+    volumes:
+      - type: bind
+        source: ${TURTLE_TRIAL_DOCKER_SOCKET:?set the dedicated rootless socket path}
+        target: /var/run/docker.sock
+        bind: { create_host_path: false }
+    networks: [gui-control]
+    tmpfs: [/tmp:rw,noexec,nosuid,size=32m]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4010/health',{headers:{Authorization:'Bearer '+process.env.GUI_SERVICE_SECRET}}).then(async r=>{const h=await r.json();if(!r.ok||!h.ready||h.pool!=='trial'||h.capacity!==1)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: 20m, max-file: "3" }
+networks:
+  gui-control:
+    external: true
+    name: ${TURTLE_TRIAL_CONTROL_NETWORK:?use the existing private gui-control network}

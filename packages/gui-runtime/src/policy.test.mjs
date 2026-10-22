@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateRun, equalSecret } from "./policy.mjs";
+import { assertRootlessRuntime, validateRun, equalSecret } from "./policy.mjs";
+test('rootless pilot refuses rootful daemons and missing resource enforcement', () => {
+  const info = { SecurityOptions: ['name=rootless'], CgroupDriver: 'systemd', CgroupVersion: '2', MemoryLimit: true, CpuCfsQuota: true, PidsLimit: true };
+  assert.doesNotThrow(() => assertRootlessRuntime(info));
+  for (const patch of [{ SecurityOptions: [] }, { CgroupDriver: 'none' }, { CgroupVersion: '1' }, { MemoryLimit: false }, { CpuCfsQuota: false }, { PidsLimit: false }])
+    assert.throws(() => assertRootlessRuntime({ ...info, ...patch }));
+  assert.throws(() => assertRootlessRuntime(null));
+});
 const run = {
   files: { "main.py": "print(1)" },
   entryPoint: "main.py",

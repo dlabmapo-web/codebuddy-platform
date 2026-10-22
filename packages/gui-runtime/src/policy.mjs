@@ -1,4 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
+export function assertRootlessRuntime(info) {
+  if (!info || !Array.isArray(info.SecurityOptions) || !info.SecurityOptions.includes('name=rootless') ||
+      info.CgroupDriver !== 'systemd' || info.CgroupVersion !== '2' ||
+      !['MemoryLimit', 'CpuCfsQuota', 'PidsLimit'].every(key => info[key] === true))
+    throw new Error('Public Turtle pilot requires rootless Docker with enforced CPU, memory and PID limits');
+}
 export function equalSecret(a, b) {
   if (typeof a !== "string" || typeof b !== "string") return false;
   const x = Buffer.from(a),

@@ -5,7 +5,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { StringDecoder } from "node:string_decoder";
 import { WebSocketServer } from "ws";
-import { equalSecret, validateRun, terminalParser } from "./policy.mjs";
+import { assertRootlessRuntime, equalSecret, validateRun, terminalParser } from "./policy.mjs";
 import { runtimeImages, selectRuntimeImage } from "./runtime-images.mjs";
 const exec = promisify(execFile);
 const secret = process.env.GUI_SERVICE_SECRET;
@@ -26,6 +26,11 @@ const seccomp = fileURLToPath(
 const sessions = new Map();
 const docker = (...args) =>
   exec("docker", args, { maxBuffer: 1024 * 1024, timeout: 30000 });
+if (process.env.GUI_REQUIRE_ROOTLESS === 'true') {
+  if (process.env.GUI_TRIAL_ONLY !== 'true' || capacity !== 1)
+    throw new Error('Rootless public Turtle pilot must use the one-session trial profile');
+  assertRootlessRuntime(JSON.parse((await docker('info', '--format', '{{json .}}')).stdout));
+}
 const versions = new Map();
 let runtimeVersion;
 for (const approvedReference of runtimeImages(image, process.env.GUI_RETAINED_RUNTIME_IMAGES, process.env.NODE_ENV === "production")) {

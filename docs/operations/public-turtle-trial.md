@@ -66,9 +66,11 @@ API endpoint; clients cannot bypass the web boundary to supply their own IP.
 
 ## Dedicated execution host
 
-Use a **different Docker daemon/host** from the course broker. The runtime
+Use a **different Docker daemon** from the course broker. The runtime
 checks pool labels before startup cleanup and refuses to remove another
 pool's containers. This protection does not make sharing a daemon supported.
+A separate execution host remains the recommended classroom deployment. The
+limited rootless pilot below supports an existing VPS with a separate daemon.
 
 On that host, deploy `compose.turtle-trial.yml`, its private env file based on
 `secrets/turtle-trial.env.example`, and an approved broker/runtime image pinned
@@ -98,6 +100,63 @@ plus broker/host/CPU headroom. A one-slot setup is for local testing only. Run
 the actual expected class size in staging before classroom launch and record
 peak usage, startup delays, queueing, reconnect, and cleanup. This implementation
 does not automatically provision or validate a 20-seat production host.
+
+## Limited pilot on an existing VPS
+
+This option supports **one active drawing**, with a bounded waiting queue.
+It shares the host kernel and physical resources with the application, so it
+is not evidence of classroom capacity or the same isolation as a separate VM.
+The guest Docker daemon and its student containers use a separate Unix socket,
+data directory, user systemd service, and cgroup slice. The application Docker
+context and course daemon are not changed. The guest slice is capped at 1 GiB,
+1.5 CPUs and 256 tasks; each drawing retains its 512 MiB/one CPU/64-PID limits.
+The private broker separately reserves 256 MiB and 0.5 CPU.
+
+One-time prerequisites, run by the VPS administrator:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y uidmap slirp4netns
+sudo loginctl enable-linger cove
+```
+
+As the deployment user over SSH, run `bash scripts/setup-turtle-rootless.sh`.
+It creates `cove-turtle-docker.service` and `cove-turtle.slice` in the user's
+systemd directory, validates rootless mode and cgroup v2 controllers, and prints
+the socket path. It refuses to overwrite differing configuration. Re-run it
+unchanged to check an existing setup. No system Docker service is restarted.
+
+Prepare a private `turtle-trial-rootless.env` manifest (mode 600):
+
+```dotenv
+TURTLE_TRIAL_BROKER_IMAGE=ghcr.io/dlabmapo-web/cove-gui-service@sha256:APPROVED_DIGEST
+TURTLE_TRIAL_DOCKER_SOCKET=/run/user/DEPLOYMENT_USER_UID/cove-turtle/docker.sock
+TURTLE_TRIAL_CONTROL_NETWORK=cove-production_gui-control
+```
+
+Keep the independent broker secret and approved runtime digest in
+`secrets/turtle-trial.env`. Pull the approved runtime using an explicit socket:
+`docker --host unix:///run/user/DEPLOYMENT_USER_UID/cove-turtle/docker.sock pull IMAGE@sha256:DIGEST`.
+Never change the deployment user's default Docker context. Then start the
+private broker with:
+
+```bash
+docker compose --env-file turtle-trial-rootless.env \
+  -f compose.turtle-trial-rootless.yml up -d --wait
+```
+
+The broker has no published ports, joins only the existing internal control
+network, and mounts only the rootless socket. Its startup refuses rootful
+Docker, missing resource controllers, or any capacity other than one. Configure
+the API's guest URL as `http://trial-broker:4010`, the display upstream as
+`trial-broker:4010`, and the public display URL as
+`wss://cs.coveedu.com/turtle-display`. Generate the stable PIN pepper privately.
+Verify resource enforcement and a real drawing before enabling the release
+flag. A runtime failure closes admission; it never falls back to course Docker.
+
+For rollback, disable public admission through the release manifest, stop this
+separate Compose project, and stop the user service if needed. Keep its data
+and PIN pepper for recovery. Do not remove course containers or shared networks.
 
 ## Local verification
 

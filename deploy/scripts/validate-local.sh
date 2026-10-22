@@ -68,6 +68,29 @@ if any(volume.get("target") == "/var/run/docker.sock" for volume in services["vi
 print("Optional learning profiles: private GUI control network and isolated video worker")
 PY
 
+# The shared-VPS pilot must use the rootless socket, no published ports, and
+# the same private control network as the API/Caddy, never course Docker.
+TURTLE_TRIAL_BROKER_IMAGE="ghcr.io/dlabmapo-web/cove-gui-service@sha256:$(printf '0%.0s' {1..64})" \
+TURTLE_TRIAL_DOCKER_SOCKET=/run/user/1001/cove-turtle/docker.sock \
+TURTLE_TRIAL_CONTROL_NETWORK=cove-production_gui-control \
+docker compose --project-directory "$validation_root" \
+  -f "$validation_root/compose.turtle-trial-rootless.yml" config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+broker = config["services"]["trial-broker"]
+assert not broker.get("ports") and not broker.get("privileged")
+assert broker["environment"]["GUI_REQUIRE_ROOTLESS"] == "true"
+assert broker["environment"]["GUI_TRIAL_ONLY"] == "true"
+assert broker["environment"]["GUI_SESSION_CAPACITY"] == "1"
+assert set(broker["networks"]) == {"gui-control"}
+assert config["networks"]["gui-control"]["external"] is True
+assert len(broker["volumes"]) == 1
+assert broker["volumes"][0]["source"] == "/run/user/1001/cove-turtle/docker.sock"
+assert broker["volumes"][0].get("bind", {}).get("create_host_path", False) is False
+assert int(broker["mem_limit"]) == 256 * 1024**2 and int(broker["pids_limit"]) == 64
+print("Public Turtle pilot: independent rootless socket, private network, bounded resources")
+'
+
 # The previous image's validator pins the Render origin. Restoring its older
 # manifest must restore that origin too, even with the new Compose assets.
 cp "$validation_root/deployment.env" "$validation_root/new-domain.env"

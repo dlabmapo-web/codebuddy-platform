@@ -125,6 +125,8 @@ It creates `cove-turtle-docker.service` and `cove-turtle.slice` in the user's
 systemd directory, validates rootless mode and cgroup v2 controllers, and prints
 the socket path. It refuses to overwrite differing configuration. Re-run it
 unchanged to check an existing setup. No system Docker service is restarted.
+After daemon recovery, its post-start hook restarts only the private pilot
+broker so its bind mount reconnects to the newly created Unix socket.
 
 Prepare a private `turtle-trial-rootless.env` manifest (mode 600):
 

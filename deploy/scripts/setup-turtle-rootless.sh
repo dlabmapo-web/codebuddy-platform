@@ -17,6 +17,15 @@ python3 - "$trial_config" "$trial_units" "$trial_runtime" <<'PY'
 import json, pathlib, sys
 config, units, runtime = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 files = {
+ config / 'restart-broker.sh': '''#!/usr/bin/env bash
+set -Eeuo pipefail
+# Rebind the new Unix socket after daemon restart; never restart course services.
+unset DOCKER_HOST DOCKER_CONTEXT
+broker=cove-turtle-trial-rootless-trial-broker-1
+if /usr/bin/docker --host unix:///var/run/docker.sock container inspect "$broker" >/dev/null 2>&1; then
+ /usr/bin/docker --host unix:///var/run/docker.sock restart --time 10 "$broker" >/dev/null
+fi
+''',
  config / 'daemon.json': json.dumps({
   'data-root': str(pathlib.Path.home() / '.local/share/cove-turtle/docker'),
   'exec-root': runtime + '/exec', 'pidfile': runtime + '/docker.pid',
@@ -47,6 +56,7 @@ Environment=DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR=%t/cove-turtle/rootlesskit
 RuntimeDirectory=cove-turtle
 RuntimeDirectoryMode=0700
 ExecStart=/usr/bin/dockerd-rootless.sh --config-file=%h/.config/cove-turtle/daemon.json
+ExecStartPost=/bin/bash %h/.config/cove-turtle/restart-broker.sh
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=120

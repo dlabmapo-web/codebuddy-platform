@@ -190,6 +190,13 @@
 .workspace:fullscreen {
   background:#fff
 }
+.restoring {
+  flex:1;
+  display:grid;
+  place-items:center;
+  color:#777;
+  font-size:14px
+}
 .header {
   display:flex;
   align-items:center;

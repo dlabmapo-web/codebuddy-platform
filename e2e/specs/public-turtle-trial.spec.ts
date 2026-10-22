@@ -160,7 +160,7 @@ test('Cove settings dismiss correctly and language changes preserve the code', a
   await page.getByLabel('체험 코드', { exact: true }).fill('012345');
   await page.getByRole('button', { name: '시작하기', exact: true }).click();
   await expect(page.getByLabel('파이썬 코드', { exact: true })).toBeVisible();
-  const source = 'import turtle\nt = turtle.Turtle("turtle")\nassert t.pensize() == 5\nassert t.shapesize() == (2, 2, 2)\nt.color("purple")\nt.speed(0)\nfor i in range(4):\n    t.forward(100)\n    t.left(90)\nprint("STANDARD_TURTLE_OK")\n';
+  const source = 'import turtle\nt = turtle.Turtle("turtle")\nassert t.pensize() == 5\nassert t.shapesize() == (2, 2, 2)\nt.pensize(3)\nassert t.pensize() == 3\nt.color("purple")\nt.speed(0)\nfor i in range(4):\n    t.forward(100)\n    t.left(90)\nprint("STANDARD_TURTLE_OK")\n';
   await code(page, source);
   await page.getByRole('button', { name: '더 보기', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '더 보기', exact: true })).toBeVisible();
@@ -177,9 +177,28 @@ test('Cove settings dismiss correctly and language changes preserve the code', a
   await page.getByRole('button', { name: '더 보기', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: '더 보기', exact: true })).toHaveCount(0);
+  // Observe every DOM update in the next document, not only its final state.
+  await page.addInitScript(() => {
+    const state = { pinShown: false };
+    (window as unknown as { turtleAccessCheck: typeof state }).turtleAccessCheck = state;
+    new MutationObserver(() => {
+      if (document.getElementById('turtle-pin')) state.pinShown = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  let releaseBootstrap!: () => void;
+  const bootstrapReady = new Promise<void>(resolve => { releaseBootstrap = resolve; });
+  await page.route('**/turtle/api/bootstrap', async route => {
+    await bootstrapReady;
+    await route.continue();
+  });
   await page.getByRole('button', { name: /언어|Language/ }).click();
-  await page.getByRole('menuitemradio', { name: 'English', exact: true }).click();
+  try {
+    await page.getByRole('menuitemradio', { name: 'English', exact: true }).click({ noWaitAfter: true });
+    await expect(page.getByTestId('turtle-restoring')).toBeVisible();
+    await expect(page.locator('#turtle-pin')).toHaveCount(0);
+  } finally { releaseBootstrap(); }
   await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { turtleAccessCheck: { pinShown: boolean } }).turtleAccessCheck.pinShown)).toBe(false);
   await expect(page.locator('.monaco-editor .view-lines')).toContainText('STANDARD_TURTLE_OK');
   await page.getByRole('button', { name: 'More options', exact: true }).click();
   await page.getByRole('button', { name: 'Commands', exact: true }).click();
@@ -188,7 +207,14 @@ test('Cove settings dismiss correctly and language changes preserve the code', a
   await page.getByRole('button', { name: 'Close help', exact: true }).click();
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Output', exact: true })).toContainText('STANDARD_TURTLE_OK');
-  await expect(page.locator('[data-testid="turtle-display"] canvas')).toBeVisible();
+  const canvas = page.locator('[data-testid="turtle-display"] canvas');
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => {
+    const pixels = element.getContext('2d')!.getImageData(0, 0, element.width, element.height).data;
+    let purple = 0;
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i]! > 80 && pixels[i + 1]! < 60 && pixels[i + 2]! > 80) purple++;
+    return purple;
+  })).toBeGreaterThan(2000);
   await page.screenshot({ path: testInfo.outputPath('standard-turtle-english.png') });
   await page.getByRole('button', { name: 'More options', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'More options', exact: true })).toBeVisible();

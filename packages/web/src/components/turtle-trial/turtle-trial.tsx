@@ -43,7 +43,7 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
   const [draft, setDraft] = useState<TurtleDraft>(initialTurtleDraft);
   const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(true);
-  const [access, setAccess] = useState(false);
+  const [access, setAccess] = useState<boolean | null>(enabled ? null : false);
   const [loading, setLoading] = useState(enabled);
   const [nonceReady, setNonceReady] = useState(false);
   const [pin, setPin] = useState('');
@@ -99,11 +99,12 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
     setLoading(true);
     try {
       const result = await turtleRequest<TurtleBootstrap | null>('bootstrap');
-      if (!result) { await challenge(); return; }
+      if (!result) { setAccess(false); await challenge(); return; }
       setAccess(true); setSession(result.session); setError('');
     } catch (e) {
-      if (!(e instanceof TurtleRequestError && e.status === 401)) handleError(e);
-      await challenge();
+      if (e instanceof TurtleRequestError && e.status === 401) {
+        setAccess(false); await challenge();
+      } else handleError(e);
     } finally { setLoading(false); }
   }
   useEffect(() => {
@@ -225,6 +226,11 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
   }
   const retry = Math.max(0, Math.ceil((retryUntil - now) / 1000));
   const status = session ? ({ QUEUED: t('waiting_for_a_drawing_space'), STARTING: t('preparing_your_turtle'), RUNNING: t('running_your_code'), DISPLAYING: t('your_drawing_is_ready'), WAITING_INPUT: t('waiting_for_your_input'), STOPPED: t('stopped'), TIMED_OUT: t('time_is_up_you_can_run_again'), ERROR: t('check_your_code'), OUTPUT_LIMIT: t('stopped_because_output_was_too_large'), QUEUE_EXPIRED: t('the_queue_expired_please_run_again'), DISCONNECTED: t('disconnected_please_run_again') } as Record<string, string>)[session.state] ?? session.state : t('write_some_code_and_press_run');
+
+  if (access === null || (loading && !access)) return <main className={styles.workspace} aria-busy={loading} data-testid="turtle-restoring">
+    <header className={styles.header}><div className={styles.wordmark}><Turtle size={22} /><strong>Cove Turtle</strong></div></header>
+    <div className={styles.restoring} role="status">{error ? <div><p className={styles.error}>{error}</p><button type="button" className={styles.textButton} disabled={loading} onClick={() => void bootstrap()}>{t('refresh_access')}</button></div> : t('connecting_loading')}</div>
+  </main>;
 
   if (!access) return <main className={styles.gate}>
     <div className={styles.gateHeader}><div className={styles.gateBrand}><Turtle size={27} /> <strong>Cove Turtle</strong><span>PYTHON PLAYGROUND</span></div><LanguageControl /></div>

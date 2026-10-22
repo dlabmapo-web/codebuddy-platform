@@ -132,6 +132,14 @@ def CircleTurtle():
 export const turtleRunnerSource = String.raw`import runpy
 import sys
 import turtle
+# Keep Python pen values intact while making strokes legible in the scaled
+# classroom canvas, including programs that explicitly request a thin pen.
+_original_drawline = turtle.TurtleScreenBase._drawline
+def _classroom_drawline(self, lineitem, coordlist=None, fill=None, width=None, top=False):
+    if isinstance(width, (int, float)) and width >= 0:
+        width = max(6, width * 2)
+    return _original_drawline(self, lineitem, coordlist, fill, width, top)
+turtle.TurtleScreenBase._drawline = _classroom_drawline
 # Classroom defaults apply to every standard turtle in this guest process.
 # Keep the class identity and honor later explicit pensize()/shapesize() calls.
 _original_init = turtle.RawTurtle.__init__

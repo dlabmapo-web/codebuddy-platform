@@ -82,6 +82,20 @@ def verify_standard_turtles(*args, **kwargs):
     pen.forward(1)
     assert pen.pensize() == 9, "Honor explicit pen settings"
     assert pen.shapesize() == (3, 3, 1)
+    for width in (1, 2, 3, 8):
+        pen.pensize(width)
+        pen.forward(5)
+        assert pen.pensize() == width, "Keep Python pen values intact"
+        rendered = float(screen.cv.itemcget(pen.currentLineItem, "width"))
+        assert rendered == max(6, width * 2), (width, rendered)
+    pen.width(3)
+    pen.forward(5)
+    assert pen.width() == 3
+    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 6
+    pen.pen(pensize=2)
+    pen.forward(5)
+    assert pen.pen()["pensize"] == 2
+    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 6
     pen.reset()
     assert pen.pensize() == 5
     assert pen.shapesize() == (2, 2, 2)

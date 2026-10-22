@@ -25,6 +25,33 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Thin-pen rendering and access restoration
+
+The spiral explicitly called pensize(3), overriding the five-unit default.
+The guest runner now applies a presentation rule at Tk's turtle line renderer:
+rendered stroke width is max(6, 2 × requested width). Python's pen getters,
+coordinates and explicit pen-state values remain unchanged. The rule covers
+pensize(), width(), pen(pensize=...), helpers and all pen colors in the guest
+process. It does not change the course runner or local Python installation.
+
+Initial access is now unknown until bootstrap returns. The server-rendered and
+client startup view is a neutral Connecting shell, followed by the workspace
+for an existing grant or the PIN gate for confirmed signed-out access. A failed
+connection stays in the neutral shell with retry. Language reloads therefore do
+not briefly render the PIN form. Loading controls are omitted until access is
+known so a menu cannot unmount under an early language selection.
+
+Regression coverage holds bootstrap pending during the language reload and
+observes every DOM mutation to prove the PIN form never appears for a valid
+grant. The standard-turtle example requests pensize(3), verifies Python still
+reports 3, and checks more than 2,000 purple pixels for a 100-unit square. Real
+Tk checks inspect the canvas line width for requested pen sizes 1, 2, 3 and 8,
+the width alias and pen dictionary, alongside the prior helper/runner checks.
+Ten focused web tests, web/E2E types and targeted lint pass; the full Chromium
+and WebKit turtle scenarios also pass.
+
+[Explicit pensize(3), bold rendered strokes](assets/2026-10-22-public-turtle-trial/bold-lines.png)
+
 ## Cove controls, localization and drawing defaults
 
 Settings now use Cove's shared Popover and ChoiceSelector instead of native

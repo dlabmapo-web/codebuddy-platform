@@ -119,5 +119,8 @@
   "manager_error": "Could not complete the request. Refresh code status and try again.",
   "manager_conflict": "Another manager changed the code. Refresh code status before continuing.",
   "manager_copy_error": "Copy was unavailable. Select and copy the displayed code manually.",
-  "manager_unavailable": "Public Turtle is not enabled yet. Ask your platform administrator to enable it."
+  "manager_unavailable": "Public Turtle is not enabled yet. Ask your platform administrator to enable it.",
+  "show_access_code": "Show code",
+  "hide_access_code": "Hide code",
+  "ask_teacher_for_code": "Don’t know the code? Ask your teacher."
 }

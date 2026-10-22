@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import Image from 'next/image';
-import { ArrowRight, Play, Square, Turtle, X } from 'lucide-react';
+import { ArrowRight, Check, LoaderCircle, Play, RotateCw, Square, Turtle, X } from 'lucide-react';
 import { turtleHelperVersion, turtleRunning, turtleSpiralExample, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { GuiViewer } from '@/components/manual/gui-viewer';
 import { turtleRequest, TurtleRequestError } from '@/lib/turtle-trial/client';
 import { initialTurtleDraft, parseTurtleDraft, turtleDraftKey, turtleErrorHint, type TurtleDraft } from '@/lib/turtle-trial/drafts';
 import { LanguageControl } from '@/components/studio/language-control';
+import { Button } from '@/components/studio/button';
 import { useTurtleTranslation } from './use-turtle-translation';
 import { TurtleOptions } from './turtle-options';
+import { TurtlePinInput } from './turtle-pin-input';
 import styles from './turtle-trial.module.css';
 
 const help = [
@@ -161,7 +163,9 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
   }, [session?.id, running, busy, handleError]);
 
   async function enter(e: FormEvent) {
-    e.preventDefault(); setBusy(true); setError('');
+    e.preventDefault();
+    if (busy || loading || !nonceReady || pin.length !== 6 || retryUntil > Date.now()) return;
+    setBusy(true); setError('');
     try { await turtleRequest('access', 'POST', { pin }); setPin(''); await bootstrap(); }
     catch (e) { handleError(e); } finally { setBusy(false); }
   }
@@ -262,16 +266,19 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
         <div className={styles.preview} aria-hidden="true"><code><b>TForward</b>(100)<br /><b>TLeft</b>(90)</code><div className={styles.square}><Turtle size={32} /></div></div>
       </section>
       <section className={styles.accessCard} aria-labelledby="trial-title">
-        <Turtle className={styles.cardTurtle} size={38} /><h2 id="trial-title">{t('try_python_turtle')}</h2>
+        <div className={styles.cardTurtle}><Turtle size={36} aria-hidden="true" /></div><h2 id="trial-title">{t('try_python_turtle')}</h2>
         <p>{t('enter_the_six_digit_code_from_your_teacher')}</p>
-        {enabled ? <form onSubmit={enter}>
-          <label htmlFor="turtle-pin">{t('classroom_code')}</label>
-          <input id="turtle-pin" autoComplete="off" type="password" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={pin} disabled={loading || busy || !nonceReady} onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="······" required aria-describedby={error ? 'trial-error' : undefined} />
-          <button className={styles.primary} disabled={busy || loading || !nonceReady || pin.length !== 6 || retry > 0} type="submit">{loading || busy ? t('connecting_loading') : t('start_drawing')}<ArrowRight size={18} /></button>
+        {enabled ? <form onSubmit={enter} aria-busy={busy || loading}>
+          <TurtlePinInput value={pin} onChange={value => { setPin(value); if (error && retry === 0) setError(''); }} disabled={loading || busy || !nonceReady} invalid={error === t('error_invalid_pin')} />
+          {error && <p id="trial-error" className={styles.error} role="alert">{error}{retry > 0 && ` (${retry}s)`}</p>}
+          <Button className={styles.gateSubmit} disabled={busy || loading || !nonceReady || pin.length !== 6 || retry > 0} type="submit">
+            {busy || loading ? <LoaderCircle className={styles.spinner} aria-hidden="true" /> : <Play fill="currentColor" aria-hidden="true" />}
+            <span>{busy || loading ? t('connecting_loading') : t('start_drawing')}</span>
+            {!busy && !loading && <ArrowRight aria-hidden="true" />}
+          </Button>
         </form> : <p role="status">{t('the_classroom_is_not_open_yet_please_ask')}</p>}
-        {error && <p id="trial-error" className={styles.error} role="alert">{error}{retry > 0 && ` (${retry}s)`}</p>}
-        {enabled && (!nonceReady || error) && <button type="button" className={styles.textButton} onClick={() => { setError(''); void challenge(); }}>{t('refresh_access')}</button>}
-        <div className={styles.gateNote}>{t('start_without_creating_an_account')}</div>
+        {enabled && (!nonceReady || error) && <Button variant="ghost" size="sm" type="button" className={styles.gateRefresh} onClick={() => { setError(''); void challenge(); }}><RotateCw aria-hidden="true" />{t('refresh_access')}</Button>}
+        <div className={styles.gateNote}><Check size={16} aria-hidden="true" />{t('start_without_creating_an_account')}</div>
       </section>
     </div>
     <footer className={styles.gateFooter}>COVE · {t('the_joy_of_thinking_the_joy_of_making')}</footer>

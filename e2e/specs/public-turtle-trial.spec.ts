@@ -22,6 +22,63 @@ async function code(page: Page, source: string) {
   })).toBe(source);
 }
 
+test('six-box entry supports paste, editing, visibility, errors and mobile layout', async ({ page }, testInfo) => {
+  await page.goto('/turtle');
+  const pin = page.getByLabel(/체험 코드|Classroom code/, { exact: true });
+  const start = page.getByRole('button', { name: /시작하기|Start drawing/ });
+  await expect(pin).toBeEnabled();
+  await expect(start).toBeDisabled();
+  await pin.fill('012');
+  await expect(start).toBeDisabled();
+  await pin.evaluate(element => {
+    const data = new DataTransfer(); data.setData('text/plain', '012 345');
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(pin).toHaveValue('012345');
+  await expect(start).toBeEnabled();
+  await expect(pin).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: /^(코드 보기|Show code)$/ }).click();
+  await expect(pin).toHaveAttribute('type', 'text');
+  await expect(pin).toHaveValue('012345');
+  await page.getByRole('button', { name: /^(코드 숨기기|Hide code)$/ }).click();
+  await pin.focus();
+  await pin.press('ControlOrMeta+A');
+  await pin.press('ArrowRight');
+  await pin.press('ArrowLeft');
+  await pin.press('Backspace');
+  await expect(pin).toHaveValue('01235');
+  await pin.press('4');
+  await expect(pin).toHaveValue('012345');
+  await pin.fill('999999');
+  await pin.press('Enter');
+  await expect(page.locator('#trial-error')).toBeVisible();
+  await expect(pin).toHaveAttribute('aria-invalid', 'true');
+  await pin.fill('012345');
+  await expect(page.locator('#trial-error')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('six-digit-entry-desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 360, height: 780 });
+  await expect(start).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('six-digit-entry-mobile.png'), animations: 'disabled' });
+  await pin.press('Enter');
+  await expect(page.getByLabel(/파이썬 코드|Python code/, { exact: true })).toBeVisible();
+});
+
+test('Korean entry stays readable on small phones, tablets and desktop', async ({ page }, testInfo) => {
+  await page.goto('/turtle');
+  await page.getByRole('button', { name: /^(언어|Language)$/ }).click();
+  await page.getByRole('menuitemradio', { name: '한국어', exact: true }).click();
+  const pin = page.getByLabel('체험 코드', { exact: true });
+  await expect(pin).toBeEnabled();
+  await expect(page.getByText('코드를 모르겠다면 선생님께 물어보세요.')).toBeVisible();
+  for (const width of [320, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole('button', { name: '시작하기', exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`korean-entry-${width}.png`), animations: 'disabled' });
+  }
+});
+
 test('PIN, helpers, drawing, export, refresh and mobile controls work without an account', async ({ page }, testInfo) => {
   const identityRequests: string[] = [];
   const bootstrapFailures: number[] = [];

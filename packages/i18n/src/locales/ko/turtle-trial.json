@@ -119,5 +119,8 @@
   "manager_error": "요청을 완료하지 못했어요. 코드 상태를 새로고침하고 다시 시도해 주세요.",
   "manager_conflict": "다른 매니저가 코드를 변경했어요. 코드 상태를 새로고침한 후 다시 진행해 주세요.",
   "manager_copy_error": "복사하지 못했어요. 표시된 코드를 직접 선택해 복사해 주세요.",
-  "manager_unavailable": "아직 거북이 체험 기능이 활성화되지 않았어요. 플랫폼 관리자에게 문의해 주세요."
+  "manager_unavailable": "아직 거북이 체험 기능이 활성화되지 않았어요. 플랫폼 관리자에게 문의해 주세요.",
+  "show_access_code": "코드 보기",
+  "hide_access_code": "코드 숨기기",
+  "ask_teacher_for_code": "코드를 모르겠다면 선생님께 물어보세요."
 }

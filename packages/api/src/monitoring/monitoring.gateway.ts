@@ -59,7 +59,7 @@ import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { StudentSessionService } from "../auth/student-session.service.js";
 import { PrismaService } from "../database/prisma.service.js";
-import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
+import { effectivelyVisibleActivityWhere } from "../learn/curriculum-visibility.js";
 import { LearningActivityAccumulator } from "../teach/learning-activity.accumulator.js";
 import { CollaborationDocumentService } from "./collaboration-document.service.js";
 import { WatchSessionRegistry, type WatchLease } from "./watch-session.registry.js";
@@ -936,11 +936,12 @@ export class MonitoringGateway
       ? await this.prisma.material.findFirst({
           where: {
             id: parsed.data.materialId,
-            ...effectivelyVisibleMaterialWhere(student.academyId),
+            ...effectivelyVisibleActivityWhere(student.academyId),
           },
           select: {
             id: true,
             title: true,
+            type: true,
             lecture: {
               select: {
                 id: true,
@@ -961,20 +962,42 @@ export class MonitoringGateway
     const requestedCourseId = parsed.data.materialId
       ? material?.lecture.courseModule.courseId ?? null
       : parsed.data.courseId;
-    const eligibleClassIds = requestedCourseId
-      ? new Set(
-          (
-            await this.prisma.classCourse.findMany({
-              where: {
-                courseId: requestedCourseId,
-                classId: { in: student.classes.map((entry) => entry.classId) },
-                class: { status: "ACTIVE" },
-              },
-              select: { classId: true },
-            })
-          ).map((assignment) => assignment.classId),
-        )
-      : new Set<string>();
+    // Identity can stay cached for the socket, but enrollment cannot: students
+    // may be added to or removed from a class while already signed in. This
+    // replaces the course-assignment lookup rather than adding a query per class.
+    const currentClasses = await this.prisma.class.findMany({
+      where: {
+        academyId: student.academyId,
+        status: "ACTIVE",
+        enrollments: { some: {
+          membershipId: student.membershipId,
+          membership: {
+            academyId: student.academyId, status: "ACTIVE", role: "STUDENT",
+            user: { authUserId: socket.data.identity.authUserId, status: "ACTIVE" },
+          },
+        } },
+      },
+      select: {
+        id: true,
+        courseAssignments: {
+          where: { courseId: { in: requestedCourseId ? [requestedCourseId] : [] } },
+          select: { courseId: true },
+        },
+      },
+    });
+    const currentIds = new Set(currentClasses.map(entry => entry.id));
+    const removedClasses = student.classes.filter(entry => !currentIds.has(entry.classId));
+    student.classes = currentClasses.map(entry => ({ classId: entry.id, membershipId: student.membershipId }));
+    for (const removed of removedClasses) {
+      await this.presence.clear(student.academyId, removed.classId, student.membershipId);
+      const snapshot = await this.presence.snapshot(student.academyId, removed.classId);
+      if (snapshot) this.server.to(monitoringRooms.classPresence(student.academyId, removed.classId))
+        .emit(monitoringServerEvents.classSnapshot, snapshot);
+      this.publishWatchContext(student, removed.classId, { materialId: null, courseId: null, path: null, available: false });
+    }
+    const eligibleClassIds = new Set(currentClasses
+      .filter(entry => entry.courseAssignments.some(assignment => assignment.courseId === requestedCourseId))
+      .map(entry => entry.id));
     const verifiedCourseId =
       requestedCourseId && eligibleClassIds.size > 0 ? requestedCourseId : null;
     const verifiedClassId =
@@ -1014,12 +1037,15 @@ export class MonitoringGateway
         active: parsed.data.active,
       });
       await this.publishPresence(student.academyId, entry.classId, state);
+      // Manual activities report solving, but cannot become a programming
+      // editor's follow target. Their answers have a separate tutoring view.
+      const watchableInClass = visibleInClass && (!material || material.type === "PROGRAMMING_EXERCISE");
       this.publishWatchContext(student, entry.classId, {
-        available: visibleInClass,
-        materialId: visibleInClass ? material?.id ?? null : null,
-        courseId: visibleInClass ? verifiedCourseId : null,
+        available: watchableInClass,
+        materialId: watchableInClass ? material?.id ?? null : null,
+        courseId: watchableInClass ? verifiedCourseId : null,
         path:
-          visibleInClass && material
+          watchableInClass && material
             ? {
                 course: {
                   id: material.lecture.courseModule.course.id,
@@ -1982,6 +2008,10 @@ export class MonitoringGateway
       (entry) => entry.studentMembershipId === student.membershipId,
     );
     if (current && current.state !== "OFFLINE") return;
+    // Class cards have no per-student expiry timer. Push the authoritative
+    // offline counts at the grace boundary, not only a watch-context update.
+    this.server.to(monitoringRooms.classPresence(student.academyId, classId))
+      .emit(monitoringServerEvents.classSnapshot, snapshot);
     this.publishWatchContext(student, classId, {
       materialId: null,
       courseId: null,

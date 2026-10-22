@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, ChevronLeft, ChevronRight, Expand, Send, Save, BookOpen, Menu, LogOut, History, MessageSquareText, ListChecks } from 'lucide-react';
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import { ManualStaffActions } from './manual-staff-actions';
 import { WrittenAnswerCard, AssessmentDrawer, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
@@ -223,6 +224,13 @@ export function ManualWorkspace({
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
+  const { setOpenMaterial } = useStudentPresence();
+  const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
+  useEffect(() => {
+    if (!presenceCourseId || !selectedClass) return;
+    setOpenMaterial({ materialId, courseId: presenceCourseId, classId: selectedClass });
+    return () => setOpenMaterial(null);
+  }, [materialId, presenceCourseId, selectedClass, setOpenMaterial]);
   async function run(solution = false) {
     setBusy(true);
     setError("");

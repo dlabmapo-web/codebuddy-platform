@@ -104,6 +104,7 @@ function createGateway(overrides?: {
     // before any of this matters, so the roster half is deliberately inert.
     isAvailable: true,
     publish: vi.fn().mockResolvedValue(null),
+    clear: vi.fn().mockResolvedValue(undefined),
     nextVersion: vi.fn().mockResolvedValue(null),
     snapshot: vi
       .fn()
@@ -579,6 +580,11 @@ describe("handleDisconnect", () => {
       await vi.advanceTimersByTimeAsync(monitoringTiming.recoveryGraceMs + 1);
 
       expect(emissions).toContainEqual({
+        room: monitoringRooms.classPresence(academyId, classId),
+        event: monitoringServerEvents.classSnapshot,
+        payload: snapshot,
+      });
+      expect(emissions).toContainEqual({
         room: monitoringRooms.watchContext(
           academyId,
           classId,
@@ -651,6 +657,7 @@ describe("handleDisconnect", () => {
             entry.event === monitoringServerEvents.studentContextChanged,
         ),
       ).toHaveLength(0);
+      expect(emissions.filter(entry => entry.event === monitoringServerEvents.classSnapshot)).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
@@ -1352,6 +1359,7 @@ describe("student movement", () => {
     return {
       id,
       title: "Sum two numbers",
+      type: "PROGRAMMING_EXERCISE",
       lecture: {
         id: "c0000000-0000-4000-8000-000000000001",
         title: "Input and output",
@@ -1374,11 +1382,9 @@ describe("student movement", () => {
             : Promise.resolve(options.material),
         ),
       },
-      classCourse: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue(options?.assigned === false ? [] : [{ classId }]),
-      },
+      class: { findMany: vi.fn().mockResolvedValue([
+        { id: classId, courseAssignments: options?.assigned === false ? [] : [{ courseId }] },
+      ]) },
       classEnrollment: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
     const harness = createGateway({ prisma });
@@ -1412,6 +1418,33 @@ describe("student movement", () => {
       });
     return { ...harness, socket, publish, prisma };
   }
+
+  it("refreshes enrollment for a student who joined a class after socket connection", async () => {
+    const { socket, publish, presence, prisma } = createStudent();
+    socket.data.student!.classes = [];
+    await publish(materialId);
+    expect(socket.data.student!.classes).toEqual([{ classId, membershipId: studentMembershipId }]);
+    expect(presence.publish).toHaveBeenCalledWith(expect.objectContaining({ classId, materialId, courseId }));
+    expect(prisma.class.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ academyId, status: 'ACTIVE', enrollments: expect.any(Object) }) }));
+  });
+
+  it("clears presence when the student no longer belongs to a previously cached class", async () => {
+    const { socket, publish, presence, prisma } = createStudent();
+    prisma.class.findMany.mockResolvedValueOnce([]);
+    await publish(materialId);
+    expect(socket.data.student!.classes).toEqual([]);
+    expect(presence.clear).toHaveBeenCalledWith(academyId, classId, studentMembershipId);
+    expect(presence.publish).not.toHaveBeenCalled();
+    expect(socket.data.student!.materialId).toBeNull();
+  });
+
+  it("counts manual activities without offering them as live code-editor follow targets", async () => {
+    const { publish, presence, emissions } = createStudent({ material: { ...materialRow(materialId), type: "WRITTEN_RESPONSE" } });
+    await publish(materialId);
+    expect(presence.publish).toHaveBeenCalledWith(expect.objectContaining({ classId, materialId, courseId }));
+    const context = emissions.find(entry => entry.event === monitoringServerEvents.studentContextChanged);
+    expect(context?.payload).toMatchObject({ available: false, materialId: null, courseId: null, path: null });
+  });
 
   it("retries presence after a temporary session-store failure without forcing a reload", async () => {
     const { studentSessions, socket, publish, presence } = createStudent();

@@ -227,6 +227,11 @@ test('Manager and Team Lead use one workspace, with teaching granted only by rea
     await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
     await studentPage.goto(workspace + '?classId=' + assigned.id);
     await expect(studentPage.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+    // Rendering Run precedes the student's realtime handshake. Establish
+    // live presence before asking to edit; an offline saved-code view is valid.
+    await page.goto('/academy/' + manager.academy.slug + '/teach/classes');
+    await expect(page.getByText('1 solving', { exact: true })).toBeVisible();
+    await page.goto(workspace);
     await page.getByRole('button', { name: 'Tutoring', exact: true }).click();
     await expect(page.getByText('Browser student', { exact: true })).toBeVisible();
     await expect(page.getByText('Other Python class', { exact: true })).toHaveCount(0);
@@ -378,3 +383,50 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
     } finally { await staffContext.close(); await studentContext.close(); }
   });
 }
+
+test('Manager class cards receive student presence over WebSocket across coding, short answers and quizzes', async ({ page, request, browser }) => {
+  test.setTimeout(180_000);
+  const manager = await fixture(request, 'lab_head');
+  await enter(page, manager);
+  await expect(page).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+  const student = await fixture(request, 'student', { parentFixtureId: manager.id });
+  const studentContext = await browser.newContext();
+  const studentPage = await studentContext.newPage();
+  const studentSockets: string[] = [], managerSockets: string[] = [];
+  studentPage.on('websocket', socket => studentSockets.push(socket.url()));
+  page.on('websocket', socket => managerSockets.push(socket.url()));
+  try {
+    await enter(studentPage, student);
+    await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
+    expect(seeded.ok(), await seeded.text()).toBe(true);
+    const classroom = await seeded.json(), [assigned] = classroom.classes;
+    const membership = (await (await request.get(fixtureOrigin + '/fixtures/' + manager.id)).json()).memberships[0];
+    const base = { academyId: manager.academy.id, classId: assigned.id };
+    expect((await rpc(page, request, 'academyClasses/setTeacher', { ...base, teacherMembershipId: membership.id, expectedUpdatedAt: assigned.updatedAt })).ok()).toBe(true);
+    const root = '/academy/' + manager.academy.slug;
+    await page.goto(root + '/teach/classes');
+    const card = page.getByRole('link').filter({ has: page.getByRole('heading', { name: 'Assigned Python class', exact: true }) });
+    await expect(card.getByText('1 online', { exact: true })).toBeVisible();
+    await expect(card.getByText('0 solving', { exact: true })).toBeVisible();
+    for (const [path, id] of [['exercises', classroom.materialId], ['turtle', classroom.shortMaterialId], ['quizzes', classroom.quizMaterialId]] as const) {
+      await studentPage.goto(root + '/learn/' + path + '/' + id + '?classId=' + assigned.id);
+      await expect(card.getByText('1 solving', { exact: true })).toBeVisible();
+      const roster = await rpc(page, request, 'monitoring/getClassRoster', base);
+      expect(roster.ok()).toBe(true);
+      // The class card must be updated by pushed snapshots/deltas, not an HTTP polling loop.
+      expect(studentSockets.some(url => url.includes('transport=websocket'))).toBe(true);
+      expect(managerSockets.some(url => url.includes('transport=websocket'))).toBe(true);
+      await studentPage.goto(root + '/learn/courses/' + classroom.courseId + '?classId=' + assigned.id);
+      await expect(card.getByText('0 solving', { exact: true })).toBeVisible();
+      await expect(card.getByText('1 online', { exact: true })).toBeVisible();
+    }
+    await studentPage.goto(root + '/learn/quizzes/' + classroom.quizMaterialId + '?classId=' + assigned.id);
+    await studentPage.reload();
+    await expect(card.getByText('1 solving', { exact: true })).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('manager-live-class-counts.png'), animations: 'disabled', timeout: 15_000 });
+    await studentContext.close();
+    await expect(card.getByText('0 online', { exact: true })).toBeVisible({ timeout: 45_000 });
+    await expect(card.getByText('0 solving', { exact: true })).toBeVisible();
+  } finally { await studentContext.close(); }
+});

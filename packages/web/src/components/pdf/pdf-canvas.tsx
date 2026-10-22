@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { ensureReadableStreamIterator } from '@/lib/readable-stream-iterator';
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { pdfApi } from '@/lib/pdf-api';
 import 'react-pdf/dist/Page/TextLayer.css';
+// Keep the searchable/selectable text layer available on Safari as well as canvas rendering.
+ensureReadableStreamIterator();
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,

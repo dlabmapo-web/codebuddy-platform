@@ -73,6 +73,7 @@ describe('mergeRoster', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'SOLVING', materialId })],
+      [{ materialId, number: 1, title: 'Coding exercise' }],
     );
     expect(row).toMatchObject({
       state: 'SOLVING',
@@ -85,10 +86,12 @@ describe('mergeRoster', () => {
     const [idle] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'IDLE', materialId })],
+      [{ materialId, number: 1, title: 'Coding exercise' }],
     );
     const [online] = mergeRoster(
       [student({ membershipId: 'b' })],
       [presence('b', { state: 'ONLINE', materialId })],
+      [{ materialId, number: 1, title: 'Coding exercise' }],
     );
     expect(idle!.canOpenLive).toBe(true);
     expect(online!.canOpenLive).toBe(true);
@@ -116,6 +119,7 @@ describe('mergeRoster', () => {
     );
     expect(row!.exercise).toBeNull();
     expect(row!.materialId).toBe(materialId);
+    expect(row!.canOpenLive).toBe(false);
   });
 
   it('has no exercise for a student outside one', () => {

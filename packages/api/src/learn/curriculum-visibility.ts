@@ -22,6 +22,16 @@ export function effectivelyVisibleMaterialWhere(
   };
 }
 
+/** Presence also covers short answers, quizzes and other manual exercises.
+ * Keep code-editor authorization on the narrower predicate above. */
+export function effectivelyVisibleActivityWhere(academyId: string): Prisma.MaterialWhereInput {
+  const { programmingExercise: _programmingExercise, ...visibility } = effectivelyVisibleMaterialWhere(academyId);
+  return {
+    ...visibility,
+    OR: [{ programmingExercise: { isNot: null } }, { manualMaterial: { isNot: null } }],
+  };
+}
+
 /**
  * Both gates at once: the curriculum must be effectively visible *and* the
  * actor's class assignments must reach it. Every student operation that

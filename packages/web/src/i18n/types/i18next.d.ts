@@ -63,6 +63,7 @@ declare module 'i18next' {
       solutions: typeof import("@cove/i18n/locales/en/solutions.json");
       editor: typeof editor;
       manual:typeof manual;
+      "turtle-trial": typeof import("@cove/i18n/locales/en/turtle-trial.json");
       video:typeof video;
       quiz: typeof import("@cove/i18n/locales/en/quiz.json");
       grading: typeof grading;

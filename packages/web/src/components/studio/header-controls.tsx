@@ -4,7 +4,6 @@ import Link from 'next/link';
 import type * as React from 'react';
 import { useState } from 'react';
 import { LogOut, Moon, Sun, UserRound } from 'lucide-react';
-import { locales, localeCodes, type Locale } from '@cove/i18n/settings';
 import type { AcademyRole } from '@cove/shared';
 
 import { useSignOut } from '@/app/(auth)/_components/sign-out-control';
@@ -19,14 +18,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
 import { RoleBadge } from '@/components/studio/role-badge';
-import { LocaleFlag } from '@/components/studio/locale-flag';
+import { LanguageControl } from './language-control';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
-import { useLayoutTranslation, useLocale } from '@/i18n';
-import { setBrowserLocale } from '@/i18n/client/set-locale';
+import { useLayoutTranslation } from '@/i18n';
 import { routes } from '@/lib/routes';
 import { useTheme } from '@/lib/theme/theme-provider';
 import { themes, type Theme } from '@/lib/theme/settings';
 import { cn } from '@/lib/utils';
+
+export { LanguageControl } from './language-control';
 
 /**
  * Theme and language are the same kind of control: not content, not account
@@ -67,59 +67,6 @@ export function ThemeControl({ className }: { className?: string }) {
           {themes.map((option) => (
             <DropdownMenuRadioItem key={option} value={option}>
               {t(`theme.${option}`)}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/**
- * The trigger carries the current language as a flag and a code; the menu
- * carries each language's own name beside its flag. The code answers "what am
- * I reading?" at a glance, `한국어` answers "what can I switch to?" in the one
- * form the reader who needs it can read, and the flag answers both before
- * either is read at all.
- *
- * The flag replaces the generic `Languages` glyph rather than joining it. That
- * icon said "this control is about language" — which the code beside it already
- * said — where the flag says *which* language, so keeping both would spend the
- * width on the less useful half.
- *
- * The code sits in a fixed-width box and both spellings are three letters, so
- * switching language never nudges the controls beside it. On a bilingual
- * product every reader presses this at least once, and a button that reflows
- * its neighbours when used is a defect.
- */
-export function LanguageControl({ className }: { className?: string }) {
-  const { t } = useLayoutTranslation('common');
-  const current = useLocale();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={t('language.label')}
-        className={cn(trigger, className)}
-        title={t('language.label')}
-      >
-        <LocaleFlag locale={current} />
-        <span className="min-w-[1.75rem] text-center text-[12px] font-bold tracking-[0.06em]">
-          {localeCodes[current]}
-        </span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className={menu}>
-        <DropdownMenuRadioGroup
-          onValueChange={(value) => {
-            if (value !== current) setBrowserLocale(value as Locale);
-          }}
-          value={current}
-        >
-          {locales.map((locale) => (
-            // `RadioItem` carries no gap of its own, unlike `MenuItem`.
-            <DropdownMenuRadioItem className="gap-2" key={locale} value={locale}>
-              <LocaleFlag locale={locale} />
-              {t(`language.${locale}`)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

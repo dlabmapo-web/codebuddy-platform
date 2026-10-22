@@ -99,11 +99,18 @@ Cove Turtle                                                [⋯]
 - Font defaults to 18px, adjustable 14–28px. Editor has Python highlighting, line numbers, four-space indentation, normal copy/paste, and no mandatory file-tree interaction.
 - Run executes the current saved-in-memory code snapshot; changes during execution apply to the next run. Run remains available after startup. Pressing it stops the previous owned run before starting a fresh drawing with the current code. A separate Stop control is present while a run is active. Controls are disabled during an in-flight start/stop request.
 - A finished drawing remains visible. The canvas is white with no desktop border, keyboard toolbar, live badge, or visible connection labels. Resizing scales the viewport without changing turtle coordinates. Workspace fullscreen is available in More options.
-- Examples, font size, reset code, command help, downloads, fullscreen, Exit, and the tab-save indicator live in the More options menu. The normal workspace shows only the compact brand bar and Run/Light/Clear toolbar.
+- Examples, font size, reset code, command help, downloads, fullscreen, Exit, and the tab-save indicator live in the More options popover. Reuse Cove's Popover and ChoiceSelector components. Outside click or Escape dismisses settings; action buttons close settings before acting. The normal workspace shows only the compact brand bar and Run/Light/Clear toolbar.
 - `코드 초기화` replaces only the current starter's editable code after confirmation. `지우기` (Clear) stops/removes the current run and clears its drawing/output, retaining code. A new Run always starts from fresh Python/turtle state.
 - `나가기` revokes the guest grant, stops its active/queued run, clears trial drafts and transient viewer data, and returns to the PIN form. It does not sign the visitor out of Cove Studio.
 - The help drawer lists lesson commands, arguments, one-line Korean explanations, and examples. Opening help never replaces code. Include a short bridge from `TForward(100)` to standard `turtle.forward(100)`.
 - Errors show a concise Korean explanation and the editable `main.py` line when known, with expandable original Python details. Missing colon, indentation, wrong helper case, and missing race setup receive targeted deterministic hints. Do not send student code to an AI service.
+
+A visible Cove language control appears on the PIN screen and workspace header.
+It selects 한국어 or English using the platform locale cookie and reload behavior,
+preserving this tab's draft and valid guest grant. Feature copy, help, hints and
+page title live in `packages/i18n/src/locales/{ko,en}/turtle-trial.json`, loaded
+only for this page; Python commands, student source and program output are not
+translated. The switch does not require an account.
 
 ### 5.3 Starter choices and local work
 
@@ -137,7 +144,7 @@ from custom import *
 
 Implement Cove-owned `custom.py` and `shape.py`, versioned as `cove-trial-v1`. `custom` exports the lesson helpers plus standard `speed` and `color`. `shape` exports `CircleTurtle`; neither wildcard import exports implementation internals. Importing modules must not start the race, draw a welcome animation, or redefine `randint`/`print`.
 
-`TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. New helper drawing turtles use a 5-pixel pen and speed 1; the guest screen defaults to a 30 ms animation delay so movement is visible. Explicit speed and standard turtle pen settings remain adjustable. Race turtles also use a 5-pixel pen and speed 1 after their instant setup. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
+`TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. New helper drawing turtles use a 5-pixel pen, a double-size cursor and speed 1; the guest screen defaults to a 30 ms animation delay so movement is visible. Explicit speed and standard turtle pen settings remain adjustable. Race turtles also use a 5-pixel pen, a double-size cursor and speed 1 after their instant setup. The guest runner applies the same pen/cursor defaults to standard Turtle/RawTurtle construction and reset, regardless of color or helper imports. Explicit pensize()/shapesize() calls remain available. This adaptation runs only inside the guest process and preserves the standard turtle class identities. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
 
 The guest API assembles fixed helper files and a fixed entry runner with submitted `main.py`. The runner prepares a full-size borderless white screen and the helpers select a turtle-shaped cursor for movement. It executes `main.py` at its actual filename, flushes the screen, and enters `turtle.mainloop()` after normal completion when a screen remains open. An explicit student `done()`/`mainloop()` continues to work. Exceptions remain errors and do not become successful completed programs. On an error, retain the latest delivered drawing as best effort alongside the traceback.
 

@@ -11,13 +11,13 @@ export function parseTurtleDraft(raw: string | null): TurtleDraft {
     return { starter: value.starter, buffers: Object.fromEntries(turtleStarterIds.map(id => [id, value.buffers[id]])) as TurtleDraft['buffers'], font: value.font };
   } catch { return initialTurtleDraft(); }
 }
-export function turtleErrorHint(output: string, english: boolean) {
-  let message = '';
-  if (/IndentationError|TabError/.test(output)) message = english ? 'Indent the repeated code with four spaces.' : '반복할 코드 앞에 공백 4칸으로 들여쓰기 해 보세요.';
-  else if (/SyntaxError/.test(output)) message = english ? 'Check parentheses, quotes, and the colon after for, while or if.' : '괄호와 따옴표, for·while·if 뒤의 콜론(:)을 확인해 보세요.';
-  else if (/NameError/.test(output)) message = english ? 'Check command capitals, such as TForward, and restore the imports if needed.' : 'TForward처럼 대소문자를 확인하고, 필요하면 기본 코드를 복원해 보세요.';
-  else if (/ReadyToRace/.test(output)) message = english ? 'Run ReadyToRace() before moving a racer.' : '경주 거북이를 움직이기 전에 ReadyToRace()를 실행해 주세요.';
-  else if (/Error:/.test(output)) message = english ? 'Check the indicated line and the command arguments.' : '표시된 줄과 명령어에 넣은 값을 확인해 주세요.';
+export function turtleErrorHint(output: string) {
+  let key: 'hint_indent' | 'hint_syntax' | 'hint_name' | 'hint_race' | 'hint_arguments' | null = null;
+  if (/IndentationError|TabError/.test(output)) key = 'hint_indent';
+  else if (/SyntaxError/.test(output)) key = 'hint_syntax';
+  else if (/NameError/.test(output)) key = 'hint_name';
+  else if (/ReadyToRace/.test(output)) key = 'hint_race';
+  else if (/Error:/.test(output)) key = 'hint_arguments';
   const matches = [...output.matchAll(/File "(?:\/work\/)?main\.py", line (\d+)/g)];
-  return { message, line: matches.length ? Number(matches[matches.length - 1]![1]) : null };
+  return { key, line: matches.length ? Number(matches[matches.length - 1]![1]) : null };
 }

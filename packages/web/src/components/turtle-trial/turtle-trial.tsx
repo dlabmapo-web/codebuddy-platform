@@ -2,26 +2,29 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import Image from 'next/image';
-import { ArrowRight, MoreHorizontal, Play, Square, Turtle, X } from 'lucide-react';
+import { ArrowRight, Play, Square, Turtle, X } from 'lucide-react';
 import { turtleHelperVersion, turtleRunning, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { GuiViewer } from '@/components/manual/gui-viewer';
 import { turtleRequest, TurtleRequestError } from '@/lib/turtle-trial/client';
 import { initialTurtleDraft, parseTurtleDraft, turtleDraftKey, turtleErrorHint, type TurtleDraft } from '@/lib/turtle-trial/drafts';
+import { LanguageControl } from '@/components/studio/language-control';
+import { useTurtleTranslation } from './use-turtle-translation';
+import { TurtleOptions } from './turtle-options';
 import styles from './turtle-trial.module.css';
 
 const help = [
-  ['TForward(100)', '앞으로 100만큼 이동해요.', 'Move forward 100 steps.'],
-  ['TLeft(90)', '왼쪽으로 90도 돌아요. 내각이 아닌 외각이에요.', 'Turn left 90 degrees. Use the exterior angle.'],
-  ['color("red")', '선과 거북이 색을 바꿔요.', 'Change the pen and turtle color.'],
-  ['speed(0)', '0은 가장 빠른 속도예요. 1~10도 사용할 수 있어요.', '0 is fastest. You can also use 1–10.'],
-  ['randint(1, 20)', '1과 20을 포함한 무작위 정수를 골라요.', 'Pick a random integer, including both bounds.'],
-  ['print(123)', '아래 출력 창에 값을 표시해요.', 'Show a value in Output.'],
-  ['ReadyToRace()', '경기장과 네 마리 거북이를 준비해요.', 'Prepare the track and four turtles.'],
-  ['BlueForward(20)', '파란 거북이만 이동해요. Pink·Yellow·Green도 있어요.', 'Move Blue. Pink, Yellow and Green work too.'],
-  ['BlueLeft(10)', '파란 거북이만 돌아요. 다른 색도 사용할 수 있어요.', 'Turn Blue. The other colors work too.'],
-  ['BlueX()', '파란 거북이의 x좌표예요. 결승선은 330이에요.', 'Get Blue’s x coordinate. The finish is at 330.'],
-];
+  ["TForward(100)", "help_forward"],
+  ["TLeft(90)", "help_left"],
+  ["color(\"red\")", "help_color"],
+  ["speed(0)", "help_speed"],
+  ["randint(1, 20)", "help_random"],
+  ["print(123)", "help_print"],
+  ["ReadyToRace()", "help_race"],
+  ["BlueForward(20)", "help_racer_forward"],
+  ["BlueLeft(10)", "help_racer_left"],
+  ["BlueX()", "help_racer_x"],
+] as const;
 
 function SplitHandle({ vertical = false, value, onChange, label }: { vertical?: boolean; value: number; onChange: (n: number) => void; label: string }) {
   return <div role="separator" aria-label={label} aria-orientation={vertical ? 'horizontal' : 'vertical'} aria-valuenow={value} aria-valuemin={20} aria-valuemax={80}
@@ -35,8 +38,8 @@ function SplitHandle({ vertical = false, value, onChange, label }: { vertical?: 
     }} />;
 }
 
-export function TurtleTrial({ enabled, english }: { enabled: boolean; english: boolean }) {
-  const t = (ko: string, en: string) => english ? en : ko;
+export function TurtleTrial({ enabled }: { enabled: boolean }) {
+  const { t } = useTurtleTranslation();
   const [draft, setDraft] = useState<TurtleDraft>(initialTurtleDraft);
   const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(true);
@@ -65,30 +68,29 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
   const mounted = useRef(false);
   const source = draft.buffers[draft.starter];
   const running = turtleRunning(session);
-  const hint = turtleErrorHint(session?.output ?? '', english);
+  const hint = turtleErrorHint(session?.output ?? '');
 
   const handleError = useCallback((e: unknown) => {
     const code = e instanceof Error ? e.message : '';
-    const en = english;
     const messages: Record<string, string> = {
-      INVALID_PIN: en ? 'That code doesn’t match. Please check it and try again.' : '코드가 맞지 않아요. 다시 확인해 주세요.',
-      ACCESS_EXPIRED: en ? 'Your session ended. Enter the classroom code again; your code is still here.' : '체험 시간이 끝났어요. 코드를 다시 입력해 주세요. 작성한 코드는 그대로 있어요.',
-      RUN_CONFLICT: en ? 'A run is already active. Stop it before running again.' : '이미 실행 중인 코드가 있어요. 먼저 중지해 주세요.',
-      SOURCE_TOO_LARGE: en ? 'Your code is larger than 64 KiB. Shorten it before running.' : '코드가 64 KiB를 넘었어요. 코드를 줄인 후 실행해 주세요.',
-      HELPERS_CHANGED: en ? 'The classroom has been updated. Reload this page; your code is saved in this tab.' : '체험 수업이 업데이트됐어요. 이 탭에 코드를 저장한 후 새로고침해 주세요.',
-      CHALLENGE_EXPIRED: en ? 'The code form expired. Refresh access and try again.' : '코드 입력 시간이 지났어요. 연결 확인 후 다시 시도해 주세요.',
-      RUN_LIMIT: en ? 'You’ve reached this session’s run limit. Ask your teacher before starting a new session.' : '이번 체험의 실행 한도에 도달했어요. 선생님께 알려 주세요.',
-      RUNTIME_BUSY: en ? 'All drawing spaces are in use. Try again shortly.' : '지금은 모든 그림 공간을 사용 중이에요. 잠시 후 다시 실행해 주세요.',
-      RATE_LIMITED: en ? 'Too many attempts. Please wait before trying again.' : '시도 횟수가 많아요. 잠시 기다린 후 다시 시도해 주세요.',
-      RUN_ENDED: en ? 'This run has ended. Press Run to start again.' : '실행이 끝났어요. 실행 버튼으로 다시 시작해 보세요.',
+      INVALID_PIN: t('error_invalid_pin'),
+      ACCESS_EXPIRED: t('error_access_expired'),
+      RUN_CONFLICT: t('error_run_conflict'),
+      SOURCE_TOO_LARGE: t('error_source_too_large'),
+      HELPERS_CHANGED: t('error_helpers_changed'),
+      CHALLENGE_EXPIRED: t('error_challenge_expired'),
+      RUN_LIMIT: t('error_run_limit'),
+      RUNTIME_BUSY: t('error_runtime_busy'),
+      RATE_LIMITED: t('error_rate_limited'),
+      RUN_ENDED: t('error_run_ended'),
     };
-    setError(messages[code] ?? (en ? 'The classroom connection is unavailable. Please try again.' : '체험 수업에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.'));
+    setError(messages[code] ?? t('error_connection'));
     if (e instanceof TurtleRequestError && e.retryAfter) setRetryUntil(Date.now() + e.retryAfter * 1000);
     if (e instanceof TurtleRequestError && e.status === 401 && code !== 'INVALID_PIN' && code !== 'CHALLENGE_EXPIRED') {
       setAccess(false); setSession(null); setNonceReady(false);
       void turtleRequest('challenge').then(() => setNonceReady(true)).catch(() => {});
     }
-  }, [english]);
+  }, [t]);
   const viewerError = useCallback((text: string) => setError(text), []);
   async function challenge() {
     try { await turtleRequest('challenge'); setNonceReady(true); setError(''); } catch (e) { handleError(e); }
@@ -202,13 +204,13 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
     catch (e) { handleError(e); }
   }
   function reset() {
-    if (!window.confirm(t('현재 코드를 기본 코드로 바꿀까요?', 'Replace this starter’s code with the original?'))) return;
+    if (!window.confirm(t('replace_this_starter_s_code_with_the_original'))) return;
     pendingRun.current = null;
     setDraft(d => ({ ...d, buffers: { ...d.buffers, [d.starter]: turtleStarters[d.starter] } }));
   }
   async function fullscreen(element: HTMLElement | null) {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await element?.requestFullscreen(); }
-    catch { setError(t('이 브라우저에서는 전체 화면을 사용할 수 없어요.', 'Fullscreen is unavailable in this browser.')); }
+    catch { setError(t('fullscreen_is_unavailable_in_this_browser')); }
   }
   function download(bytes: BlobPart, name: string, type: string) {
     const url = URL.createObjectURL(new Blob([bytes], { type })); const a = document.createElement('a');
@@ -222,79 +224,72 @@ export function TurtleTrial({ enabled, english }: { enabled: boolean; english: b
     } catch (e) { handleError(e); }
   }
   const retry = Math.max(0, Math.ceil((retryUntil - now) / 1000));
-  const status = session ? ({ QUEUED: t('그림 공간을 기다리고 있어요', 'Waiting for a drawing space'), STARTING: t('거북이를 준비하고 있어요', 'Preparing your turtle'), RUNNING: t('코드를 실행하고 있어요', 'Running your code'), DISPLAYING: t('그림을 확인하고 있어요', 'Your drawing is ready'), WAITING_INPUT: t('입력할 값을 기다리고 있어요', 'Waiting for your input'), STOPPED: t('실행을 멈췄어요', 'Stopped'), TIMED_OUT: t('실행 시간이 끝났어요. 다시 실행할 수 있어요.', 'Time is up. You can run again.'), ERROR: t('코드를 확인해 보세요', 'Check your code'), OUTPUT_LIMIT: t('출력이 너무 많아 실행을 멈췄어요', 'Stopped because output was too large'), QUEUE_EXPIRED: t('대기 시간이 끝났어요. 다시 실행해 주세요.', 'The queue expired. Please run again.'), DISCONNECTED: t('연결이 끝났어요. 다시 실행해 주세요.', 'Disconnected. Please run again.') } as Record<string, string>)[session.state] ?? session.state : t('코드를 쓰고 실행해 보세요', 'Write some code and press Run');
+  const status = session ? ({ QUEUED: t('waiting_for_a_drawing_space'), STARTING: t('preparing_your_turtle'), RUNNING: t('running_your_code'), DISPLAYING: t('your_drawing_is_ready'), WAITING_INPUT: t('waiting_for_your_input'), STOPPED: t('stopped'), TIMED_OUT: t('time_is_up_you_can_run_again'), ERROR: t('check_your_code'), OUTPUT_LIMIT: t('stopped_because_output_was_too_large'), QUEUE_EXPIRED: t('the_queue_expired_please_run_again'), DISCONNECTED: t('disconnected_please_run_again') } as Record<string, string>)[session.state] ?? session.state : t('write_some_code_and_press_run');
 
   if (!access) return <main className={styles.gate}>
-    <div className={styles.gateBrand}><Turtle size={27} /> <strong>Cove Turtle</strong><span>PYTHON PLAYGROUND</span></div>
+    <div className={styles.gateHeader}><div className={styles.gateBrand}><Turtle size={27} /> <strong>Cove Turtle</strong><span>PYTHON PLAYGROUND</span></div><LanguageControl /></div>
     <div className={styles.gateGrid}>
       <section className={styles.intro}>
-        <span className={styles.eyebrow}>{t('코드로 그리는 첫 번째 그림', 'YOUR FIRST DRAWING WITH CODE')}</span>
-        <h1>{t('작은 명령어로,', 'A little code.')}<br />{t('커다란 상상력.', 'A lot of imagination.')}</h1>
-        <p>{t('거북이와 함께 도형을 그리고, 나만의 경주를 만들어 보세요.', 'Draw shapes with a turtle, then build a race of your own.')}</p>
+        <span className={styles.eyebrow}>{t('your_first_drawing_with_code')}</span>
+        <h1>{t('a_little_code')}<br />{t('a_lot_of_imagination')}</h1>
+        <p>{t('draw_shapes_with_a_turtle_then_build_a')}</p>
         <div className={styles.preview} aria-hidden="true"><code><b>TForward</b>(100)<br /><b>TLeft</b>(90)</code><div className={styles.square}><Turtle size={32} /></div></div>
       </section>
       <section className={styles.accessCard} aria-labelledby="trial-title">
-        <Turtle className={styles.cardTurtle} size={38} /><h2 id="trial-title">{t('파이썬 거북이 체험', 'Try Python & Turtle')}</h2>
-        <p>{t('선생님이 알려준 6자리 코드를 입력해 주세요.', 'Enter the six-digit code from your teacher.')}</p>
+        <Turtle className={styles.cardTurtle} size={38} /><h2 id="trial-title">{t('try_python_turtle')}</h2>
+        <p>{t('enter_the_six_digit_code_from_your_teacher')}</p>
         {enabled ? <form onSubmit={enter}>
-          <label htmlFor="turtle-pin">{t('체험 코드', 'Classroom code')}</label>
+          <label htmlFor="turtle-pin">{t('classroom_code')}</label>
           <input id="turtle-pin" autoComplete="off" type="password" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={pin} disabled={loading || busy || !nonceReady} onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="······" required aria-describedby={error ? 'trial-error' : undefined} />
-          <button className={styles.primary} disabled={busy || loading || !nonceReady || pin.length !== 6 || retry > 0} type="submit">{loading || busy ? t('연결하고 있어요…', 'Connecting…') : t('시작하기', 'Start drawing')}<ArrowRight size={18} /></button>
-        </form> : <p role="status">{t('체험 수업을 준비하고 있어요. 선생님께 문의해 주세요.', 'The classroom is not open yet. Please ask your teacher.')}</p>}
+          <button className={styles.primary} disabled={busy || loading || !nonceReady || pin.length !== 6 || retry > 0} type="submit">{loading || busy ? t('connecting_loading') : t('start_drawing')}<ArrowRight size={18} /></button>
+        </form> : <p role="status">{t('the_classroom_is_not_open_yet_please_ask')}</p>}
         {error && <p id="trial-error" className={styles.error} role="alert">{error}{retry > 0 && ` (${retry}s)`}</p>}
-        {enabled && (!nonceReady || error) && <button type="button" className={styles.textButton} onClick={() => { setError(''); void challenge(); }}>{t('연결 확인', 'Refresh access')}</button>}
-        <div className={styles.gateNote}>{t('회원가입 없이 바로 시작해요.', 'Start without creating an account.')}</div>
+        {enabled && (!nonceReady || error) && <button type="button" className={styles.textButton} onClick={() => { setError(''); void challenge(); }}>{t('refresh_access')}</button>}
+        <div className={styles.gateNote}>{t('start_without_creating_an_account')}</div>
       </section>
     </div>
-    <footer className={styles.gateFooter}>COVE · {t('생각하는 즐거움, 만드는 즐거움', 'The joy of thinking. The joy of making.')}</footer>
+    <footer className={styles.gateFooter}>COVE · {t('the_joy_of_thinking_the_joy_of_making')}</footer>
   </main>;
 
   return <main className={styles.workspace} ref={workspace}>
     <header className={styles.header}>
       <div className={styles.wordmark}><Turtle size={22} /><strong>Cove Turtle</strong></div>
-      <details className={styles.options}>
-        <summary aria-label={t('더 보기', 'More options')}><MoreHorizontal size={22} /></summary>
-        <div className={styles.optionsPanel}>
-          <label>{t('예제', 'Example')}<select aria-label={t('기본 코드 선택', 'Choose a starter')} value={draft.starter} onChange={e => setDraft(d => ({ ...d, starter: e.target.value as TurtleStarterId }))}>
-            <option value="drawing">{t('도형 그리기', 'Draw shapes')}</option><option value="race">{t('거북이 경주', 'Turtle race')}</option><option value="free">{t('자유 연습', 'Free practice')}</option>
-          </select></label>
-          <label>{t('글자 크기', 'Font size')}<select aria-label={t('글자 크기', 'Font size')} value={draft.font} onChange={e => setDraft(d => ({ ...d, font: Number(e.target.value) }))}>{[14, 16, 18, 20, 22, 24, 26, 28].map(n => <option value={n} key={n}>{n}px</option>)}</select></label>
-          <button type="button" onClick={reset} disabled={busy}>{t('코드 초기화', 'Reset code')}</button>
-          <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}>{t('명령어 도움말', 'Commands')}</button>
-          <button type="button" onClick={() => download(source, 'main.py', 'text/x-python')}>{t('코드 다운로드 (.py)', 'Download code (.py)')}</button>
-          <button type="button" onClick={() => void project()}>{t('전체 프로젝트 (.zip)', 'Project with helpers (.zip)')}</button>
-          <button type="button" onClick={() => void fullscreen(workspace.current)}>{t('전체 화면', 'Fullscreen')}</button>
-          <button type="button" onClick={() => void exit()} disabled={busy}>{t('나가기', 'Exit')}</button>
-          <p className={saved ? '' : styles.unsaved}>{saved ? t('이 탭에 임시 저장됨', 'Saved in this tab') : t('다운로드로 코드를 보관하세요.', 'Download to keep your code.')}</p>
-        </div>
-      </details>
+      <div className={styles.headerActions}>
+        <LanguageControl />
+        <TurtleOptions starter={draft.starter} font={draft.font} saved={saved} busy={busy}
+          onStarterChange={starter => setDraft(d => ({ ...d, starter }))}
+          onFontChange={font => setDraft(d => ({ ...d, font }))}
+          onReset={reset} onHelp={() => setShowHelp(true)}
+          onDownload={() => download(source, 'main.py', 'text/x-python')}
+          onProject={() => void project()} onFullscreen={() => void fullscreen(workspace.current)} onExit={() => void exit()} />
+      </div>
     </header>
-    <nav className={styles.toolbar} aria-label={t('실행 도구', 'Execution controls')}>
-      <button type="button" className={styles.run} disabled={busy || retry > 0} onClick={() => void run()}><Play size={13} fill="currentColor" />{busy ? t('잠시만요', 'Please wait') : t('실행', 'Run')}</button>
-      <button type="button" onClick={() => setTheme(value => value === 'light' ? 'paircode-dark' : 'light')}>{theme === 'light' ? t('어둡게', 'Dark') : t('밝게', 'Light')}</button>
-      <button type="button" onClick={() => void stop(true)} disabled={busy}>{t('지우기', 'Clear')}</button>
-      {running && <button type="button" className={styles.stop} disabled={busy} onClick={() => void stop()}><Square size={11} fill="currentColor" />{t('중지', 'Stop')}</button>}
-      <span className={styles.runStatus} role="status">{busy ? t('거북이를 준비하고 있어요…', 'Preparing your turtle…') : session && session.state !== 'DISPLAYING' && session.state !== 'STOPPED' ? status : ''}</span>
+    <nav className={styles.toolbar} aria-label={t('execution_controls')}>
+      <button type="button" className={styles.run} disabled={busy || retry > 0} onClick={() => void run()}><Play size={13} fill="currentColor" />{busy ? t('please_wait') : t('run')}</button>
+      <button type="button" onClick={() => setTheme(value => value === 'light' ? 'paircode-dark' : 'light')}>{theme === 'light' ? t('dark') : t('light')}</button>
+      <button type="button" onClick={() => void stop(true)} disabled={busy}>{t('clear')}</button>
+      {running && <button type="button" className={styles.stop} disabled={busy} onClick={() => void stop()}><Square size={11} fill="currentColor" />{t('stop')}</button>}
+      <span className={styles.runStatus} role="status">{busy ? t('preparing_your_turtle_loading') : session && session.state !== 'DISPLAYING' && session.state !== 'STOPPED' ? status : ''}</span>
     </nav>
-    {error && <div className={styles.errorBar} role="alert">{error}{retry > 0 && ` (${retry}s)`}<button type="button" aria-label={t('닫기', 'Dismiss')} onClick={() => setError('')}><X size={16} /></button></div>}
-    <nav className={styles.mobileTabs} aria-label={t('작업 공간', 'Workspace')} role="tablist">{[['code', t('코드', 'Code')], ['drawing', t('그림', 'Drawing')], ['output', t('출력', 'Output')]].map(([id, name]) => <button key={id} type="button" role="tab" aria-selected={mobileTab === id} onClick={() => setMobileTab(id!)}>{name}</button>)}</nav>
+    {error && <div className={styles.errorBar} role="alert">{error}{retry > 0 && ` (${retry}s)`}<button type="button" aria-label={t('dismiss')} onClick={() => setError('')}><X size={16} /></button></div>}
+    <nav className={styles.mobileTabs} aria-label={t('workspace')} role="tablist">{[['code', t('code')], ['drawing', t('drawing')], ['output', t('output')]].map(([id, name]) => <button key={id} type="button" role="tab" aria-selected={mobileTab === id} onClick={() => setMobileTab(id!)}>{name}</button>)}</nav>
     <div className={styles.panes} style={{ '--editor': split + '%' } as CSSProperties}>
-      <section className={styles.editor} data-visible={mobileTab === 'code'} aria-label={t('파이썬 코드', 'Python code')}>
+      <section className={styles.editor} data-visible={mobileTab === 'code'} aria-label={t('python_code')}>
         <CodeEditor code={source} fontSize={draft.font} theme={theme} onChange={value => { setSaved(false); setDraft(d => ({ ...d, buffers: { ...d.buffers, [d.starter]: value } })); }} />
       </section>
-      <SplitHandle value={split} onChange={n => setSplit(Math.min(70, Math.max(30, n)))} label={t('코드와 그림 크기 조절', 'Resize code and drawing')} />
+      <SplitHandle value={split} onChange={n => setSplit(Math.min(70, Math.max(30, n)))} label={t('resize_code_and_drawing')} />
       <div className={styles.results} style={{ gridTemplateRows: `minmax(0,${100 - consoleSize}fr) 6px minmax(0,${consoleSize}fr)` }}>
-        <section className={styles.drawing} data-visible={mobileTab === 'drawing'} aria-label={t('그림', 'Drawing')} ref={drawing}>
-          {retainedFrame ? <Image src={retainedFrame} width={1024} height={640} unoptimized alt={t('마지막 거북이 그림', 'Last turtle drawing')} className={styles.frame} /> : !busy && running && session && session.state !== 'QUEUED' ? <GuiViewer session={session} minimal onFrame={keepFrame} onError={viewerError} /> : <div className={styles.empty}><span className="sr-only">{session?.state === 'QUEUED' ? t('그림 공간이 준비되면 자동으로 시작해요.', 'Your code starts when a drawing space is ready.') : t('왼쪽에 코드를 쓰고 실행을 눌러 보세요.', 'Write code on the left, then press Run.')}</span></div>}
+        <section className={styles.drawing} data-visible={mobileTab === 'drawing'} aria-label={t('drawing')} ref={drawing}>
+          {retainedFrame ? <Image src={retainedFrame} width={1024} height={640} unoptimized alt={t('last_turtle_drawing')} className={styles.frame} /> : !busy && running && session && session.state !== 'QUEUED' ? <GuiViewer session={session} minimal onFrame={keepFrame} onError={viewerError} /> : <div className={styles.empty}><span className="sr-only">{session?.state === 'QUEUED' ? t('your_code_starts_when_a_drawing_space_is') : t('write_code_on_the_left_then_press_run')}</span></div>}
         </section>
-        <SplitHandle vertical value={consoleSize} onChange={setConsoleSize} label={t('출력 창 크기 조절', 'Resize output')} />
-        <section className={styles.console} data-visible={mobileTab === 'output'} aria-label={t('출력', 'Output')}>
-          {hint.message && <p className={styles.hint}>{hint.line && `${t('줄', 'Line')} ${hint.line} · `}{hint.message}</p>}
-          {hint.message ? <details><summary>{t('파이썬 오류 자세히 보기', 'Python error details')}</summary><pre>{session?.output}</pre></details> : <pre aria-live="polite">{session?.output}</pre>}
-          {session?.state === 'WAITING_INPUT' && <form onSubmit={sendInput}><input aria-label={t('입력할 값', 'Program input')} value={input} onChange={e => setInput(e.target.value)} /><button type="submit">{t('입력', 'Send')}</button></form>}
+        <SplitHandle vertical value={consoleSize} onChange={setConsoleSize} label={t('resize_output')} />
+        <section className={styles.console} data-visible={mobileTab === 'output'} aria-label={t('output')}>
+          {hint.key && <p className={styles.hint}>{hint.line && `${t('line')} ${hint.line} · `}{t(hint.key)}</p>}
+          {hint.key ? <details><summary>{t('python_error_details')}</summary><pre>{session?.output}</pre></details> : <pre aria-live="polite">{session?.output}</pre>}
+          {session?.state === 'WAITING_INPUT' && <form onSubmit={sendInput}><input aria-label={t('program_input')} value={input} onChange={e => setInput(e.target.value)} /><button type="submit">{t('send')}</button></form>}
         </section>
       </div>
     </div>
-    {showHelp && <aside className={styles.help} aria-label={t('명령어 도움말', 'Command reference')}><header><h2>{t('작은 명령어 사전', 'Your command reference')}</h2><button type="button" onClick={() => setShowHelp(false)} aria-label={t('도움말 닫기', 'Close help')}><X size={20} /></button></header><p>{t('명령어의 대소문자와 괄호를 확인해 보세요.', 'Command names are case-sensitive. Remember the parentheses.')}</p>{help.map(([command, ko, en]) => <div key={command}><code>{command}</code><p>{english ? en : ko}</p></div>)}<p><code>TForward(100)</code> → <code>turtle.forward(100)</code></p></aside>}
+    {showHelp && <aside className={styles.help} aria-label={t('command_reference')}><header><h2>{t('your_command_reference')}</h2><button type="button" onClick={() => setShowHelp(false)} aria-label={t('close_help')}><X size={20} /></button></header><p>{t('command_names_are_case_sensitive_remember_the_parentheses')}</p>{help.map(([command, key]) => <div key={command}><code>{command}</code><p>{t(key)}</p></div>)}<p><code>TForward(100)</code> → <code>turtle.forward(100)</code></p></aside>}
   </main>;
 }

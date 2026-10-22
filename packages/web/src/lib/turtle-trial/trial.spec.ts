@@ -27,6 +27,6 @@ describe('public turtle browser boundary', () => {
   });
   it('locates the editable caller without exposing helper internals as the failing line', () => {
     const output = 'File "/work/main.py", line 7\nFile "/work/custom.py", line 25\nRuntimeError: Call ReadyToRace() first';
-    expect(turtleErrorHint(output, false)).toMatchObject({ line: 7, message: expect.stringContaining('ReadyToRace()') });
+    expect(turtleErrorHint(output)).toMatchObject({ line: 7, key: 'hint_race' });
   });
 });

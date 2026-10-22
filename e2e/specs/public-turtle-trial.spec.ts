@@ -52,11 +52,11 @@ test('PIN, helpers, drawing, export, refresh and mobile controls work without an
   await page.screenshot({ path: testInfo.outputPath('workspace.png') });
   await page.getByRole('button', { name: /^(중지|Stop)$/ }).click();
   await expect(page.getByAltText(/마지막 거북이 그림|Last turtle drawing/)).toBeVisible();
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: /전체 프로젝트|Project with helpers/ }).click();
   expect((await download).suggestedFilename()).toBe('cove-turtle.zip');
-  await page.getByLabel(/더 보기|More options/).click();
+  await expect(page.getByRole('dialog', { name: /더 보기|More options/ })).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.monaco-editor')).toContainText('SQUARE_OK');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -66,7 +66,7 @@ test('PIN, helpers, drawing, export, refresh and mobile controls work without an
   await expect(page.locator('.monaco-editor')).toBeVisible();
   await expect(page.locator('.monaco-editor .view-lines')).toContainText('SQUARE_OK');
   await page.screenshot({ path: testInfo.outputPath('mobile.png') });
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
   await expect(page.getByLabel(/체험 코드|Classroom code/)).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('cove:turtle:tab:v1') ?? '')).not.toContain('SQUARE_OK');
@@ -76,9 +76,10 @@ test('PIN, helpers, drawing, export, refresh and mobile controls work without an
 
 test('race helpers and infinite loops run in isolated stoppable sessions', async ({ page }) => {
   await enter(page);
-  await page.getByLabel(/더 보기|More options/).click();
-  await page.getByLabel(/기본 코드 선택|Choose a starter/).selectOption('race');
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ }).click();
+  await page.getByRole('menuitemradio', { name: /거북이 경주|Turtle race/ }).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await code(page, 'from custom import *\nReadyToRace()\nBlueForward(740)\nassert BlueX() > 330\nassert PinkX() == -400\nPinkForward(-10)\nassert PinkX() == -410\nfor i in range(36):\n    BlueLeft(10)\nprint("RACE_OK")\n');
   await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
   await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('RACE_OK');
@@ -88,7 +89,7 @@ test('race helpers and infinite loops run in isolated stoppable sessions', async
   await expect(page.getByRole('button', { name: /^(중지|Stop)$/ })).toBeEnabled();
   await page.getByRole('button', { name: /^(중지|Stop)$/ }).click();
   await expect(page.getByRole('button', { name: /^(실행|Run)$/ })).toBeEnabled();
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
 });
 
@@ -117,7 +118,7 @@ test('the turtle cursor animates on a white canvas and Clear keeps the code', as
   await expect(canvas).toHaveCount(0);
   await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toBeEmpty();
   await expect(page.locator('.monaco-editor .view-lines')).toContainText('t.forward(200)');
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
 });
 
@@ -147,6 +148,50 @@ test('the lesson star uses a bold pen and cleans up an already disconnected view
   await page.getByRole('button', { name: /^(지우기|Clear)$/ }).click();
   await expect(page.getByRole('button', { name: /^(중지|Stop)$/ })).toHaveCount(0);
   expect(viewerErrors).toEqual([]);
-  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});
+
+test('Cove settings dismiss correctly and language changes preserve the code', async ({ page }, testInfo) => {
+  await page.goto('/turtle');
+  await page.getByRole('button', { name: /언어|Language/ }).click();
+  await page.getByRole('menuitemradio', { name: '한국어', exact: true }).click();
+  await expect(page.getByLabel('체험 코드', { exact: true })).toBeVisible();
+  await page.getByLabel('체험 코드', { exact: true }).fill('012345');
+  await page.getByRole('button', { name: '시작하기', exact: true }).click();
+  await expect(page.getByLabel('파이썬 코드', { exact: true })).toBeVisible();
+  const source = 'import turtle\nt = turtle.Turtle("turtle")\nassert t.pensize() == 5\nassert t.shapesize() == (2, 2, 2)\nt.color("purple")\nt.speed(0)\nfor i in range(4):\n    t.forward(100)\n    t.left(90)\nprint("STANDARD_TURTLE_OK")\n';
+  await code(page, source);
+  await page.getByRole('button', { name: '더 보기', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '더 보기', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '기본 코드 선택', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '거북이 경주', exact: true }).click();
+  await expect(page.getByRole('button', { name: '기본 코드 선택', exact: true })).toHaveText('거북이 경주');
+  await page.getByRole('button', { name: '기본 코드 선택', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '도형 그리기', exact: true }).click();
+  await page.getByRole('button', { name: '글자 크기', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '22px', exact: true }).click();
+  await expect(page.getByRole('button', { name: '글자 크기', exact: true })).toHaveText('22px');
+  await page.getByRole('region', { name: '파이썬 코드', exact: true }).click({ position: { x: 20, y: 20 } });
+  await expect(page.getByRole('dialog', { name: '더 보기', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '더 보기', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '더 보기', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /언어|Language/ }).click();
+  await page.getByRole('menuitemradio', { name: 'English', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText('STANDARD_TURTLE_OK');
+  await page.getByRole('button', { name: 'More options', exact: true }).click();
+  await page.getByRole('button', { name: 'Commands', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'More options', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: 'Command reference' })).toContainText('Move forward 100 steps.');
+  await page.getByRole('button', { name: 'Close help', exact: true }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Output', exact: true })).toContainText('STANDARD_TURTLE_OK');
+  await expect(page.locator('[data-testid="turtle-display"] canvas')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('standard-turtle-english.png') });
+  await page.getByRole('button', { name: 'More options', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'More options', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('cove-settings.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Exit', exact: true }).click();
 });

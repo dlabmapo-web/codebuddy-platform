@@ -30,6 +30,7 @@ def _pen():
     pen = _t.getturtle()
     if pen is not _drawing:
         pen.shape("turtle")
+        pen.shapesize(2, 2, 2)
         pen.pensize(5)
         pen.speed(1)
         _drawing = pen
@@ -81,6 +82,7 @@ def ReadyToRace():
     _racers = {}
     for name, shade, y in [("Blue", "#087fcc", 180), ("Pink", "#d72c83", 60), ("Yellow", "#b18000", -60), ("Green", "#16824e", -180)]:
         racer = _t.Turtle(shape="turtle")
+        racer.shapesize(2, 2, 2)
         racer.color(shade); racer.speed(0); racer.penup(); racer.goto(-400, y)
         racer.write(name, align="center", font=("DejaVu Sans", 11, "normal"))
         racer.pendown(); racer.width(5); racer.speed(1)
@@ -121,6 +123,7 @@ def CircleTurtle():
     screen.setup(1.0, 1.0)
     if _demo is None or _demo not in screen.turtles():
         _demo = _t.Turtle(shape="turtle")
+        _demo.shapesize(2, 2, 2)
     _demo.clear(); _demo.penup(); _demo.home(); _demo.speed(1)
     _demo.pendown(); _demo.color("#2787d5"); _demo.width(5)
     _demo.circle(65)
@@ -129,6 +132,21 @@ def CircleTurtle():
 export const turtleRunnerSource = String.raw`import runpy
 import sys
 import turtle
+# Classroom defaults apply to every standard turtle in this guest process.
+# Keep the class identity and honor later explicit pensize()/shapesize() calls.
+_original_init = turtle.RawTurtle.__init__
+_original_reset = turtle.RawTurtle.reset
+def _drawing_defaults(pen):
+    pen.pensize(5)
+    pen.shapesize(2, 2, 2)
+def _classroom_init(self, *args, **kwargs):
+    _original_init(self, *args, **kwargs)
+    _drawing_defaults(self)
+def _classroom_reset(self):
+    _original_reset(self)
+    _drawing_defaults(self)
+turtle.RawTurtle.__init__ = _classroom_init
+turtle.RawTurtle.reset = _classroom_reset
 # The guest page presents a drawing surface, without desktop window borders.
 screen = turtle.Screen()
 screen.setup(1.0, 1.0)

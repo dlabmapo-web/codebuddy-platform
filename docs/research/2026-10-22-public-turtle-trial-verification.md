@@ -25,6 +25,40 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Cove controls, localization and drawing defaults
+
+Settings now use Cove's shared Popover and ChoiceSelector instead of native
+HTML details/select elements. Clicking outside or pressing Escape dismisses the
+popover; actions close it before executing. The nested example/font selectors
+use the same styled radio menus as the rest of Cove. Both support fullscreen
+portals. The existing Cove language control was extracted without account
+controls, re-exported at its old path, and reused on the gate and workspace.
+Selecting 한국어 or English uses the normal locale cookie/reload behavior.
+
+All turtle-page labels, help, error hints and metadata now use the typed,
+feature-scoped `turtle-trial.json` locale resources. Locale parity and root
+payload budgets pass. Language switches retain the existing draft and guest
+grant; no account is required and user-written code/output is preserved.
+
+The cursor defaults to double size. The guest runner adapts standard
+Turtle/RawTurtle construction and reset to a 5-pixel pen and double-size cursor,
+covering code that never imports the lesson helpers and any pen color. Class
+identity and explicit pen/cursor overrides are preserved. The adaptation stays
+inside the isolated guest process. Helpers/racers/demo exports also select the
+larger cursor.
+
+Validation: ten Chromium/WebKit scenarios including nested menu selections,
+outside/Escape dismissal, action dismissal, Korean/English switching with draft
+retention, localized help, and a purple standard turtle asserting the new
+width/size defaults. Sixteen focused web/control tests and 115 locale checks pass, alongside
+shared build, web/E2E type checks and targeted lint. The real Docker helper test
+now executes the guest runner and checks standard Turtle, RawTurtle, module-level
+commands, reset, explicit overrides and class identity, plus existing lesson
+geometry/race tests.
+
+- [English workspace and larger standard turtle](assets/2026-10-22-public-turtle-trial/standard-turtle-english.png)
+- [Cove settings controls](assets/2026-10-22-public-turtle-trial/cove-settings.png)
+
 ## Animation and disconnect follow-up
 
 The classroom helpers now initialize their default turtle once with a 5-pixel

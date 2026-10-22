@@ -120,3 +120,33 @@ test('the turtle cursor animates on a white canvas and Clear keeps the code', as
   await page.getByLabel(/더 보기|More options/).click();
   await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
 });
+
+
+test('the lesson star uses a bold pen and cleans up an already disconnected viewer', async ({ page, request }, testInfo) => {
+  const viewerErrors: string[] = [];
+  page.on('console', message => {
+    if (/Tried changing state of a disconnected RFB object/.test(message.text())) viewerErrors.push(message.text());
+  });
+  await enter(page);
+  await code(page, 'from custom import *\nimport turtle\ncolor("blue")\nspeed(3)\nassert turtle.pensize() == 5\nfor i in range(5):\n    TForward(180)\n    TLeft(144)\nprint("My first star!")\n');
+  const creation = page.waitForResponse(response => response.url().endsWith('/turtle/api/runs') && response.request().method() === 'POST');
+  const started = Date.now();
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  const run = await (await creation).json();
+  await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('My first star!');
+  expect(Date.now() - started).toBeGreaterThan(2500);
+  await expect(page.locator('[data-testid="turtle-display"] canvas')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('bold-star.png') });
+  // End the real broker session independently, as happens on expiry/network loss.
+  // The viewer must not call disconnect again on noVNC's terminal instance.
+  const stopped = await request.delete('http://127.0.0.1:4017/sessions/' + run.id, {
+    headers: { Authorization: 'Bearer local-trial-runtime-secret-never-production' },
+  });
+  expect(stopped.ok()).toBe(true);
+  await expect(page.getByAltText(/마지막 거북이 그림|Last turtle drawing/)).toBeVisible();
+  await page.getByRole('button', { name: /^(지우기|Clear)$/ }).click();
+  await expect(page.getByRole('button', { name: /^(중지|Stop)$/ })).toHaveCount(0);
+  expect(viewerErrors).toEqual([]);
+  await page.getByLabel(/더 보기|More options/).click();
+  await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});

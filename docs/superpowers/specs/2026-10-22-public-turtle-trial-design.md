@@ -111,7 +111,7 @@ Provide three explicit choices, not an entire mission/course system:
 
 | Starter | Editable initial code | Purpose |
 | --- | --- | --- |
-| 도형 그리기 | Teaching imports, red pen, `speed(3)`, and a four-sided square loop | Teacher-led movement, polygons, loops, color, and random values |
+| 도형 그리기 | Teaching imports, red pen, `speed(1)`, and a four-sided square loop | Teacher-led movement, polygons, loops, color, and random values |
 | 거북이 경주 | Same imports, `ReadyToRace()`, and a comment inviting movement code | Race setup without giving away its loop or finish checks |
 | 자유 연습 | Same imports and an empty coding area | Experiments or teacher-provided code |
 
@@ -137,7 +137,7 @@ from custom import *
 
 Implement Cove-owned `custom.py` and `shape.py`, versioned as `cove-trial-v1`. `custom` exports the lesson helpers plus standard `speed` and `color`. `shape` exports `CircleTurtle`; neither wildcard import exports implementation internals. Importing modules must not start the race, draw a welcome animation, or redefine `randint`/`print`.
 
-`TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
+`TForward`, `TLeft`, `speed`, and `color` all operate on the same default turtle. New helper drawing turtles use a 5-pixel pen and speed 1; the guest screen defaults to a 30 ms animation delay so movement is visible. Explicit speed and standard turtle pen settings remain adjustable. Race turtles also use a 5-pixel pen and speed 1 after their instant setup. Helpers are thin adapters around standard turtle behavior; they do not invent a Python-like language or hide loops/conditions behind a complete `Race()` function.
 
 The guest API assembles fixed helper files and a fixed entry runner with submitted `main.py`. The runner prepares a full-size borderless white screen and the helpers select a turtle-shaped cursor for movement. It executes `main.py` at its actual filename, flushes the screen, and enters `turtle.mainloop()` after normal completion when a screen remains open. An explicit student `done()`/`mainloop()` continues to work. Exceptions remain errors and do not become successful completed programs. On an error, retain the latest delivered drawing as best effort alongside the traceback.
 

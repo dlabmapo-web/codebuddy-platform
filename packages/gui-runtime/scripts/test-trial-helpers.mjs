@@ -21,7 +21,16 @@ try:
     raise AssertionError("Missing race setup was accepted")
 except RuntimeError as error:
     assert "ReadyToRace" in str(error)
+custom.color("blue")
+assert turtle.pensize() == 5
+assert turtle.speed() == 1
+assert turtle.Screen().delay() == 30
+custom.speed(3)
+custom.TForward(10)
+assert turtle.speed() == 3, "Movement must preserve an explicit speed"
 custom.speed(0)
+custom.TForward(10)
+assert turtle.speed() == 0, "Instant drawing must remain available"
 for sides in (3, 4, 5, 6, 12):
     turtle.reset(); custom.speed(0); custom.color("red")
     for i in range(sides):
@@ -39,6 +48,8 @@ assert len(custom._racers) == 4
 assert math.isclose(turtle.Screen().xscale, turtle.Screen().yscale, rel_tol=0.000000001), "Race world units must have equal scale"
 for name in ("Blue", "Pink", "Yellow", "Green"):
     assert getattr(custom, name + "X")() == -400
+    assert custom._racers[name].pensize() == 5
+    assert custom._racers[name].speed() == 1
 custom.BlueForward(-20)
 assert custom.BlueX() == -420
 assert custom.PinkX() == -400

@@ -25,6 +25,31 @@ Operations: [configuration and rollout](../operations/public-turtle-trial.md)
   Production flags remain off by default. The dedicated guest host is configured
   through a separate Compose file; it is not added to the course Docker daemon.
 
+## Animation and disconnect follow-up
+
+The classroom helpers now initialize their default turtle once with a 5-pixel
+pen and speed 1, preserving later explicit speed/pen choices. The guest screen
+uses a 30 ms animation delay; speed 0 remains available without interpolated
+movement. New starter buffers use speed 1; existing student code is preserved.
+Race turtles use the same pen width and slow movement after instant track setup.
+
+The reported noVNC console error came from calling disconnect during React
+cleanup after the server had already disconnected the RFB instance. The shared
+viewer now clears only the matching reference on the disconnect event and
+clears a live reference before initiating cleanup, avoiding a second disconnect.
+
+Validation for this follow-up: three viewer lifecycle regressions (peer close,
+session replacement, reconnect), seven existing access/boundary tests, shared
+build, web/E2E TypeScript checks, and the real CPython/Tk helper assertions for
+pen width, default speed, explicit speed preservation, speed 0 and race turtles.
+Eight Chromium/WebKit browser scenarios cover the existing behavior plus the
+user's blue star, a runtime assertion of pen width, visible drawing time, and a
+real server-side disconnect followed by viewer cleanup without the reported
+console error. Targeted lint has no errors and retains the existing shared
+viewer image warning.
+
+[Blue star with the thicker pen](assets/2026-10-22-public-turtle-trial/bold-star.png)
+
 ## Simplified workspace follow-up
 
 After the user's visual review, the workspace follows the reference's compact

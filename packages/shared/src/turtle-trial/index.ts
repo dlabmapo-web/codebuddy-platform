@@ -9,7 +9,7 @@ export const turtleStarterIds = ['drawing', 'race', 'free'] as const;
 export type TurtleStarterId = typeof turtleStarterIds[number];
 export const turtlePreamble = 'from random import *\nfrom shape import *\nfrom custom import *\n\n';
 export const turtleStarters: Record<TurtleStarterId, string> = {
-  drawing: turtlePreamble + 'color("red")\nspeed(3)\n\nfor i in range(4):\n    TForward(100)\n    TLeft(90)\n',
+  drawing: turtlePreamble + 'color("red")\nspeed(1)\n\nfor i in range(4):\n    TForward(100)\n    TLeft(90)\n',
   race: turtlePreamble + 'ReadyToRace()\n\n# 거북이를 움직여 보세요. / Move the turtles.\n',
   free: turtlePreamble,
 };

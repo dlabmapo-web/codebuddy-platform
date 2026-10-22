@@ -6,6 +6,8 @@ import math as _math
 
 __all__ = ["TForward", "TLeft", "speed", "color", "ReadyToRace"]
 _racers = {}
+_drawing = None
+_configured_screen = None
 
 def _number(value, name):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not _math.isfinite(value):
@@ -13,30 +15,40 @@ def _number(value, name):
     return value
 
 def _screen():
+    global _configured_screen
     screen = _t.Screen()
     screen.setup(1.0, 1.0)
     screen.title("Cove Turtle")
+    if screen is not _configured_screen:
+        screen.delay(30)
+        _configured_screen = screen
     return screen
 
-def TForward(distance):
+def _pen():
+    global _drawing
     _screen()
-    _t.shape("turtle")
-    _t.forward(_number(distance, "TForward"))
+    pen = _t.getturtle()
+    if pen is not _drawing:
+        pen.shape("turtle")
+        pen.pensize(5)
+        pen.speed(1)
+        _drawing = pen
+    return pen
+
+def TForward(distance):
+    _pen().forward(_number(distance, "TForward"))
 
 def TLeft(angle):
-    _screen()
-    _t.left(_number(angle, "TLeft"))
+    _pen().left(_number(angle, "TLeft"))
 
 def speed(value):
-    _screen()
     value = _number(value, "speed")
     if not isinstance(value, int) or not 0 <= value <= 10:
         raise ValueError("speed: use an integer from 0 to 10 / 0~10 정수를 입력해 주세요.")
-    return _t.speed(value)
+    return _pen().speed(value)
 
 def color(*value):
-    _screen()
-    return _t.color(*value)
+    return _pen().color(*value)
 
 def ReadyToRace():
     global _racers
@@ -71,9 +83,9 @@ def ReadyToRace():
         racer = _t.Turtle(shape="turtle")
         racer.color(shade); racer.speed(0); racer.penup(); racer.goto(-400, y)
         racer.write(name, align="center", font=("DejaVu Sans", 11, "normal"))
-        racer.pendown(); racer.width(2)
+        racer.pendown(); racer.width(5); racer.speed(1)
         _racers[name] = racer
-    screen.tracer(1)
+    screen.tracer(1, 30)
     screen.update()
 
 def _racer(name):
@@ -109,8 +121,8 @@ def CircleTurtle():
     screen.setup(1.0, 1.0)
     if _demo is None or _demo not in screen.turtles():
         _demo = _t.Turtle(shape="turtle")
-    _demo.clear(); _demo.penup(); _demo.home(); _demo.speed(6)
-    _demo.pendown(); _demo.color("#2787d5"); _demo.width(3)
+    _demo.clear(); _demo.penup(); _demo.home(); _demo.speed(1)
+    _demo.pendown(); _demo.color("#2787d5"); _demo.width(5)
     _demo.circle(65)
 `;
 
@@ -120,6 +132,7 @@ import turtle
 # The guest page presents a drawing surface, without desktop window borders.
 screen = turtle.Screen()
 screen.setup(1.0, 1.0)
+screen.delay(30)
 canvas = screen.getcanvas()
 canvas.winfo_toplevel().overrideredirect(True)
 canvas._canvas.configure(borderwidth=0, highlightthickness=0, relief="flat")

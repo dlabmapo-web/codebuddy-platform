@@ -61,6 +61,9 @@ export function GuiViewer({
             setConnection("ready");
           });
           rfb.addEventListener("disconnect", () => {
+            // noVNC's disconnected state is terminal. Do not disconnect this
+            // instance again when React cleans up or replaces the viewer.
+            if (remote.current === rfb) remote.current = null;
             if (disposed) return;
             if (canvas.current) {
               try {
@@ -96,9 +99,10 @@ export function GuiViewer({
     return () => {
       disposed = true;
       clearTimeout(reconnect);
-      remote.current?.disconnect();
+      const current = remote.current;
       remote.current = null;
-      socket?.close();
+      current?.disconnect();
+      if (socket?.readyState === WebSocket.OPEN) socket.close();
     };
   }, [session.id, session.displayUrl, session.token, session.readOnly, onError, mt, admitted, minimal]);
   return (

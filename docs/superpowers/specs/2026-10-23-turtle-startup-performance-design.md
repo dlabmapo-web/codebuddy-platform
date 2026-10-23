@@ -1,7 +1,8 @@
 # Faster public Turtle startup on the existing VPS
 
 Date: 2026-10-23 (Asia/Seoul)
-Status: proposed design for review; no implementation or production changes made by this document.
+Status: approved by the user on 2026-10-23 for implementation and real local tests.
+Deployment is deferred. Production warm enablement remains subject to the gates below.
 
 ## 1. Outcome and scope
 

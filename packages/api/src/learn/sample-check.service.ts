@@ -82,6 +82,7 @@ export class SampleCheckService {
     const material = await this.prisma.material.findFirst({
       where: {
         id: input.materialId,
+        type: 'PROGRAMMING_EXERCISE',
         ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)),
       },
       include: exerciseInclude,

@@ -51,6 +51,7 @@ const legacyProfile = {
 /** The fixture's material, with its exercise replaced. */
 function materialWith(exercise: Record<string, unknown>) {
   return {
+    type: 'PROGRAMMING_EXERCISE',
     id: materialId,
     title: "Sum two numbers",
     position: 3,
@@ -85,6 +86,7 @@ function createService(options?: {
   submission?: Record<string, unknown>;
 }) {
   const material = (options?.material ?? {
+    type: 'PROGRAMMING_EXERCISE',
     id: materialId,
     title: "Sum two numbers",
     position: 3,
@@ -172,6 +174,7 @@ function createService(options?: {
       ? { id: solveSessionId, startedAt: new Date("2026-07-31T00:00:00Z") }
       : options.solveSession;
   const transaction = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     material: { findFirst: vi.fn().mockResolvedValue(material) },
     submission: { create: submissionCreate },
     exerciseSolveSession: {
@@ -228,6 +231,12 @@ function createService(options?: {
 }
 
 describe("SubmissionService.submit", () => {
+  it('refuses automatic grading of a converted Turtle material while retaining its programming history', async () => {
+    const { service, prisma, queue } = createService({ material: { ...materialWith({ testCases: [{ position: 1, input: '', expectedOutput: 'x', visibility: 'SAMPLE' }] }), type: 'TURTLE_EXERCISE' } });
+    await expect(service.submit(identity, { academyId, classId, materialId, code: 'print(1)' })).rejects.toMatchObject({ code: 'EXERCISE_NOT_AVAILABLE' });
+    expect(prisma.submission.create).not.toHaveBeenCalled();
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
   it("uses the shared Redis limiter before creating the durable row", async () => {
     const { service, queue, prisma } = createService({ allowed: false });
 

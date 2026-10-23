@@ -98,6 +98,10 @@ export class SubmissionService {
     let createdSubmission: { id: string; totalCount: number };
     try {
       createdSubmission = await this.prisma.$transaction(async (tx) => {
+        // Serialize admission against typed runtime conversion. A conversion
+        // takes FOR UPDATE; an earlier admission must commit before its pending
+        // work inventory, and a later admission must read the converted type.
+        await tx.$queryRaw`SELECT id FROM materials WHERE id = ${input.materialId}::uuid FOR SHARE`;
         // Visibility and grading inputs are read in the same transaction that
         // owns the snapshot. A concurrent hide or test edit therefore cannot
         // create a submission from a mixed curriculum state.
@@ -123,7 +127,7 @@ export class SubmissionService {
         });
         const exercise = material?.programmingExercise;
         if (exercise?.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
-        if (!material || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
+        if (!material || material.type !== 'PROGRAMMING_EXERCISE' || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
           throw new AppException(
             "EXERCISE_NOT_AVAILABLE",
             HttpStatus.NOT_FOUND,

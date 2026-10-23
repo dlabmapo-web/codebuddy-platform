@@ -10,7 +10,7 @@ const identity = { authUserId: 'auth' } as SupabaseIdentity;
 function fixture(via = 'membership', roles = ['TEACHER']) {
   const access = { requirePermission: vi.fn().mockResolvedValue({ userId: 'owner', role: roles[0], roles, via }) };
   const db = {
-    material: { findFirst: vi.fn().mockResolvedValue({ id: materialId, programmingExercise: {}, lecture: { courseModule: {} } }) },
+    material: { findFirst: vi.fn().mockResolvedValue({ id: materialId, type: 'PROGRAMMING_EXERCISE', programmingExercise: {}, lecture: { courseModule: {} } }) },
     staffPracticeDraft: { findUnique: vi.fn(), createMany: vi.fn().mockResolvedValue({ count: 0 }), findUniqueOrThrow: vi.fn(), updateMany: vi.fn() },
     staffPracticeAttempt: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -21,6 +21,13 @@ function fixture(via = 'membership', roles = ['TEACHER']) {
   return { service, db, access, queue };
 }
 describe('private staff practice boundaries', () => {
+  it('retains private historical reads but refuses new programming work on a converted Turtle', async () => {
+    const { service, db } = fixture();
+    db.material.findFirst.mockResolvedValue({ id: materialId, type: 'TURTLE_EXERCISE', programmingExercise: {}, lecture: { courseModule: {} } });
+    await expect(service.history(identity, { academyId, materialId })).resolves.toBeDefined();
+    await expect(service.saveDraft(identity, { academyId, materialId, code: 'import turtle' })).rejects.toMatchObject({ code: 'EXERCISE_NOT_AVAILABLE' });
+    await expect(service.submit(identity, { academyId, materialId, code: 'import turtle', requestId: 'request' })).rejects.toMatchObject({ code: 'EXERCISE_NOT_AVAILABLE' });
+  });
   it.each(['platform', 'support'])('refuses %s inspection writes before reading material', async (via) => {
     const { service, db } = fixture(via);
     await expect(service.saveDraft(identity, { academyId, materialId, code: 'print(1)' })).rejects.toThrow();
@@ -63,7 +70,7 @@ describe('private staff practice boundaries', () => {
 
 it('rejects staff grading for practice-only exercises before queueing', async () => {
   const { service, db, queue } = fixture();
-  db.material.findFirst.mockResolvedValue({ id: materialId, programmingExercise: { submissionPolicy: 'PRACTICE_ONLY' }, lecture: { courseModule: {} } });
+  db.material.findFirst.mockResolvedValue({ id: materialId, type: 'PROGRAMMING_EXERCISE', programmingExercise: { submissionPolicy: 'PRACTICE_ONLY' }, lecture: { courseModule: {} } });
   await expect(service.submit(identity, { academyId, materialId, requestId: materialId, code: 'print(1)' })).rejects.toMatchObject({ code: 'EXERCISE_PRACTICE_ONLY' });
   expect(queue.enqueuePractice).not.toHaveBeenCalled();
 });

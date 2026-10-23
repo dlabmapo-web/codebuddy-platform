@@ -105,9 +105,20 @@ export class LearnService {
     };
   }
 
+  async getMaterialType(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean }) {
+    const { scope, role, roles } = await this.requireLearner(identity, input.academyId);
+    if (input.preview && !rolesHavePermission(roles ?? [role], 'curriculum.review'))
+      throw new AppException('PERMISSION_DENIED', HttpStatus.FORBIDDEN);
+    const row = input.preview ? await this.prisma.material.findFirst({
+      where: { id: input.materialId, AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] },
+    }) : await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
+    if (!row) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    return { type: row.type };
+  }
+
   async getCourseOutline(
     identity: SupabaseIdentity,
-    input: { academyId: string; courseId: string; classId?: string; mode?: "student" | "staff-practice" },
+    input: { academyId: string; courseId: string; classId?: string; mode?: "student" | "staff-practice"; preview?: boolean },
   ): Promise<LearnCourseOutlineResult> {
     const { userId, role, roles, scope } = await this.requireLearner(
       identity,
@@ -115,7 +126,16 @@ export class LearnService {
     );
     const student = input.mode === "student" || !rolesHavePermission(roles ?? [role], "practice.own.create");
     if (student && !(roles ?? [role]).includes("STUDENT")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
-    const course = await this.requireVisibleCourse(input, scope);
+    if (input.preview && (student || !rolesHavePermission(roles ?? [role], "curriculum.review"))) {
+      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    }
+    const course = input.preview
+      ? await this.prisma.course.findFirst({
+          where: { ...scope.course, id: input.courseId },
+          include: previewCurriculumInclude,
+        })
+      : await this.requireVisibleCourse(input, scope);
+    if (!course) throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     // Delivery is a student's relationship to a course: the class decides
     // progress, presence and points. Staff reach this course through their
     // own permissions and have no enrollment to deliver against, so they get
@@ -159,6 +179,10 @@ export class LearnService {
     if (input.mode === "student" && !roles.includes("STUDENT")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     if (input.preview && (!staff || !rolesHavePermission(roles, "curriculum.review"))) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     const material = await this.requireWorkspaceMaterial(input, learner.scope, input.preview);
+    // A converted material retains its programming record solely for historical
+    // attempts. New work must enter the typed Turtle workspace.
+    if (material.type !== 'PROGRAMMING_EXERCISE' && !input.submissionId)
+      throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     const course = material.lecture.courseModule.course;
     // Only student participation needs a delivery class. Staff practice is independent.
     const classContext =
@@ -189,6 +213,8 @@ export class LearnService {
         : Promise.resolve(null),
     ]);
     const navigator = toNavigatorContext(outline, material.id);
+    if (material.type !== 'PROGRAMMING_EXERCISE' && !selectedSubmission)
+      throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     if (!navigator) {
       // The material resolved through the visibility predicate but is absent
       // from the outline the same predicate produced. That is a contradiction
@@ -264,6 +290,7 @@ export class LearnService {
   ): Promise<LearnExerciseWorkspace> {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
     const material = await this.requireWorkspaceMaterial(input, scope);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     await this.classContext.resolve({
       academyId: input.academyId,
       userId,
@@ -450,6 +477,7 @@ export class LearnService {
       scope,
     );
     const base = input.baseUpdatedAt ? new Date(input.baseUpdatedAt) : null;
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     const result = await this.drafts.save({
       userId,
       materialId: input.materialId,
@@ -476,7 +504,8 @@ export class LearnService {
     input: { academyId: string; materialId: string },
   ) {
     const { userId, scope } = await this.requireLearner(identity, input.academyId);
-    await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
+    const material = await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     // Through the coordinator, so any live document goes with the row rather
     // than outliving it and failing its next flush against a missing draft.
     const discarded = await this.drafts.discard({

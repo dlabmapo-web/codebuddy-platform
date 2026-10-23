@@ -441,6 +441,7 @@ export const learnAcademyInputSchema = z.object({ academyId: z.uuid() });
 
 export const learnCourseInputSchema = learnAcademyInputSchema.extend({
   courseId: z.uuid(),
+  preview: z.boolean().optional(),
   mode: z.enum(["student", "staff-practice"]).optional(),
   classId: z.uuid().optional(),
 });

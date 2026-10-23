@@ -191,7 +191,7 @@ export class CurriculumOutlineService {
               : [],
           ),
           exercises: lecture.materials.flatMap((material) =>
-            material.programmingExercise
+            material.type === 'PROGRAMMING_EXERCISE' && material.programmingExercise
               ? [
                   {
                     materialId: material.id,
@@ -220,11 +220,11 @@ export class CurriculumOutlineService {
     if (materialIds.length === 0) return statuses;
     const [drafts, progress, revisions] = await Promise.all([
       this.prisma.exerciseDraft.findMany({
-        where: { userId, materialId: { in: materialIds } },
+        where: { userId, materialId: { in: materialIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
         select: { materialId: true },
       }),
       this.prisma.studentExerciseProgress.findMany({
-        where: { userId, materialId: { in: materialIds } },
+        where: { userId, materialId: { in: materialIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
         select: {
           materialId: true,
           status: true,
@@ -395,7 +395,7 @@ export function exerciseMaterialIds(
   return course.modules.flatMap((courseModule) =>
     courseModule.lectures.flatMap((lecture) =>
       lecture.materials.flatMap((material) =>
-        material.programmingExercise || material.manualMaterial?.includeInScore || (material.videoLesson?.includeInScore && material.videoLesson.asset.state==="READY" && material.videoLesson.placement!=="SUPPLEMENTARY")
+        (material.type === 'PROGRAMMING_EXERCISE' && material.programmingExercise) || material.manualMaterial?.includeInScore || (material.videoLesson?.includeInScore && material.videoLesson.asset.state==="READY" && material.videoLesson.placement!=="SUPPLEMENTARY")
           ? [material.id]
           : [],
       ),
@@ -405,7 +405,7 @@ export function exerciseMaterialIds(
 
 /** Practice remains navigable but never increases the graded-progress denominator. */
 function gradedMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
-  const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY").map(row => row.id))));
+  const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === 'PROGRAMMING_EXERCISE' && row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY").map(row => row.id))));
   return exerciseMaterialIds(course).filter(id => !practice.has(id));
 }
 

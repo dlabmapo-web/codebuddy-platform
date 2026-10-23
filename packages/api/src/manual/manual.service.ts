@@ -1525,6 +1525,7 @@ export class ManualService {
       timeLimitSeconds: profile.timeLimitSeconds,
       memoryLimitMb: profile.memoryLimitMb,
       owner: `${actor.userId}:${row.id}`,
+      replaceOwner: true,
     });
     setTimeout(
       () => this.sessions.delete(session.id),

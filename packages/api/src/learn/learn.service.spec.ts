@@ -242,6 +242,20 @@ function createService(options?: {
 }
 
 describe("LearnService visible curriculum", () => {
+  it('refuses a student request for a hidden preview outline before querying content', async () => {
+    const { service, prisma } = createService();
+    await expect(service.getCourseOutline(identity, { academyId, courseId, preview: true })).rejects.toMatchObject({ status: 403 });
+    expect(prisma.course.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('uses the scoped complete hierarchy for authorized staff preview only', async () => {
+    const { service, prisma } = createService({ role: 'MANAGER' });
+    await service.getCourseOutline(identity, { academyId, courseId, preview: true });
+    const query = vi.mocked(prisma.course.findFirst).mock.calls[0][0]!;
+    expect(query.where).toMatchObject({ id: courseId, academyId });
+    expect(query.where).not.toHaveProperty('isVisible');
+    expect(query.include).toHaveProperty('modules');
+  });
   it("lists only visible courses and visible descendants", async () => {
     const { service, prisma } = createService();
 

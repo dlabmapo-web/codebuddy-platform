@@ -54,7 +54,8 @@ export class StaffPracticeService {
   async saveDraft(identity: SupabaseIdentity, input: {
     academyId: string; materialId: string; code: string; preview?: boolean; gradingRevision?: number; baseUpdatedAt?: string | null;
   }): Promise<SaveDraftResult> {
-    const { actor, exercise } = await this.authorize(identity, input);
+    const { actor, exercise, material } = await this.authorize(identity, input);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     const key = { academyId: input.academyId, userId: actor.userId, materialId: input.materialId, context: input.preview ? `preview:${exercise.gradingRevision}` : "live" };
     // Compare-and-swap, including first insert: a second tab must never silently replace work.
     return this.prisma.$transaction(async (tx) => {
@@ -75,6 +76,7 @@ export class StaffPracticeService {
     academyId: string; materialId: string; code: string; requestId: string; preview?: boolean; gradingRevision?: number;
   }) {
     const { actor, material, exercise } = await this.authorize(identity, input);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     if (!this.queue) throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     const existing = await this.prisma.staffPracticeAttempt.findUnique({
       where: { academyId_userId_requestId: { academyId: input.academyId, userId: actor.userId, requestId: input.requestId } },

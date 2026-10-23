@@ -1,6 +1,7 @@
 import { practiceSubmitSchema, practiceHistorySchema } from "../../content/learn.js";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { materialTypeSchema } from '../../content/course.js';
 
 import {
   submissionAcceptedSchema,
@@ -76,6 +77,9 @@ export const learnContract = {
   getCourseOutline: oc
     .input(learnCourseInputSchema)
     .output(learnCourseOutlineResultSchema),
+  getMaterialType: oc
+    .input(learnMaterialInputSchema.extend({ preview: z.boolean().optional() }))
+    .output(z.object({ type: materialTypeSchema })),
   /**
    * The classes a student learns through, and one of them in full.
    *

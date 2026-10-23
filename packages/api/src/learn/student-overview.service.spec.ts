@@ -8,8 +8,8 @@ function fixture(practiceOnly: boolean) {
     courses: [{
       id: "course", title: "PDF course", description: "",
       modules: [{ lectures: [{ materials: [
-        { id: "practice", programmingExercise: { submissionPolicy: "PRACTICE_ONLY" } },
-        ...(!practiceOnly ? [{ id: "graded", programmingExercise: { submissionPolicy: "AUTOMATIC" } }] : []),
+        { id: "practice", type: 'PROGRAMMING_EXERCISE', programmingExercise: { submissionPolicy: "PRACTICE_ONLY" } },
+        ...(!practiceOnly ? [{ id: "graded", type: 'PROGRAMMING_EXERCISE', programmingExercise: { submissionPolicy: "AUTOMATIC" } }] : []),
       ] }] }],
     }],
     exercises: [

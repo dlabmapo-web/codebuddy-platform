@@ -1,6 +1,7 @@
 # Course Turtle workspace controls and solution dialog
 
-Status: approved by the user on 2026-10-23; implementation in progress.
+Status: implemented and verified locally on 2026-10-23. See
+`docs/research/2026-10-23-course-turtle-ui-verification.md`.
 
 ## Scope and reference
 
@@ -110,3 +111,13 @@ This is local implementation and verification only; deployment is a later task.
 3. Compact workspace notices, file tabs, execution actions, and result states.
 4. Add English/Korean copy and focused behavior tests.
 5. Run local browser checks against the real course runtime and record results.
+
+## Course syntax clarification (2026-10-23)
+
+The user clarified that course Turtle must use standard Python Turtle, matching
+the reference: `import turtle as t`, `t.forward(...)`, `t.left(...)`, and other
+standard module/object methods. Only the public playground uses the workshop
+`TForward`/`TLeft` helpers. Update the three newly created development examples
+and new-course starter accordingly, retaining existing student drafts and
+submissions. Additional course files, when authored, remain ordinary Python
+modules; there is no automatically installed custom helper API in course runs.

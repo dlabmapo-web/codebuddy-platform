@@ -25,3 +25,9 @@ for real test results and the latency distributions. The performance release
 gates are not passed; production warm mode remains disabled. No deployment was
 performed. Linux/rootless acceptance and combined host sizing remain required
 for the later production enablement decision.
+
+Follow-up: the user later authorized a release through the local deployment
+guide. The cold-path changes and dormant guarded standby implementation are
+prepared for that release; enabling production standbys remains excluded until
+the resource and performance gates pass. The verification document records the
+full release checks and the required Next.js security dependency update.

@@ -129,3 +129,44 @@ Local manual entry: `http://127.0.0.1:3067/turtle`, disposable fixture PIN
 values are not production credentials. See
 [operations](../operations/turtle-startup-performance.md) for fixture commands,
 resource gates and the later rollout/rollback process.
+
+## Release preparation follow-up
+
+The user subsequently authorized commits and deployment through the local
+deployment guide, with the protected GitHub production approval performed by
+`jurabek10`. This authorization covers the cold-path changes; production standby
+enablement remains gated as described above.
+
+The complete release checks ran: shared/i18n builds, Prisma generation/schema
+validation, workspace and E2E type checks, workspace lint, canonical routes,
+translation validation, tests, production builds, deployment validation and
+rollback-selection tests. Shared tests passed 920 cases, i18n 138, web 1,366,
+and the runtime unit suite 37 (six opt-in skips). API tests passed 136 files
+while the known Pyodide file had six resource/timing failures under parallel
+load. Its isolated rerun passed all 68 cases without changing the engine,
+tests, timeouts or memory policy. All local production builds passed.
+
+The image security gate also found two critical advisories in the existing
+Next.js 16.3.8 dependency, published to the advisory database on October 22.
+Studio and home were updated to Next.js 16.4.1 with matching lint configuration:
+[image optimization advisory](https://github.com/advisories/GHSA-2464-fhr4-w9xw)
+and [cache advisory](https://github.com/advisories/GHSA-673q-mjm6-r5xr).
+The patched frontend type checks, lint, all 1,366 web tests and full workspace
+production builds passed. Both frontend image scans passed on the updated PR.
+
+Eight additional Chromium/WebKit browser checks passed on Next.js 16.4.1 with
+the real local cold runtime: viewer preload without allocation, failed preload
+and Run retry, PIN-to-drawing/helpers/exports/refresh/mobile controls, and menu
+dismissal/language preservation. These are functional regressions, not new
+performance acceptance measurements. Next's generated agent guidance heading
+was retained with its version-matched documentation instructions.
+
+The release must wait for green CI on the final release-branch commit before
+tagging. The protected main deployment and the independent rootless trial
+upgrade are separate operations. The prepared trial upgrade blocks only new
+public Run requests, drains existing runs, fences legacy creates by restarting
+only the dedicated rootless daemon, updates immutable image pins with private
+rollback backups, and verifies real Python/Tk drawing and an authenticated RFB
+handshake before reopening admission. The existing 1 GiB slice is preserved,
+`GUI_WARM_STANDBY=0` remains explicit, and course Docker is not restarted by that
+trial upgrade. Production deployment has not occurred at this preparation point.

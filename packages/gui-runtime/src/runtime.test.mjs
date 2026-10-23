@@ -34,6 +34,36 @@ const profile = {
   memoryLimitMb: 128,
   owner: "runtime-tests",
 };
+test('course completion retains Tk for late viewers and preserves errors, exits and the original deadline', { skip: !secret }, async () => {
+  const cases = [
+    ["import turtle\ns=turtle.Screen()\nprint('DEFAULT_PEN', int(turtle.pensize()), turtle.shape(), flush=True)\ns.setup(320,320)\nprint('EXPLICIT',s.window_width(),s.window_height(),flush=True)", 'FINISHED', 0, 'DEFAULT_PEN 1 classic\nEXPLICIT 320 320'],
+    ["import turtle\nturtle.tracer(0)\nturtle.pencolor('red')\nturtle.forward(100)\nprint('INSTANT', flush=True)", 'FINISHED', 0, 'INSTANT'],
+    ["import turtle\nturtle.forward(80)\nraise ValueError('PARTIAL_DRAWING_ERROR')", 'ERROR', 1, 'PARTIAL_DRAWING_ERROR'],
+    ["print('TEXT_ONLY', flush=True)", 'FINISHED', 0, 'TEXT_ONLY'],
+    ["import turtle\nturtle.forward(40)\nraise SystemExit(7)", 'ERROR', 7, ''],
+    ["import turtle\nturtle.forward(40)\nturtle.bye()", 'FINISHED', 0, ''],
+  ];
+  for (const [source, state, exitCode, output] of cases) {
+    const session = await request('/sessions', 'POST', { ...profile, files: { 'main.py': source } });
+    try {
+      const done = await until(session.id, s => s.state === state);
+      assert.equal(done.exitCode, exitCode); assert.ok(done.output.includes(output));
+      assert.ok(done.endedAt <= done.expiresAt);
+      if (source.includes('INSTANT') || source.includes('PARTIAL_DRAWING_ERROR')) {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        const alive = JSON.parse(execFileSync('docker', ['inspect', done.containerId], { encoding: 'utf8' }))[0];
+        assert.equal(alive.State.Running, true, 'the isolated desktop survives source completion');
+        const process = execFileSync('docker', ['top', done.containerId], { encoding: 'utf8' });
+        assert.match(process, /python3.*run.py/, 'Tk is still serving the completed picture');
+      }
+    } finally { await request(`/sessions/${session.id}`, 'DELETE'); }
+  }
+  const short = await request('/sessions', 'POST', { ...profile, timeLimitSeconds: 10, files: { 'main.py': "import turtle\nturtle.forward(40)" } });
+  await until(short.id, s => s.state === 'FINISHED');
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, short.expiresAt - Date.now()) + 200));
+  assert.equal((await request(`/sessions/${short.id}`)).state, 'FINISHED');
+  await request(`/sessions/${short.id}`, 'DELETE');
+});
 test('recorded runtime survives a broker default-image upgrade', {skip: !secret || !process.env.GUI_TEST_RETAINED_VERSION}, async () => {
   const runtimeVersion = process.env.GUI_TEST_RETAINED_VERSION;
   const health = await request('/health');
@@ -49,6 +79,20 @@ test('recorded runtime survives a broker default-image upgrade', {skip: !secret 
     assert.equal(actual, runtimeVersion.split(';')[0]);
   } finally {
     await request(`/sessions/${session.id}`, 'DELETE');
+  }
+});
+test('authorized course replacement releases the prior owner generation without stopping another owner', { skip: !secret }, async () => {
+  const other = await request('/sessions', 'POST', { ...profile, owner: 'replacement-other', files: { 'main.py': 'input()' } });
+  const first = await request('/sessions', 'POST', { ...profile, owner: 'replacement-learner', files: { 'main.py': 'input()' } });
+  let next;
+  try {
+    next = await request('/sessions', 'POST', { ...profile, owner: 'replacement-learner', replaceOwner: true, files: { 'main.py': "print('REPLACED', flush=True)" } });
+    assert.notEqual(next.id, first.id);
+    assert.equal((await request(`/sessions/${first.id}`)).state, 'STOPPED');
+    assert.equal((await request(`/sessions/${other.id}`)).state, 'WAITING_INPUT');
+    await until(next.id, s => s.state === 'FINISHED' && s.output.includes('REPLACED'));
+  } finally {
+    for (const run of [other, first, next].filter(Boolean)) await request(`/sessions/${run.id}`, 'DELETE');
   }
 });
 test(

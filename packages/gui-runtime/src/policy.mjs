@@ -88,6 +88,8 @@ export function terminalParser(onState) {
     ["\x1eCOVE_WAITING_INPUT\x1f", "WAITING_INPUT"],
     ["\x1eCOVE_RUNNING\x1f", "RUNNING"],
     ["\x1eCOVE_DISPLAYING\x1f", "DISPLAYING"],
+    ["\x1eCOVE_FINISHED\x1f", "FINISHED"],
+    ["\x1eCOVE_ERROR\x1f", "ERROR"],
   ];
   let pending = "";
   return {
@@ -103,18 +105,25 @@ export function terminalParser(onState) {
             index: value.indexOf(marker),
           }))
           .filter((match) => match.index >= 0)
-          .sort((a, b) => a.index - b.index);
+          ;
+        const completion = /\x1eCOVE_EXIT:(\d{1,3})\x1f/.exec(value);
+        if (completion && Number(completion[1]) <= 255) matches.push({
+          marker: completion[0], state: Number(completion[1]) === 0 ? 'FINISHED' : 'ERROR',
+          index: completion.index, exitCode: Number(completion[1]),
+        });
+        matches.sort((a, b) => a.index - b.index);
         const match = matches[0];
         if (match) {
           output.push(value.slice(0, match.index));
-          onState(match.state);
+          onState(match.state, match.exitCode);
           value = value.slice(match.index + match.marker.length);
           continue;
         }
         const prefix = value.lastIndexOf("\x1e");
         if (
           prefix >= 0 &&
-          markers.some(([marker]) => marker.startsWith(value.slice(prefix)))
+          (markers.some(([marker]) => marker.startsWith(value.slice(prefix))) ||
+            '\x1eCOVE_EXIT:'.startsWith(value.slice(prefix)) || /^\x1eCOVE_EXIT:\d{0,3}$/.test(value.slice(prefix)))
         ) {
           pending = value.slice(prefix);
           output.push(value.slice(0, prefix));

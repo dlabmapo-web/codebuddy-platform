@@ -33,6 +33,7 @@ const seccomp = fileURLToPath(
   new URL("../docker/seccomp.json", import.meta.url),
 );
 const sessions = new Map();
+const ownerTransitions = new Map();
 const docker = (...args) =>
   exec("docker", args, { maxBuffer: 1024 * 1024, timeout: 30000 });
 if (process.env.GUI_REQUIRE_ROOTLESS === 'true') {
@@ -85,7 +86,7 @@ let shuttingDown = false;
 function markClosed(s, state) {
   if (s.closed) return;
   s.closed = true; s.controller.abort(); s.data = null; s.pendingBytes = 0;
-  s.state = state; s.endedAt = Date.now();
+  s.state = state; s.endedAt ??= Date.now();
   clearTimeout(s.deadline); clearTimeout(s.reconnect);
   s.program?.kill();
   for (const bridge of s.bridges) bridge.kill();
@@ -121,11 +122,14 @@ async function start(body, traceId) {
     data.timeLimitSeconds !== 120 || data.memoryLimitMb !== 512 ||
     data.width !== 1024 || data.height !== 640 || data.outputLimitBytes !== 262144 ||
     data.assets.length || data.entryPoint !== '_cove_trial_runner.py' ||
-    !data.owner.startsWith('trial:') || !data.requestKey || !data.authorizationExpiresAt
+    !data.owner.startsWith('trial:') || !data.requestKey || !data.authorizationExpiresAt || body.replaceOwner
   )) throw Object.assign(new Error('Invalid trial execution profile'), { status: 400 });
   const previous = [...sessions.values()].find(s => s.owner === data.owner && s.requestKey === data.requestKey && data.requestKey);
   if (previous) return previous;
+  const approvedImage = selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion);
   const pendingBytes = Buffer.byteLength(JSON.stringify(data));
+  function admit() {
+  if (shuttingDown || !sandboxes.status().healthy) throw Object.assign(new Error('Runtime unavailable'), { status: 503 });
   if ([...sessions.values()].reduce((sum, s) => sum + (s.pendingBytes || 0), 0) + pendingBytes > 64 * 1024 * 1024 ||
       [...sessions.values()].filter(s => !s.closed && s.state === 'QUEUED').length >= capacity * 4)
     throw Object.assign(new Error('GUI queue is full; try again shortly'), { status: 429 });
@@ -134,12 +138,27 @@ async function start(body, traceId) {
   const s = { id: randomUUID(), owner: data.owner, requestKey: data.requestKey,
     traceId: /^[a-f0-9-]{36}$/.test(traceId || '') ? traceId : randomUUID(),
     outputLimitBytes: data.outputLimitBytes, authorizationExpiresAt: data.authorizationExpiresAt,
-    runtimeImage: selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion), token: randomBytes(32).toString('hex'),
+    runtimeImage: approvedImage, token: randomBytes(32).toString('hex'),
     state: 'QUEUED', data, pendingBytes, queuedAt: Date.now(), output: '', outputBytes: 0, closed: false,
     sockets: new Set(), viewers: new Map(), bridges: new Set(), controller: new AbortController(),
     expiresAt: Date.now() + data.timeLimitSeconds * 1000, lease: Date.now() + 30000 };
   sessions.set(s.id, s);
   scheduler.dispatch();
+  return s;
+  }
+  let s;
+  if (body.replaceOwner === true && poolName === 'course') {
+    // Serialize replacement through confirmed deletion/admission, not through
+    // execution. A second start can cancel a still-preparing first generation.
+    const predecessor = ownerTransitions.get(data.owner) ?? Promise.resolve();
+    const transition = predecessor.catch(() => {}).then(async () => {
+      for (const existing of sessions.values()) if (!existing.closed && existing.owner === data.owner) await stop(existing);
+      return admit();
+    });
+    ownerTransitions.set(data.owner, transition);
+    try { s = await transition; }
+    finally { if (ownerTransitions.get(data.owner) === transition) ownerTransitions.delete(data.owner); }
+  } else s = admit();
   return s.launchTask ? await s.launchTask : s;
 }
 async function launch(s) {
@@ -173,7 +192,8 @@ async function launch(s) {
     s.program = driver.program(s.handle, data);
     s.program.on('error', () => backgroundStop(s, 'ERROR'));
     s.program.stdin.on('error', () => { if (!s.closed) backgroundStop(s, 'ERROR'); });
-    s.program.stdin.write(JSON.stringify({ files: data.files, entryPoint: data.entryPoint }) + '\n');
+    s.program.stdin.write(JSON.stringify({ files: data.files, entryPoint: data.entryPoint,
+      retainDrawing: poolName === 'course', courseViewport: poolName === 'course' }) + '\n');
     telemetry.observe('spawn', s.handle.mode, performance.now() - spawnStart);
     s.data = null; s.pendingBytes = 0; s.state = 'RUNNING'; s.lease = Date.now() + 30000;
     const output = (text, rawBytes = 0) => {
@@ -182,17 +202,29 @@ async function launch(s) {
       if (s.outputBytes > s.outputLimitBytes) { s.output += '\nOutput limit exceeded'; backgroundStop(s, 'OUTPUT_LIMIT'); }
       else s.output += text;
     };
+    function completed(state, code) {
+      if (s.closed || s.endedAt) return;
+      s.state = state; s.endedAt = Date.now(); s.exitCode = code;
+      clearTimeout(s.deadline);
+      // Retaining a window never extends the original execution/authorization
+      // budget. The slot remains occupied until sandbox deletion is acknowledged.
+      const remaining = Math.min(30000, s.expiresAt - Date.now(),
+        s.authorizationExpiresAt ? s.authorizationExpiresAt - Date.now() : Infinity);
+      s.deadline = setTimeout(() => backgroundStop(s, s.state), Math.max(0, remaining)).unref();
+    }
     for (const stream of [s.program.stdout, s.program.stderr]) {
       const decoder = new StringDecoder('utf8');
-      const parser = terminalParser(state => { if (!s.closed) s.state = state; });
+      const parser = terminalParser((state, exitCode) => {
+        if (state === 'FINISHED' || state === 'ERROR') completed(state, exitCode ?? (state === 'FINISHED' ? 0 : 1));
+        else if (!s.closed && !s.endedAt) s.state = state;
+      });
       stream.on('data', chunk => output(parser.push(decoder.write(chunk)), chunk.length));
       stream.on('end', () => { output(parser.push(decoder.end())); output(parser.end()); });
     }
     s.program.on('close', code => {
       if (s.closed) return;
-      s.state = code === 0 ? 'FINISHED' : 'ERROR'; s.endedAt = Date.now(); s.exitCode = code;
-      clearTimeout(s.deadline);
-      s.deadline = setTimeout(() => backgroundStop(s, s.state), 30000).unref();
+      if (s.endedAt) s.exitCode = code;
+      else completed(code === 0 ? 'FINISHED' : 'ERROR', code);
     });
     telemetry.observe('launch', s.handle.mode, performance.now() - began);
     console.log(JSON.stringify({ event: 'gui.started', traceId: s.traceId, sessionId: s.id,

@@ -43,6 +43,19 @@ test("capability comparison rejects absent and different secrets", () => {
   assert.equal(equalSecret(undefined, undefined), false);
   assert.equal(equalSecret("a", "b"), false);
 });
+test('course completion markers preserve nonzero exit codes across every stream boundary', async () => {
+  const { terminalParser } = await import('./policy.mjs');
+  for (const code of [0, 1, 7, 255]) {
+    const marker = `\x1eCOVE_EXIT:${code}\x1f`;
+    for (let boundary = 0; boundary <= marker.length; boundary++) {
+      const states = [];
+      const parser = terminalParser((state, exitCode) => states.push([state, exitCode]));
+      const text = parser.push('before' + marker.slice(0, boundary)) + parser.push(marker.slice(boundary) + 'after') + parser.end();
+      assert.equal(text, 'beforeafter');
+      assert.deepEqual(states, [[code === 0 ? 'FINISHED' : 'ERROR', code]]);
+    }
+  }
+});
 
 test("terminal control markers survive fragmentation, preserve text and retain event order", async () => {
   const { terminalParser } = await import("./policy.mjs");

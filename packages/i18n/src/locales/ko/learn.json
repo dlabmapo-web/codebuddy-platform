@@ -255,7 +255,8 @@
     "live": "실시간",
     "footer_student": "코스로 돌아가기",
     "transition_failed": "해당 문제를 열지 못했습니다. 작성한 코드는 그대로입니다.",
-    "transition_retry": "다시 시도"
+    "transition_retry": "다시 시도",
+    "unavailable": "강좌 목차에서 이 활동을 찾을 수 없습니다. 강좌로 돌아가거나 다시 시도해 주세요."
   },
   "records": {
     "title": "제출 기록",

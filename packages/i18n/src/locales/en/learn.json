@@ -268,7 +268,8 @@
     "live": "Live",
     "footer_student": "Back to the course",
     "transition_failed": "That problem could not be opened. Your code is untouched.",
-    "transition_retry": "Try again"
+    "transition_retry": "Try again",
+    "unavailable": "This activity is no longer available in the course outline. Return to the course or try again."
   },
   "records": {
     "title": "Answer records",

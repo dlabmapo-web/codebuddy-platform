@@ -13,6 +13,7 @@ import { AssessmentDrawer } from './assessment-ui';
 import { lessonAction as assessmentAction } from '@/components/workspace/lesson-chrome';
 import { ChoiceRich } from './choice-options';
 import { useManualTranslation } from './use-manual-translation';
+import { TurtleSolutionDialog } from './turtle-solution-dialog';
 
 // Authoring tools load only when an authorized member opens Edit.
 const ManualAuthorDialog = dynamic(() => import('./manual-author-dialog').then(module => module.ManualAuthorDialog));
@@ -62,12 +63,14 @@ function SolutionReference({ config, academyId, materialId }: {
 }
 
 /** Shared assessment actions. Visibility is a server capability, never a role-mode cookie. */
-export function ManualStaffActions({ academyId, data, classId, reviewing = false, allowNavigate = () => true }: {
+export function ManualStaffActions({ academyId, data, classId, reviewing = false, allowNavigate = () => true, onRunSolution, runDisabled }: {
   academyId: string;
   data: ManualWorkspace;
   classId?: string;
   reviewing?: boolean;
   allowNavigate?: () => boolean;
+  onRunSolution?: () => void;
+  runDisabled?: boolean;
 }) {
   const { t } = useManualTranslation();
   const slug = useAcademySlug();
@@ -83,14 +86,14 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
   const reference = useQuery({
     queryKey: ['manual-reference', academyId, data.materialId],
     queryFn: () => manualApi.read({ academyId, materialId: data.materialId, preview: true }),
-    enabled: Boolean(staff?.canViewSolutions && solutionOpen),
+    enabled: Boolean(staff?.canViewSolutions && solutionOpen && data.type !== 'TURTLE_EXERCISE'),
     retry: false,
     staleTime: 0,
   });
   if (!staff) return null;
   const activity = routes.academyLearnMaterial(slug, data.materialId, data.type, { classId });
   return <>
-    {staff.canViewSolutions ? <AssessmentDrawer
+    {staff.canViewSolutions && data.type === 'TURTLE_EXERCISE' ? <TurtleSolutionDialog key={data.materialId} academyId={academyId} materialId={data.materialId} title={data.title} onRun={onRunSolution} runDisabled={runDisabled} /> : staff.canViewSolutions ? <AssessmentDrawer
       title={t('view_solution')} open={solutionOpen} onOpenChange={setSolutionOpen}
       trigger={<button type="button" className={assessmentAction}>
         <CheckCircle2 aria-hidden className="size-3.5" />{t('view_solution')}

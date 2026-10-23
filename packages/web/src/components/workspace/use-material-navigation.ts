@@ -14,16 +14,17 @@ export function useMaterialNavigation({ academyId, courseId, materialId, classId
   const slug = useAcademySlug();
   const router = useRouter();
   const query = useQuery({
-    queryKey: ['material-navigation', academyId, courseId, classId],
-    queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId: courseId!, classId }),
+    queryKey: ['material-navigation', academyId, courseId, classId, Boolean(preview)],
+    queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId: courseId!, classId, preview: preview || undefined }),
     enabled: Boolean(courseId), retry: false, staleTime: 30_000,
   });
   const context = query.data ? toNavigatorContext(query.data, materialId) : null;
+  const unavailable = Boolean(query.data && !context);
   const sequence = context ? workspaceMaterialSequence(context) : materials;
   const index = sequence.findIndex(item => item.materialId === materialId);
   const href = (item: { materialId: string; type: string }) => routes.academyLearnMaterial(slug, item.materialId, item.type, { classId, preview: preview || undefined });
   return {
-    context, failed: query.isError, retry: () => void query.refetch(),
+    context, failed: query.isError || unavailable, unavailable, retry: () => void query.refetch(),
     courseHref: courseId ? routes.academyLearnCourse(slug, courseId, { classId }) : routes.academyLearnCourses(slug),
     previous: index > 0 ? { href: href(sequence[index - 1]) } : null,
     next: index >= 0 && index + 1 < sequence.length ? { href: href(sequence[index + 1]) } : null,

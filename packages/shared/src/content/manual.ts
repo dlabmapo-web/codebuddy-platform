@@ -101,7 +101,7 @@ export const manualConfigSchema = z.object({
   description: z.string().max(100000).default(""),
   files: sourceFilesSchema.default({
     "main.py":
-      "import turtle\nturtle.Screen().setup(1.0, 1.0)\nt = turtle.Turtle()\nt.shape('turtle')\n\n# Draw here\nturtle.done()\n",
+      "import turtle as t\n\nt.shape('turtle')\n\n# Draw here\nt.done()\n",
   }),
   entryPoint: z.string().max(128).default("main.py"),
   solutionFiles: sourceFilesSchema.nullable().optional(),

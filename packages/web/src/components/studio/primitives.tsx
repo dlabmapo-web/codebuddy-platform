@@ -84,10 +84,11 @@ function TooltipContent({
   className,
   sideOffset = 4,
   children,
+  portalContainer,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+}: React.ComponentProps<typeof TooltipPrimitive.Content> & { portalContainer?: HTMLElement | null }) {
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={portalContainer}>
       <TooltipPrimitive.Content
         className={cn(
           /*
@@ -128,17 +129,19 @@ function Tooltip({
   content,
   side = 'right',
   hidden = false,
+  portalContainer,
 }: {
   children: React.ReactNode;
   content: React.ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
   hidden?: boolean;
+  portalContainer?: HTMLElement | null;
 }) {
   if (hidden) return <>{children}</>;
   return (
     <TooltipRoot>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side}>{content}</TooltipContent>
+      <TooltipContent side={side} portalContainer={portalContainer}>{content}</TooltipContent>
     </TooltipRoot>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, Save, BookOpen, History, MessageSquareText, ListChecks } from 'lucide-react';
+import { Send, Save, BookOpen, History, MessageSquareText, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
 import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
@@ -27,6 +27,13 @@ import { manualApi } from "@/lib/manual-api";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
 import { GuiViewer } from "./gui-viewer";
+import { AddSourceFile } from './add-source-file';
+import { Button } from '@/components/studio/button';
+import { DrawingIconButton, DrawingLayoutControl } from './drawing-panel-controls';
+import { WorkspaceResizeHandle } from './workspace-resize-handle';
+import styles from './manual-workspace.module.css';
+import type { CSSProperties } from 'react';
+import { executionTranslationKey } from './execution-state';
 export function ManualWorkspace({
   academyId,
   materialId,
@@ -70,9 +77,14 @@ export function ManualWorkspace({
   const [saved, setSaved] = useState("");
   const [session, setSession] = useState<ManualSession | null>(null);
   const [input, setInput] = useState("");
-  const [executionTab, setExecutionTab] = useState<"drawing" | "terminal">(
-    "drawing",
+  const [executionTab, setExecutionTab] = useState<"code" | "drawing" | "terminal">(
+    "code",
   );
+  const [drawingLayout, setDrawingLayout] = useState('below');
+  const [editorShare, setEditorShare] = useState(40);
+  const [solutionRun, setSolutionRun] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const generation = useRef(0);
   const [dirty, setDirty] = useState(false);
   const pendingSubmit = useRef<{ key: string; content: string } | null>(null);
   const resultPanel = useRef<HTMLElement | null>(null);
@@ -143,6 +155,7 @@ export function ManualWorkspace({
   }, [explicit, dirty, preview, mt]);
   useEffect(
     () => () => {
+      generation.current++;
       if (active.current) void manualApi.stop(active.current).catch(() => {});
     },
     [],
@@ -150,12 +163,13 @@ export function ManualWorkspace({
   useEffect(() => {
     if (
       !session ||
-      !["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT"].includes(
+      !["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT", "DISPLAYING"].includes(
         session.state,
       )
     )
       return;
     let cancelled = false;
+    const currentGeneration = generation.current;
     let inFlight = false;
     const timer = setInterval(() => {
       if (inFlight) return;
@@ -163,7 +177,7 @@ export function ManualWorkspace({
       void manualApi
         .status(session.id)
         .then((next) => {
-          if (!cancelled) {
+          if (!cancelled && currentGeneration === generation.current && active.current === next.id) {
             setSession(next);
             if (connectionFailed.current) {
               connectionFailed.current = false;
@@ -172,7 +186,7 @@ export function ManualWorkspace({
           }
         })
         .catch((e) => {
-          if (!cancelled) {
+          if (!cancelled && currentGeneration === generation.current) {
             connectionFailed.current = true;
             setError(e.message);
             if ([401, 403, 404].includes(e.status))
@@ -192,7 +206,7 @@ export function ManualWorkspace({
   }, [session?.id, session?.state]);
   const running =
     session &&
-    ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT"].includes(session.state);
+    ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT", "DISPLAYING"].includes(session.state);
   async function save() {
     if (preview || explicit) return true;
     if (saving.current) return saving.current;
@@ -232,11 +246,15 @@ export function ManualWorkspace({
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
   const navigation = useMaterialNavigation({ academyId, materialId, classId: selectedClass, preview, courseId: data?.course.id, materials: data?.materials });
-  const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
+  const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline', Boolean(data && data.type !== 'TURTLE_EXERCISE'), Boolean(data));
   async function navigateMaterial(id?: string, href?: string) {
-    if (busy || running) return;
+    if (busy) return;
     if (dirty && explicit && !window.confirm(mt('discard_answer'))) return;
     if (dirty && !explicit && !await save()) return;
+    if (active.current) {
+      try { await manualApi.stop(active.current); active.current = null; }
+      catch (error) { setError(error instanceof Error ? error.message : mt('stop_failed')); return; }
+    }
     if (href) router.push(href); else if (id) navigation.navigate(id);
   }
   const { setOpenMaterial } = useStudentPresence();
@@ -247,10 +265,17 @@ export function ManualWorkspace({
     return () => setOpenMaterial(null);
   }, [materialId, presenceCourseId, selectedClass, setOpenMaterial]);
   async function run(solution = false) {
+    setSolutionRun(solution);
+    const current = ++generation.current;
     setBusy(true);
+    setPreparing(true);
     setError("");
+    setInput('');
+    setSession(null);
     try {
       if (active.current) await manualApi.stop(active.current);
+      active.current = null;
+      if (current !== generation.current) return;
       const next = await manualApi.start({
         ...target,
         ...latest.current,
@@ -259,16 +284,19 @@ export function ManualWorkspace({
         preview,
         solution,
       });
+      if (current !== generation.current) { await manualApi.stop(next.id); return; }
       active.current = next.id;
       setSession(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : mt("run_failed"));
+      if (current === generation.current) setError(e instanceof Error ? e.message : mt("run_failed"));
     } finally {
-      setBusy(false);
+      if (current === generation.current) { setBusy(false); setPreparing(false); }
     }
   }
   async function stop() {
-    if (!active.current) return;
+    generation.current++;
+    setPreparing(false);
+    if (!active.current) { setBusy(false); return; }
     setBusy(true);
     try {
       await manualApi.stop(active.current);
@@ -482,9 +510,9 @@ export function ManualWorkspace({
         leaveHref={navigation.courseHref}
         curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
         {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
-        <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} />
+        <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
-      {preview ? <p role="note" className="flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 py-3 text-sm text-brand"><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}
+      {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}
       {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
       {/* Assigned when a draft loads, alongside state that re-renders. */}
       {/* eslint-disable-next-line react-hooks/refs */}
@@ -500,10 +528,10 @@ export function ManualWorkspace({
       ) : null}
       <div className="relative flex min-h-0 flex-1">
         <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
-          onClose={closePanel} onSelect={id => void navigateMaterial(id)} disabled={busy || Boolean(running)} error={navigation.failed} onRetry={navigation.retry}
+          onClose={closePanel} onSelect={id => void navigateMaterial(id)} disabled={busy} error={navigation.failed} unavailable={navigation.unavailable} onRetry={navigation.retry}
           footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-brand-soft/40 px-4 py-2 text-xs font-semibold text-brand">
+      <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-brand-soft/40 px-4 py-1.5 text-xs font-semibold text-brand">
         <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
       </div>
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
@@ -511,7 +539,7 @@ export function ManualWorkspace({
           className={
             !showInstructions
               ? "hidden"
-              : drawing ? "shrink-0 overflow-auto border-b border-border bg-card p-5 md:w-[38%] md:max-w-xl md:border-r md:border-b-0 sm:p-7" : "min-h-48 min-w-0 shrink-0 rounded-lg border border-border bg-card p-6 md:min-h-0 md:w-[calc(50%-8px)] md:overflow-y-auto"
+              : drawing ? "max-h-[25dvh] shrink-0 overflow-auto border-b border-border bg-card p-5 md:max-h-none md:w-[32%] md:max-w-xl md:resize-x md:border-r md:border-b-0 sm:p-7" : "min-h-48 min-w-0 shrink-0 rounded-lg border border-border bg-card p-6 md:min-h-0 md:w-[calc(50%-8px)] md:overflow-y-auto"
           }
         >
           <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sub"><BookOpen aria-hidden className="size-4" />{mt("activity_instructions")}</h2>
@@ -526,21 +554,6 @@ export function ManualWorkspace({
               title={mt("activity_instructions")}
             />
           )}
-          {preview && data.config.solutionFiles ? (
-            <details className="mt-4">
-              <summary>{mt("view_solution")}</summary>
-              <pre className="overflow-auto whitespace-pre-wrap">
-                {Object.values(data.config.solutionFiles).join("\n")}
-              </pre>
-              <button
-                type="button"
-                disabled={busy || Boolean(running)}
-                onClick={() => void run(true)}
-              >
-                {mt("run_solution")}
-              </button>
-            </details>
-          ) : null}
           {preview && data.config.modelAnswer ? (
             <details className="mt-6 rounded-xl border border-border bg-canvas/60 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-sub">{mt("model_answer_private")}</summary>
@@ -550,35 +563,28 @@ export function ManualWorkspace({
           {drawing ? submissionPanels : null}
       <VideoResourceLinks academyId={academyId} materialId={materialId} classId={selectedClass} preview={preview}/>
         </aside>
-        <section aria-label={mt("ui.answer_workspace")} className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "" : `min-h-[440px] rounded-lg border border-border bg-card md:min-h-0 ${showInstructions ? "" : "mx-auto w-full max-w-3xl"}`}`}>
+        <section aria-label={mt("ui.answer_workspace")} data-layout={drawingLayout} data-tab={executionTab} style={{ '--editor-track': `${editorShare}fr`, '--result-track': `${100 - editorShare}fr` } as CSSProperties} className={drawing ? styles.workspace : `flex min-h-0 min-w-0 flex-1 flex-col min-h-[440px] rounded-lg border border-border bg-card md:min-h-0 ${showInstructions ? "" : "mx-auto w-full max-w-3xl"}`}>
           {!showInstructions ? <div className="px-6"><VideoResourceLinks academyId={academyId} materialId={materialId} classId={selectedClass} preview={preview} /></div> : null}
           {data.type === "TURTLE_EXERCISE" ? (
             <>
-              <div className="flex gap-2 overflow-auto bg-editor-bg p-2 text-white">
+              <div className={`${styles.files} flex min-h-11 items-center overflow-x-auto border-b border-border bg-editor-bg text-sm text-white/70`}>
                 {Object.keys(files).map((name) => (
                   <button
                     key={name}
                     type="button"
-                    className={selected === name ? "font-bold underline" : ""}
+                    aria-pressed={selected === name}
+                    className="inline-flex h-11 shrink-0 items-center gap-2 border-r border-b-2 border-r-white/10 border-b-transparent px-4 text-sm outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand aria-pressed:border-b-brand aria-pressed:bg-white/5 aria-pressed:text-white"
                     onClick={() => setSelected(name)}
                   >
-                    {name}
+                    <FileCode2 aria-hidden className="size-4 text-brand" />{name}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const name = window.prompt(mt("python_file_name"));
-                    if (name && !Object.hasOwn(files, name)) {
-                      setFiles({ ...files, [name]: "" });
-                      setSelected(name);
-                    }
-                  }}
-                >
-                  {mt("file")}
-                </button>
+                <div className="ml-1"><AddSourceFile className="text-white/65 hover:bg-white/10 hover:text-white" files={files} onAdd={name => {
+                  setFiles({ ...files, [name]: '' }); setSelected(name);
+                  setDirty(true); setSaved(mt('unsaved_changes'));
+                }} /></div>
               </div>
-              <div className="flex min-h-[220px] flex-[1] flex-col">
+              <div className={styles.editor}>
                 <CodeEditor
                   code={files[selected] ?? ""}
                   fontSize={14}
@@ -612,24 +618,24 @@ export function ManualWorkspace({
               {submissionPanels}
             </div>
           )}
-          <div className={`flex shrink-0 flex-wrap items-center gap-3 ${data.type === "TURTLE_EXERCISE" ? "border-y border-border bg-card p-3" : "mt-auto justify-end border-t border-border bg-canvas/30 px-5 py-4"}`}>
+          <div className={`flex shrink-0 flex-wrap items-center gap-2 ${data.type === "TURTLE_EXERCISE" ? `${styles.controls} min-h-12 border-y border-border bg-card px-3 py-1.5` : "mt-auto justify-end border-t border-border bg-canvas/30 px-5 py-4"}`}>
             {data.type === "TURTLE_EXERCISE" ? (
               <>
                 <button
-                  className="rounded bg-brand px-4 py-2 text-white"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={busy || Boolean(running)}
                   type="button"
                   onClick={() => void run()}
                 >
-                  {mt("run")}
+                  <Play aria-hidden className="size-3.5" />{mt("run")}
                 </button>
-                <button
-                  disabled={busy || !running}
+                <Button variant="ghost" size="sm" className="h-9"
+                  disabled={!preparing && (busy || !running)}
                   type="button"
                   onClick={() => void stop()}
                 >
-                  {mt("stop")}
-                </button>
+                  <Square aria-hidden className="size-3.5" />{mt("stop")}
+                </Button>
               </>
             ) : null}
             {preview && !drawing ? <button type="button" disabled className={assessmentPrimary}><Send aria-hidden className="size-4" />{mt("submit")}</button> : null}
@@ -683,8 +689,9 @@ export function ManualWorkspace({
                 {mt(choice ? "choice_unavailable" : "short_answer_unavailable")}
               </p>
             ) : null}
-            <span role="status" className={drawing ? "text-xs" : "order-first mr-auto text-xs text-sub"}>
-              {saved} {session?.state}{" "}
+            <span role="status" className={drawing ? "ml-auto text-xs text-sub" : "order-first mr-auto text-xs text-sub"}>
+              {solutionRun && <span className="mr-2 rounded bg-brand-soft px-2 py-1 font-semibold text-brand">{mt("solution_result")}</span>}
+              {saved} {preparing ? mt('execution.preparing') : session ? mt(executionTranslationKey(session.state)) : ''}{" "}
               {session?.exitCode !== undefined
                 ? mt("exit_code", { code: session.exitCode })
                 : null}
@@ -704,8 +711,10 @@ export function ManualWorkspace({
             <>
               <div
                 role="tablist"
-                className="flex gap-4 border-b border-border p-2 md:hidden"
+                className={`${styles.tabs} flex gap-4 border-b border-border p-2 md:hidden`}
+                aria-label={mt('workspace_panels')}
               >
+                <button role="tab" aria-selected={executionTab === 'code'} onClick={() => setExecutionTab('code')}>{mt('code')}</button>
                 <button
                   role="tab"
                   aria-selected={executionTab === "drawing"}
@@ -721,33 +730,36 @@ export function ManualWorkspace({
                   {mt("terminal")}
                 </button>
               </div>
-              <div className="flex min-h-[280px] flex-[1] flex-col lg:flex-row">
+              <WorkspaceResizeHandle value={editorShare} onChange={setEditorShare} />
+              <div className={styles.results}>
                 <div
-                  className={
-                    "min-h-[280px] md:min-h-0 min-w-0 flex-1 flex-col md:flex " +
-                    (executionTab === "drawing" ? "flex" : "hidden")
-                  }
+                  className={styles.drawing}
                 >
                   {session ? (
-                    <GuiViewer session={session} onError={showError} />
+                    <GuiViewer key={session.id} session={session} onError={showError} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
                   ) : (
-                    <div className="grid flex-1 place-items-center bg-white text-slate-600">
-                      {mt("run_python_to_open_the_drawing")}
+                    <div className="flex min-h-0 flex-1 flex-col bg-white">
+                      <div className="flex min-h-11 shrink-0 items-center gap-1 border-b border-border bg-card px-3 text-xs">
+                        <strong className="mr-auto font-semibold">{mt("drawing")}</strong>
+                        <DrawingLayoutControl value={drawingLayout} onChange={setDrawingLayout} />
+                        <DrawingIconButton label={mt("expand_drawing")} disabled><Expand aria-hidden /></DrawingIconButton>
+                      </div>
+                      <div className="grid min-h-0 flex-1 place-content-center justify-items-center gap-3 p-4 text-center text-slate-500">
+                        <Turtle aria-hidden className="size-9 text-slate-300" /><p className="text-xs">{mt("run_python_to_open_the_drawing")}</p>
+                      </div>
                     </div>
                   )}
                 </div>
                 <section
-                  className={
-                    "min-h-[120px] min-w-0 flex-1 flex-col bg-editor-bg p-3 text-white md:flex " +
-                    (executionTab === "terminal" ? "flex" : "hidden")
-                  }
+                  className={`${styles.terminal} bg-editor-bg text-white`}
                   aria-label={mt("terminal")}
                 >
+                  <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-white/10 px-3 text-xs font-semibold text-white/65"><Terminal aria-hidden className="size-3.5" />{mt("terminal")}</div>
                   <pre
-                    className="max-h-[200px] flex-1 overflow-auto whitespace-pre-wrap text-xs"
+                    className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed"
                     data-testid="turtle-terminal"
                   >
-                    {session?.output}
+                    {session?.output || (!session ? mt("code_not_run") : "")}
                   </pre>
                   <form
                     onSubmit={(e) => {
@@ -761,7 +773,7 @@ export function ManualWorkspace({
                     }}
                   >
                     <input
-                      className="w-full border-t border-white/20 bg-transparent p-2 text-sm"
+                      className="w-full border-t border-white/15 bg-transparent px-3 py-2.5 text-xs outline-none placeholder:text-white/40 focus:ring-2 focus:ring-inset focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={mt("terminal_input")}
                       placeholder={mt("terminal_input")}
                       value={input}
@@ -780,7 +792,7 @@ export function ManualWorkspace({
       <LessonFooter
         previous={navigation.previous ? { onClick: () => void navigateMaterial(undefined, navigation.previous!.href) } : null}
         next={navigation.next ? { onClick: () => void navigateMaterial(undefined, navigation.next!.href) } : null}
-        index={navigation.index} total={navigation.total} disabled={busy || Boolean(running)} />
+        index={navigation.index} total={navigation.total} disabled={busy} />
     </main>
   );
 }

@@ -14,6 +14,7 @@ import { routes } from "@/lib/routes";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { GuiViewer } from "./gui-viewer";
+import { executionTranslationKey } from './execution-state';
 export function ManualReviewWorkspace({
   academyId,
   classId,
@@ -413,11 +414,11 @@ export function ManualReviewWorkspace({
                       {mt("run_submitted_code")}
                     </button>
                     <button onClick={() => void stop()}>{mt("stop")}</button>
-                    <span>{session?.state}</span>
+                    <span>{session ? mt(executionTranslationKey(session.state)) : ''}</span>
                   </div>
                   {session ? (
                     <div className="grid min-h-[300px] gap-3 lg:grid-cols-2">
-                      <GuiViewer session={session} onError={onError} />
+                      <GuiViewer key={session.id} session={session} onError={onError} onStop={session.readOnly ? undefined : () => void stop().catch(error => onError(error.message))} />
                       <section className="min-w-0 bg-editor-bg p-3 text-white">
                         <pre
                           className="max-h-72 overflow-auto whitespace-pre-wrap"

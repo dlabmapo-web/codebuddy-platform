@@ -215,7 +215,9 @@ test('switching examples clears live and stopped results while preserving each c
     ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"REQUEST_FAILED"}' })
     : route.continue());
   await choose(/도형 그리기|Draw shapes/);
-  await expect(page.getByRole('alert')).toBeVisible();
+  // Monaco and Next's route announcer also expose alerts; assert the actual
+  // classroom cleanup error rather than all live regions on the page.
+  await expect(page.getByRole('alert').filter({ hasText: /classroom connection|연결/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ })).toHaveText(/거북이 경주|Turtle race/);
   await closeOptions();
   await expect(output).toContainText('RACE_BUFFER');

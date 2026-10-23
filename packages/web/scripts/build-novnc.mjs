@@ -25,7 +25,10 @@ await build({
       },
     },
   ],
-  entryPoints: [require.resolve("@novnc/novnc/lib/rfb")],
+  stdin: {
+    contents: 'export { default } from "@novnc/novnc/lib/rfb"; export { releaseCapture } from "@novnc/novnc/lib/util/events";',
+    resolveDir: process.cwd(), sourcefile: 'cove-novnc-entry.js', loader: 'js',
+  },
   bundle: true,
   format: "iife",
   globalName: "CoveVNC",

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ManualSession } from '@cove/shared';
 
 const mocks = vi.hoisted(() => ({ load: vi.fn(), t: (key: string) => key }));
-vi.mock('./novnc-loader', () => ({ loadRfb: mocks.load }));
+vi.mock('./novnc-loader', () => ({ loadRfb: mocks.load, releaseRfbCapture: vi.fn() }));
 vi.mock('./use-manual-translation', () => ({ useManualTranslation: () => ({ t: mocks.t }) }));
 import { GuiViewer } from './gui-viewer';
 
@@ -67,6 +67,39 @@ const render = async (current = session) => {
 };
 
 describe('drawing viewer connection lifecycle', () => {
+  it('makes completed course drawings read-only without replacing the viewer', async () => {
+    await act(async () => root.render(<GuiViewer session={{ ...session, state: 'RUNNING' }} onError={onError} />));
+    expect(FakeRfb.instances[0].viewOnly).toBe(false);
+    await act(async () => root.render(<GuiViewer session={{ ...session, state: 'FINISHED' }} onError={onError} />));
+    expect(FakeRfb.instances).toHaveLength(1);
+    expect(FakeRfb.instances[0].viewOnly).toBe(true);
+  });
+  it('retains a connected frame even when noVNC clears the canvas on disconnect', async () => {
+    await render({ ...session, state: 'FINISHED' });
+    const remote = FakeRfb.instances[0]!;
+    await act(() => { remote.dispatchEvent(new Event('connect')); vi.advanceTimersByTime(500); });
+    vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockReturnValue('data:image/png;base64,black');
+    await act(() => remote.peerDisconnect());
+    expect(host.querySelector('img')?.src).toBe('data:image/png;base64,frame');
+    await act(() => { vi.advanceTimersByTime(3000); });
+    expect(FakeRfb.instances).toHaveLength(1);
+  });
+
+  it('expands, changes fitting and closes without reconnecting or resizing Python', async () => {
+    await act(async () => root.render(<GuiViewer session={session} onError={onError} />));
+    const button = (label: string) => [...host.querySelectorAll('button')].find(node => node.textContent === label)!;
+    const opener = button('expand_drawing'); opener.focus();
+    await act(() => opener.click());
+    expect(host.querySelector('dialog')?.getAttribute('aria-modal')).toBe('true');
+    expect(document.activeElement?.textContent).toBe('close_drawing');
+    await act(() => button('actual_size').click());
+    expect(FakeRfb.instances[0].scaleViewport).toBe(false);
+    expect(FakeRfb.instances[0].resizeSession).toBe(false);
+    await act(() => button('close_drawing').click());
+    expect(FakeRfb.instances).toHaveLength(1);
+    expect(document.activeElement).toBe(button('expand_drawing'));
+  });
+
   it('unmounts safely after the server has already disconnected', async () => {
     await render();
     const remote = FakeRfb.instances[0]!;

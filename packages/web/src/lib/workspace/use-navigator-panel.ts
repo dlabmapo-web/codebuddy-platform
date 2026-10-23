@@ -12,12 +12,19 @@ import * as React from 'react';
  * whichever of the three ways it closed, it returns to the trigger, which is
  * the element the reader used to get here.
  */
-export function useNavigatorPanel(panelId: string, initiallyOpen = true) {
+export function useNavigatorPanel(panelId: string, initiallyOpen = true, ready = true) {
   // Every fresh student or teacher problem workspace starts with its course
   // context visible. This state stays local to the mounted workspace: closing
   // survives in-place problem movement, while leaving and re-entering starts
   // open again without persisting a preference.
   const [open, setOpen] = React.useState(initiallyOpen);
+  const initialized = React.useRef(ready);
+  React.useEffect(() => {
+    if (ready && !initialized.current) {
+      initialized.current = true;
+      setOpen(initiallyOpen);
+    }
+  }, [ready, initiallyOpen]);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const close = React.useCallback(() => {

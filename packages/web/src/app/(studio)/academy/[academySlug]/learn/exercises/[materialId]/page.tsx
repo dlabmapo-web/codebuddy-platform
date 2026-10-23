@@ -2,7 +2,7 @@ import { StaffWorkspace } from "./_components/staff-workspace";
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnExerciseBootstrap } from '@cove/shared';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -30,6 +30,17 @@ export default async function ExerciseWorkspacePage({
   const search = await searchParams;
   const submissionId = single(search.submission);
   const requestedClassId = single(search.classId);
+  if (!submissionId) {
+    let destination: string | undefined;
+    try {
+      const material = await createServerORPCClient().learn.getMaterialType({ academyId, materialId, preview: single(search.preview) === 'true' || undefined });
+      if (material.type === 'TURTLE_EXERCISE') destination = routes.academyLearnMaterial(academySlug, materialId, material.type, {
+        ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
+        ...(single(search.preview) === 'true' ? { preview: true } : {}),
+      });
+    } catch { notFound(); }
+    if (destination) redirect(destination);
+  }
   // Reduced to this academy's own records path before it reaches the client,
   // so a crafted `returnTo` cannot turn Back into an open redirect.
   const returnTo = search.returnTo

@@ -61,6 +61,7 @@ export function WorkspaceCurriculumNavigator({
   disabled,
   dockAt = 'md',
   error,
+  unavailable = false,
   footer,
   onClose,
   onSelect,
@@ -83,6 +84,7 @@ export function WorkspaceCurriculumNavigator({
   /** The breakpoint where the overlay becomes a dedicated 320px column. */
   dockAt?: 'md' | 'lg';
   error?: boolean;
+  unavailable?: boolean;
   /** Where this role goes to leave: a course outline, or a class roster. */
   footer: { href: string; label: string };
   onClose: () => void;
@@ -184,7 +186,7 @@ export function WorkspaceCurriculumNavigator({
             className="truncate text-[13.5px] font-bold"
             title={context?.course.title}
           >
-            {context?.course.title ?? t('navigator.loading')}
+            {context?.course.title ?? t(error || unavailable ? 'navigator.title' : 'navigator.loading')}
           </p>
           {context ? (
             <p className="text-[11.5px] text-sub">
@@ -211,7 +213,7 @@ export function WorkspaceCurriculumNavigator({
           // it: the panel says so, offers a retry, and the exercise beside it
           // stays entirely usable.
           <div className="px-3 py-6 text-center">
-            <p className="text-[13px] font-semibold">{t('navigator.error')}</p>
+            <p className="text-[13px] font-semibold">{t(unavailable ? 'navigator.unavailable' : 'navigator.error')}</p>
             {onRetry ? (
               <button
                 className="mt-2 rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-bold text-sub transition-colors hover:border-brand/40 hover:text-brand"

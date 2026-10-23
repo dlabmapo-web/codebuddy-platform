@@ -93,6 +93,42 @@ assert int(broker["mem_limit"]) == 256 * 1024**2 and int(broker["pids_limit"]) =
 print("Public Turtle pilot: independent rootless socket, private network, bounded resources")
 '
 
+TURTLE_TRIAL_BROKER_IMAGE="ghcr.io/dlabmapo-web/cove-gui-service@sha256:$(printf '0%.0s' {1..64})" \
+TURTLE_TRIAL_DOCKER_SOCKET=/run/user/1001/cove-turtle/docker.sock \
+TURTLE_TRIAL_DOCKER_UID=1001 TURTLE_TRIAL_DOCKER_GID=1001 \
+TURTLE_TRIAL_CONTROL_NETWORK=cove-production_gui-control \
+TURTLE_TRIAL_ENVELOPE_DIRECTORY=/private/turtle-envelope TURTLE_METRICS_DIRECTORY=/private/turtle-metrics GUI_WARM_STANDBY=1 \
+docker compose --project-directory "$validation_root" \
+  -f "$validation_root/compose.turtle-trial-rootless.yml" \
+  -f "$validation_root/compose.turtle-trial-warm.yml" config --format json | python3 -c '
+import json, sys
+broker = json.load(sys.stdin)["services"]["trial-broker"]
+assert broker["environment"]["GUI_WARM_STANDBY"] == "1"
+assert broker["environment"]["GUI_REQUIRE_ROOTLESS"] == "true"
+assert broker["environment"]["GUI_SESSION_CAPACITY"] == "1"
+assert not broker.get("ports")
+assert len(broker["volumes"]) == 3
+assert any(v["target"] == "/run/turtle-envelope" and v["read_only"] for v in broker["volumes"])
+print("Warm trial: opt-in, private attestation, unchanged student capacity")
+'
+TURTLE_METRICS_CREDENTIAL_FILE=/private/turtle-token \
+TURTLE_METRICS_DIRECTORY=/private/turtle-metrics \
+docker compose --project-directory "$validation_root" --env-file "$validation_root/deployment.env" \
+  -f "$validation_root/compose.production.yml" -f "$validation_root/compose.turtle-monitoring.yml" \
+  config --format json | python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+assert "trial-broker" not in services
+prom = services["prometheus"]
+assert set(prom["networks"]) == {"monitoring", "gui-control"}
+assert any(v["target"] == "/run/secrets/turtle-metrics" and v["read_only"] for v in prom["volumes"])
+node = services["node-exporter"]
+assert "--collector.textfile.directory=/run/turtle-metrics" in node["command"]
+assert not any(v["target"].endswith("docker.sock") for v in node["volumes"])
+print("Turtle monitoring: separate main-project overlay, metrics-only token and textfiles")
+'
+python3 "$deploy_root/scripts/turtle-startup.test.py"
+
 # The previous image's validator pins the Render origin. Restoring its older
 # manifest must restore that origin too, even with the new Compose assets.
 cp "$validation_root/deployment.env" "$validation_root/new-domain.env"
@@ -147,6 +183,15 @@ docker run --rm \
   prom/prometheus:v3.5.0 \
   check config /etc/prometheus/prometheus.yml
 
+mkdir -p "$validation_root/monitoring/optional"
+cp "$validation_root/monitoring/turtle-scrape.yml" "$validation_root/monitoring/optional/turtle.yml"
+printf '%s' fixture-only-metrics-credential-never-production > "$validation_root/metrics-token"
+chmod 644 "$validation_root/metrics-token"
+docker run --rm --entrypoint /bin/promtool \
+  -v "$validation_root/monitoring:/etc/prometheus:ro" \
+  -v "$validation_root/metrics-token:/run/secrets/turtle-metrics:ro" \
+  prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
+
 docker run --rm \
   --user 0:0 \
   --entrypoint /bin/amtool \
@@ -164,6 +209,8 @@ validation_compose run --rm --no-deps \
 
 python3 -m json.tool \
   "$validation_root/monitoring/grafana/dashboards/cove-host.json" >/dev/null
+python3 -m json.tool \
+  "$validation_root/monitoring/grafana/dashboards/turtle-startup.json" >/dev/null
 
 for script in "$deploy_root"/scripts/*.sh; do
   bash -n "$script"

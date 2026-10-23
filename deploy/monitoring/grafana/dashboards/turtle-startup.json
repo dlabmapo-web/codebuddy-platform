@@ -1,0 +1,244 @@
+{
+  "uid": "cove-turtle-startup",
+  "title": "Public Turtle startup",
+  "description": "Broker timing is not browser first-drawing latency. Enable optional monitoring overlay.",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Warm hits and misses",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (__name__) (rate({__name__=~\"cove_turtle_warm_(hit|miss)_total\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Broker launch p95 by mode",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, mode) (rate(cove_turtle_stage_seconds_bucket{stage=\"launch\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Allocated and draining containers",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "{__name__=~\"cove_turtle_(allocated|ready|building|draining|uncertain)\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Queue and active runs",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "{__name__=~\"cove_turtle_(queued|active)\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Stage p50 and p95",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(cove_turtle_stage_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, stage) (rate(cove_turtle_stage_seconds_bucket[5m])))",
+          "refId": "B",
+          "legendFormat": "p50 {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Launch and preparation failures",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (__name__) (rate({__name__=~\"cove_turtle_(launch_failure|prepare_failure|cleanup_failure)_total\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Rootless slice memory",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "cove_turtle_slice_memory_bytes",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Rootless slice CPU throttling",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(cove_turtle_slice_cpu_throttled_seconds_total[5m])",
+          "refId": "A",
+          "legendFormat": "{{__name__}} {{mode}} {{stage}}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Merge ONLY with compose.production.yml in the main project. No new broker.
+services:
+  prometheus:
+    networks: [monitoring, gui-control]
+    volumes:
+      - ./monitoring/turtle-scrape.yml:/etc/prometheus/optional/turtle.yml:ro
+      - type: bind
+        source: ${TURTLE_METRICS_CREDENTIAL_FILE:?set the protected Prometheus-readable bearer file}
+        target: /run/secrets/turtle-metrics
+        read_only: true
+        bind: { create_host_path: false }
+  node-exporter:
+    command: [--path.rootfs=/host, --collector.textfile.directory=/run/turtle-metrics]
+    volumes:
+      - type: bind
+        source: ${TURTLE_METRICS_DIRECTORY:?set the non-secret textfile directory}
+        target: /run/turtle-metrics
+        read_only: true
+        bind: { create_host_path: false }

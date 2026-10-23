@@ -1,0 +1,18 @@
+# Merge ONLY with compose.turtle-trial-rootless.yml in its separate project.
+services:
+  trial-broker:
+    environment:
+      GUI_WARM_STANDBY: ${GUI_WARM_STANDBY:-0}
+      GUI_WARM_ENVELOPE_FILE: /run/turtle-envelope/envelope.json
+      GUI_WARM_SLICE_METRICS_FILE: /run/turtle-metrics/cove-turtle.prom
+    volumes:
+      - type: bind
+        source: ${TURTLE_TRIAL_ENVELOPE_DIRECTORY:?set the private envelope directory}
+        target: /run/turtle-envelope
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${TURTLE_METRICS_DIRECTORY:?set the non-secret textfile directory}
+        target: /run/turtle-metrics
+        read_only: true
+        bind: { create_host_path: false }

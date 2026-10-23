@@ -68,6 +68,10 @@ WantedBy=default.target
 ''',
 }
 for path, content in files.items():
+ if path.name == 'cove-turtle.slice' and path.exists() and path.read_text() == content.replace('MemoryHigh=768M\nMemoryMax=1G\n', 'MemoryHigh=1536M\nMemoryMax=2G\n'):
+  # Preserve only the exact envelope installed by configure-turtle-warm.sh.
+  files[path] = path.read_text()
+  continue
  if path.exists() and path.read_text() != content:
   raise SystemExit('Review existing configuration before replacing: ' + str(path))
 for path, content in files.items():

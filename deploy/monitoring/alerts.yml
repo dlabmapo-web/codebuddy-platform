@@ -1,4 +1,53 @@
 groups:
+  - name: cove-turtle-startup
+    rules:
+      - alert: TurtleAllocationUnsafe
+        expr: cove_turtle_uncertain > 0 or cove_turtle_allocated > 2
+        labels: {severity: critical}
+        annotations:
+          summary: "Public Turtle has an uncertain or excessive container allocation"
+      - alert: TurtleCleanupPending
+        expr: cove_turtle_draining > 0
+        for: 30s
+        labels: {severity: critical}
+        annotations:
+          summary: "Public Turtle cannot confirm container cleanup"
+      - alert: TurtlePreparationFailures
+        expr: increase(cove_turtle_prepare_failure_total[1m]) >= 3
+        labels: {severity: warning}
+        annotations:
+          summary: "Public Turtle preparation is repeatedly failing"
+      - alert: TurtleSliceOOM
+        expr: increase(cove_turtle_slice_oom_total[5m]) > 0 or increase(cove_turtle_slice_oom_kill_total[5m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Public Turtle exceeded its aggregate memory budget"
+      - alert: TurtleSliceMetricsStale
+        expr: |
+          (time() - cove_turtle_slice_collected_at_seconds > 60)
+          or (absent(cove_turtle_slice_collected_at_seconds) and on() (max(up{job="turtle-startup"}) == 1))
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Public Turtle cgroup measurements are stale"
+      - alert: TurtleWarmMissRate
+        expr: |
+          (increase(cove_turtle_warm_hit_total[15m]) / clamp_min(increase(cove_turtle_warm_hit_total[15m]) + increase(cove_turtle_warm_miss_total[15m]), 1) < 0.8)
+          and (increase(cove_turtle_warm_hit_total[15m]) + increase(cove_turtle_warm_miss_total[15m]) >= 20)
+          and (cove_turtle_enabled == 1)
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Public Turtle often starts without a ready standby"
+      - alert: TurtleWarmStartupSlow
+        expr: |
+          (histogram_quantile(0.95, sum by (le, instance, job) (rate(cove_turtle_stage_seconds_bucket{stage="launch",mode="warm"}[15m]))) > 1)
+          and on(instance, job) (sum by (instance, job) (increase(cove_turtle_stage_seconds_count{stage="launch",mode="warm"}[15m])) >= 20)
+          and on(instance, job) (cove_turtle_enabled == 1)
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Public Turtle warm broker launch p95 exceeds one second"
   - name: cove-host
     rules:
       - alert: MetricsTargetDown

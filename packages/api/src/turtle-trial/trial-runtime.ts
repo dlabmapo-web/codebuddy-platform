@@ -9,14 +9,14 @@ export class TrialRuntime {
     const health = await this.control('/health') as { ready?: boolean; pool?: string };
     if (!health.ready || health.pool !== 'trial') throw new ServiceUnavailableException('TRIAL_UNAVAILABLE');
   }
-  private async control(path: string, method = 'GET', body?: unknown): Promise<unknown> {
+  private async control(path: string, method = 'GET', body?: unknown, traceId?: string): Promise<unknown> {
     const base = this.config.get<string>('TURTLE_TRIAL_SERVICE_URL');
     const secret = this.config.get<string>('TURTLE_TRIAL_SERVICE_SECRET');
     if (!base || !secret) throw new ServiceUnavailableException('TRIAL_UNAVAILABLE');
     let response: Response;
     try {
       response = await fetch(base + path, {
-        method, headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json' },
+        method, headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json', ...(traceId ? { 'X-Cove-Trace-ID': traceId } : {}) },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(45000), redirect: 'error',
       });
@@ -26,8 +26,8 @@ export class TrialRuntime {
     }
     return response.json();
   }
-  async request(path: string, method = 'GET', body?: unknown): Promise<TurtleSession> {
-    const data = await this.control(path, method, body) as TurtleSession;
+  async request(path: string, method = 'GET', body?: unknown, traceId?: string): Promise<TurtleSession> {
+    const data = await this.control(path, method, body, traceId) as TurtleSession;
     // Never pass future broker-internal fields through to anonymous browsers.
     return { id: data.id, state: data.state, output: data.output, token: data.token,
       expiresAt: data.expiresAt, startedAt: data.startedAt, endedAt: data.endedAt, exitCode: data.exitCode,

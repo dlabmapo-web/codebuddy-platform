@@ -22,6 +22,36 @@ async function code(page: Page, source: string) {
   })).toBe(source);
 }
 
+test('admission preloads the viewer without creating a run or display connection', async ({ page }) => {
+  const runs: string[] = [], sockets: string[] = [];
+  page.on('request', r => { if (r.url().endsWith('/turtle/api/runs')) runs.push(r.method()); });
+  page.on('websocket', s => sockets.push(s.url()));
+  const viewer = page.waitForResponse(r => r.url().includes('/novnc-rfb.js'));
+  await enter(page);
+  expect((await viewer).ok()).toBe(true);
+  expect(runs).toEqual([]);
+  expect(sockets.filter(s => s.includes('/display'))).toEqual([]);
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});
+
+test('failed viewer preload leaves the editor usable and retries on Run', async ({ page }) => {
+  let attempts = 0;
+  await page.route('**/novnc-rfb.js*', async route => {
+    attempts++;
+    if (attempts === 1) await route.abort(); else await route.continue();
+  });
+  await enter(page);
+  await expect.poll(() => attempts).toBe(1);
+  await code(page, 'from custom import *\nspeed(0)\ncolor("red")\nTForward(100)\nprint("PRELOAD_RETRY_OK")\n');
+  await page.getByRole('button', { name: /^(실행|Run)$/ }).click();
+  await expect(page.getByRole('region', { name: /^(출력|Output)$/ })).toContainText('PRELOAD_RETRY_OK');
+  await expect(page.locator('[data-testid="turtle-display"] canvas')).toBeVisible();
+  expect(attempts).toBe(2);
+  await page.getByRole('button', { name: /더 보기|More options/ }).click();
+  await page.getByRole('button', { name: /^(나가기|Exit)$/ }).click();
+});
+
 test('six-box entry supports paste, editing, visibility, errors and mobile layout', async ({ page }, testInfo) => {
   await page.goto('/turtle');
   const pin = page.getByLabel(/체험 코드|Classroom code/, { exact: true });

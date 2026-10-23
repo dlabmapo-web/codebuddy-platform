@@ -10,11 +10,12 @@ describe('guest broker boundary', () => {
   it('exposes only the session DTO, excluding future internal broker fields', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ id: 'fixture', state: 'RUNNING',
       output: 'hello', token: 'display-capability', expiresAt: 123, owner: 'private-owner',
-      serviceSecret: 'must-not-pass-through', runtimeImage: 'internal-image' })));
+      serviceSecret: 'must-not-pass-through', runtimeImage: 'internal-image', containerId: 'internal-container' })));
     const session = await new TrialRuntime(config).request('/sessions/fixture');
     expect(session.displayUrl).toBe('wss://cs.coveedu.com/turtle-display/sessions/fixture/display');
     expect(session).not.toHaveProperty('owner'); expect(session).not.toHaveProperty('serviceSecret');
     expect(session).not.toHaveProperty('runtimeImage');
+    expect(session).not.toHaveProperty('containerId');
   });
   it('rejects a course broker and preserves bounded busy errors', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ready: true, pool: 'course' })));

@@ -1,6 +1,6 @@
-import { HttpException, Inject, Injectable, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import {
   turtleCustomSource, turtleShapeSource, turtleRunnerSource, turtleProjectReadme,
@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service.js';
 
 @Injectable()
 export class TrialService {
+  private readonly logger = new Logger(TrialService.name);
   constructor(@Inject(ConfigService) private readonly config: ConfigService, @Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialRuntime) private readonly runtime: TrialRuntime,
     @Optional() @Inject(TrialPins) private readonly pins?: TrialPins,
     @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService) {}
@@ -98,11 +99,16 @@ export class TrialService {
     return session;
   }
   async start(token: string, input: TurtleRunInput) {
+    const traceId = randomUUID(), began = performance.now();
     const g = await this.grant(token); const unlock = await this.store.lock(g);
+    const authorizationMs = performance.now() - began;
+    let reservationMs = 0;
     try {
       if (g.active) await this.recover(g, g.active);
       const fingerprint = trialHash(JSON.stringify(input));
+      const reserving = performance.now();
       const reservation = await this.store.reserve(g, input.requestKey, fingerprint);
+      reservationMs = performance.now() - reserving;
       if (reservation === 'EXISTING') {
         const run = await this.store.run(g, input.requestKey);
         const session = await this.recover(g, input.requestKey);
@@ -118,7 +124,7 @@ export class TrialService {
           files: { 'main.py': input.source, 'custom.py': turtleCustomSource, 'shape.py': turtleShapeSource, '_cove_trial_runner.py': turtleRunnerSource },
           entryPoint: '_cove_trial_runner.py', assets: [], width: 1024, height: 640,
           timeLimitSeconds: turtleRunSeconds, memoryLimitMb: 512, outputLimitBytes: 262144,
-        });
+        }, traceId);
       } catch (error) {
         // A transport timeout can mean the broker accepted the run. Reconcile
         // through its idempotent owner/key lookup before deciding on a refund.
@@ -131,7 +137,13 @@ export class TrialService {
       try { await this.grant(token); }
       catch (error) { await this.runtime.request('/sessions/' + s.id, 'DELETE').catch(() => {}); throw error; }
       return s;
-    } finally { await unlock().catch(() => {}); }
+    } finally {
+      await unlock().catch(() => {});
+      // Fixed fields only; admission credentials, source and capabilities are never logged.
+      this.logger.log(JSON.stringify({ event: 'turtle.start', traceId,
+        authorizationMs: Math.round(authorizationMs), reservationMs: Math.round(reservationMs),
+        durationMs: Math.round(performance.now() - began) }));
+    }
   }
   async session(token: string, id: string, method = 'GET', text?: string) {
     const g = await this.grant(token); const key = await this.store.owned(g, id);

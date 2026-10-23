@@ -18,6 +18,7 @@ services:
       GUI_TRIAL_ONLY: "true"
       GUI_REQUIRE_ROOTLESS: "true"
       GUI_SESSION_CAPACITY: "1"
+      GUI_WARM_STANDBY: "0"
       NODE_OPTIONS: --max-old-space-size=160
       DOCKER_CONFIG: /tmp/docker
     volumes:

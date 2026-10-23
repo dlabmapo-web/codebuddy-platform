@@ -5,6 +5,10 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# Optional jobs are mounted only by the corresponding monitoring overlay.
+scrape_config_files:
+  - /etc/prometheus/optional/*.yml
+
 alerting:
   alertmanagers:
     - static_configs:

@@ -6,6 +6,7 @@ import { ArrowRight, Check, LoaderCircle, Play, RotateCw, Square, Turtle, X } fr
 import { turtleHelperVersion, turtleRunning, turtleSpiralExample, turtleStarters, type TurtleBootstrap, type TurtleSession, type TurtleStarterId } from '@cove/shared';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { GuiViewer } from '@/components/manual/gui-viewer';
+import { loadRfb } from '@/components/manual/novnc-loader';
 import { turtleRequest, TurtleRequestError } from '@/lib/turtle-trial/client';
 import { initialTurtleDraft, parseTurtleDraft, turtleDraftKey, turtleErrorHint, type TurtleDraft } from '@/lib/turtle-trial/drafts';
 import { LanguageControl } from '@/components/studio/language-control';
@@ -130,6 +131,11 @@ export function TurtleTrial({ enabled }: { enabled: boolean }) {
     // Initial guest bootstrap does not depend on subsequent editor state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    // Load the viewer while students edit; do not allocate a session or socket.
+    // Failure remains retryable when GuiViewer later calls the same cached loader.
+    if (access) void loadRfb().catch(() => {});
+  }, [access]);
   useEffect(() => {
     if (!hydrated) return;
     const timer = setTimeout(() => {

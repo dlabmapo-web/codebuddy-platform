@@ -282,7 +282,7 @@ test(
       "ps",
       "-aq",
       "--filter",
-      `name=cove-gui-${processes.id}`,
+      `id=${processes.containerId}`,
     ]);
     assert.equal(check.stdout.trim(), "");
   },

@@ -1,3 +1,10 @@
+import { reapPrevious } from './reap-previous.mjs';
+import { readFile } from 'node:fs/promises';
+import { StandbyPool } from './standby-pool.mjs';
+import { createSandboxDriver } from './sandbox.mjs';
+import { Telemetry } from './telemetry.mjs';
+import { validateWarmConfiguration } from './warm-config.mjs';
+import { SessionScheduler } from './session-scheduler.mjs';
 import { createServer } from "node:http";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -14,6 +21,8 @@ if (!secret || secret.length < 32)
 const image = process.env.GUI_RUNTIME_IMAGE || "cove-gui-runtime:dev";
 if (process.env.NODE_ENV === "production" && !image.includes("@sha256:"))
   throw new Error("Production GUI image must be pinned by digest");
+const metricsSecret = process.env.GUI_METRICS_SECRET;
+if (metricsSecret && (metricsSecret.length < 32 || equalSecret(metricsSecret, secret))) throw new Error('Metrics credential must be independent and at least 32 characters');
 const origins = new Set(
   (process.env.GUI_ALLOWED_ORIGINS || "http://localhost:3000").split(","),
 );
@@ -31,6 +40,12 @@ if (process.env.GUI_REQUIRE_ROOTLESS === 'true') {
     throw new Error('Rootless public Turtle pilot must use the one-session trial profile');
   assertRootlessRuntime(JSON.parse((await docker('info', '--format', '{{json .}}')).stdout));
 }
+const poolName = process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course';
+const instance = process.env.GUI_INSTANCE_ID || poolName;
+if (!/^[a-z0-9-]{1,64}$/.test(instance)) throw new Error('Invalid broker instance');
+// Custom instances exist only for isolated local fixtures, never shared production brokers.
+if (process.env.NODE_ENV === 'production' && instance !== poolName) throw new Error('Production broker instance must match its pool');
+await reapPrevious((signal, ...args) => exec('docker', args, { signal, timeout: 15000, maxBuffer: 1024 * 1024 }), poolName, instance);
 const versions = new Map();
 let runtimeVersion;
 for (const approvedReference of runtimeImages(image, process.env.GUI_RETAINED_RUNTIME_IMAGES, process.env.NODE_ENV === "production")) {
@@ -57,259 +72,142 @@ for (const approvedReference of runtimeImages(image, process.env.GUI_RETAINED_RU
   versions.set(version, approvedImage);
   if (approvedReference === image) runtimeVersion = version;
 }
-async function stop(s, state = "STOPPED") {
+const telemetry = new Telemetry();
+const wantsWarm = process.env.GUI_WARM_STANDBY === '1';
+const envelope = wantsWarm && process.env.GUI_WARM_ENVELOPE_FILE ? JSON.parse(await readFile(process.env.GUI_WARM_ENVELOPE_FILE, 'utf8')) : null;
+const sliceMetrics = wantsWarm && process.env.GUI_WARM_SLICE_METRICS_FILE ? await readFile(process.env.GUI_WARM_SLICE_METRICS_FILE, 'utf8') : '';
+const warmEnabled = validateWarmConfiguration(process.env, envelope, Date.now(), sliceMetrics);
+const driver = createSandboxDriver({ seccomp, pool: poolName, instance, telemetry });
+const sandboxes = new StandbyPool({ driver, telemetry, enabled: warmEnabled, capacity, instance,
+  profile: { runtimeImage: versions.get(runtimeVersion), width: 1024, height: 640, memoryLimitMb: 512 } });
+const scheduler = new SessionScheduler(sessions, capacity, launch, () => !shuttingDown && sandboxes.status().healthy && !sandboxes.status().draining);
+let shuttingDown = false;
+function markClosed(s, state) {
   if (s.closed) return;
-  s.closed = true;
-  s.data = null;
-  s.pendingBytes = 0;
-  s.state = state;
-  s.endedAt = Date.now();
-  console.log(JSON.stringify({ event: "gui.ended", sessionId: s.id, state }));
-  clearTimeout(s.deadline);
-  clearTimeout(s.reconnect);
+  s.closed = true; s.controller.abort(); s.data = null; s.pendingBytes = 0;
+  s.state = state; s.endedAt = Date.now();
+  clearTimeout(s.deadline); clearTimeout(s.reconnect);
   s.program?.kill();
   for (const bridge of s.bridges) bridge.kill();
   for (const ws of s.sockets) ws.close();
-  await docker("rm", "-f", s.container).catch(() => {});
-  setTimeout(() => sessions.delete(s.id), 60000).unref();
-  const closed = [...sessions.values()].filter((session) => session.closed);
-  for (const old of closed.slice(0, Math.max(0, closed.length - capacity * 4)))
-    sessions.delete(old.id);
+  console.log(JSON.stringify({ event: 'gui.ended', sessionId: s.id, state }));
 }
-async function start(body) {
+async function release(s) {
+  await sandboxes.retire(s.handle);
+  // Failed/unknown cleanup holds the scheduler slot. The maintenance sweep retries.
+  if (!s.handle || !sandboxes.entries.has(s.handle)) {
+    scheduler.release(s);
+    if (!scheduler.active) sandboxes.refill();
+    if (!s.forgetTimer) s.forgetTimer = setTimeout(() => sessions.delete(s.id), 60000).unref();
+    const retired = [...sessions.values()].filter(old => old.closed && !old.occupies);
+    for (const old of retired.slice(0, Math.max(0, retired.length - capacity * 4))) {
+      clearTimeout(old.forgetTimer); sessions.delete(old.id);
+    }
+  }
+}
+async function stop(s, state = 'STOPPED') {
+  markClosed(s, state);
+  await (s.stopTask ||= (async () => {
+    await s.launchTask?.catch(() => {});
+    await release(s);
+  })());
+  if (s.occupies) throw Object.assign(new Error('GUI cleanup pending'), { status: 503 });
+}
+function backgroundStop(s, state) { void stop(s, state).catch(() => {}); }
+async function start(body, traceId) {
   const data = validateRun(body);
-  if (process.env.GUI_TRIAL_ONLY === "true" && (
+  if (shuttingDown || !sandboxes.status().healthy) throw Object.assign(new Error('Runtime unavailable'), { status: 503 });
+  if (process.env.GUI_TRIAL_ONLY === 'true' && (
     data.timeLimitSeconds !== 120 || data.memoryLimitMb !== 512 ||
     data.width !== 1024 || data.height !== 640 || data.outputLimitBytes !== 262144 ||
-    data.assets.length || data.entryPoint !== "_cove_trial_runner.py" ||
-    !data.owner.startsWith("trial:") || !data.requestKey || !data.authorizationExpiresAt
-  )) throw Object.assign(new Error("Invalid trial execution profile"), { status: 400 });
-  const previous = [...sessions.values()].find((s) => s.owner === data.owner && s.requestKey === data.requestKey && data.requestKey);
+    data.assets.length || data.entryPoint !== '_cove_trial_runner.py' ||
+    !data.owner.startsWith('trial:') || !data.requestKey || !data.authorizationExpiresAt
+  )) throw Object.assign(new Error('Invalid trial execution profile'), { status: 400 });
+  const previous = [...sessions.values()].find(s => s.owner === data.owner && s.requestKey === data.requestKey && data.requestKey);
   if (previous) return previous;
-  const runtimeImage = selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion);
   const pendingBytes = Buffer.byteLength(JSON.stringify(data));
-  if (
-    [...sessions.values()].reduce(
-      (sum, s) => sum + (!s.closed ? (s.pendingBytes ?? 0) : 0),
-      0,
-    ) +
-      pendingBytes >
-    64 * 1024 * 1024
-  )
-    throw Object.assign(
-      new Error("GUI admission buffer is full; try again shortly"),
-      { status: 429 },
-    );
-  const busy =
-    [...sessions.values()].filter((s) => !s.closed && s.state !== "QUEUED")
-      .length >= capacity;
-  if (
-    [...sessions.values()].filter((s) => !s.closed && s.state === "QUEUED")
-      .length >=
-    capacity * 4
-  )
-    throw Object.assign(new Error("GUI queue is full; try again shortly"), {
-      status: 429,
-    });
-  if ([...sessions.values()].some((s) => !s.closed && s.owner === data.owner))
-    throw Object.assign(new Error("A GUI run is already active"), {
-      status: 409,
-    });
-  const id = randomUUID(),
-    container = `cove-gui-${id}`;
-  const s = {
-    id,
-    container,
-    owner: data.owner,
-    requestKey: data.requestKey,
-    outputLimitBytes: data.outputLimitBytes,
-    authorizationExpiresAt: data.authorizationExpiresAt,
-    runtimeImage,
-    token: randomBytes(32).toString("hex"),
-    state: busy ? "QUEUED" : "STARTING",
-    data,
-    pendingBytes,
-    queuedAt: Date.now(),
-    output: "",
-    outputBytes: 0,
-    closed: false,
-    sockets: new Set(),
-    viewers: new Map(),
-    bridges: new Set(),
-    expiresAt: Date.now() + data.timeLimitSeconds * 1000,
-    lease: Date.now() + 30000,
-  };
-  sessions.set(id, s);
-  if (busy) return s;
-  return launch(s);
+  if ([...sessions.values()].reduce((sum, s) => sum + (s.pendingBytes || 0), 0) + pendingBytes > 64 * 1024 * 1024 ||
+      [...sessions.values()].filter(s => !s.closed && s.state === 'QUEUED').length >= capacity * 4)
+    throw Object.assign(new Error('GUI queue is full; try again shortly'), { status: 429 });
+  if ([...sessions.values()].some(s => !s.closed && s.owner === data.owner))
+    throw Object.assign(new Error('A GUI run is already active'), { status: 409 });
+  const s = { id: randomUUID(), owner: data.owner, requestKey: data.requestKey,
+    traceId: /^[a-f0-9-]{36}$/.test(traceId || '') ? traceId : randomUUID(),
+    outputLimitBytes: data.outputLimitBytes, authorizationExpiresAt: data.authorizationExpiresAt,
+    runtimeImage: selectRuntimeImage(versions, runtimeVersion, body.runtimeVersion), token: randomBytes(32).toString('hex'),
+    state: 'QUEUED', data, pendingBytes, queuedAt: Date.now(), output: '', outputBytes: 0, closed: false,
+    sockets: new Set(), viewers: new Map(), bridges: new Set(), controller: new AbortController(),
+    expiresAt: Date.now() + data.timeLimitSeconds * 1000, lease: Date.now() + 30000 };
+  sessions.set(s.id, s);
+  scheduler.dispatch();
+  return s.launchTask ? await s.launchTask : s;
 }
 async function launch(s) {
-  const { data, container } = s;
-  if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now()) {
-    await stop(s, 'DISCONNECTED');
-    return s;
+  const data = s.data;
+  const began = performance.now();
+  s.preparationStartedAt = Date.now();
+  telemetry.observe('queue', 'cold', Math.max(0, Date.now() - s.queuedAt));
+  function authorized() {
+    s.controller.signal.throwIfAborted();
+    if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now()) throw new Error('Authorization expired');
   }
-  s.state = "STARTING";
-  s.expiresAt = Date.now() + data.timeLimitSeconds * 1000;
-  s.startedAt = Date.now();
-  s.deadline = setTimeout(
-    () => void stop(s, "TIMED_OUT"),
-    data.timeLimitSeconds * 1000,
-  );
-  s.deadline.unref();
+  function startExecutionBudget() {
+    s.startedAt = Date.now(); s.expiresAt = s.startedAt + data.timeLimitSeconds * 1000;
+    s.deadline = setTimeout(() => backgroundStop(s, 'TIMED_OUT'), Math.min(data.timeLimitSeconds * 1000,
+      s.authorizationExpiresAt ? s.authorizationExpiresAt - Date.now() : Infinity)).unref();
+  }
   try {
-    await docker(
-      "run",
-      "--detach",
-      "--name",
-      container,
-      "--label",
-      "cove.gui=true",
-      "--label",
-      `cove.gui.pool=${process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course'}`,
-      "--network",
-      "none",
-      "--read-only",
-      "--cap-drop",
-      "ALL",
-      "--security-opt",
-      "no-new-privileges",
-      "--security-opt",
-      `seccomp=${seccomp}`,
-      "--cpus",
-      "1",
-      "--memory",
-      `${data.memoryLimitMb}m`,
-      "--memory-swap",
-      `${data.memoryLimitMb}m`,
-      "--pids-limit",
-      "64",
-      "--tmpfs",
-      "/tmp:rw,nosuid,nodev,size=8m,uid=1000,gid=1000",
-      "--tmpfs",
-      "/work:rw,nosuid,nodev,size=16m,uid=1000,gid=1000",
-      "--tmpfs",
-      "/assets:rw,nosuid,nodev,noexec,size=21m,uid=0,gid=0",
-      "--shm-size",
-      "8m",
-      "-e",
-      `GUI_WIDTH=${data.width}`,
-      "-e",
-      `GUI_HEIGHT=${data.height}`,
-      s.runtimeImage,
-    );
-    for (let i = 0; i < 80; i++) {
-      if (s.closed) throw new Error("Start cancelled");
-      try {
-        await docker(
-          "exec",
-          container,
-          "python3",
-          "-c",
-          "import socket; s=socket.create_connection(('127.0.0.1',5900),.2); s.close()",
-        );
-        break;
-      } catch {
-        if (i === 79) throw new Error("GUI display unavailable");
-        await new Promise((r) => setTimeout(r, 100));
-      }
-    }
-    const { stdout: inspection } = await docker("inspect", container);
-    const info = JSON.parse(inspection)[0];
-    if (
-      info.Config.User !== "1000:1000" ||
-      info.HostConfig.NetworkMode !== "none" ||
-      !info.HostConfig.ReadonlyRootfs ||
-      !info.HostConfig.CapDrop.includes("ALL") ||
-      !info.HostConfig.SecurityOpt.includes("no-new-privileges") ||
-      info.Mounts.some((m) => m.Type === "bind") ||
-      info.HostConfig.Privileged ||
-      info.HostConfig.Memory !== data.memoryLimitMb * 1048576 ||
-      info.HostConfig.MemorySwap !== data.memoryLimitMb * 1048576 ||
-      info.HostConfig.NanoCpus !== 1000000000 ||
-      info.HostConfig.PidsLimit !== 64 ||
-      !info.HostConfig.SecurityOpt.some(
-        (option) =>
-          option.startsWith("seccomp=") && !option.includes("unconfined"),
-      ) ||
-      info.HostConfig.CgroupnsMode !== "private"
-    )
-      throw new Error("Sandbox isolation verification failed");
-    s.runtimeImage = info.Image;
-    if (s.closed) throw new Error("Start cancelled");
-    await new Promise((resolve, reject) => {
-      const setup = spawn(
-        "docker",
-        ["exec", "--user", "0", "-i", container, "python3", "/opt/assets.py"],
-        { stdio: ["pipe", "ignore", "pipe"] },
-      );
-      let error = "";
-      setup.stderr.on("data", (chunk) => (error += chunk));
-      setup.on("error", reject);
-      setup.on("exit", (code) =>
-        code === 0 ? resolve() : reject(new Error("Asset setup failed")),
-      );
-      setup.stdin.end(JSON.stringify(data.assets));
-    });
-    s.program = spawn(
-      "docker",
-      ["exec", "-i", container, "python3", "-u", "/opt/run.py"],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
-    s.program.stdin.write(
-      JSON.stringify({ files: data.files, entryPoint: data.entryPoint }) + "\n",
-    );
-    s.data = null;
-    s.pendingBytes = 0;
-    s.state = "RUNNING";
-    s.lease = Date.now() + 30000;
-    console.log(
-      JSON.stringify({
-        event: "gui.started",
-        sessionId: s.id,
-        runtimeImage: s.runtimeImage,
-        width: data.width,
-        height: data.height,
-        memoryLimitMb: data.memoryLimitMb,
-        timeLimitSeconds: data.timeLimitSeconds,
-      }),
-    );
+    authorized();
+    if (Date.now() - s.queuedAt > 60000 || s.lease < Date.now()) throw new Error('Queue expired');
+    // Preserve course accounting; only the public trial excludes startup time.
+    if (poolName === 'course') startExecutionBudget();
+    const profile = { runtimeImage: s.runtimeImage, width: data.width, height: data.height, memoryLimitMb: data.memoryLimitMb };
+    s.handle = await sandboxes.claim(profile, AbortSignal.any([s.controller.signal, AbortSignal.timeout(30000)]), entry => { s.handle = entry; });
+    s.container = s.handle.id;
+    const signal = AbortSignal.any([s.controller.signal, AbortSignal.timeout(15000)]);
+    authorized();
+    await telemetry.time('assets', s.handle.mode, () => driver.assets(s.handle, data.assets, signal));
+    signal.throwIfAborted(); authorized();
+    if (poolName === 'trial') startExecutionBudget();
+    const spawnStart = performance.now();
+    s.program = driver.program(s.handle, data);
+    s.program.on('error', () => backgroundStop(s, 'ERROR'));
+    s.program.stdin.on('error', () => { if (!s.closed) backgroundStop(s, 'ERROR'); });
+    s.program.stdin.write(JSON.stringify({ files: data.files, entryPoint: data.entryPoint }) + '\n');
+    telemetry.observe('spawn', s.handle.mode, performance.now() - spawnStart);
+    s.data = null; s.pendingBytes = 0; s.state = 'RUNNING'; s.lease = Date.now() + 30000;
     const output = (text, rawBytes = 0) => {
       if (s.closed) return;
       s.outputBytes += Math.max(rawBytes, Buffer.byteLength(text));
-      if (s.outputBytes > s.outputLimitBytes) {
-        s.output += "\nOutput limit exceeded";
-        void stop(s, "OUTPUT_LIMIT");
-      } else s.output += text;
+      if (s.outputBytes > s.outputLimitBytes) { s.output += '\nOutput limit exceeded'; backgroundStop(s, 'OUTPUT_LIMIT'); }
+      else s.output += text;
     };
     for (const stream of [s.program.stdout, s.program.stderr]) {
-      const decoder = new StringDecoder("utf8");
-      const parser = terminalParser((state) => {
-        if (!s.closed) s.state = state;
-      });
-      stream.on("data", (chunk) =>
-        output(parser.push(decoder.write(chunk)), chunk.length),
-      );
-      stream.on("end", () => {
-        output(parser.push(decoder.end()));
-        output(parser.end());
-      });
+      const decoder = new StringDecoder('utf8');
+      const parser = terminalParser(state => { if (!s.closed) s.state = state; });
+      stream.on('data', chunk => output(parser.push(decoder.write(chunk)), chunk.length));
+      stream.on('end', () => { output(parser.push(decoder.end())); output(parser.end()); });
     }
-    s.program.on("error", () => void stop(s, "ERROR"));
-    s.program.on("close", (code) => {
+    s.program.on('close', code => {
       if (s.closed) return;
-      s.state = code === 0 ? "FINISHED" : "ERROR";
-      s.endedAt = Date.now();
-      s.exitCode = code;
+      s.state = code === 0 ? 'FINISHED' : 'ERROR'; s.endedAt = Date.now(); s.exitCode = code;
       clearTimeout(s.deadline);
-      s.deadline = setTimeout(() => void stop(s, s.state), 30000);
-      s.deadline.unref();
+      s.deadline = setTimeout(() => backgroundStop(s, s.state), 30000).unref();
     });
+    telemetry.observe('launch', s.handle.mode, performance.now() - began);
+    console.log(JSON.stringify({ event: 'gui.started', traceId: s.traceId, sessionId: s.id,
+      mode: s.handle.mode, durationMs: Math.round(performance.now() - began), runtimeImage: s.runtimeImage,
+      width: data.width, height: data.height, memoryLimitMb: data.memoryLimitMb, timeLimitSeconds: data.timeLimitSeconds }));
+    sandboxes.refill();
     return s;
-  } catch (error) {
-    await stop(s, "ERROR");
-    await docker("rm", "-f", s.container).catch(() => {});
-    throw error;
+  } catch {
+    const cancelled = s.closed;
+    telemetry.increment('launch_failure');
+    markClosed(s, s.closed ? s.state : 'ERROR');
+    // Do not await stop(s) from its own launch promise.
+    await release(s);
+    if (cancelled && !s.occupies) return s;
+    throw Object.assign(new Error('GUI launch failed'), { status: 503 });
   }
 }
 function view(s) {
@@ -323,6 +221,9 @@ function view(s) {
     startedAt: s.startedAt,
     endedAt: s.endedAt,
     runtimeImage: s.runtimeImage,
+    containerId: s.container,
+    startupMode: s.handle?.mode,
+    queueWaitMs: s.preparationStartedAt ? Math.max(0, s.preparationStartedAt - s.queuedAt) : undefined,
   };
 }
 async function read(req) {
@@ -339,6 +240,15 @@ async function read(req) {
 const server = createServer(async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
+  if (req.method === 'GET' && req.url === '/metrics') {
+    if (!metricsSecret || !equalSecret(req.headers.authorization, `Bearer ${metricsSecret}`)) {
+      res.writeHead(401); res.end('{}'); return;
+    }
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+    res.end(telemetry.render({ ...sandboxes.status(), active: scheduler.active,
+      queued: [...sessions.values()].filter(s => !s.closed && s.state === 'QUEUED').length }));
+    return;
+  }
   if (!equalSecret(req.headers.authorization, `Bearer ${secret}`)) {
     res.writeHead(401);
     res.end("{}");
@@ -349,7 +259,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/health") {
       res.end(
         JSON.stringify({
-          ready: true,
+          ready: !shuttingDown && sandboxes.status().healthy,
+          standby: sandboxes.status(),
           runtimeVersion,
           pool: process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course',
           capacity,
@@ -359,7 +270,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "POST" && url.pathname === "/sessions") {
-      const session = await start(await read(req));
+      const session = await start(await read(req), req.headers['x-cove-trace-id']);
       res.writeHead(201);
       res.end(JSON.stringify(view(session)));
       return;
@@ -444,6 +355,7 @@ server.on("upgrade", (req, socket, head) => {
   );
   if (
     !s ||
+    !s.container ||
     s.state === "QUEUED" ||
     s.closed ||
     s.lease < Date.now() ||
@@ -494,47 +406,30 @@ server.on("upgrade", (req, socket, head) => {
       s.bridges.delete(bridge);
       s.sockets.delete(ws);
       if (!s.closed && ![...s.sockets].some((socket) => !socket.viewerToken)) {
-        s.reconnect = setTimeout(() => void stop(s, "DISCONNECTED"), 30000);
+        s.reconnect = setTimeout(() => backgroundStop(s, "DISCONNECTED"), 30000);
         s.reconnect.unref();
       }
     });
   });
 });
-// Containers left by a crashed service cannot survive into a new service generation.
-const previous = await docker("ps", "-aq", "--filter", "label=cove.gui=true");
-const previousIds = previous.stdout.trim().split('\n').filter(Boolean);
-const pool = process.env.GUI_TRIAL_ONLY === 'true' ? 'trial' : 'course';
-for (const id of previousIds) {
-  const info = JSON.parse((await docker('inspect', id)).stdout)[0];
-  const previousPool = info.Config.Labels?.['cove.gui.pool'] ?? 'course';
-  if (previousPool !== pool) throw new Error('Guest and course brokers require separate Docker daemons; refusing cross-pool cleanup');
-}
-for (const id of previousIds)
-  await docker("rm", "-f", id);
-setInterval(() => {
-  for (const s of sessions.values()) {
-    if (s.closed) continue;
-    for (const [token, expiry] of s.viewers)
-      if (expiry < Date.now()) s.viewers.delete(token);
-    for (const socket of s.sockets)
-      if (
-        socket.viewerToken &&
-        (s.viewers.get(socket.viewerToken) ?? 0) < Date.now()
-      )
-        socket.close();
-    if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now())
-      void stop(s, 'DISCONNECTED');
-    else if (s.state !== "STARTING" && s.lease < Date.now())
-      void stop(s, "DISCONNECTED");
-    else if (s.state === "QUEUED") {
-      if (Date.now() - s.queuedAt > 60000) void stop(s, "QUEUE_EXPIRED");
-      else if (
-        [...sessions.values()].filter((a) => !a.closed && a.state !== "QUEUED")
-          .length < capacity
-      )
-        void launch(s).catch(() => {});
+sandboxes.refill();
+let sweeping = false;
+setInterval(async () => {
+  if (sweeping || shuttingDown) return;
+  sweeping = true;
+  try {
+    await sandboxes.reconcile(false);
+    for (const s of sessions.values()) {
+      if (s.closed) { if (s.occupies) await release(s); continue; }
+      for (const [token, expiry] of s.viewers) if (expiry < Date.now()) s.viewers.delete(token);
+      for (const socket of s.sockets) if (socket.viewerToken && (s.viewers.get(socket.viewerToken) || 0) < Date.now()) socket.close();
+      if (s.authorizationExpiresAt && s.authorizationExpiresAt <= Date.now()) backgroundStop(s, 'DISCONNECTED');
+      else if (s.state !== 'STARTING' && s.lease < Date.now()) backgroundStop(s, 'DISCONNECTED');
+      else if (s.state === 'QUEUED' && Date.now() - s.queuedAt > 60000) backgroundStop(s, 'QUEUE_EXPIRED');
     }
-  }
+    if (sandboxes.status().healthy) scheduler.dispatch();
+    if (![...sessions.values()].some(s => !s.closed && s.state === 'STARTING')) sandboxes.refill();
+  } finally { sweeping = false; }
 }, 1000).unref();
 server.listen(
   Number(process.env.GUI_PORT || 4010),
@@ -542,9 +437,13 @@ server.listen(
   () => console.log("GUI service ready"),
 );
 async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  sandboxes.closed = true;
   server.close();
   await Promise.all([...sessions.values()].map((s) => stop(s)));
-  process.exit(0);
+  await sandboxes.close();
+  process.exit(sandboxes.entries.size ? 1 : 0);
 }
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);

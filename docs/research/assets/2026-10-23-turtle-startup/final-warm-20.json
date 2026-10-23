@@ -1,0 +1,172 @@
+{
+  "mode": "final-warm",
+  "summary": {
+    "samples": 20,
+    "failures": 0,
+    "p50": 882.0499999970198,
+    "p95": 1744.9349999949336
+  },
+  "samples": [
+    {
+      "run": 0,
+      "kind": "initial",
+      "responseMs": 1696.015000000596,
+      "firstDrawingMs": 7628.609999999404,
+      "allocation": "warm",
+      "queueWaitMs": 13
+    },
+    {
+      "run": 1,
+      "kind": "repeat",
+      "responseMs": 777.7299999967217,
+      "firstDrawingMs": 1744.9349999949336,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 2,
+      "kind": "repeat",
+      "responseMs": 565.5,
+      "firstDrawingMs": 1427.280000001192,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 3,
+      "kind": "repeat",
+      "responseMs": 479.03999999910593,
+      "firstDrawingMs": 1163.375,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 4,
+      "kind": "repeat",
+      "responseMs": 506.32500000298023,
+      "firstDrawingMs": 1069.554999999702,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 5,
+      "kind": "repeat",
+      "responseMs": 442.070000000298,
+      "firstDrawingMs": 966.5399999991059,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 6,
+      "kind": "repeat",
+      "responseMs": 293.1499999985099,
+      "firstDrawingMs": 882.0499999970198,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 7,
+      "kind": "repeat",
+      "responseMs": 280.9099999964237,
+      "firstDrawingMs": 845.2999999970198,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 8,
+      "kind": "repeat",
+      "responseMs": 676.6300000026822,
+      "firstDrawingMs": 1482.4350000023842,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 9,
+      "kind": "repeat",
+      "responseMs": 754.9149999991059,
+      "firstDrawingMs": 1415.4100000038743,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 10,
+      "kind": "initial",
+      "responseMs": 169.19999999552965,
+      "firstDrawingMs": 786.5299999937415,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 11,
+      "kind": "repeat",
+      "responseMs": 264.25,
+      "firstDrawingMs": 1002.8999999985099,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 12,
+      "kind": "repeat",
+      "responseMs": 278.16499999910593,
+      "firstDrawingMs": 833.1050000041723,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 13,
+      "kind": "repeat",
+      "responseMs": 252.98999999463558,
+      "firstDrawingMs": 864.820000000298,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 14,
+      "kind": "repeat",
+      "responseMs": 199.70499999821186,
+      "firstDrawingMs": 748.6349999979138,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 15,
+      "kind": "repeat",
+      "responseMs": 228.87999999523163,
+      "firstDrawingMs": 837.5399999991059,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 16,
+      "kind": "repeat",
+      "responseMs": 211.47499999403954,
+      "firstDrawingMs": 770.0149999931455,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 17,
+      "kind": "repeat",
+      "responseMs": 213.94500000029802,
+      "firstDrawingMs": 734.1349999979138,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 18,
+      "kind": "repeat",
+      "responseMs": 374.3449999988079,
+      "firstDrawingMs": 936.0949999988079,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    },
+    {
+      "run": 19,
+      "kind": "repeat",
+      "responseMs": 208.39000000059605,
+      "firstDrawingMs": 880.0649999976158,
+      "allocation": "warm",
+      "queueWaitMs": 0
+    }
+  ],
+  "failures": []
+}

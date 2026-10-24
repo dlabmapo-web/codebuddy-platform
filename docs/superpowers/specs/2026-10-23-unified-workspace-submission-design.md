@@ -1,6 +1,8 @@
 # Unified workspace Submit and latest submission summary
 
-Status: approved by the user on 2026-10-23; implementation in progress.
+Status: implemented locally after user approval on 2026-10-23. All 40
+Chromium/WebKit browser scenarios pass locally after resolving the external Monaco worker-loading failure. Evidence is recorded in
+[the verification report](../../research/2026-10-23-unified-submission-local-verification.md).
 
 ## Request and reference limits
 
@@ -157,3 +159,19 @@ No production deployment or production test submissions are part of this change.
 3. Add shared score/time UI and hook it into coding and manual workspaces.
 4. Add authorization, latest-attempt, isolation, and browser regression checks.
 5. Verify locally across roles/materials and document the results.
+
+## Editor loading reliability follow-up
+
+The local WebKit acceptance run exposed an external Monaco module-worker load
+failure. Keep the existing browser editor version (0.55.1), pin it explicitly,
+and copy its complete `min/vs` distribution and license during predev/prebuild.
+All dynamic editor entry points share one configured loader using the versioned
+same-origin `/monaco/<version>/vs` path. Retain cross-origin isolation for Python
+input; versioned assets receive same-origin CORP and immutable caching. The
+existing Docker build already runs prebuild and copies public assets.
+
+This uses the wrapper's documented [loader configuration](https://github.com/suren-atoyan/monaco-react#loader-config),
+without changing student edits, language services, or submission semantics.
+Acceptance includes real editor input and Submit in Chromium/WebKit while the
+external CDN is blocked, a successfully loaded local editor worker, and no page
+errors.

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
   loading: () => <EditorFallback />,
 });

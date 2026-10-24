@@ -74,6 +74,10 @@ const nextConfig: NextConfig = {
         source: "/reset-password",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        source: "/monaco/:path*",
+        headers: workerAssetHeaders,
+      },
       // 워커/파이오다이드 자원은 같은 출처 하위 리소스로 로드되도록 CORP 추가
       {
         source: "/pyodide-worker.js",

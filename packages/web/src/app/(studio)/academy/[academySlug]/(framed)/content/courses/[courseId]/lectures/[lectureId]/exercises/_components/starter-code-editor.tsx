@@ -7,7 +7,7 @@ import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 import { SectionCard } from './authoring-fields';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
 });
 

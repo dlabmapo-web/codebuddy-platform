@@ -14,7 +14,7 @@ import { LiveEditor } from '@/app/(studio)/academy/[academySlug]/teach/classes/[
 import { FeedbackDock } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-feedback';
 import { HelpModeToggle } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/help-mode-toggle';
 import type { TutoringStudent } from './staff-tutoring-drawer';
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 export type TutoringTransitionGuard = { current: (() => Promise<boolean>) | null };
 type Props = { academyId: string; materialId: string; userId: string; starterCode: string; student: TutoringStudent; beforeChangeRef: TutoringTransitionGuard; close: () => Promise<boolean> };
 

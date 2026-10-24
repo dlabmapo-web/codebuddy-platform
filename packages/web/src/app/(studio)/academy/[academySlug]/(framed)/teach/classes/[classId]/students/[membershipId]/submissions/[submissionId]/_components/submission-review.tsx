@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 import { durationDisplay } from '../../../../../progress/_lib/progress-view';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
   loading: () => <span className="block h-full bg-editor-bg" />,
 });

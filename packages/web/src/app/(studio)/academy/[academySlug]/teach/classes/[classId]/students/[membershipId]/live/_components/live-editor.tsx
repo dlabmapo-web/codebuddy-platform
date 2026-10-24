@@ -16,7 +16,7 @@ import {
   type MonacoCodeEditor,
 } from '@/lib/monitoring/yjs-monaco';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
   loading: () => <EditorFallback />,
 });

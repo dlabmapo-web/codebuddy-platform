@@ -9,7 +9,7 @@ import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { useLayoutTranslation } from '@/i18n';
 import { SectionCard } from './authoring-fields';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 
 export function SolutionCodeEditor({ value, onChange, error }: {
   value: ExerciseSolutionEntry[];

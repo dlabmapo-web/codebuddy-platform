@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 
 export function SolutionAnswerBlock({ solution, index, fontSize }: { solution: ExerciseSolutionEntry; index: number; fontSize: number }) {
   const { t } = useTranslation('solutions');

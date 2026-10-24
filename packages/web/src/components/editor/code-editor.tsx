@@ -10,7 +10,7 @@ import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 // Monaco is ~1 MB and is only ever needed here, so it never enters the catalog
 // or outline bundles.
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
   loading: () => <EditorFallback />,
 });
@@ -18,9 +18,9 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 /**
  * How long the editor may take before loading is reported as failed.
  *
- * Monaco itself comes from jsDelivr at runtime. A network that filters the CDN
- * never answers with an error the loader surfaces, so without a deadline the
- * student watches "Loading editor…" forever.
+ * Monaco assets are served by Cove. Keep a deadline for interrupted requests
+ * or stale browser caches so students can recover instead of watching
+ * "Loading editor…" forever.
  */
 const EDITOR_LOAD_DEADLINE_MS = 15_000;
 

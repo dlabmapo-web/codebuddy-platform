@@ -83,3 +83,6 @@ e2e/.auth/
 # Browser bundle generated from pinned noVNC package
 packages/web/public/novnc-rfb.js*
 packages/web/public/novnc-LICENSE.txt
+
+# Versioned Monaco browser assets copied from the pinned npm package
+packages/web/public/monaco/

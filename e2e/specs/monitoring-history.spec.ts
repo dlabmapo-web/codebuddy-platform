@@ -1,12 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { signInAs } from '../support/auth';
+import { routes } from '../../packages/web/src/lib/routes';
 const fixture = process.env.E2E_MONITORING_HISTORY_FIXTURE
   ? JSON.parse(readFileSync(process.env.E2E_MONITORING_HISTORY_FIXTURE, 'utf8')) as { academyId: string; classId: string; membershipId: string; ids: Record<string,string> }
   : undefined;
 test.skip(!fixture, 'Requires a separate development history fixture and prepared sessions');
-const path = (key: string) => `/academy/development-academy/learn/exercises/${fixture!.ids[key]}?classId=${fixture!.classId}`;
-const watch = () => `/academy/development-academy/teach/classes/${fixture!.classId}/students/${fixture!.membershipId}/live`;
+const path = (key: string) => routes.academyLearnExercise('development-academy', fixture!.ids[key], { classId: fixture!.classId });
+const watch = () => routes.academyTeachStudentLive('development-academy', fixture!.classId, fixture!.membershipId);
 async function text(page: Page): Promise<string | undefined> {
   return page.evaluate(() => {
     const api = (window as any).monaco;

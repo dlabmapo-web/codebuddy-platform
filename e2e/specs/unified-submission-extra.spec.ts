@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { signInAs } from '../support/auth';
+import { routes } from '../../packages/web/src/lib/routes';
 const fixture = process.env.E2E_SUBMISSION_FIXTURE ? JSON.parse(readFileSync(process.env.E2E_SUBMISSION_FIXTURE, 'utf8')) as { classId: string; ids: Record<string,string> } : undefined;
 test.skip(!fixture?.ids.quiz || !fixture?.ids.weighted, 'Requires the isolated submission fixture');
 async function code(page:Page,text:string){
@@ -21,7 +22,7 @@ async function code(page:Page,text:string){
  })).toBe(text);
 }
 for (const role of ['student','teacher','teamlead','manager']) test(`${role}: legacy quiz and decimal weighted latest scores`, async ({ page }, info) => {
- const url = (key:string) => `/academy/development-academy/learn/exercises/${fixture!.ids[key]}${role === 'student' ? '?classId='+fixture!.classId : ''}`;
+ const url = (key:string) => routes.academyLearnExercise('development-academy', fixture!.ids[key], { classId: role === 'student' ? fixture!.classId : undefined });
  await signInAs({ page, identifier: role+'@cove.test', password: 'CoveDev123!', initialPath: url('quiz') });
  const summary = page.getByTestId('latest-submission-summary');
  const submit = page.getByRole('button', { name: role === 'student' ? 'Submit answer' : 'Submit', exact: true });

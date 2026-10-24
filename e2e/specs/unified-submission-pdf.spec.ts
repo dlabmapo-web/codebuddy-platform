@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { signInAs } from '../support/auth';
+import { routes } from '../../packages/web/src/lib/routes';
 const fixture=process.env.E2E_SUBMISSION_PDF_FIXTURE?JSON.parse(readFileSync(process.env.E2E_SUBMISSION_PDF_FIXTURE,'utf8')) as {materialId:string;classId:string}:undefined;
 test.skip(!fixture,'Requires a fresh graded PDF fixture');
 async function code(page:Page,text:string){
@@ -21,7 +22,7 @@ async function code(page:Page,text:string){
  })).toBe(text);
 }
 for(const role of ['student','teacher','teamlead','manager'])test(`${role}: graded PDF keeps Submit and precise persisted scores`,async({page},info)=>{
- const url=`/academy/development-academy/learn/exercises/${fixture!.materialId}${role==='student'?'?classId='+fixture!.classId:''}`;
+ const url=routes.academyLearnExercise('development-academy', fixture!.materialId, { classId: role === 'student' ? fixture!.classId : undefined });
  await signInAs({page,identifier:role+'@cove.test',password:'CoveDev123!',initialPath:url});
  await expect(page.getByTestId('exercise-reference-pane')).toBeVisible();
  await code(page,'print("hello")');

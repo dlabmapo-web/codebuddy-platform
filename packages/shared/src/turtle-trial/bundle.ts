@@ -25,7 +25,7 @@ def _screen():
     screen.setup(1.0, 1.0)
     screen.title("Cove Turtle")
     if screen is not _configured_screen:
-        screen.delay(30)
+        screen.delay(25)
         _configured_screen = screen
     return screen
 
@@ -96,7 +96,7 @@ def ReadyToRace():
         racer.write(name, align="center", font=("DejaVu Sans", 11, "normal"))
         racer.pendown(); racer.width(5); racer.speed(1)
         _racers[name] = racer
-    screen.tracer(1, 30)
+    screen.tracer(1, 25)
     screen.update()
 
 def _racer(name):
@@ -141,12 +141,12 @@ def CircleTurtle():
 export const turtleRunnerSource = String.raw`import runpy
 import sys
 import turtle
-# Keep Python pen values intact while making strokes legible in the scaled
-# classroom canvas, including programs that explicitly request a thin pen.
+# Keep Python pen values intact. Render at the requested width with a small
+# minimum for readability, without the previous doubled classroom strokes.
 _original_drawline = turtle.TurtleScreenBase._drawline
 def _classroom_drawline(self, lineitem, coordlist=None, fill=None, width=None, top=False):
     if isinstance(width, (int, float)) and width >= 0:
-        width = max(6, width * 2)
+        width = max(3, width)
     return _original_drawline(self, lineitem, coordlist, fill, width, top)
 turtle.TurtleScreenBase._drawline = _classroom_drawline
 # Classroom defaults apply to every standard turtle in this guest process.
@@ -167,7 +167,7 @@ turtle.RawTurtle.reset = _classroom_reset
 # The guest page presents a drawing surface, without desktop window borders.
 screen = turtle.Screen()
 screen.setup(1.0, 1.0)
-screen.delay(30)
+screen.delay(25)
 canvas = screen.getcanvas()
 canvas.winfo_toplevel().overrideredirect(True)
 canvas._canvas.configure(borderwidth=0, highlightthickness=0, relief="flat")

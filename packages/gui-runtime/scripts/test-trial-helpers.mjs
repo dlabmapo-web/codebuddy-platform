@@ -27,7 +27,7 @@ custom.color("blue")
 assert turtle.pensize() == 5
 assert turtle.shapesize() == (2, 2, 2)
 assert turtle.speed() == 1
-assert turtle.Screen().delay() == 30
+assert turtle.Screen().delay() == 25
 custom.speed(3)
 assert custom.speed() == 3, "The lesson's speed() call should report the current speed"
 custom.TForward(10)
@@ -79,6 +79,7 @@ for bad in (True, "100", float("nan"), float("inf")):
         pass
 custom.ReadyToRace()
 assert len(custom._racers) == 4
+assert turtle.Screen().delay() == 25
 # The complete student race uses wildcard imports, randint, while/if/break,
 # and color-named commands without exposing or constructing turtle objects.
 student = {}
@@ -137,6 +138,7 @@ import runpy
 original_run = runpy.run_path
 def verify_standard_turtles(*args, **kwargs):
     screen = turtle.Screen()
+    assert screen.delay() == 25
     screen.clearscreen()
     pen = turtle.Turtle("turtle")
     assert isinstance(pen, turtle.Turtle), "Keep standard class identity"
@@ -146,20 +148,20 @@ def verify_standard_turtles(*args, **kwargs):
     pen.forward(1)
     assert pen.pensize() == 9, "Honor explicit pen settings"
     assert pen.shapesize() == (3, 3, 1)
-    for width in (1, 2, 3, 8):
+    for width in (1, 2, 3, 5, 8):
         pen.pensize(width)
         pen.forward(5)
         assert pen.pensize() == width, "Keep Python pen values intact"
         rendered = float(screen.cv.itemcget(pen.currentLineItem, "width"))
-        assert rendered == max(6, width * 2), (width, rendered)
+        assert rendered == max(3, width), (width, rendered)
     pen.width(3)
     pen.forward(5)
     assert pen.width() == 3
-    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 6
+    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 3
     pen.pen(pensize=2)
     pen.forward(5)
     assert pen.pen()["pensize"] == 2
-    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 6
+    assert float(screen.cv.itemcget(pen.currentLineItem, "width")) == 3
     pen.reset()
     assert pen.pensize() == 5
     assert pen.shapesize() == (2, 2, 2)

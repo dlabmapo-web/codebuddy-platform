@@ -83,9 +83,14 @@ describe("roleHasPermission", () => {
     }
   });
 
-  // The property, not the list. A permission added to the team lead set must
-  // reach a manager without a second edit — otherwise the two drift apart one
-  // forgotten line at a time, which is the failure this composition prevents.
+  // Check inheritance as a property, so a new Teacher or Team Lead permission
+  // cannot silently leave a higher staff role behind.
+  it("keeps a team lead a superset of a teacher", () => {
+    for (const permission of academyRolePermissions.TEACHER) {
+      expect(academyRolePermissions.TEAM_LEAD).toContain(permission);
+    }
+  });
+
   it("keeps a manager a superset of a team lead", () => {
     for (const permission of academyRolePermissions.TEAM_LEAD) {
       expect(academyRolePermissions.MANAGER).toContain(permission);

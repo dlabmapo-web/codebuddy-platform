@@ -36,6 +36,7 @@ export function EditorPane({
   canSubmit = true,
   practiceOnly = false,
   code,
+  collaborating = false,
   onCodeChange,
   runner,
   submission,
@@ -58,6 +59,7 @@ export function EditorPane({
   canSubmit?: boolean;
   practiceOnly?: boolean;
   code: string;
+  collaborating?: boolean;
   onCodeChange: (value: string) => void;
   /** Lets live collaboration bind to the very model the student is typing in. */
   onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
@@ -109,6 +111,7 @@ export function EditorPane({
       <div className="flex min-h-0 flex-1 flex-col" {...surfaceProps('editor')}>
         <CodeEditor
           code={code}
+          documentManaged={collaborating}
           fontSize={preferences.fontSize}
           onChange={onCodeChange}
           onMount={onEditorMount}

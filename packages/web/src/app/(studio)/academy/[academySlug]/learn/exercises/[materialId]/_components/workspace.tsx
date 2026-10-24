@@ -706,6 +706,7 @@ function ProgrammingWorkspace({
               onSubmit={handleSubmit}
               activeSample={activeSample}
               code={draft.code}
+              collaborating={monitoring.collaborating}
               onCodeChange={(value) => {
                 monitoring.markActive();
                 draft.setCode(value);

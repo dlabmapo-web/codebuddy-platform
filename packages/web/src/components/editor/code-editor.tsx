@@ -63,6 +63,7 @@ export function CodeEditor({
   onChange,
   onMount,
   readOnly = false,
+  documentManaged = false,
   theme = 'paircode-dark',
 }: {
   code: string;
@@ -70,6 +71,8 @@ export function CodeEditor({
   onChange: (value: string) => void;
   onMount?: OnMount;
   readOnly?: boolean;
+  /** A collaboration binding owns the model; React snapshots may lag its edits. */
+  documentManaged?: boolean;
   theme?: 'paircode-dark' | 'light';
 }) {
   const handleMount = React.useMemo(() => pinLfOnMount(onMount), [onMount]);
@@ -78,6 +81,7 @@ export function CodeEditor({
     <div className="min-h-0 flex-1 bg-editor-bg">
       <MonacoEditor
         beforeMount={registerPaircodeTheme}
+        defaultValue={code}
         height="100%"
         language="python"
         // The dynamic import above covers the React wrapper; this covers
@@ -102,7 +106,7 @@ export function CodeEditor({
           wordWrap: 'off',
         }}
         theme={theme}
-        value={code}
+        value={documentManaged ? undefined : code}
       />
     </div>
   );

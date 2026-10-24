@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { SubmissionSummary } from "@/components/workspace/submission-summary";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { workspaceMaterialSequence, type LearnExerciseBootstrap } from "@cove/shared";
@@ -49,7 +50,7 @@ export function QuizWorkspace({
     historicalCode: selectedSubmission?.code ?? null,
   });
   const submission = useSubmission({
-    academyId,
+    academyId, userId,
     classId,
     materialId: exercise.materialId,
     solveSessionId: session.solveSessionId,
@@ -209,6 +210,7 @@ export function QuizWorkspace({
               {t(submission.submitting ? "submitting" : "submit")}
             </button>
           )}
+          <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} />
           {submission.error ||
           result?.status === "ERRORED" ||
           result?.status === "CANCELLED" ? (

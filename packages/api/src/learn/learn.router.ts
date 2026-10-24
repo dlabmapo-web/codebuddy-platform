@@ -5,6 +5,8 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    getLatestSubmission: os.learn.getLatestSubmission.use(access.studentAuthenticated)
+      .handler(({ context, input }) => deps.learnService.getLatestSubmission(context.identity, input)),
     getMaterialType: os.learn.getMaterialType.use(access.studentAuthenticated)
       .handler(({ context, input }) => deps.learnService.getMaterialType(context.identity, input)),
     savePracticeDraft: os.learn.savePracticeDraft.use(access.authenticated)

@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 
 import { orpc } from '@/lib/orpc';
+import { useLatestSubmission } from '@/components/workspace/use-latest-submission';
 
 import {
   createSubmissionFallback,
@@ -32,6 +33,7 @@ type ReportedCase = {
 
 export function useSubmission({
   academyId,
+  userId,
   classId,
   materialId,
   initialResult = null,
@@ -39,6 +41,7 @@ export function useSubmission({
   reopenSolveSession,
 }: {
   academyId: string;
+  userId: string;
   classId: string;
   materialId: string;
   /**
@@ -54,6 +57,7 @@ export function useSubmission({
   reopenSolveSession?: () => Promise<{ solveSessionId: string } | null>;
 }) {
   const queryClient = useQueryClient();
+  const latest = useLatestSubmission({ academyId, materialId, classId, mode: 'student' }, userId);
   const [submitting, setSubmitting] = React.useState(false);
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -104,6 +108,7 @@ export function useSubmission({
         teardown();
         // The verdict moves progress, so the outline and catalog are stale.
         void queryClient.invalidateQueries({ queryKey: ['learn', academyId] });
+        void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
         return true;
       } catch (caught) {
         setError(caught);
@@ -112,7 +117,7 @@ export function useSubmission({
         return true;
       }
     },
-    [academyId, queryClient, teardown],
+    [academyId, queryClient, teardown, userId, materialId],
   );
 
   const submit = React.useCallback(
@@ -158,6 +163,7 @@ export function useSubmission({
         }
       }
 
+      void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
       setSubmissionId(accepted.submissionId);
       setTotalCount(accepted.totalCount);
 
@@ -205,9 +211,11 @@ export function useSubmission({
       classId,
       loadResult,
       materialId,
+      queryClient,
       reopenSolveSession,
       solveSessionId,
       teardown,
+      userId,
     ],
   );
 
@@ -227,6 +235,7 @@ export function useSubmission({
   );
 
   return {
+    latestSubmission: latest.data, summaryLoading: latest.isPending, summaryError: latest.isError,
     submit,
     submitting,
     submissionId,

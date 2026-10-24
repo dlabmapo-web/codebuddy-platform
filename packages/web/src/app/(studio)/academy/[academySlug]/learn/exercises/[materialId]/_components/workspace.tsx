@@ -162,7 +162,7 @@ function ProgrammingWorkspace({
     materialId: exercise.materialId,
   });
   const submission = useSubmission({
-    academyId,
+    academyId, userId,
     classId,
     materialId: exercise.materialId,
     initialResult: selected?.result ?? null,

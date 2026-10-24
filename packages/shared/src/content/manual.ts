@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LatestSubmission } from './latest-submission.js';
 import {
   multipleChoiceSchema,
   publicChoiceSchema,
@@ -181,6 +182,8 @@ export const manualWorkSchema = manualTargetSchema.extend({
   files: sourceFilesSchema,
   answer: z.string().max(10000).default(""),
   revision: z.number().int().nonnegative(),
+  preview: z.boolean().optional(),
+  contentRevision: z.number().int().positive().optional(),
 });
 export const manualSubmitSchema = manualWorkSchema
   .extend({
@@ -249,7 +252,22 @@ export type ManualAttempt = {
   } | null;
   learnerName?: string;
 };
+export function manualLatestSubmission(attempt: ManualAttempt | undefined, practice = false): LatestSubmission | null {
+  if (!attempt) return null;
+  const result = effectiveManualResult(attempt);
+  const evaluation = attempt.multipleChoiceAssessment ?? attempt.shortAnswerAssessment;
+  return {
+    submissionId: attempt.id, createdAt: attempt.createdAt, maximumHundredths: attempt.maximumHundredths,
+    scoreHundredths: result?.scoreHundredths ?? null,
+    status: result ? 'GRADED' : evaluation?.status === 'ERROR' ? 'ERROR'
+      : evaluation && !['MANUAL', 'GRADED'].includes(evaluation.status) ? 'PENDING'
+      : practice ? 'RECORDED' : 'AWAITING_REVIEW',
+  };
+}
 export type ManualWorkspace = {
+  participation?: { mode: 'student' | 'staff-practice' | 'inspection'; canSubmit: boolean; reason?: 'AUTHOR_DISABLED' | 'UNAVAILABLE_GRADING' | 'INSPECTION' };
+  latestSubmission?: LatestSubmission | null;
+  ownerUserId?: string;
   staff?: {
     canAuthor: boolean;
     canViewSolutions: boolean;

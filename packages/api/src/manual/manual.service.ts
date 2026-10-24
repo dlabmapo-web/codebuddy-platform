@@ -31,6 +31,7 @@ import {
   publicChoice,
   shortAnswerSchema,
   effectiveManualResult,
+  manualLatestSubmission,
   sourceFilesSchema,
   manualConfigSchema,
   rolesHavePermission,
@@ -403,8 +404,8 @@ export class ManualService {
       input,
       preview,
     );
-    const staffPractice = !preview && Boolean(this.practice?.allowed(actor));
-    const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id) : null;
+    const staffPractice = Boolean(this.practice?.allowed(actor));
+    const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id, preview, config.revision) : null;
     const roles = actor.roles ?? [actor.role];
     const canViewSolutions = rolesHavePermission(roles, "curriculum.review");
     const canTutor = actor.via === "membership" && roles.some(roleCanMonitor) &&
@@ -431,7 +432,7 @@ export class ManualService {
           userId: actor.userId,
           classId: input.classId,
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: 'desc' }],
         take: 30,
         include: {
           shortAnswerAssessment: true,
@@ -517,7 +518,26 @@ export class ManualService {
       !classes.some((c) => c.id === input.classId)
     )
       throw new NotFoundException();
+    const gradingUnavailable = Boolean((parsed.shortAnswer && !this.shortAnswers.enabled()) || (parsed.multipleChoice && !this.choices.enabled()));
+    const canParticipate = staffPractice || (!preview && actor.role === 'STUDENT' && actor.via === 'membership');
+    const ownAttempts = privatePractice?.attempts ?? attempts.map((attempt) => this.publicAttempt(attempt));
+    // A student's summary belongs to one delivery class; never borrow the last
+    // attempt from another class when the selector is still undecided.
+    const selectedClass = input.classId ?? (classes.length === 1 ? classes[0].id : undefined);
+    // Query independently of the bounded history: other class deliveries must
+    // not push this class's latest attempt out of the first 30 history rows.
+    const latestRow = !staffPractice && selectedClass ? await this.db.manualSubmission.findFirst({
+      where: { materialId: row.id, userId: actor.userId, classId: selectedClass },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: { shortAnswerAssessment: true, multipleChoiceAssessment: true, reviews: { orderBy: { version: 'desc' } } },
+    }) : null;
+    const latestAttempt = staffPractice ? ownAttempts[0] : latestRow ? this.publicAttempt(latestRow) : undefined;
     return {
+      ownerUserId: actor.userId,
+      participation: { mode: staffPractice ? 'staff-practice' : canParticipate ? 'student' : 'inspection',
+        canSubmit: canParticipate && config.submitEnabled && !gradingUnavailable,
+        ...(!canParticipate ? { reason: 'INSPECTION' as const } : !config.submitEnabled ? { reason: 'AUTHOR_DISABLED' as const } : gradingUnavailable ? { reason: 'UNAVAILABLE_GRADING' as const } : {}) },
+      latestSubmission: manualLatestSubmission(latestAttempt, staffPractice),
       ...(canViewSolutions ? { staff: {
         canAuthor, canViewSolutions, canTutor, lectureId: row.lectureId,
         classes: tutoringClasses.map(c => ({ classId: c.id, name: c.name })),
@@ -556,7 +576,7 @@ export class ManualService {
               revision: draft.revision,
             }
           : null,
-      attempts: privatePractice?.attempts ?? attempts.map((attempt) => this.publicAttempt(attempt)),
+      attempts: ownAttempts,
       practice: staffPractice,
       ...(privatePractice ? { draft: privatePractice.draft } : {}),
     };
@@ -640,7 +660,8 @@ export class ManualService {
     };
   }
   async draft(identity: SupabaseIdentity, input: ManualWork) {
-    const { actor, config } = await this.material(identity, input);
+    const { actor, config } = await this.material(identity, input, input.preview);
+    if (input.contentRevision !== undefined && input.contentRevision !== config.revision) throw new ConflictException('Content changed; reload');
     if (this.practice?.allowed(actor)) return this.practice.draft(actor, input);
     const writer = await this.access.requirePermission(identity.authUserId, input.academyId, "submissions.own.create");
     if (writer.via && writer.via !== "membership") throw new ForbiddenException();
@@ -694,12 +715,13 @@ export class ManualService {
       });
   }
   async submitPractice(identity: SupabaseIdentity, input: Omit<ManualSubmit, "classId">) {
-    const { actor, config } = await this.material(identity, input);
+    const { actor, config } = await this.material(identity, input, input.preview);
     if (!this.practice || !this.practice.allowed(actor)) throw new ForbiddenException();
     if (config.revision !== input.contentRevision) throw new ConflictException("Content changed; reload");
     return this.practice.submit(actor, input, config);
   }
   async submit(identity: SupabaseIdentity, input: ManualSubmit) {
+    if (input.preview) throw new ForbiddenException('Student submissions cannot use preview');
     const { actor, row, config } = await this.material(identity, input);
     await this.access.requirePermission(
       identity.authUserId,
@@ -707,7 +729,7 @@ export class ManualService {
       "submissions.own.create",
     );
 
-    if (actor.role !== "STUDENT" || !config.submitEnabled)
+    if ((actor.via && actor.via !== 'membership') || actor.role !== "STUDENT" || !config.submitEnabled)
       throw new ForbiddenException("Submission is not enabled");
     if (
       !(await this.db.class.findFirst({

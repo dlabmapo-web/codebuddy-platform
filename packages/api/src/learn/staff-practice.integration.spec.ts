@@ -1,4 +1,5 @@
 import { ManualPracticeService } from '../manual/manual-practice.service.js';
+import { ManualService } from '../manual/manual.service.js';
 import { ShortAnswerService } from '../manual/short-answer.service.js';
 import { MultipleChoiceService } from '../manual/multiple-choice.service.js';
 import 'dotenv/config';
@@ -63,6 +64,7 @@ describe.skipIf(process.env.COVE_PRACTICE_INTEGRATION !== '1')('staff practice d
       const accepted = await service.submit(people[name]!, input());
       await runner.run(accepted.submissionId);
       expect(await service.get(people[name]!, { academyId, submissionId: accepted.submissionId })).toMatchObject({ status: 'PASSED' });
+      expect(await service.latest(people[name]!, { academyId, materialId })).toMatchObject({ submissionId: accepted.submissionId, status: 'GRADED', scoreHundredths: 10000 });
     }
     await expect(service.authorize(people['cove-student']!, { academyId, materialId })).rejects.toThrow();
     await expect(service.authorize(people['cove-teacher2']!, { academyId, materialId })).rejects.toThrow();
@@ -92,6 +94,19 @@ describe.skipIf(process.env.COVE_PRACTICE_INTEGRATION !== '1')('staff practice d
     expect(await service.saveDraft(teacher, { ...target, code: 'stale' })).toMatchObject({ outcome: 'CONFLICT' });
     expect(await service.draft(people['cove-manager']!, target)).toBeNull();
     expect(await db.exerciseDraft.count({ where: { materialId } })).toBe(0);
+  });
+  it('projects the weighted score from the attempt snapshot rather than current author settings', async () => {
+    const identity = people['cove-manager']!;
+    const accepted = await service.submit(identity, input());
+    await runner.run(accepted.submissionId);
+    const stored = await db.staffPracticeAttempt.findUniqueOrThrow({ where: { id: accepted.submissionId } });
+    await db.staffPracticeAttempt.update({ where: { id: stored.id }, data: {
+      snapshot: { ...(stored.snapshot as object), materialMaximumHundredths: 2550, materialScorePolicy: 'PROPORTIONAL' },
+      result: { ...(stored.result as object), earnedWeight: 1, possibleWeight: 3 },
+    } });
+    await db.programmingExercise.update({ where: { materialId }, data: { materialMaximumHundredths: 9999 } });
+    expect(await service.latest(identity, { academyId, materialId })).toMatchObject({ submissionId: stored.id, scoreHundredths: 850, maximumHundredths: 2550 });
+    await db.programmingExercise.update({ where: { materialId }, data: { materialMaximumHundredths: null } });
   });
   it('records short-answer and turtle practice without manual submissions or teacher review queues', async () => {
     const actor = await access.requirePermission(people['cove-teacher']!.authUserId, academyId, 'practice.own.create');
@@ -124,4 +139,44 @@ describe.skipIf(process.env.COVE_PRACTICE_INTEGRATION !== '1')('staff practice d
     await db.lecture.update({ where: { id: lectureId }, data: { isVisible: true } });
     expect(await service.draft(teacher, { academyId, materialId })).toMatchObject({ code: 'second' });
   });
+  it('staff preview submissions use private owner/revision contexts across manual activity types', async () => {
+    const config = new ConfigService({ SHORT_ANSWER_ENABLED: true, MULTIPLE_CHOICE_ENABLED: true });
+    const points = new PointAwardService(db), short = new ShortAnswerService(db, config, points), choices = new MultipleChoiceService(config);
+    const practice = new ManualPracticeService(db, short, choices);
+    const manual = new ManualService(db, access, {} as never, {} as never, {} as never, points, short, choices, practice);
+    const option = randomUUID(), other = randomUUID();
+    const definitions = [
+      { type: 'TURTLE_EXERCISE' as const, config: {}, status: 'RECORDED' },
+      { type: 'WRITTEN_RESPONSE' as const, config: {}, status: 'RECORDED' },
+      ...(['MANUAL', 'EXACT', 'REGEX'] as const).map(gradingMode => ({ type: 'WRITTEN_RESPONSE' as const,
+        config: { shortAnswer: { version: 1, question: 'Language?', gradingMode, expectedAnswer: 'Python', pattern: '^Python$' } }, status: gradingMode === 'MANUAL' ? 'RECORDED' : 'GRADED' })),
+      { type: 'MULTIPLE_CHOICE' as const, config: { multipleChoice: { version: 1, question: 'Language?', selectionMode: 'SINGLE', options: [{ id: option, content: 'Python' }, { id: other, content: 'Other' }], correctOptionIds: [option] } }, status: 'GRADED' },
+    ];
+    for (const [index, definition] of definitions.entries()) {
+      const id = randomUUID();
+      await db.material.create({ data: { id, lectureId, title: `Preview ${index}`, type: definition.type, position: index + 4, isVisible: false,
+        manualMaterial: { create: { ...definition.config, maximumHundredths: 2550 } } } });
+      for (const name of ['cove-teacher', 'cove-teamlead', 'cove-manager']) {
+        const identity = people[name]!, target = { academyId, materialId: id };
+        expect((await manual.workspace(identity, target, true)).latestSubmission).toBeNull();
+        const request = { ...target, preview: true, contentRevision: 1, files: {}, answer: 'Python', revision: 0, requestKey: randomUUID(), selectedOptionIds: [option], displayOrder: [option, other] };
+        const accepted = await manual.submitPractice(identity, request);
+        const result = await manual.workspace(identity, target, true);
+        expect(result.participation).toMatchObject({ mode: 'staff-practice', canSubmit: true });
+        expect(result.latestSubmission).toMatchObject({ submissionId: accepted.submissionId, status: definition.status, maximumHundredths: 2550, scoreHundredths: definition.status === 'GRADED' ? 2550 : null });
+        if (definition.status === 'GRADED') {
+          const wrong = await manual.submitPractice(identity, { ...request, answer: 'Other', selectedOptionIds: [other], requestKey: randomUUID() });
+          expect((await manual.workspace(identity, target, true)).latestSubmission).toMatchObject({ submissionId: wrong.submissionId, scoreHundredths: 0 });
+        }
+      }
+      await expect(manual.workspace(people['cove-student']!, { academyId, materialId: id }, true)).rejects.toThrow();
+      await expect(manual.submitPractice(people['cove-teacher2']!, { academyId, materialId: id, preview: true, contentRevision: 1, files: {}, answer: 'Python', revision: 0, requestKey: randomUUID() })).rejects.toThrow();
+      await db.manualMaterial.update({ where: { materialId: id }, data: { revision: 2 } });
+      expect((await manual.workspace(people['cove-manager']!, { academyId, materialId: id }, true)).latestSubmission).toBeNull();
+      await expect(manual.submitPractice(people['cove-manager']!, { academyId, materialId: id, preview: true, contentRevision: 1, files: {}, answer: 'Python', revision: 0, requestKey: randomUUID() })).rejects.toThrow();
+      await db.material.update({ where: { id }, data: { isVisible: true } });
+      expect((await manual.workspace(people['cove-manager']!, { academyId, materialId: id })).latestSubmission).toBeNull();
+      expect(await db.manualSubmission.count({ where: { materialId: id } })).toBe(0);
+    }
+  }, 180000);
 });

@@ -2,6 +2,7 @@ import { practiceSubmitSchema, practiceHistorySchema } from "../../content/learn
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { materialTypeSchema } from '../../content/course.js';
+import { latestSubmissionInputSchema, latestSubmissionSchema } from '../../content/latest-submission.js';
 
 import {
   submissionAcceptedSchema,
@@ -52,10 +53,11 @@ import {
  * remembered filter.
  */
 export const learnContract = {
+  getLatestSubmission: oc.input(latestSubmissionInputSchema).output(latestSubmissionSchema.nullable()),
   savePracticeDraft: oc.input(saveDraftSchema).output(saveDraftResultSchema),
   submitPractice: oc.input(practiceSubmitSchema).output(submissionAcceptedSchema),
   getPracticeResult: oc.input(submissionInputSchema).output(submissionResultSchema),
-  listPracticeAttempts: oc.input(learnMaterialInputSchema.extend({ preview: z.boolean().optional() })).output(practiceHistorySchema),
+  listPracticeAttempts: oc.input(learnMaterialInputSchema.extend({ preview: z.boolean().optional(), gradingRevision: z.number().int().positive().optional() })).output(practiceHistorySchema),
   /**
    * The student's own academy overview, as one bounded read.
    *

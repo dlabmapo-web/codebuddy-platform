@@ -67,6 +67,23 @@ function fixture() {
   return { service, db, access, audit, gui, points, row, config };
 }
 describe("manual assessment boundaries", () => {
+  it.each(['platform', 'support'])('does not grant personal participation to %s inspection', async (via) => {
+    const { service, access, config } = fixture();
+    Object.assign(config, { submitEnabled: true });
+    access.requirePermission.mockResolvedValue({ role: 'STUDENT', roles: ['STUDENT'], userId: 'inspector', via } as never);
+    expect((await service.workspace(identity, target)).participation).toMatchObject({ mode: 'inspection', canSubmit: false, reason: 'INSPECTION' });
+    await expect(service.submit(identity, { ...target, classId: 'class', files: {}, answer: '', revision: 0, contentRevision: 1, requestKey: 'key' })).rejects.toThrow();
+  });
+  it('reads the latest owned class attempt independently of the bounded history', async () => {
+    const { service, db } = fixture();
+    db.class.findMany.mockResolvedValue([{ id: 'class', name: 'Delivery' }]);
+    db.manualSubmission.findFirst.mockResolvedValue({ id: 'latest', userId: 'student', classId: 'class', files: {}, answer: '',
+      createdAt: new Date('2026-10-23T00:00:00Z'), maximumHundredths: 2550, includeInScore: true,
+      reviewVersion: 0, reviews: [], shortAnswerAssessment: null, multipleChoiceAssessment: null });
+    const result = await service.workspace(identity, target);
+    expect(result.latestSubmission).toMatchObject({ submissionId: 'latest', status: 'AWAITING_REVIEW', scoreHundredths: null });
+    expect(db.manualSubmission.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { materialId: 'material', userId: 'student', classId: 'class' }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }));
+  });
   it.each([
     ['TEACHER', ['TEACHER'], false],
     ['TEAM_LEAD', ['TEAM_LEAD', 'TEACHER'], true],

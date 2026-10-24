@@ -211,7 +211,8 @@
     "staff_reference_notice": "Private staff reference. Students cannot see this answer key.",
     "reference_unavailable": "The reference is unavailable. Close this panel and try again.",
     "no_reference": "No reference answer has been added.",
-    "answer_pattern": "Answer pattern"
+    "answer_pattern": "Answer pattern",
+    "preview_practice_notice": "Staff preview. Submissions are saved as your private self-tests, separate from student coursework."
   },
   "actual_size": "Actual size",
   "fit_drawing": "Fit",
@@ -256,5 +257,10 @@
   "solution_result": "Solution result",
   "resize_results": "Resize editor and results",
   "editor_percentage": "Editor height {{value}} percent",
-  "code_not_run": "Code has not run yet."
+  "code_not_run": "Code has not run yet.",
+  "submission_reason": {
+    "AUTHOR_DISABLED": "Submission is disabled for this activity.",
+    "UNAVAILABLE_GRADING": "Grading is currently unavailable.",
+    "INSPECTION": "Inspection only. Personal submission requires academy membership."
+  }
 }

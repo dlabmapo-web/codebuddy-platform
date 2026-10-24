@@ -10,6 +10,7 @@ import { useMaterialNavigation } from '@/components/workspace/use-material-navig
 import { useLayoutTranslation } from '@/i18n';
 import { useRouter } from 'next/navigation';
 import { ManualStaffActions } from './manual-staff-actions';
+import { SubmissionSummary } from '@/components/workspace/submission-summary';
 import { WrittenAnswerCard, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
@@ -22,7 +23,7 @@ import {
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { effectiveManualResult, type ManualSession } from "@cove/shared";
+import { effectiveManualResult, shouldPollLatestSubmission, type ManualSession } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
@@ -37,11 +38,13 @@ import { executionTranslationKey } from './execution-state';
 export function ManualWorkspace({
   academyId,
   materialId,
+  userId,
   classId,
   preview = false,
 }: {
   academyId: string;
   materialId: string;
+  userId: string;
   classId?: string;
   preview?: boolean;
 }) {
@@ -52,15 +55,11 @@ export function ManualWorkspace({
   const [deliveryClass, setDeliveryClass] = useState(classId);
   const target = { academyId, materialId };
   const query = useQuery({
-    queryKey: ["manual", academyId, materialId, preview, deliveryClass],
+    queryKey: ["manual", userId, academyId, materialId, preview, deliveryClass],
     queryFn: () =>
       manualApi.read({ ...target, preview, classId: deliveryClass }),
-    retry: false,
-    refetchInterval: (query) =>
-      query.state.data?.config.shortAnswer ||
-      query.state.data?.config.multipleChoice
-        ? 3000
-        : false,
+    retry: false, staleTime: 0, refetchOnWindowFocus: true,
+    refetchInterval: query => shouldPollLatestSubmission(query.state.data?.latestSubmission, Date.now()) ? 3000 : false,
   });
   const data = query.data;
   const short = data?.config.shortAnswer;
@@ -208,7 +207,7 @@ export function ManualWorkspace({
     session &&
     ["RUNNING", "STARTING", "QUEUED", "WAITING_INPUT", "DISPLAYING"].includes(session.state);
   async function save() {
-    if (preview || explicit) return true;
+    if ((preview && !data?.practice) || explicit) return true;
     if (saving.current) return saving.current;
     const snapshot = latest.current;
     const operation = (async () => {
@@ -217,7 +216,7 @@ export function ManualWorkspace({
         const result = await manualApi.draft({
           ...target,
           ...latest.current,
-          revision: draftRevision.current,
+          revision: draftRevision.current, preview, contentRevision: loadedContentRevision.current,
         });
         draftRevision.current = result.revision;
         if (
@@ -238,10 +237,10 @@ export function ManualWorkspace({
     return operation;
   }
   useEffect(() => {
-    if (preview || explicit || !dirty) return;
+    if ((preview && !data?.practice) || explicit || !dirty) return;
     const timer = setTimeout(() => void save(), 1500);
     return () => clearTimeout(timer);
-  }, [files, answer, dirty, preview, explicit]);
+  }, [files, answer, dirty, preview, explicit, data?.practice]);
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
@@ -279,7 +278,7 @@ export function ManualWorkspace({
       const next = await manualApi.start({
         ...target,
         ...latest.current,
-        contentRevision: data!.config.revision,
+        contentRevision: loadedContentRevision.current ?? data!.config.revision,
         revision: draftRevision.current,
         preview,
         solution,
@@ -321,9 +320,7 @@ export function ManualWorkspace({
         classId: selectedClass,
         selectedOptionIds: choiceSelected,
         displayOrder: loadedChoice?.options.map((o) => o.id),
-        revision: explicit
-          ? loadedContentRevision.current
-          : data!.config.revision,
+        revision: loadedContentRevision.current,
       });
       if (pendingSubmit.current?.content !== content)
         pendingSubmit.current = { content, key: crypto.randomUUID() };
@@ -336,9 +333,8 @@ export function ManualWorkspace({
               displayOrder: loadedChoice!.options.map((o) => o.id),
             }
           : {}),
-        contentRevision: explicit
-          ? loadedContentRevision.current!
-          : data!.config.revision,
+        contentRevision: loadedContentRevision.current ?? data!.config.revision,
+        ...(data?.practice ? { preview } : {}),
         revision: draftRevision.current,
         classId: selectedClass!,
         requestKey: pendingSubmit.current.key,
@@ -382,7 +378,7 @@ export function ManualWorkspace({
   });
   const resultLabel = (attempt: NonNullable<typeof latestAttempt>) => {
     const result = effectiveManualResult(attempt);
-    if (data?.practice && !attempt.shortAnswerAssessment && !attempt.multipleChoiceAssessment) return pt("saved_result");
+    if (data?.practice && !result && (!attempt.shortAnswerAssessment || attempt.shortAnswerAssessment.status === "MANUAL") && !attempt.multipleChoiceAssessment) return pt("saved_result");
     if (attempt.reviews[0])
       return `${result!.scoreHundredths / 100} / ${attempt.maximumHundredths / 100} · ${result!.completed ? mt("completed") : mt("needs_revision")}`;
     const assessment =
@@ -512,11 +508,11 @@ export function ManualWorkspace({
         {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
-      {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt("ui.preview_notice")}</p> : null}
+      {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt(data.practice ? "ui.preview_practice_notice" : "ui.preview_notice")}</p> : null}
       {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
       {/* Assigned when a draft loads, alongside state that re-renders. */}
       {/* eslint-disable-next-line react-hooks/refs */}
-      {explicit && loadedContentRevision.current !== data.config.revision ? (
+      {loadedContentRevision.current !== undefined && loadedContentRevision.current !== data.config.revision ? (
         <p role="alert" className="p-3 text-danger">
           {mt("content_changed")}
         </p>
@@ -638,8 +634,8 @@ export function ManualWorkspace({
                 </Button>
               </>
             ) : null}
-            {preview && !drawing ? <button type="button" disabled className={assessmentPrimary}><Send aria-hidden className="size-4" />{mt("submit")}</button> : null}
-            {!preview ? (
+
+            {(!preview || data.practice) ? (
               <>
                 {!explicit ? (
                   <button
@@ -658,6 +654,7 @@ export function ManualWorkspace({
                     disabled={
                       busy ||
                       data.submissionUnavailable ||
+                      data.participation?.canSubmit === false ||
                       (!selectedClass && !data.practice) ||
                       Boolean(short && answer.length === 0) ||
                       Boolean(choice && choiceSelected.length === 0)
@@ -669,6 +666,9 @@ export function ManualWorkspace({
                 ) : null}
               </>
             ) : null}
+            {preview && !data.practice && data.config.submitEnabled ? <button type="button" disabled className={assessmentPrimary}><Send aria-hidden className="size-4" />{mt('submit')}</button> : null}
+            {data.participation?.reason ? <p role="status" className="text-xs text-sub">{mt(`submission_reason.${data.participation.reason}`)}</p> : null}
+            {data.config.submitEnabled && data.participation?.mode !== 'inspection' ? <SubmissionSummary latest={data.latestSubmission} /> : null}
             {!preview && data.classes.length > 1 ? (
               <select
                 aria-label={mt("submission_class")}

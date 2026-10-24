@@ -11,6 +11,8 @@ import { JudgeQueue } from "../judge/judge.queue.js";
 import { gradingSnapshotFor, resolveGradingProfile } from "../judge/grading-profile.js";
 import { practiceSnapshotSchema } from "../judge/practice-snapshot.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+import { automaticLatestSubmission } from './latest-submission.js';
+import { appliedScoreHundredthsFor } from '../judge/grading.js';
 
 @Injectable()
 export class StaffPracticeService {
@@ -144,5 +146,23 @@ export class StaffPracticeService {
     return { attempts: attempts.map((row) => ({ submissionId: row.id, code: row.code,
       createdAt: row.createdAt.toISOString(), status: row.status,
       score: row.result ? submissionResultSchema.parse(row.result).score : null })) };
+  }
+
+  async latest(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }) {
+    const { actor, material, exercise } = await this.authorize(identity, input);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    const row = await this.prisma.staffPracticeAttempt.findFirst({
+      where: { academyId: input.academyId, materialId: input.materialId, userId: actor.userId, context: input.preview ? `preview:${exercise.gradingRevision}` : 'live' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    if (!row) return null;
+    const snapshot = practiceSnapshotSchema.parse(row.snapshot);
+    const result = row.result ? submissionResultSchema.parse(row.result) : null;
+    const maximum = snapshot.materialMaximumHundredths;
+    const applied = maximum !== null && snapshot.materialScorePolicy && result?.earnedWeight != null && result.possibleWeight != null
+      ? appliedScoreHundredthsFor({ earnedWeight: result.earnedWeight, possibleWeight: result.possibleWeight, materialMaximumHundredths: maximum, policy: snapshot.materialScorePolicy }) : null;
+    return automaticLatestSubmission({ ...row, score: result?.score ?? 0,
+      materialMaximumHundredths: maximum, appliedScoreHundredths: applied,
+      gradingAborted: Boolean(result?.failureReason) });
   }
 }

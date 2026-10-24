@@ -1,4 +1,5 @@
 import type practice from '@cove/i18n/locales/en/practice.json';
+import type submissionSummary from '@cove/i18n/locales/en/submission-summary.json';
 import type pdfPractice from '@cove/i18n/locales/en/pdf-practice.json';
 import type editor from '@cove/i18n/locales/en/editor.json';
 import type video from "@cove/i18n/locales/en/video.json";
@@ -59,6 +60,7 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common';
     resources: {
+      'submission-summary': typeof submissionSummary;
       practice: typeof practice;
       solutions: typeof import("@cove/i18n/locales/en/solutions.json");
       editor: typeof editor;

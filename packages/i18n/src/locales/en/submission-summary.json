@@ -1,0 +1,14 @@
+{
+  "score": "Last submit score",
+  "datetime": "Last submit datetime",
+  "loading": "Loading…",
+  "unavailable": "Unavailable",
+  "states": {
+    "PENDING": "Grading…",
+    "GRADED": "Graded",
+    "AWAITING_REVIEW": "Awaiting review",
+    "RECORDED": "Not automatically graded",
+    "ERROR": "Evaluation unavailable",
+    "CANCELLED": "Cancelled"
+  }
+}

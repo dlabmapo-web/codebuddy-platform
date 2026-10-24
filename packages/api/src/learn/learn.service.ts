@@ -40,6 +40,7 @@ import {
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { SubmissionService } from "./submission.service.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
+import { automaticLatestSubmission } from './latest-submission.js';
 
 /** The material graph one authorized workspace read produces. */
 const workspaceMaterialInclude = {
@@ -114,6 +115,29 @@ export class LearnService {
     }) : await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
     if (!row) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     return { type: row.type };
+  }
+
+  async getLatestSubmission(identity: SupabaseIdentity, input: {
+    academyId: string; materialId: string; classId?: string; mode: 'student' | 'staff-practice'; preview?: boolean; gradingRevision?: number;
+  }) {
+    if (input.mode === 'staff-practice') {
+      if (!this.practice) throw new AppException('PERMISSION_DENIED', HttpStatus.FORBIDDEN);
+      return this.practice.latest(identity, input);
+    }
+    const learner = await this.requireLearner(identity, input.academyId);
+    if (learner.via !== 'membership' || !(learner.roles ?? [learner.role]).includes('STUDENT') || input.preview)
+      throw new AppException('PERMISSION_DENIED', HttpStatus.FORBIDDEN);
+    const material = await this.requireWorkspaceMaterial(input, learner.scope);
+    if (material.type !== 'PROGRAMMING_EXERCISE') throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    const context = await this.classContext.resolve({ academyId: input.academyId, userId: learner.userId,
+      courseId: material.lecture.courseModule.course.id, requestedClassId: input.classId });
+    if (!context.classId) return null;
+    return automaticLatestSubmission(await this.prisma.submission.findFirst({
+      where: { userId: learner.userId, materialId: material.id, classId: context.classId,
+        course: { academyId: input.academyId }, regradeRunId: null },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, createdAt: true, status: true, score: true, materialMaximumHundredths: true, appliedScoreHundredths: true, gradingAborted: true },
+    }));
   }
 
   async getCourseOutline(

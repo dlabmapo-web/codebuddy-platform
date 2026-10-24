@@ -6,6 +6,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLayoutTranslation } from '@/i18n';
+import { SubmissionSummary } from '@/components/workspace/submission-summary';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
 import { RunControls } from '@/components/workspace/run-controls';
 import { TerminalPanel } from '@/components/workspace/terminal-panel';
@@ -128,7 +129,7 @@ export function EditorPane({
         style={{ height: outputHeight }}
         {...surfaceProps('terminal')}
       >
-        <div className="@container flex shrink-0 items-center gap-2 overflow-x-auto py-1 border-b border-white/10 bg-[#2d2d2d] px-2">
+        <div className="@container flex shrink-0 flex-wrap items-center gap-2 py-1 border-b border-white/10 bg-[#2d2d2d] px-2">
           <button type="button" disabled={testingSamples || runner.running || submission.submitting} onClick={onReset} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white disabled:opacity-50"><RotateCcw className="size-3" />{t('workspace.reset')}</button>
           <RunControls
             activeSample={activeSample}
@@ -142,6 +143,7 @@ export function EditorPane({
             sampleTestCases={practiceOnly ? [] : sampleTestCases}
           />
           {!practiceOnly ? <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button> : null}
+          {!practiceOnly ? <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} dark /> : null}
         </div>
 
         <div

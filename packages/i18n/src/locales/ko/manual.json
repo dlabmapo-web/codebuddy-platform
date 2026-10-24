@@ -211,7 +211,8 @@
     "staff_reference_notice": "교직원 전용 참고 답안입니다. 학생에게 정답이 공개되지 않습니다.",
     "reference_unavailable": "참고 답안을 불러올 수 없습니다. 패널을 닫고 다시 시도하세요.",
     "no_reference": "등록된 참고 답안이 없습니다.",
-    "answer_pattern": "정답 패턴"
+    "answer_pattern": "정답 패턴",
+    "preview_practice_notice": "교직원 미리보기입니다. 제출한 답안은 학생 성적과 별개인 나의 연습 기록으로 저장됩니다."
   },
   "actual_size": "실제 크기",
   "fit_drawing": "화면에 맞추기",
@@ -256,5 +257,10 @@
   "solution_result": "해설 실행 결과",
   "resize_results": "편집기와 실행 결과 크기 조절",
   "editor_percentage": "편집기 높이 {{value}}퍼센트",
-  "code_not_run": "아직 코드를 실행하지 않았습니다."
+  "code_not_run": "아직 코드를 실행하지 않았습니다.",
+  "submission_reason": {
+    "AUTHOR_DISABLED": "이 활동은 제출 기능이 꺼져 있습니다.",
+    "UNAVAILABLE_GRADING": "현재 채점 기능을 사용할 수 없습니다.",
+    "INSPECTION": "열람 전용입니다. 직접 제출하려면 학원의 구성원이어야 합니다."
+  }
 }

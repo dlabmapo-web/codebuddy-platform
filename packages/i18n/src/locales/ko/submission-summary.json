@@ -1,0 +1,14 @@
+{
+  "score": "최근 제출 점수",
+  "datetime": "최근 제출 일시",
+  "loading": "불러오는 중…",
+  "unavailable": "확인할 수 없음",
+  "states": {
+    "PENDING": "채점 중…",
+    "GRADED": "채점 완료",
+    "AWAITING_REVIEW": "교사 채점 대기",
+    "RECORDED": "자동 채점 없음",
+    "ERROR": "채점 결과 확인 불가",
+    "CANCELLED": "취소됨"
+  }
+}

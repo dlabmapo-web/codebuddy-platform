@@ -72,7 +72,7 @@ export const monitoringContract = {
   /**
    * One exercise the teacher wants to read, without leaving the live watch.
    *
-   * The public projection only. It has no draft id, so the preview surface has
+   * Public exercise plus the selected student's saved code. It has no draft id, so the preview surface has
    * nothing to join a collaboration room with even by mistake.
    */
   getExercisePreview: oc

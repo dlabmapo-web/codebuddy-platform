@@ -5,7 +5,7 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import type {
-  MonitoringExercisePreview,
+  MonitoringPublicExercise,
   MonitoringStudentContext,
 } from '@cove/shared';
 import { ArrowLeft } from 'lucide-react';
@@ -54,7 +54,7 @@ export function LiveHeader({
    * Deliberately the public projection: a header that took the live context
    * would be a second place holding a draft id, and it has no use for one.
    */
-  exercise: MonitoringExercisePreview | null;
+  exercise: MonitoringPublicExercise | null;
   /** Where the student actually is, said separately from where the screen is. */
   liveStatus?: string;
   unsaved: boolean;

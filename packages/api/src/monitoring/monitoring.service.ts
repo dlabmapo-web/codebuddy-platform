@@ -11,6 +11,7 @@ import {
   type MonitoringRosterExercise,
   type MonitoringClassSummary,
   type MonitoringExercisePreview,
+  type MonitoringPublicExercise,
   type MonitoringFeedback,
   type MonitoringStudentContext,
   type WorkspaceNavigatorContext,
@@ -357,8 +358,8 @@ export class MonitoringService {
    *
    * Built from the same public projection as the live workspace and returned
    * as a contract with no draft id, so nothing in this response can be used to
-   * join a collaboration room, apply an update, or address the student's own
-   * work.
+   * join a collaboration room or apply an update. Saved student code is a
+   * read-only snapshot, not a collaboration document.
    */
   async getExercisePreview(
     identity: SupabaseIdentity,
@@ -383,7 +384,20 @@ export class MonitoringService {
         HttpStatus.NOT_FOUND,
       );
     }
-    return preview;
+    const draft = await this.prisma.exerciseDraft.findUnique({
+      where: { userId_materialId: { userId: student.studentUserId, materialId: input.materialId } },
+      select: { code: true },
+    });
+    // An empty draft is still the student's latest work; do not resurrect an
+    // older submission when they deliberately cleared their editor.
+    if (draft) return { ...preview, studentCode: draft.code };
+    const latest = await this.prisma.submission.findFirst({
+      where: { userId: student.studentUserId, materialId: input.materialId,
+        OR: [{ classId: claim.classId }, { classId: null }], regradeRunId: null },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { code: true },
+    });
+    return { ...preview, studentCode: latest?.code ?? null };
   }
 
   /**
@@ -633,7 +647,7 @@ export class MonitoringService {
   private async loadPublicExercise(
     claim: MonitoringClassClaim,
     materialId: string,
-  ): Promise<MonitoringExercisePreview | null> {
+  ): Promise<MonitoringPublicExercise | null> {
     const material = await this.prisma.material.findFirst({
       where: {
         id: materialId,

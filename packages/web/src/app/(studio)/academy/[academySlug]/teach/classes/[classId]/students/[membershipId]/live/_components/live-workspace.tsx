@@ -587,7 +587,7 @@ export function LiveWorkspace({
                   // updates keep arriving and keep being applied to it; what
                   // this pane shows is a string that no socket can reach.
                   <PreviewEditor
-                    code={previewed.exercise.starterCode}
+                    code={previewed.studentCode ?? previewed.exercise.starterCode}
                     fontSize={preferences.fontSize}
                   />
                 ) : (

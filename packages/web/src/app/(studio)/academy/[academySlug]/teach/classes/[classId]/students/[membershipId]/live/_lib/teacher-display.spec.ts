@@ -28,6 +28,7 @@ function path(materialId: string, courseId = 'course-1'): NavigatorPath {
 
 function snapshot(materialId: string): MonitoringExercisePreview {
   return {
+    studentCode: null,
     breadcrumb: {
       course: { id: 'course-1', title: 'Python Basics' },
       module: { id: 'module-1', title: 'Getting started' },

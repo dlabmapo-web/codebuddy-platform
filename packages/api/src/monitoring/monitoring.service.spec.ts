@@ -207,7 +207,7 @@ function createService(options?: {
     lecture: { courseModule: { courseId: string } };
   }[];
   visit?: { id: string; material: { programmingExercise: { solutions: { title: string | null; code: string }[] } | null } | null } | null;
-  latestSubmission?: { id: string; status: string } | null;
+  latestSubmission?: { id: string; status: string; code?: string } | null;
 }) {
   const prisma = {
     class: {
@@ -231,7 +231,7 @@ function createService(options?: {
     },
     exerciseDraft: {
       findUnique: vi.fn().mockResolvedValue(
-        options?.draft === undefined ? { id: draftId } : options.draft,
+        options?.draft === undefined ? { id: draftId, code: "student-saved-code" } : options.draft,
       ),
     },
     programmingExercise: {
@@ -997,7 +997,7 @@ describe("getExercisePreview", () => {
    * The structural guarantee, asserted rather than assumed: a preview carries
    * no hidden expectation and nothing that could address a live document.
    */
-  it("carries no hidden cases, no draft id, and no student work", async () => {
+  it("returns only selected-student code without hidden cases or a collaboration identity", async () => {
     const { service, prisma } = createService();
 
     const preview = await service.getExercisePreview(identity, input);
@@ -1005,22 +1005,62 @@ describe("getExercisePreview", () => {
     expect(preview.exercise.hiddenTestCaseCount).toBe(1);
     expect(JSON.stringify(preview)).not.toContain("999 1");
     expect(preview).not.toHaveProperty("draftId");
+    expect(preview.studentCode).toBe("student-saved-code");
+    expect(prisma.exerciseDraft.findUnique).toHaveBeenCalledWith({
+      where: { userId_materialId: { userId: studentUserId, materialId } },
+      select: { code: true },
+    });
+    expect(prisma.submission.findFirst).not.toHaveBeenCalled();
+    expect(preview).not.toHaveProperty("hasSolution");
+  });
+
+  it("preserves an intentionally empty draft instead of reviving an old submission", async () => {
+    const { service, prisma } = createService({ draft: { id: draftId, code: "" },
+      latestSubmission: { id: "old-submission", status: "PASSED", code: "old answer" } });
+    expect((await service.getExercisePreview(identity, input)).studentCode).toBe("");
+    expect(prisma.submission.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the latest original class or legacy unassigned submission when no draft exists", async () => {
+    const { service, prisma } = createService({ draft: null,
+      latestSubmission: { id: "latest-submission", status: "FAILED", code: "print('previous work')" } });
+    expect((await service.getExercisePreview(identity, input)).studentCode).toBe("print('previous work')");
+    expect(prisma.submission.findFirst).toHaveBeenCalledWith({
+      where: { userId: studentUserId, materialId, OR: [{ classId }, { classId: null }], regradeRunId: null },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { code: true },
+    });
+  });
+
+  it("returns null code for an untouched problem so the client can show starter code", async () => {
+    const { service } = createService({ draft: null });
+    expect((await service.getExercisePreview(identity, input)).studentCode).toBeNull();
+  });
+
+  it("does not read student code if student authorization fails", async () => {
+    const { service, access, prisma } = createService();
+    vi.mocked(access.requireMonitorableStudent).mockRejectedValue(new AppException("MONITORING_STUDENT_UNAVAILABLE", 404));
+    await expect(service.getExercisePreview(identity, input)).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
     expect(prisma.exerciseDraft.findUnique).not.toHaveBeenCalled();
+    expect(prisma.submission.findFirst).not.toHaveBeenCalled();
   });
 
   it("refuses an exercise outside the class's assigned courses", async () => {
-    const { service } = createService({
+    const { service, prisma } = createService({
       materialError: new AppException("MONITORING_STUDENT_UNAVAILABLE", 404),
     });
     await expect(
       service.getExercisePreview(identity, input),
     ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+    expect(prisma.exerciseDraft.findUnique).not.toHaveBeenCalled();
+    expect(prisma.submission.findFirst).not.toHaveBeenCalled();
   });
 
   it("refuses a hidden material without disclosing that it exists", async () => {
-    const { service } = createService({ material: null });
+    const { service, prisma } = createService({ material: null });
     await expect(
       service.getExercisePreview(identity, input),
     ).rejects.toMatchObject({ code: "MONITORING_STUDENT_UNAVAILABLE" });
+    expect(prisma.exerciseDraft.findUnique).not.toHaveBeenCalled();
+    expect(prisma.submission.findFirst).not.toHaveBeenCalled();
   });
 });

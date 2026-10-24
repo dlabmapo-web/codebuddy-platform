@@ -20,7 +20,7 @@ function EditorFallback() {
 }
 
 /**
- * The starting code of an exercise the teacher is reading.
+ * The selected student's saved code (or starter code for untouched problems).
  *
  * Deliberately not `LiveEditor`: that one takes a `Y.Text` and writes every
  * keystroke into a shared document. This takes a string. There is no document

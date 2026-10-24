@@ -729,6 +729,7 @@ export const monitoringPublicExerciseSchema = z.object({
   }),
   exercise: learnExerciseSchema,
 });
+export type MonitoringPublicExercise = z.infer<typeof monitoringPublicExerciseSchema>;
 
 export const monitoringExerciseContextSchema =
   monitoringPublicExerciseSchema.extend({
@@ -765,7 +766,10 @@ export type MonitoringExerciseContext = z.infer<
  * That is the whole reason it is a separate type from the live context above
  * rather than the same type with a nulled field.
  */
-export const monitoringExercisePreviewSchema = monitoringPublicExerciseSchema;
+export const monitoringExercisePreviewSchema = monitoringPublicExerciseSchema.extend({
+  /** Selected student's saved draft, or latest class submission if no draft exists. */
+  studentCode: z.string().nullable(),
+});
 export type MonitoringExercisePreview = z.infer<
   typeof monitoringExercisePreviewSchema
 >;

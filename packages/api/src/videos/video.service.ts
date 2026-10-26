@@ -19,6 +19,8 @@ import {
   type VideoReadResult,
   type VideoCheckpoint,
   type WatchedInterval,
+  type VideoReportQuery,
+  type VideoClassReport,
 } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { Prisma } from "../generated/prisma/client.js";
@@ -41,6 +43,7 @@ import {
   choiceAssetIds,
 } from "../manual/multiple-choice.service.js";
 import { VideoStorage } from "./video-storage.js";
+import { readVideoClassReport } from "./video-report.js";
 import { normalizeVideoCaption } from "./video-captions.js";
 type Target = { academyId: string; courseId: string; lectureId: string };
 type Read = {
@@ -895,6 +898,28 @@ export class VideoService {
       });
       return progressDTO(updated);
     });
+  }
+  async report(identity: SupabaseIdentity, input: VideoReportQuery): Promise<VideoClassReport> {
+    const { actor, row, lesson } = await this.accessible(identity, { ...input, preview: false, resource: true });
+    if (!["TEACHER", "MANAGER", "TEAM_LEAD"].includes(actor.role)) throw new ForbiddenException();
+    const classroom = await this.db.class.findFirst({
+      where: {
+        id: input.classId,
+        ...(actor.role === "TEACHER" ? taughtClassWhere(input.academyId, actor.userId) : { academyId: input.academyId, status: "ACTIVE" }),
+        courseAssignments: { some: { courseId: row.lecture.courseModule.course.id } },
+      },
+      select: { id: true, name: true },
+    });
+    if (!classroom) throw new ForbiddenException();
+    const report = await readVideoClassReport(this.db, input, lesson.assetId);
+    return {
+      ...report,
+      material: { id: row.id, title: row.title, assetId: lesson.assetId, filename: lesson.asset.filename, durationMs: lesson.asset.durationMs },
+      course: { id: row.lecture.courseModule.course.id, title: row.lecture.courseModule.course.title },
+      class: classroom,
+      trackingAvailable: this.enabled(),
+      updatedAt: new Date().toISOString(),
+    };
   }
   async history(
     identity: SupabaseIdentity,

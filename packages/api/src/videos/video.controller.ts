@@ -21,6 +21,7 @@ import {
   videoTargetSchema,
   videoReadSchema,
   videoCheckpointSchema,
+  videoReportQuerySchema,
 } from "@cove/shared";
 import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { StudentSessionService } from "../auth/student-session.service.js";
@@ -209,6 +210,12 @@ export class VideoController {
       await this.identify(auth),
       parse(videoCheckpointSchema, body),
     );
+  }
+  @Get("report") @Header("Cache-Control", "private, no-store") async report(
+    @Query() query: unknown,
+    @Headers("authorization") auth?: string,
+  ) {
+    return this.videos.report(await this.identify(auth), parse(videoReportQuerySchema, query));
   }
   @Get("history") @Header("Cache-Control", "private, no-store") async history(
     @Query() query: unknown,

@@ -1,6 +1,8 @@
 import { Upload } from "tus-js-client";
 import type {
   VideoAssetSummary,
+  VideoClassReport,
+  VideoReportQuery,
   VideoCheckpoint,
   VideoProgress,
   VideoReadResult,
@@ -51,6 +53,7 @@ const query = (data: Record<string, string | boolean | undefined>) =>
       .map(([k, v]) => [k, String(v)]),
   ).toString();
 export const videoApi = {
+  report: (data: VideoReportQuery) => videoRequest<VideoClassReport>("/report?" + query({ ...data, page: String(data.page) })),
   resources: (data: {
     academyId: string;
     materialId: string;

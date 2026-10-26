@@ -1,12 +1,13 @@
 "use client";
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { VideoPlayerControls } from "./video-player-controls";
 import { useVideoTranslation } from "./use-video-translation";
 import type { VideoReadResult } from "@cove/shared";
 import { videoMediaBase } from "@/lib/video-api";
 import { useVideoProgress } from "./use-video-progress";
-const time = (s: number) =>
-  `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+import { VideoViewingProgress } from "./video-viewing-progress";
 export function VideoPlayer({
   data,
   academyId,
@@ -44,7 +45,8 @@ export function VideoPlayer({
     ),
     [error, setError] = useState(""),
     [waiting, setWaiting] = useState(false),
-    [ended, setEnded] = useState(false);
+    [ended, setEnded] = useState(false),
+    [fullscreen, setFullscreen] = useState(false);
   const watch = useVideoProgress(
     {
       academyId,
@@ -140,7 +142,7 @@ export function VideoPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [base, data.asset.id]);
+  }, [base, data.asset.id, data.asset.masterPath, data.asset.mp4Path]);
   useEffect(() => {
     if (!ready || !loaded.current) return;
     if (!preview && !resource)
@@ -166,6 +168,13 @@ export function VideoPlayer({
       leaving();
     };
   }, [data.asset.id, classId]);
+  useEffect(() => {
+    const updateFullscreen = () =>
+      setFullscreen(document.fullscreenElement === root.current);
+    document.addEventListener("fullscreenchange", updateFullscreen);
+    return () =>
+      document.removeEventListener("fullscreenchange", updateFullscreen);
+  }, []);
   const toggle = () => {
     const video = element.current;
     if (!video) return;
@@ -183,280 +192,269 @@ export function VideoPlayer({
     }
   };
   const duration = data.asset.durationMs / 1000;
+  const personalProgress = !preview && data.canTrack && Boolean(classId);
   return (
-    <div
-      ref={root}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.code === "Space") {
-          e.preventDefault();
-          toggle();
-        }
-        if (e.code === "ArrowRight" || e.code === "ArrowLeft") {
-          e.preventDefault();
-          const v = element.current;
-          if (v)
-            v.currentTime = Math.max(
-              0,
-              Math.min(
-                duration,
-                v.currentTime + (e.code === "ArrowRight" ? 5 : -5),
-              ),
-            );
-        }
-      }}
-      className="flex min-w-0 flex-col gap-3 rounded-xl bg-card p-3"
-    >
-      <div className="relative flex aspect-video min-h-0 items-center justify-center bg-black">
-        <video
-          ref={element}
-          aria-label={data.title}
-          playsInline
-          preload="metadata"
-          poster={base + data.asset.posterPath}
-          crossOrigin="anonymous"
-          className="max-h-[70dvh] w-full object-contain"
-          onClick={toggle}
-          onLoadedMetadata={() => {
-            const video = element.current!;
-            if (loaded.current) return;
-            loaded.current = true;
-            const resume = watch.progress?.completed
-              ? 0
-              : (watch.progress?.positionMs ?? data.progress?.positionMs ?? 0) /
-                1000;
-            if (resume)
-              video.currentTime = Math.min(resume, Math.max(0, duration - 0.1));
-            if (ready && !preview && !resource)
-              void video.play().catch(() => undefined);
-          }}
-          onTimeUpdate={() => setPosition(element.current?.currentTime ?? 0)}
-          onPlay={() => {
-            setPlaying(true);
-            setEnded(false);
-            setWaiting(false);
-            onPlayback?.(true);
-          }}
-          onPause={() => {
-            setPlaying(false);
-            send(false);
-            onPlayback?.(false);
-          }}
-          onWaiting={() => {
-            setWaiting(true);
-            send(false, true);
-          }}
-          onPlaying={() => {
-            setWaiting(false);
-            send(true);
-          }}
-          onSeeking={() => {
-            nearEndSeek.current =
-              (element.current?.currentTime ?? 0) >= duration - 0.5;
-            send(false, true);
-          }}
-          onSeeked={() => {
-            send(!element.current?.paused);
-          }}
-          onEnded={() => {
-            setPlaying(false);
-            setEnded(true);
-            send(false);
-            onPlayback?.(false);
-            if (!nearEndSeek.current && !preview && !resource) onEnd?.();
-          }}
-          onError={() => setError(t("media_failed"))}
+    <div className="min-w-0 space-y-3">
+      <div
+        ref={root}
+        role="region"
+        aria-label={t("player_label", { title: data.title })}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.code === "Space") {
+            event.preventDefault();
+            toggle();
+          }
+          if (event.code === "ArrowRight" || event.code === "ArrowLeft") {
+            event.preventDefault();
+            const video = element.current;
+            if (video)
+              video.currentTime = Math.max(
+                0,
+                Math.min(
+                  duration,
+                  video.currentTime + (event.code === "ArrowRight" ? 5 : -5),
+                ),
+              );
+          }
+        }}
+        className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-black text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&:fullscreen]:h-dvh [&:fullscreen]:w-screen [&:fullscreen]:rounded-none"
+      >
+        <div
+          className={
+            fullscreen
+              ? "relative min-h-0 flex-1"
+              : personalProgress
+                ? "relative aspect-video max-h-[max(8rem,calc(100dvh-22rem))] min-h-0 w-full"
+                : "relative aspect-video max-h-[max(8rem,calc(100dvh-16rem))] min-h-0 w-full"
+          }
         >
-          {data.config.captions.map((track) => (
-            <track
-              key={track.id}
-              kind="subtitles"
-              src={base + track.path}
-              srcLang={track.language}
-              label={track.label}
-              default={caption === track.language}
-            />
-          ))}
-        </video>
-        {waiting ? (
-          <span
-            role="status"
-            className="absolute rounded bg-black/70 p-2 text-white"
-          >
-            {t("buffering")}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={!ready} onClick={toggle}>
-          {t(playing ? "pause" : "play")}
-        </button>
-        <span className="text-sm tabular-nums">
-          {time(position)} / {time(duration)}
-        </span>
-        <input
-          className="min-w-24 flex-1"
-          aria-label={t("seek")}
-          type="range"
-          min={0}
-          max={duration}
-          step={0.1}
-          value={Math.min(position, duration)}
-          onChange={(e) => {
-            if (element.current)
-              element.current.currentTime = Number(e.target.value);
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            const v = element.current;
-            if (v) {
-              v.muted = !v.muted;
-              setMuted(v.muted);
-            }
-          }}
-        >
-          {t(muted ? "unmute" : "mute")}
-        </button>
-        <input
-          className="w-20"
-          aria-label={t("volume")}
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={volume}
-          onChange={(e) => {
-            const value = Number(e.target.value);
-            setVolume(value);
-            if (element.current) element.current.volume = value;
-          }}
-        />
-        <label>
-          {t("speed")}{" "}
-          <select
-            aria-label={t("speed")}
-            value={rate}
-            onChange={(e) => {
-              send();
-              const value = Number(e.target.value);
-              setRate(value);
-              if (element.current) element.current.playbackRate = value;
-              send();
-            }}
-          >
-            {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
-              <option key={r} value={r}>
-                {r}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t("quality")}{" "}
-          <select
-            aria-label={t("quality")}
-            disabled={usingFallback}
-            value={quality}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              setQuality(n);
-              if (hls.current) hls.current.currentLevel = n;
-              else if (element.current && (n < 0 || data.asset.renditions[n])) {
-                const video = element.current,
-                  pos = video.currentTime,
-                  wasPlaying = !video.paused;
-                video.src =
-                  base +
-                  (n < 0
-                    ? data.asset.masterPath
-                    : data.asset.renditions[n].path);
-                video.addEventListener(
-                  "loadedmetadata",
-                  () => {
-                    video.currentTime = pos;
-                    if (wasPlaying) void video.play().catch(() => undefined);
-                  },
-                  { once: true },
+          <video
+            ref={element}
+            aria-label={data.title}
+            playsInline
+            preload="metadata"
+            poster={base + data.asset.posterPath}
+            crossOrigin="anonymous"
+            className="absolute inset-0 block h-full w-full object-contain"
+            onClick={toggle}
+            onLoadedMetadata={() => {
+              const video = element.current!;
+              if (loaded.current) return;
+              loaded.current = true;
+              const resume = watch.progress?.completed
+                ? 0
+                : (watch.progress?.positionMs ??
+                    data.progress?.positionMs ??
+                    0) / 1000;
+              if (resume)
+                video.currentTime = Math.min(
+                  resume,
+                  Math.max(0, duration - 0.1),
                 );
+              if (ready && !preview && !resource)
+                void video.play().catch(() => undefined);
+            }}
+            onTimeUpdate={() => setPosition(element.current?.currentTime ?? 0)}
+            onVolumeChange={() => {
+              if (element.current) {
+                setMuted(element.current.muted);
+                setVolume(element.current.volume);
               }
             }}
+            onRateChange={() => setRate(element.current?.playbackRate ?? 1)}
+            onPlay={() => {
+              setPlaying(true);
+              setEnded(false);
+              setWaiting(false);
+              onPlayback?.(true);
+            }}
+            onPause={() => {
+              setPlaying(false);
+              send(false);
+              onPlayback?.(false);
+            }}
+            onWaiting={() => {
+              setWaiting(true);
+              send(false, true);
+            }}
+            onPlaying={() => {
+              setWaiting(false);
+              send(true);
+            }}
+            onSeeking={() => {
+              nearEndSeek.current =
+                (element.current?.currentTime ?? 0) >= duration - 0.5;
+              send(false, true);
+            }}
+            onSeeked={() => {
+              send(!element.current?.paused);
+            }}
+            onEnded={() => {
+              setPlaying(false);
+              setEnded(true);
+              send(false);
+              onPlayback?.(false);
+              if (!nearEndSeek.current && !preview && !resource) onEnd?.();
+            }}
+            onError={() => setError(t("media_failed"))}
           >
-            <option value={-1}>{t("auto")}</option>
-            {data.asset.renditions.map((r, i) => (
-              <option value={i} key={r.height}>
-                {r.height}p
-              </option>
+            {data.config.captions.map((track) => (
+              <track
+                key={track.id}
+                kind="subtitles"
+                src={base + track.path}
+                srcLang={track.language}
+                label={track.label}
+                default={caption === track.language}
+              />
             ))}
-          </select>
-        </label>
-        {data.config.captions.length ? (
-          <label>
-            {t("captions")}{" "}
-            <select
-              aria-label={t("captions")}
-              value={caption}
-              onChange={(e) => {
-                setCaption(e.target.value);
-                localStorage.setItem("cove-video-caption", e.target.value);
-                const v = element.current;
-                if (v)
-                  for (const track of Array.from(v.textTracks))
-                    track.mode =
-                      track.language === e.target.value
-                        ? "showing"
-                        : "disabled";
-              }}
+          </video>
+          {waiting ? (
+            <span
+              role="status"
+              className="absolute inset-0 flex items-center justify-center gap-2 bg-black/30 text-sm text-white"
             >
-              <option value="">{t("off")}</option>
-              {data.config.captions.map((c) => (
-                <option value={c.language} key={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+              <LoaderCircle
+                aria-hidden
+                className="size-5 animate-spin motion-reduce:animate-none"
+              />
+              {t("buffering")}
+            </span>
+          ) : null}
+        </div>
+        <VideoPlayerControls
+          playing={playing}
+          ready={ready}
+          ended={ended}
+          position={position}
+          duration={duration}
+          muted={muted}
+          volume={volume}
+          rate={rate}
+          quality={quality}
+          usingFallback={usingFallback}
+          caption={
+            data.config.captions.some((track) => track.language === caption)
+              ? caption
+              : ""
+          }
+          fullscreen={fullscreen}
+          renditions={data.asset.renditions}
+          captions={data.config.captions}
+          onToggle={toggle}
+          onReplay={startOver}
+          onSeek={(value) => {
+            if (element.current) {
+              element.current.currentTime = value;
+              setPosition(value);
+            }
+          }}
+          onMute={() => {
+            const video = element.current;
+            if (!video) return;
+            if (video.volume === 0) {
+              video.volume = 1;
+              video.muted = false;
+            } else video.muted = !video.muted;
+          }}
+          onVolume={(value) => {
+            const video = element.current;
+            if (video) {
+              video.volume = value;
+              video.muted = value === 0;
+            }
+          }}
+          onRate={(value) => {
+            send();
+            if (element.current) element.current.playbackRate = value;
+            send();
+          }}
+          onQuality={(value) => {
+            setQuality(value);
+            if (hls.current) hls.current.currentLevel = value;
+            else if (
+              element.current &&
+              (value < 0 || data.asset.renditions[value])
+            ) {
+              const video = element.current;
+              const position = video.currentTime;
+              const wasPlaying = !video.paused;
+              const playbackRate = video.playbackRate;
+              video.addEventListener(
+                "loadedmetadata",
+                () => {
+                  video.currentTime = position;
+                  video.playbackRate = playbackRate;
+                  if (wasPlaying) void video.play().catch(() => undefined);
+                },
+                { once: true },
+              );
+              video.src =
+                base +
+                (value < 0
+                  ? data.asset.masterPath
+                  : data.asset.renditions[value].path);
+            }
+          }}
+          onCaption={(language) => {
+            setCaption(language);
+            localStorage.setItem("cove-video-caption", language);
+            if (element.current)
+              for (const track of Array.from(element.current.textTracks))
+                track.mode =
+                  track.language === language ? "showing" : "disabled";
+          }}
+          onFullscreen={() => {
+            setError("");
+            if (document.fullscreenElement === root.current)
+              void document
+                .exitFullscreen()
+                .catch(() => setError(t("fullscreen_failed")));
+            else if (root.current?.requestFullscreen)
+              void root.current
+                .requestFullscreen()
+                .catch(() => setError(t("fullscreen_failed")));
+            else setError(t("fullscreen_failed"));
+          }}
+        />
+      </div>
+      {!personalProgress &&
+      !ended &&
+      (position > 0 || Boolean(watch.progress?.positionMs)) ? (
         <button
           type="button"
-          onClick={() => {
-            void root.current
-              ?.requestFullscreen?.()
-              .catch(() => setError(t("fullscreen_failed")));
-          }}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          onClick={startOver}
         >
-          {t("fullscreen")}
-        </button>
-      </div>
-      {ended || position > 0 || Boolean(watch.progress?.positionMs) ? (
-        <button type="button" onClick={startOver}>
-          {t(ended ? "replay" : "start_over")}
+          {t("start_over")}
         </button>
       ) : null}
-      {!preview && data.canTrack && classId ? (
-        <p role="status">
-          {t(watch.progress?.completed ? "completed" : "saved_progress", {
-            percent: Math.floor(
-              ((watch.progress?.watchedMs ?? 0) / data.asset.durationMs) * 100,
-            ),
-          })}
-        </p>
+      {personalProgress ? (
+        <VideoViewingProgress
+          progress={watch.progress}
+          durationMs={data.asset.durationMs}
+          onStartOver={position > 0 && !ended ? startOver : undefined}
+        />
       ) : null}
       {!data.trackingAvailable && data.canTrack && !preview ? (
-        <p>{t("tracking_disabled")}</p>
+        <p className="text-xs text-sub">{t("tracking_disabled")}</p>
       ) : null}
       {watch.error ? (
-        <p role="alert">
+        <p role="alert" className="text-sm text-danger">
           {t("unsaved")}{" "}
-          <button type="button" onClick={() => void watch.retry()}>
+          <button
+            type="button"
+            className="font-semibold text-brand underline underline-offset-2"
+            onClick={() => void watch.retry()}
+          >
             {t("retry")}
           </button>
         </p>
       ) : null}
       {error ? (
-        <p role="alert">
+        <p role="alert" className="text-sm text-danger">
           {error}{" "}
           <button
             type="button"

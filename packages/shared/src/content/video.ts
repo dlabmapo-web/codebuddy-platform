@@ -170,6 +170,76 @@ export type VideoProgress = {
   sessionId?: string;
   sequence: number;
 };
+
+export const videoViewingStatusSchema = z.enum([
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "COMPLETED",
+]);
+export type VideoViewingStatus = z.infer<typeof videoViewingStatusSchema>;
+export const videoReportQuerySchema = videoReadSchema
+  .pick({ academyId: true, materialId: true })
+  .extend({
+    classId: z.uuid(),
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    search: z.string().trim().max(128).default(""),
+    status: z
+      .enum(["ALL", "NOT_STARTED", "IN_PROGRESS", "COMPLETED"])
+      .default("ALL"),
+  });
+export type VideoReportQuery = z.infer<typeof videoReportQuerySchema>;
+export function videoWatchPercent(
+  watchedMs: number,
+  durationMs: number,
+): number {
+  if (
+    !Number.isFinite(watchedMs) ||
+    !Number.isFinite(durationMs) ||
+    durationMs <= 0
+  )
+    return 0;
+  return Math.floor(Math.min(1, Math.max(0, watchedMs) / durationMs) * 100);
+}
+export function videoViewingStatus(
+  progress: Pick<VideoProgress, "watchedMs" | "completed"> | null,
+): VideoViewingStatus {
+  return progress?.completed
+    ? "COMPLETED"
+    : (progress?.watchedMs ?? 0) > 0
+      ? "IN_PROGRESS"
+      : "NOT_STARTED";
+}
+export type VideoClassReport = {
+  material: {
+    id: string;
+    title: string;
+    assetId: string;
+    filename: string;
+    durationMs: number;
+  };
+  course: { id: string; title: string };
+  class: { id: string; name: string };
+  trackingAvailable: boolean;
+  updatedAt: string;
+  summary: {
+    students: number;
+    notStarted: number;
+    inProgress: number;
+    completed: number;
+  };
+  page: number;
+  pageSize: number;
+  filteredCount: number;
+  rows: Array<{
+    userId: string;
+    learnerName: string;
+    watchedMs: number;
+    positionMs: number | null;
+    completed: boolean;
+    status: VideoViewingStatus;
+    updatedAt: string | null;
+  }>;
+};
 export const videoMetadataSchema = z.object({
   assetId: z.uuid(),
   revision: z.number().int().positive(),

@@ -1,0 +1,368 @@
+{
+  "roles": {
+    "platformAdmin": [
+      {
+        "page": "Users",
+        "ms": 1171,
+        "boundary": "heading visible"
+      },
+      {
+        "page": "Applications",
+        "ms": 992,
+        "boundary": "heading visible and AX observation",
+        "error": false
+      },
+      {
+        "page": "Invitations",
+        "ms": 931,
+        "boundary": "heading visible and AX observation",
+        "error": false
+      },
+      {
+        "page": "Features",
+        "ms": 977,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Point policies",
+        "ms": 767,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Maintenance",
+        "ms": 1453,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Support access",
+        "ms": 954,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Audit trail",
+        "ms": 775,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Library",
+        "ms": 839,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Academy courses",
+        "ms": 947,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Classes",
+        "ms": 1151,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Academies",
+        "ms": 876,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Ranking",
+        "ms": 1043,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My page",
+        "ms": 1519,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      }
+    ],
+    "manager": [
+      {
+        "page": "Members",
+        "ms": 3041,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Students",
+        "ms": 1185,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Teachers",
+        "ms": 1219,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Applications",
+        "ms": 621,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Invitations",
+        "ms": 398,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Academy settings",
+        "ms": 725,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Points and rewards",
+        "ms": 904,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Maintenance",
+        "ms": 764,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Student analytics",
+        "ms": 3839,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Class ranking",
+        "ms": 411,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Courses",
+        "ms": 1116,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Classes",
+        "ms": 805,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My classes",
+        "ms": 677,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Overview",
+        "ms": 4409,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My page",
+        "ms": 919,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      }
+    ],
+    "teamLead": [
+      {
+        "page": "Students",
+        "ms": 1188,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Teachers",
+        "ms": 1113,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Applications",
+        "ms": 405,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Maintenance",
+        "ms": 627,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Student analytics",
+        "ms": 3325,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Courses",
+        "ms": 592,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Classes",
+        "ms": 559,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Class ranking",
+        "ms": 402,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My classes",
+        "ms": 577,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Overview",
+        "ms": 1396,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My page",
+        "ms": 856,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      }
+    ],
+    "teacher": [
+      {
+        "page": "Students",
+        "ms": 1630,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Student analytics",
+        "ms": 843,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Courses",
+        "ms": 596,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My classes",
+        "ms": 821,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Overview",
+        "ms": 1094,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My page",
+        "ms": 777,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Students",
+        "ms": 1494,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Student detail",
+        "ms": 1508,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Live class and solution status",
+        "completed": true,
+        "ms": null,
+        "boundary": "visually verified; no reliable duration retained"
+      }
+    ],
+    "student": [
+      {
+        "page": "Answer records",
+        "ms": 1090,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My points",
+        "ms": 926,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Courses",
+        "ms": 1298,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My classes",
+        "ms": 1064,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Overview",
+        "ms": 1336,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "My page",
+        "ms": 840,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Class detail",
+        "ms": 1428,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Course detail (class context)",
+        "ms": 1211,
+        "boundary": "changed h1 observed through browser controls",
+        "completed": true
+      },
+      {
+        "page": "Coding workspace first visit",
+        "ms": null,
+        "completed": true,
+        "boundary": "Workspace and editor verified; timing unavailable because diff-only observation did not detect both controls together"
+      },
+      {
+        "page": "Coding workspace repeat",
+        "ms": 2140,
+        "completed": true,
+        "boundary": "Test run and Submit controls visible; not first editor keystroke or PDF completion"
+      }
+    ]
+  },
+  "method": "Sequential Chrome UI navigation; one exploratory sample per newly visited page type, including automation overhead; not p95 or load testing."
+}

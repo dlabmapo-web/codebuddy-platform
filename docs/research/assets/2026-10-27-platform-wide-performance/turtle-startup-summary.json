@@ -1,0 +1,52 @@
+{
+  "boundary": "Eight recent existing production log pairs, correlated internally and identifiers discarded. May include other users; not a controlled benchmark. Broker launch excludes browser connection/first drawing.",
+  "samples": [
+    {
+      "apiStartMs": 1988,
+      "brokerLaunchMs": 1862,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1873,
+      "brokerLaunchMs": 1772,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1840,
+      "brokerLaunchMs": 1744,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1770,
+      "brokerLaunchMs": 1659,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 2108,
+      "brokerLaunchMs": 2023,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1727,
+      "brokerLaunchMs": 1636,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1759,
+      "brokerLaunchMs": 1649,
+      "mode": "cold"
+    },
+    {
+      "apiStartMs": 1833,
+      "brokerLaunchMs": 1727,
+      "mode": "cold"
+    }
+  ],
+  "health": {
+    "ready": true,
+    "capacity": 1,
+    "active": 0,
+    "warmEnabled": false,
+    "metricsConfigured": false
+  }
+}

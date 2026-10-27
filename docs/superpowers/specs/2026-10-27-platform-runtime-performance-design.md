@@ -609,3 +609,42 @@ Server-rendered RPC uses an optional runtime-only `INTERNAL_API_RPC_URL`;
 Compose supplies `http://api:4000/api/rpc` on the existing private network.
 Browser requests retain the public origin. Authorization headers and role-view
 behavior remain unchanged. Deploy the additive API endpoint before the web.
+
+## Broader deployed investigation and shared-read follow-up
+
+The user expanded the request to all role surfaces after the first course/class
+verification. Continue the existing sections 6, 7 and 9: attribute delays before
+changing the read path, preserve authority and grading semantics, and retain the
+separate runtime/resource gates. The
+[broader verification](../../research/2026-10-27-platform-wide-performance-verification.md)
+records every visible sidebar section across five roles and inventories all 95
+page templates; it explicitly distinguishes those two coverage boundaries.
+
+The measured follow-up has three implementation changes:
+
+1. Replace the shared academy permission fact lookup with one parameterized,
+   academy/user-scoped SQL projection of account status, membership, extra roles
+   and academy status/kind. Apply the existing policy to those fresh facts.
+   DLAB, support, library, platform-view and student-session rules remain live;
+   no permission is cached between requests.
+2. Replace the attention query's grouped self-join with a per-pair window
+   minimum of passing-attempt rank. Preserve counted/source/pair predicates,
+   timestamp/UUID ordering, thresholds and progress/revision interpretation.
+   This removes a measured repeated aggregation shared by dashboards and
+   analytics rather than changing the meaning of an attention flag.
+3. Poll sample-check visibility using current revision and only the selected
+   public case's position/visibility. Keep current permission, curriculum
+   reachability and ownership checks. Admission still validates the complete
+   grading profile; results and cancellation keep their current contracts.
+
+Validate the projection and attention facts against PostgreSQL, including
+cross-academy and cross-class isolation, extra roles, suspension/revocation,
+DLAB HQ handling, missing progress and ties. Compare baseline/candidate SELECTs
+inside the same enforced read-only production snapshot without logging bodies
+or identifiers. These service/query measurements do not certify whole-page p95.
+
+No worker/CPU/memory increase, Turtle standby enablement, interpreter reuse,
+runtime migration or production maintenance benchmark belongs to this patch.
+The inspected deployment still runs two worker/sandbox slots, regardless of
+the development environment schema's default of four. A native-runtime
+experiment needs its own [proposed design](2026-10-27-native-grading-prototype-design.md).

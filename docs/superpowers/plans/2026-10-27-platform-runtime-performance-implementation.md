@@ -61,3 +61,14 @@ Navigation follow-up implemented and locally verified. See
 [verification and rollout order](../../research/2026-10-27-navigation-performance-local-verification.md).
 Production navigation acceptance and deployment remain outstanding; the stopped
 native grading comparison is not part of this implementation.
+
+## Shared reads after the broader role audit
+
+Following the expanded request and existing design's measurement-first loading
+work, the shared permission snapshot, attention window query and narrow
+sample-status projection are implemented. The
+[verification report](../../research/2026-10-27-platform-wide-performance-verification.md)
+records 531 passing regression tests, 23 separate PostgreSQL checks, API
+typecheck/build and read-only production baseline/candidate comparisons.
+These changes have not been deployed. Native grading latency and Turtle warm
+enablement remain separate, unmet gates; the production benchmark stays stopped.

@@ -242,25 +242,26 @@ export class TeacherProgressRepository {
             : countedScope(input)
         }
       ),
-      newest_pass AS (
-        SELECT user_id, material_id, MIN(rn) AS pass_rn
+      -- Find the newest passing attempt once per pair. Joining a separately
+      -- grouped copy of counted can make PostgreSQL recompute that aggregate
+      -- for every attempt, turning the shared attention read quadratic.
+      attempts_with_pass AS (
+        SELECT *, MIN(rn) FILTER (WHERE status = 'PASSED') OVER (
+          PARTITION BY user_id, material_id
+        ) AS pass_rn
         FROM counted
-        WHERE status = 'PASSED'
-        GROUP BY user_id, material_id
       ),
       pairs AS (
         SELECT
           c.user_id,
           c.material_id,
           COUNT(*) FILTER (
-            WHERE c.rn < COALESCE(np.pass_rn, 2147483647)
+            WHERE c.rn < COALESCE(c.pass_rn, 2147483647)
           )::int AS consecutive_failures,
           MAX(c.created_at) AS last_attempt_at,
           MAX(c.solve_elapsed_sec) FILTER (WHERE c.rn = 1) AS latest_solve_sec,
           bool_or(c.status = 'PASSED' AND c.rn = 1) AS latest_accepted
-        FROM counted c
-        LEFT JOIN newest_pass np
-          ON np.user_id = c.user_id AND np.material_id = c.material_id
+        FROM attempts_with_pass c
         GROUP BY c.user_id, c.material_id
       )
       SELECT

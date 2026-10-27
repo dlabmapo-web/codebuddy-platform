@@ -408,3 +408,19 @@ it("keeps roles scoped to each campus for a multi-campus account", async () => {
   expect(await codeOf(service.requirePermission(authUserId, other, "academy.members.manage"))).not.toBe("NO_ERROR");
   expect(await codeOf(service.requirePermission(authUserId, "30000000-0000-4000-8000-000000000005", "academy.read"))).not.toBe("NO_ERROR");
 });
+
+
+// Policy tests retain mutable relation doubles; the SQL projection itself is
+// exercised against PostgreSQL in academy-access-read.integration.spec.ts.
+vi.mock('./academy-access-read.js', () => ({
+  readAcademyPermission: async (prisma: PrismaService, authUserId: string, academyId: string) => {
+    const user = await prisma.user.findUnique({ where: { authUserId }, select: { id: true, status: true } });
+    if (!user) return null;
+    const membership = await prisma.academyMembership.findUnique({
+      where: { academyId_userId: { academyId, userId: user.id } },
+      include: { academy: { select: { status: true } }, extraRoles: { select: { role: true } } },
+    });
+    const academy = await prisma.academy.findUnique({ where: { id: academyId }, select: { status: true, kind: true } });
+    return { ...user, membership, academy };
+  },
+}));

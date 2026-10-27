@@ -32,7 +32,7 @@ vi.mock('@/lib/orpc-server', () => ({
   createPlatformServerORPCClient: () => ({
     platformLibrary: { academy: async () => ({ academyId: 'academy' }), courses: async () => ({ courses: [], total: 0, page: 1, pageSize: 25 }) },
     academyCourses: {
-      getTree: async () => ({ course: { id: 'course', title: 'Course' }, modules: [{ id: 'module', title: 'Module', lectures: [{ id: 'lecture', title: 'Lecture', materials: [] }] }] }),
+      getOutline: async () => ({ course: { id: 'course', title: 'Course' }, modules: [{ id: 'module', title: 'Module', lectures: [{ id: 'lecture', title: 'Lecture', materials: [] }] }] }),
       getExercise: async () => ({ course: { id: 'course', title: 'Course' }, module: { id: 'module', title: 'Module' }, lecture: { id: 'lecture', title: 'Lecture' }, material: null }),
       getExerciseSolution: async () => ({ solutionCode: '' }),
     },

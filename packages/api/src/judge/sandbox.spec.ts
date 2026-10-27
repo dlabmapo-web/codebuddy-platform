@@ -207,22 +207,18 @@ describe("sandbox round trip", () => {
     await new Promise<void>((resolve, reject) => { socket.once("connect", resolve); socket.once("error", reject); });
     writeFrame(socket, { type: "run", protocol: 3, id: randomUUID(), request: { code: "while True: pass", stdin: "", timeLimitMs: 10000, memoryLimitMb: 128 } });
     try {
-      let active = false;
-      for (let i = 0; i < 100; i++) {
-        if ((await engine.readDiagnostics())?.pool.executing === 1) { active = true; break; }
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      expect(active).toBe(true); socket.destroy();
-      let stopped = false;
-      for (let i = 0; i < 100; i++) {
-        const pool = (await engine.readDiagnostics())!.pool;
-        if (pool.executing === 0 && pool.draining === 0) { stopped = true; break; }
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      expect(stopped).toBe(true);
+      // Wait for the real run to acquire a cold replacement before testing
+      // disconnect cleanup. Interpreter preparation is not a cleanup deadline.
+      await expect.poll(async () => (await engine.readDiagnostics())?.pool.executing,
+        { timeout: 30_000, interval: 50 }).toBe(1);
+      socket.destroy();
+      await expect.poll(async () => {
+        const pool = (await engine.readDiagnostics())?.pool;
+        return pool?.executing === 0 && pool.draining === 0;
+      }, { timeout: 5_000, interval: 20 }).toBe(true);
       expect((await engine.run({ code: "print(42)", stdin: "", timeLimitMs: 5000, memoryLimitMb: 128 })).stdout).toBe("42\n");
     } finally { socket.destroy(); }
-  }, 20000);
+  }, 60000);
 
   it("refuses an unverified sandbox where isolation is required", async () => {
     // This sandbox is the development one, honestly reporting isolated=false.

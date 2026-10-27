@@ -203,3 +203,13 @@ sets server-only `INTERNAL_API_RPC_URL=http://api:4000/api/rpc`; the browser kee
 its public API URL. No migration or resource-limit change is required. Roll back
 the web before an API image that removes the endpoint. Re-measure deployed
 navigation and error rates before claiming the performance target is achieved.
+
+
+### CI correctness-test budgets
+
+Real-interpreter correctness tests allow 30 seconds per test because a test can
+prepare and execute multiple isolated processes. Request execution deadlines
+remain independently enforced. The socket-disconnect test waits up to 30 seconds
+for a cold interpreter to acquire the request, then separately requires cleanup
+within 5 seconds and checks that a subsequent request works. These are bounded
+correctness-test budgets, not evidence that the production latency SLO is met.

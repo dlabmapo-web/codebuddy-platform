@@ -9,7 +9,10 @@ import { PyodideExecutionEngine } from "./pyodide-engine.js";
  * must not contaminate another, and student code must not be able to forge the
  * verdict of its own execution. Recycling alone only ever addressed the first.
  */
-describe("PyodideExecutionEngine", () => {
+// These are real-process correctness tests, including cold replacements. A
+// test may run two separate interpreters; Vitest's 5s default is not their
+// execution deadline. Each request below retains its independent time limit.
+describe("PyodideExecutionEngine", { timeout: 30_000 }, () => {
   const engine = new PyodideExecutionEngine("0.27.5", 2, 1);
   const limits = { stdin: "", timeLimitMs: 10_000, memoryLimitMb: 256 };
 

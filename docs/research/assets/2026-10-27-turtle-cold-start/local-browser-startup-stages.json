@@ -1,0 +1,12 @@
+[
+  {
+    "event": "gui.started",
+    "durationMs": 1184,
+    "mode": "cold"
+  },
+  {
+    "event": "gui.started",
+    "durationMs": 542,
+    "mode": "cold"
+  }
+]

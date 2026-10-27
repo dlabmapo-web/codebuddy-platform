@@ -1,0 +1,28 @@
+{
+  "baselineRevision": "739422ec",
+  "environment": "local Linux Docker Desktop ARM64; not VPS/rootless acceptance",
+  "productionConfigurationChanged": false,
+  "fixtureCleanupConfirmed": true,
+  "checks": {
+    "runtimeUnitPassed": 42,
+    "runtimeOptInSkipped": 8,
+    "separateRealDockerIntegrationPassed": 1,
+    "localChromeInitialAndRerun": "visually verified; no pixel latency claimed"
+  },
+  "sourceSha256": {
+    "packages/gui-runtime/src/sandbox.mjs": "e6aaadb2696e3afc10375264f9a93e53884db50c990ee37f904ff5dcdb9ce098",
+    "packages/gui-runtime/src/display-readiness.mjs": "553326d160957f9054d4d600df268a6a6c5cb29e6bee061705777bf1394294c0",
+    "packages/gui-runtime/src/display-readiness.test.mjs": "988dfe9130c58be3765cb266f4f707b7c4c93899c49fe70f0586091ff10809da",
+    "packages/gui-runtime/scripts/benchmark-display-readiness.mjs": "cca5ffa4f3029d116c458c1013f4f68fc89bef4b4c31c0503cfd2ecaf19e275c"
+  },
+  "artifactSha256": {
+    "preparation-paired-20.json": "8902e0e382a44e2f15bfed5e8d4f62378e030f782a48dc9bb797d542736816f4",
+    "local-candidate-drawing.png": "359e81c4a3253b2b5adb888d7860f7b2298b811ccde556ff8e907277f5ee6081",
+    "live-baseline-drawing.png": "2ba1bffaab51fd721f90bc5f27b3c3c749ee37379034365943e91165825d6c00",
+    "preparation-paired-10.json": "10bc52b929e9976086ef2bf7a328026a621180937675c9d9ead79311b743a8c3",
+    "local-candidate-rerun.png": "2fef7724c37052018deb3967284ee3ab8239507405ef11b3e54a924322035a67",
+    "preparation-initial-5.json": "3aa2e915f0f0e6f7cd9eca30cf3aaa8d4b4d2dbc4ac2bac5ad36709bfc4c7a88",
+    "local-browser-startup-stages.json": "faa229e01b18d8215d4790627d3ec699291d1ea6920bfb62dd23adbc03f23c86",
+    "preparation-paired-100.json": "126be7c114d995e73872a8dd4a476f5c314bce4ca56967e0518d274144d04279"
+  }
+}

@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
+import { displayReadinessProbe } from './display-readiness.mjs';
 const exec = promisify(execFile);
 export const profileKey = p => `${p.runtimeImage}:${p.width}:${p.height}:${p.memoryLimitMb}`;
 export function verifySandbox(info, profile) {
@@ -70,7 +71,7 @@ export function createSandboxDriver({ seccomp, pool, instance, telemetry }) {
           if (entry.cancelled) throw new Error('Preparation cancelled');
           try {
             await bounded(signal, 'exec', entry.id, 'python3', '-c',
-              "import socket; s=socket.create_connection(('127.0.0.1',5900),.2); s.close()");
+              displayReadinessProbe());
             break;
           } catch (error) { signal.throwIfAborted(); await delay(100, undefined, { signal }); }
         }

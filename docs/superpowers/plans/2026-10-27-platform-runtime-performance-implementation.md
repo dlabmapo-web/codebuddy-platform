@@ -72,3 +72,19 @@ records 531 passing regression tests, 23 separate PostgreSQL checks, API
 typecheck/build and read-only production baseline/candidate comparisons.
 These changes have not been deployed. Native grading latency and Turtle warm
 enablement remain separate, unmet gates; the production benchmark stays stopped.
+
+## Public Turtle Run-to-drawing follow-up
+
+Within approved spec section 8, replace repeated readiness-probe process launches
+with one bounded in-container watcher. Keep isolation, fresh guests, capacity,
+animation, quota and cleanup behavior. Run watcher unit tests and runtime
+regressions, then paired local real-Docker preparation measurements. Record
+measured gain and remaining end-to-end gates separately; do not enable warm
+mode or deploy through this local refinement.
+
+Follow-up completed locally: one persistent display watcher, four watcher unit
+checks, 42 passing runtime unit/policy checks, real Docker integration and Chrome
+initial/rerun drawing smoke. Final 100-pair component p50: 428 → 273 ms; p95:
+498 → 335 ms. Earlier conflicting samples retained. Full browser/VPS acceptance
+and warm enablement remain open; see
+[verification](../../research/2026-10-27-turtle-cold-start-verification.md).

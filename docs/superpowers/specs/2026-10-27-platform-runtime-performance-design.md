@@ -648,3 +648,33 @@ runtime migration or production maintenance benchmark belongs to this patch.
 The inspected deployment still runs two worker/sandbox slots, regardless of
 the development environment schema's default of four. A native-runtime
 experiment needs its own [proposed design](2026-10-27-native-grading-prototype-design.md).
+
+## Public Turtle follow-up: Run to first drawing
+
+The user clarified the target on October 27: the 3–4 second gap after pressing
+Run, before drawing starts. Animation speed is outside this change. This is a
+cold-path refinement within the already approved section 8, without production
+standby enablement, resource changes or deployment.
+
+The current display readiness loop launches Docker exec and Python again after
+each failed socket probe, with a 100 ms host delay. A local five-run diagnostic
+recorded 74–304 ms in this stage; it does not explain the complete live wait.
+Prefer one short-lived trusted Python socket watcher inside the fresh container,
+checking every 20 ms until ready. Keep the existing bounded Docker operation,
+claim/preparation deadlines, cancellation, both isolation/ownership inspections,
+cleanup accounting, runtime image compatibility and VNC connection policy.
+Retain the outer retry for transient Docker exec failures. The watcher exits
+before learner source is delivered and adds no listener or retained process.
+
+Alternatives are retaining repeated probes (no improvement) or prepared standby
+(larger potential benefit, blocked by existing resource/acceptance gates).
+Measure baseline/candidate alternately using the same local immutable guest
+image and exact profile. Cover immediate readiness, delayed readiness, bounded
+failure, cancellation and real Docker cleanup. Separate preparation timings
+from actual browser Run-to-visible-pixel acceptance; do not promise that this
+small refinement removes the full 3–4 second delay.
+
+The [local follow-up report](../../research/2026-10-27-turtle-cold-start-verification.md)
+records a roughly 0.15-second preparation-stage improvement over 100 paired
+samples. This is a narrow optimization, not proof that the live 3–4-second
+click-to-drawing wait or the full Stage D acceptance gate is resolved.

@@ -154,7 +154,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
             {exercise.quiz.choices.map((choice) => <label key={choice.id} className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-4 has-checked:border-brand has-checked:bg-brand-soft"><input type="radio" name="practice-answer" value={choice.id} checked={draft.code === choice.id} onChange={() => draft.setCode(choice.id)} /><span>{choice.text}</span></label>)}
           </fieldset>
           <button type="button" disabled={!draft.code || submission.submitting || !access?.canSubmit} onClick={submit} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand disabled:opacity-50">{t('submit')}</button>
-          <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} />
+          <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} />
           <ResultPanel submission={submission} />
         </div>
       </main> : <div ref={containerRef} className="flex min-h-0 min-w-0 flex-1 overflow-hidden">

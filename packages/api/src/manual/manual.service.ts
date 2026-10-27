@@ -85,19 +85,8 @@ export class ManualService {
     private readonly choices: MultipleChoiceService,
     @Optional() private readonly practice?: ManualPracticeService,
   ) {}
-  private async material(
-    identity: SupabaseIdentity,
-    input: Target & { classId?: string },
-    preview = false,
-  ) {
-    const actor = await this.access.requirePermission(
-      identity.authUserId,
-      input.academyId,
-      preview ? "curriculum.review" : "curriculum.read",
-    );
-    const scope = learningScopeFor(input.academyId, actor);
-    const row = await this.db.material.findFirst({
-      where: {
+  private materialWhere(input: Target, scope: ReturnType<typeof learningScopeFor>, preview: boolean): Prisma.MaterialWhereInput {
+    return {
         id: input.materialId,
         type: {
           in: ["TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"],
@@ -127,7 +116,21 @@ export class ManualService {
             },
           },
         ],
-      },
+      };
+  }
+  private async material(
+    identity: SupabaseIdentity,
+    input: Target & { classId?: string },
+    preview = false,
+  ) {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      preview ? "curriculum.review" : "curriculum.read",
+    );
+    const scope = learningScopeFor(input.academyId, actor);
+    const row = await this.db.material.findFirst({
+      where: this.materialWhere(input, scope, preview),
       include: {
         manualMaterial: true,
         lecture: { include: { courseModule: { include: { course: true } } } },
@@ -580,6 +583,34 @@ export class ManualService {
       practice: staffPractice,
       ...(privatePractice ? { draft: privatePractice.draft } : {}),
     };
+  }
+  /** Latest own result only: no draft, outline, assets, solutions or history read. */
+  async latestSubmission(identity: SupabaseIdentity, input: Target & { classId?: string }, preview = false) {
+    const actor = await this.access.requirePermission(identity.authUserId, input.academyId, preview ? "curriculum.review" : "curriculum.read");
+    const row = await this.db.material.findFirst({
+      where: this.materialWhere(input, learningScopeFor(input.academyId, actor), preview),
+      select: { id: true, manualMaterial: { select: { revision: true } },
+        lecture: { select: { courseModule: { select: { course: { select: { id: true } } } } } } },
+    });
+    if (!row?.manualMaterial) throw new NotFoundException("Material is not available");
+    if (this.practice?.allowed(actor)) return this.practice.latest(input.academyId, actor.userId, row.id, preview, row.manualMaterial.revision);
+    if (preview || actor.via !== "membership" || actor.role !== "STUDENT") return null;
+    const classes = await this.db.class.findMany({
+      where: { ...enrolledClassWhere(input.academyId, actor.userId), courseAssignments: { some: { courseId: row.lecture.courseModule.course.id } } },
+      select: { id: true },
+    });
+    if (input.classId && !classes.some(c => c.id === input.classId)) throw new NotFoundException();
+    const classId = input.classId ?? (classes.length === 1 ? classes[0]!.id : undefined);
+    if (!classId) return null;
+    const attempt = await this.db.manualSubmission.findFirst({
+      where: { materialId: row.id, userId: actor.userId, classId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true, createdAt: true, maximumHundredths: true,
+        shortAnswerAssessment: { select: { status: true, completed: true, scoreHundredths: true } },
+        multipleChoiceAssessment: { select: { status: true, completed: true, scoreHundredths: true } },
+        reviews: { orderBy: { version: "desc" }, take: 1, select: { completed: true, scoreHundredths: true } } },
+    });
+    return manualLatestSubmission(attempt ? { ...attempt, createdAt: attempt.createdAt.toISOString() } : undefined);
   }
   private publicAttempt(row: {
     id: string;

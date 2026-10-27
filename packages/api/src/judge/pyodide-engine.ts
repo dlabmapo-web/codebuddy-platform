@@ -1,4 +1,5 @@
 import { readProcessMemoryMb } from "./process-memory.js";
+import { ExecutionTelemetry, type ExecutionDiagnostics } from "./execution-telemetry.js";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
@@ -125,6 +126,9 @@ export function killProcessesOwnedBy(uid: number): void {
  * handles the parent cares about, and killing it is unconditional.
  */
 class RunnerProcess {
+  readonly preparedAt = performance.now();
+  private executedAt: number | null = null;
+  private exitedAt: number | null = null;
   private readonly child: ChildProcess;
   private readonly ready: Promise<void>;
   private readonly stdoutChunks: Buffer[] = [];
@@ -146,6 +150,7 @@ class RunnerProcess {
     /** In the sandbox, the uid this runner alone executes as. */
     private identity: RunnerIdentity | null = null,
     private readonly identities: RunnerIdentityPool | null = null,
+    private readonly telemetry = new ExecutionTelemetry(),
   ) {
     this.child = spawn(
       process.execPath,
@@ -187,6 +192,8 @@ class RunnerProcess {
     });
     this.child.on("exit", (code, signal) => {
       this.exited = { code, signal };
+      this.exitedAt = performance.now();
+      if (this.executedAt !== null) this.telemetry.observe("exit", this.exitedAt - this.executedAt);
       // Not settled here. `exit` fires when the process is gone, which is not
       // when its pipes are drained: output already written can still be
       // sitting unread, and finalising now truncates it. `close` is the event
@@ -194,7 +201,9 @@ class RunnerProcess {
       //
       // The timer is a safety net, not the mechanism — a `close` that never
       // arrives would otherwise hang the case past its own deadline.
-      const fallback = setTimeout(() => this.markClosed(), DRAIN_GRACE_MS);
+      const fallback = setTimeout(() => {
+        if (!this.closed) { this.telemetry.failures.drainFallback++; this.markClosed(); }
+      }, DRAIN_GRACE_MS);
       fallback.unref();
     });
     this.child.on("close", () => this.markClosed());
@@ -235,6 +244,7 @@ class RunnerProcess {
   private markClosed(): void {
     if (this.closed) return;
     this.closed = true;
+    if (this.exitedAt !== null) this.telemetry.observe("drain", performance.now() - this.exitedAt);
     this.onClose?.();
   }
 
@@ -280,17 +290,20 @@ class RunnerProcess {
    */
   async run(request: ExecutionRequest): Promise<ExecutionResult> {
     await this.ready;
+    if (request.signal?.aborted) throw new Error("Execution request cancelled");
     this.outputLimitBytes = request.outputLimitBytes ?? MAX_OUTPUT_BYTES;
     if (!Number.isInteger(this.outputLimitBytes) || this.outputLimitBytes < 1 || this.outputLimitBytes > MAX_OUTPUT_BYTES) {
       throw new Error("unsupported output limit");
     }
     const startedAt = Date.now();
+    this.executedAt = performance.now();
 
     return new Promise<ExecutionResult>((resolve, reject) => {
       let settled = false;
       let timedOut = false;
       let exceededMemory = false;
       let unmeasurable = false;
+      let cancelled = false;
 
       const settle = (): void => {
         if (settled) return;
@@ -298,7 +311,9 @@ class RunnerProcess {
         clearTimeout(deadline);
         clearTimeout(grace);
         clearInterval(memory);
+        request.signal?.removeEventListener("abort", abort);
         const runtimeMs = Date.now() - startedAt;
+        if (cancelled) { reject(new Error("Execution request cancelled")); return; }
         if (unmeasurable) {
           reject(
             new Error("runner memory could not be measured; refusing to grade"),
@@ -307,6 +322,7 @@ class RunnerProcess {
         }
         resolve(this.resultFor(timedOut, exceededMemory, runtimeMs));
       };
+      const abort = (): void => { cancelled = true; this.kill(); settle(); };
 
       const grace: NodeJS.Timeout = setTimeout(() => undefined, 0);
       clearTimeout(grace);
@@ -354,6 +370,7 @@ class RunnerProcess {
 
       const deadline = setTimeout(() => {
         timedOut = true;
+        this.telemetry.failures.forcedTermination++;
         // Signal first, as the spec asks; a WASM loop will not service it, so
         // the unconditional kill below is what actually ends the case.
         this.child.kill("SIGTERM");
@@ -381,6 +398,8 @@ class RunnerProcess {
         return;
       }
       this.onClose = settle;
+      request.signal?.addEventListener("abort", abort, { once: true });
+      if (request.signal?.aborted) { abort(); return; }
 
       const control = this.child.stdio[3];
       if (control && "write" in control) {
@@ -498,6 +517,7 @@ class RunnerProcess {
         fallback.unref();
       });
     }
+    if (this.child.pid !== undefined && this.exited === null) throw new Error("Runner cleanup could not confirm process exit");
     this.releaseIdentity();
   }
 
@@ -505,8 +525,10 @@ class RunnerProcess {
   private releaseIdentity(): void {
     if (!this.identity || !this.identities) return;
     const identity = this.identity;
-    this.identity = null;
+    const began = performance.now();
     this.identities.release(identity);
+    this.identity = null;
+    this.telemetry.observe("identity", performance.now() - began);
   }
 }
 
@@ -522,6 +544,7 @@ class RunnerProcess {
  */
 export class PyodideExecutionEngine implements ExecutionEngine {
   readonly version: string;
+  readonly telemetry = new ExecutionTelemetry();
   private readonly capacity: number;
   private readonly spare: number;
   private runnerPath: string;
@@ -529,9 +552,12 @@ export class PyodideExecutionEngine implements ExecutionEngine {
   private readonly pyodideDir: string;
   private readonly idle: RunnerProcess[] = [];
   private readonly live = new Set<RunnerProcess>();
+  private readonly draining = new Set<RunnerProcess>();
+  private lastCompletedAt: number | null = null;
   private readonly waiters: Array<{
     resolve: (runner: RunnerProcess) => void;
     reject: (error: Error) => void;
+    since: number;
   }> = [];
   /**
    * Runners that exist but are not yet warm.
@@ -544,6 +570,9 @@ export class PyodideExecutionEngine implements ExecutionEngine {
   private readonly warmingRunners = new Set<RunnerProcess>();
   private disposed = false;
   private spawnFailure: Error | null = null;
+  private cleanupFailed = false;
+  private retrying = 0;
+  private recoveryTimer: NodeJS.Timeout | undefined;
 
   constructor(
     /**
@@ -634,15 +663,16 @@ export class PyodideExecutionEngine implements ExecutionEngine {
     await Promise.all(
       Array.from({ length: this.target }, () => this.spawnOne()),
     );
+    if (!this.disposed && this.idle.length === 0) throw this.spawnFailure ?? new Error("No execution runner became ready");
   }
 
   async run(request: ExecutionRequest): Promise<ExecutionResult> {
     if (request.inputPromptPolicy !== undefined && request.inputPromptPolicy !== "INCLUDE" && request.inputPromptPolicy !== "IGNORE") {
       throw new Error("unsupported input prompt policy");
     }
-    const runner = await this.acquire();
+    const runner = await this.telemetry.time("acquire", () => this.acquire(request.signal));
     try {
-      return await runner.run(request);
+      return await this.telemetry.time("execute", () => runner.run(request));
     } finally {
       // Used once. Killing is what makes the next case a fresh interpreter,
       // and it is unconditional because the process holds nothing we need.
@@ -651,14 +681,19 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       // intentions, so releasing the slot and spawning the replacement while
       // the old one is still dying puts `capacity + spare + 1` interpreters
       // on the host — and if it is dying slowly, more than that.
-      await runner.dispose().catch(() => undefined);
+      this.draining.add(runner);
+      try { await this.telemetry.time("cleanup", () => runner.dispose()); }
+      catch (error) { this.cleanupFailed = true; throw error; }
+      this.draining.delete(runner);
       this.live.delete(runner);
+      this.lastCompletedAt = performance.now();
       this.top_up();
     }
   }
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    clearTimeout(this.recoveryTimer);
     while (this.waiters.length > 0) {
       this.waiters.shift()?.reject(new Error("Execution engine disposed"));
     }
@@ -669,12 +704,15 @@ export class PyodideExecutionEngine implements ExecutionEngine {
     this.idle.length = 0;
     this.warmingRunners.clear();
     await Promise.all(runners.map((runner) => runner.dispose()));
+    this.draining.clear();
   }
 
-  private acquire(): Promise<RunnerProcess> {
+  private acquire(signal?: AbortSignal): Promise<RunnerProcess> {
+    if (signal?.aborted) return Promise.reject(new Error("Execution request cancelled"));
     if (this.disposed) {
       return Promise.reject(new Error("Execution engine disposed"));
     }
+    if (this.cleanupFailed) return Promise.reject(new Error("Runner cleanup remains unconfirmed"));
     const runner = this.idle.pop();
     if (runner) {
       this.live.add(runner);
@@ -685,7 +723,15 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       return Promise.reject(this.spawnFailure);
     }
     const waiting = new Promise<RunnerProcess>((resolve, reject) => {
-      this.waiters.push({ resolve, reject });
+      const waiter = { resolve: (runner: RunnerProcess) => { signal?.removeEventListener("abort", abort); resolve(runner); },
+        reject: (error: Error) => { signal?.removeEventListener("abort", abort); reject(error); }, since: performance.now() };
+      const abort = () => {
+        const index = this.waiters.indexOf(waiter);
+        if (index >= 0) this.waiters.splice(index, 1);
+        waiter.reject(new Error("Execution request cancelled"));
+      };
+      this.waiters.push(waiter);
+      signal?.addEventListener("abort", abort, { once: true });
     });
     this.top_up();
     return waiting;
@@ -701,8 +747,12 @@ export class PyodideExecutionEngine implements ExecutionEngine {
    */
   private top_up(): void {
     if (this.disposed) return;
-    const total = this.live.size + this.idle.length + this.warmingRunners.size;
-    for (let index = total; index < this.target; index += 1) {
+    const total = this.live.size + this.idle.length + this.warmingRunners.size + this.retrying;
+    // A full burst of WASM initializers shares the same quota as executing code.
+    // Refill one at a time; initial warmUp still prepares the whole pool before
+    // admission. A completed preparation triggers the next refill immediately.
+    const slots = Math.min(this.target - total, 1 - this.warmingRunners.size - this.retrying);
+    for (let index = 0; index < slots; index += 1) {
       void this.spawnOne().catch(() => undefined);
     }
   }
@@ -727,6 +777,15 @@ export class PyodideExecutionEngine implements ExecutionEngine {
     };
   }
 
+  diagnostics(): ExecutionDiagnostics["pool"] {
+    const now = performance.now();
+    return { capacity: this.capacity, spare: this.spare, executing: this.live.size - this.draining.size,
+      idle: this.idle.length, warming: this.warmingRunners.size, draining: this.draining.size,
+      waiting: this.waiters.length, oldestWaitMs: this.waiters.length ? now - this.waiters[0]!.since : 0,
+      oldestWarmMs: this.warmingRunners.size ? Math.max(...[...this.warmingRunners].map(r => now - r.preparedAt)) : 0,
+      retryExhausted: this.spawnFailure !== null || this.cleanupFailed, lastCompletedAgoMs: this.lastCompletedAt === null ? null : now - this.lastCompletedAt };
+  }
+
   private async spawnOne(attempt = 1): Promise<void> {
     if (this.disposed) return;
     const runner = new RunnerProcess(
@@ -735,10 +794,11 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       this.readMemoryMb,
       this.identities?.acquire() ?? null,
       this.identities,
+      this.telemetry,
     );
     this.warmingRunners.add(runner);
     try {
-      await runner.warmUp();
+      await this.telemetry.time("prepare", () => runner.warmUp());
       this.warmingRunners.delete(runner);
       if (this.disposed) {
         await runner.dispose();
@@ -752,14 +812,26 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       } else {
         this.idle.push(runner);
       }
+      this.top_up();
     } catch (error) {
+      this.telemetry.failures.prepare++;
+      // Failed processes still count against the physical bound while draining.
+      try { await runner.dispose(); }
+      catch {
+        this.cleanupFailed = true;
+        this.spawnFailure = new Error("Failed runner cleanup is unconfirmed");
+        while (this.waiters.length) this.waiters.shift()!.reject(this.spawnFailure);
+        return;
+      }
       this.warmingRunners.delete(runner);
-      await runner.dispose().catch(() => undefined);
       if (this.disposed) return;
       if (attempt < SPAWN_ATTEMPTS) {
+        this.retrying++;
         await new Promise((resolve) => {
           setTimeout(resolve, SPAWN_RETRY_MS).unref();
         });
+        this.retrying--;
+        if (this.disposed) return;
         await this.spawnOne(attempt + 1);
         return;
       }
@@ -769,6 +841,15 @@ export class PyodideExecutionEngine implements ExecutionEngine {
       this.spawnFailure = failure;
       while (this.waiters.length > 0) {
         this.waiters.shift()?.reject(failure);
+      }
+      // Recovery must not depend on another student claim: the readiness guard
+      // may have paused all queues. Retry one bounded refill after backoff.
+      if (!this.recoveryTimer && !this.disposed) {
+        this.recoveryTimer = setTimeout(() => {
+          this.recoveryTimer = undefined;
+          this.top_up();
+        }, 5000);
+        this.recoveryTimer.unref();
       }
     }
   }

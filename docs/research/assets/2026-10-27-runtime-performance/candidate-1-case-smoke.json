@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "9ed4d49c177ad4e100aaf7b7be6deeb29f8cee0b",
+  "dirty": true,
+  "image": "sha256:a7ae976edc63632e48fab8877c2d311db4c59c4b372bce0043526d7929d699aa",
+  "imageRevision": "9ed4d49c-plus-uncommitted-performance",
+  "platform": "arm64",
+  "requestedRuns": 1,
+  "cases": 1,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "parallel": 1,
+  "releaseAcceptance": "not assessed; isolated execution microbenchmark only",
+  "completedRuns": 1,
+  "failures": 0,
+  "p50Ms": 57.26841700000023,
+  "p95Ms": 57.26841700000023,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "before": {
+    "cpu": "usage_usec 9224120\nuser_usec 8547130\nsystem_usec 676990\nnr_periods 62\nnr_throttled 60\nthrottled_usec 25299116\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "487526400",
+    "peak": "487530496",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=26.37 avg60=5.64 avg300=1.21 total=3680984\nfull avg10=25.39 avg60=5.43 avg300=1.16 total=3541960"
+  },
+  "after": {
+    "cpu": "usage_usec 9292568\nuser_usec 8578223\nsystem_usec 714344\nnr_periods 62\nnr_throttled 60\nthrottled_usec 25299116\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "339247104",
+    "peak": "489607168",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=26.37 avg60=5.64 avg300=1.21 total=3681009\nfull avg10=25.39 avg60=5.43 avg300=1.16 total=3541985"
+  },
+  "diagnostics": {
+    "version": 1,
+    "generation": "796199a9-1585-48cb-afca-a44c7a336d5d",
+    "pool": {
+      "capacity": 2,
+      "spare": 1,
+      "executing": 0,
+      "idle": 2,
+      "warming": 1,
+      "draining": 0,
+      "waiting": 0,
+      "oldestWaitMs": 0,
+      "oldestWarmMs": 3.242833000000246,
+      "retryExhausted": false,
+      "lastCompletedAgoMs": 3.2524169999996957
+    },
+    "resources": {
+      "cpuQuota": 1.5,
+      "periods": 62,
+      "throttledPeriods": 60,
+      "throttledSeconds": 25.299116,
+      "cpuPressure": 25.39,
+      "memoryBytes": 339247104,
+      "memoryPeakBytes": 489607168,
+      "memoryLimitBytes": 1342177280,
+      "oom": 0,
+      "oomKill": 0,
+      "tasks": 30,
+      "eventLoopP95Ms": 21.512191
+    },
+    "timings": [
+      {
+        "stage": "prepare",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 3,
+        "sum": 18.017069214,
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      {
+        "stage": "acquire",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.00006512499999917054,
+        "buckets": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "stage": "exit",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.05030012500000066,
+        "buckets": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "stage": "drain",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.0001527909999995245,
+        "buckets": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "stage": "execute",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.05071220799999992,
+        "buckets": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "stage": "identity",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.0008523329999998168,
+        "buckets": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "stage": "cleanup",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 1,
+        "sum": 0.0009017919999996593,
+        "buckets": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "failures": {
+      "prepare": 0,
+      "drainFallback": 0,
+      "forcedTermination": 0
+    }
+  },
+  "samples": [
+    {
+      "wallMs": 57.26841700000023,
+      "cases": [
+        {
+          "wallMs": 57.25237500000003,
+          "runtimeMs": 51,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,18 @@
 # Faster execution and grading on the existing VPS
 
 Date: 2026-10-27 (Asia/Seoul)
-Status: proposed specification, written at the user's request. Performance targets
-below are release gates, not achieved results. This document authorizes no
-production change and makes no classroom-capacity claim.
+Status: implementation authorized by the user on 2026-10-27. Performance targets
+below remain release gates, not achieved results. Production rollout requires
+the stated evidence; this document makes no classroom-capacity claim.
+
+Implementation and open gates are tracked in the
+[local verification report](../../research/2026-10-27-runtime-performance-local-verification.md)
+and [runtime/host decision note](../../adr/2026-10-27-grading-runtime-latency.md).
+The complete initiative is not yet accepted for production.
+
+The subsequent [production page-navigation investigation](../../research/2026-10-27-production-page-navigation-performance.md)
+records authenticated course/class delays and read/payload costs. Native grading
+testing was stopped by the user; production grading remained active.
 
 ## 1. Decision and intended outcome
 

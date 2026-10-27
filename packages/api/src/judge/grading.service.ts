@@ -1,5 +1,6 @@
 import { quizSnapshotSchema } from "@cove/shared";
 import { Injectable, Logger } from "@nestjs/common";
+import { ExecutionTelemetry, withExecutionCaseCount } from "./execution-telemetry.js";
 
 import { PrismaService } from "../database/prisma.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
@@ -102,10 +103,12 @@ class GradingAbort extends Error {
 @Injectable()
 export class GradingService {
   private readonly logger = new Logger(GradingService.name);
+  private readonly engine: ExecutionEngine;
+  private readonly comparator: OutputComparator;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly engine: ExecutionEngine,
+    engine: ExecutionEngine,
     /**
      * Points are written inside the same transaction as the progress row, so a
      * solve and what it earned are never observable apart. The service is
@@ -118,8 +121,12 @@ export class GradingService {
      * code. Only enhanced profiles use it; legacy comparison stays the pure
      * function it always was.
      */
-    private readonly comparator: OutputComparator,
-  ) {}
+    comparator: OutputComparator,
+    readonly telemetry = new ExecutionTelemetry(),
+  ) {
+    this.engine = { get version() { return engine.version; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
+    this.comparator = { get version() { return comparator.version; }, compare: request => this.telemetry.time("compare", () => comparator.compare(request)) };
+  }
 
   async grade(
     submissionId: string,
@@ -127,10 +134,10 @@ export class GradingService {
   ): Promise<void> {
     // Claiming is a conditional update, so a duplicate delivery finds nothing
     // to claim and exits rather than grading the same submission twice.
-    const claimed = await this.prisma.submission.updateMany({
+    const claimed = await this.telemetry.time("claim", () => this.prisma.submission.updateMany({
       where: { id: submissionId, status: "QUEUED" },
       data: { status: "RUNNING", startedAt: new Date() },
-    });
+    }));
     if (claimed.count === 0) {
       this.logger.debug(`submission ${submissionId} was already claimed`);
       return;
@@ -139,10 +146,10 @@ export class GradingService {
     // every comparison spend it. Queue wait is not the student's time.
     const claimedAt = Date.now();
 
-    const submission = await this.prisma.submission.findUnique({
+    const submission = await this.telemetry.time("load", () => this.prisma.submission.findUnique({
       where: { id: submissionId },
       include: gradingInclude,
-    });
+    }));
 
     if (!submission) { await this.fail(submissionId, "EXERCISE_UNAVAILABLE"); return; }
     await this.execute(submission, report, claimedAt);
@@ -154,7 +161,18 @@ export class GradingService {
     claimedAt: number,
     sink?: GradeSink,
   ): Promise<void> {
+    return withExecutionCaseCount(submission.gradingCases.length, () => this.telemetry.time("grading", () => this.executeProfile(submission, report, claimedAt, sink)));
+  }
+
+  private async executeProfile(
+    submission: GradingWork,
+    report: (progress: GradingProgress) => Promise<void>,
+    claimedAt: number,
+    sink?: GradeSink,
+  ): Promise<void> {
     const submissionId = submission.id;
+    const reportProgress = report;
+    report = progress => this.telemetry.time("report", () => reportProgress(progress));
     const fail = (reason: string) => sink ? sink.fail(reason) : this.fail(submissionId, reason);
     if (submission?.quizSnapshot) {
       const parsed = quizSnapshotSchema.safeParse(submission.quizSnapshot);
@@ -454,7 +472,7 @@ export class GradingService {
     );
 
     if (sink) { await sink.fail(abort.failureReason, rows); return; }
-    await this.prisma.$transaction(async (tx) => {
+    await this.telemetry.time("commit", () => this.prisma.$transaction(async (tx) => {
       const updated = await tx.submission.updateMany({
         where: { id: submission.id, status: "RUNNING" },
         data: {
@@ -471,7 +489,7 @@ export class GradingService {
       await tx.submissionCase.createMany({
         data: rows.map((item) => ({ submissionId: submission.id, ...item })),
       });
-    });
+    }));
   }
 
   /** Persists a completed verdict and the progress it implies, atomically. */
@@ -490,7 +508,7 @@ export class GradingService {
     const submissionId = submission.id;
     // One transaction: a verdict and the progress it implies must never be
     // observable apart.
-    await this.prisma.$transaction(async (tx) => {
+    await this.telemetry.time("commit", () => this.prisma.$transaction(async (tx) => {
       const updated = await tx.submission.updateMany({
         where: { id: submissionId, status: "RUNNING" },
         data: {
@@ -580,7 +598,7 @@ export class GradingService {
           now: new Date(),
         });
       }
-    });
+    }));
   }
 
   /** A judge fault. Never counted against the student's attempts. */

@@ -235,7 +235,7 @@ export function useSubmission({
   );
 
   return {
-    latestSubmission: latest.data, summaryLoading: latest.isPending, summaryError: latest.isError,
+    refreshSummary: () => { void latest.refetch(); }, summaryRefreshing: latest.isFetching, latestSubmission: latest.data, summaryLoading: latest.isPending, summaryError: latest.isError,
     submit,
     submitting,
     submissionId,

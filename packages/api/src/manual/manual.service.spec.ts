@@ -7,9 +7,10 @@ import type { GuiClientService } from "./gui-client.service.js";
 import type { ManualAssetsService } from "./manual-assets.service.js";
 import type { PointAwardService } from "../points/point-award.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
+import type { ManualPracticeService } from "./manual-practice.service.js";
 const identity = { authUserId: "auth-student" } as SupabaseIdentity;
 const target = { academyId: "academy", materialId: "material" };
-function fixture() {
+function fixture(practice?: ManualPracticeService) {
   const config = {
     files: { "main.py": "print(1)" },
     solutionFiles: { "main.py": "PRIVATE" },
@@ -63,10 +64,42 @@ function fixture() {
       evaluator: { evaluate: vi.fn() },
     } as never,
     { enabled: () => true, assertEnabled: () => {} } as never,
+    practice,
   );
   return { service, db, access, audit, gui, points, row, config };
 }
 describe("manual assessment boundaries", () => {
+  it('reads only the authorized class result summary without drafts, content, solutions or history', async () => {
+    const { service, db, access } = fixture();
+    access.requirePermission.mockResolvedValue({ role: 'STUDENT', roles: ['STUDENT'], userId: 'student', via: 'membership' } as never);
+    db.class.findMany.mockResolvedValue([{ id: 'class' }] as never);
+    db.manualSubmission.findFirst.mockResolvedValue({ id: 'attempt', createdAt: new Date('2026-10-27T00:00:00Z'), maximumHundredths: 2550,
+      reviews: [{ completed: false, scoreHundredths: 0 }], shortAnswerAssessment: null, multipleChoiceAssessment: null });
+    expect(await service.latestSubmission(identity, target)).toEqual({ submissionId: 'attempt', createdAt: '2026-10-27T00:00:00.000Z', maximumHundredths: 2550, scoreHundredths: 0, status: 'GRADED' });
+    expect(db.material.findFirst.mock.calls[0]![0]).toMatchObject({ select: { manualMaterial: { select: { revision: true } } } });
+    expect(db.manualSubmission.findFirst.mock.calls[0]![0]).toMatchObject({ where: { userId: 'student', classId: 'class', materialId: 'material' }, select: { reviews: { take: 1 } } });
+    expect(db.course.findUnique).not.toHaveBeenCalled(); expect(db.manualDraft.findUnique).not.toHaveBeenCalled(); expect(db.manualSubmission.findMany).not.toHaveBeenCalled();
+  });
+  it('does not borrow another class or expose personal results during inspection', async () => {
+    const { service, db, access } = fixture();
+    access.requirePermission.mockResolvedValue({ role: 'STUDENT', roles: ['STUDENT'], userId: 'student', via: 'membership' } as never);
+    db.class.findMany.mockResolvedValue([{ id: 'first' }, { id: 'second' }] as never);
+    expect(await service.latestSubmission(identity, target)).toBeNull();
+    await expect(service.latestSubmission(identity, { ...target, classId: 'foreign' })).rejects.toThrow();
+    expect(await service.latestSubmission(identity, target, true)).toBeNull();
+    access.requirePermission.mockResolvedValue({ role: 'MANAGER', roles: ['MANAGER'], userId: 'operator', via: 'platform' } as never);
+    expect(await service.latestSubmission(identity, { ...target, classId: 'first' })).toBeNull();
+    expect(db.manualSubmission.findFirst).not.toHaveBeenCalled();
+  });
+  it('scopes staff result reads to the actor, preview context and current content revision', async () => {
+    const latest = vi.fn().mockResolvedValue({ status: 'RECORDED' });
+    const { service, db, access } = fixture({ allowed: () => true, latest } as unknown as ManualPracticeService);
+    access.requirePermission.mockResolvedValue({ role: 'TEACHER', roles: ['TEACHER'], userId: 'teacher', via: 'membership' } as never);
+    await service.latestSubmission(identity, target, true);
+    expect(latest).toHaveBeenCalledWith('academy', 'teacher', 'material', true, 1);
+    expect(access.requirePermission).toHaveBeenCalledWith(identity.authUserId, 'academy', 'curriculum.review');
+    expect(db.class.findMany).not.toHaveBeenCalled(); expect(db.manualSubmission.findFirst).not.toHaveBeenCalled();
+  });
   it.each(['platform', 'support'])('does not grant personal participation to %s inspection', async (via) => {
     const { service, access, config } = fixture();
     Object.assign(config, { submitEnabled: true });

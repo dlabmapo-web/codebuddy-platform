@@ -1,5 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, type Server } from "node:net";
+import { createServer, createConnection, type Server } from "node:net";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -200,6 +201,28 @@ describe("sandbox round trip", () => {
     const mismatched = new SandboxExecutionEngine(socketPath, "9.9.9", false);
     await expect(mismatched.warmUp()).rejects.toThrow("judge expects pyodide-9.9.9");
   });
+
+  it("retires execution after its requesting socket disconnects", async () => {
+    const socket = createConnection(socketPath);
+    await new Promise<void>((resolve, reject) => { socket.once("connect", resolve); socket.once("error", reject); });
+    writeFrame(socket, { type: "run", protocol: 3, id: randomUUID(), request: { code: "while True: pass", stdin: "", timeLimitMs: 10000, memoryLimitMb: 128 } });
+    try {
+      let active = false;
+      for (let i = 0; i < 100; i++) {
+        if ((await engine.readDiagnostics())?.pool.executing === 1) { active = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(active).toBe(true); socket.destroy();
+      let stopped = false;
+      for (let i = 0; i < 100; i++) {
+        const pool = (await engine.readDiagnostics())!.pool;
+        if (pool.executing === 0 && pool.draining === 0) { stopped = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(stopped).toBe(true);
+      expect((await engine.run({ code: "print(42)", stdin: "", timeLimitMs: 5000, memoryLimitMb: 128 })).stdout).toBe("42\n");
+    } finally { socket.destroy(); }
+  }, 20000);
 
   it("refuses an unverified sandbox where isolation is required", async () => {
     // This sandbox is the development one, honestly reporting isolated=false.

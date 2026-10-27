@@ -1,0 +1,14 @@
+# Optional; metrics require an independent secret in the judge's private env.
+services:
+  judge-worker:
+    environment:
+      JUDGE_HEALTH_BIND: 0.0.0.0
+    networks: [backend, egress, monitoring]
+  prometheus:
+    volumes:
+      - ./monitoring/judge-scrape.yml:/etc/prometheus/optional/judge.yml:ro
+      - type: bind
+        source: ${JUDGE_METRICS_CREDENTIAL_FILE:?set a private metrics-only token file}
+        target: /run/secrets/judge-metrics
+        read_only: true
+        bind: { create_host_path: false }

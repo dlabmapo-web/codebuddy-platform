@@ -6,6 +6,8 @@ import type {
   ExecutionRequest,
   ExecutionResult,
 } from "./execution-engine.js";
+import type { ExecutionDiagnostics } from "./execution-telemetry.js";
+import { executionLogContext } from "./execution-telemetry.js";
 import {
   readFrame,
   sandboxResponseSchema,
@@ -51,6 +53,7 @@ export class SandboxExecutionEngine implements ExecutionEngine {
     version: string,
     /** Production refuses a sandbox that could not prove its own isolation. */
     private readonly requireIsolation: boolean,
+    private readonly traceTimings = false,
   ) {
     this.version = `pyodide-${version}`;
   }
@@ -95,27 +98,43 @@ export class SandboxExecutionEngine implements ExecutionEngine {
   }
 
   async run(request: ExecutionRequest): Promise<ExecutionResult> {
-    const reply = await this.exchange(
-      {
-        type: "run",
-        protocol: SANDBOX_PROTOCOL_VERSION,
-        id: randomUUID(),
-        request: {
-          inputPromptPolicy: request.inputPromptPolicy ?? "INCLUDE",
-          code: request.code,
-          stdin: request.stdin,
-          timeLimitMs: request.timeLimitMs,
-          memoryLimitMb: request.memoryLimitMb,
-          ...(request.outputLimitBytes === undefined ? {} : { outputLimitBytes: request.outputLimitBytes }),
+    const traceId = randomUUID(), began = performance.now();
+    try {
+      const reply = await this.exchange(
+        {
+          type: "run",
+          protocol: SANDBOX_PROTOCOL_VERSION,
+          id: traceId,
+          request: {
+            inputPromptPolicy: request.inputPromptPolicy ?? "INCLUDE",
+            code: request.code,
+            stdin: request.stdin,
+            timeLimitMs: request.timeLimitMs,
+            memoryLimitMb: request.memoryLimitMb,
+            ...(request.outputLimitBytes === undefined ? {} : { outputLimitBytes: request.outputLimitBytes }),
+          },
         },
-      },
-      request.timeLimitMs + SANDBOX_SLACK_MS,
-    );
-    if (reply.type === "error") {
-      throw new Error(`sandbox could not run the case: ${reply.message}`);
+        request.timeLimitMs + SANDBOX_SLACK_MS,
+      );
+      if (reply.type === "error") {
+        throw new Error(`sandbox could not run the case: ${reply.message}`);
+      }
+      if (reply.type !== "result") throw new Error("unexpected sandbox reply");
+      return reply.result;
+    } finally {
+      if (this.traceTimings) {
+        try { console.log(JSON.stringify({ event: "judge.engine", traceId, ...executionLogContext(), durationMs: Math.round(performance.now() - began) })); } catch { /* Logging cannot decide a grade. */ }
+      }
     }
-    if (reply.type !== "result") throw new Error("unexpected sandbox reply");
-    return reply.result;
+  }
+
+  /** Optional additive health capability; never executes a canary or student code. */
+  async readDiagnostics(): Promise<ExecutionDiagnostics | undefined> {
+    const reply = await this.exchange({ type: "health", id: randomUUID() }, HEALTH_TIMEOUT_MS);
+    if (reply.type !== "health" || reply.protocol !== SANDBOX_PROTOCOL_VERSION || reply.engineVersion !== this.version || (this.requireIsolation && !reply.isolated)) {
+      throw new Error("Sandbox diagnostics compatibility check failed");
+    }
+    return reply.diagnostics;
   }
 
   async dispose(): Promise<void> {

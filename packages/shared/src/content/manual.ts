@@ -252,7 +252,13 @@ export type ManualAttempt = {
   } | null;
   learnerName?: string;
 };
-export function manualLatestSubmission(attempt: ManualAttempt | undefined, practice = false): LatestSubmission | null {
+export type ManualResultSummary = {
+  id: string; createdAt: string; maximumHundredths: number;
+  reviews: Array<{ completed: boolean; scoreHundredths: number }>;
+  multipleChoiceAssessment?: { status: string; completed: boolean; scoreHundredths: number } | null;
+  shortAnswerAssessment?: { status: string; completed: boolean | null; scoreHundredths: number | null } | null;
+};
+export function manualLatestSubmission(attempt: ManualResultSummary | undefined, practice = false): LatestSubmission | null {
   if (!attempt) return null;
   const result = effectiveManualResult(attempt);
   const evaluation = attempt.multipleChoiceAssessment ?? attempt.shortAnswerAssessment;

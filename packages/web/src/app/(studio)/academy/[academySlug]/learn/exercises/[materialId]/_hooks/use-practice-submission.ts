@@ -52,7 +52,7 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
   }, [result.data]);
   return {
     submit, submissionId, result: value,
-    latestSubmission: latest.data, summaryLoading: enabled && latest.isPending, summaryError: latest.isError,
+    refreshSummary: () => { void latest.refetch(); }, summaryRefreshing: latest.isFetching, latestSubmission: latest.data, summaryLoading: enabled && latest.isPending, summaryError: latest.isError,
     submitting: accepting || Boolean(submissionId && !result.error && (!result.data || !isTerminalStatus(result.data.status))),
     error: error ?? result.error,
     cells: buildCaseCells({ totalCount: value?.totalCount ?? totalCount, reported: value?.cases ?? [] }),

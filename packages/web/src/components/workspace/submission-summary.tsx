@@ -9,8 +9,9 @@ import { initTranslationsSync } from '@/i18n/init-translations';
 import en from '@cove/i18n/locales/en/submission-summary.json';
 import ko from '@cove/i18n/locales/ko/submission-summary.json';
 
-export function SubmissionSummary({ latest, loading = false, failed = false, dark = false }: {
+export function SubmissionSummary({ latest, loading = false, failed = false, dark = false, onRefresh, refreshing = false }: {
   latest?: LatestSubmission | null; loading?: boolean; failed?: boolean; dark?: boolean;
+  onRefresh?: () => void; refreshing?: boolean;
 }) {
   const locale = useLocale();
   const instance = useMemo(() => initTranslationsSync(locale, ['submission-summary'], { en: { 'submission-summary': en }, ko: { 'submission-summary': ko } }), [locale]);
@@ -31,5 +32,8 @@ export function SubmissionSummary({ latest, loading = false, failed = false, dar
         {latest ? <time dateTime={latest.createdAt}>{formatDateTime(latest.createdAt, locale, true)}</time> : unavailable}
       </dd>
     </div>
+    {onRefresh && (failed || latest?.status === 'PENDING' || latest?.status === 'AWAITING_REVIEW') ? <div>
+      <dt className="sr-only">{t('refresh')}</dt><dd><button type="button" onClick={onRefresh} disabled={refreshing} className="rounded border border-current/20 px-2 py-1 disabled:opacity-50">{t('refresh')}</button></dd>
+    </div> : null}
   </dl>;
 }

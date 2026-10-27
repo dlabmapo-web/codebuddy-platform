@@ -227,6 +227,7 @@ services:
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=512
       JUDGE_HEALTH_PORT: 4101
+      JUDGE_TRACE_TIMINGS: ${JUDGE_TRACE_TIMINGS:-false}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       JUDGE_SANDBOX_SOCKET: /run/cove-sandbox/judge.sock
       PYODIDE_VERSION: ${PYODIDE_VERSION:-0.27.5}
@@ -292,6 +293,7 @@ services:
       NODE_ENV: production
       PYODIDE_VERSION: ${PYODIDE_VERSION:-0.27.5}
       SANDBOX_REQUIRE_ISOLATION: "1"
+      SANDBOX_TRACE_TIMINGS: ${JUDGE_TRACE_TIMINGS:-false}
       SANDBOX_SOCKET_PATH: /run/cove-sandbox/judge.sock
       SANDBOX_CLIENT_GID: "1001"
       SANDBOX_RUNNER_UID_BASE: "20000"

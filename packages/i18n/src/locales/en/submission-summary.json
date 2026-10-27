@@ -3,6 +3,7 @@
   "datetime": "Last submit datetime",
   "loading": "Loading…",
   "unavailable": "Unavailable",
+  "refresh": "Refresh result",
   "states": {
     "PENDING": "Grading…",
     "GRADED": "Graded",

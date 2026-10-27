@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import { ExecutionTelemetry } from "./execution-telemetry.js";
 import { fileURLToPath } from "node:url";
 
 import type { CaseComparator } from "@cove/shared";
@@ -338,7 +339,7 @@ export class ComparatorPool implements OutputComparator {
    */
   private failure: Error | null = null;
 
-  constructor(size = 1, options: ComparatorPoolOptions = {}) {
+  constructor(size = 1, options: ComparatorPoolOptions = {}, readonly telemetry = new ExecutionTelemetry()) {
     this.size = Math.max(1, size);
     this.createWorker = options.createWorker ?? (() => new ComparatorThread());
     this.spawnAttempts = Math.max(1, options.spawnAttempts ?? SPAWN_ATTEMPTS);
@@ -372,12 +373,15 @@ export class ComparatorPool implements OutputComparator {
     }
     let thread: ComparatorWorker;
     try {
-      thread = await this.acquire(request.deadlineAt);
+      thread = await this.telemetry.time("comparator_acquire", () => this.acquire(request.deadlineAt));
     } catch (error) {
       if (error instanceof DeadlineExpired) return { kind: "deadline" };
       return { kind: "error", detail: String(error).slice(0, 200) };
     }
     try {
+      // Acquisition may yield while shutdown retires this worker. Do not
+      // dispatch to a disposed interpreter after that asynchronous boundary.
+      if (this.disposed || thread.isDead) return { kind: "error", detail: "comparator disposed" };
       // The wait for an interpreter has already spent some of the caller's
       // time. What remains, not the comparator's own budget, is the ceiling.
       const ownBudget = request.budgetMs ?? DEFAULT_COMPARATOR_BUDGET_MS;
@@ -387,7 +391,7 @@ export class ComparatorPool implements OutputComparator {
           : request.deadlineAt - Date.now();
       if (left <= 0) return { kind: "deadline" };
       const budgetMs = Math.min(ownBudget, left);
-      const result = await thread.compare({ ...request, budgetMs });
+      const result = await this.telemetry.time("comparator_execute", () => thread.compare({ ...request, budgetMs }));
       // Cut short by the caller's deadline rather than its own budget: that
       // is the run being out of time, not the pattern being too slow.
       return result.kind === "timeout" && budgetMs < ownBudget

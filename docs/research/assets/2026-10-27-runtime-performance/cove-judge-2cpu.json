@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "9ed4d49c177ad4e100aaf7b7be6deeb29f8cee0b",
+  "image": "sha256:23edc2e449888357c74f1a94cd85fb839cbe2ca483438c24721ee9a562015121",
+  "platform": "arm64",
+  "requestedRuns": 1,
+  "cases": 10,
+  "cpus": 2,
+  "concurrency": 2,
+  "spare": 1,
+  "completedRuns": 1,
+  "failures": 0,
+  "p50Ms": 9652.727630000001,
+  "p95Ms": 9652.727630000001,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "before": {
+    "cpu": "usage_usec 8342738\nuser_usec 7313899\nsystem_usec 1028838\nnr_periods 43\nnr_throttled 41\nthrottled_usec 13678338\nnr_bursts 0\nburst_usec 0",
+    "quota": "200000 100000",
+    "memory": "473362432",
+    "peak": "473366528",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=15.79 avg60=3.11 avg300=0.66 total=2030651\nfull avg10=14.36 avg60=2.82 avg300=0.59 total=1862638"
+  },
+  "after": {
+    "cpu": "usage_usec 22203653\nuser_usec 20276932\nsystem_usec 1926721\nnr_periods 139\nnr_throttled 59\nthrottled_usec 16348640\nnr_bursts 0\nburst_usec 0",
+    "quota": "200000 100000",
+    "memory": "27926528",
+    "peak": "475455488",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=9.71 avg60=3.31 avg300=0.77 total=2460247\nfull avg10=9.06 avg60=3.06 avg300=0.71 total=2291818"
+  },
+  "diagnostics": {
+    "version": 1,
+    "generation": "c5d843c4-3364-437e-8ab7-bb1cba00e2e4",
+    "pool": {
+      "capacity": 2,
+      "spare": 1,
+      "executing": 0,
+      "idle": 0,
+      "warming": 1,
+      "draining": 0,
+      "waiting": 0,
+      "oldestWaitMs": 0,
+      "oldestWarmMs": 33.53100000000086,
+      "retryExhausted": false,
+      "lastCompletedAgoMs": 1.0480420000003505
+    },
+    "resources": {
+      "cpuQuota": 2,
+      "periods": 139,
+      "throttledPeriods": 59,
+      "throttledSeconds": 16.34864,
+      "cpuPressure": 9.06,
+      "memoryBytes": 27926528,
+      "memoryPeakBytes": 475455488,
+      "memoryLimitBytes": 1342177280,
+      "oom": 0,
+      "oomKill": 0,
+      "tasks": 14,
+      "eventLoopP95Ms": 26.017791
+    },
+    "timings": [
+      {
+        "stage": "prepare",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 21.797080801000003,
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          4,
+          7,
+          7,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "acquire",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 9.265075920000003,
+        "buckets": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          8,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "exit",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 0.3625306230000024,
+        "buckets": [
+          0,
+          4,
+          9,
+          9,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "drain",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 0.0006762919999982841,
+        "buckets": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "execute",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 0.3641260010000015,
+        "buckets": [
+          0,
+          3,
+          9,
+          9,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "identity",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 0.0035075829999968848,
+        "buckets": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      },
+      {
+        "stage": "cleanup",
+        "kind": "sandbox",
+        "count": 10,
+        "sum": 0.0036765830000013012,
+        "buckets": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ]
+      }
+    ],
+    "failures": {
+      "prepare": 0,
+      "drainFallback": 0,
+      "forcedTermination": 0
+    }
+  },
+  "samples": [
+    {
+      "wallMs": 9652.727630000001,
+      "cases": [
+        {
+          "wallMs": 43.97666699999991,
+          "runtimeMs": 32,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 28.543375000000196,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 25.935375000000022,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1803.1821679999994,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1148.1986260000003,
+          "runtimeMs": 21,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1106.1615429999993,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1113.1268330000003,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1637.3860840000016,
+          "runtimeMs": 132,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1441.7182090000006,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1304.443541999999,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

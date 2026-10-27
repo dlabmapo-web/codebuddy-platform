@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-27T02:11:01.095Z",
+  "hostOS": "darwin",
+  "image": "sha256:a7ae976edc63632e48fab8877c2d311db4c59c4b372bce0043526d7929d699aa",
+  "imageRevision": "9ed4d49c-plus-uncommitted-performance",
+  "architecture": "arm64",
+  "postgresImage": "sha256:ff80089083d7365046af7f03d949a2defa14e0b09e14bd5b8f08a242291be8b2",
+  "redisImage": "sha256:d2c274a2dc1878dbdfa69148a42856f8a2a1b6a5d05203eeab970066c6ef1044",
+  "migrationsSha256": "56695c7f9714d918a3caf760f7b1746277905476c8d87f0c2e35dd73cb2a59d7",
+  "fixtureSha256": "bf8de6a8fd76c6701a5057bcd11e507363d97ef070c577e01a1d0b9457c1204a",
+  "orchestratorSha256": "29691a236345ccd2dc1a1adaca3405dfa9c3a3141f725b69def5081acebeb54c",
+  "cases": 1,
+  "runs": 1,
+  "parallel": 2,
+  "sandbox": {
+    "cpus": 1.5,
+    "memoryMiB": 1280,
+    "concurrency": 2,
+    "spare": 1,
+    "network": "none"
+  },
+  "worker": {
+    "cpus": 0.75,
+    "memoryMiB": 768,
+    "comparatorPool": 1
+  },
+  "fixtureInfrastructure": {
+    "postgresMiB": 192,
+    "redisMiB": 64,
+    "clientMiB": 768,
+    "sharesParentBudget": false
+  },
+  "parent": null,
+  "maxSeconds": 600,
+  "releaseAcceptance": "not assessed; fixture excludes HTTP/auth/browser and remote Supabase latency",
+  "result": {
+    "node": "v22.23.4",
+    "arch": "arm64",
+    "count": 1,
+    "requestedRuns": 1,
+    "parallel": 2,
+    "boundary": "fixture admission insert through real BullMQ completion after grading/points commit; excludes HTTP/auth/browser and remote Supabase latency",
+    "samples": [
+      {
+        "path": "first-solve",
+        "admissionMs": 98.42958299999918,
+        "acceptedToCompletedMs": 1605.5881669999999,
+        "requestToCompletedMs": 1704.017749999999,
+        "queueFailure": false,
+        "correct": true,
+        "status": "PASSED",
+        "aborted": false,
+        "abortReason": null,
+        "passedCount": 1,
+        "caseOutcomes": [
+          "PASSED"
+        ],
+        "pointsCorrect": true,
+        "timing": {
+          "engineMs": 52.428499999999985,
+          "engineCalls": 1,
+          "compareMs": 9.982874999999694,
+          "compareCalls": 1,
+          "queueWaitMs": 20,
+          "observationMs": 18.03216599999905,
+          "serviceMs": 1466.9818340000002,
+          "stages": null
+        }
+      },
+      {
+        "path": "repeat-solve",
+        "admissionMs": 4.419667000001937,
+        "acceptedToCompletedMs": 67.66812500000015,
+        "requestToCompletedMs": 72.08779200000208,
+        "queueFailure": false,
+        "correct": true,
+        "status": "PASSED",
+        "aborted": false,
+        "abortReason": null,
+        "passedCount": 1,
+        "caseOutcomes": [
+          "PASSED"
+        ],
+        "pointsCorrect": true,
+        "timing": {
+          "engineMs": 27.990459000000556,
+          "engineCalls": 1,
+          "compareMs": 0.8777919999993173,
+          "compareCalls": 1,
+          "queueWaitMs": 11,
+          "observationMs": 0.6561660000006668,
+          "serviceMs": 54.71708299999955,
+          "stages": null
+        }
+      }
+    ],
+    "failures": 0
+  },
+  "clientExitCode": 0,
+  "resources": {
+    "worker": {
+      "cpu.stat": "usage_usec 6306113\nuser_usec 4834346\nsystem_usec 1471767\nnr_periods 112\nnr_throttled 79\nthrottled_usec 11197890\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "75000 100000",
+      "cpu.pressure": "some avg10=7.84 avg60=3.00 avg300=0.72 total=2281620\nfull avg10=7.84 avg60=3.00 avg300=0.72 total=2276797",
+      "memory.current": "330551296",
+      "memory.peak": "395821056",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.max": "805306368",
+      "pids.current": "13"
+    },
+    "sandbox": {
+      "cpu.stat": "usage_usec 14342326\nuser_usec 11749518\nsystem_usec 2592807\nnr_periods 168\nnr_throttled 78\nthrottled_usec 24784291\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "150000 100000",
+      "cpu.pressure": "some avg10=10.36 avg60=4.97 avg300=1.24 total=3862582\nfull avg10=9.99 avg60=4.72 avg300=1.17 total=3681912",
+      "memory.current": "468647936",
+      "memory.peak": "495288320",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.max": "1342177280",
+      "pids.current": "41"
+    },
+    "postgres": {
+      "cpu.stat": "usage_usec 2071437\nuser_usec 706007\nsystem_usec 1365430\nnr_periods 88\nnr_throttled 29\nthrottled_usec 1377594\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "50000 100000",
+      "cpu.pressure": "some avg10=0.29 avg60=0.31 avg300=0.08 total=302928\nfull avg10=0.29 avg60=0.31 avg300=0.08 total=298361",
+      "memory.current": "117817344",
+      "memory.peak": "121626624",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.max": "201326592",
+      "pids.current": "9"
+    }
+  },
+  "terminationStates": [
+    {
+      "role": "db",
+      "running": true,
+      "exitCode": 0,
+      "oomKilled": false
+    },
+    {
+      "role": "redis",
+      "running": true,
+      "exitCode": 0,
+      "oomKilled": false
+    },
+    {
+      "role": "sandbox",
+      "running": true,
+      "exitCode": 0,
+      "oomKilled": false
+    },
+    {
+      "role": "worker",
+      "running": true,
+      "exitCode": 0,
+      "oomKilled": false
+    },
+    {
+      "role": "client",
+      "running": false,
+      "exitCode": 0,
+      "oomKilled": false
+    }
+  ],
+  "finishedAt": "2026-10-27T02:11:30.059Z"
+}

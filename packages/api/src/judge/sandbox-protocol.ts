@@ -2,6 +2,7 @@ import type { Socket } from "node:net";
 
 import { z } from "zod";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
+import { executionDiagnosticsSchema } from "./execution-telemetry.js";
 
 /**
  * The one conversation between the judge and the student-code sandbox.
@@ -75,6 +76,7 @@ export const sandboxResponseSchema = z.discriminatedUnion("type", [
     engineVersion: z.string(),
     /** Whether the sandbox verified its own isolation at boot. */
     isolated: z.boolean(),
+    diagnostics: executionDiagnosticsSchema.optional(),
   }),
 ]);
 export type SandboxResponse = z.infer<typeof sandboxResponseSchema>;

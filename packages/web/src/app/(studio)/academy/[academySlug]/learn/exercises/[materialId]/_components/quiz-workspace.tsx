@@ -210,7 +210,7 @@ export function QuizWorkspace({
               {t(submission.submitting ? "submitting" : "submit")}
             </button>
           )}
-          <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} />
+          <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} />
           {submission.error ||
           result?.status === "ERRORED" ||
           result?.status === "CANCELLED" ? (

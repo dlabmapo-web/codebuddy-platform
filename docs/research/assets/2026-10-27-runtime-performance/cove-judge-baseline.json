@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "9ed4d49c177ad4e100aaf7b7be6deeb29f8cee0b",
+  "image": "sha256:1cb1e5d071c1e8417dd24c5b1f52f049f9747e39ada46b28996fcc749d07803d",
+  "platform": "arm64",
+  "requestedRuns": 1,
+  "cases": 10,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "completedRuns": 1,
+  "failures": 0,
+  "p50Ms": 17354.947883,
+  "p95Ms": 17354.947883,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "before": {
+    "cpu": "usage_usec 10521816\nuser_usec 9213260\nsystem_usec 1308556\nnr_periods 71\nnr_throttled 69\nthrottled_usec 26850572\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "487084032",
+    "peak": "491991040",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=27.32 avg60=5.71 avg300=1.22 total=4144398\nfull avg10=25.54 avg60=5.33 avg300=1.14 total=3891800"
+  },
+  "after": {
+    "cpu": "usage_usec 36567572\nuser_usec 33347038\nsystem_usec 3220534\nnr_periods 245\nnr_throttled 242\nthrottled_usec 86941041\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "320581632",
+    "peak": "525316096",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=49.23 avg60=17.94 avg300=4.31 total=13467257\nfull avg10=46.52 avg60=16.96 avg300=4.08 total=12707888"
+  },
+  "diagnostics": null,
+  "samples": [
+    {
+      "wallMs": 17354.947883,
+      "cases": [
+        {
+          "wallMs": 43.63808400000016,
+          "runtimeMs": 37,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 27.523208000000523,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 75.02987499999927,
+          "runtimeMs": 28,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 5409.9743770000005,
+          "runtimeMs": 76,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 97.40229200000067,
+          "runtimeMs": 84,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 28.111582999999882,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 4918.125002000001,
+          "runtimeMs": 39,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 63.926040999998804,
+          "runtimeMs": 61,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 27.92583299999751,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 6663.223336999999,
+          "runtimeMs": 81,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

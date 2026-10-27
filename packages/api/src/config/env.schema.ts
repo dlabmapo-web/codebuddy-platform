@@ -129,6 +129,10 @@ export const apiEnvironmentSchema = z.object({
     .default(10_000),
   /** CPU-bound work, so this tracks cores rather than being set high. */
   JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  JUDGE_METRICS_SECRET: z.string().min(32).optional(),
+  JUDGE_TRACE_TIMINGS: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  JUDGE_HEALTH_BIND: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1"),
+  JUDGE_READINESS_GUARD: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   /**
    * How many repairs a maintenance re-grade runs at once.
    *

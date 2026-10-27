@@ -1,6 +1,10 @@
 import { chmodSync, existsSync, unlinkSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { networkInterfaces } from "node:os";
+import { randomUUID } from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
+import { sandboxResources } from "./sandbox-resources.js";
+import type { ExecutionDiagnostics } from "./execution-telemetry.js";
 
 import {
   PyodideExecutionEngine,
@@ -143,9 +147,15 @@ export async function startSandbox(config: SandboxConfig): Promise<{
     identities,
   );
   await engine.warmUp();
+  const generation = randomUUID();
+  const delay = monitorEventLoopDelay({ resolution: 20 });
+  delay.enable();
+  const diagnostics = (): ExecutionDiagnostics => ({ version: 1, generation, pool: engine.diagnostics(),
+    resources: sandboxResources(delay.percentile(95) / 1e6), timings: engine.telemetry.snapshot(),
+    failures: { ...engine.telemetry.failures } });
 
   const server = createServer((socket) => {
-    void serve(socket, engine, isolated);
+    void serve(socket, engine, isolated, diagnostics);
   });
   await listen(server, config);
 
@@ -153,6 +163,7 @@ export async function startSandbox(config: SandboxConfig): Promise<{
     isolated,
     version: engine.version,
     close: async () => {
+      delay.disable();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await engine.dispose();
     },
@@ -169,6 +180,7 @@ async function serve(
   socket: Socket,
   engine: PyodideExecutionEngine,
   isolated: boolean,
+  diagnostics: () => ExecutionDiagnostics,
 ): Promise<void> {
   socket.on("error", () => undefined);
   let frame: unknown;
@@ -191,13 +203,21 @@ async function serve(
       protocol: SANDBOX_PROTOCOL_VERSION,
       engineVersion: engine.version,
       isolated,
+      diagnostics: diagnostics(),
     });
     socket.end();
     return;
   }
+  if (socket.destroyed) return;
+  const cancellation = new AbortController();
+  const disconnected = () => cancellation.abort();
+  socket.once("close", disconnected);
+  const began = performance.now();
+  let outcome = "error";
   try {
-    const result = await engine.run(request.request);
-    writeFrame(socket, {
+    const result = await engine.run({ ...request.request, signal: cancellation.signal });
+    outcome = result.outcome;
+    if (!socket.destroyed) writeFrame(socket, {
       type: "result",
       id: request.id,
       result: {
@@ -209,11 +229,17 @@ async function serve(
       },
     });
   } catch (error) {
-    writeFrame(socket, {
+    if (!socket.destroyed) writeFrame(socket, {
       type: "error",
       id: request.id,
       message: String(error).slice(0, 500),
     });
+  } finally {
+    socket.removeListener("close", disconnected);
+    if (process.env.SANDBOX_TRACE_TIMINGS === "true") {
+      try { console.log(JSON.stringify({ event: "sandbox.run", traceId: request.id,
+        durationMs: Math.round(performance.now() - began), outcome: cancellation.signal.aborted ? "cancelled" : outcome })); } catch { /* Diagnostics are not a verdict channel. */ }
+    }
   }
   socket.end();
 }

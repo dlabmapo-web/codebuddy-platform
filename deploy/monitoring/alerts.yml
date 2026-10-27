@@ -1,4 +1,35 @@
 groups:
+  - name: cove-judge
+    rules:
+      - alert: JudgeDiagnosticsUnavailable
+        expr: cove_judge_diagnostics_available == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Judge cannot obtain fresh execution diagnostics"
+      - alert: JudgeExecutionDegraded
+        expr: cove_judge_ready == 0
+        for: 30s
+        labels: {severity: warning}
+        annotations:
+          summary: "Judge is alive but execution scheduling is degraded"
+      - alert: JudgeQueueWaitHigh
+        expr: cove_judge_queue_oldest_wait_seconds{kind="official"} > 5
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Official grading queue wait exceeds five seconds"
+      - alert: JudgeSandboxCPUThrottled
+        expr: rate(cove_judge_sandbox_cpu_throttled_periods_total[5m]) / clamp_min(rate(cove_judge_sandbox_cpu_periods_total[5m]), 0.001) > 0.2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Grading sandbox frequently exhausts its CPU quota"
+      - alert: JudgeSandboxOOM
+        expr: increase(cove_judge_sandbox_oom_kill_total[5m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Grading sandbox killed a process for exceeding memory"
   - name: cove-turtle-startup
     rules:
       - alert: TurtleAllocationUnsafe

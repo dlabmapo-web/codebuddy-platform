@@ -164,6 +164,21 @@ export class JudgeQueue implements OnModuleDestroy {
     return this.sampleInstance;
   }
 
+  /** Bounded operational counts only; job bodies/identifiers never leave here. */
+  async diagnostics() {
+    const queues = [this.queue, this.practiceQueue, this.sampleQueue, this.regradeQueue] as const;
+    const kinds = ["official", "practice", "sample", "regrade"] as const;
+    const results = await Promise.allSettled(queues.map(async (queue, index) => {
+      const [countsResult, oldestResult] = await Promise.allSettled([queue.getJobCounts("waiting", "active", "delayed", "failed"), queue.getWaiting(0, 0)]);
+      if (countsResult.status === "rejected" || oldestResult.status === "rejected") throw new Error("Queue diagnostics unavailable");
+      const counts = countsResult.value, oldest = oldestResult.value;
+      return { kind: kinds[index]!, waiting: counts.waiting ?? 0, active: counts.active ?? 0,
+        delayed: counts.delayed ?? 0, failed: counts.failed ?? 0,
+        oldestWaitMs: oldest[0] ? Math.max(0, Date.now() - oldest[0].timestamp) : 0 };
+    }));
+    return results.map(result => { if (result.status === "rejected") throw new Error("Queue diagnostics unavailable"); return result.value; });
+  }
+
   /** `jobId` is the check id: a retried dispatch cannot run a check twice. */
   async enqueueSampleCheck(checkId: string): Promise<void> {
     await this.sampleQueue.add("sample", { checkId }, { jobId: checkId });
@@ -263,6 +278,7 @@ export class JudgeQueue implements OnModuleDestroy {
     handler: (job: {
       data: GradingJob;
       updateProgress: (progress: GradingProgress) => Promise<void>;
+      queuedAtMs?: number;
     }) => Promise<unknown>,
     concurrency: number,
   ): Worker<GradingJob> {
@@ -271,6 +287,7 @@ export class JudgeQueue implements OnModuleDestroy {
       async (job) =>
         handler({
           data: job.data,
+          queuedAtMs: job.timestamp,
           updateProgress: (progress) => job.updateProgress(progress),
         }),
       { connection: redisConnection(this.redisUrl), concurrency },
@@ -284,8 +301,8 @@ export class JudgeQueue implements OnModuleDestroy {
     return worker;
   }
 
-  createPracticeWorker(handler: (job: PracticeJob) => Promise<void>, concurrency: number): Worker<PracticeJob> {
-    const worker = new Worker<PracticeJob>(PRACTICE_QUEUE, (job) => handler(job.data), {
+  createPracticeWorker(handler: (job: PracticeJob, queuedAtMs?: number) => Promise<void>, concurrency: number): Worker<PracticeJob> {
+    const worker = new Worker<PracticeJob>(PRACTICE_QUEUE, (job) => handler(job.data, job.timestamp), {
       connection: redisConnection(this.redisUrl), concurrency,
     });
     worker.on("failed", (job, error) => this.logger.error(`practice job ${job?.id ?? "unknown"} failed: ${error.message}`));
@@ -293,12 +310,12 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   createRegradeWorker(
-    handler: (job: { data: RegradeJob }) => Promise<unknown>,
+    handler: (job: { data: RegradeJob; queuedAtMs?: number }) => Promise<unknown>,
     concurrency: number,
   ): Worker<RegradeJob> {
     const worker = new Worker<RegradeJob>(
       REGRADE_QUEUE,
-      async (job) => handler({ data: job.data }),
+      async (job) => handler({ data: job.data, queuedAtMs: job.timestamp }),
       { connection: redisConnection(this.redisUrl), concurrency },
     );
     worker.on("failed", (job, error) => {
@@ -310,13 +327,13 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   createSampleWorker(
-    handler: (job: { data: SampleCheckJob }) => Promise<unknown>,
+    handler: (job: { data: SampleCheckJob; queuedAtMs?: number }) => Promise<unknown>,
     concurrency: number,
     onFailed: (checkId: string, error: Error) => void,
   ): Worker<SampleCheckJob> {
     const worker = new Worker<SampleCheckJob>(
       SAMPLE_QUEUE,
-      async (job) => handler({ data: job.data }),
+      async (job) => handler({ data: job.data, queuedAtMs: job.timestamp }),
       { connection: redisConnection(this.redisUrl), concurrency },
     );
     worker.on("failed", (job, error) => {

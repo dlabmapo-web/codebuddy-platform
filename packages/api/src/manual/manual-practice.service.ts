@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createPracticeAttempt } from "../learn/staff-practice.repository.js";
 import { Injectable, ConflictException, ForbiddenException } from "@nestjs/common";
 import { manualConfigSchema, sourceFilesSchema, shortAnswerSchema, multipleChoiceSchema, publicChoice,
-  rolesHavePermission, type ManualSubmit, type ManualAttempt } from "@cove/shared";
+  rolesHavePermission, manualLatestSubmission, type ManualSubmit, type ManualAttempt } from "@cove/shared";
 import type { AcademyAccess } from "../authorization/academy-access.service.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { ShortAnswerService } from "./short-answer.service.js";
@@ -26,6 +26,13 @@ export class ManualPracticeService {
     ]);
     return { draft: draft ? { ...JSON.parse(draft.code) as { files: Record<string,string>; answer: string }, revision: draft.updatedAt.getTime() } : null,
       attempts: attempts.flatMap((row) => row.result ? [row.result as unknown as ManualAttempt] : []) };
+  }
+  async latest(academyId: string, userId: string, materialId: string, preview = false, revision?: number) {
+    const row = await this.db.staffPracticeAttempt.findFirst({
+      where: { academyId, userId, materialId, context: this.context(preview, revision) },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { result: true },
+    });
+    return manualLatestSubmission(row?.result ? row.result as unknown as ManualAttempt : undefined, true);
   }
   async draft(actor: AcademyAccess, input: { academyId: string; materialId: string; files: Record<string,string>; answer: string; revision: number; preview?: boolean; contentRevision?: number }) {
     if (!this.allowed(actor)) throw new ForbiddenException();

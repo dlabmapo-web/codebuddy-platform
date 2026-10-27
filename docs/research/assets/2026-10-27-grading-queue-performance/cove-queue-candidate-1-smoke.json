@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-27T01:59:15.965Z",
+  "hostOS": "darwin",
+  "image": "sha256:a7ae976edc63632e48fab8877c2d311db4c59c4b372bce0043526d7929d699aa",
+  "imageRevision": "9ed4d49c-plus-uncommitted-performance",
+  "architecture": "arm64",
+  "postgresImage": "sha256:ff80089083d7365046af7f03d949a2defa14e0b09e14bd5b8f08a242291be8b2",
+  "redisImage": "sha256:d2c274a2dc1878dbdfa69148a42856f8a2a1b6a5d05203eeab970066c6ef1044",
+  "migrationsSha256": "56695c7f9714d918a3caf760f7b1746277905476c8d87f0c2e35dd73cb2a59d7",
+  "fixtureSha256": "93d13f1ec753c37b45b3b89c8047a9586fef66f21cd1253c3951446df0f0fdef",
+  "cases": 1,
+  "runs": 1,
+  "parallel": 1,
+  "sandbox": {
+    "cpus": 1.5,
+    "memoryMiB": 1280,
+    "concurrency": 2,
+    "spare": 1,
+    "network": "none"
+  },
+  "worker": {
+    "cpus": 0.75,
+    "memoryMiB": 768,
+    "comparatorPool": 1
+  },
+  "parent": null,
+  "maxSeconds": 600,
+  "releaseAcceptance": "not assessed; fixture excludes HTTP/auth/browser and remote Supabase latency",
+  "result": null,
+  "clientExitCode": 137,
+  "infrastructureFailure": "No complete fixture report",
+  "fixtureFailures": [],
+  "finishedAt": "2026-10-27T01:59:55.241Z"
+}

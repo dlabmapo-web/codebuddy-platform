@@ -1,0 +1,9 @@
+{
+  "candidateImage": "cove-performance-fixture:20261027-99032bc0",
+  "candidateImageId": "sha256:1fd008592fb0b6df622d6c415523d580263e3c8c60ef26f52e9e2a9bce615345",
+  "buildImageConfigId": "sha256:48b0f572d2afd3719beff713e3134000c7be85a94e54327c0b9c8d335e9f7547",
+  "verifiedConfigDigest": "sha256:48b0f572d2afd3719beff713e3134000c7be85a94e54327c0b9c8d335e9f7547",
+  "rootFSLayersSha256": "a974760a68d0b4bca96ebb262bee568fa7dfded17e94e445dbc3628f603e02c4",
+  "state": "cached test artifact only; no native grading benchmark or production deployment",
+  "architecture": "amd64"
+}

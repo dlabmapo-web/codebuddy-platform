@@ -1,0 +1,6 @@
+{
+  "packages/api/scripts/benchmark-grading.mjs": "29691a236345ccd2dc1a1adaca3405dfa9c3a3141f725b69def5081acebeb54c",
+  "packages/api/scripts/benchmark-grading-fixture.mjs": "bf8de6a8fd76c6701a5057bcd11e507363d97ef070c577e01a1d0b9457c1204a",
+  "packages/api/scripts/benchmark-grading.test.mjs": "e568f708c737ac187589becc6f0d7cfbe49a21d6f1170903477a53bdd77c054a",
+  "deploy/scripts/prepare-performance-budget.sh": "7b1676cf35060824a744789c38139f5ad2a125bec0cbaa0b4fa1d3750fa72786"
+}

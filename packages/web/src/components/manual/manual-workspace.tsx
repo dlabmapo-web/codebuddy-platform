@@ -11,6 +11,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { useRouter } from 'next/navigation';
 import { ManualStaffActions } from './manual-staff-actions';
 import { SubmissionSummary } from '@/components/workspace/submission-summary';
+import { useSubmissionStatus } from '@/components/workspace/use-submission-status';
 import { WrittenAnswerCard, AssessmentStatus, assessmentAction, assessmentPrimary } from './assessment-ui';
 import { usePracticeTranslation } from "@/components/workspace/use-practice-translation";
 import {VideoResourceLinks} from "@/components/video/video-resource-links";
@@ -23,7 +24,7 @@ import {
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { effectiveManualResult, shouldPollLatestSubmission, type ManualSession } from "@cove/shared";
+import { effectiveManualResult, type ManualSession } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
@@ -59,7 +60,6 @@ export function ManualWorkspace({
     queryFn: () =>
       manualApi.read({ ...target, preview, classId: deliveryClass }),
     retry: false, staleTime: 0, refetchOnWindowFocus: true,
-    refetchInterval: query => shouldPollLatestSubmission(query.state.data?.latestSubmission, Date.now()) ? 3000 : false,
   });
   const data = query.data;
   const short = data?.config.shortAnswer;
@@ -244,6 +244,13 @@ export function ManualWorkspace({
   const selectedClass =
     deliveryClass ??
     (data?.classes.length === 1 ? data.classes[0].classId : undefined);
+  const latestStatus = useSubmissionStatus({
+    queryKey: ['manual-latest', userId, academyId, materialId, selectedClass, preview, data?.practice ?? false, data?.config.revision],
+    read: signal => manualApi.latestSubmission({ academyId, materialId, classId: selectedClass, preview }, signal),
+    enabled: Boolean(data?.config.submitEnabled && data.participation?.mode !== 'inspection'),
+    seed: data?.latestSubmission,
+    onTerminal: () => { void query.refetch(); },
+  });
   const navigation = useMaterialNavigation({ academyId, materialId, classId: selectedClass, preview, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline', Boolean(data && data.type !== 'TURTLE_EXERCISE'), Boolean(data));
   async function navigateMaterial(id?: string, href?: string) {
@@ -668,7 +675,7 @@ export function ManualWorkspace({
             ) : null}
             {preview && !data.practice && data.config.submitEnabled ? <button type="button" disabled className={assessmentPrimary}><Send aria-hidden className="size-4" />{mt('submit')}</button> : null}
             {data.participation?.reason ? <p role="status" className="text-xs text-sub">{mt(`submission_reason.${data.participation.reason}`)}</p> : null}
-            {data.config.submitEnabled && data.participation?.mode !== 'inspection' ? <SubmissionSummary latest={data.latestSubmission} /> : null}
+            {data.config.submitEnabled && data.participation?.mode !== 'inspection' ? <SubmissionSummary latest={latestStatus.data} failed={latestStatus.isError} onRefresh={() => void latestStatus.refetch()} refreshing={latestStatus.isFetching} /> : null}
             {!preview && data.classes.length > 1 ? (
               <select
                 aria-label={mt("submission_class")}

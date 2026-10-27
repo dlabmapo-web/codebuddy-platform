@@ -49,6 +49,21 @@ PY
 COVE_DEPLOY_ROOT="$validation_root" "$validation_root/scripts/render-monitoring-config.sh"
 validation_compose config --quiet
 validation_compose --profile gui --profile video config --quiet
+judge_json="$(JUDGE_METRICS_CREDENTIAL_FILE="$validation_root/secrets/judge-metrics-token" validation_compose -f "$validation_root/compose.judge-monitoring.yml" config --format json)"
+python3 - "$judge_json" <<'PY'
+import json, sys
+c = json.loads(sys.argv[1]); judge = c['services']['judge-worker']; sandbox = c['services']['judge-sandbox']
+assert not judge.get('ports') and not sandbox.get('ports')
+assert set(judge['networks']) == {'backend', 'egress', 'monitoring'}
+assert judge['environment']['JUDGE_HEALTH_BIND'] == '0.0.0.0'
+assert judge['environment']['JUDGE_READINESS_GUARD'] == 'false'
+assert float(judge['cpus']) == .75 and float(sandbox['cpus']) == 1.5
+assert sandbox['network_mode'] == 'none'
+assert not any('METRICS_SECRET' in name for name in sandbox['environment'])
+assert set(c['services']['prometheus']['networks']) == {'monitoring'}
+assert any(v['target'] == '/etc/prometheus/optional/judge.yml' and v.get('read_only') for v in c['services']['prometheus']['volumes'])
+print('Optional judge metrics: private monitoring, unchanged quotas, guard disabled, isolated sandbox')
+PY
 learning_json="$(validation_compose --profile gui --profile video config --format json)"
 python3 - "$learning_json" <<'PY'
 import json, sys
@@ -185,11 +200,13 @@ docker run --rm \
 
 mkdir -p "$validation_root/monitoring/optional"
 cp "$validation_root/monitoring/turtle-scrape.yml" "$validation_root/monitoring/optional/turtle.yml"
+cp "$validation_root/monitoring/judge-scrape.yml" "$validation_root/monitoring/optional/judge.yml"
 printf '%s' fixture-only-metrics-credential-never-production > "$validation_root/metrics-token"
 chmod 644 "$validation_root/metrics-token"
 docker run --rm --entrypoint /bin/promtool \
   -v "$validation_root/monitoring:/etc/prometheus:ro" \
   -v "$validation_root/metrics-token:/run/secrets/turtle-metrics:ro" \
+  -v "$validation_root/metrics-token:/run/secrets/judge-metrics:ro" \
   prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
 
 docker run --rm \

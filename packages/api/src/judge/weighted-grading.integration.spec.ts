@@ -220,7 +220,7 @@ else:
       outputFormat: "",
       constraints: "",
       starterCode: "",
-      solutionCode: "a = int(input())\nb = int(input())\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a / b)\n",
+      solutions: [{ title: null, code: "a = int(input())\nb = int(input())\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a / b)\n" }],
       aiFeedbackEnabled: false,
       isVisible: true,
       testCases: calculatorCases,
@@ -343,7 +343,7 @@ else:
         outputFormat: "",
         constraints: "",
         starterCode: "",
-        solutionCode: "print()",
+        solutions: [{ title: null, code: "print()" }],
         aiFeedbackEnabled: false,
         isVisible: true,
         testCases: calculatorCases.map((testCase, index) => ({
@@ -379,7 +379,7 @@ else:
       await courses.updateExercise(manager, updateProgrammingExerciseSchema.parse({
         academyId: ids.academy, courseId, lectureId, materialId, expectedUpdatedAt: exercise.updatedAt,
         title: "Prompt example", difficulty: "EASY", description: exercise.description,
-        inputFormat: "", outputFormat: "", constraints: "", starterCode: "", solutionCode: "print(input())",
+        inputFormat: "", outputFormat: "", constraints: "", starterCode: "", solutions: [{ title: null, code: "print(input())" }],
         aiFeedbackEnabled: false, isVisible: true, hints: [],
         testCases: [{ ...calculatorCases[0]!, input: "4\n", expectedOutput: "4", weight: 1 }],
         grading: { ...authoredProfile, inputPromptPolicy },

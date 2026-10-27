@@ -103,6 +103,12 @@ export class ManualController {
     await this.identify(auth);
     return this.service.capabilities();
   }
+  @Get("latest-submission") @Header("Cache-Control", "private, no-store") async latestSubmission(
+    @Query() query: unknown, @Headers("authorization") auth?: string,
+  ) {
+    const input = parse(manualTargetSchema.extend({ preview: z.enum(["true", "false"]).optional(), classId: z.uuid().optional() }), query);
+    return this.service.latestSubmission(await this.identify(auth), input, input.preview === "true");
+  }
   @Post("choice-preview") async choicePreview(
     @Body() body: unknown,
     @Headers("authorization") auth?: string,

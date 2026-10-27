@@ -8,6 +8,8 @@ import { gradingDataLimits } from "@cove/shared/grading-limits";
 export const MAX_OUTPUT_BYTES = gradingDataLimits.stdoutBytes;
 
 export type ExecutionRequest = {
+  /** Trusted infrastructure cancellation; never accepted from the wire as data. */
+  signal?: AbortSignal;
   inputPromptPolicy?: InputPromptPolicy;
   code: string;
   stdin: string;

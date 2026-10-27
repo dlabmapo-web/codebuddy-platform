@@ -9,6 +9,7 @@ import type {
   ManualWork,
   ManualSubmit,
   ManualReviewInput,
+  LatestSubmission,
 } from "@cove/shared";
 import { publicConfig } from "./config";
 import { createClient } from "./supabase/client";
@@ -17,6 +18,7 @@ async function request<T>(
   path: string,
   method = "GET",
   data?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const {
     data: { session },
@@ -28,6 +30,7 @@ async function request<T>(
       ? { "X-Cove-View-Role": decodeURIComponent(role) }
       : {};
   const response = await fetch(endpoint + path, {
+    signal,
     method,
     headers: {
       ...view,
@@ -45,6 +48,8 @@ async function request<T>(
   return body as T;
 }
 export const manualApi = {
+  latestSubmission: (target: { academyId: string; materialId: string; classId?: string; preview?: boolean }, signal?: AbortSignal) =>
+    request<LatestSubmission | null>("/latest-submission?" + new URLSearchParams(Object.entries(target).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])), "GET", undefined, signal),
   capabilities: () => request<{ shortAnswer: boolean; multipleChoice: boolean }>("/capabilities"),
   choicePreview: (data: {academyId:string;definition:MultipleChoiceDefinition;selectedOptionIds:string[];displayOrder:string[]}) => request<{correct:boolean}>("/choice-preview","POST",data),
   choiceImage: (data:{academyId:string;materialId:string;assetId:string;classId?:string;submissionId?:string;preview?:boolean}) => request<{url:string}>("/choice-image?"+new URLSearchParams(Object.entries(data).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)]))),

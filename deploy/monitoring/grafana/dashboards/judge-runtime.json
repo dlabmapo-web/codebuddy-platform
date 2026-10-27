@@ -1,0 +1,239 @@
+{
+  "uid": "cove-judge-runtime",
+  "title": "Python grading runtime",
+  "description": "Private diagnostics; grading excludes initial admission and browser result polling. No data means unavailable telemetry, not a healthy zero.",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scheduling readiness",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "cove_judge_ready",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Oldest official queue wait",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "cove_judge_queue_oldest_wait_seconds{kind=\"official\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Grading p95 by test count",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le,cases) (rate(cove_judge_stage_seconds_bucket{component=\"judge\",stage=\"grading\",kind=\"official\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{cases}} cases"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Interpreter acquisition p95",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(cove_judge_stage_seconds_bucket{component=\"sandbox\",stage=\"acquire\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Sandbox throttled periods",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * rate(cove_judge_sandbox_cpu_throttled_periods_total[5m]) / clamp_min(rate(cove_judge_sandbox_cpu_periods_total[5m]),0.001)",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Interpreter pool",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "{__name__=~\"cove_judge_pool_(idle|executing|warming|draining)\"}",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Worker throttled periods",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * rate(cove_judge_worker_cpu_throttled_periods_total[5m]) / clamp_min(rate(cove_judge_worker_cpu_periods_total[5m]),0.001)",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Execution diagnostics available",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "cove_judge_diagnostics_available",
+          "refId": "A",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    }
+  ]
+}

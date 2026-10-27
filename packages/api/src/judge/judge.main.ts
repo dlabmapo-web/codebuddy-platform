@@ -3,7 +3,8 @@ import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
 import "dotenv/config";
 
-import { createServer } from "node:http";
+import { startJudgeMonitor } from "./judge-monitor.js";
+import { ExecutionTelemetry, withExecutionKind, type ExecutionKind } from "./execution-telemetry.js";
 
 import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -39,6 +40,9 @@ const STALE_AFTER_MS = 10 * 60_000;
 async function bootstrap(): Promise<void> {
   const logger = new Logger("Judge");
   const environment = validateEnvironment(process.env);
+  if (environment.JUDGE_METRICS_SECRET && Object.entries(environment).some(([key, value]) => key !== "JUDGE_METRICS_SECRET" && /SECRET|TOKEN|PASSWORD|_KEY$/.test(key) && value === environment.JUDGE_METRICS_SECRET)) {
+    throw new Error("Judge metrics credential must be independent");
+  }
 
   if (!environment.REDIS_URL) {
     logger.error("REDIS_URL is required to run the judge");
@@ -64,6 +68,7 @@ async function bootstrap(): Promise<void> {
       environment.JUDGE_SANDBOX_SOCKET,
       environment.PYODIDE_VERSION,
       environment.NODE_ENV === "production",
+      environment.JUDGE_TRACE_TIMINGS,
     );
   } else if (environment.NODE_ENV === "production") {
     logger.error(
@@ -81,12 +86,14 @@ async function bootstrap(): Promise<void> {
       environment.JUDGE_CONCURRENCY,
     );
   }
-  const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE);
+  const telemetry = new ExecutionTelemetry();
+  const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE, {}, telemetry);
   const grading = new GradingService(
     prisma,
     engine,
     new PointAwardService(prisma),
     comparator,
+    telemetry,
   );
   const queue = new JudgeQueue(environment.REDIS_URL);
 
@@ -98,20 +105,27 @@ async function bootstrap(): Promise<void> {
   // delayed by it, and background work — regrades and sample checks together
   // — can never take the slot it reserves for submissions.
   const capacity = new ExecutionCapacity(environment.JUDGE_CONCURRENCY);
+  const measured = <T>(kind: ExecutionKind, action: () => Promise<T>, jobId: string) => withExecutionKind(kind, () => grading.telemetry.time("service", action), jobId);
 
   const practice = new PracticeRunner(prisma, grading);
   const worker = queue.createWorker(
-    (job) =>
+    (job) => {
+      if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "official");
+      return measured("official", () =>
       capacity.runOfficial(() =>
         grading.grade(job.data.submissionId, job.updateProgress),
-      ),
+      ), job.data.submissionId);
+    },
     environment.JUDGE_CONCURRENCY,
   );
 
   // Separate queue: older judge processes can never consume a staff attempt
   // as a student submission during a rolling deployment.
   const practiceWorker = queue.createPracticeWorker(
-    (job) => capacity.runBackground(() => practice.run(job.attemptId)),
+    (job, queuedAtMs) => {
+      if (queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - queuedAtMs), "practice");
+      return measured("practice", () => capacity.runBackground(() => practice.run(job.attemptId)), job.attemptId);
+    },
     environment.REGRADE_CONCURRENCY,
   );
 
@@ -120,7 +134,10 @@ async function bootstrap(): Promise<void> {
   // pool, which is what `REGRADE_CONCURRENCY` is sized against.
   const regrade = new RegradeRunner(prisma, grading);
   const regradeWorker = queue.createRegradeWorker(
-    (job) => capacity.runBackground(() => regrade.run(job.data)),
+    (job) => {
+      if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "regrade");
+      return measured("regrade", () => capacity.runBackground(() => regrade.run(job.data)), job.data.submissionId);
+    },
     environment.REGRADE_CONCURRENCY,
   );
 
@@ -134,17 +151,22 @@ async function bootstrap(): Promise<void> {
     capacity,
   );
   const sampleWorker = queue.createSampleWorker(
-    (job) => samples.run(job.data.checkId),
+    (job) => {
+      if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "sample");
+      return measured("sample", () => samples.run(job.data.checkId), job.data.checkId);
+    },
     environment.SAMPLE_CHECK_CONCURRENCY,
     (checkId) => void samples.markFailed(checkId),
   );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
-  const healthServer = healthPort > 0
-    ? createServer((_request, response) => {
-        response.writeHead(200, { "Content-Type": "application/json" });
-        response.end('{"status":"ok"}');
-      }).listen(healthPort, "127.0.0.1")
-    : null;
+  const monitor = startJudgeMonitor({ port: healthPort, bind: environment.JUDGE_HEALTH_BIND,
+    secret: environment.JUDGE_METRICS_SECRET, guard: environment.JUDGE_READINESS_GUARD,
+    telemetry: grading.telemetry, workers: [worker, practiceWorker, regradeWorker, sampleWorker],
+    diagnostics: () => engine instanceof SandboxExecutionEngine ? engine.readDiagnostics() : Promise.resolve(undefined),
+    queues: () => queue.diagnostics() });
+  logger.log(JSON.stringify({ event: "judge.config", concurrency: environment.JUDGE_CONCURRENCY,
+    comparatorPool: environment.JUDGE_COMPARATOR_POOL_SIZE, backgroundConcurrency: environment.REGRADE_CONCURRENCY,
+    sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS }));
 
   const sweeper = setInterval(() => {
     void prisma.staffPracticeAttempt.findMany({
@@ -178,6 +200,7 @@ async function bootstrap(): Promise<void> {
     shuttingDown = true;
     logger.log(`${signal} received, draining`);
     clearInterval(sweeper);
+    await monitor.close();
     // Lets in-flight grading finish so a deploy does not strand submissions.
     await worker.close();
     await practiceWorker.close();
@@ -186,11 +209,6 @@ async function bootstrap(): Promise<void> {
     // restart cannot make one report more work than it did.
     await regradeWorker.close();
     await sampleWorker.close();
-    if (healthServer) {
-      await new Promise<void>((resolve, reject) => {
-        healthServer.close((error) => error ? reject(error) : resolve());
-      });
-    }
     await queue.close();
     await engine.dispose();
     await comparator.dispose();

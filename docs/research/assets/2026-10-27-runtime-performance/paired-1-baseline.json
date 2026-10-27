@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "9ed4d49c177ad4e100aaf7b7be6deeb29f8cee0b",
+  "dirty": true,
+  "image": "sha256:1cb1e5d071c1e8417dd24c5b1f52f049f9747e39ada46b28996fcc749d07803d",
+  "imageRevision": null,
+  "platform": "arm64",
+  "requestedRuns": 1,
+  "cases": 10,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "parallel": 1,
+  "releaseAcceptance": "not assessed; isolated execution microbenchmark only",
+  "completedRuns": 1,
+  "failures": 0,
+  "p50Ms": 17875.848841,
+  "p95Ms": 17875.848841,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "before": {
+    "cpu": "usage_usec 11640253\nuser_usec 9310953\nsystem_usec 2329299\nnr_periods 79\nnr_throttled 74\nthrottled_usec 31086054\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "516042752",
+    "peak": "516108288",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=29.32 avg60=6.01 avg300=1.28 total=4519317\nfull avg10=26.92 avg60=5.53 avg300=1.18 total=4227863"
+  },
+  "after": {
+    "cpu": "usage_usec 38460552\nuser_usec 34056126\nsystem_usec 4404426\nnr_periods 258\nnr_throttled 252\nthrottled_usec 96621562\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "342376448",
+    "peak": "518270976",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=52.14 avg60=18.67 avg300=4.48 total=14551647\nfull avg10=49.36 avg60=17.59 avg300=4.21 total=13805369"
+  },
+  "diagnostics": null,
+  "samples": [
+    {
+      "wallMs": 17875.848841,
+      "cases": [
+        {
+          "wallMs": 69.12079099999937,
+          "runtimeMs": 57,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 49.54716699999972,
+          "runtimeMs": 45,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 88.81425000000036,
+          "runtimeMs": 84,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 6064.277752999999,
+          "runtimeMs": 99,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 30.126791999999114,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 80.07687499999884,
+          "runtimeMs": 78,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 5126.254668999998,
+          "runtimeMs": 102,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 79.65620900000067,
+          "runtimeMs": 77,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 31.22624999999971,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 6256.683127,
+          "runtimeMs": 105,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,508 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "64160384890c434bbb439c7c0cae38d9c4da02b6",
+  "dirty": true,
+  "image": "sha256:1f316925b64d864b31b11b5281db80fc2d4e10efe2da6aadbd6487846c752c8e",
+  "imageRevision": "af8c54aedfcc69adac07dd3e0435b3827a1a5c27",
+  "platform": "arm64",
+  "requestedRuns": 4,
+  "cases": 10,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "parallel": 2,
+  "releaseAcceptance": "not assessed; isolated execution microbenchmark only",
+  "completedRuns": 4,
+  "failures": 0,
+  "p50Ms": 24829.503636,
+  "p95Ms": 31801.612223000004,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "warmupMs": 7751.768378,
+  "before": {
+    "cpu": "usage_usec 11893774\nuser_usec 10283038\nsystem_usec 1610735\nnr_periods 80\nnr_throttled 77\nthrottled_usec 29293301\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "478302208",
+    "peak": "492257280",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=29.23 avg60=6.73 avg300=1.46 total=4392923\nfull avg10=27.64 avg60=6.34 avg300=1.38 total=4141589"
+  },
+  "after": {
+    "cpu": "usage_usec 87139737\nuser_usec 79725284\nsystem_usec 7414452\nnr_periods 647\nnr_throttled 318\nthrottled_usec 64709405\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "30072832",
+    "peak": "492257280",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=12.06 avg60=9.15 avg300=3.05 total=10444634\nfull avg10=12.05 avg60=8.99 avg300=2.98 total=10178442"
+  },
+  "diagnostics": {
+    "version": 1,
+    "generation": "b9e43eaf-0e8f-4c41-b143-045fc15567eb",
+    "pool": {
+      "capacity": 2,
+      "spare": 1,
+      "executing": 0,
+      "idle": 0,
+      "warming": 1,
+      "draining": 0,
+      "waiting": 0,
+      "oldestWaitMs": 0,
+      "oldestWarmMs": 63.00174999999581,
+      "retryExhausted": false,
+      "lastCompletedAgoMs": 2.0327909999978147
+    },
+    "resources": {
+      "cpuQuota": 1.5,
+      "periods": 647,
+      "throttledPeriods": 318,
+      "throttledSeconds": 64.709405,
+      "cpuPressure": 12.05,
+      "memoryBytes": 30072832,
+      "memoryPeakBytes": 492257280,
+      "memoryLimitBytes": 1342177280,
+      "oom": 0,
+      "oomKill": 0,
+      "tasks": 14,
+      "eventLoopP95Ms": 26.017791
+    },
+    "timings": [
+      {
+        "stage": "prepare",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 79.31094399100002,
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          24,
+          35,
+          37,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "acquire",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 108.49460467200005,
+        "buckets": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          4,
+          5,
+          36,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "exit",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 1.415603292000029,
+        "buckets": [
+          0,
+          11,
+          34,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "drain",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 0.003538835999987896,
+        "buckets": [
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "execute",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 1.423430501000021,
+        "buckets": [
+          0,
+          9,
+          34,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "identity",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 0.010552617000003917,
+        "buckets": [
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      },
+      {
+        "stage": "cleanup",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 40,
+        "sum": 0.011100963999990202,
+        "buckets": [
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40,
+          40
+        ]
+      }
+    ],
+    "failures": {
+      "prepare": 0,
+      "drainFallback": 0,
+      "forcedTermination": 0
+    }
+  },
+  "samples": [
+    {
+      "wallMs": 24829.503636,
+      "cases": [
+        {
+          "wallMs": 50.760332999999264,
+          "runtimeMs": 45,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1578.8707090000007,
+          "runtimeMs": 40,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2689.712335,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2588.391042000001,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2795.410875999998,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3431.4092100000016,
+          "runtimeMs": 39,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2770.1116260000017,
+          "runtimeMs": 30,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3219.523376000001,
+          "runtimeMs": 38,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3025.77721,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2679.4983759999996,
+          "runtimeMs": 33,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 23436.22726,
+      "cases": [
+        {
+          "wallMs": 49.42100000000028,
+          "runtimeMs": 41,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 69.12045800000033,
+          "runtimeMs": 68,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2925.577918,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2558.0588339999995,
+          "runtimeMs": 28,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2801.533668,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2901.296668000001,
+          "runtimeMs": 28,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3197.693834999998,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2956.3862100000006,
+          "runtimeMs": 34,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3262.4000019999985,
+          "runtimeMs": 49,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2714.6583759999994,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 29910.229764000003,
+      "cases": [
+        {
+          "wallMs": 1443.9209999999948,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2555.679750999996,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3235.5056689999983,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2711.544541999996,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2494.1577099999995,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2721.698500999999,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2607.6821679999994,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3524.144459999996,
+          "runtimeMs": 67,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 4097.320169000006,
+          "runtimeMs": 87,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 4518.531752000003,
+          "runtimeMs": 63,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 31801.612223000004,
+      "cases": [
+        {
+          "wallMs": 2687.223333999995,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2797.0340429999997,
+          "runtimeMs": 59,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3181.1257929999992,
+          "runtimeMs": 37,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2525.470334999998,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2652.974083999994,
+          "runtimeMs": 43,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2638.3847930000047,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 2884.347001000002,
+          "runtimeMs": 33,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 3358.608334999997,
+          "runtimeMs": 32,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 4139.022752000004,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 4937.377418999997,
+          "runtimeMs": 55,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

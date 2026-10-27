@@ -28,3 +28,17 @@ production configuration, grading identity, pause or deployment is authorized.
    and document whether a full runtime design is justified or the prototype
    should be rejected. Original 100-submission latency/capacity gates remain
    mandatory before any production recommendation.
+
+## Completion record
+
+Implemented the isolated fixture, source verification, bounded pool, local-only
+guards and synthetic probes. Thirteen unit checks passed. Four matched small
+cohorts completed (13 submissions / 88 performance cases per engine); native
+ran 25 smoke checks before each cohort. All failed setup attempts are retained.
+See the [verification report](../../research/2026-10-27-native-grading-prototype-verification.md).
+
+Queue/commit was correctly deferred because its snapshots permit only the
+Pyodide identity. Full system accounting, official/background reservation,
+100-submission acceptance and four-slot timing remain unassessed. These are
+production-design gates, not completed prototype claims. Production settings,
+records, queues and deployment were unchanged.

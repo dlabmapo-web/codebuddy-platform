@@ -24,7 +24,9 @@ import { createConnection } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 const socketPath='/run/cove-sandbox/benchmark.sock';
+const warmupBegan=performance.now();
 const sandbox=await startSandbox({socketPath,clientGid:1001,concurrency:${concurrency},spare:${spare},pyodideVersion:'0.27.5',runnerUidBase:20000,requireIsolation:true});
+const warmupMs=performance.now()-warmupBegan;
 function exchange(frame){return new Promise((resolve,reject)=>{let data='';const socket=createConnection(socketPath);let settled=false;
  const done=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);socket.destroy();error?reject(error):resolve(value)};
  const timer=setTimeout(()=>done(new Error('transport timeout')),47000);
@@ -51,7 +53,7 @@ try {
   if(batch.some(sample=>sample.cases.some(o=>!o.correct))) break;
  }
  const health=await exchange({type:'health',id:randomUUID()});
- console.log(JSON.stringify({node:process.version,arch:process.arch,isolated:sandbox.isolated,before,after:resources(),diagnostics:health.diagnostics??null,samples}));
+ console.log(JSON.stringify({node:process.version,arch:process.arch,isolated:sandbox.isolated,warmupMs,before,after:resources(),diagnostics:health.diagnostics??null,samples}));
 }finally{await sandbox.close()}
 `;
 let child;
@@ -69,7 +71,16 @@ child.stdout.on('data', data => { stdout += data; });
 child.stderr.on('data', data => { if (stderr.length < 16000) stderr += data; });
 const code = await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
 cleanup();
-if (code !== 0) { process.stderr.write(stderr); throw new Error(`Fixture exited ${code}`); }
+if (code !== 0) {
+  const report = { version: 1, boundary: 'sandbox execution only; excludes admission, comparator, points and commit',
+    commit, dirty, image: inspect.Id, imageRevision: inspect.Config.Labels?.['org.opencontainers.image.revision'] ?? null,
+    platform: inspect.Architecture, requestedRuns: runs, cases, cpus, concurrency, spare, parallel,
+    releaseAcceptance: 'not assessed', completedRuns: 0, failures: 1, failurePhase: 'fixture process', processCode: code,
+    p50Ms: null, p95Ms: null };
+  mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, JSON.stringify(report, null, 2)+'\n');
+  console.log(JSON.stringify({ output, failures: 1, failurePhase: report.failurePhase }));
+  process.stderr.write(stderr); process.exit(2);
+}
 const data = JSON.parse(stdout.trim().split('\n').at(-1));
 const values = data.samples.filter(s => s.cases.length === cases && s.cases.every(c => c.correct)).map(s => s.wallMs).sort((a,b) => a-b);
 const percentile = p => values.length ? values[Math.min(values.length-1, Math.ceil(p*values.length)-1)] : null;

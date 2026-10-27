@@ -1,7 +1,8 @@
 # Local native-grading feasibility prototype
 
 Date: 2026-10-27.
-Status: approved by the user on 2026-10-27 for local-only implementation.
+Status: approved by the user on 2026-10-27; local prototype implemented and
+diagnostic cohorts completed. Production acceptance remains unassessed.
 No new runtime is selected for production or authorized to regrade historical
 submissions. Production configuration remains unchanged.
 
@@ -73,6 +74,26 @@ interpreter/container overhead. Reject a configuration that cannot enforce the
 original limit without exceeding its aggregate envelope; do not quietly lower
 the student's allowance to make a benchmark fit.
 
+The initial two-slot safety smoke passed before enabling the optional four-slot
+local comparison. Its written budgets are:
+
+| Local configuration | Guests including unused spare | Guest ceiling | Controller/comparator ceiling | Combined memory / CPU |
+| --- | ---: | --- | --- | --- |
+| Two active | 3 | 384 MiB / 0.5 CPU each | 768 MiB / 0.75 CPU | 1,920 MiB / 2.25 CPUs |
+| Four active | 5 | 320 MiB / 0.3 CPU each | 448 MiB / 0.75 CPU | 2,048 MiB / 2.25 CPUs |
+
+Each experiment keeps a 256 MiB learner RSS limit; guest overhead has at least
+64 MiB. This is a redistribution within the combined grading envelope, not a
+production configuration recommendation. Static guest quotas cannot borrow an
+idle guest's CPU, unlike the shared Pyodide sandbox; report this difference.
+A future four-slot Pyodide comparison must keep its 1,280 MiB / 1.5-CPU
+sandbox and one spare; any startup/OOM/timeout failure must be saved, not
+excused by raising limits. Four-slot timing was deferred: the written table
+accounts for container ceilings, but full system accounting and official/
+background reservation acceptance remain open. Docker daemon/VM and outer
+harness overhead are outside the measured cgroups; the table does not prove
+full resource-budget acceptance.
+
 Preserve case sequencing, stdin, Unicode, newline/input-prompt semantics,
 stdout/stderr separation, output truncation, exit/error classification and the
 existing case/total/comparator deadlines. Startup and cleanup remain measured
@@ -124,3 +145,10 @@ host. Preserve the existing resource gate. A separate execution-host or revised
 resource allocation proposal must specify the full combined budget and original
 rootless recovery/100-run drawing gates; no service is stopped, allowance
 reduced, warm standby enabled, or host purchased by this proposal.
+
+## Local outcome
+
+See the [verification report](../../research/2026-10-27-native-grading-prototype-verification.md)
+for all paired results and failed setup attempts. Native execution is promising
+for multiple cases, but missed five seconds in the small simultaneous cohort.
+The approved experiment is complete; no production engine selection follows.

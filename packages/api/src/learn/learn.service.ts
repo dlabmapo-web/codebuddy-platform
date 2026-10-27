@@ -46,7 +46,7 @@ import { automaticLatestSubmission } from './latest-submission.js';
 const workspaceMaterialInclude = {
   programmingExercise: {
     include: {
-      referencePdf: { include: { asset: true, material: true } },
+      referencePdf: { include: { asset: true, material: { include: { lecture: { include: { courseModule: true } } } } } },
       testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] },
       hints: { orderBy: [{ position: "asc" }, { id: "asc" }] },
     },
@@ -397,7 +397,7 @@ export class LearnService {
         submissionAvailability: exercise.submissionPolicy === "PRACTICE_ONLY" ? "PRACTICE_ONLY" : exercise.quiz || (exercise.testCases.length && resolveGradingProfile(exercise, exercise.testCases).kind !== "unsupported") ? "READY" : "INVALID_GRADING",
         maximumPoints: (exercise.materialMaximumHundredths ?? 10000) / 100,
         hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
-        referencePdf: referencePdfMetadata(exercise.referencePdf),
+        referencePdf: referencePdfMetadata(exercise.referencePdf, course.id),
         quiz: publicQuiz(exercise.quiz),
         materialId: material.id,
         title: material.title,

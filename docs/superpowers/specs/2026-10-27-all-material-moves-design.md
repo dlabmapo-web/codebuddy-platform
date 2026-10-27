@@ -1,7 +1,6 @@
 # Moving every material type between lectures
 
-Date: 2026-10-27. Status: proposed; waiting for review of the changed PDF-reference
-boundary. User intent: move an item like a normal coding problem, between
+Date: 2026-10-27. Status: approved and implemented locally on 2026-10-27; not deployed. User intent: move an item like a normal coding problem, between
 lectures/modules of its current course, preserving content and student work.
 
 ## Confirmed cause
@@ -97,3 +96,22 @@ Run relevant API and frontend suites/typechecks and installed Next.js guidance
 before frontend edits. Browser-verify a local PDF+code move and PDF move, read
 and edit after moving, retained instructions, destination order and Undo.
 No production material move, deployment or regrading is authorized by this spec.
+
+## Confirmed interaction requirement
+
+The user clarified that every supported material must move through both the
+existing dotted drag handle/drop targets and the three-dot menu's Move action.
+Both must reach the same authorized transaction and retain rollback/Undo. No
+special PDF-only move workflow is introduced. Parameterized row and builder
+hook tests cover both entry points for all types, including PDF+code.
+
+## Existing UI preserved
+
+The user explicitly requires the deployed course-builder appearance to stay the
+same. The separate local verification harness was not a product redesign and
+is removed after testing. Preserve the existing outline rows, grip placement,
+three-dot actions, move dialog, styles and move-dialog copy. Only PDF reference
+selection/dependency data and correctness copy change where required by the
+new course-local reference behavior. No new application route or test page ships.
+
+Implementation and test evidence: [verification record](../../research/2026-10-27-all-material-moves-verification.md).

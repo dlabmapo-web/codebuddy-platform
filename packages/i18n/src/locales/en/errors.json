@@ -154,7 +154,7 @@
   "PDF_UPLOAD_EXPIRED": "Upload the file again before saving.",
   "PDF_EDIT_STALE": "The material changed. Reload before editing.",
   "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
-  "PDF_REFERENCE_INVALID": "Choose a supplementary PDF in this lecture.",
+  "PDF_REFERENCE_INVALID": "Choose a supplementary PDF in this course.",
   "PDF_REFERENCE_IN_USE": "Change or detach the referring exercises first.",
   "PDF_REFERENCE_NOT_READY": "Publish the reference PDF and its parents first.",
   "LIBRARY_IMPORT_SOURCE_CHANGED": "The source course changed. Refresh the preview before copying.",

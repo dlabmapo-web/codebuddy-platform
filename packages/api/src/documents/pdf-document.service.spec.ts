@@ -38,6 +38,25 @@ function setup() {
   return { prisma, access, storage, service };
 }
 describe("PDF authorization and asset lifecycle", () => {
+  it("signs an embedded same-course PDF after its exercise moves to another lecture", async () => {
+    const { service, prisma, storage } = setup();
+    prisma.material.findFirst.mockResolvedValueOnce({ id: 'exercise', lecture: { courseModule: { courseId: 'course' } } })
+      .mockResolvedValueOnce({ id: 'pdf', title: 'Instructions', lectureId: 'source-lecture',
+        lecture: { courseModule: { course: { id: 'course' } } },
+        pdfDocument: { revision: 1, placement: 'BOTH', asset: { state: 'READY', objectKey: 'private-pdf', originalFilename: 'instructions.pdf', byteSize: 100, pageCount: 1 } } });
+    const result = await service.read(identity, { ...target, exerciseMaterialId: 'exercise' });
+    expect(result.url).toBe('signed'); expect(storage.sign).toHaveBeenCalled();
+    expect(prisma.course.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("never signs an embedded PDF from a different course even if both materials are accessible", async () => {
+    const { service, prisma, storage } = setup();
+    prisma.material.findFirst.mockResolvedValueOnce({ id: 'exercise', lecture: { courseModule: { courseId: 'course' } } })
+      .mockResolvedValueOnce({ id: 'pdf', lecture: { courseModule: { course: { id: 'other-course' } } }, pdfDocument: { placement: 'BOTH' } });
+    await expect(service.read(identity, { ...target, exerciseMaterialId: 'exercise' })).rejects.toMatchObject({ code: 'PDF_NOT_AVAILABLE' });
+    expect(storage.sign).not.toHaveBeenCalled();
+  });
+
   it("requires an accessible exercise with the exact persisted PDF link before embedded signing", async () => {
     const { service, prisma, storage } = setup();
     prisma.material.findFirst.mockResolvedValue(null);

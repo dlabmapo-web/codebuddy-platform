@@ -1057,6 +1057,7 @@ export class CourseService {
       const material = await tx.material.findFirst({
         where: { id: input.materialId },
         include: {
+          programmingExercise: { select: { referencePdfMaterialId: true, quiz: true } },
           lecture: {
             select: {
               isVisible: true,
@@ -1114,8 +1115,12 @@ export class CourseService {
       if (!reparenting && sameOrder(currentIds, ordering)) return false;
 
       if (reparenting) {
-        const linked = await tx.programmingExercise.count({ where: { OR: [{ materialId: material.id, referencePdfMaterialId: { not: null } }, { referencePdfMaterialId: material.id }] } });
-        if (linked) throw new AppException("PDF_REFERENCE_IN_USE", HttpStatus.CONFLICT);
+        if (material.type === "PROGRAMMING_EXERCISE" && material.programmingExercise?.referencePdfMaterialId) {
+          await validatePdfReference(tx, { academyId: input.academyId, courseId: input.courseId,
+            lectureId: destination.id, quiz: material.programmingExercise.quiz },
+          material.programmingExercise.referencePdfMaterialId,
+          material.isVisible && material.lecture.courseModule.course.isVisible && destination.isVisible && destination.courseModule.isVisible);
+        }
         await reparentAbovePositions(
           tx,
           "material",

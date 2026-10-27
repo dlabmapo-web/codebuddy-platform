@@ -303,12 +303,14 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
             },
           ],
         };
+    let exerciseCourseId: string | undefined;
     if (input.exerciseMaterialId) {
       const exercise = await this.prisma.material.findFirst({
         where: { AND: [where, { id: input.exerciseMaterialId, type: "PROGRAMMING_EXERCISE", programmingExercise: { referencePdfMaterialId: input.materialId, quiz: { equals: PrismaValues.DbNull } } }] },
-        select: { id: true },
+        select: { id: true, lecture: { select: { courseModule: { select: { courseId: true } } } } },
       });
       if (!exercise) throw new AppException("PDF_NOT_AVAILABLE", 404);
+      exerciseCourseId = exercise.lecture.courseModule.courseId;
     }
     const material = await this.prisma.material.findFirst({
       where: {
@@ -329,6 +331,8 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     if (!material?.pdfDocument)
       throw new AppException("PDF_NOT_AVAILABLE", 404);
     const course = material.lecture.courseModule.course;
+    if (exerciseCourseId && course.id !== exerciseCourseId) throw new AppException("PDF_NOT_AVAILABLE", 404);
+    if (input.exerciseMaterialId && material.pdfDocument.placement === "MAIN") throw new AppException("PDF_NOT_AVAILABLE", 404);
     const outline = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
       where: { id: course.id },
       include: visibleCurriculumInclude,

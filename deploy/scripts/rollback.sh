@@ -7,6 +7,8 @@ require_file "$previous"
 
 current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"
+# Stop the newer web before restoring an API that may lack its endpoints.
+compose stop --timeout 30 studio
 stop_learning_services
 install -m 600 "$previous" "$deployment_env"
 

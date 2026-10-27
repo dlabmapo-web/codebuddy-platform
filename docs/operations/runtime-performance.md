@@ -195,7 +195,10 @@ increasing hidden process counts or silently accepting a failed gate.
 
 The local navigation changes and their evidence are documented in
 [local verification](../research/2026-10-27-navigation-performance-local-verification.md).
-Deploy the additive API before the new web (`getOutline` must exist). Compose
+Deploy the additive API before the new web (`getOutline` must exist). The release
+script now starts the API with `compose up --wait` before updating the remaining
+services. Both automatic and manual rollback stop the newer web before restoring
+an older API. Compose
 sets server-only `INTERNAL_API_RPC_URL=http://api:4000/api/rpc`; the browser keeps
 its public API URL. No migration or resource-limit change is required. Roll back
 the web before an API image that removes the endpoint. Re-measure deployed

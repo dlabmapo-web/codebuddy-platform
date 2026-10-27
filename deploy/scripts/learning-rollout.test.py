@@ -115,6 +115,74 @@ class LearningRolloutTests(unittest.TestCase):
         self.assertEqual([command[-1] for command in commands], ["gui-service", "video-worker"])
         self.assertTrue(all(command[-4:-1] == ["stop", "--timeout", "30"] for command in commands))
 
+    def prepare_deployment_fixture(self):
+        for name in ("deploy.sh", "rollback.sh"):
+            shutil.copy(SCRIPTS / name, self.root / "scripts" / name)
+        for name in ("render-monitoring-config.sh", "preflight.sh", "wait-healthy.sh", "smoke.sh"):
+            script = self.root / "scripts" / name
+            script.write_text("#!/bin/sh\nexit 0\n")
+            script.chmod(0o700)
+        (self.root / "flock").write_text("#!/bin/sh\nexit 0\n")
+        (self.root / "flock").chmod(0o700)
+        (self.root / "docker").write_text(r"""#!/usr/bin/env python3
+import json, os, pathlib, sys
+root = pathlib.Path(os.environ['COVE_DEPLOY_ROOT'])
+args = sys.argv[1:]
+manifest = (root / 'deployment.env').read_text()
+with (root / 'calls.jsonl').open('a') as output:
+    output.write(json.dumps({'args': args, 'candidate': 'new-api' in manifest}) + '\n')
+if os.environ.get('FAIL_API') and '--wait' in args:
+    sys.exit(42)
+if os.environ.get('FAIL_APP') and args[-3:] == ['up', '-d', '--remove-orphans'] and 'new-api' in manifest:
+    sys.exit(43)
+""")
+        self.candidate = self.root / "new.env"
+        self.candidate.write_text(self.manifest.read_text().replace("API_IMAGE=ghcr.io/acme/old", "API_IMAGE=ghcr.io/acme/new-api"))
+        self.previous_manifest = self.manifest.read_text()
+
+    def deployment_calls(self):
+        return [json.loads(line) for line in (self.root / "calls.jsonl").read_text().splitlines()]
+
+    def test_deployment_waits_for_api_before_replacing_web(self):
+        self.prepare_deployment_fixture()
+        self.run_script("deploy.sh", str(self.candidate))
+        calls = self.deployment_calls()
+        api = next(i for i, call in enumerate(calls) if '--wait' in call['args'])
+        app = next(i for i, call in enumerate(calls) if call['args'][-3:] == ['up', '-d', '--remove-orphans'])
+        self.assertLess(api, app)
+        self.assertEqual(calls[api]['args'][-1], 'api')
+        self.assertEqual((self.root / 'state/current-deployment.env').read_text(), self.candidate.read_text())
+
+    def test_api_failure_does_not_start_new_web_and_restores_manifest(self):
+        self.prepare_deployment_fixture()
+        self.env['FAIL_API'] = '1'
+        result = self.run_script("deploy.sh", str(self.candidate), check=False)
+        self.assertEqual(result.returncode, 42)
+        self.assertEqual(self.manifest.read_text(), self.previous_manifest)
+        app_starts = [call for call in self.deployment_calls() if call['args'][-3:] == ['up', '-d', '--remove-orphans']]
+        self.assertEqual(len(app_starts), 1)
+        self.assertFalse(app_starts[0]['candidate'])
+
+    def test_automatic_rollback_stops_new_web_before_restoring_old_api(self):
+        self.prepare_deployment_fixture()
+        self.env['FAIL_APP'] = '1'
+        self.assertEqual(self.run_script("deploy.sh", str(self.candidate), check=False).returncode, 43)
+        calls = self.deployment_calls()
+        stop = next(i for i, call in enumerate(calls) if call['args'][-4:] == ['stop', '--timeout', '30', 'studio'])
+        restored = next(i for i, call in enumerate(calls) if call['args'][-3:] == ['up', '-d', '--remove-orphans'] and not call['candidate'])
+        self.assertLess(stop, restored)
+
+    def test_manual_rollback_stops_new_web_before_restoring_old_api(self):
+        self.prepare_deployment_fixture()
+        (self.root / 'state').mkdir()
+        (self.root / 'state/previous-deployment.env').write_text(self.previous_manifest)
+        self.manifest.write_text(self.candidate.read_text())
+        self.run_script('rollback.sh')
+        calls = self.deployment_calls()
+        self.assertEqual(calls[0]['args'][-4:], ['stop', '--timeout', '30', 'studio'])
+        self.assertTrue(calls[0]['candidate'])
+        self.assertEqual(self.manifest.read_text(), self.previous_manifest)
+
     def test_runtime_is_pinned_by_digest_and_secret_file_stays_private(self):
         with self.manifest.open("a") as output:
             output.write(f"GUI_RUNTIME_IMAGE=ghcr.io/acme/cove-gui-runtime:sha-{SHA}\n")

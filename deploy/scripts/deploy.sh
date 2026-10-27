@@ -32,6 +32,8 @@ rollback_on_error() {
   fi
   printf 'Deployment failed; attempting application rollback.\n' >&2
   if [[ "$had_previous" == true ]]; then
+    # A newer web can require endpoints absent from the restored API.
+    compose stop --timeout 30 studio || true
     stop_learning_services
     install -m 600 "$state_dir/previous-deployment.env" "$deployment_env"
     if feature_enabled GUI_ENABLED; then
@@ -58,6 +60,9 @@ fi
 compose --profile operations run --rm migrate
 compose --profile operations run --rm --entrypoint node migrate \
   node_modules/tsx/dist/cli.mjs scripts/setup-learning-storage.mts --production
+# Keep the existing web serving until the new API passes its health check.
+# getOutline is additive: the old web remains compatible during this stage.
+compose up -d --wait --wait-timeout "${HEALTH_TIMEOUT_SECONDS:-300}" api
 compose up -d --remove-orphans
 compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "$script_dir/wait-healthy.sh"

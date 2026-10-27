@@ -1,7 +1,6 @@
 import {
   platformRoleHasPermission,
   type ContentLens,
-  type PlatformContentSummary,
 } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
@@ -55,26 +54,15 @@ export async function renderContentPage({
   let initialData: ContentPage | null = null;
   let denied = false;
 
-  // Fetched together, but they fail apart. The summary is eight counts across
-  // every academy and is the likeliest call on this page to time out; the rows
-  // are what the operator came for. Folding both into one `Promise.all` made a
-  // slow count answer "Content is unavailable" over a table that had loaded.
-  const [rows, summary] = await Promise.allSettled([
-    lens === 'courses'
-      ? client.platformContent.courses(query)
-      : client.platformContent.classes(query),
-    client.platformContent.summary({ academyIds: query.academyIds }),
-  ]);
-
-  if (rows.status === 'fulfilled') {
-    initialData = rows.value;
-  } else {
-    denied = isAccessDeniedError(rows.reason);
+  // The table is the primary content. Supplementary counts load through the
+  // existing client query, so a slow summary cannot hold back usable rows.
+  try {
+    initialData = lens === 'courses'
+      ? await client.platformContent.courses(query)
+      : await client.platformContent.classes(query);
+  } catch (error) {
+    denied = isAccessDeniedError(error);
   }
-  // No strip rather than no page. The client refetches it on mount, so a
-  // summary that failed here is usually on screen a moment later.
-  const initialSummary: PlatformContentSummary | null =
-    summary.status === 'fulfilled' ? summary.value : null;
 
   return (
     <PlatformShell
@@ -91,7 +79,7 @@ export async function renderContentPage({
             canCopyToLibrary={canCopyToLibrary}
             initialData={initialData}
             initialKey={serializeContentQuery(query)}
-            initialSummary={initialSummary}
+            initialSummary={null}
             initialSummaryKey={contentSummaryKey(query.academyIds)}
             lens={lens}
           />

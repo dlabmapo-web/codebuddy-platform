@@ -248,6 +248,7 @@ describe("AuthService.me profile images", () => {
       }],
     };
     const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([record]),
       user: { findUnique: vi.fn().mockResolvedValue(record) },
     } as unknown as PrismaService;
     const signMany = vi.fn().mockResolvedValue([

@@ -14,7 +14,9 @@ export function createServerORPCClient(
   forwardViewRole = true,
 ): ContractRouterClient<AppContract> {
   const link = new RPCLink({
-    url: publicConfig.apiUrl,
+    // Server renders can call the API on the private container network. Keep
+    // this runtime-only setting out of publicConfig and browser bundles.
+    url: process.env.INTERNAL_API_RPC_URL?.trim() || publicConfig.apiUrl,
     headers: async () => {
       const headers: Record<string, string> = {};
       if (accessToken) {

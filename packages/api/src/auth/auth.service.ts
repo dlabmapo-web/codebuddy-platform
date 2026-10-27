@@ -1,3 +1,4 @@
+import { readAccount, type AccountRead } from "./account-read.js";
 import { randomUUID } from "node:crypto";
 
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -475,7 +476,7 @@ export class AuthService {
    * which is every account until someone uploads one — so the common path
    * costs nothing and only a person who chose a photo pays for it.
    */
-  private async present(user: AuthUserRecord): Promise<AuthMeResponse> {
+  private async present(user: AccountRead): Promise<AuthMeResponse> {
     const allowed = user.authUserId ? await this.supabaseAuth.dlabAcademyIds?.(user.authUserId) : null;
     if (allowed) user = { ...user, memberships: user.memberships.filter(m => allowed.includes(m.academyId)) };
 
@@ -517,10 +518,7 @@ export class AuthService {
   }
 
   async me(identity: SupabaseIdentity): Promise<AuthMeResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { authUserId: identity.authUserId },
-      include: userInclude,
-    });
+    const user = await readAccount(this.prisma, identity.authUserId);
 
     if (!user) {
       return this.bootstrap(identity);
@@ -559,7 +557,7 @@ function isUsernameConflict(error: unknown): boolean {
 }
 
 function toAuthMe(
-  user: AuthUserRecord,
+  user: AccountRead,
   imageUrl: string | null = null,
   imageUrls: ReadonlyMap<string, string> = new Map(),
 ): AuthMeResponse {

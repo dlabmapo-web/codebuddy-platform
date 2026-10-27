@@ -1,0 +1,534 @@
+{
+  "boundary": "deployed read methods in enforced read-only transaction; fresh auxiliary process; excludes HTTP/token/RSC and may serialize independent SQL",
+  "readOnly": true,
+  "samples": [
+    {
+      "round": 0,
+      "name": "account",
+      "durationMs": 1058.7495100000006,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 33.59691799999928,
+          "rows": 1
+        },
+        "media_assets": {
+          "count": 2,
+          "totalMs": 160.61899500000072,
+          "rows": 1
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 63.73025199999938,
+          "rows": 1
+        },
+        "academy_join_requests": {
+          "count": 1,
+          "totalMs": 95.13088300000072,
+          "rows": 1
+        },
+        "academies": {
+          "count": 2,
+          "totalMs": 202.43967499999962,
+          "rows": 2
+        },
+        "academy_member_profiles": {
+          "count": 1,
+          "totalMs": 101.16846499999974,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 132.5270700000001,
+          "rows": 2
+        },
+        "academy_feature_flags": {
+          "count": 1,
+          "totalMs": 128.76256600000033,
+          "rows": 5
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 34.04698499999995,
+          "rows": 0
+        }
+      }
+    },
+    {
+      "round": 0,
+      "name": "courses",
+      "durationMs": 576.016028,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 36.72181100000034,
+          "rows": 1
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 33.979809999999816,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 45.926118000000315,
+          "rows": 1
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 32.14450599999964,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 68.27142100000037,
+          "rows": 2
+        },
+        "courses": {
+          "count": 2,
+          "totalMs": 137.68945500000063,
+          "rows": 25
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 41.48696800000016,
+          "rows": 33
+        },
+        "library_course_imports": {
+          "count": 1,
+          "totalMs": 66.27471700000024,
+          "rows": 0
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 134.76128900000003,
+          "rows": 170
+        },
+        "materials": {
+          "count": 1,
+          "totalMs": 105.13926600000013,
+          "rows": 988
+        }
+      },
+      "resultCount": 23
+    },
+    {
+      "round": 0,
+      "name": "classes",
+      "durationMs": 747.9249140000002,
+      "queryCount": 17,
+      "queries": {
+        "users": {
+          "count": 3,
+          "totalMs": 266.7871879999984,
+          "rows": 14
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 109.74816999999985,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 3,
+          "totalMs": 236.29610700000012,
+          "rows": 14
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 35.179903000000195,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 3,
+          "totalMs": 232.78129799999988,
+          "rows": 14
+        },
+        "classes": {
+          "count": 1,
+          "totalMs": 32.825762999999824,
+          "rows": 21
+        },
+        "class_courses": {
+          "count": 1,
+          "totalMs": 34.387408000000505,
+          "rows": 34
+        },
+        "class_assistant_teachers": {
+          "count": 1,
+          "totalMs": 100.55682999999954,
+          "rows": 13
+        },
+        "courses": {
+          "count": 1,
+          "totalMs": 100.6171319999994,
+          "rows": 15
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 132.2600249999996,
+          "rows": 25
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 98.47894500000075,
+          "rows": 136
+        }
+      },
+      "resultCount": 21
+    },
+    {
+      "round": 1,
+      "name": "account",
+      "durationMs": 489.88326999999845,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 44.16472100000101,
+          "rows": 1
+        },
+        "media_assets": {
+          "count": 2,
+          "totalMs": 165.69147599999815,
+          "rows": 1
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 62.75009999999929,
+          "rows": 1
+        },
+        "academy_join_requests": {
+          "count": 1,
+          "totalMs": 94.2979149999992,
+          "rows": 1
+        },
+        "academies": {
+          "count": 2,
+          "totalMs": 194.68479000000116,
+          "rows": 2
+        },
+        "academy_member_profiles": {
+          "count": 1,
+          "totalMs": 95.52940800000033,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 131.15417799999886,
+          "rows": 2
+        },
+        "academy_feature_flags": {
+          "count": 1,
+          "totalMs": 134.0436239999999,
+          "rows": 5
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 61.363680000000386,
+          "rows": 0
+        }
+      }
+    },
+    {
+      "round": 1,
+      "name": "courses",
+      "durationMs": 456.16792299999906,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 34.89871099999982,
+          "rows": 1
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 37.90942299999915,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 38.72843599999942,
+          "rows": 1
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 38.7822559999986,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 31.547373999999763,
+          "rows": 2
+        },
+        "courses": {
+          "count": 2,
+          "totalMs": 130.20240899999953,
+          "rows": 25
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 32.766562000000704,
+          "rows": 33
+        },
+        "library_course_imports": {
+          "count": 1,
+          "totalMs": 63.36189800000102,
+          "rows": 0
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 95.71906300000046,
+          "rows": 170
+        },
+        "materials": {
+          "count": 1,
+          "totalMs": 44.698405000001,
+          "rows": 988
+        }
+      },
+      "resultCount": 23
+    },
+    {
+      "round": 1,
+      "name": "classes",
+      "durationMs": 735.7430700000004,
+      "queryCount": 17,
+      "queries": {
+        "users": {
+          "count": 3,
+          "totalMs": 307.683579999999,
+          "rows": 14
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 35.884995999998864,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 3,
+          "totalMs": 331.4199470000003,
+          "rows": 14
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 31.979059000001143,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 3,
+          "totalMs": 266.2031270000007,
+          "rows": 14
+        },
+        "classes": {
+          "count": 1,
+          "totalMs": 32.279968000000736,
+          "rows": 21
+        },
+        "class_courses": {
+          "count": 1,
+          "totalMs": 34.15865500000109,
+          "rows": 34
+        },
+        "class_assistant_teachers": {
+          "count": 1,
+          "totalMs": 114.16680500000075,
+          "rows": 13
+        },
+        "courses": {
+          "count": 1,
+          "totalMs": 113.02854600000137,
+          "rows": 15
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 235.8472869999987,
+          "rows": 25
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 130.41865099999995,
+          "rows": 136
+        }
+      },
+      "resultCount": 21
+    },
+    {
+      "round": 2,
+      "name": "account",
+      "durationMs": 691.850563,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 33.244001999999455,
+          "rows": 1
+        },
+        "media_assets": {
+          "count": 2,
+          "totalMs": 236.0624799999987,
+          "rows": 1
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 89.34128500000043,
+          "rows": 1
+        },
+        "academy_join_requests": {
+          "count": 1,
+          "totalMs": 157.45381300000008,
+          "rows": 1
+        },
+        "academies": {
+          "count": 2,
+          "totalMs": 330.34256599999935,
+          "rows": 2
+        },
+        "academy_member_profiles": {
+          "count": 1,
+          "totalMs": 168.12713099999928,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 246.73057899999912,
+          "rows": 2
+        },
+        "academy_feature_flags": {
+          "count": 1,
+          "totalMs": 193.00718400000005,
+          "rows": 5
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 46.73989299999994,
+          "rows": 0
+        }
+      }
+    },
+    {
+      "round": 2,
+      "name": "courses",
+      "durationMs": 467.4531479999987,
+      "queryCount": 11,
+      "queries": {
+        "users": {
+          "count": 1,
+          "totalMs": 31.64460700000018,
+          "rows": 1
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 38.42395000000033,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 1,
+          "totalMs": 31.335972999999285,
+          "rows": 1
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 30.905762000000323,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 1,
+          "totalMs": 63.3128770000003,
+          "rows": 2
+        },
+        "courses": {
+          "count": 2,
+          "totalMs": 200.95806500000253,
+          "rows": 25
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 36.100006000000576,
+          "rows": 33
+        },
+        "library_course_imports": {
+          "count": 1,
+          "totalMs": 135.7687560000013,
+          "rows": 0
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 171.04644200000075,
+          "rows": 170
+        },
+        "materials": {
+          "count": 1,
+          "totalMs": 38.43485200000032,
+          "rows": 988
+        }
+      },
+      "resultCount": 23
+    },
+    {
+      "round": 2,
+      "name": "classes",
+      "durationMs": 604.5285430000004,
+      "queryCount": 17,
+      "queries": {
+        "users": {
+          "count": 3,
+          "totalMs": 285.3942169999991,
+          "rows": 14
+        },
+        "dlab_identities": {
+          "count": 1,
+          "totalMs": 32.354567999998835,
+          "rows": 0
+        },
+        "academy_memberships": {
+          "count": 3,
+          "totalMs": 234.51899000000049,
+          "rows": 14
+        },
+        "academies": {
+          "count": 1,
+          "totalMs": 32.73099799999909,
+          "rows": 1
+        },
+        "academy_membership_roles": {
+          "count": 3,
+          "totalMs": 245.14849800000047,
+          "rows": 14
+        },
+        "classes": {
+          "count": 1,
+          "totalMs": 32.615192999999636,
+          "rows": 21
+        },
+        "class_courses": {
+          "count": 1,
+          "totalMs": 51.143866000000344,
+          "rows": 34
+        },
+        "class_assistant_teachers": {
+          "count": 1,
+          "totalMs": 110.99531500000012,
+          "rows": 13
+        },
+        "courses": {
+          "count": 1,
+          "totalMs": 94.31806700000016,
+          "rows": 15
+        },
+        "course_modules": {
+          "count": 1,
+          "totalMs": 152.24380199999905,
+          "rows": 25
+        },
+        "lectures": {
+          "count": 1,
+          "totalMs": 97.14674900000136,
+          "rows": 136
+        }
+      },
+      "resultCount": 21
+    }
+  ]
+}

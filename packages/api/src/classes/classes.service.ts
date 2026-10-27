@@ -1,3 +1,5 @@
+import { classListQuery } from "./class-list-query.js";
+import { courseCounts } from "../content/course-counts.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { displayableEmail, effectiveAcademyRoles } from "@cove/shared";
 
@@ -40,18 +42,6 @@ type ClassRequestContext = { requestId?: string };
  * status and role come back so the caller can say "unavailable" instead of
  * silently showing a suspended member as the responsible teacher.
  */
-const assignedTeacherSelect = {
-  select: {
-    id: true,
-    role: true,
-    // The assignment is effective while the member *holds* TEACHER, which for
-    // somebody who also manages is an extra role rather than their primary.
-    extraRoles: { select: { role: true } },
-    status: true,
-    user: { select: { id: true, displayName: true, status: true } },
-  },
-} as const;
-
 /** The detail page names the person exactly; the list gets by on a name. */
 const assignedTeacherDetailSelect = {
   select: {
@@ -76,14 +66,6 @@ const assignedTeacherDetailSelect = {
  * The assistants, ordered the way the panel lists them: by name, so the set
  * reads the same on every load rather than in insertion order.
  */
-const assistantTeachersSelect = {
-  select: { teacher: assignedTeacherSelect },
-  orderBy: [
-    { teacher: { user: { displayName: "asc" } } },
-    { membershipId: "asc" },
-  ],
-} satisfies Prisma.Class$assistantTeachersArgs;
-
 const assistantTeachersDetailSelect = {
   select: { teacher: assignedTeacherDetailSelect },
   orderBy: [
@@ -91,36 +73,6 @@ const assistantTeachersDetailSelect = {
     { membershipId: "asc" },
   ],
 } satisfies Prisma.Class$assistantTeachersArgs;
-
-/** The list intentionally avoids loading roster PII just to calculate a count. */
-const classListInclude = {
-  courseAssignments: {
-    include: {
-      course: {
-        select: {
-          id: true,
-          title: true,
-          isVisible: true,
-          // The ancestor chain a student walks, so the panel can say that an
-          // assigned, published course still delivers nothing.
-          modules: {
-            where: { isVisible: true },
-            select: {
-              lectures: {
-                where: { isVisible: true },
-                select: { _count: { select: { materials: { where: { isVisible: true } } } } },
-              },
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ course: { title: "asc" } }, { courseId: "asc" }],
-  },
-  assignedTeacher: assignedTeacherSelect,
-  assistantTeachers: assistantTeachersSelect,
-  _count: { select: { enrollments: true } },
-} as const satisfies Prisma.ClassInclude;
 
 const classDetailInclude = {
   courseAssignments: {
@@ -176,7 +128,13 @@ const classDetailInclude = {
   },
 } as const satisfies Prisma.ClassInclude;
 
-type ClassListRecord = Prisma.ClassGetPayload<{ include: typeof classListInclude }>;
+/** The list SQL and detail Prisma read feed the same public summary mapper. */
+type ClassListRecord = Prisma.ClassGetPayload<object> & {
+  courseAssignments: Array<{ course: { id: string; title: string; isVisible: boolean } }>;
+  assignedTeacher: Parameters<typeof toTeacherSummary>[0] | null;
+  assistantTeachers: Array<{ teacher: Parameters<typeof toTeacherSummary>[0] }>;
+  _count: { enrollments: number };
+};
 type ClassRecord = Prisma.ClassGetPayload<{ include: typeof classDetailInclude }>;
 
 @Injectable()
@@ -201,15 +159,18 @@ export class ClassesService {
     input: { academyId: string; status?: ClassStatus },
   ): Promise<{ classes: ClassSummary[] }> {
     await this.requireClassManager(identity, input.academyId);
-    const classes = await this.prisma.class.findMany({
-      where: {
-        academyId: input.academyId,
-        ...(input.status ? { status: input.status } : {}),
-      },
-      include: classListInclude,
-      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    });
-    return { classes: classes.map(toClassListSummary) };
+    const classes = await this.prisma.$queryRaw<ClassListRecord[]>(
+      classListQuery(input.academyId, input.status),
+    );
+    const counts = await courseCounts(this.prisma, input.academyId,
+      classes.flatMap((record) => record.courseAssignments.map((a) => a.course.id)));
+    // The existing class badge counts every visible material, including PDFs.
+    const visibleCounts = new Map([...counts].map(([id, count]) => [
+      id, count.visibleExercises + (count.visibleDocuments ?? 0),
+    ]));
+    return { classes: classes.map((record) => classSummaryFields(
+      record, record._count.enrollments, visibleCounts,
+    )) };
   }
 
   async get(
@@ -1288,6 +1249,7 @@ function visibleExerciseCount(course: {
 function classSummaryFields(
   record: ClassListRecord | ClassRecord,
   studentCount: number,
+  visibleCounts: ReadonlyMap<string, number>,
 ): ClassSummary {
   return {
     id: record.id,
@@ -1299,7 +1261,7 @@ function classSummaryFields(
       id: assignment.course.id,
       title: assignment.course.title,
       isVisible: assignment.course.isVisible,
-      visibleExercises: visibleExerciseCount(assignment.course),
+      visibleExercises: visibleCounts.get(assignment.course.id) ?? 0,
     })),
     studentCount,
     assignedTeacher: record.assignedTeacher
@@ -1312,12 +1274,10 @@ function classSummaryFields(
   };
 }
 
-function toClassListSummary(record: ClassListRecord): ClassSummary {
-  return classSummaryFields(record, record._count.enrollments);
-}
-
 function toClassSummary(record: ClassRecord): ClassSummary {
-  return classSummaryFields(record, record.enrollments.length);
+  return classSummaryFields(record, record.enrollments.length,
+    new Map(record.courseAssignments.map(({ course }) => [course.id, visibleExerciseCount(course)])),
+  );
 }
 
 function toClassDetail(

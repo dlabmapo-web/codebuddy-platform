@@ -1,0 +1,34 @@
+[
+  {
+    "kind": "official",
+    "globallyPaused": false,
+    "waiting": 0,
+    "active": 0,
+    "pausedCount": 0,
+    "delayed": 0
+  },
+  {
+    "kind": "practice",
+    "globallyPaused": false,
+    "waiting": 0,
+    "active": 0,
+    "pausedCount": 0,
+    "delayed": 0
+  },
+  {
+    "kind": "sample",
+    "globallyPaused": false,
+    "waiting": 0,
+    "active": 0,
+    "pausedCount": 0,
+    "delayed": 0
+  },
+  {
+    "kind": "regrade",
+    "globallyPaused": false,
+    "waiting": 0,
+    "active": 0,
+    "pausedCount": 0,
+    "delayed": 0
+  }
+]

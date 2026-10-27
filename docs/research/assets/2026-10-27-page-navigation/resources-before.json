@@ -1,0 +1,54 @@
+{
+  "at": 1793069701.8793766,
+  "containers": {
+    "api": {
+      "started": "2026-10-24T08:54:27.127585272Z",
+      "healthy": "healthy",
+      "oomKilled": false,
+      "restarts": 0,
+      "cpus": 1.25,
+      "memoryLimit": 1610612736,
+      "counters": {
+        "usage_usec": 6322380164,
+        "user_usec": 4934836709,
+        "system_usec": 1387543455,
+        "core_sched.force_idle_usec": 0,
+        "nr_periods": 853397,
+        "nr_throttled": 5537,
+        "throttled_usec": 1225026720,
+        "nr_bursts": 0,
+        "burst_usec": 0,
+        "memory_bytes": 288251904
+      }
+    },
+    "studio": {
+      "started": "2026-10-24T08:54:26.624946485Z",
+      "healthy": "healthy",
+      "oomKilled": false,
+      "restarts": 0,
+      "cpus": 1.25,
+      "memoryLimit": 1610612736,
+      "counters": {
+        "usage_usec": 4877959231,
+        "user_usec": 3991316859,
+        "system_usec": 886642372,
+        "core_sched.force_idle_usec": 0,
+        "nr_periods": 133152,
+        "nr_throttled": 10363,
+        "throttled_usec": 1889536501,
+        "nr_bursts": 0,
+        "burst_usec": 0,
+        "memory_bytes": 275505152
+      }
+    }
+  },
+  "host_cpu_pct_5m": [
+    12.670175438591603
+  ],
+  "host_steal_pct_5m": [
+    0.0
+  ],
+  "available_gib": [
+    8.658584594726562
+  ]
+}

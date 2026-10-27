@@ -25,7 +25,7 @@ export default async function NewExercisePage({
   // write control from an operator the API would have allowed.
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
-  const tree = await client.academyCourses.getTree({ academyId, courseId });
+  const tree = await client.academyCourses.getOutline({ academyId, courseId });
   const courseModule = tree.modules.find((item) =>
     item.lectures.some((lecture) => lecture.id === lectureId),
   );

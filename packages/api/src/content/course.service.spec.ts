@@ -60,6 +60,7 @@ function createService(options?: { duplicate?: boolean }) {
     },
   };
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id: created.id, ...toCourseSummary(created).content }]),
     course: {
       findFirst: vi.fn().mockResolvedValue(
         options?.duplicate ? { id: "duplicate-course" } : null,

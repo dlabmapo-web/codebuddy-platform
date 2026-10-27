@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { orpc } from '@/lib/orpc';
-import { courseTreeQueryKey } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/course-tree';
+import { courseOutlineQueryKey } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_lib/course-tree';
 import { PdfAuthorDialog } from './pdf-author-dialog';
 
 export function ReferencePdfPicker({ target, value, disabled, onChange, onTitleAvailable }: {
@@ -18,8 +18,8 @@ export function ReferencePdfPicker({ target, value, disabled, onChange, onTitleA
   const [adding, setAdding] = useState(false);
   const [retained, setRetained] = useState(false);
   const [editing, setEditing] = useState<string>();
-  const query = useQuery({ queryKey: courseTreeQueryKey(target.academyId, target.courseId),
-    queryFn: () => orpc.academyCourses.getTree({ academyId: target.academyId, courseId: target.courseId }) });
+  const query = useQuery({ queryKey: courseOutlineQueryKey(target.academyId, target.courseId),
+    queryFn: () => orpc.academyCourses.getOutline({ academyId: target.academyId, courseId: target.courseId }) });
   const materials = query.data?.modules.flatMap(m => m.lectures).find(l => l.id === target.lectureId)?.materials ?? [];
   const documents = materials.filter(m => m.pdfDocument);
   const edit = documents.find(m => m.id === editing);

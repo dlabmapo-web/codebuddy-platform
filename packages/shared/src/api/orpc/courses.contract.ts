@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   courseTreeSchema,
+  courseOutlineSchema,
   courseIdInputSchema,
   courseSummarySchema,
   createCourseModuleSchema,
@@ -59,6 +60,7 @@ export const academyCoursesContract = {
     .input(setCourseContentVisibilitySchema)
     .output(courseTreeSchema),
   getTree: oc.input(courseIdInputSchema).output(courseTreeSchema),
+  getOutline: oc.input(courseIdInputSchema).output(courseOutlineSchema),
   createModule: oc
     .input(createCourseModuleSchema)
     .output(courseTreeSchema),

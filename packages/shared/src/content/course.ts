@@ -257,6 +257,23 @@ export const courseTreeSchema = z.object({
 });
 export type CourseTree = z.infer<typeof courseTreeSchema>;
 
+/** Builder navigation is not an exercise draft. Editors must load authoring
+ * context rather than filling missing test cases or content with defaults. */
+export const materialOutlineSchema = materialSchema.extend({
+  programmingExercise: programmingExerciseSchema.pick({
+    difficulty: true, aiFeedbackEnabled: true, referencePdfMaterialId: true,
+  }).nullable(),
+});
+export const courseOutlineSchema = z.object({
+  course: courseSummarySchema,
+  modules: z.array(courseModuleSchema.extend({
+    lectures: z.array(lectureSchema.extend({
+      materials: z.array(materialOutlineSchema),
+    })),
+  })),
+});
+export type CourseOutline = z.infer<typeof courseOutlineSchema>;
+
 export const createCourseSchema = z.object({
   academyId: z.uuid(),
   title: titleSchema,

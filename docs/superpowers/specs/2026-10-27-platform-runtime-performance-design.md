@@ -556,3 +556,47 @@ root-cause attribution, passed and failed gates, exact effective resource
 settings, tested concurrency and rollback references. It must state whether
 warm mode is actually enabled. A faster health endpoint or a successful small
 smoke run alone is not evidence that grading or first drawing became faster.
+
+
+## Navigation implementation addendum (2026-10-27)
+
+The user approved implementation after the production page-navigation audit.
+This work follows the existing design and the audit's recommendations. Prefer
+scoped SQL summaries and a separate outline DTO over more hardware or a shared
+permission cache: summaries reduce database round trips without stale access,
+whereas quota changes alone retain oversized reads. Full client-only loading
+would move the wait without removing the underlying database work.
+
+- Course lists fetch course/provenance metadata and one academy-scoped aggregate
+  for displayed IDs. Counts preserve empty modules/lectures, all material kinds,
+  and module/lecture/material visibility independently of the course flag.
+- Class lists use the same batched counts for assigned courses instead of nested
+  availability graphs. Keep class status, roster counts, teacher roles and
+  academy authorization unchanged; detail reads retain their existing contract.
+- Add an authenticated curriculum-review `getOutline` endpoint. Its distinct
+  schema contains only builder metadata and exercise badges, never exercise
+  descriptions, starter code, test cases or hints. The complete tree and
+  authoring endpoint remain available for editing. Builder consumers migrate
+  together; an outline must never masquerade as a complete exercise draft.
+- Builder queries use an outline-specific cache key under the existing course
+  invalidation prefix and a short freshness window to avoid the immediate
+  duplicate read. Mutations continue to revalidate authorization on the server.
+- Administrator tables load independently of supplementary counts, which use
+  the existing client query/error state. Retain the existing loading boundaries.
+- Do not weaken authorization, cache permissions between requests, change
+  production quotas, deploy, or resume the stopped grading benchmark.
+
+Validate with real PostgreSQL equivalence tests against the old tree summaries,
+empty/hidden/mixed-type and cross-academy fixtures, outline privacy/permission
+and editor regression tests, API/web/shared type checks, and a production web
+build. Local query/payload measurements are not a production latency claim.
+The <=1.5-second navigation target still requires a controlled deployed test.
+
+The account read also moves to one fresh, explicitly projected SQL snapshot
+instead of loading the full Prisma graph. Keep the same response serializer,
+status denial, missing-account bootstrap, DLAB filtering and avatar signing.
+Never include credentials or contact/student profile data in that projection.
+Server-rendered RPC uses an optional runtime-only `INTERNAL_API_RPC_URL`;
+Compose supplies `http://api:4000/api/rpc` on the existing private network.
+Browser requests retain the public origin. Authorization headers and role-view
+behavior remain unchanged. Deploy the additive API endpoint before the web.

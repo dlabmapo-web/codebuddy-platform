@@ -39,7 +39,7 @@ export default async function LibraryCourseImportPage({
   let problemCount = 0;
   let loadFailed = false;
   try {
-    const tree = await createPlatformServerORPCClient().academyCourses.getTree({
+    const tree = await createPlatformServerORPCClient().academyCourses.getOutline({
       academyId,
       courseId,
     });

@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "deployment": "v2.0.42 / 2d6ace8b4d828287fe0de8db4eb95df2e2663ec2",
+  "method": "Chrome UI click to visible destination heading and first data row/card; includes automation overhead; three consecutive samples per surface; no device/network standardization",
+  "roles": {
+    "manager": {
+      "coursesMs": [
+        2076,
+        1501,
+        1280
+      ],
+      "classesMs": [
+        2197,
+        1357,
+        1365
+      ],
+      "initialCoursesHeadingOnlyMs": 2258
+    },
+    "platformAdmin": {
+      "coursesMs": [
+        2306,
+        1247,
+        1002
+      ],
+      "classesMs": [
+        1447,
+        785,
+        769
+      ]
+    },
+    "teacher": {
+      "coursesMs": [
+        1572,
+        2123,
+        2670
+      ],
+      "myClassesMs": [
+        1645,
+        1460,
+        1138
+      ]
+    }
+  },
+  "network": {
+    "managerClasses": {
+      "status": 200,
+      "requestDurationMsApprox": 1800,
+      "transferredBytes": 1229,
+      "resourceBytes": 30350,
+      "waitingForResponseMs": 60.79,
+      "contentDownloadMsApprox": 1690
+    },
+    "teacherLargeCourse": {
+      "materialCount": 427,
+      "status": 200,
+      "requestDurationMsApprox": 3700,
+      "transferredBytesApprox": 237000,
+      "resourceBytesApprox": 963000,
+      "waitingForResponseMs": 38.78,
+      "contentDownloadMsApprox": 3540,
+      "observedTotalRequestsAfterNavigation": 29,
+      "notes": "Includes subsequent automatic exercise-route prefetch; this is not a 29-query SQL measurement."
+    }
+  },
+  "limitations": [
+    "One teacher readiness wait exceeded the browser tool deadline while auxiliary profiling was being prepared; page subsequently displayed normally. Its click-to-ready duration was not obtained, and it is not silently represented as a successful timing sample.",
+    "Large-course click-to-heading wait exceeded the tool deadline; request timing was obtained separately from Chrome Network.",
+    "Team-lead login was blocked before authentication by security-widget load error 300030. Student login was not attempted after that block.",
+    "No production load/capacity benchmark, deployment, course/class edits, submissions, grades or server configuration changes were performed. Normal sign-in/sign-out activity occurred."
+  ]
+}

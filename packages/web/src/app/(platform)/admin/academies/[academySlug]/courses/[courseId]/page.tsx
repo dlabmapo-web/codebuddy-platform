@@ -34,7 +34,7 @@ export default async function PlatformCourseBuilderPage({
   let initialTree = null;
   let loadFailed = false;
   try {
-    initialTree = await client.academyCourses.getTree({ academyId, courseId });
+    initialTree = await client.academyCourses.getOutline({ academyId, courseId });
   } catch (error) {
     loadFailed = !isAccessDeniedError(error);
   }

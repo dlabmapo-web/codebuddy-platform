@@ -1,0 +1,40 @@
+{
+  "intervalSeconds": 197.64271187782288,
+  "hostCpuPct5m": [
+    10.88538011695308
+  ],
+  "hostStealPct5m": [
+    0.0
+  ],
+  "availableGiB": [
+    8.686935424804688
+  ],
+  "containers": {
+    "api": {
+      "cpuLimit": 1.25,
+      "memoryMiB": 277.2,
+      "memoryLimitMiB": 1536,
+      "healthy": "healthy",
+      "sameStart": true,
+      "restarts": 0,
+      "oomKilled": false,
+      "periods": 732,
+      "throttledPeriods": 19,
+      "throttledPeriodPct": 2.5956284153005464,
+      "throttledSeconds": 0.630052
+    },
+    "studio": {
+      "cpuLimit": 1.25,
+      "memoryMiB": 262.6,
+      "memoryLimitMiB": 1536,
+      "healthy": "healthy",
+      "sameStart": true,
+      "restarts": 0,
+      "oomKilled": false,
+      "periods": 111,
+      "throttledPeriods": 26,
+      "throttledPeriodPct": 23.423423423423422,
+      "throttledSeconds": 6.254908
+    }
+  }
+}

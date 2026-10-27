@@ -1,3 +1,5 @@
+import { courseCounts, emptyCourseCounts } from "./course-counts.js";
+import type { CourseContentCounts } from "@cove/shared";
 import { inferSubmissionPolicy, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
@@ -132,6 +134,42 @@ const treeInclude = {
   ...sourceCourseInclude,
 } as const satisfies Prisma.CourseInclude;
 
+/** Explicit projection: do not fetch rich exercise/manual content for an outline. */
+const outlineInclude = {
+  ...sourceCourseInclude,
+  modules: {
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: {
+      id: true, title: true, description: true, position: true, isVisible: true,
+      lectures: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: {
+          id: true, title: true, description: true, position: true, isVisible: true,
+          materials: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            select: {
+              id: true, type: true, title: true, position: true,
+              isRequired: true, isVisible: true,
+              programmingExercise: { select: {
+                difficulty: true, aiFeedbackEnabled: true, referencePdfMaterialId: true,
+              } },
+              manualMaterial: { select: {
+                revision: true, includeInScore: true, submitEnabled: true, maximumHundredths: true,
+              } },
+              videoLesson: { select: {
+                assetId: true, revision: true, placement: true,
+                includeInScore: true, maximumHundredths: true,
+                asset: { select: { state: true, durationMs: true, filename: true, byteSize: true } },
+              } },
+              pdfDocument: { include: { asset: true } },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.CourseInclude;
+
 const exerciseAuthoringInclude = {
   lecture: {
     include: {
@@ -191,10 +229,13 @@ export class CourseService {
     );
     const courses = await this.prisma.course.findMany({
       where: { academyId },
-      include: courseSummaryInclude,
+      include: sourceCourseInclude,
       orderBy: [{ isVisible: "desc" }, { updatedAt: "desc" }, { id: "asc" }],
     });
-    return { courses: courses.map(toCourseSummary) };
+    const counts = await courseCounts(this.prisma, academyId, courses.map((c) => c.id));
+    return { courses: courses.map((course) => toCourseSummary(
+      course, counts.get(course.id) ?? emptyCourseCounts(),
+    )) };
   }
 
   async create(
@@ -399,6 +440,32 @@ export class CourseService {
     // a single-row hide can.
     if (!input.isVisible) await this.revokeCourseMonitoring(input.courseId);
     return this.currentTree(input);
+  }
+
+  async getOutline(
+    identity: SupabaseIdentity,
+    input: { academyId: string; courseId: string },
+  ) {
+    await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.review");
+    const course = await this.prisma.course.findFirst({
+      where: { id: input.courseId, academyId: input.academyId },
+      include: outlineInclude,
+    });
+    if (!course) throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    return {
+      course: toCourseSummary(course),
+      modules: course.modules.map((module) => ({
+        ...module,
+        lectures: module.lectures.map((lecture) => ({
+          ...lecture,
+          materials: lecture.materials.map((material) => ({
+            ...material,
+            videoLesson: material.videoLesson ? videoMetadata(material.videoLesson) : null,
+            pdfDocument: material.pdfDocument ? pdfMetadata(material.pdfDocument) : null,
+          })),
+        })),
+      })),
+    };
   }
 
   async getTree(
@@ -1912,29 +1979,23 @@ export function toCourseSummary(course: {
     contentRevision: number;
     retiredAt: Date | null;
   } | null;
-  /**
-   * Flags, not counts, all the way down.
-   *
-   * A caller that selected `_count` could produce `exercises` but never
-   * `visibleExercises`, and would have to report zero — which reads as "this
-   * course teaches nothing" on three surfaces. Requiring the flags here turns
-   * that into a compile error at the include instead of a wrong badge in
-   * production.
-   */
-  modules: Array<{
+  /** Complete trees supply flags; list reads supply explicit aggregate counts.
+   * Missing both is a programming error, never a fake empty curriculum. */
+  modules?: Array<{
     isVisible: boolean;
     lectures: Array<{
       isVisible: boolean;
       materials: Array<{ isVisible: boolean; type?: string }>;
     }>;
   }>;
-}) {
+}, counts?: CourseContentCounts) {
+  if (!counts && !course.modules) throw new Error("Course counts or tree required");
   let lectures = 0;
   let exercises = 0;
   let visibleExercises = 0;
   let documents = 0;
   let visibleDocuments = 0;
-  for (const courseModule of course.modules) {
+  for (const courseModule of course.modules ?? []) {
     lectures += courseModule.lectures.length;
     for (const lecture of courseModule.lectures) {
       exercises += lecture.materials.filter(
@@ -1961,8 +2022,8 @@ export function toCourseSummary(course: {
     title: course.title,
     description: course.description,
     isVisible: course.isVisible,
-    content: {
-      modules: course.modules.length,
+    content: counts ?? {
+      modules: course.modules!.length,
       lectures,
       exercises,
       visibleExercises,

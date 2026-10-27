@@ -47,7 +47,7 @@ export default async function NewCourseImportPage({
 
   try {
     const client = createServerORPCClient();
-    const tree = await client.academyCourses.getTree({ academyId, courseId });
+    const tree = await client.academyCourses.getOutline({ academyId, courseId });
     courseTitle = tree.course.title;
     // §4.3 — Prepare needs to know whether the current-course workbook would
     // exceed the importer's own cap, so it can say so before offering it.

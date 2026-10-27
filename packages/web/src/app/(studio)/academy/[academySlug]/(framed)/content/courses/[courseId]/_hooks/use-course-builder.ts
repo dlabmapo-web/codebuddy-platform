@@ -12,7 +12,7 @@ import { orpc } from '@/lib/orpc';
 
 import {
   countLectures,
-  courseTreeQueryKey,
+  courseOutlineQueryKey,
   locateItem,
   moduleOfParent,
   movedTree,
@@ -59,7 +59,7 @@ type BuilderTarget = {
 export function useCourseBuilder({
   target,
   initialTree,
-  treeStaleTime = 0,
+  treeStaleTime = 30_000,
   canEditCurriculum,
   canEditExercises,
 }: {
@@ -71,14 +71,14 @@ export function useCourseBuilder({
 }) {
   const { academyId, courseId } = target;
   const queryClient = useQueryClient();
-  const queryKey = courseTreeQueryKey(academyId, courseId);
+  const queryKey = courseOutlineQueryKey(academyId, courseId);
   const [moduleTitle, setModuleTitle] = useState('');
   const [lectureModuleId, setLectureModuleId] = useState<string | null>(null);
   const [lectureTitle, setLectureTitle] = useState('');
 
   const treeQuery = useQuery({
     queryKey,
-    queryFn: () => orpc.academyCourses.getTree(target),
+    queryFn: () => orpc.academyCourses.getOutline(target),
     initialData: initialTree,
     staleTime: treeStaleTime,
     retry: false,
@@ -237,10 +237,10 @@ export function useCourseBuilder({
       materialId: string;
       isVisible: boolean;
     }) =>
-      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
+      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
-            .then(() => orpc.academyCourses.getTree(target))
+            .then(() => orpc.academyCourses.getOutline(target))
         : orpc.academyCourses.setExerciseVisibility({ ...target, ...input }),
     onMutate: (input) =>
       flipOptimistically('exercise', input.materialId, input.isVisible),
@@ -265,10 +265,10 @@ export function useCourseBuilder({
   const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'||x.type==='MULTIPLE_CHOICE'))));
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
-      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getTree(target)) : isPdf(input.materialId)
+      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
-            .then(() => orpc.academyCourses.getTree(target))
+            .then(() => orpc.academyCourses.getOutline(target))
         : orpc.academyCourses.deleteExercise({ ...target, ...input }),
     onSuccess: applyTree,
   });

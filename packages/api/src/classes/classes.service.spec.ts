@@ -259,6 +259,14 @@ function createService(options?: {
     },
   };
   const prisma = {
+    $queryRaw: vi.fn().mockImplementation((query: { sql: string }) => Promise.resolve(
+      query.sql.includes("scoped_classes")
+        ? (record ? [{ ...record, _count: { enrollments: record.enrollments.length } }] : [])
+        : (record?.courseAssignments ?? []).map(({ course }) => ({
+          id: course.id, modules: 1, lectures: 1, exercises: 2,
+          visibleExercises: 2, documents: 0, visibleDocuments: 0,
+        })),
+    )),
     class: {
       findMany: vi.fn().mockResolvedValue(record ? [{
         ...record,
@@ -326,15 +334,12 @@ describe("ClassesService authorization", () => {
 
     await service.list(identity, { academyId });
 
-    expect(prisma.class.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        include: expect.objectContaining({
-          _count: { select: { enrollments: true } },
-        }),
-      }),
-    );
-    const include = vi.mocked(prisma.class.findMany).mock.calls[0]?.[0]?.include;
-    expect(include).not.toHaveProperty("enrollments");
+    const query = vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    expect(query.values).toContain(academyId);
+    expect(query.sql).toContain('FROM class_enrollments');
+    expect(query.sql).toContain('count(*)::integer');
+    expect(query.sql).not.toMatch(/email|member_profiles|schedule_slots/);
+    expect(prisma.class.findMany).not.toHaveBeenCalled();
   });
 
   it("gates enrollment on the separate class-enrollments.manage", async () => {
@@ -1063,12 +1068,10 @@ describe("ClassesService teacher assignment", () => {
 
     await service.list(identity, { academyId });
 
-    const include = vi.mocked(prisma.class.findMany).mock.calls[0]?.[0]?.include;
-    expect(include).toHaveProperty("assignedTeacher");
-    expect(
-      // @ts-expect-error narrowing the generated include type is not the point
-      include?.assignedTeacher?.select?.user?.select,
-    ).toEqual({ id: true, displayName: true, status: true });
+    const query = vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as { sql: string };
+    expect(query.sql).toContain('"assignedTeacher"');
+    expect(query.sql).toContain("'displayName'");
+    expect(query.sql).not.toContain('email');
   });
 });
 

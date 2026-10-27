@@ -1,6 +1,7 @@
-import type { CourseTree as SharedCourseTree } from '@cove/shared';
+import type { CourseOutline } from '@cove/shared';
 
-export type CourseTree = SharedCourseTree;
+/** The builder's tree is an outline; exercise drafts use authoring context. */
+export type CourseTree = CourseOutline;
 export type CourseModule = CourseTree['modules'][number];
 export type CourseLecture = CourseModule['lectures'][number];
 
@@ -10,6 +11,10 @@ export type CourseLecture = CourseModule['lectures'][number];
  */
 export function courseTreeQueryKey(academyId: string, courseId: string) {
   return ['academy', academyId, 'course', courseId] as const;
+}
+
+export function courseOutlineQueryKey(academyId: string, courseId: string) {
+  return [...courseTreeQueryKey(academyId, courseId), 'outline'] as const;
 }
 
 /**

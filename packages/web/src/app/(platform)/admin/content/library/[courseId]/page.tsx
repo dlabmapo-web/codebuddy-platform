@@ -45,7 +45,7 @@ export default async function LibraryCourseBuilderPage({
   let initialTree = null;
   let loadFailed = false;
   try {
-    initialTree = await createPlatformServerORPCClient().academyCourses.getTree({
+    initialTree = await createPlatformServerORPCClient().academyCourses.getOutline({
       academyId,
       courseId,
     });

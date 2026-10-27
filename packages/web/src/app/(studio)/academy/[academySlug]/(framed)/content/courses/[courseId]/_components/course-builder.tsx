@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import type { CourseTree } from '@cove/shared';
+import type { CourseOutline as CourseTree } from '@cove/shared';
 import { Plus } from 'lucide-react';
 
 import { useTranslation } from 'react-i18next';
@@ -23,7 +23,7 @@ export function CourseBuilder({
   canImport,
   courseId,
   initialTree,
-  treeStaleTime = 0,
+  treeStaleTime = 30_000,
 }: {
   academyId: string;
   canEditCurriculum: boolean;

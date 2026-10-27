@@ -40,7 +40,7 @@ export default async function LibraryExercisePage({
     // cause.
     let tree;
     try {
-      tree = await client.academyCourses.getTree({ academyId, courseId });
+      tree = await client.academyCourses.getOutline({ academyId, courseId });
     } catch (error) {
       console.error('[library-exercise] could not read the course tree', {
         academyId,
@@ -78,7 +78,7 @@ export default async function LibraryExercisePage({
           exercisePath: (currentLectureId) =>
             createContentPaths('', 'library').exercise(courseId, currentLectureId, materialId),
           lectureId,
-          loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+          loadTree: () => client.academyCourses.getOutline({ academyId, courseId }),
           materialId,
         });
         return notFound();

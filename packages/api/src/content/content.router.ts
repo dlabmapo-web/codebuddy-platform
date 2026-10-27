@@ -43,6 +43,11 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      getOutline: os.academyCourses.getOutline
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.getOutline(context.identity, input)
+        ),
       getTree: os.academyCourses.getTree
         .use(access.authenticated)
         .handler(({ context, input }) =>

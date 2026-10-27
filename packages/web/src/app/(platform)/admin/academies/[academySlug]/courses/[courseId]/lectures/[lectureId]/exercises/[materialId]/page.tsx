@@ -39,7 +39,7 @@ export default async function PlatformExercisePage({
   let solutions: ExerciseSolutionEntry[] = [];
   if (materialId === 'new') {
     const tree = await client.academyCourses
-      .getTree({ academyId, courseId })
+      .getOutline({ academyId, courseId })
       .catch(() => null);
     const courseModule = tree?.modules.find((item) =>
       item.lectures.some((lecture) => lecture.id === lectureId),
@@ -62,7 +62,7 @@ export default async function PlatformExercisePage({
           exercisePath: (currentLectureId) =>
             createContentPaths(academySlug, 'console').exercise(courseId, currentLectureId, materialId),
           lectureId,
-          loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+          loadTree: () => client.academyCourses.getOutline({ academyId, courseId }),
           materialId,
         });
         return notFound();

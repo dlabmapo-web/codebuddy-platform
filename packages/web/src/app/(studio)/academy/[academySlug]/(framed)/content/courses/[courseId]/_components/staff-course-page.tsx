@@ -40,7 +40,7 @@ export async function StaffCoursePage({
 
   try {
     const client = createServerORPCClient();
-    initialTree = await client.academyCourses.getTree({ academyId, courseId });
+    initialTree = await client.academyCourses.getOutline({ academyId, courseId });
     canEditCurriculum = canManageContent(roles);
     canEditExercises = canManageExercises(roles);
     canImport = canImportContent(roles);

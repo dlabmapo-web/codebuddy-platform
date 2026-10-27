@@ -45,7 +45,7 @@ export default async function ExercisePage({
       exercisePath: (currentLectureId) =>
         `${routes.academyCourse(academySlug, courseId)}/lectures/${encodeURIComponent(currentLectureId)}/exercises/${encodeURIComponent(materialId)}`,
       lectureId,
-      loadTree: () => client.academyCourses.getTree({ academyId, courseId }),
+      loadTree: () => client.academyCourses.getOutline({ academyId, courseId }),
       materialId,
     });
     notFound();

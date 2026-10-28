@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { trialAllowedPath, trialBody, trialCookieName, trialOriginAllowed } from './boundary';
+import { trialAllowedPath, trialBody, trialBrowserBody, trialCookieName, trialOriginAllowed } from './boundary';
 import { parseTurtleDraft, initialTurtleDraft, turtleErrorHint } from './drafts';
 
 describe('public turtle browser boundary', () => {
@@ -11,6 +11,15 @@ describe('public turtle browser boundary', () => {
     expect(trialOriginAllowed(headers, 'https://cs.coveedu.com')).toBe(true);
     headers.set('origin', 'https://evil.example'); expect(trialOriginAllowed(headers, 'https://cs.coveedu.com')).toBe(false);
     expect(trialCookieName(true)).toBe('__Host-cove-turtle');
+    expect(trialCookieName(false, true)).toBe('cove-turtle-browser-fixture');
+    expect(trialCookieName(true, true)).toBe('__Host-cove-turtle');
+  });
+  it('rejects source/output and arbitrary bodies before browser metadata reaches the API', () => {
+    const metadata = { requestKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', sourceHash: 'a'.repeat(64), starterId: 'drawing', helperVersion: 'cove-trial-v1', profile: 'cove-browser-turtle-v1' };
+    expect(() => trialBrowserBody('browser-runs', JSON.stringify(metadata))).not.toThrow();
+    expect(() => trialBrowserBody('browser-runs', JSON.stringify({ ...metadata, source: 'private' }))).toThrow('INVALID_REQUEST');
+    expect(() => trialBrowserBody('browser-runs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/renew', '{"output":"private"}')).toThrow('INVALID_REQUEST');
+    expect(trialAllowedPath('browser-runs/../../project', 'POST')).toBe(false);
   });
   it('bounds streamed request bodies even without Content-Length', async () => {
     const stream = new ReadableStream({ start(c) { c.enqueue(new Uint8Array(98305)); c.close(); } });

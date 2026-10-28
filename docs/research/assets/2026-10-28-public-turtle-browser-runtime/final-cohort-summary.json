@@ -1,0 +1,14 @@
+{
+  "runtimeId": "brython-3.15.0-8dc744cc86e3dab4db7e",
+  "n": 100,
+  "strokeP50Ms": 38.19500000029802,
+  "strokeP95Ms": 200.14499999955297,
+  "strokeMaxMs": 333.43999999947846,
+  "initialPreparationMs": 9154.299999998882,
+  "replacementPreparations": 100,
+  "replacementP50Ms": 264.59999999962747,
+  "replacementP95Ms": 4526.200000001118,
+  "replacementMaxMs": 8270,
+  "conditions": "Late diagnostic cohort under observed OS CPU/memory pressure; brief targeted verification also overlapped. Not reference-device acceptance.",
+  "releaseGate": "unassessed; not production performance acceptance"
+}

@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Cove local browser-runtime feasibility</title><link rel="stylesheet" href="/fixture.css"></head><body>
+<h1>Local Turtle feasibility fixture</h1><p>Test harness only. This is not a product UI change. No API, PIN or production resources are used.</p>
+<p id="readiness" role="status">Connecting isolated runtime…</p>
+<nav><button id="line" disabled>Draw line</button><button id="square" disabled>Default square</button><button id="race" disabled>Race helpers</button><button id="loop" disabled>Infinite loop</button><button id="stop">Stop</button><button id="clear">Clear</button><button id="unsupported" disabled>Unsupported input</button><button id="bench" disabled>Benchmark 100 prepared runs</button><button id="helper-bench" disabled>Benchmark 100 helper runs</button></nav>
+<label>Test source<textarea id="source" rows="10"></textarea></label><button id="run" disabled>Run source</button>
+<p id="state">Not started</p><iframe id="surface" title="Drawing" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+<h2>Output</h2><pre id="output"></pre><h2>Results</h2><pre id="results"></pre><script type="module" src="/fixture.mjs"></script></body></html>

@@ -1,0 +1,67 @@
+{
+  "runtimeId": "brython-3.15.0-2ab1760c5c7107d57457",
+  "scope": "local Caddy 2.10.0 with production CSP on loopback HTTP transport; no DNS/TLS acceptance",
+  "responses": {
+    "worker.js": {
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": "5440",
+        "Content-Security-Policy": "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' 'unsafe-eval'; style-src 'none'; worker-src 'none'; frame-ancestors 'none'",
+        "Content-Type": "text/javascript; charset=utf-8",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        "Etag": "\"dmg5kza4j9ps474\"",
+        "Last-Modified": "Wed, 28 Oct 2026 03:32:24 GMT",
+        "Referrer-Policy": "no-referrer",
+        "Server": "Caddy",
+        "Vary": "Accept-Encoding",
+        "Date": "Wed, 28 Oct 2026 03:33:53 GMT",
+        "Connection": "close"
+      }
+    },
+    "index.html": {
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": "478",
+        "Content-Security-Policy": "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self'; style-src 'self'; worker-src https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/worker.js; frame-ancestors https://cs.coveedu.com",
+        "Content-Type": "text/html; charset=utf-8",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        "Etag": "\"dmg5kza6kbxrda\"",
+        "Last-Modified": "Wed, 28 Oct 2026 03:32:24 GMT",
+        "Referrer-Policy": "no-referrer",
+        "Server": "Caddy",
+        "Vary": "Accept-Encoding",
+        "Date": "Wed, 28 Oct 2026 03:33:53 GMT",
+        "Connection": "close"
+      }
+    },
+    "frame.mjs": {
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": "2197",
+        "Content-Security-Policy": "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self'; style-src 'self'; worker-src https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/worker.js; frame-ancestors https://cs.coveedu.com",
+        "Content-Type": "text/javascript; charset=utf-8",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        "Etag": "\"dmg5kza48xn21p1\"",
+        "Last-Modified": "Wed, 28 Oct 2026 03:32:24 GMT",
+        "Referrer-Policy": "no-referrer",
+        "Server": "Caddy",
+        "Vary": "Accept-Encoding",
+        "Date": "Wed, 28 Oct 2026 03:33:53 GMT",
+        "Connection": "close"
+      }
+    }
+  },
+  "deniedRoutes": true
+}

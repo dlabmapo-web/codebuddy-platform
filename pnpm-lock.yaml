@@ -304,6 +304,12 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.3.0)(happy-dom@20.14.5)(vite@8.1.5(@types/node@26.3.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1))
 
+  packages/turtle-browser-runtime:
+    dependencies:
+      brython:
+        specifier: 3.15.0
+        version: 3.15.0
+
   packages/web:
     dependencies:
       '@cove/i18n':
@@ -423,6 +429,9 @@ importers:
       dompurify:
         specifier: 3.4.8
         version: 3.4.8
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
@@ -3739,6 +3748,9 @@ packages:
     resolution: {integrity: sha512-JxV13hNrFxqjOc8alRbq9dK1MM79NEXYpma2B2J4wAtpWS5zIEIKqWPGCl7N4o7Uc7B7itylh7SuDujATRyyTw==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
+
+  brython@3.15.0:
+    resolution: {integrity: sha512-qeHFBxFnCoy/+/jcc5pB40grymDcT15B6dPWfVce1zfcOXgqBgkfP3uFb46IFl/Rqkv80tLshEqW3Ha5QV5AAg==}
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
@@ -10092,6 +10104,8 @@ snapshots:
       electron-to-chromium: 1.5.395
       node-releases: 2.0.51
       update-browserslist-db: 1.2.3(browserslist@4.28.7)
+
+  brython@3.15.0: {}
 
   buffer-from@1.1.2: {}
 

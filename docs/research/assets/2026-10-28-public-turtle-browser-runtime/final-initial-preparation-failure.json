@@ -1,0 +1,7 @@
+{
+  "runtimeId": "brython-3.15.0-8db7a7423706c93c6193",
+  "outcome": "Python preparation timed out",
+  "limitMs": 10000,
+  "phase": "initial preparation before cohort; no student source was run",
+  "retained": true
+}

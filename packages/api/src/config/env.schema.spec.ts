@@ -28,6 +28,18 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ ...trial, GUI_SERVICE_URL: trial.TURTLE_TRIAL_SERVICE_URL })).toThrow(/separate guest broker/);
     expect(() => validateEnvironment({ ...trial, GUI_SERVICE_SECRET: trial.TURTLE_TRIAL_SERVICE_SECRET })).toThrow(/independent/);
   });
+  it('keeps browser execution off, accepts blank Compose defaults and validates enabled origin isolation', () => {
+    const defaults = validateEnvironment({ ...validEnvironment, TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN: '', TURTLE_TRIAL_BROWSER_RUNTIME_ID: '' });
+    expect(defaults.TURTLE_TRIAL_BROWSER_ENABLED).toBe(false); expect(defaults.TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED).toBe(false);
+    const enabled = { ...validEnvironment, TURTLE_TRIAL_ENABLED: 'true', TURTLE_TRIAL_BROWSER_ENABLED: 'true', TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED: 'true',
+      TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN: 'https://runtime.example', TURTLE_TRIAL_BROWSER_RUNTIME_ID: 'brython-3.15.0-aaaaaaaaaaaaaaaaaaaa',
+      TURTLE_TRIAL_PIN_PEPPER: 'p'.repeat(43), TURTLE_TRIAL_SERVICE_URL: 'http://guest:4010', TURTLE_TRIAL_SERVICE_SECRET: 'g'.repeat(43),
+      TURTLE_TRIAL_PUBLIC_WS_URL: 'ws://localhost:4017', BFF_SHARED_SECRET: 'b'.repeat(43), REDIS_URL: 'redis://localhost:6379' };
+    expect(validateEnvironment(enabled).TURTLE_TRIAL_BROWSER_ENABLED).toBe(true);
+    expect(() => validateEnvironment({ ...enabled, TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN: 'https://localhost:4000' })).toThrow(/different hostname/);
+    expect(() => validateEnvironment({ ...enabled, TURTLE_TRIAL_BROWSER_ENABLED: 'false' })).toThrow(/browser feature flags/);
+    expect(() => validateEnvironment({ ...enabled, TURTLE_TRIAL_BROWSER_RUNTIME_ID: '' })).toThrow(/RUNTIME_ID/);
+  });
   it("parses and types a valid API environment", () => {
     expect(validateEnvironment(validEnvironment)).toMatchObject({
       NODE_ENV: "test",

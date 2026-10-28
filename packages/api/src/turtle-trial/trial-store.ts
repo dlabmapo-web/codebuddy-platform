@@ -5,8 +5,9 @@ import { randomBytes } from 'node:crypto';
 import { trialHash, trialPrefix } from './trial-security.js';
 import type { OnModuleDestroy } from '@nestjs/common';
 
-export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string };
-export type TrialRun = { requestKey: string; fingerprint: string; id?: string; settled?: string; reservedAt: string };
+export type BrowserGrantFields = { browserProfile: string; browserRuntimeId: string; browserOrigin: string };
+export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string } & Partial<BrowserGrantFields>;
+export type TrialRun = { requestKey: string; fingerprint: string; id?: string; settled?: string; reservedAt: string; engine?: string; leaseUntil?: string; deadline?: string; state?: string; profile?: string };
 const rateScript = `local wait=0
 for i,key in ipairs(KEYS) do
  local count=redis.call('INCR',key)
@@ -15,6 +16,7 @@ for i,key in ipairs(KEYS) do
 end
 return wait`;
 const reserveScript = `
+if ARGV[5] and ARGV[5]~='' and redis.call('GET',KEYS[6])=='1' then return 'DISABLED' end
 if redis.call('EXISTS',KEYS[1])==0 then return 'EXPIRED' end
 if redis.call('EXISTS',KEYS[2])==1 then
  if redis.call('HGET',KEYS[2],'fingerprint')~=ARGV[2] then return 'CONFLICT' end
@@ -28,6 +30,11 @@ for i=3,4 do local n=redis.call('INCR',KEYS[i]); if n==1 then redis.call('EXPIRE
 redis.call('HINCRBY',KEYS[1],'used',120)
 redis.call('HSET',KEYS[1],'active',ARGV[1])
 redis.call('HSET',KEYS[2],'requestKey',ARGV[1],'fingerprint',ARGV[2],'reservedAt',ARGV[4])
+if ARGV[5] and ARGV[5]~='' then
+ local browser=cjson.decode(ARGV[5])
+ redis.call('HSET',KEYS[2],'engine','browser','id',browser.id,'leaseUntil',browser.leaseUntil,'deadline',browser.deadline,'state','ACTIVE','profile',browser.profile)
+ redis.call('SET',KEYS[5],browser.binding,'EXAT',ARGV[3])
+end
 redis.call('EXPIREAT',KEYS[2],ARGV[3])
 return 'NEW'`;
 const settleScript = `
@@ -70,10 +77,10 @@ export class TrialStore implements OnModuleDestroy {
     await r.set(trialPrefix + 'version', expected, 'NX');
     return await r.get(trialPrefix + 'version') === expected;
   }
-  async issue(version: string, academyId = '') {
+  async issue(version: string, academyId = '', browser?: BrowserGrantFields) {
     const r = await this.client(); const token = randomBytes(32).toString('hex');
     const hash = trialHash(token); const expiresAt = Date.now() + 7200000;
-    await r.multi().hset(this.grantKey(hash), { version, academyId, expiresAt, active: '', used: 0 })
+    await r.multi().hset(this.grantKey(hash), { version, academyId, expiresAt, active: '', used: 0, ...browser })
       .expireat(this.grantKey(hash), Math.ceil(expiresAt / 1000) + 600).exec();
     return { token, expiresAt };
   }
@@ -86,18 +93,20 @@ export class TrialStore implements OnModuleDestroy {
       const raw = await r.get(trialPrefix + 'academy-pin:' + g.academyId);
       if (!raw || JSON.parse(raw).version !== g.version) return null;
     } else if (g.version !== version || !await this.version(version)) return null;
-    return { hash, version: g.version, academyId: g.academyId || undefined, expiresAt: Number(g.expiresAt), active: g.active ?? '' };
+    return { hash, version: g.version, academyId: g.academyId || undefined, expiresAt: Number(g.expiresAt), active: g.active ?? '', browserProfile: g.browserProfile, browserRuntimeId: g.browserRuntimeId, browserOrigin: g.browserOrigin };
   }
   async run(g: TrialGrant, key: string): Promise<TrialRun | null> {
     const r = await this.client(); const data = await r.hgetall(this.runKey(g.hash, key));
     return data.requestKey ? data as TrialRun : null;
   }
-  async reserve(g: TrialGrant, key: string, fingerprint: string) {
+  async reserve(g: TrialGrant, key: string, fingerprint: string, browser?: { id: string; leaseUntil: number; deadline: number; profile: string }) {
     const r = await this.client();
-    const result = await r.eval(reserveScript, 4, this.grantKey(g.hash), this.runKey(g.hash, key),
-      trialPrefix + 'starts:minute:' + g.hash, trialPrefix + 'starts:hour:' + g.hash,
-      key, fingerprint, Math.ceil(g.expiresAt / 1000) + 600, Date.now());
+    const keys = [this.grantKey(g.hash), this.runKey(g.hash, key), trialPrefix + 'starts:minute:' + g.hash, trialPrefix + 'starts:hour:' + g.hash];
+    if (browser) keys.push(trialPrefix + 'session:' + browser.id, trialPrefix + 'browser:draining');
+    const result = await r.eval(reserveScript, keys.length, ...keys,
+      key, fingerprint, Math.ceil(g.expiresAt / 1000) + 600, Date.now(), browser ? JSON.stringify({ ...browser, binding: JSON.stringify({ hash: g.hash, key }) }) : '');
     if (result === 'ACTIVE' || result === 'CONFLICT') throw new HttpException('RUN_CONFLICT', 409);
+    if (result === 'DISABLED') throw new ServiceUnavailableException('BROWSER_RUNTIME_UNAVAILABLE');
     if (result === 'EXPIRED') throw new HttpException('ACCESS_EXPIRED', 401);
     if (result === 'BUDGET' || result === 'LIMIT') throw new HttpException({ message: 'RUN_LIMIT', retryAfter: result === 'BUDGET' ? 7200 : 60 }, 429);
     return result;

@@ -1,0 +1,4 @@
+{
+  "imageId": "sha256:46b3a49c43b386a746d32a4fe4df05cf430bb58de645e0a5c59afbe31a5cb604",
+  "output": "reset-visible True\ninvalid-speed TypeError\npalette {'green': (0, 32896, 0), 'gray': (32896, 32896, 32896), 'grey': (32896, 32896, 32896), 'purple': (32896, 0, 32896)}\n"
+}

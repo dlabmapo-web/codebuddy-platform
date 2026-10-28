@@ -52,6 +52,12 @@ export const apiEnvironmentSchema = z.object({
   GUI_SERVICE_SECRET:z.string().min(32).optional(),
   GUI_PUBLIC_WS_URL:z.string().url().optional(),
   TURTLE_TRIAL_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  TURTLE_TRIAL_BROWSER_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN: z.preprocess(v => v === '' ? undefined : v, httpUrlSchema.optional()),
+  TURTLE_TRIAL_BROWSER_RUNTIME_ID: z.preprocess(v => v === '' ? undefined : v, z.string().regex(/^brython-\d+\.\d+\.\d+-[a-f0-9]{20}$/).optional()),
+  TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS: z.string().default('').transform(v => v.split(',').map(x => x.trim()).filter(Boolean)).pipe(z.array(z.string().regex(/^brython-\d+\.\d+\.\d+-[a-f0-9]{20}$/)).max(16)),
+  TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS: z.string().default('').transform(v => v.split(',').map(x => x.trim()).filter(Boolean)).pipe(z.array(z.uuid()).max(1000)),
   TURTLE_TRIAL_PIN_DIGEST: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   TURTLE_TRIAL_LEGACY_PIN_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   TURTLE_TRIAL_PIN_PEPPER: z.string().min(32).optional(),
@@ -216,6 +222,15 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if (environment.TURTLE_TRIAL_BROWSER_ENABLED || environment.TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED) {
+    if (!environment.TURTLE_TRIAL_ENABLED || !environment.TURTLE_TRIAL_BROWSER_ENABLED) context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_BROWSER_ENABLED'], message: 'browser execution requires the trial and browser feature flags' });
+    for (const key of ['TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN', 'TURTLE_TRIAL_BROWSER_RUNTIME_ID'] as const) if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for browser execution' });
+    const origin = environment.TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN;
+    if (origin) {
+      const runtime = new URL(origin), app = new URL(environment.WEB_ORIGIN);
+      if (runtime.origin !== origin || runtime.hostname === app.hostname || (environment.NODE_ENV === 'production' && runtime.protocol !== 'https:')) context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN'], message: 'must be a dedicated origin on a different hostname, using HTTPS in production' });
+    }
+  }
   if (environment.TURTLE_TRIAL_ENABLED) {
     for (const key of ['TURTLE_TRIAL_PIN_PEPPER', 'TURTLE_TRIAL_SERVICE_URL', 'TURTLE_TRIAL_SERVICE_SECRET', 'TURTLE_TRIAL_PUBLIC_WS_URL', 'REDIS_URL', 'BFF_SHARED_SECRET'] as const)
       if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for turtle trial' });

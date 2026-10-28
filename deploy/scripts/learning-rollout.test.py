@@ -118,7 +118,9 @@ class LearningRolloutTests(unittest.TestCase):
     def prepare_deployment_fixture(self):
         for name in ("deploy.sh", "rollback.sh"):
             shutil.copy(SCRIPTS / name, self.root / "scripts" / name)
-        for name in ("render-monitoring-config.sh", "preflight.sh", "wait-healthy.sh", "smoke.sh"):
+        # Browser hooks have their own real-script ordering/Redis suites. These
+        # fixtures exercise the pre-existing API-before-web release contract.
+        for name in ("render-monitoring-config.sh", "preflight.sh", "wait-healthy.sh", "smoke.sh", "publish-turtle-browser.sh", "drain-turtle-browser.sh"):
             script = self.root / "scripts" / name
             script.write_text("#!/bin/sh\nexit 0\n")
             script.chmod(0o700)

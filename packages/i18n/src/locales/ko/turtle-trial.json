@@ -68,6 +68,10 @@
   "execution_controls": "실행 도구",
   "please_wait": "잠시만요",
   "run": "실행",
+  "editor_theme": "편집기 테마",
+  "ready_to_run": "실행 준비 완료",
+  "needs_attention": "확인이 필요해요",
+  "clear_drawing_and_output": "그림과 출력을 지우고 코드는 유지해요",
   "dark": "어둡게",
   "light": "밝게",
   "clear": "지우기",
@@ -122,5 +126,8 @@
   "manager_unavailable": "아직 거북이 체험 기능이 활성화되지 않았어요. 플랫폼 관리자에게 문의해 주세요.",
   "show_access_code": "코드 보기",
   "hide_access_code": "코드 숨기기",
-  "ask_teacher_for_code": "코드를 모르겠다면 선생님께 물어보세요."
+  "ask_teacher_for_code": "코드를 모르겠다면 선생님께 물어보세요.",
+  "browser_unavailable": "브라우저 터틀을 사용할 수 없습니다. 전체 Python 실행을 선택해 주세요.",
+  "run_with_full_python": "전체 Python으로 실행",
+  "use_browser_turtle": "브라우저 터틀 사용"
 }

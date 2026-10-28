@@ -1,0 +1,25 @@
+{
+  "observations": [
+    {
+      "runtimeId": "brython-3.15.0-8db7a7423706c93c6193",
+      "outcome": "10-second initial preparation timeout",
+      "count": 2
+    },
+    {
+      "runtimeId": "brython-3.15.0-8db7a7423706c93c6193",
+      "outcome": "new-tab retry ready",
+      "preparationMs": 5322.8
+    },
+    {
+      "runtimeId": "brython-3.15.0-8dc744cc86e3dab4db7e",
+      "outcome": "ready",
+      "preparationMs": 9154.3
+    }
+  ],
+  "hostObservations": {
+    "memoryCompressionBytesApprox": 2970000000,
+    "swapCountersNonzero": true,
+    "mediaanalysisdCpuPercentObserved": 198.5
+  },
+  "causality": "These are observed confounders, not a controlled attribution of every slow sample."
+}

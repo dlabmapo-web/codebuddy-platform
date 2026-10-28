@@ -20,3 +20,6 @@ playwright-report
 *.pem
 .DS_Store
 docs
+**/.next-turtle-browser
+**/__pycache__
+deploy/runtime

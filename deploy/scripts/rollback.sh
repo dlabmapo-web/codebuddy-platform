@@ -9,6 +9,7 @@ current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"
 # Stop the newer web before restoring an API that may lack its endpoints.
 compose stop --timeout 30 studio
+"$script_dir/drain-turtle-browser.sh"
 stop_learning_services
 install -m 600 "$previous" "$deployment_env"
 
@@ -20,6 +21,7 @@ if feature_enabled GUI_ENABLED; then
   compose pull gui-service
   "$script_dir/pin-gui-runtime.sh"
 fi
+"$script_dir/publish-turtle-browser.sh"
 compose up -d --remove-orphans
 compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "$script_dir/wait-healthy.sh"

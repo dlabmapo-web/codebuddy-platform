@@ -4,21 +4,25 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import {
   turtleCustomSource, turtleShapeSource, turtleRunnerSource, turtleProjectReadme,
-  turtleHelperVersion, turtleStarters, turtleRunSeconds, turtleRunning,
-  type TurtleSession, type TurtleRunInput,
+  turtleHelperVersion, turtleStarters, turtleRunSeconds, turtleRunning, turtleBrowserProfileId,
+  type TurtleSession, type TurtleRunInput, type TurtleBrowserRun,
 } from '@cove/shared';
 import { TrialStore, type TrialGrant } from './trial-store.js';
 import { TrialRuntime } from './trial-runtime.js';
 import { trialDigest, trialEqual, trialHash } from './trial-security.js';
 import { TrialPins } from './trial-pins.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { TrialBrowserPolicy } from './browser-policy.js';
+import { TrialBrowserRuns } from './browser-runs.js';
 
 @Injectable()
 export class TrialService {
   private readonly logger = new Logger(TrialService.name);
   constructor(@Inject(ConfigService) private readonly config: ConfigService, @Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialRuntime) private readonly runtime: TrialRuntime,
     @Optional() @Inject(TrialPins) private readonly pins?: TrialPins,
-    @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService) {}
+    @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService,
+    @Optional() @Inject(TrialBrowserPolicy) private readonly browserPolicy?: TrialBrowserPolicy,
+    @Optional() @Inject(TrialBrowserRuns) private readonly browserRuns?: TrialBrowserRuns) {}
   enabled() { if (!this.config.get('TURTLE_TRIAL_ENABLED')) throw new ServiceUnavailableException('TRIAL_UNAVAILABLE'); }
   private version() { return this.config.get<string>('TURTLE_TRIAL_PIN_VERSION')!; }
   private owner(g: TrialGrant) { return 'trial:' + g.hash; }
@@ -44,8 +48,9 @@ export class TrialService {
     const managed = await this.pins?.resolve(normalized);
     if (managed) {
       await this.academy(managed.academyId);
-      await this.runtime.ready();
-      return this.store.issue(managed.version, managed.academyId);
+      const browser = this.browserPolicy?.issue(managed.academyId);
+      if (!browser) await this.runtime.ready();
+      return this.store.issue(managed.version, managed.academyId, browser);
     }
     if (this.config.get('TURTLE_TRIAL_LEGACY_PIN_ENABLED') !== true) throw new UnauthorizedException('INVALID_PIN');
     if (!/^[0-9]{6}$/.test(normalized) || !trialEqual(
@@ -53,8 +58,9 @@ export class TrialService {
       this.config.get<string>('TURTLE_TRIAL_PIN_DIGEST'),
     )) throw new UnauthorizedException('INVALID_PIN');
     if (!await this.store.version(this.version())) throw new ServiceUnavailableException('TRIAL_UNAVAILABLE');
-    await this.runtime.ready();
-    return this.store.issue(this.version());
+    const browser = this.browserPolicy?.issue();
+    if (!browser) await this.runtime.ready();
+    return this.store.issue(this.version(), '', browser);
   }
   async grant(token: string): Promise<TrialGrant> {
     this.enabled();
@@ -72,8 +78,15 @@ export class TrialService {
   async bootstrap(token: string) {
     const g = await this.grant(token);
     let session: TurtleSession | null = null;
-    if (g.active) session = await this.recover(g, g.active);
-    return { expiresAt: g.expiresAt, helperVersion: turtleHelperVersion, starters: turtleStarters, session, academy: g.academyId ? await this.academy(g.academyId) : null };
+    let browserRun: TurtleBrowserRun | null = null;
+    if (g.active) {
+      if ((await this.store.run(g, g.active))?.engine === 'browser') browserRun = await this.browserRuns?.recover(g, g.active) ?? null;
+      else session = await this.recover(g, g.active);
+    }
+    const browser = this.browserPolicy?.profile(g);
+    return { expiresAt: g.expiresAt, helperVersion: turtleHelperVersion, starters: turtleStarters, session, academy: g.academyId ? await this.academy(g.academyId) : null,
+      ...(g.browserProfile === turtleBrowserProfileId ? { preferredEngine: 'browser' as const } : {}),
+      ...(browser || browserRun ? { browser, browserRun } : {}) };
   }
   private async finish(g: TrialGrant, key: string, s: TurtleSession) {
     if (turtleRunning(s)) return;
@@ -84,6 +97,7 @@ export class TrialService {
   private async recover(g: TrialGrant, key: string) {
     const run = await this.store.run(g, key);
     if (!run) return null;
+    if (run.engine === 'browser') { await this.browserRuns?.recover(g, key); return null; }
     let session: TurtleSession | null = null;
     if (run.id) {
       try { session = await this.runtime.request('/sessions/' + run.id); }
@@ -148,6 +162,7 @@ export class TrialService {
   async session(token: string, id: string, method = 'GET', text?: string) {
     const g = await this.grant(token); const key = await this.store.owned(g, id);
     if (!key) throw new HttpException('RUN_NOT_FOUND', 404);
+    if ((await this.store.run(g, key))?.engine === 'browser') throw new HttpException('RUN_NOT_FOUND', 404);
     await this.store.limit([['session:' + g.hash, 180, 60000]]);
     if (method === 'DELETE') {
       const before = await this.recover(g, key);
@@ -168,6 +183,7 @@ export class TrialService {
     await this.store.revoke(g); // Revoke first: no request can renew the lease.
     if (g.active) {
       const run = await this.store.run(g, g.active);
+      if (run?.engine === 'browser') { await this.browserRuns?.end(g, g.active); return {}; }
       const s = run?.id ? { id: run.id } : await this.runtime.lookup(this.owner(g), g.active).catch(() => null);
       if (s) await this.runtime.request('/sessions/' + s.id, 'DELETE').catch(() => {});
     }

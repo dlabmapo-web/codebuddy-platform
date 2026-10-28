@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-28",
+  "timezone": "Asia/Seoul",
+  "release": "v2.0.46",
+  "source_revision": "0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+  "scope": "Seven sequential live staff-practice submissions, 33 passing cases. Same evaluator as official grading; separate practice queue and persistence. No student submissions, progress, points, or production settings changed.",
+  "configuration": {
+    "engine": "pyodide-0.27.5",
+    "sandboxConcurrency": 2,
+    "spares": 1,
+    "sandboxCpuQuota": 1.5
+  },
+  "summary": [
+    {
+      "cases": 1,
+      "server_runs": 3,
+      "continuous_browser_runs": 2,
+      "recorded_created_to_graded_at_ms": [
+        498,
+        879
+      ],
+      "observed_click_to_visible_ms": [
+        2848,
+        2902
+      ]
+    },
+    {
+      "cases": 5,
+      "server_runs": 2,
+      "continuous_browser_runs": 1,
+      "recorded_created_to_graded_at_ms": [
+        8604,
+        8614
+      ],
+      "observed_click_to_visible_ms": [
+        9724,
+        9724
+      ]
+    },
+    {
+      "cases": 10,
+      "server_runs": 2,
+      "continuous_browser_runs": 2,
+      "recorded_created_to_graded_at_ms": [
+        25340,
+        29590
+      ],
+      "observed_click_to_visible_ms": [
+        27691,
+        32727
+      ]
+    }
+  ],
+  "server_runs": [
+    {
+      "cases": 1,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:04:34.506Z",
+      "startedAt": "2026-10-28T08:04:34.724Z",
+      "gradedAt": "2026-10-28T08:04:35.385Z",
+      "passedCases": 1,
+      "displayedSlowestCaseRuntimeMs": 171,
+      "recordedCaseRuntimeSumMs": 171,
+      "queueMs": 218
+    },
+    {
+      "cases": 1,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:05:20.721Z",
+      "startedAt": "2026-10-28T08:05:20.830Z",
+      "gradedAt": "2026-10-28T08:05:21.219Z",
+      "passedCases": 1,
+      "displayedSlowestCaseRuntimeMs": 114,
+      "recordedCaseRuntimeSumMs": 114,
+      "queueMs": 109
+    },
+    {
+      "cases": 1,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:05:32.948Z",
+      "startedAt": "2026-10-28T08:05:33.056Z",
+      "gradedAt": "2026-10-28T08:05:33.540Z",
+      "passedCases": 1,
+      "displayedSlowestCaseRuntimeMs": 107,
+      "recordedCaseRuntimeSumMs": 107,
+      "queueMs": 108
+    },
+    {
+      "cases": 5,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:06:43.105Z",
+      "startedAt": "2026-10-28T08:06:43.215Z",
+      "gradedAt": "2026-10-28T08:06:51.719Z",
+      "passedCases": 5,
+      "displayedSlowestCaseRuntimeMs": 165,
+      "recordedCaseRuntimeSumMs": 554,
+      "queueMs": 110
+    },
+    {
+      "cases": 5,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:07:34.496Z",
+      "startedAt": "2026-10-28T08:07:34.599Z",
+      "gradedAt": "2026-10-28T08:07:43.100Z",
+      "passedCases": 5,
+      "displayedSlowestCaseRuntimeMs": 120,
+      "recordedCaseRuntimeSumMs": 518,
+      "queueMs": 103
+    },
+    {
+      "cases": 10,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:10:26.114Z",
+      "startedAt": "2026-10-28T08:10:26.221Z",
+      "gradedAt": "2026-10-28T08:10:55.704Z",
+      "passedCases": 10,
+      "displayedSlowestCaseRuntimeMs": 225,
+      "recordedCaseRuntimeSumMs": 1339,
+      "queueMs": 107
+    },
+    {
+      "cases": 10,
+      "status": "PASSED",
+      "createdAt": "2026-10-28T08:11:28.594Z",
+      "startedAt": "2026-10-28T08:11:28.705Z",
+      "gradedAt": "2026-10-28T08:11:53.934Z",
+      "passedCases": 10,
+      "displayedSlowestCaseRuntimeMs": 121,
+      "recordedCaseRuntimeSumMs": 948,
+      "queueMs": 111
+    }
+  ],
+  "browser_observations": [
+    {
+      "cases": 1,
+      "startedAt": "2026-10-28T08:05:19.868Z",
+      "observedMs": 2848,
+      "sawChecking": true
+    },
+    {
+      "cases": 1,
+      "startedAt": "2026-10-28T08:05:32.250Z",
+      "observedMs": 2902,
+      "sawChecking": true
+    },
+    {
+      "cases": 5,
+      "startedAt": "2026-10-28T08:07:33.963Z",
+      "observedMs": 9724,
+      "sawChecking": true,
+      "complete": true
+    },
+    {
+      "cases": 10,
+      "startedAt": "2026-10-28T08:10:24.987Z",
+      "observedMs": 32727,
+      "sawChecking": true,
+      "complete": true
+    },
+    {
+      "cases": 10,
+      "startedAt": "2026-10-28T08:11:27.934Z",
+      "observedMs": 27691,
+      "sawChecking": true,
+      "complete": true
+    }
+  ],
+  "sandbox_windows": [
+    {
+      "name": "ten-case-first",
+      "start_observed_at": "2026-10-28T08:08:16.386Z",
+      "end_observed_at": "2026-10-28T08:11:14.426Z",
+      "stage_deltas": {
+        "prepare": {
+          "count": 10,
+          "seconds": 41.37332
+        },
+        "acquire": {
+          "count": 10,
+          "seconds": 27.716745
+        },
+        "exit": {
+          "count": 10,
+          "seconds": 1.336385
+        },
+        "drain": {
+          "count": 10,
+          "seconds": 0.002955
+        },
+        "execute": {
+          "count": 10,
+          "seconds": 1.341396
+        },
+        "identity": {
+          "count": 10,
+          "seconds": 0.007262
+        },
+        "cleanup": {
+          "count": 10,
+          "seconds": 0.00751
+        }
+      }
+    },
+    {
+      "name": "ten-case-repeat",
+      "start_observed_at": "2026-10-28T08:11:14.426Z",
+      "end_observed_at": "2026-10-28T08:12:56.520Z",
+      "stage_deltas": {
+        "prepare": {
+          "count": 10,
+          "seconds": 35.507444
+        },
+        "acquire": {
+          "count": 10,
+          "seconds": 23.889814
+        },
+        "exit": {
+          "count": 10,
+          "seconds": 0.945575
+        },
+        "drain": {
+          "count": 10,
+          "seconds": 0.001756
+        },
+        "execute": {
+          "count": 10,
+          "seconds": 0.948524
+        },
+        "identity": {
+          "count": 10,
+          "seconds": 0.004434
+        },
+        "cleanup": {
+          "count": 10,
+          "seconds": 0.004594
+        }
+      }
+    }
+  ],
+  "final_queues": [
+    {
+      "kind": "official",
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "failed": 0,
+      "oldestWaitMs": 0
+    },
+    {
+      "kind": "practice",
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "failed": 0,
+      "oldestWaitMs": 0
+    },
+    {
+      "kind": "sample",
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "failed": 0,
+      "oldestWaitMs": 0
+    },
+    {
+      "kind": "regrade",
+      "waiting": 0,
+      "active": 0,
+      "delayed": 0,
+      "failed": 0,
+      "oldestWaitMs": 0
+    }
+  ],
+  "limitations": [
+    "Diagnostic sample, not production p95 or classroom capacity acceptance.",
+    "Server timestamp intervals are gradedAt minus createdAt. gradedAt is assigned before its persistence finishes; these are not acknowledged commit-latency measurements. Earlier conversational saved-grade labels referred to this recorded interval.",
+    "Browser observations include automation and sampling overhead; five continuously observed results for seven server runs.",
+    "Displayed runtime is the slowest case, not total grading or total case execution time.",
+    "Prepare is background work and overlaps acquire/execute; do not add prepare time to foreground wait.",
+    "Native prototype was local ARM64 Docker Desktop, not this live Linux AMD64 cohort."
+  ]
+}

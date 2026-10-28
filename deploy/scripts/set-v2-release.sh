@@ -9,6 +9,7 @@ short_answer="${4:-}"
 choice="${5:-}"
 video="${6:-}"
 trial="${7:-false}"
+browser_config="${8:-}"
 [[ "$namespace" =~ ^ghcr\.io/[a-z0-9_.-]+$ ]] || fail "invalid GHCR namespace"
 assert_safe_tag "$tag"
 require_file "$deployment_env"
@@ -19,7 +20,7 @@ candidate="$(mktemp "$deploy_root/state/v2-release.XXXXXX")"
 cp "$deployment_env" "$candidate"
 chmod 600 "$candidate"
 
-python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" "$trial" <<'PY'
+python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" "$trial" "$browser_config" "$script_dir" <<'PY'
 import pathlib
 import sys
 
@@ -45,6 +46,21 @@ for key, value in zip(
         if value not in ("true", "false"):
             raise SystemExit(f"{key} must be true or false")
         updates[key] = value
+browser_keys = set()
+if sys.argv[9]:
+    import importlib.util
+    sys.dont_write_bytecode = True
+    spec = importlib.util.spec_from_file_location('browser_release', pathlib.Path(sys.argv[10]) / 'turtle-browser-release.py')
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    current = {}
+    for line in path.read_text().splitlines():
+        key, separator, value = line.partition('=')
+        if separator and not key.startswith('#'):
+            current[key.strip()] = value.strip().strip("\"'")
+    browser = helper.release_updates(sys.argv[9], {**current, **updates})
+    updates.update(browser)
+    browser_keys = set(browser)
 seen = set()
 lines = []
 for line in path.read_text().splitlines():
@@ -55,6 +71,7 @@ for line in path.read_text().splitlines():
     else:
         lines.append(line)
 optional = {"VIDEO_WORKER_IMAGE", "GUI_SERVICE_IMAGE", "GUI_RUNTIME_IMAGE", "DLAB_OS_BASE_URL"}
+optional.update(browser_keys)
 optional.update(key for key in updates if key.endswith("_ENABLED"))
 missing = (updates.keys() - optional) - seen
 if missing:

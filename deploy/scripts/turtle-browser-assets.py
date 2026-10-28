@@ -98,6 +98,8 @@ def render(env, destination, snippet):
     common = "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';"
     text = f'''# Generated from verified immutable assets. No proxy or application routes.
 {runtime.netloc} {{
+  # This outer deferred header must win over production_common's default.
+  header >Referrer-Policy no-referrer
   import production_common
   @assets {{
     method GET HEAD

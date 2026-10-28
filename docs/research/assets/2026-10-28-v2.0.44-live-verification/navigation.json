@@ -1,0 +1,731 @@
+{
+  "date": "2026-10-28",
+  "release": "v2.0.44",
+  "revision": "d096a7ed19fff70d91ae9a4f9d97560b8dc8558a",
+  "samples": [
+    {
+      "role": "manager",
+      "page": "Courses",
+      "ms": 1167,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 15
+    },
+    {
+      "role": "manager",
+      "page": "Maintenance",
+      "ms": 961,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 2
+    },
+    {
+      "role": "manager",
+      "page": "Classes",
+      "ms": 1496,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 10
+    },
+    {
+      "role": "manager",
+      "page": "Class ranking",
+      "ms": 547,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "My classes",
+      "ms": 836,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Student analytics",
+      "ms": 2041,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Members",
+      "ms": 1100,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Students",
+      "ms": 865,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Teachers",
+      "ms": 1070,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 11
+    },
+    {
+      "role": "manager",
+      "page": "Applications",
+      "ms": 433,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Invitations",
+      "ms": 540,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Academy settings",
+      "ms": 649,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Points and rewards",
+      "ms": 857,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "My page",
+      "ms": 895,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Overview",
+      "ms": 2372,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 47
+    },
+    {
+      "role": "manager",
+      "page": "Members",
+      "ms": 1116,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 1,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Overview",
+      "ms": 2694,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 47
+    },
+    {
+      "role": "manager",
+      "page": "Student analytics",
+      "ms": 1761,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Courses",
+      "ms": 659,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 15
+    },
+    {
+      "role": "manager",
+      "page": "Overview",
+      "ms": 2179,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 47
+    },
+    {
+      "role": "manager",
+      "page": "Members",
+      "ms": 874,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Student analytics",
+      "ms": 1593,
+      "boundary": "changed h1 and skeletons gone; background fetch may remain",
+      "busy": 1,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "teamLead",
+      "page": "Courses",
+      "ms": 681,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 15
+    },
+    {
+      "role": "teamLead",
+      "page": "Maintenance",
+      "ms": 751,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 2
+    },
+    {
+      "role": "teamLead",
+      "page": "Classes",
+      "ms": 666,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 10
+    },
+    {
+      "role": "teamLead",
+      "page": "Class ranking",
+      "ms": 454,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teamLead",
+      "page": "My classes",
+      "ms": 650,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teamLead",
+      "page": "Student analytics",
+      "ms": 1620,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "teamLead",
+      "page": "Students",
+      "ms": 993,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "teamLead",
+      "page": "Teachers",
+      "ms": 835,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 11
+    },
+    {
+      "role": "teamLead",
+      "page": "Applications",
+      "ms": 412,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teamLead",
+      "page": "My page",
+      "ms": 846,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teamLead",
+      "page": "Overview",
+      "ms": 1213,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 24
+    },
+    {
+      "role": "teamLead",
+      "page": "Student analytics",
+      "ms": 1493,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "teamLead",
+      "page": "Overview",
+      "ms": 1510,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 24
+    },
+    {
+      "role": "teacher",
+      "page": "Courses",
+      "ms": 580,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 15
+    },
+    {
+      "role": "teacher",
+      "page": "My classes",
+      "ms": 535,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teacher",
+      "page": "Student analytics",
+      "ms": 1051,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 3
+    },
+    {
+      "role": "teacher",
+      "page": "Students",
+      "ms": 1184,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 5
+    },
+    {
+      "role": "teacher",
+      "page": "My page",
+      "ms": 925,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teacher",
+      "page": "Overview",
+      "ms": 1296,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 9
+    },
+    {
+      "role": "teacher",
+      "page": "Students",
+      "ms": 1069,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 5
+    },
+    {
+      "role": "teacher",
+      "page": "Student detail",
+      "ms": 1289,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teacher",
+      "page": "My classes",
+      "ms": 641,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "teacher",
+      "page": "Live class",
+      "ms": 955,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 3
+    },
+    {
+      "role": "teacher",
+      "page": "Live roster",
+      "ms": 953,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 6
+    },
+    {
+      "role": "teacher",
+      "page": "Class solution status",
+      "ms": 728,
+      "boundary": "observed heading, first table row, aria-busy cleared",
+      "busy": 0,
+      "error": false
+    },
+    {
+      "role": "student",
+      "page": "Courses",
+      "ms": 1645,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "My classes",
+      "ms": 1285,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Answer records",
+      "ms": 870,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 20
+    },
+    {
+      "role": "student",
+      "page": "My points",
+      "ms": 1066,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 26
+    },
+    {
+      "role": "student",
+      "page": "My page",
+      "ms": 921,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Courses",
+      "ms": 1922,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Overview",
+      "ms": 2507,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 35
+    },
+    {
+      "role": "student",
+      "page": "My classes",
+      "ms": 1536,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Class detail",
+      "ms": 1384,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Course outline",
+      "ms": 1487,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "student",
+      "page": "Coding workspace",
+      "ms": 1813,
+      "boundary": "Test run and Submit visible",
+      "error": false
+    },
+    {
+      "role": "student",
+      "page": "Coding workspace ready repeat",
+      "ms": 2294,
+      "boundary": "Test run enabled and editor loading message gone",
+      "error": false
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Users",
+      "ms": 1209,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Applications",
+      "ms": 792,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 2
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Invitations",
+      "ms": 720,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 1
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Features",
+      "ms": 575,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 4
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Point policies",
+      "ms": 680,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 4
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Maintenance",
+      "ms": 612,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 1
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Support access",
+      "ms": 565,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Audit trail",
+      "ms": 613,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Library",
+      "ms": 789,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 8
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Academy courses",
+      "ms": 831,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Classes",
+      "ms": 891,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Academies",
+      "ms": 904,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 4
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Ranking",
+      "ms": 1021,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 24
+    },
+    {
+      "role": "platformAdmin",
+      "page": "Academies",
+      "ms": 646,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 4
+    },
+    {
+      "role": "platformAdmin",
+      "page": "My page",
+      "ms": 1033,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 0
+    },
+    {
+      "role": "manager",
+      "page": "Courses",
+      "ms": 644,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 15
+    },
+    {
+      "role": "manager",
+      "page": "Members",
+      "ms": 1167,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Overview",
+      "ms": 1950,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 47
+    },
+    {
+      "role": "manager",
+      "page": "Student analytics",
+      "ms": 1489,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Members",
+      "ms": 860,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    },
+    {
+      "role": "manager",
+      "page": "Overview",
+      "ms": 2135,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 47
+    },
+    {
+      "role": "manager",
+      "page": "Student analytics",
+      "ms": 1486,
+      "boundary": "changed main h1, skeletons gone, aria-busy cleared; DOM observation",
+      "busy": 0,
+      "error": false,
+      "rows": 25
+    }
+  ]
+}

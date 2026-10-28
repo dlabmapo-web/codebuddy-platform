@@ -1,0 +1,20 @@
+{
+  "visitors": 20,
+  "simultaneousActiveBrowserAdmissions": 20,
+  "admission": {
+    "count": 20,
+    "p50Ms": 19.141124999999988,
+    "p95Ms": 19.59454199999999,
+    "maxMs": 19.61054200000001
+  },
+  "renewal": {
+    "count": 20,
+    "p50Ms": 19.12854199999998,
+    "p95Ms": 19.67054200000001,
+    "maxMs": 19.726541999999995
+  },
+  "elapsedMs": 159.439042,
+  "sourceUploaded": false,
+  "scope": "Synthetic loopback Nest/Redis fixture; broker methods throw. Excludes Next BFF, production academy DB reads, network and browser drawing/device costs.",
+  "cleanedUpVisitors": 20
+}

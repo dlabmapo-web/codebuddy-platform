@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-10-28T05:54:45.920688+00:00",
+  "origin": "https://turtle-runtime.coveedu.com",
+  "runtimeId": "brython-3.15.0-2ab1760c5c7107d57457",
+  "tlsVerified": true,
+  "assets": [
+    {
+      "file": "BRYTHON-LICENSE.txt",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "brython.js",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "brython_stdlib.js",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "frame.mjs",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "index.html",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self'; style-src 'self'; worker-src https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/worker.js; frame-ancestors https://cs.coveedu.com"
+    },
+    {
+      "file": "protocol.mjs",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "renderer.mjs",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "runtime.mjs",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "surface.css",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "worker.js",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "default-src 'none'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' 'unsafe-eval'; style-src 'none'; worker-src 'none'; frame-ancestors 'none'"
+    },
+    {
+      "file": "config.mjs",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    },
+    {
+      "file": "modules.js",
+      "status": 200,
+      "sha256Verified": true,
+      "noReferrer": true,
+      "csp": "verified"
+    }
+  ],
+  "unknownRouteAndPost": 404,
+  "applicationActivation": "not yet enabled"
+}

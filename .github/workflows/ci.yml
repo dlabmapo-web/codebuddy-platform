@@ -95,6 +95,8 @@ jobs:
         run: python3 deploy/scripts/learning-rollout.test.py
       - name: Verify browser admission rollback ordering
         run: python3 deploy/scripts/turtle-browser-rollback.test.py
+      - name: Verify browser pilot release configuration
+        run: python3 deploy/scripts/turtle-browser-release.test.py
 
   container-images:
     runs-on: ubuntu-latest

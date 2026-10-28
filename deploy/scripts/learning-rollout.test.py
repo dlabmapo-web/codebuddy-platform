@@ -1,5 +1,6 @@
 """Exercise release/profile selection without credentials or a Docker daemon."""
 import json
+import base64
 import importlib.util
 import os
 import pathlib
@@ -49,7 +50,7 @@ class LearningRolloutTests(unittest.TestCase):
         self.root = pathlib.Path(self.temporary.name)
         (self.root / "scripts").mkdir()
         (self.root / "secrets").mkdir()
-        for name in ("common.sh", "set-v2-release.sh", "pin-gui-runtime.sh"):
+        for name in ("common.sh", "set-v2-release.sh", "pin-gui-runtime.sh", "turtle-browser-release.py"):
             shutil.copy(SCRIPTS / name, self.root / "scripts" / name)
         self.env = dict(os.environ, COVE_DEPLOY_ROOT=str(self.root))
         self.manifest = self.root / "deployment.env"
@@ -101,6 +102,33 @@ class LearningRolloutTests(unittest.TestCase):
         result = self.run_script("set-v2-release.sh", "ghcr.io/acme", "sha-" + SHA, "not-a-boolean", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GUI_ENABLED must be true or false", result.stderr)
+        self.assertEqual(self.manifest.read_text(), previous)
+
+    def test_reviewed_browser_pilot_is_applied_only_to_the_release_candidate(self):
+        deploy = self.root / 'scripts/deploy.sh'
+        deploy.write_text('#!/bin/sh\ncp "$1" "$COVE_DEPLOY_ROOT/candidate.env"\n')
+        deploy.chmod(0o700)
+        previous = self.manifest.read_text()
+        pilot = {
+            'TURTLE_TRIAL_BROWSER_ENABLED': 'true',
+            'TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED': 'true',
+            'TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN': 'https://turtle-runtime.coveedu.com',
+            'TURTLE_TRIAL_BROWSER_RUNTIME_ID': 'brython-3.15.0-' + 'a' * 20,
+            'TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS': '20000000-0000-4000-8000-000000000001',
+        }
+        encoded = base64.b64encode(json.dumps(pilot).encode()).decode()
+        self.run_script('set-v2-release.sh', 'ghcr.io/acme', 'sha-' + SHA, 'true', 'true', 'true', 'true', 'true', encoded)
+        candidate = (self.root / 'candidate.env').read_text()
+        for key, value in pilot.items():
+            self.assertIn(key + '=' + value + '\n', candidate)
+        self.assertEqual(self.manifest.read_text(), previous)
+
+    def test_invalid_browser_pilot_never_invokes_deployment(self):
+        previous = self.manifest.read_text()
+        encoded = base64.b64encode(json.dumps({'API_IMAGE': 'unreviewed'}).encode()).decode()
+        result = self.run_script('set-v2-release.sh', 'ghcr.io/acme', 'sha-' + SHA, 'true', 'true', 'true', 'true', 'true', encoded, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / 'candidate.env').exists())
         self.assertEqual(self.manifest.read_text(), previous)
 
     def test_rollback_does_not_require_disabled_runtime_environments(self):

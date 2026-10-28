@@ -1,7 +1,9 @@
 # Public Turtle browser runtime operations
 
-Implementation branch: `feat/public-turtle-browser-runtime`. This is a disabled
-pilot, not production acceptance or deployment authorization. See the
+Implementation branch: `feat/public-turtle-browser-runtime`; activation wiring:
+`feat/public-turtle-browser-pilot`. Defaults remain disabled. A selected academy
+pilot requires the protected release approval described below; classroom-wide
+performance acceptance remains separate. See the
 [design](../superpowers/specs/2026-10-28-public-turtle-browser-runtime-design.md).
 Course Turtle/Tkinter, official grading and the one-slot full-Python guest broker
 keep their existing execution paths and limits.
@@ -66,6 +68,33 @@ retires browser admission first, then submits source through the existing guest
 path. Preparation errors do not automatically upload source or allocate guests.
 Server capacity remains one; broad automatic fallback is intentionally absent.
 
+## Activation through the protected release
+
+The v2 workflow accepts optional repository variable
+`TURTLE_BROWSER_RELEASE_CONFIG_BASE64`: base64-encoded JSON containing only the
+non-secret `TURTLE_TRIAL_BROWSER_*` manifest fields listed above. Values must be
+strings. Enabling admission requires a pinned artifact, canonical dedicated
+HTTPS origin, public Turtle enabled, and an explicit academy UUID allowlist.
+Unknown keys, invalid booleans, multiline values and invalid IDs fail before
+deployment. Never include credentials or classroom codes in this variable.
+
+The protected Production job passes this configuration to `set-v2-release.sh`,
+which merges it into its private candidate manifest. It does not replace the
+active manifest before normal preflight, rollback capture and deployment.
+Without the optional variable, releases preserve the installed selection.
+The runtime ID must match the artifact in that exact release's Studio image;
+update the reviewed value when runtime content changes. Disabled/current and
+retained static versions remain available according to the existing policy.
+
+The release does not automatically remove the persistent drain marker. If an
+operator previously drained the browser engine, explicitly resume it only after
+the reviewed pilot switches are enabled and validation is complete.
+
+After a successful one-time activation, remove the optional repository variable
+so future releases preserve installed switches instead of replaying activation.
+Existing native grants need Exit followed by a new code entry to select the
+browser profile; refreshing alone preserves their original engine.
+
 ## Disable and rollback
 
 For a routine kill, set admission false for both web/API and restart those
@@ -125,6 +154,17 @@ are unchanged.
 Run admission tests only with
 `TURTLE_BROWSER_TEST_REDIS_URL=redis://127.0.0.1:6398/1`. They refuse other hosts,
 ports/databases and clean only fixture-prefix keys in that isolated DB.
+
+With the optional API fixture running, this independent-visitor admission
+cohort exercises twenty simultaneously active browser reservations and renewals:
+
+```sh
+COVE_TURTLE_BROWSER_FIXTURE=1 node packages/turtle-browser-runtime/scripts/admission-fixture-load.mjs
+```
+
+It refuses non-fixture execution and cleans up its own grants/runs. The fixture
+throws on broker calls. Its timings exclude production academy reads, Next BFF,
+network and browser rendering; it is not a twenty-device performance result.
 
 Required acceptance evidence remains: actual classroom laptop/Chromebook/iPad
 and supported-browser cohorts, cold 10 Mbps/50 ms readiness, end-to-end admission

@@ -168,9 +168,14 @@ jobs:
           RELEASE_SHORT_ANSWER_ENABLED: ${{ vars.NEXT_PUBLIC_SHORT_ANSWER_ENABLED || 'false' }}
           RELEASE_MULTIPLE_CHOICE_ENABLED: ${{ vars.NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED || 'false' }}
           RELEASE_VIDEO_ENABLED: ${{ vars.NEXT_PUBLIC_VIDEO_LESSONS_ENABLED || 'false' }}
+          RELEASE_TURTLE_BROWSER_CONFIG_BASE64: ${{ vars.TURTLE_BROWSER_RELEASE_CONFIG_BASE64 || '' }}
         run: |
           for flag in RELEASE_GUI_ENABLED RELEASE_SHORT_ANSWER_ENABLED RELEASE_MULTIPLE_CHOICE_ENABLED RELEASE_VIDEO_ENABLED RELEASE_TURTLE_TRIAL_ENABLED; do
             [[ "${!flag}" == true || "${!flag}" == false ]] || { echo "$flag must be true or false"; exit 1; }
           done
+          # Non-secret pilot metadata only. Base64's finite alphabet prevents
+          # shell interpretation when this optional argument crosses SSH.
+          [[ -z "$RELEASE_TURTLE_BROWSER_CONFIG_BASE64" || "$RELEASE_TURTLE_BROWSER_CONFIG_BASE64" =~ ^[A-Za-z0-9+/=]+$ ]] || { echo 'Invalid browser configuration encoding'; exit 1; }
+          (( ${#RELEASE_TURTLE_BROWSER_CONFIG_BASE64} <= 65536 )) || { echo 'Browser configuration is too large'; exit 1; }
           ssh -i ~/.ssh/cove-production "$VPS_USER@$VPS_HOST" \
-            "/opt/cove/scripts/set-v2-release.sh '$REGISTRY_NAMESPACE' '$IMAGE_TAG' '$RELEASE_GUI_ENABLED' '$RELEASE_SHORT_ANSWER_ENABLED' '$RELEASE_MULTIPLE_CHOICE_ENABLED' '$RELEASE_VIDEO_ENABLED' '$RELEASE_TURTLE_TRIAL_ENABLED'"
+            "/opt/cove/scripts/set-v2-release.sh '$REGISTRY_NAMESPACE' '$IMAGE_TAG' '$RELEASE_GUI_ENABLED' '$RELEASE_SHORT_ANSWER_ENABLED' '$RELEASE_MULTIPLE_CHOICE_ENABLED' '$RELEASE_VIDEO_ENABLED' '$RELEASE_TURTLE_TRIAL_ENABLED' '$RELEASE_TURTLE_BROWSER_CONFIG_BASE64'"

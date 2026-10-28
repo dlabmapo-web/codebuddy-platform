@@ -93,3 +93,26 @@ production artifact still matches the reviewed activation runtime ID.
 See [local check results](assets/2026-10-28-brython-activation/local-release-checks.json).
 Exact merged-commit CI, release images and human Production approval follow;
 these local checks do not by themselves activate production.
+
+## Protected release handoff
+
+The complete activation branch merged into `feat/cove-studio-v2` at
+`0ae56bc6ce882ce1fad5730c1bc19e5d8677c238`.
+[CI](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/40641536396)
+passed all ten jobs on that exact merge. Annotated tag `v2.0.46` was published
+only after success and a fresh remote check.
+[Release](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/40642762218)
+passed all eight image publication/scanning jobs and is waiting for Production
+approval from `jurabek10`. The preparing account cannot approve. Production
+application flags remain false until that reviewed deployment runs.
+
+The prepared repository variable was read back and matched the validated
+seven-field configuration: both browser switches true, the verified runtime
+origin/ID, production parent, Dlab-Mapo academy allowlist and no retained versions.
+No classroom code or credentials are included. Remove this one-time variable
+only after successful activation, then verify a new live grant and measured
+visible drawing before reporting production speed.
+
+[Approval gate screenshot](assets/2026-10-28-brython-activation/release-awaiting-approval.jpg).
+Local fixture servers/containers and temporary release worktrees were removed;
+ordinary developer services and production student sessions were retained.

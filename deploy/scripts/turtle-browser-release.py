@@ -48,17 +48,27 @@ def release_updates(encoded, current):
     runtime = effective.get(PREFIX + 'RUNTIME_ORIGIN', '')
     parent = effective.get(PREFIX + 'PARENT_ORIGIN', 'https://cs.coveedu.com')
     runtime_id = effective.get(PREFIX + 'RUNTIME_ID', '')
+    # preflight sources this non-secret manifest: even inactive metadata must
+    # be shell-safe and canonical rather than becoming a dormant payload.
+    parent_host = origin(parent)
     if enabled or runtime or runtime_id:
-        if origin(runtime) == origin(parent):
+        if origin(runtime) == parent_host:
             raise ValueError('Browser runtime must use a different hostname')
         if not RUNTIME_ID.fullmatch(runtime_id):
             raise ValueError('Browser runtime ID must identify the pinned artifact')
-    pilots = [v.strip() for v in effective.get(PREFIX + 'PILOT_ACADEMY_IDS', '').split(',') if v.strip()]
+    def csv(name):
+        value = effective.get(PREFIX + name, '')
+        entries = value.split(',') if value else []
+        if any(not entry or entry.strip() != entry for entry in entries):
+            raise ValueError('Browser lists must be canonical comma-separated values')
+        return entries
+
+    pilots = csv('PILOT_ACADEMY_IDS')
     if len(pilots) > 1000 or any(str(uuid.UUID(v)) != v for v in pilots):
         raise ValueError('Invalid browser pilot academy IDs')
     if admission and not pilots:
         raise ValueError('Browser admission requires an explicit academy pilot')
-    retained = [v.strip() for v in effective.get(PREFIX + 'RETAINED_RUNTIME_IDS', '').split(',') if v.strip()]
+    retained = csv('RETAINED_RUNTIME_IDS')
     if len(retained) > 16 or any(not RUNTIME_ID.fullmatch(v) for v in retained):
         raise ValueError('Invalid retained browser runtime IDs')
     return updates

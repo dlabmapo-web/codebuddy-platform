@@ -1,0 +1,78 @@
+{
+  "sourceRevision": "5f31f398",
+  "checks": [
+    {
+      "name": "shared-build",
+      "exitCode": 0,
+      "seconds": 4.3
+    },
+    {
+      "name": "prisma-validate",
+      "exitCode": 0,
+      "seconds": 0.9
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "seconds": 48.4
+    },
+    {
+      "name": "e2e-typecheck",
+      "exitCode": 0,
+      "seconds": 2.6
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "seconds": 24.5
+    },
+    {
+      "name": "routes",
+      "exitCode": 0,
+      "seconds": 0.5
+    },
+    {
+      "name": "translations",
+      "exitCode": 0,
+      "seconds": 16.9
+    },
+    {
+      "name": "test",
+      "exitCode": 0,
+      "seconds": 115.5
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "seconds": 125.8
+    },
+    {
+      "name": "browser-release",
+      "exitCode": 0,
+      "seconds": 0.1
+    },
+    {
+      "name": "runtime-assets",
+      "exitCode": 0,
+      "seconds": 5.9
+    },
+    {
+      "name": "deployment-config",
+      "exitCode": 0,
+      "seconds": 4.2
+    },
+    {
+      "name": "learning-rollback",
+      "exitCode": 0,
+      "seconds": 9.8
+    },
+    {
+      "name": "browser-rollback",
+      "exitCode": 0,
+      "seconds": 7.4
+    }
+  ],
+  "artifactId": "brython-3.15.0-2ab1760c5c7107d57457",
+  "syntheticConfiguration": true,
+  "productionSecretsUsed": false
+}

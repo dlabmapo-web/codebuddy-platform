@@ -78,3 +78,18 @@ from this pilot. The release must first be approved by the designated human;
 after deployment, verify a fresh live grant, actual drawing, effective profile,
 startup timing and zero new native allocations for supported drawing.
 Existing native grants require Exit and new code entry to select Brython.
+
+## Release verification
+
+All fourteen local release checks passed in an isolated clean worktree at
+`5f31f398` using synthetic CI configuration. Frozen-lock installation and Prisma
+client generation passed first. Workspace and end-to-end typechecks, full lint,
+canonical routes, translations and all production builds passed. Suites:
+GUI 42 passed / 8 skipped; shared 928; runtime 10 (including 11 Python model
+methods); API 1,622 passed / 176 skipped; i18n 140; web 1,444.
+Deployment configuration, 9 browser-config cases, 4 asset/Caddy cases, 15
+learning-rollout cases and 6 browser-rollback cases passed. The freshly built
+production artifact still matches the reviewed activation runtime ID.
+See [local check results](assets/2026-10-28-brython-activation/local-release-checks.json).
+Exact merged-commit CI, release images and human Production approval follow;
+these local checks do not by themselves activate production.

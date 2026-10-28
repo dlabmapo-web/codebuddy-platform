@@ -396,45 +396,157 @@
 }
 .toolbar {
   display:flex;
-  align-items:stretch;
-  min-height:38px;
-  border-bottom:1px solid #ddd
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px 16px;
+  padding:8px 16px;
+  min-height:60px;
+  flex-shrink:0;
+  border-bottom:1px solid var(--trial-border);
+  background:#fff
 }
 .toolbar button {
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:6px;
-  padding:0 20px;
-  min-height:38px;
-  border-right:1px solid #e2e2e2;
-  font-size:12px;
-  color:#333;
-  background:#fff
+  gap:8px;
+  padding:0 14px;
+  min-height:44px;
+  border:1px solid transparent;
+  border-radius:8px;
+  font-size:14px;
+  font-weight:600;
+  line-height:1.4;
+  color:var(--trial-ink);
+  background:#fff;
+  transition:background .15s,border-color .15s,color .15s
+}
+.toolbar button svg {
+  width:16px;
+  height:16px;
+  flex-shrink:0
+}
+.executionActions,.runtimeActions {
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+.executionActions {
+  flex-shrink:0
+}
+.runtimeActions {
+  flex-wrap:wrap
+}
+.runtimeActions:empty {
+  display:none
+}
+.toolbarFeedback {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex:1 1 400px;
+  gap:16px;
+  min-width:0;
+  margin-left:auto
 }
 .toolbar .run {
   color:#fff;
-  background:#397de0;
-  min-width:82px
+  background:#1b64da;
+  min-width:96px;
+  box-shadow:0 1px 2px #18344e14
 }
 .toolbar .stop {
-  color:#ad4035
+  color:#b91c1c;
+  background:#fef2f2;
+  border-color:#fecaca
 }
-.toolbar button:hover:not(:disabled),.optionsTrigger:hover {
-  background:#f0f0f0
+.toolbar .stop svg {
+  width:12px;
+  height:12px
+}
+.toolbar .clear,.runtimeActions button {
+  border-color:var(--trial-border)
+}
+.toolbar button:hover:not(:disabled) {
+  background:#f1f6fb;
+  border-color:#bacce0
 }
 .toolbar .run:hover:not(:disabled) {
-  background:#286bcc
+  background:#1450b5;
+  border-color:transparent
+}
+.toolbar .stop:hover:not(:disabled) {
+  background:#fee2e2;
+  border-color:#fca5a5
+}
+.toolbar button:disabled {
+  opacity:1;
+  color:#758296;
+  background:#f1f5f9;
+  border-color:#e5eaf0;
+  box-shadow:none
+}
+.optionsTrigger:hover {
+  background:#f0f0f0
 }
 .runStatus {
-  align-self:center;
-  padding:0 12px;
-  margin-left:auto;
-  color:#777;
-  font-size:11px;
-  overflow:hidden;
-  white-space:nowrap;
-  text-overflow:ellipsis
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:7px 10px;
+  border:1px solid transparent;
+  border-radius:8px;
+  color:#526479;
+  background:#f1f5f9;
+  font-size:12px;
+  font-weight:550;
+  line-height:1.5;
+  min-width:0;
+  overflow-wrap:anywhere
+}
+.runStatus>svg {
+  width:15px;
+  height:15px;
+  flex-shrink:0
+}
+.runStatus[data-tone=active] {
+  color:#1450b5;
+  background:#eaf1fe;
+  border-color:#d7e5fd
+}
+.runStatus[data-tone=success] {
+  color:#15803d;
+  background:#edf8f0;
+  border-color:#d0ecd9
+}
+.runStatus[data-tone=warning] {
+  color:#92400e;
+  background:#fffbeb;
+  border-color:#fde6b1
+}
+.runStatus[data-tone=danger] {
+  color:#b91c1c;
+  background:#fef2f2;
+  border-color:#fecaca
+}
+.editorTheme {
+  display:flex;
+  flex-shrink:0;
+  align-items:center;
+  gap:2px;
+  border-radius:8px;
+  background:#f1f5f9
+}
+.editorTheme button {
+  color:#5a6c80;
+  background:transparent;
+  padding:0 12px
+}
+.editorTheme button[aria-pressed=true] {
+  color:#1450b5;
+  background:#fff;
+  border-color:#c5d6ed;
+  box-shadow:0 1px 3px #18344e12
 }
 .panes {
   display:grid;
@@ -647,12 +759,31 @@
     min-height:52px;
     padding:0 12px
   }
-  .toolbar button {
-    padding:0 12px
+  .toolbar {
+    padding:8px 12px;
+    gap:8px
+  }
+  .toolbarFeedback {
+    flex-basis:100%;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px
+  }
+  .runtimeActions {
+    flex-basis:100%
+  }
+  .runtimeActions button {
+    max-width:100%;
+    text-align:left
+  }
+  .editorTheme button {
+    padding:0 10px;
+    gap:6px;
+    font-size:12px
   }
   .runStatus {
-    padding:0 8px;
-    font-size:10px
+    padding:6px 8px;
+    font-size:12px
   }
   .mobileTabs {
     display:flex;
@@ -699,4 +830,11 @@
     transition:none;
     animation:none
   }
+}
+.browserFrame {
+  width:100%;
+  flex:1;
+  min-height:0;
+  border:0;
+  background:#fff
 }

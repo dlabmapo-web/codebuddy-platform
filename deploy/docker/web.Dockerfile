@@ -13,8 +13,9 @@ COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/web/package.json packages/web/package.json
+COPY packages/turtle-browser-runtime/package.json packages/turtle-browser-runtime/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @cove/web...
+    pnpm install --frozen-lockfile --filter @cove/web... --filter @cove/turtle-browser-runtime
 
 FROM dependencies AS builder
 COPY . .
@@ -46,7 +47,8 @@ ENV NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=$NEXT_PUBLIC_GOOGLE_AUTH_ENABLED
 ENV NEXT_PUBLIC_NAVER_AUTH_ENABLED=$NEXT_PUBLIC_NAVER_AUTH_ENABLED
 ENV NEXT_PUBLIC_KAKAO_AUTH_ENABLED=$NEXT_PUBLIC_KAKAO_AUTH_ENABLED
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
-RUN pnpm --filter @cove/shared --filter @cove/i18n build \
+RUN TURTLE_BROWSER_PARENT_ORIGIN="$NEXT_PUBLIC_SITE_URL" pnpm --filter @cove/turtle-browser-runtime build \
+ && pnpm --filter @cove/shared --filter @cove/i18n build \
  && pnpm --filter @cove/web build
 
 FROM node:22-bookworm-slim AS runtime
@@ -65,6 +67,7 @@ WORKDIR /app
 COPY --from=builder --chown=cove:cove /app/packages/web/.next/standalone ./
 COPY --from=builder --chown=cove:cove /app/packages/web/.next/static ./packages/web/.next/static
 COPY --from=builder --chown=cove:cove /app/packages/web/public ./packages/web/public
+COPY --from=builder --chown=cove:cove /app/packages/turtle-browser-runtime/dist /opt/cove/turtle-browser-runtime
 USER cove
 EXPOSE 3000
 CMD ["node", "packages/web/server.js"]

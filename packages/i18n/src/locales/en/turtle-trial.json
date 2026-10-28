@@ -68,6 +68,10 @@
   "execution_controls": "Execution controls",
   "please_wait": "Please wait",
   "run": "Run",
+  "editor_theme": "Editor theme",
+  "ready_to_run": "Ready to run",
+  "needs_attention": "Needs attention",
+  "clear_drawing_and_output": "Clear drawing and output; keep your code",
   "dark": "Dark",
   "light": "Light",
   "clear": "Clear",
@@ -122,5 +126,8 @@
   "manager_unavailable": "Public Turtle is not enabled yet. Ask your platform administrator to enable it.",
   "show_access_code": "Show code",
   "hide_access_code": "Hide code",
-  "ask_teacher_for_code": "Don’t know the code? Ask your teacher."
+  "ask_teacher_for_code": "Don’t know the code? Ask your teacher.",
+  "browser_unavailable": "Browser Turtle is unavailable. You can choose full Python.",
+  "run_with_full_python": "Run with full Python",
+  "use_browser_turtle": "Use browser Turtle"
 }

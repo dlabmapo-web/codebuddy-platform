@@ -1,0 +1,11 @@
+{
+  "scope": "local Next dev + real synthetic API/Redis + separate-origin runtime; diagnostic samples, not a reference-device cohort",
+  "runtimeId": "brython-3.15.0-a4f491b1c5e257abe21e",
+  "squareFirstStrokeMs": 1042.3149999994785,
+  "errorProgramFirstStrokeMs": 435.69999999925494,
+  "compatibilityOutput": "100 0 True 1024",
+  "runtimeError": "File \"main.py\", line 4: ZeroDivisionError: division by zero",
+  "reloadWithoutReplay": true,
+  "infiniteLoopStop": true,
+  "lifecycleScope": "Reload/Stop observations were made on earlier diagnostic integration builds; final runtime unit tests and final standalone Stop probe are separate evidence."
+}

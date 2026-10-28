@@ -129,3 +129,6 @@ mvp.coveedu.com {
 	import production_common
 	reverse_proxy mvp:3200
 }
+
+# Empty until a reviewed browser runtime pilot is configured.
+import /etc/caddy/turtle-browser/*.caddy

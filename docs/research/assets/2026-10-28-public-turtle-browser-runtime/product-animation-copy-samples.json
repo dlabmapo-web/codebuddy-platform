@@ -1,0 +1,21 @@
+{
+  "runtimeId": "brython-3.15.0-97b0e463f551d881e2dd",
+  "samples": [
+    {
+      "total": 213.31000000052154,
+      "admission": 91.67000000178814,
+      "dispatchToStroke": 109.28500000014901
+    },
+    {
+      "total": 188.285000000149,
+      "admission": 98.41000000014901,
+      "dispatchToStroke": 84.98499999940395
+    },
+    {
+      "total": 1588.265000000596,
+      "admission": 172.6100000012666,
+      "dispatchToStroke": 1408.335000000894
+    }
+  ],
+  "scope": "local Next dev, synthetic API/Redis; diagnostic, not a reference-device SLO cohort"
+}

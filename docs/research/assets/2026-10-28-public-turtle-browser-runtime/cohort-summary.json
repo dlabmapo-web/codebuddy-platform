@@ -1,0 +1,32 @@
+{
+  "boundary": "local dispatch to renderer stroke then next animation frame; excludes API admission",
+  "runtimeId": "brython-3.15.0-f34daf05dc3cfbf39857",
+  "helperStroke": {
+    "n": 100,
+    "p50": 27.72499999962747,
+    "p95": 67.7050000000745,
+    "max": 106.56000000052154
+  },
+  "standardStroke": {
+    "n": 100,
+    "p50": 33.605000000447035,
+    "p95": 65.4550000000745,
+    "max": 83.32499999925494
+  },
+  "helperPreparation": {
+    "n": 101,
+    "p50": 324.59999999962747,
+    "p95": 1457.0999999996275,
+    "max": 2005.699999999255
+  },
+  "standardPreparation": {
+    "n": 101,
+    "p50": 1088.5999999996275,
+    "p95": 1466.1000000014901,
+    "max": 1635
+  },
+  "preparationNote": "Standard raw report retained cumulative session preparation; derived standard slice begins with the final unused helper spare, then 100 replacements.",
+  "failures": 0,
+  "timeouts": 0,
+  "schedulingNote": "No stress workload was imposed; ordinary desktop resource contention was not controlled."
+}

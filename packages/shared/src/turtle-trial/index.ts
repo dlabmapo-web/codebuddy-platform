@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-export const turtleHelperVersion = 'cove-trial-v1';
+import { turtleHelperVersion, turtleStarterIds } from './constants.js';
+export { turtleHelperVersion, turtleStarterIds };
 export const turtleGrantSeconds = 7200;
 export const turtleRunSeconds = 120;
 export const turtleSourceBytes = 65536;
 export const turtleBodyBytes = 98304;
-export const turtleStarterIds = ['drawing', 'race', 'free'] as const;
 export type TurtleStarterId = typeof turtleStarterIds[number];
 export const turtlePreamble = 'from random import *\nfrom shape import *\nfrom custom import *\n\n';
 export const turtleStarters: Record<TurtleStarterId, string> = {
@@ -31,9 +31,13 @@ export type TurtleBootstrap = {
   academy?: { id: string; name: string } | null;
   expiresAt: number; helperVersion: string; starters: typeof turtleStarters;
   session: TurtleSession | null;
+  browser?: import('./browser.js').TurtleBrowserProfile;
+  browserRun?: import('./browser.js').TurtleBrowserRun | null;
+  preferredEngine?: 'browser';
 };
 export const turtleActiveStates = ['QUEUED', 'STARTING', 'RUNNING', 'WAITING_INPUT', 'DISPLAYING'];
 export function turtleRunning(session: TurtleSession | null): boolean {
   return !!session && turtleActiveStates.includes(session.state);
 }
 export * from './bundle.js';
+export * from './browser.js';

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { trialAllowedPath, trialBody, trialCookieName, trialNonceName, trialOriginAllowed } from '@/lib/turtle-trial/boundary';
+import { trialAllowedPath, trialBody, trialBrowserBody, trialCookieName, trialNonceName, trialOriginAllowed } from '@/lib/turtle-trial/boundary';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' };
@@ -16,12 +16,15 @@ async function handler(request: Request, context: Context) {
   if (request.method !== 'GET' && !trialOriginAllowed(request.headers, site))
     return NextResponse.json({ message: 'ACCESS_DENIED' }, { status: 403, headers });
   const production = process.env.NODE_ENV === 'production'; const jar = await cookies();
-  const token = jar.get(trialCookieName(production))?.value ?? '';
-  const nonce = jar.get(trialNonceName(production))?.value ?? '';
+  const fixture = !production && process.env.COVE_TURTLE_BROWSER_E2E === '1';
+  const guestCookie = trialCookieName(production, fixture), nonceCookie = trialNonceName(production, fixture);
+  const token = jar.get(guestCookie)?.value ?? '';
+  const nonce = jar.get(nonceCookie)?.value ?? '';
   // Opening the public page without a grant is an ordinary signed-out state.
   if (path === 'bootstrap' && !token) return new NextResponse(null, { status: 204, headers });
   try {
     const body = await trialBody(request);
+    trialBrowserBody(path, body);
     // Caddy overwrites this header. The studio port stays on the private
     // network; public caller forwarding headers are never passed through.
     const ip = production ? request.headers.get('x-cove-client-ip') ?? 'unknown' : '127.0.0.1';
@@ -41,7 +44,7 @@ async function handler(request: Request, context: Context) {
     if (!upstream.ok) {
       if (path === 'bootstrap' && upstream.status === 401) {
         const response = new NextResponse(null, { status: 204, headers });
-        response.cookies.set(trialCookieName(production), '', { ...cookieOptions(), maxAge: 0 });
+        response.cookies.set(guestCookie, '', { ...cookieOptions(), maxAge: 0 });
         return response;
       }
       const retryAfter = Number(data.retryAfter ?? 0);
@@ -51,7 +54,7 @@ async function handler(request: Request, context: Context) {
     }
     if (path === 'challenge') {
       const response = NextResponse.json({ ready: true }, { headers });
-      response.cookies.set(trialNonceName(production), data.nonce, { ...cookieOptions(), maxAge: 600 });
+      response.cookies.set(nonceCookie, data.nonce, { ...cookieOptions(), maxAge: 600 });
       return response;
     }
     if (path === 'access' && request.method === 'POST') {
@@ -59,11 +62,11 @@ async function handler(request: Request, context: Context) {
         method: 'DELETE', headers: upstreamHeaders, signal: AbortSignal.timeout(5000),
       }).catch(() => {});
       const response = NextResponse.json({ expiresAt: data.expiresAt }, { headers });
-      response.cookies.set(trialCookieName(production), data.token, { ...cookieOptions(), maxAge: 7200 });
+      response.cookies.set(guestCookie, data.token, { ...cookieOptions(), maxAge: 7200 });
       return response;
     }
     const response = NextResponse.json(data, { headers });
-    if (path === 'access' && request.method === 'DELETE') response.cookies.set(trialCookieName(production), '', { ...cookieOptions(), maxAge: 0 });
+    if (path === 'access' && request.method === 'DELETE') response.cookies.set(guestCookie, '', { ...cookieOptions(), maxAge: 0 });
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : '';

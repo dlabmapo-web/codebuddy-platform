@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-28",
+  "release": "v2.0.44",
+  "revision": "d096a7ed19fff70d91ae9a4f9d97560b8dc8558a",
+  "releaseWorkflow": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/40611938913",
+  "roleTypes": 5,
+  "visibleSidebarDestinations": 52,
+  "navigationTimingSamples": 81,
+  "sampleChecks": {
+    "functional": 1,
+    "timed": 3,
+    "publicCasesPerCheck": 1,
+    "officialSubmissions": 0
+  },
+  "turtle": {
+    "brokerUpdatedAfterApprovedMainRelease": true,
+    "brokerDigest": "sha256:67d75a003d2fb19250e45b7041dd7ba69ca61f8d7c1ad41cdb2de96945e92197",
+    "guestRuntimeUnchanged": true,
+    "resourceAndSecurityConfigUnchanged": true,
+    "capacity": 1,
+    "warmEnabled": false,
+    "queuedAttemptRetained": true,
+    "timedSuccessfulDrawings": 3,
+    "functionalDrawingWithTimingInstrumentationFailure": 1,
+    "allRoleSessionsSignedOut": true,
+    "ownPublicGrantExited": true,
+    "finalBrokerOpenSessions": 0,
+    "finalBrokerAllocatedGuests": 0
+  },
+  "files": {
+    "navigation.json": "c29fd75a37e534f8da51e5e571e58e8b4809dc6948db2e3a33166e91c8a26bc0",
+    "sample-checks.json": "d3ae490aa4e4a405d763bb429097797090647d7667b6e3e94b70f0569621449f",
+    "turtle-complete.jpg": "a807c9ca5caf69e35e739de5808f16fc55e7b2add685bcfef8a84496c394d13b",
+    "turtle-run-1-no-color.jpg": "d5681b24989aed30f7b48624009758b2e06f3d6f3ab3978af2e89096701ca597",
+    "turtle-run-3-first-color.jpg": "6e42248f8fec9da6d0a2e293ac7389c091bad79549f4c06c3b653aa3dfe9de8d",
+    "turtle-run-3-preceding-frame.jpg": "d5681b24989aed30f7b48624009758b2e06f3d6f3ab3978af2e89096701ca597",
+    "turtle-run-4-first-color.jpg": "52ab94f8808d45aa5521e0fbac074a1c784b75b3bdff0b5c1cf488342bdf8aec",
+    "turtle-run-4-green-detector-counterexample.jpg": "52ab94f8808d45aa5521e0fbac074a1c784b75b3bdff0b5c1cf488342bdf8aec",
+    "turtle-run-4-preceding-frame.jpg": "d5681b24989aed30f7b48624009758b2e06f3d6f3ab3978af2e89096701ca597",
+    "turtle-run-5-first-color.jpg": "c986aad210bcc8f6871560f0fec0ee580455bbb93b86cc6d3d10387168e52df3",
+    "turtle-run-5-preceding-frame.jpg": "d5681b24989aed30f7b48624009758b2e06f3d6f3ab3978af2e89096701ca597",
+    "turtle-strict-color-diagnostic.json": "2af12dfad6aea1eba108430ed117cbece4470198f4163301fdfa1eadebba5712",
+    "turtle-timings.json": "3776ad238514310196d1935f889397ac81e81df92ee74dec1ff939353e83410e"
+  }
+}

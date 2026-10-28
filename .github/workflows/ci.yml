@@ -24,6 +24,18 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      turtle-server-test-redis:
+        image: redis:8.0.3-alpine
+        ports: ["6397:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      turtle-browser-test-redis:
+        image: redis:8.0.3-alpine
+        ports: ["6398:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TURTLE_TRIAL_TEST_REDIS_URL: redis://127.0.0.1:6397/1
+      TURTLE_BROWSER_TEST_REDIS_URL: redis://127.0.0.1:6398/1
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +82,9 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      - name: Verify immutable browser runtime packaging
+        run: python3 deploy/scripts/turtle-browser-assets.test.py
+
   deployment-config:
     runs-on: ubuntu-latest
     steps:
@@ -78,6 +93,8 @@ jobs:
         run: bash deploy/scripts/validate-local.sh
       - name: Test learning release and rollback selection
         run: python3 deploy/scripts/learning-rollout.test.py
+      - name: Verify browser admission rollback ordering
+        run: python3 deploy/scripts/turtle-browser-rollback.test.py
 
   container-images:
     runs-on: ubuntu-latest

@@ -34,11 +34,14 @@ rollback_on_error() {
   if [[ "$had_previous" == true ]]; then
     # A newer web can require endpoints absent from the restored API.
     compose stop --timeout 30 studio || true
+    # Fail closed: an unaware API must never see browser run IDs.
+    "$script_dir/drain-turtle-browser.sh" || { printf 'Browser drain failed; rollback stopped before restoring the old API.\n' >&2; exit "$status"; }
     stop_learning_services
     install -m 600 "$state_dir/previous-deployment.env" "$deployment_env"
     if feature_enabled GUI_ENABLED; then
       "$script_dir/pin-gui-runtime.sh" || true
     fi
+    "$script_dir/publish-turtle-browser.sh" || { printf 'Previous runtime assets could not be restored.\n' >&2; exit "$status"; }
     compose up -d --remove-orphans || true
   fi
   exit "$status"
@@ -57,6 +60,7 @@ if feature_enabled GUI_ENABLED; then
   compose pull gui-service
   "$script_dir/pin-gui-runtime.sh"
 fi
+"$script_dir/publish-turtle-browser.sh"
 compose --profile operations run --rm migrate
 compose --profile operations run --rm --entrypoint node migrate \
   node_modules/tsx/dist/cli.mjs scripts/setup-learning-storage.mts --production

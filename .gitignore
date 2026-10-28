@@ -86,3 +86,7 @@ packages/web/public/novnc-LICENSE.txt
 
 # Versioned Monaco browser assets copied from the pinned npm package
 packages/web/public/monaco/
+
+# Published immutable browser interpreter assets are host-owned release data.
+deploy/runtime/
+packages/web/.next-turtle-browser/

@@ -1,0 +1,70 @@
+{
+  "profile": "cove-browser-turtle-v1",
+  "engine": "brython",
+  "engineVersion": "3.15.0",
+  "protocol": 1,
+  "id": "brython-3.15.0-2ab1760c5c7107d57457",
+  "digest": "2ab1760c5c7107d574571922c79d9057808664f4a58bae3630df7e5d0d2a7868",
+  "files": {
+    "BRYTHON-LICENSE.txt": {
+      "sha256": "e3f7e1ea7ac06a4ddb92e476bba7a37e467d3c5937082279fcaf4fe6b73d00c8",
+      "bytes": 1497,
+      "gzipBytes": 805
+    },
+    "brython.js": {
+      "sha256": "426ba1fb70855cc8e2a8f0cf2a65e2a78fa711196f3a68e7a438d3bd22ded850",
+      "bytes": 1470329,
+      "gzipBytes": 291308
+    },
+    "brython_stdlib.js": {
+      "sha256": "87c63f98f5c95a28969a263d7346ddbdc31d30a736f544209618a8f636f59c4b",
+      "bytes": 5036998,
+      "gzipBytes": 1103468
+    },
+    "frame.mjs": {
+      "sha256": "cee1f80a091a191a75c5b7e3205b0a7c5d010d0c677728f9c6b0a6d3a66c789c",
+      "bytes": 2197,
+      "gzipBytes": 824
+    },
+    "index.html": {
+      "sha256": "6be97397e90e534fcd0d826cf8224e9625655416da70b86a9c1cf81750f69f1b",
+      "bytes": 478,
+      "gzipBytes": 295
+    },
+    "protocol.mjs": {
+      "sha256": "c1ca3ec79f2331cb7cd7d454a36b73ad7bd15f76eec705ba673d697082f5a8a5",
+      "bytes": 4822,
+      "gzipBytes": 1677
+    },
+    "renderer.mjs": {
+      "sha256": "426f7917df2450565426ac08e1ca40ca830e9c43893df0ebb05c00379c7e205f",
+      "bytes": 8065,
+      "gzipBytes": 2634
+    },
+    "runtime.mjs": {
+      "sha256": "755a603b1113b5f970b543ec85f1a0ef467f00fea4e70d1c265a4db28adceafe",
+      "bytes": 5659,
+      "gzipBytes": 1796
+    },
+    "surface.css": {
+      "sha256": "b1bb74c5f47f160f7a5e0a264d27759e747166ee3f91701e1995749df08dc4c5",
+      "bytes": 208,
+      "gzipBytes": 158
+    },
+    "worker.js": {
+      "sha256": "d4f64814ad76647fd0cf916b5c94ba4c7ff21d471f991fb858188b7172b55491",
+      "bytes": 5440,
+      "gzipBytes": 2123
+    },
+    "config.mjs": {
+      "sha256": "2b7f0378e40602c1f6704b7c9f59c93701852a4f588f35e707ec2859a3e53c79",
+      "bytes": 54,
+      "gzipBytes": 74
+    },
+    "modules.js": {
+      "sha256": "744d4e95a57e876a80c3cee6eec481cbc67b51f76bb6e893b61b5c007ce40412",
+      "bytes": 19696,
+      "gzipBytes": 5654
+    }
+  }
+}

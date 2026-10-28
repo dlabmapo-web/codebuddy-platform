@@ -4,6 +4,7 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 require_command docker
 require_command python3
+mkdir -p "$deploy_root/runtime/turtle-browser" "$deploy_root/generated/turtle-browser"
 require_file "$compose_file"
 require_file "$deployment_env"
 

@@ -1,14 +1,16 @@
-import { Body, Controller, Delete, Get, Headers, HttpException, Inject, Param, Post, Res, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpException, Inject, Optional, Param, Post, Res, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { turtleBodyBytes, turtleHelperVersion, turtleRunSchema, turtleSourceBytes } from '@cove/shared';
+import { turtleBodyBytes, turtleHelperVersion, turtleRunSchema, turtleSourceBytes, turtleBrowserStartSchema } from '@cove/shared';
+import { TrialBrowserService } from './browser.service.js';
 import { TrialService } from './trial.service.js';
 import { trialEqual } from './trial-security.js';
 
 @Controller('turtle-trial')
 export class TrialController {
-  constructor(@Inject(TrialService) private readonly service: TrialService, @Inject(ConfigService) private readonly config: ConfigService) {}
+  constructor(@Inject(TrialService) private readonly service: TrialService, @Inject(ConfigService) private readonly config: ConfigService,
+    @Optional() @Inject(TrialBrowserService) private readonly browser?: TrialBrowserService) {}
   private identify(secret?: string, token?: string) {
     if (!trialEqual(secret, this.config.get<string>('BFF_SHARED_SECRET'))) throw new UnauthorizedException('ACCESS_DENIED');
     return token ?? '';
@@ -16,6 +18,7 @@ export class TrialController {
   private bounded(body: unknown) {
     if (Buffer.byteLength(JSON.stringify(body) ?? '') > turtleBodyBytes) throw new HttpException('SOURCE_TOO_LARGE', 413);
   }
+  private browserService() { if (!this.browser) throw new HttpException('BROWSER_RUNTIME_UNAVAILABLE', 503); return this.browser; }
   @Post('challenge') challenge(@Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-client-ip') ip?: string) {
     this.identify(secret); return this.service.challenge(ip ?? 'unknown');
   }
@@ -30,6 +33,25 @@ export class TrialController {
   }
   @Delete('access') revoke(@Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
     return this.service.revoke(this.identify(secret, token));
+  }
+  @Post('browser-runs') browserStart(@Body() body: unknown, @Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
+    const grant = this.identify(secret, token); this.bounded(body);
+    const parsed = turtleBrowserStartSchema.safeParse(body);
+    if (!parsed.success) throw new HttpException('INVALID_REQUEST', 400);
+    return this.browserService().start(grant, parsed.data);
+  }
+  @Get('browser-runs/request/:key') browserRecover(@Param('key') key: string, @Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
+    const grant = this.identify(secret, token);
+    return this.browserService().recover(grant, this.id(key));
+  }
+  @Post('browser-runs/:id/renew') browserRenew(@Param('id') id: string, @Body() body: unknown, @Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
+    const grant = this.identify(secret, token);
+    if (!z.object({}).strict().safeParse(body).success) throw new HttpException('INVALID_REQUEST', 400);
+    return this.browserService().request(grant, this.id(id), 'renew');
+  }
+  @Delete('browser-runs/:id') browserStop(@Param('id') id: string, @Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
+    const grant = this.identify(secret, token);
+    return this.browserService().request(grant, this.id(id), 'stop');
   }
   @Post('runs') start(@Body() body: unknown, @Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
     const grant = this.identify(secret, token); this.bounded(body);

@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-28",
+  "sourceCommit": "b836a8d9",
+  "workspace": "isolated clean checkout",
+  "browserRuntimeEnabled": false,
+  "checks": [
+    {
+      "name": "shared-build",
+      "exitCode": 0,
+      "seconds": 5.2
+    },
+    {
+      "name": "prisma-validate",
+      "exitCode": 0,
+      "seconds": 1.6
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "seconds": 48.9
+    },
+    {
+      "name": "e2e-typecheck",
+      "exitCode": 0,
+      "seconds": 2.5
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "seconds": 22.5
+    },
+    {
+      "name": "routes",
+      "exitCode": 0,
+      "seconds": 0.4
+    },
+    {
+      "name": "translations",
+      "exitCode": 0,
+      "seconds": 16.3
+    },
+    {
+      "name": "test",
+      "exitCode": 0,
+      "seconds": 114.4
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "seconds": 121.0
+    },
+    {
+      "name": "runtime-assets",
+      "exitCode": 0,
+      "seconds": 3.7
+    },
+    {
+      "name": "deployment-config",
+      "exitCode": 0,
+      "seconds": 4.4
+    },
+    {
+      "name": "learning-rollback",
+      "exitCode": 0,
+      "seconds": 9.0
+    },
+    {
+      "name": "browser-rollback",
+      "exitCode": 0,
+      "seconds": 7.4
+    }
+  ]
+}

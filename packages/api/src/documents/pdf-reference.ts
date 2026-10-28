@@ -15,7 +15,7 @@ export async function validatePdfReference(
       materialId: referenceId,
       placement: { in: ["BOTH", "SUPPLEMENTARY"] },
       asset: { state: "READY" },
-      material: { lectureId: input.lectureId, lecture: { courseModule: {
+      material: { lecture: { courseModule: {
         courseId: input.courseId, course: { academyId: input.academyId },
       } } },
     },
@@ -27,18 +27,26 @@ export async function validatePdfReference(
 }
 
 /** Safe student metadata. The delivery endpoint reauthorizes before signing. */
-export function referencePdfMetadata(pdf?: {
+export function referencePdfMetadata(pdf: {
   materialId: string; revision: number; placement: string;
-  material: { title: string; isVisible: boolean };
+  material: { title: string; isVisible: boolean; lecture: {
+    isVisible: boolean; courseModule: { courseId: string; isVisible: boolean };
+  } };
   asset: { state: string; originalFilename: string; byteSize: number; pageCount: number };
-} | null) {
-  if (!pdf || !pdf.material.isVisible || pdf.placement === "MAIN" || pdf.asset.state !== "READY") return null;
+} | null | undefined, courseId: string) {
+  if (!pdf || !pdf.material.isVisible || !pdf.material.lecture.isVisible ||
+      !pdf.material.lecture.courseModule.isVisible || pdf.material.lecture.courseModule.courseId !== courseId ||
+      pdf.placement === "MAIN" || pdf.asset.state !== "READY") return null;
   return { materialId: pdf.materialId, title: pdf.material.title, revision: pdf.revision,
     originalFilename: pdf.asset.originalFilename, byteSize: pdf.asset.byteSize, pageCount: pdf.asset.pageCount };
 }
 
-/** All endpoints are lecture-local, so deleting a whole subtree can detach its internal edges. */
+/** Detach deleted exercises, but never lose a surviving exercise's instructions. */
 export async function detachSubtreePdfReferences(tx: Prisma.TransactionClient, where: Prisma.MaterialWhereInput) {
+  const external = await tx.programmingExercise.count({ where: {
+    referencePdf: { material: where }, NOT: { material: where },
+  } });
+  if (external) throw new AppException("PDF_REFERENCE_IN_USE", 409);
   await tx.programmingExercise.updateMany({ where: { material: where, referencePdfMaterialId: { not: null } }, data: { referencePdfMaterialId: null } });
 }
 
@@ -47,8 +55,12 @@ export async function assertPublishedPdfReferences(tx: Prisma.TransactionClient,
   const exercises = await tx.programmingExercise.findMany({
     where: { referencePdfMaterialId: { not: null }, material: { isVisible: true,
       lecture: { isVisible: true, courseModule: { courseId, isVisible: true } } } },
-    select: { referencePdf: { select: { placement: true, asset: { select: { state: true } }, material: { select: { isVisible: true } } } } },
+    select: { referencePdf: { select: { placement: true, asset: { select: { state: true } }, material: { select: {
+      isVisible: true, lecture: { select: { isVisible: true, courseModule: { select: { courseId: true, isVisible: true } } } },
+    } } } } },
   });
-  if (exercises.some(({ referencePdf: pdf }) => !pdf || !pdf.material.isVisible || pdf.placement === "MAIN" || pdf.asset.state !== "READY"))
+  if (exercises.some(({ referencePdf: pdf }) => !pdf || !pdf.material.isVisible || !pdf.material.lecture.isVisible ||
+      !pdf.material.lecture.courseModule.isVisible || pdf.material.lecture.courseModule.courseId !== courseId ||
+      pdf.placement === "MAIN" || pdf.asset.state !== "READY"))
     throw new AppException("PDF_REFERENCE_NOT_READY", 409);
 }

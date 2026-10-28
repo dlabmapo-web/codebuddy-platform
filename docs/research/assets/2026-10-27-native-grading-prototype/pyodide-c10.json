@@ -1,0 +1,443 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "64160384890c434bbb439c7c0cae38d9c4da02b6",
+  "dirty": true,
+  "image": "sha256:1f316925b64d864b31b11b5281db80fc2d4e10efe2da6aadbd6487846c752c8e",
+  "imageRevision": "af8c54aedfcc69adac07dd3e0435b3827a1a5c27",
+  "platform": "arm64",
+  "requestedRuns": 3,
+  "cases": 10,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "parallel": 1,
+  "releaseAcceptance": "not assessed; isolated execution microbenchmark only",
+  "completedRuns": 3,
+  "failures": 0,
+  "p50Ms": 12397.385296999997,
+  "p95Ms": 13777.105464999999,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "warmupMs": 6549.798127999999,
+  "before": {
+    "cpu": "usage_usec 9960329\nuser_usec 8683786\nsystem_usec 1276543\nnr_periods 67\nnr_throttled 65\nthrottled_usec 26870805\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "474279936",
+    "peak": "508981248",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=28.17 avg60=5.92 avg300=1.27 total=4095042\nfull avg10=26.53 avg60=5.57 avg300=1.19 total=3863211"
+  },
+  "after": {
+    "cpu": "usage_usec 57128742\nuser_usec 52925836\nsystem_usec 4202905\nnr_periods 424\nnr_throttled 217\nthrottled_usec 47607785\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "30576640",
+    "peak": "508981248",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=9.58 avg60=7.56 avg300=2.25 total=7468784\nfull avg10=9.54 avg60=7.37 avg300=2.19 total=7235176"
+  },
+  "diagnostics": {
+    "version": 1,
+    "generation": "a8f21f9e-1034-4047-aa4c-8d2760bb0464",
+    "pool": {
+      "capacity": 2,
+      "spare": 1,
+      "executing": 0,
+      "idle": 0,
+      "warming": 1,
+      "draining": 0,
+      "waiting": 0,
+      "oldestWaitMs": 0,
+      "oldestWarmMs": 24.092875000002095,
+      "retryExhausted": false,
+      "lastCompletedAgoMs": 0.9145829999979469
+    },
+    "resources": {
+      "cpuQuota": 1.5,
+      "periods": 424,
+      "throttledPeriods": 217,
+      "throttledSeconds": 47.607785,
+      "cpuPressure": 9.54,
+      "memoryBytes": 30576640,
+      "memoryPeakBytes": 508981248,
+      "memoryLimitBytes": 1342177280,
+      "oom": 0,
+      "oomKill": 0,
+      "tasks": 14,
+      "eventLoopP95Ms": 26.017791
+    },
+    "timings": [
+      {
+        "stage": "prepare",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 55.081498899,
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          25,
+          27,
+          27,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "acquire",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 34.79964138999999,
+        "buckets": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          28,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "exit",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 0.8358092079999997,
+        "buckets": [
+          0,
+          18,
+          29,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "drain",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 0.001857247999991159,
+        "buckets": [
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "execute",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 0.8403756670000094,
+        "buckets": [
+          0,
+          17,
+          28,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "identity",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 0.005007000000002335,
+        "buckets": [
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      },
+      {
+        "stage": "cleanup",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 30,
+        "sum": 0.005504498000005698,
+        "buckets": [
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ]
+      }
+    ],
+    "failures": {
+      "prepare": 0,
+      "drainFallback": 0,
+      "forcedTermination": 0
+    }
+  },
+  "samples": [
+    {
+      "wallMs": 9496.046379,
+      "cases": [
+        {
+          "wallMs": 56.93937499999993,
+          "runtimeMs": 50,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 35.90208299999995,
+          "runtimeMs": 35,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 25.13933299999917,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1373.663834,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1324.5135420000006,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1326.3725419999992,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1286.3093739999986,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1440.3694589999996,
+          "runtimeMs": 67,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1388.0648339999989,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1238.7160430000004,
+          "runtimeMs": 28,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 13777.105464999999,
+      "cases": [
+        {
+          "wallMs": 1387.5921670000007,
+          "runtimeMs": 35,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1401.8521669999973,
+          "runtimeMs": 34,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1299.6045000000013,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1779.6262920000008,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1260.7700010000008,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1209.3673340000023,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1640.7548349999997,
+          "runtimeMs": 39,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1286.512416999998,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1264.9080840000024,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1246.0775840000024,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 12397.385296999997,
+      "cases": [
+        {
+          "wallMs": 1206.3021679999983,
+          "runtimeMs": 21,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1220.5975010000002,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1201.0695429999978,
+          "runtimeMs": 25,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1231.0272499999992,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1258.991624999995,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1282.0874590000021,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1242.5336670000033,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1262.6437089999963,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1255.093249999998,
+          "runtimeMs": 24,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1237.0061249999999,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

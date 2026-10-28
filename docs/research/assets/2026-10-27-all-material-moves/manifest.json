@@ -1,0 +1,53 @@
+{
+  "environment": "disposable local PostgreSQL 17; component browser harness, not signed-in Next/Supabase",
+  "productionChanged": false,
+  "temporaryHarnessRemoved": true,
+  "fixtureDatabaseRemoved": true,
+  "checks": {
+    "apiPassed": 168,
+    "apiSkipped": 5,
+    "postgresMoveChecksIncluded": 24,
+    "frontendPassed": 88,
+    "localizationPassed": 140,
+    "apiTypecheck": true,
+    "webTypecheck": true,
+    "apiBuild": true,
+    "targetedFrontendLint": true
+  },
+  "interactionCoverage": [
+    "dotted drag handle",
+    "three-dot menu Move to",
+    "reverse moves/Undo"
+  ],
+  "productLayoutChanged": false,
+  "sourceSha256": {
+    "packages/api/src/content/course-move.integration.spec.ts": "8582de594bf4802c31a1533fe5f76157ced93b7c1cac79d28c0cb99a42f5b6e7",
+    "packages/api/src/content/course.service.ts": "b97a4ad3a097f546d9211d1c1a9a3a0e908afbb0514c62c8632eead288acb55c",
+    "packages/api/src/documents/pdf-document.service.spec.ts": "83022de48b793c97e82390acb5644761cd56d959223538525947b50fa743d4af",
+    "packages/api/src/documents/pdf-document.service.ts": "f67d7cc0422c186960f4575a36f4aed65209da0584aed81cded229d6bbbcc506",
+    "packages/api/src/documents/pdf-reference.integration.spec.ts": "f6fcc724b3d91542a6450379b89d8fa67ac6d28c5c9386ac565a60cafe1b66d1",
+    "packages/api/src/documents/pdf-reference.spec.ts": "2afcab0a21004e6e24e297895c988346b23f881c532805f666a2a6ae69257292",
+    "packages/api/src/documents/pdf-reference.ts": "90446a906c8aa341b02a73dc103a4a22cc3e11972c16ab71eb31cafe6c08532b",
+    "packages/api/src/learn/learn.service.ts": "4e29aa8477b05c70a2a5f4276ad19efd4475680a7fc987a541e2a512c83cb462",
+    "packages/api/src/monitoring/monitoring.service.ts": "2d72432840f27f437c3f1e00529adf6844d7249397e69489b12d32fe6d67c3f9",
+    "packages/i18n/src/locales/en/content.json": "3810474104f2996ae900c47af6cea9d3fa31e2dc66af002469911a9f29004a85",
+    "packages/i18n/src/locales/en/errors.json": "e4a750d55269e2a5183ca6eb8267970940e02d06983e3dac144ffde69c1a55a1",
+    "packages/i18n/src/locales/en/pdf-practice.json": "2d99d84ca65c229925ec2ff10c8e7180ba32d8efa8754d943f3ac7af6da0f437",
+    "packages/i18n/src/locales/ko/content.json": "90f36589fe7c09cc1bf624e5f3869ed5b037da4bdc162fff5958391ec560e360",
+    "packages/i18n/src/locales/ko/errors.json": "376182c69cc15b49bf2e40d2c4720709985426a1e691314c82151bf53ed2b01f",
+    "packages/i18n/src/locales/ko/pdf-practice.json": "d585fcae98b1c72e091e58506f9b7ced0f0e364a6f19b17ca6e6c3cdf5c30a4f",
+    "packages/shared/src/errors/codes.ts": "14aec569939f04050155c23a34c1eff5929f76cd0a3e62505d51aecedf3550c9",
+    "packages/web/src/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_components/lecture-row.spec.tsx": "a2b054241fc93e1231f115ba159e611f87d94050f7c59275f314476c631b1859",
+    "packages/web/src/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_components/lecture-row.tsx": "f70793b5fe54ec03da0e7943a3d358aaedf200c093a68bf7cf53d8c029ea7c8d",
+    "packages/web/src/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_hooks/use-course-builder.spec.tsx": "ca205da86d6d3ef1f867cd5182cfaad8393787463a75396468ea2e42ac5c5645",
+    "packages/web/src/components/pdf/reference-pdf-picker.spec.tsx": "18d8e4f998d79fc7c6f1cb2d3232e0b98d1d42a56a64394e16eb36edc70df989",
+    "packages/web/src/components/pdf/reference-pdf-picker.tsx": "98cee6ab59be721bc3985b548340b63ae4a195b1aa4ef5d220365bac7beca9eb"
+  },
+  "artifactSha256": {
+    "local-harness-drag-pdf-code.png": "6726cd959e1c472259b7b79c470bc81b3fff64f9abe9ac6e547d2131a2f70e98",
+    "local-harness-menu-pdf-code.png": "f0491cf55bc396eeb9a255f90912214b3e0709bd446971cd7d949f7f582e51fd",
+    "README.md": "960958953f1f5c4ba79651e8bd209dff6cbc8e77763881b5e59b2033d183d973",
+    "local-harness-drag-pdf.png": "a0bf973446c51528008e678f127a89338ccb5626c23f000c2a5729ad7689c513",
+    "local-harness-menu-pdf.png": "3ec1ed69ae174712130c374e7cef2a56393459566ee258b5714e1f6c06867ee0"
+  }
+}

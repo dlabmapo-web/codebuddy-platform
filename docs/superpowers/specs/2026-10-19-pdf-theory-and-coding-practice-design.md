@@ -366,3 +366,13 @@ The [verification report](../../research/2026-10-19-pdf-practice-local-verificat
 records seven passing browser tests on the local standalone production build,
 unit/database checks, screenshots and the separate legacy input-prompt browser
 fixture's localhost-database requirement. No production deployment was performed.
+
+## 2026-10-27 same-course material moves
+
+The approved [all-material moves design](2026-10-27-all-material-moves-design.md)
+supersedes this initial release's same-lecture PDF-reference restriction.
+References can span lectures within the same course/academy, so the existing
+drag and menu move actions preserve attachments without relocating other items.
+The existing course-builder UI is retained. Document authorization, visibility,
+publication and dependency protections still apply; see the linked verification
+record for implemented checks and local-only release status.

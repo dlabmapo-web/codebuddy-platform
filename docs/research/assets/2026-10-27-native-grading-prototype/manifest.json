@@ -1,0 +1,40 @@
+{
+  "baselineSourceRevision": "af8c54aedfcc69adac07dd3e0435b3827a1a5c27",
+  "environment": "local Docker Desktop Linux ARM64; not VPS",
+  "productionChanged": false,
+  "cleanedFixtureContainers": true,
+  "fourSlotTiming": "deferred",
+  "sourceSha256": {
+    "packages/api/prototypes/native-grading/guest.Dockerfile": "5c4d02afd01c929954376828bdc51306e80d5e77a69fd0b48a7c8bede8554114",
+    "packages/api/prototypes/native-grading/seccomp.json": "f51c3029fa73f29a5b9ce46908c0502d5d3a96ce02678454b2f26f3d7af8c7ac",
+    "packages/api/prototypes/native-grading/native-pool.test.mjs": "373e62e3eebb11a76a542fc67a9b7dcf7dc9a7f9b31c209df236ae867a5e28d7",
+    "packages/api/prototypes/native-grading/supervisor.py": "e7680a752c8dbc382118ec1240b49d5eaa638564c2e83778a47403e263406037",
+    "packages/api/prototypes/native-grading/native-pool.mjs": "1287d638afef5c94b2ec5b6a5018a0060a9a8a5af50aec60fb8cbf8fdc485858",
+    "packages/api/prototypes/native-grading/budget.mjs": "258f437bafb7b36f902eb693d572cbe85544751ec8e45c8bdbdba37102e19ad4",
+    "packages/api/prototypes/native-grading/controller.mjs": "d243e338d48cf59ca9bacb90930cc26a1e2816796fcd244a73a11bf9bee60a4b",
+    "packages/api/prototypes/native-grading/README.md": "7b3871aec8335ff7d6a2a876e7993908933213d9c4253a6c5f79a08650156fe9",
+    "packages/api/prototypes/native-grading/local-guard.test.mjs": "ff9985807a245b8f46adf42fc184cf31a11338abf2cdd5cdc78c3c71f59d0502",
+    "packages/api/prototypes/native-grading/controller.Dockerfile": "2f401297672ae3fd8f73e807a6f633e941675115ab0bcc6c793c325d71ab363a",
+    "packages/api/prototypes/native-grading/docker-driver.mjs": "ee7df483672a789eed2e5a3477c0d23117a71b8a780bb74affb36f637d747709",
+    "packages/api/prototypes/native-grading/learner.py": "44e4a9b3e49ed818955571ad90d06679d425decce02749d1f6af79a5b1957bc6",
+    "packages/api/scripts/benchmark-native-grading.mjs": "039d421981a1facc1dde3624a7a22941e1a4f5a0906050f75ab170018e022d46",
+    "packages/api/scripts/benchmark-judge.mjs": "be6a57a8da7bb389871f6639bbc0fbc1c94791399c9ef8807f65d36f97f5524b"
+  },
+  "artifactsSha256": {
+    "cove-native-first-smoke.json": "82d56c57c41a5b760fb7e550bb0fe7ac790d2884ec8f35ba47e9de06132e87e5",
+    "cove-native-fourth-smoke.json": "c3fe913c020f6997d7e2b636e317d573a50d389542cea58ae22324870e4dad7a",
+    "cove-native-second-smoke.json": "5df7bd9df50a7597eceb66a5abed5fcd79fe3dc940571bf5ba2b75b93952a36e",
+    "cove-native-source-matched-smoke.json": "6467ae1315068026918bfb2fbbbc518aa368d083a85651d18c3ab044b19609be",
+    "cove-native-third-smoke.json": "9b529d264c8ec702adbe12d009cad38efe80e3250255eabcd53bd009cc0f0020",
+    "native-abi.json": "7eedcfb86320a4b7df35e114868ed36307a6c9e2bfeaad7d94a2de8e6e31c175",
+    "native-c1.json": "ae6251ec818e811e09744fbc826562579cc948887d81bc76a416bce22b16f153",
+    "native-c10-p2.json": "323aa00611f25f79880035190c5c5888a034de7446da51a13473ec20c8365ac2",
+    "native-c10.json": "d4ebe86dd471803278a73d0df149df9b31a41c73dc1be94eff573af5555bbfa8",
+    "native-c5.json": "470dd2451d94213375ff81b23f16004f12256a7149effd8739e81c9e8d379abd",
+    "pyodide-abi.json": "cabd3b71fa5fa4d3f3515090d5eb21954719398951f113a04d40b0b3c9364ad3",
+    "pyodide-c1.json": "90344c4a33b97a07b2bd1657c0aa54164c024c7c7c78330d62f1fc93db24d398",
+    "pyodide-c10-p2.json": "df6eb07ba9f6284403bf9853e15981169204e91937b4741b6b1b08ba0394cf20",
+    "pyodide-c10.json": "03761a45b5102c639a50c141559ee16c24eedee85071bfe1e54d2530a8d4aae6",
+    "pyodide-c5.json": "cde8b42d7c0e9964c08009fc220b07668da1dc86923cfeb79bef7ee8dae136c8"
+  }
+}

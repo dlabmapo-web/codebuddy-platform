@@ -1,0 +1,145 @@
+{
+  "deployment": "v2.0.43",
+  "roles": {
+    "manager": {
+      "coursesMs": [
+        809,
+        713,
+        831
+      ],
+      "classesMs": [
+        1040,
+        871,
+        723
+      ],
+      "largeCourseHeadingMs": 3086,
+      "largeCourseMs": [
+        1587,
+        1762
+      ]
+    },
+    "platformAdmin": {
+      "coursesMs": [
+        851,
+        762,
+        772
+      ],
+      "classesMs": [
+        1134,
+        639,
+        643
+      ]
+    },
+    "teamLead": {
+      "coursesMs": [
+        940,
+        708,
+        1043
+      ],
+      "classesMs": [
+        622,
+        937,
+        717
+      ]
+    },
+    "teacher": {
+      "coursesMs": [
+        2189,
+        1055,
+        882
+      ],
+      "myClassesMs": [
+        1149,
+        721,
+        1002
+      ],
+      "initialCourseMs": 958,
+      "analyticsHeadingMs": 1883
+    },
+    "student": {
+      "coursesMs": [
+        1461,
+        1439,
+        1600
+      ],
+      "myClassesMs": [
+        1420,
+        1171,
+        1650
+      ],
+      "editorInitialObservation": "Wait exceeded the browser-control deadline; diagnostics reported the editor visible. No reliable initial duration retained."
+    }
+  },
+  "turtle": {
+    "runs": [
+      {
+        "elapsedMs": 3236,
+        "canvas": true,
+        "unsupported": true
+      }
+    ],
+    "viewerReadyMs": [
+      {
+        "ms": 3756,
+        "ready": true,
+        "pendingSeen": true
+      },
+      {
+        "ms": 3632,
+        "ready": true,
+        "pendingSeen": true
+      }
+    ],
+    "firstDrawingMs": [
+      {
+        "ms": 3810,
+        "blankSeen": true,
+        "found": true,
+        "redPixels": 439
+      },
+      {
+        "ms": 3777,
+        "blankSeen": true,
+        "found": true,
+        "redPixels": 622
+      },
+      {
+        "ms": 4307,
+        "blankSeen": true,
+        "found": true,
+        "redPixels": 763
+      }
+    ],
+    "defaultSpeedExample": {
+      "firstRedMs": 4963,
+      "nearCompleteMs": 6760,
+      "redPixels": 704,
+      "blankSeen": true
+    },
+    "method": "Fast red L shape with speed(0). Run to first screenshot with >300 red pixels in the drawing pane, after a blank frame. Includes preceding run teardown, request, runtime/viewer startup, screenshot polling and JPEG decoding. Not a p95 benchmark."
+  },
+  "sampleChecks": {
+    "caseCount": 2,
+    "ms": [
+      {
+        "durationMs": 5299,
+        "completed": true,
+        "pendingSeen": true
+      },
+      {
+        "durationMs": 4324,
+        "completed": true,
+        "pendingSeen": true
+      },
+      {
+        "durationMs": 11406,
+        "completed": true,
+        "pendingSeen": true
+      }
+    ],
+    "officialSubmission": false,
+    "codeEdited": false
+  },
+  "source": "af8c54aedfcc69adac07dd3e0435b3827a1a5c27",
+  "method": "Chrome UI click to visible heading and first data row/card, three consecutive samples per list. Includes browser-control overhead; assets warmed naturally; no standardized network/device or capacity test."
+}

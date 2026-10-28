@@ -10,6 +10,7 @@ import { SupportGrantResolver } from "../authorization/support-grant.resolver.js
 import { PrismaService } from "../database/prisma.service.js";
 import type { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { CourseService } from "./course.service.js";
+import { validatePdfReference } from "../documents/pdf-reference.js";
 
 /**
  * Moving lectures and problems between parents, against a real PostgreSQL.
@@ -100,6 +101,20 @@ describe.skipIf(!databaseUrl)("moving curriculum between parents", () => {
       },
     });
     problem[title] = material.id;
+  }
+
+  async function addReferencePdf() {
+    const asset = await prisma.pdfAsset.create({ data: {
+      objectKey: `move-fixture/${randomUUID()}`, academyId, courseId,
+      lectureId: lecture.L1!, uploaderUserId: ids.manager, state: "READY",
+      consumedAt: new Date(), originalFilename: "instructions.pdf", byteSize: 100,
+      pageCount: 1, checksumSha256: "fixture",
+    } });
+    return prisma.material.create({ data: {
+      lectureId: lecture.L1!, type: "PDF_DOCUMENT", title: "Instructions",
+      position: 4, isVisible: true, isRequired: false,
+      pdfDocument: { create: { assetId: asset.id, placement: "BOTH" } },
+    }, include: { pdfDocument: true } });
   }
 
   /**
@@ -234,6 +249,91 @@ describe.skipIf(!databaseUrl)("moving curriculum between parents", () => {
     await moveProblem("P3", "L1", "L4", 0);
 
     expect(await outline()).toMatchObject({ Ch1: { L1: ["P1", "P2"] }, Ch2: { L4: ["P3"] } });
+    expect(await positionsAreDense()).toBe(true);
+  });
+
+  it("moves PDF+code alone across modules and reverses it without changing instructions or student history", async () => {
+    const pdf = await addReferencePdf();
+    await prisma.programmingExercise.updateMany({ where: { materialId: { in: [problem.P1!, problem.P2!] } }, data: { referencePdfMaterialId: pdf.id } });
+    const before = await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: problem.P1! } });
+    const draft = await prisma.exerciseDraft.create({ data: { userId: ids.student, materialId: problem.P1!, sourceMaterialId: problem.P1!, courseId, code: "print('kept')" } });
+    const progress = await prisma.studentExerciseProgress.create({ data: { userId: ids.student, materialId: problem.P1!, bestScore: 85, attemptCount: 2 } });
+    const submission = await prisma.submission.create({ data: {
+      userId: ids.student, materialId: problem.P1!, sourceMaterialId: problem.P1!, courseId,
+      gradingRevision: before.gradingRevision, language: "PYTHON", timeLimitMs: 1000,
+      memoryLimitMb: 256, code: "print('graded')", status: "PASSED", totalCount: 1,
+      passedCount: 1, score: 100, engineVersion: "pyodide-0.27.5",
+      problemTitle: "Original problem", courseTitle: "Original course", moduleTitle: "Original module",
+      lectureTitle: "Original lecture", modulePosition: 1, lecturePosition: 1, problemPosition: 1,
+    } });
+
+    await moveProblem("P1", "L1", "L3", 0);
+    expect(await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: problem.P1! } })).toEqual(before);
+    expect((await prisma.material.findUniqueOrThrow({ where: { id: pdf.id } })).lectureId).toBe(lecture.L1);
+    expect((await prisma.material.findUniqueOrThrow({ where: { id: problem.P2! } })).lectureId).toBe(lecture.L1);
+    expect(await prisma.exerciseDraft.findUniqueOrThrow({ where: { id: draft.id } })).toEqual(draft);
+    expect(await prisma.studentExerciseProgress.findUniqueOrThrow({ where: { id: progress.id } })).toEqual(progress);
+    expect(await prisma.submission.findUniqueOrThrow({ where: { id: submission.id } })).toEqual(submission);
+    await moveProblem("P1", "L3", "L1", 0);
+    expect(await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: problem.P1! } })).toEqual(before);
+    expect(await positionsAreDense()).toBe(true);
+  });
+
+  it("allows same-course PDF references after moving and refuses another course or academy", async () => {
+    const pdf = await addReferencePdf();
+    await prisma.$transaction(tx => validatePdfReference(tx, { academyId, courseId, lectureId: lecture.L3! }, pdf.id, true));
+    for (const scope of [{ academyId: ids.otherAcademy, courseId }, { academyId, courseId: randomUUID() }]) {
+      await expect(prisma.$transaction(tx => validatePdfReference(tx, { ...scope, lectureId: lecture.L3! }, pdf.id))).rejects.toMatchObject({ code: "PDF_REFERENCE_INVALID" });
+    }
+  });
+
+  it("moves a shared PDF alone and leaves all referencing exercises attached in their original lecture", async () => {
+    const pdf = await addReferencePdf();
+    await prisma.programmingExercise.updateMany({ where: { materialId: { in: [problem.P1!, problem.P2!] } }, data: { referencePdfMaterialId: pdf.id } });
+    await courses.moveExercise(manager, { academyId, courseId, materialId: pdf.id,
+      fromLectureId: lecture.L1!, toLectureId: lecture.L3!, toIndex: 0 });
+    expect((await prisma.material.findUniqueOrThrow({ where: { id: pdf.id } })).lectureId).toBe(lecture.L3);
+    expect(await prisma.pdfDocument.findUnique({ where: { materialId: pdf.id } })).toEqual(pdf.pdfDocument);
+    expect(await prisma.programmingExercise.count({ where: { referencePdfMaterialId: pdf.id, material: { lectureId: lecture.L1! } } })).toBe(2);
+    expect(await positionsAreDense()).toBe(true);
+  });
+
+  it.each(["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const)(
+    "moves %s across modules into an empty lecture and preserves its payload", async (type) => {
+      const material = type === "PDF_DOCUMENT" ? await addReferencePdf() : await prisma.material.create({ data: {
+        lectureId: lecture.L1!, type, title: `Move ${type}`, position: 4, isVisible: true,
+        ...(type === "PROGRAMMING_EXERCISE" ? { programmingExercise: { create: { externalKey: randomUUID(), difficulty: "EASY" as const, starterCode: "print(1)" } } }
+          : type === "VIDEO_LESSON" ? { videoLesson: { create: { requestKey: randomUUID(), asset: { create: {
+            requestKey: randomUUID(), objectKey: `move/${randomUUID()}`, uploaderUserId: ids.manager,
+            academyId, courseId, lectureId: lecture.L1!, filename: "fixture.mp4", byteSize: 100, state: "READY",
+          } } } } } : { manualMaterial: { create: { description: "Keep instructions", files: { "main.py": "print(1)" } } } }),
+      } });
+      const payload = () => prisma.material.findUniqueOrThrow({ where: { id: material.id }, include: {
+        programmingExercise: true, pdfDocument: true, manualMaterial: true, videoLesson: true,
+      } });
+      const before = await payload();
+      await courses.moveExercise(manager, { academyId, courseId, materialId: material.id,
+        fromLectureId: lecture.L1!, toLectureId: lecture.L4!, toIndex: 0 });
+      const after = await payload();
+      expect(after).toEqual({ ...before, lectureId: lecture.L4, position: 1, updatedAt: after.updatedAt });
+      expect(await positionsAreDense()).toBe(true);
+    },
+  );
+
+  it("refuses deleting a PDF subtree referenced by an exercise in another lecture without changing either", async () => {
+    const pdf = await addReferencePdf();
+    await prisma.programmingExercise.update({ where: { materialId: problem.P5! }, data: { referencePdfMaterialId: pdf.id } });
+    await expect(courses.deleteLecture(manager, { academyId, courseId, lectureId: lecture.L1! })).rejects.toMatchObject({ code: "PDF_REFERENCE_IN_USE" });
+    expect(await prisma.material.findUnique({ where: { id: pdf.id } })).not.toBeNull();
+    expect((await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: problem.P5! } })).referencePdfMaterialId).toBe(pdf.id);
+  });
+
+  it("does not expose a moved PDF+code exercise whose PDF is under a hidden module", async () => {
+    const pdf = await addReferencePdf();
+    await prisma.programmingExercise.update({ where: { materialId: problem.P6! }, data: { referencePdfMaterialId: pdf.id } });
+    await prisma.material.update({ where: { id: pdf.id }, data: { lectureId: lecture.L5!, position: 2 } });
+    await expect(moveProblem("P6", "L5", "L3", 0)).rejects.toMatchObject({ code: "PDF_REFERENCE_NOT_READY" });
+    expect((await prisma.material.findUniqueOrThrow({ where: { id: problem.P6! } })).lectureId).toBe(lecture.L5);
     expect(await positionsAreDense()).toBe(true);
   });
 

@@ -1,0 +1,40 @@
+{
+  "boundary": "Read-only running-container inspection and selected non-secret manifest settings; snapshot only. No configuration changes.",
+  "judgeWorker": {
+    "concurrency": 2,
+    "cpuLimit": 0.75,
+    "memoryMiB": 768
+  },
+  "judgeSandbox": {
+    "concurrency": 2,
+    "spare": 1,
+    "cpuLimit": 1.5,
+    "memoryMiB": 1280
+  },
+  "apiEnvironment": {
+    "JUDGE_CONCURRENCY": 1
+  },
+  "deploymentManifest": {
+    "JUDGE_CONCURRENCY": 2
+  },
+  "host": {
+    "memoryMiB": 11960.4921875,
+    "usedMemoryMiB": 2646,
+    "availableMemoryMiB": 9313,
+    "swapMiB": 0,
+    "loadAverage": [
+      0.36,
+      0.45,
+      0.72
+    ]
+  },
+  "warmBudgetLowerBound": {
+    "boundary": "Running container ceilings only; already fails headroom without adding dynamic course guests or deployment overlap. Not an attestation.",
+    "mainRunningCeilingsMiB": 11456,
+    "trialBrokerCeilingMiB": 256,
+    "requiredWarmSliceMiB": 2048,
+    "requiredHostHeadroomMiB": 3072,
+    "requiredTotalAtLeastMiB": 16832,
+    "fits": false
+  }
+}

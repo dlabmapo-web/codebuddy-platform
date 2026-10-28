@@ -36,8 +36,11 @@ describe.skipIf(process.env.COVE_PDF_INTEGRATION !== '1')('PDF reference databas
   it('accepts a same-lecture supplementary reference', async () => {
     await prisma.$transaction(tx => validatePdfReference(tx, { academyId, courseId, lectureId }, pdfId, true));
   });
-  it('refuses a cross-lecture, cross-academy, or missing document', async () => {
-    for (const input of [{ academyId, courseId, lectureId: otherLectureId }, { academyId: randomUUID(), courseId, lectureId }]) {
+  it('supports a reference in another lecture of the same course', async () => {
+    await prisma.$transaction(tx => validatePdfReference(tx, { academyId, courseId, lectureId: otherLectureId }, pdfId, true));
+  });
+  it('refuses a cross-course, cross-academy, or missing document', async () => {
+    for (const input of [{ academyId, courseId: randomUUID(), lectureId: otherLectureId }, { academyId: randomUUID(), courseId, lectureId }]) {
       await expect(prisma.$transaction(tx => validatePdfReference(tx, input, pdfId))).rejects.toMatchObject({ code: 'PDF_REFERENCE_INVALID' });
     }
     await expect(prisma.$transaction(tx => validatePdfReference(tx, { academyId, courseId, lectureId }, randomUUID()))).rejects.toMatchObject({ code: 'PDF_REFERENCE_INVALID' });

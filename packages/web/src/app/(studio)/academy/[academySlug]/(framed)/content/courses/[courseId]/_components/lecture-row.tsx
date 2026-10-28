@@ -138,6 +138,12 @@ function ExerciseRow({
       ? builder.editable
       : builder.exerciseEditable;
   const [moving, setMoving] = useState(false);
+  // Resolve shared references across the course only while a PDF action is
+  // open, so idle outline rows do not repeatedly scan the entire curriculum.
+  const referringExercises = material.type === 'PDF_DOCUMENT' && (pdfMode || deleting)
+    ? builder.tree.modules.flatMap(module => module.lectures.flatMap(lecture => lecture.materials))
+      .filter(row => row.programmingExercise?.referencePdfMaterialId === material.id)
+    : [];
   const rowRef = useRevealAfterMove<HTMLLIElement>(builder, material.id);
   const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
     canDrag: rowEditable && !builder.movePending,
@@ -293,7 +299,7 @@ function ExerciseRow({
         />
       ) : null}
       <DeleteModal
-        dependencyTitles={material.type === "PDF_DOCUMENT" ? siblings.filter(row => row.programmingExercise?.referencePdfMaterialId === material.id).map(row => row.title) : []}
+        dependencyTitles={referringExercises.map(row => row.title)}
         itemTitle={material.title}
         kind={material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
         onCancel={() => setDeleting(false)}
@@ -309,7 +315,7 @@ function ExerciseRow({
         <PdfAuthorDialog
           target={{ ...builder.target, lectureId }}
           material={material}
-          referringExercises={siblings.filter(row => row.programmingExercise?.referencePdfMaterialId === material.id)}
+          referringExercises={referringExercises}
           initialPreview={pdfMode === 'preview'}
           editable={builder.editable}
           onClose={() => {

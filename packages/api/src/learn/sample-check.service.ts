@@ -310,13 +310,24 @@ export class SampleCheckService {
       return { store, record: null, visible: false };
     }
     // Current access, not access at acceptance: a student who has since lost
-    // the course reads nothing more about it.
+    // the course reads nothing more about it. Polling needs revision/visibility
+    // only; code, statements, hidden cases and the course graph stay out.
     const material = await this.prisma.material.findFirst({
       where: {
         id: record.materialId,
         ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)),
       },
-      include: exerciseInclude,
+      select: {
+        programmingExercise: {
+          select: {
+            gradingRevision: true,
+            testCases: {
+              where: { position: record.position, visibility: "SAMPLE" },
+              select: { position: true, visibility: true },
+            },
+          },
+        },
+      },
     });
     const exercise = material?.programmingExercise;
     if (!exercise) throw notFound();

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "runtime": "cpython-prototype-3.12.7",
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "boundary": "isolated local execution, acquisition and acknowledged guest removal; comparator reported separately; no admission, queues, points or commit",
+  "releaseAcceptance": "not assessed",
+  "pool": {
+    "capacity": 2,
+    "spare": 1
+  },
+  "guestBudget": {
+    "totalCpu": 1.5,
+    "totalMemoryMiB": 1152,
+    "perGuestCpu": 0.5,
+    "perGuestMemoryMiB": 384
+  },
+  "controllerBudget": {
+    "cpu": 0.75,
+    "memoryMiB": 768
+  },
+  "probes": [],
+  "samples": [],
+  "failures": 1,
+  "cleanupConfirmed": true,
+  "failurePhase": "warmup",
+  "failureKind": "Native guest isolation verification failed: capabilities",
+  "poolFinal": {
+    "allocated": 0,
+    "active": 0,
+    "ready": 0,
+    "preparing": 0,
+    "draining": 0,
+    "quarantined": 0,
+    "waiting": 0,
+    "closed": true,
+    "healthy": false
+  },
+  "stageObservations": [
+    {
+      "stage": "cleanup",
+      "ms": 185.36787500000003
+    },
+    {
+      "stage": "cleanup",
+      "ms": 181.35091599999998
+    },
+    {
+      "stage": "cleanup",
+      "ms": 189.847125
+    }
+  ],
+  "controllerResources": {
+    "memoryPeak": "43155456",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu": "usage_usec 436520\nuser_usec 191772\nsystem_usec 244748\nnr_periods 7\nnr_throttled 4\nthrottled_usec 932468\nnr_bursts 0\nburst_usec 0",
+    "quota": "75000 100000"
+  },
+  "hostBoundary": "local Linux Docker fixture; not production VPS performance",
+  "context": "desktop-linux",
+  "commit": "64160384890c434bbb439c7c0cae38d9c4da02b6",
+  "dirty": true,
+  "sourceFiles": {
+    "supervisor.py": "ebf78e8cc050438fffd8da689e975433d68e88b68b550341dfa84174565872cb",
+    "learner.py": "44e4a9b3e49ed818955571ad90d06679d425decce02749d1f6af79a5b1957bc6",
+    "native-pool.mjs": "e8903f231cd3e9be835a17e5a4f9cb164520f4b53363ccc39fdd23306a83cfb1",
+    "docker-driver.mjs": "c1f9d5f960074c4697a6dc31b89884736c5045361df29c86226a44f14f3962d7",
+    "controller.mjs": "2ab90111652416810dd7bde75c6cc2d3c69d75460b0cdd7a6aada5cb57753dd1",
+    "seccomp.json": "f51c3029fa73f29a5b9ce46908c0502d5d3a96ce02678454b2f26f3d7af8c7ac"
+  },
+  "image": "sha256:32f69ab92fc8e7d2b64109fa3850f6f05037c64f7c86688532231003ffa2d095",
+  "controllerImage": "sha256:484b46ec54c7549ef70759d226eb2ce355b091352c4f75fdb984dd4726ea4c0f",
+  "imageArchitecture": "arm64",
+  "requestedRuns": 1,
+  "cases": 1,
+  "parallel": 1,
+  "completedRuns": 0,
+  "diagnosticEngineP50Ms": null,
+  "diagnosticEngineP95Ms": null,
+  "interrupted": false,
+  "outerCleanupConfirmed": true
+}

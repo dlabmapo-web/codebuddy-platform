@@ -21,6 +21,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import type { AcademyStatus } from "../generated/prisma/client.js";
 import { DlabPolicyService } from '../integrations/dlab/dlab-policy.service.js';
 import { SupportGrantResolver } from "./support-grant.resolver.js";
+import { readAcademyPermission } from "./academy-access-read.js";
 
 export type AcademyAccess = {
   userId: string;
@@ -95,10 +96,7 @@ export class AcademyAccessService {
     academyId: string,
     permission: AcademyPermission,
   ): Promise<AcademyAccess> {
-    const user = await this.prisma.user.findUnique({
-      where: { authUserId },
-      select: { id: true, status: true },
-    });
+    const user = await readAcademyPermission(this.prisma, authUserId, academyId);
     if (!user) {
       throw new AppException("PROFILE_INCOMPLETE", HttpStatus.FORBIDDEN);
     }
@@ -111,21 +109,11 @@ export class AcademyAccessService {
 
     const managed = await this.dlab?.assertAcademy(authUserId, academyId);
     // HQ admins use normal platform inspection/support rules, not historic OS memberships.
-    const membership = managed?.isPlatformAdmin ? null : await this.prisma.academyMembership.findUnique({
-      where: { academyId_userId: { academyId, userId: user.id } },
-      include: {
-        academy: { select: { status: true } },
-        extraRoles: { select: { role: true } },
-      },
-    });
+    const membership = managed?.isPlatformAdmin ? null : user.membership;
     if (!membership) {
-      // Read once, here, rather than inside each path below: the support
-      // resolver needs the status and the library branch needs the kind, and
-      // the two used to be one query anyway.
-      const academy = await this.prisma.academy.findUnique({
-        where: { id: academyId },
-        select: { status: true, kind: true },
-      });
+      // Both fallback paths use the same fresh snapshot: support needs the
+      // status, and the library branch also needs the kind.
+      const academy = user.academy;
       if (!academy) {
         throw new AppException(
           "ACADEMY_MEMBERSHIP_REQUIRED",

@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "boundary": "sandbox execution only; excludes admission, comparator, points and commit",
+  "commit": "64160384890c434bbb439c7c0cae38d9c4da02b6",
+  "dirty": true,
+  "image": "sha256:1f316925b64d864b31b11b5281db80fc2d4e10efe2da6aadbd6487846c752c8e",
+  "imageRevision": "af8c54aedfcc69adac07dd3e0435b3827a1a5c27",
+  "platform": "arm64",
+  "requestedRuns": 3,
+  "cases": 5,
+  "cpus": 1.5,
+  "concurrency": 2,
+  "spare": 1,
+  "parallel": 1,
+  "releaseAcceptance": "not assessed; isolated execution microbenchmark only",
+  "completedRuns": 3,
+  "failures": 0,
+  "p50Ms": 6435.408587000002,
+  "p95Ms": 6858.764711,
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "isolated": true,
+  "warmupMs": 6773.938461,
+  "before": {
+    "cpu": "usage_usec 10362246\nuser_usec 8698437\nsystem_usec 1663808\nnr_periods 70\nnr_throttled 67\nthrottled_usec 27345022\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "467480576",
+    "peak": "479498240",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=27.56 avg60=5.77 avg300=1.23 total=4078381\nfull avg10=25.50 avg60=5.32 avg300=1.14 total=3789258"
+  },
+  "after": {
+    "cpu": "usage_usec 31878736\nuser_usec 28590284\nsystem_usec 3288452\nnr_periods 232\nnr_throttled 134\nthrottled_usec 37233586\nnr_bursts 0\nburst_usec 0",
+    "quota": "150000 100000",
+    "memory": "29413376",
+    "peak": "479498240",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "pressure": "some avg10=14.01 avg60=7.13 avg300=1.80 total=5787082\nfull avg10=13.60 avg60=6.79 avg300=1.71 total=5495646"
+  },
+  "diagnostics": {
+    "version": 1,
+    "generation": "47a54eba-d5f9-403c-8160-2c94e80d875b",
+    "pool": {
+      "capacity": 2,
+      "spare": 1,
+      "executing": 0,
+      "idle": 0,
+      "warming": 1,
+      "draining": 0,
+      "waiting": 0,
+      "oldestWaitMs": 0,
+      "oldestWarmMs": 76.47079200000007,
+      "retryExhausted": false,
+      "lastCompletedAgoMs": 1.8680830000012065
+    },
+    "resources": {
+      "cpuQuota": 1.5,
+      "periods": 232,
+      "throttledPeriods": 134,
+      "throttledSeconds": 37.233586,
+      "cpuPressure": 13.6,
+      "memoryBytes": 29151232,
+      "memoryPeakBytes": 479498240,
+      "memoryLimitBytes": 1342177280,
+      "oom": 0,
+      "oomKill": 0,
+      "tasks": 14,
+      "eventLoopP95Ms": 26.017791
+    },
+    "timings": [
+      {
+        "stage": "prepare",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 35.937934682,
+        "buckets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          11,
+          12,
+          12,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "acquire",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 15.683021217000004,
+        "buckets": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "exit",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 0.46367916999999675,
+        "buckets": [
+          0,
+          5,
+          13,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "drain",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 0.0010152049999996961,
+        "buckets": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "execute",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 0.466271791000001,
+        "buckets": [
+          0,
+          5,
+          13,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "identity",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 0.002541750999996111,
+        "buckets": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      },
+      {
+        "stage": "cleanup",
+        "kind": "sandbox",
+        "cases": "unknown",
+        "count": 15,
+        "sum": 0.002787540000002082,
+        "buckets": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ]
+      }
+    ],
+    "failures": {
+      "prepare": 0,
+      "drainFallback": 0,
+      "forcedTermination": 0
+    }
+  },
+  "samples": [
+    {
+      "wallMs": 2876.4992089999996,
+      "cases": [
+        {
+          "wallMs": 80.4141669999999,
+          "runtimeMs": 71,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 28.04966599999989,
+          "runtimeMs": 27,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 31.11108299999978,
+          "runtimeMs": 30,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1470.7304590000003,
+          "runtimeMs": 21,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1266.170583000001,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 6435.408587000002,
+      "cases": [
+        {
+          "wallMs": 1258.798793,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1225.8597089999985,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1226.4001250000001,
+          "runtimeMs": 22,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1215.7037920000002,
+          "runtimeMs": 26,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1508.4960009999995,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "wallMs": 6858.764711,
+      "cases": [
+        {
+          "wallMs": 1391.2809169999982,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1306.7333330000001,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1426.5772090000028,
+          "runtimeMs": 29,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1333.3662509999995,
+          "runtimeMs": 23,
+          "outcome": "PASSED",
+          "correct": true
+        },
+        {
+          "wallMs": 1400.7922089999993,
+          "runtimeMs": 57,
+          "outcome": "PASSED",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

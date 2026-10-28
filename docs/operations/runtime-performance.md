@@ -205,6 +205,30 @@ the web before an API image that removes the endpoint. Re-measure deployed
 navigation and error rates before claiming the performance target is achieved.
 
 
+### Broader shared-read follow-up and effective concurrency
+
+The [broader role audit](../research/2026-10-27-platform-wide-performance-verification.md)
+records the fresh academy permission projection, attention-query rewrite and
+narrow sample-status projection. They require no schema migration or contract
+change. Follow normal image build/CI/release/rollback procedures and verify
+data-ready pages and result feedback after deployment; read-only candidate
+service timings are not post-deployment browser acceptance.
+
+`JUDGE_CONCURRENCY` in the Compose interpolation manifest controls both worker
+and sandbox. The explicit Compose value overrides the worker's `api.env` entry;
+the TypeScript schema's default of four applies only when no effective value is
+provided. The October 27 live inspection found manifest/worker/sandbox **two**,
+not four, with a 1.5-CPU sandbox. Inspect running settings and health diagnostics
+when validating a rollout. Editing an env file alone does not update a running
+container. Do not raise concurrency as part of a web-only speed fix or use a
+larger pool as proof that sequential cases run faster.
+
+The running-container memory-ceiling lower bound already fails the existing
+warm Turtle headroom policy. Keep standby off; do not use free-memory snapshots
+as permission to omit dynamic guests, overlap or required headroom. See the
+separate [proposed native-grading experiment](../superpowers/specs/2026-10-27-native-grading-prototype-design.md)
+for unresolved interpreter latency. It changes no production default.
+
 ### CI correctness-test budgets
 
 Real-interpreter correctness tests allow 30 seconds per test because a test can

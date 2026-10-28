@@ -210,7 +210,7 @@ export function isAppErrorCode(value: unknown): value is AppErrorCode {
 }
 
 export const appErrorFallbacks: Record<AppErrorCode, string> = {
-  PDF_REFERENCE_INVALID: "Choose a supplementary PDF in the same lecture.",
+  PDF_REFERENCE_INVALID: "Choose a supplementary PDF in the same course.",
   PDF_REFERENCE_IN_USE: "Detach the referring exercises before changing this PDF.",
   PDF_REFERENCE_NOT_READY: "Publish the reference PDF before the exercise.",
   POINTS_ACCESS_DENIED: "You do not have access to these points.",

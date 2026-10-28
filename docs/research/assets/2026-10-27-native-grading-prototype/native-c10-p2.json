@@ -1,0 +1,3083 @@
+{
+  "version": 1,
+  "runtime": "cpython-prototype-3.12.7",
+  "node": "v22.23.4",
+  "arch": "arm64",
+  "boundary": "isolated local execution, acquisition and acknowledged guest removal; comparator reported separately; no admission, queues, points or commit",
+  "releaseAcceptance": "not assessed",
+  "pool": {
+    "capacity": 2,
+    "spare": 1
+  },
+  "guestBudget": {
+    "totalCpu": 1.5,
+    "totalMemoryMiB": 1152,
+    "perGuestCpu": 0.5,
+    "perGuestMemoryMiB": 384
+  },
+  "controllerBudget": {
+    "cpu": 0.75,
+    "memoryMiB": 768
+  },
+  "combinedBudget": {
+    "capacity": 2,
+    "spare": 1,
+    "guestCount": 3,
+    "guestMemoryMiB": 384,
+    "guestCpu": 0.5,
+    "controllerMemoryMiB": 768,
+    "controllerCpu": 0.75,
+    "totalMemoryMiB": 1920,
+    "totalCpu": 2.25
+  },
+  "probes": [
+    {
+      "name": "unicode-prompt-include",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 89.98887500000001,
+      "runtimeMs": 5,
+      "resources": {
+        "memoryPeakBytes": 17260544,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 120261,
+          "user_usec": 68148,
+          "system_usec": 52113,
+          "nr_periods": 3,
+          "nr_throttled": 1,
+          "throttled_usec": 15085,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "unicode-prompt-ignore",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 197.56566699999996,
+      "runtimeMs": 8,
+      "resources": {
+        "memoryPeakBytes": 17256448,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 122551,
+          "user_usec": 74948,
+          "system_usec": 47602,
+          "nr_periods": 3,
+          "nr_throttled": 1,
+          "throttled_usec": 36470,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10772480,
+      "survivingLearners": 0
+    },
+    {
+      "name": "environment",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 124.01424999999995,
+      "runtimeMs": 11,
+      "resources": {
+        "memoryPeakBytes": 17002496,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 149031,
+          "user_usec": 96972,
+          "system_usec": 52059,
+          "nr_periods": 4,
+          "nr_throttled": 1,
+          "throttled_usec": 47167,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "root-filesystem",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 398.992209,
+      "runtimeMs": 9,
+      "resources": {
+        "memoryPeakBytes": 17260544,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 132716,
+          "user_usec": 80224,
+          "system_usec": 52492,
+          "nr_periods": 4,
+          "nr_throttled": 1,
+          "throttled_usec": 46299,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "controller-proc-access",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 403.91987599999993,
+      "runtimeMs": 41,
+      "resources": {
+        "memoryPeakBytes": 17010688,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 120726,
+          "user_usec": 70165,
+          "system_usec": 50560,
+          "nr_periods": 3,
+          "nr_throttled": 2,
+          "throttled_usec": 65075,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "controller-signal",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 252.27904100000023,
+      "runtimeMs": 4,
+      "resources": {
+        "memoryPeakBytes": 17252352,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 79371,
+          "user_usec": 47035,
+          "system_usec": 32336,
+          "nr_periods": 1,
+          "nr_throttled": 1,
+          "throttled_usec": 27569,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "network-syscall",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 303.985459,
+      "runtimeMs": 11,
+      "resources": {
+        "memoryPeakBytes": 18624512,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 81607,
+          "user_usec": 61457,
+          "system_usec": 20149,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 53673,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 12480512,
+      "survivingLearners": 0
+    },
+    {
+      "name": "unix-socket-and-docker",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 268.0450420000002,
+      "runtimeMs": 39,
+      "resources": {
+        "memoryPeakBytes": 18792448,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 85002,
+          "user_usec": 54361,
+          "system_usec": 30640,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 41933,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 12623872,
+      "survivingLearners": 0
+    },
+    {
+      "name": "ptrace-syscall",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 427.0953330000002,
+      "runtimeMs": 9,
+      "resources": {
+        "memoryPeakBytes": 17911808,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 129408,
+          "user_usec": 72920,
+          "system_usec": 56488,
+          "nr_periods": 3,
+          "nr_throttled": 2,
+          "throttled_usec": 85397,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 11735040,
+      "survivingLearners": 0
+    },
+    {
+      "name": "forged-result-output",
+      "correct": true,
+      "outcome": "RUNTIME_ERROR",
+      "wallMs": 269.99312499999996,
+      "runtimeMs": 3,
+      "resources": {
+        "memoryPeakBytes": 17522688,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 79669,
+          "user_usec": 51145,
+          "system_usec": 28523,
+          "nr_periods": 1,
+          "nr_throttled": 1,
+          "throttled_usec": 11801,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10907648,
+      "survivingLearners": 0
+    },
+    {
+      "name": "system-exit-zero",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 322.7470420000004,
+      "runtimeMs": 3,
+      "resources": {
+        "memoryPeakBytes": 16994304,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 82439,
+          "user_usec": 52278,
+          "system_usec": 30160,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 47190,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "system-exit-failure",
+      "correct": true,
+      "outcome": "RUNTIME_ERROR",
+      "wallMs": 307.9248339999999,
+      "runtimeMs": 3,
+      "resources": {
+        "memoryPeakBytes": 17137664,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 91875,
+          "user_usec": 62271,
+          "system_usec": 29604,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 12431,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10768384,
+      "survivingLearners": 0
+    },
+    {
+      "name": "tmp-write",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 322.11599999999953,
+      "runtimeMs": 4,
+      "resources": {
+        "memoryPeakBytes": 17256448,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 74681,
+          "user_usec": 51098,
+          "system_usec": 23583,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 51186,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "fresh-guest-files",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 276.7567509999999,
+      "runtimeMs": 3,
+      "resources": {
+        "memoryPeakBytes": 17145856,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 77619,
+          "user_usec": 57458,
+          "system_usec": 20160,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 47081,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10772480,
+      "survivingLearners": 0
+    },
+    {
+      "name": "large-stdin-consumed",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 269.87504199999967,
+      "runtimeMs": 4,
+      "resources": {
+        "memoryPeakBytes": 17186816,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 73829,
+          "user_usec": 56397,
+          "system_usec": 17431,
+          "nr_periods": 1,
+          "nr_throttled": 1,
+          "throttled_usec": 38098,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10731520,
+      "survivingLearners": 0
+    },
+    {
+      "name": "large-stdin-unconsumed",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 292.3672919999999,
+      "runtimeMs": 4,
+      "resources": {
+        "memoryPeakBytes": 17256448,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 74905,
+          "user_usec": 51251,
+          "system_usec": 23654,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 28599,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10731520,
+      "survivingLearners": 0
+    },
+    {
+      "name": "output-flood-bounded",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 209.56024999999954,
+      "runtimeMs": 5,
+      "resources": {
+        "memoryPeakBytes": 18001920,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 80638,
+          "user_usec": 53759,
+          "system_usec": 26879,
+          "nr_periods": 1,
+          "nr_throttled": 0,
+          "throttled_usec": 0,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 11268096,
+      "survivingLearners": 0
+    },
+    {
+      "name": "stderr-flood-bounded",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 248.49908400000004,
+      "runtimeMs": 4,
+      "resources": {
+        "memoryPeakBytes": 17489920,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 83663,
+          "user_usec": 53783,
+          "system_usec": 29879,
+          "nr_periods": 1,
+          "nr_throttled": 1,
+          "throttled_usec": 25628,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10874880,
+      "survivingLearners": 0
+    },
+    {
+      "name": "rss-memory-limit-64-mib-fixture",
+      "correct": true,
+      "outcome": "MEMORY_LIMIT",
+      "wallMs": 372.7078760000004,
+      "runtimeMs": 168,
+      "resources": {
+        "memoryPeakBytes": 75038720,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 146077,
+          "user_usec": 48692,
+          "system_usec": 97384,
+          "nr_periods": 3,
+          "nr_throttled": 2,
+          "throttled_usec": 86532,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 68431872,
+      "survivingLearners": 0
+    },
+    {
+      "name": "memory-deadline-race-256-mib-fixture",
+      "correct": true,
+      "outcome": "MEMORY_LIMIT",
+      "wallMs": 564.9841670000005,
+      "runtimeMs": 398,
+      "resources": {
+        "memoryPeakBytes": 287531008,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 282026,
+          "user_usec": 63140,
+          "system_usec": 218886,
+          "nr_periods": 6,
+          "nr_throttled": 5,
+          "throttled_usec": 315123,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 279900160,
+      "survivingLearners": 0
+    },
+    {
+      "name": "wall-time-limit",
+      "correct": true,
+      "outcome": "TIME_LIMIT",
+      "wallMs": 335.8122080000003,
+      "runtimeMs": 231,
+      "resources": {
+        "memoryPeakBytes": 17264640,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 235710,
+          "user_usec": 199841,
+          "system_usec": 35868,
+          "nr_periods": 6,
+          "nr_throttled": 3,
+          "throttled_usec": 176509,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 10743808,
+      "survivingLearners": 0
+    },
+    {
+      "name": "setsid-descendant-cleanup",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 87.09820800000034,
+      "runtimeMs": 9,
+      "resources": {
+        "memoryPeakBytes": 20480000,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 82828,
+          "user_usec": 61086,
+          "system_usec": 21742,
+          "nr_periods": 3,
+          "nr_throttled": 0,
+          "throttled_usec": 0,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 17780736,
+      "survivingLearners": 0
+    },
+    {
+      "name": "pid-exhaustion-contained",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 72.76383299999998,
+      "runtimeMs": 20,
+      "resources": {
+        "memoryPeakBytes": 24223744,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 115377,
+          "user_usec": 81849,
+          "system_usec": 33528,
+          "nr_periods": 3,
+          "nr_throttled": 2,
+          "throttled_usec": 31279,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 114298880,
+      "survivingLearners": 0
+    },
+    {
+      "name": "thread-exhaustion-contained",
+      "correct": true,
+      "outcome": "PASSED",
+      "wallMs": 212.31945900000028,
+      "runtimeMs": 12,
+      "resources": {
+        "memoryPeakBytes": 20344832,
+        "memoryMaxBytes": 402653184,
+        "memoryEvents": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0
+        },
+        "cpu": {
+          "usage_usec": 80934,
+          "user_usec": 57371,
+          "system_usec": 23563,
+          "nr_periods": 2,
+          "nr_throttled": 1,
+          "throttled_usec": 46084,
+          "nr_bursts": 0,
+          "burst_usec": 0
+        }
+      },
+      "peakLearnerRssBytes": 12853248,
+      "survivingLearners": 0
+    },
+    {
+      "name": "active-cancel-cleanup",
+      "correct": true
+    }
+  ],
+  "samples": [
+    {
+      "wallMs": 4526.839377,
+      "engineOnlyMs": 4511.021044999998,
+      "cases": [
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 138.11841699999968,
+          "runtimeMs": 12,
+          "comparatorMs": 5.705374999999549,
+          "resources": {
+            "memoryPeakBytes": 16994304,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 109470,
+              "user_usec": 69193,
+              "system_usec": 40276,
+              "nr_periods": 3,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 93.00783299999966,
+          "runtimeMs": 6,
+          "comparatorMs": 2.2056249999986903,
+          "resources": {
+            "memoryPeakBytes": 17260544,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 85109,
+              "user_usec": 52226,
+              "system_usec": 32883,
+              "nr_periods": 3,
+              "nr_throttled": 1,
+              "throttled_usec": 6034,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 559.813458999999,
+          "runtimeMs": 3,
+          "comparatorMs": 1.0320420000007289,
+          "resources": {
+            "memoryPeakBytes": 17047552,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 66402,
+              "user_usec": 44919,
+              "system_usec": 21483,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 14283,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 520.7205420000009,
+          "runtimeMs": 3,
+          "comparatorMs": 0.7133329999996931,
+          "resources": {
+            "memoryPeakBytes": 16994304,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 67583,
+              "user_usec": 52452,
+              "system_usec": 15130,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 31292,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 553.214625999999,
+          "runtimeMs": 3,
+          "comparatorMs": 1.0572919999995065,
+          "resources": {
+            "memoryPeakBytes": 16990208,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 72595,
+              "user_usec": 59303,
+              "system_usec": 13292,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 50036,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 546.4491669999989,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8775000000005093,
+          "resources": {
+            "memoryPeakBytes": 16994304,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 85795,
+              "user_usec": 67838,
+              "system_usec": 17957,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 48676,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 522.8250420000004,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8653329999997368,
+          "resources": {
+            "memoryPeakBytes": 16994304,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 72292,
+              "user_usec": 55223,
+              "system_usec": 17069,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 32226,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 507.3899590000001,
+          "runtimeMs": 3,
+          "comparatorMs": 0.6383749999986321,
+          "resources": {
+            "memoryPeakBytes": 17133568,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 67011,
+              "user_usec": 51244,
+              "system_usec": 15767,
+              "nr_periods": 1,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 523.5905829999992,
+          "runtimeMs": 4,
+          "comparatorMs": 1.544499999999971,
+          "resources": {
+            "memoryPeakBytes": 17072128,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 87167,
+              "user_usec": 60422,
+              "system_usec": 26744,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 48016,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 545.8914170000007,
+          "runtimeMs": 3,
+          "comparatorMs": 1.0545409999995172,
+          "resources": {
+            "memoryPeakBytes": 17002496,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 73945,
+              "user_usec": 49634,
+              "system_usec": 24310,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 44363,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "wallMs": 4808.507377,
+      "engineOnlyMs": 4799.75592,
+      "cases": [
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 142.39287499999955,
+          "runtimeMs": 13,
+          "comparatorMs": 1.5806659999998374,
+          "resources": {
+            "memoryPeakBytes": 17063936,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 97173,
+              "user_usec": 70125,
+              "system_usec": 27048,
+              "nr_periods": 4,
+              "nr_throttled": 1,
+              "throttled_usec": 24945,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 439.1424169999991,
+          "runtimeMs": 3,
+          "comparatorMs": 0.6844170000003942,
+          "resources": {
+            "memoryPeakBytes": 17244160,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 85080,
+              "user_usec": 51830,
+              "system_usec": 33249,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 39936,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 483.877625000001,
+          "runtimeMs": 4,
+          "comparatorMs": 0.5934159999997064,
+          "resources": {
+            "memoryPeakBytes": 17092608,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 74967,
+              "user_usec": 52374,
+              "system_usec": 22592,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 48531,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 522.9890000000014,
+          "runtimeMs": 4,
+          "comparatorMs": 0.8515840000000026,
+          "resources": {
+            "memoryPeakBytes": 17125376,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 68428,
+              "user_usec": 54130,
+              "system_usec": 14298,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 54075,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 534.3308340000003,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8240829999995185,
+          "resources": {
+            "memoryPeakBytes": 16994304,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 73882,
+              "user_usec": 46826,
+              "system_usec": 27055,
+              "nr_periods": 1,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 552.1589999999997,
+          "runtimeMs": 3,
+          "comparatorMs": 0.6803749999999127,
+          "resources": {
+            "memoryPeakBytes": 17133568,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 73866,
+              "user_usec": 55898,
+              "system_usec": 17967,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 11316,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 560.6371249999993,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8251249999993888,
+          "resources": {
+            "memoryPeakBytes": 16990208,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 72811,
+              "user_usec": 54352,
+              "system_usec": 18459,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 54013,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 471.9202089999999,
+          "runtimeMs": 35,
+          "comparatorMs": 0.5104580000006536,
+          "resources": {
+            "memoryPeakBytes": 17002496,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 69166,
+              "user_usec": 55943,
+              "system_usec": 13222,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 57038,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 516.034001,
+          "runtimeMs": 3,
+          "comparatorMs": 0.5859999999993306,
+          "resources": {
+            "memoryPeakBytes": 17129472,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 74846,
+              "user_usec": 47271,
+              "system_usec": 27574,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 48758,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 576.2728339999994,
+          "runtimeMs": 3,
+          "comparatorMs": 1.5249169999988226,
+          "resources": {
+            "memoryPeakBytes": 17096704,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 70992,
+              "user_usec": 51920,
+              "system_usec": 19072,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 39016,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "wallMs": 5577.397628000001,
+      "engineOnlyMs": 5564.528750999996,
+      "cases": [
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 391.6037919999999,
+          "runtimeMs": 3,
+          "comparatorMs": 1.1537919999991573,
+          "resources": {
+            "memoryPeakBytes": 17022976,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 81115,
+              "user_usec": 53037,
+              "system_usec": 28078,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 50406,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 557.0801670000001,
+          "runtimeMs": 35,
+          "comparatorMs": 0.7162080000016431,
+          "resources": {
+            "memoryPeakBytes": 17182720,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 78266,
+              "user_usec": 60656,
+              "system_usec": 17610,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 61581,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 585.8402079999978,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8085840000021562,
+          "resources": {
+            "memoryPeakBytes": 16986112,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 76626,
+              "user_usec": 58713,
+              "system_usec": 17912,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 15936,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 527.5440830000007,
+          "runtimeMs": 3,
+          "comparatorMs": 2.5880420000030426,
+          "resources": {
+            "memoryPeakBytes": 16990208,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 79802,
+              "user_usec": 54548,
+              "system_usec": 25254,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 46077,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 463.3165000000008,
+          "runtimeMs": 3,
+          "comparatorMs": 0.7687500000029104,
+          "resources": {
+            "memoryPeakBytes": 17154048,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 76317,
+              "user_usec": 47574,
+              "system_usec": 28742,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 42807,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 550.4573749999981,
+          "runtimeMs": 4,
+          "comparatorMs": 1.2132500000006985,
+          "resources": {
+            "memoryPeakBytes": 16990208,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 75763,
+              "user_usec": 54828,
+              "system_usec": 20934,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 21566,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 499.1314590000002,
+          "runtimeMs": 3,
+          "comparatorMs": 0.6448329999984708,
+          "resources": {
+            "memoryPeakBytes": 16998400,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 64507,
+              "user_usec": 47372,
+              "system_usec": 17134,
+              "nr_periods": 1,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 686.6354580000007,
+          "runtimeMs": 11,
+          "comparatorMs": 3.7475000000013097,
+          "resources": {
+            "memoryPeakBytes": 16998400,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 103320,
+              "user_usec": 73516,
+              "system_usec": 29804,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 45794,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 629.7063339999986,
+          "runtimeMs": 3,
+          "comparatorMs": 0.5633340000022145,
+          "resources": {
+            "memoryPeakBytes": 17137664,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 83624,
+              "user_usec": 51158,
+              "system_usec": 32465,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 45653,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 673.2133749999994,
+          "runtimeMs": 4,
+          "comparatorMs": 0.5681250000016007,
+          "resources": {
+            "memoryPeakBytes": 16982016,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 86202,
+              "user_usec": 52337,
+              "system_usec": 33865,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 4163,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "wallMs": 5901.235211000001,
+      "engineOnlyMs": 5886.504421,
+      "cases": [
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 694.9408339999991,
+          "runtimeMs": 3,
+          "comparatorMs": 1.1701670000002196,
+          "resources": {
+            "memoryPeakBytes": 17043456,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 73346,
+              "user_usec": 53522,
+              "system_usec": 19823,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 51202,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 514.2347090000003,
+          "runtimeMs": 8,
+          "comparatorMs": 1.997457999998005,
+          "resources": {
+            "memoryPeakBytes": 17121280,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 76828,
+              "user_usec": 57365,
+              "system_usec": 19463,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 51075,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 559.4904590000006,
+          "runtimeMs": 3,
+          "comparatorMs": 0.6494590000002063,
+          "resources": {
+            "memoryPeakBytes": 17207296,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 72457,
+              "user_usec": 53825,
+              "system_usec": 18631,
+              "nr_periods": 1,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 553.229209000001,
+          "runtimeMs": 3,
+          "comparatorMs": 1.0014999999984866,
+          "resources": {
+            "memoryPeakBytes": 17137664,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 68135,
+              "user_usec": 54714,
+              "system_usec": 13420,
+              "nr_periods": 1,
+              "nr_throttled": 0,
+              "throttled_usec": 0,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 487.92974999999933,
+          "runtimeMs": 3,
+          "comparatorMs": 0.8130830000009155,
+          "resources": {
+            "memoryPeakBytes": 16998400,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 75534,
+              "user_usec": 57644,
+              "system_usec": 17889,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 28652,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 538.3030839999992,
+          "runtimeMs": 4,
+          "comparatorMs": 0.8452919999981532,
+          "resources": {
+            "memoryPeakBytes": 17018880,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 82444,
+              "user_usec": 56998,
+              "system_usec": 25445,
+              "nr_periods": 1,
+              "nr_throttled": 1,
+              "throttled_usec": 34368,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 493.4667499999996,
+          "runtimeMs": 3,
+          "comparatorMs": 0.5496669999993173,
+          "resources": {
+            "memoryPeakBytes": 17088512,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 74965,
+              "user_usec": 52678,
+              "system_usec": 22286,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 38069,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 732.604292,
+          "runtimeMs": 4,
+          "comparatorMs": 1.4682500000017171,
+          "resources": {
+            "memoryPeakBytes": 17133568,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 82947,
+              "user_usec": 59394,
+              "system_usec": 23552,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 26025,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 702.2272919999996,
+          "runtimeMs": 4,
+          "comparatorMs": 4.826541999998881,
+          "resources": {
+            "memoryPeakBytes": 17035264,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 107780,
+              "user_usec": 80093,
+              "system_usec": 27686,
+              "nr_periods": 2,
+              "nr_throttled": 2,
+              "throttled_usec": 51442,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        },
+        {
+          "correct": true,
+          "outcome": "PASSED",
+          "engineMs": 610.078042000001,
+          "runtimeMs": 34,
+          "comparatorMs": 1.378207999998267,
+          "resources": {
+            "memoryPeakBytes": 16998400,
+            "memoryMaxBytes": 402653184,
+            "memoryEvents": {
+              "low": 0,
+              "high": 0,
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0,
+              "oom_group_kill": 0
+            },
+            "cpu": {
+              "usage_usec": 76687,
+              "user_usec": 54488,
+              "system_usec": 22199,
+              "nr_periods": 2,
+              "nr_throttled": 1,
+              "throttled_usec": 31097,
+              "nr_bursts": 0,
+              "burst_usec": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "failures": 0,
+  "cleanupConfirmed": true,
+  "controllerSourceFiles": {
+    "native-pool.mjs": "1287d638afef5c94b2ec5b6a5018a0060a9a8a5af50aec60fb8cbf8fdc485858",
+    "docker-driver.mjs": "ee7df483672a789eed2e5a3477c0d23117a71b8a780bb74affb36f637d747709",
+    "controller.mjs": "d243e338d48cf59ca9bacb90930cc26a1e2816796fcd244a73a11bf9bee60a4b",
+    "budget.mjs": "258f437bafb7b36f902eb693d572cbe85544751ec8e45c8bdbdba37102e19ad4",
+    "seccomp.json": "f51c3029fa73f29a5b9ce46908c0502d5d3a96ce02678454b2f26f3d7af8c7ac"
+  },
+  "resourceAccounting": "Guest/controller container ceilings only. Docker daemon/VM and outer harness overhead are outside these cgroups; full system-budget acceptance is not established.",
+  "poolWarmupMs": 509.01733399999995,
+  "comparatorWarmupMs": 3490.755669,
+  "comparatorVersion": "pyodide-0.27.5",
+  "queueCommitGate": {
+    "assessed": false,
+    "reason": "Current grading snapshots require the Pyodide runtime identity; native queue/commit acceptance needs a separate runtime-contract design. No identity was relabeled."
+  },
+  "poolFinal": {
+    "allocated": 0,
+    "active": 0,
+    "ready": 0,
+    "preparing": 0,
+    "draining": 0,
+    "quarantined": 0,
+    "waiting": 0,
+    "closed": true,
+    "healthy": false
+  },
+  "stageObservations": [
+    {
+      "stage": "prepare",
+      "ms": 478.352334
+    },
+    {
+      "stage": "prepare",
+      "ms": 494.10149999999993
+    },
+    {
+      "stage": "prepare",
+      "ms": 508.74033299999996
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.050208999999995285
+    },
+    {
+      "stage": "execute",
+      "ms": 11.026000000000067
+    },
+    {
+      "stage": "cleanup",
+      "ms": 77.89858300000003
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.007916999999906693
+    },
+    {
+      "stage": "execute",
+      "ms": 14.565000000000055
+    },
+    {
+      "stage": "cleanup",
+      "ms": 182.92570899999998
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.03300000000001546
+    },
+    {
+      "stage": "execute",
+      "ms": 25.931999999999903
+    },
+    {
+      "stage": "cleanup",
+      "ms": 97.98395900000003
+    },
+    {
+      "stage": "prepare",
+      "ms": 600.3900000000001
+    },
+    {
+      "stage": "acquire",
+      "ms": 278.75533299999995
+    },
+    {
+      "stage": "execute",
+      "ms": 15.49129199999993
+    },
+    {
+      "stage": "cleanup",
+      "ms": 104.44570799999997
+    },
+    {
+      "stage": "prepare",
+      "ms": 414.3952919999999
+    },
+    {
+      "stage": "acquire",
+      "ms": 294.53779199999985
+    },
+    {
+      "stage": "execute",
+      "ms": 47.346416999999974
+    },
+    {
+      "stage": "cleanup",
+      "ms": 61.923
+    },
+    {
+      "stage": "prepare",
+      "ms": 272.4246250000001
+    },
+    {
+      "stage": "acquire",
+      "ms": 163.61920899999996
+    },
+    {
+      "stage": "execute",
+      "ms": 6.194292000000132
+    },
+    {
+      "stage": "cleanup",
+      "ms": 82.41208300000017
+    },
+    {
+      "stage": "prepare",
+      "ms": 293.4817919999998
+    },
+    {
+      "stage": "acquire",
+      "ms": 205.06674999999996
+    },
+    {
+      "stage": "execute",
+      "ms": 12.655999999999949
+    },
+    {
+      "stage": "cleanup",
+      "ms": 86.19095800000014
+    },
+    {
+      "stage": "prepare",
+      "ms": 260.8199589999999
+    },
+    {
+      "stage": "acquire",
+      "ms": 162.02350000000024
+    },
+    {
+      "stage": "execute",
+      "ms": 40.92374999999993
+    },
+    {
+      "stage": "cleanup",
+      "ms": 65.02050000000008
+    },
+    {
+      "stage": "prepare",
+      "ms": 421.83925
+    },
+    {
+      "stage": "acquire",
+      "ms": 315.9776670000001
+    },
+    {
+      "stage": "execute",
+      "ms": 12.00470899999982
+    },
+    {
+      "stage": "cleanup",
+      "ms": 98.771792
+    },
+    {
+      "stage": "prepare",
+      "ms": 296.1415000000002
+    },
+    {
+      "stage": "acquire",
+      "ms": 185.41604099999995
+    },
+    {
+      "stage": "execute",
+      "ms": 5.100750000000062
+    },
+    {
+      "stage": "cleanup",
+      "ms": 79.26170899999988
+    },
+    {
+      "stage": "prepare",
+      "ms": 320.0414999999998
+    },
+    {
+      "stage": "acquire",
+      "ms": 235.79100000000017
+    },
+    {
+      "stage": "execute",
+      "ms": 4.911916999999903
+    },
+    {
+      "stage": "cleanup",
+      "ms": 81.96716699999979
+    },
+    {
+      "stage": "prepare",
+      "ms": 323.104292
+    },
+    {
+      "stage": "acquire",
+      "ms": 236.603834
+    },
+    {
+      "stage": "execute",
+      "ms": 4.424332999999933
+    },
+    {
+      "stage": "cleanup",
+      "ms": 66.8111670000003
+    },
+    {
+      "stage": "prepare",
+      "ms": 294.9402500000001
+    },
+    {
+      "stage": "acquire",
+      "ms": 223.76658299999963
+    },
+    {
+      "stage": "execute",
+      "ms": 10.049875000000611
+    },
+    {
+      "stage": "cleanup",
+      "ms": 88.23637500000041
+    },
+    {
+      "stage": "prepare",
+      "ms": 304.27045799999996
+    },
+    {
+      "stage": "acquire",
+      "ms": 206.16699999999946
+    },
+    {
+      "stage": "execute",
+      "ms": 4.514957999999751
+    },
+    {
+      "stage": "cleanup",
+      "ms": 66.01199999999972
+    },
+    {
+      "stage": "prepare",
+      "ms": 276.0387090000004
+    },
+    {
+      "stage": "acquire",
+      "ms": 205.55241699999988
+    },
+    {
+      "stage": "execute",
+      "ms": 8.15191600000071
+    },
+    {
+      "stage": "cleanup",
+      "ms": 56.12837500000023
+    },
+    {
+      "stage": "prepare",
+      "ms": 268.86225000000013
+    },
+    {
+      "stage": "acquire",
+      "ms": 205.33916599999975
+    },
+    {
+      "stage": "execute",
+      "ms": 9.361375000000407
+    },
+    {
+      "stage": "cleanup",
+      "ms": 77.62845800000014
+    },
+    {
+      "stage": "prepare",
+      "ms": 242.3798340000003
+    },
+    {
+      "stage": "acquire",
+      "ms": 155.72170900000037
+    },
+    {
+      "stage": "execute",
+      "ms": 10.442000000000007
+    },
+    {
+      "stage": "cleanup",
+      "ms": 41.99420800000007
+    },
+    {
+      "stage": "prepare",
+      "ms": 244.48850000000039
+    },
+    {
+      "stage": "acquire",
+      "ms": 190.71379200000047
+    },
+    {
+      "stage": "execute",
+      "ms": 6.292958999999428
+    },
+    {
+      "stage": "cleanup",
+      "ms": 51.35149999999976
+    },
+    {
+      "stage": "prepare",
+      "ms": 207.92625000000044
+    },
+    {
+      "stage": "acquire",
+      "ms": 150.27191700000003
+    },
+    {
+      "stage": "execute",
+      "ms": 171.7589169999992
+    },
+    {
+      "stage": "cleanup",
+      "ms": 50.60925000000043
+    },
+    {
+      "stage": "prepare",
+      "ms": 322.1895420000001
+    },
+    {
+      "stage": "acquire",
+      "ms": 99.81841700000041
+    },
+    {
+      "stage": "prepare",
+      "ms": 348.17070799999965
+    },
+    {
+      "stage": "execute",
+      "ms": 402.1894999999995
+    },
+    {
+      "stage": "cleanup",
+      "ms": 62.5950840000005
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.014667000000372354
+    },
+    {
+      "stage": "prepare",
+      "ms": 248.57408399999986
+    },
+    {
+      "stage": "execute",
+      "ms": 233.8104999999996
+    },
+    {
+      "stage": "cleanup",
+      "ms": 101.91183399999954
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.011582999999518506
+    },
+    {
+      "stage": "execute",
+      "ms": 19.192834000000403
+    },
+    {
+      "stage": "prepare",
+      "ms": 259.0225419999997
+    },
+    {
+      "stage": "cleanup",
+      "ms": 67.82616700000017
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.011499999999614374
+    },
+    {
+      "stage": "execute",
+      "ms": 29.35674999999992
+    },
+    {
+      "stage": "cleanup",
+      "ms": 43.359417000000576
+    },
+    {
+      "stage": "prepare",
+      "ms": 248.1110830000007
+    },
+    {
+      "stage": "acquire",
+      "ms": 143.22587600000043
+    },
+    {
+      "stage": "execute",
+      "ms": 13.577457999999751
+    },
+    {
+      "stage": "cleanup",
+      "ms": 55.469333999999435
+    },
+    {
+      "stage": "prepare",
+      "ms": 215.49983299999985
+    },
+    {
+      "stage": "acquire",
+      "ms": 146.4244580000004
+    },
+    {
+      "stage": "execute",
+      "ms": 26.497666999999637
+    },
+    {
+      "stage": "cleanup",
+      "ms": 72.8808339999996
+    },
+    {
+      "stage": "prepare",
+      "ms": 282.134
+    },
+    {
+      "stage": "prepare",
+      "ms": 397.74362500000007
+    },
+    {
+      "stage": "prepare",
+      "ms": 492.3007089999992
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.021917000000030384
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.05512500000077125
+    },
+    {
+      "stage": "execute",
+      "ms": 25.081458000000566
+    },
+    {
+      "stage": "execute",
+      "ms": 31.959500000000844
+    },
+    {
+      "stage": "cleanup",
+      "ms": 112.8266249999997
+    },
+    {
+      "stage": "cleanup",
+      "ms": 110.35641699999906
+    },
+    {
+      "stage": "acquire",
+      "ms": 0.0057500000002619345
+    },
+    {
+      "stage": "execute",
+      "ms": 33.83570800000052
+    },
+    {
+      "stage": "cleanup",
+      "ms": 59.123874999999316
+    },
+    {
+      "stage": "prepare",
+      "ms": 364.75262499999917
+    },
+    {
+      "stage": "acquire",
+      "ms": 358.4560419999998
+    },
+    {
+      "stage": "execute",
+      "ms": 5.198709000000235
+    },
+    {
+      "stage": "cleanup",
+      "ms": 75.44095800000105
+    },
+    {
+      "stage": "prepare",
+      "ms": 242.1349999999984
+    },
+    {
+      "stage": "acquire",
+      "ms": 506.0159999999996
+    },
+    {
+      "stage": "execute",
+      "ms": 4.7583749999994325
+    },
+    {
+      "stage": "cleanup",
+      "ms": 49.00237500000003
+    },
+    {
+      "stage": "prepare",
+      "ms": 266.5200410000016
+    },
+    {
+      "stage": "acquire",
+      "ms": 427.4957919999997
+    },
+    {
+      "stage": "execute",
+      "ms": 5.278583000001163
+    },
+    {
+      "stage": "cleanup",
+      "ms": 51.08074999999917
+    },
+    {
+      "stage": "prepare",
+      "ms": 235.22975000000042
+    },
+    {
+      "stage": "acquire",
+      "ms": 447.099126000001
+    },
+    {
+      "stage": "execute",
+      "ms": 4.187667000000147
+    },
+    {
+      "stage": "cleanup",
+      "ms": 69.40100000000166
+    },
+    {
+      "stage": "prepare",
+      "ms": 270.95316699999967
+    },
+    {
+      "stage": "acquire",
+      "ms": 449.3585839999996
+    },
+    {
+      "stage": "execute",
+      "ms": 5.134249999999156
+    },
+    {
+      "stage": "cleanup",
+      "ms": 68.47095900000022
+    },
+    {
+      "stage": "prepare",
+      "ms": 284.2108339999995
+    },
+    {
+      "stage": "acquire",
+      "ms": 480.9992089999996
+    },
+    {
+      "stage": "execute",
+      "ms": 7.037583000001177
+    },
+    {
+      "stage": "cleanup",
+      "ms": 65.13129200000003
+    },
+    {
+      "stage": "prepare",
+      "ms": 241.56124999999884
+    },
+    {
+      "stage": "acquire",
+      "ms": 451.52529199999844
+    },
+    {
+      "stage": "execute",
+      "ms": 4.7473750000008295
+    },
+    {
+      "stage": "cleanup",
+      "ms": 78.0192500000012
+    },
+    {
+      "stage": "prepare",
+      "ms": 285.5568750000002
+    },
+    {
+      "stage": "acquire",
+      "ms": 454.0811250000006
+    },
+    {
+      "stage": "execute",
+      "ms": 4.715416999999434
+    },
+    {
+      "stage": "cleanup",
+      "ms": 87.61020800000006
+    },
+    {
+      "stage": "prepare",
+      "ms": 265.15241699999933
+    },
+    {
+      "stage": "acquire",
+      "ms": 467.2883750000001
+    },
+    {
+      "stage": "execute",
+      "ms": 4.909541999999419
+    },
+    {
+      "stage": "cleanup",
+      "ms": 79.90158299999894
+    },
+    {
+      "stage": "prepare",
+      "ms": 270.9142499999998
+    },
+    {
+      "stage": "acquire",
+      "ms": 443.0049169999984
+    },
+    {
+      "stage": "execute",
+      "ms": 4.8353750000005675
+    },
+    {
+      "stage": "cleanup",
+      "ms": 74.95695899999919
+    },
+    {
+      "stage": "prepare",
+      "ms": 294.82729199999994
+    },
+    {
+      "stage": "acquire",
+      "ms": 480.3600829999996
+    },
+    {
+      "stage": "execute",
+      "ms": 7.471583999998984
+    },
+    {
+      "stage": "cleanup",
+      "ms": 72.74408299999959
+    },
+    {
+      "stage": "prepare",
+      "ms": 223.76358400000026
+    },
+    {
+      "stage": "acquire",
+      "ms": 438.09029199999895
+    },
+    {
+      "stage": "execute",
+      "ms": 4.084624999999505
+    },
+    {
+      "stage": "cleanup",
+      "ms": 65.18899999999849
+    },
+    {
+      "stage": "prepare",
+      "ms": 231.20974999999999
+    },
+    {
+      "stage": "acquire",
+      "ms": 374.0385409999999
+    },
+    {
+      "stage": "execute",
+      "ms": 36.70766700000058
+    },
+    {
+      "stage": "cleanup",
+      "ms": 61.15008400000079
+    },
+    {
+      "stage": "prepare",
+      "ms": 272.6475420000006
+    },
+    {
+      "stage": "acquire",
+      "ms": 434.09341700000004
+    },
+    {
+      "stage": "execute",
+      "ms": 8.676665999999386
+    },
+    {
+      "stage": "cleanup",
+      "ms": 80.75629200000003
+    },
+    {
+      "stage": "prepare",
+      "ms": 285.830582999999
+    },
+    {
+      "stage": "acquire",
+      "ms": 460.3364590000001
+    },
+    {
+      "stage": "execute",
+      "ms": 4.097041999999419
+    },
+    {
+      "stage": "cleanup",
+      "ms": 51.56595799999923
+    },
+    {
+      "stage": "prepare",
+      "ms": 270.4264999999996
+    },
+    {
+      "stage": "acquire",
+      "ms": 465.43470799999886
+    },
+    {
+      "stage": "execute",
+      "ms": 4.738750000000437
+    },
+    {
+      "stage": "cleanup",
+      "ms": 75.66849999999977
+    },
+    {
+      "stage": "prepare",
+      "ms": 283.41762500000004
+    },
+    {
+      "stage": "acquire",
+      "ms": 497.7492920000004
+    },
+    {
+      "stage": "execute",
+      "ms": 4.775792000000365
+    },
+    {
+      "stage": "cleanup",
+      "ms": 73.71958300000006
+    },
+    {
+      "stage": "prepare",
+      "ms": 340.9280829999989
+    },
+    {
+      "stage": "acquire",
+      "ms": 259.30670800000007
+    },
+    {
+      "stage": "execute",
+      "ms": 7.628875000000335
+    },
+    {
+      "stage": "cleanup",
+      "ms": 124.63304100000096
+    },
+    {
+      "stage": "prepare",
+      "ms": 354.1217080000006
+    },
+    {
+      "stage": "acquire",
+      "ms": 613.435125
+    },
+    {
+      "stage": "execute",
+      "ms": 4.505625000001601
+    },
+    {
+      "stage": "cleanup",
+      "ms": 76.96704200000022
+    },
+    {
+      "stage": "prepare",
+      "ms": 242.70737500000178
+    },
+    {
+      "stage": "acquire",
+      "ms": 463.66975099999945
+    },
+    {
+      "stage": "execute",
+      "ms": 37.34608300000036
+    },
+    {
+      "stage": "cleanup",
+      "ms": 56.02404099999694
+    },
+    {
+      "stage": "prepare",
+      "ms": 264.79733300000225
+    },
+    {
+      "stage": "acquire",
+      "ms": 425.0766670000012
+    },
+    {
+      "stage": "execute",
+      "ms": 14.724624999998923
+    },
+    {
+      "stage": "cleanup",
+      "ms": 74.38262499999837
+    },
+    {
+      "stage": "prepare",
+      "ms": 339.56295899999895
+    },
+    {
+      "stage": "acquire",
+      "ms": 510.44270900000265
+    },
+    {
+      "stage": "execute",
+      "ms": 4.845250000002125
+    },
+    {
+      "stage": "cleanup",
+      "ms": 70.51616700000159
+    },
+    {
+      "stage": "prepare",
+      "ms": 225.33299999999872
+    },
+    {
+      "stage": "acquire",
+      "ms": 473.981667
+    },
+    {
+      "stage": "execute",
+      "ms": 4.315041999998357
+    },
+    {
+      "stage": "cleanup",
+      "ms": 81.15966599999956
+    },
+    {
+      "stage": "prepare",
+      "ms": 291.5209590000013
+    },
+    {
+      "stage": "acquire",
+      "ms": 440.83166699999856
+    },
+    {
+      "stage": "execute",
+      "ms": 4.990084000000934
+    },
+    {
+      "stage": "cleanup",
+      "ms": 81.69204199999876
+    },
+    {
+      "stage": "prepare",
+      "ms": 245.97541700000147
+    },
+    {
+      "stage": "acquire",
+      "ms": 451.50737500000105
+    },
+    {
+      "stage": "execute",
+      "ms": 4.410082999998849
+    },
+    {
+      "stage": "cleanup",
+      "ms": 97.25204200000007
+    },
+    {
+      "stage": "prepare",
+      "ms": 254.3539579999997
+    },
+    {
+      "stage": "acquire",
+      "ms": 411.2384579999998
+    },
+    {
+      "stage": "execute",
+      "ms": 4.616915999999037
+    },
+    {
+      "stage": "cleanup",
+      "ms": 47.429041999999754
+    },
+    {
+      "stage": "prepare",
+      "ms": 282.1024580000012
+    },
+    {
+      "stage": "acquire",
+      "ms": 433.97199999999793
+    },
+    {
+      "stage": "execute",
+      "ms": 4.678917000001093
+    },
+    {
+      "stage": "cleanup",
+      "ms": 49.227499999997235
+    },
+    {
+      "stage": "prepare",
+      "ms": 259.2760420000013
+    },
+    {
+      "stage": "acquire",
+      "ms": 488.7459170000002
+    },
+    {
+      "stage": "execute",
+      "ms": 5.627083999999741
+    },
+    {
+      "stage": "cleanup",
+      "ms": 56.05312500000218
+    },
+    {
+      "stage": "prepare",
+      "ms": 258.1590840000026
+    },
+    {
+      "stage": "acquire",
+      "ms": 462.914084
+    },
+    {
+      "stage": "execute",
+      "ms": 7.015666999999667
+    },
+    {
+      "stage": "cleanup",
+      "ms": 68.34262500000114
+    },
+    {
+      "stage": "prepare",
+      "ms": 232.15474999999788
+    },
+    {
+      "stage": "acquire",
+      "ms": 428.0351669999982
+    },
+    {
+      "stage": "execute",
+      "ms": 4.477083000001585
+    },
+    {
+      "stage": "cleanup",
+      "ms": 66.53825000000143
+    },
+    {
+      "stage": "prepare",
+      "ms": 263.0140829999982
+    },
+    {
+      "stage": "acquire",
+      "ms": 419.5221249999995
+    },
+    {
+      "stage": "execute",
+      "ms": 4.441666999999143
+    },
+    {
+      "stage": "cleanup",
+      "ms": 69.48175000000265
+    },
+    {
+      "stage": "prepare",
+      "ms": 328.0530839999992
+    },
+    {
+      "stage": "acquire",
+      "ms": 519.5310839999984
+    },
+    {
+      "stage": "execute",
+      "ms": 15.171458000000712
+    },
+    {
+      "stage": "cleanup",
+      "ms": 151.83191699999952
+    },
+    {
+      "stage": "prepare",
+      "ms": 384.6231669999979
+    },
+    {
+      "stage": "acquire",
+      "ms": 639.0134580000013
+    },
+    {
+      "stage": "execute",
+      "ms": 5.779083999997965
+    },
+    {
+      "stage": "cleanup",
+      "ms": 87.77004099999976
+    },
+    {
+      "stage": "prepare",
+      "ms": 333.2962499999994
+    },
+    {
+      "stage": "acquire",
+      "ms": 547.846501
+    },
+    {
+      "stage": "execute",
+      "ms": 7.8880410000019765
+    },
+    {
+      "stage": "cleanup",
+      "ms": 73.8861250000009
+    },
+    {
+      "stage": "prepare",
+      "ms": 330.5107089999983
+    },
+    {
+      "stage": "acquire",
+      "ms": 568.9482510000016
+    },
+    {
+      "stage": "execute",
+      "ms": 6.246041999998852
+    },
+    {
+      "stage": "cleanup",
+      "ms": 126.97833300000275
+    },
+    {
+      "stage": "prepare",
+      "ms": 338.6072090000016
+    },
+    {
+      "stage": "acquire",
+      "ms": 586.9872499999983
+    },
+    {
+      "stage": "execute",
+      "ms": 6.267584000001079
+    },
+    {
+      "stage": "cleanup",
+      "ms": 79.93245899999965
+    },
+    {
+      "stage": "prepare",
+      "ms": 281.8393329999999
+    },
+    {
+      "stage": "acquire",
+      "ms": 482.67083300000013
+    },
+    {
+      "stage": "execute",
+      "ms": 37.543916999999055
+    },
+    {
+      "stage": "cleanup",
+      "ms": 89.69316700000127
+    },
+    {
+      "stage": "prepare",
+      "ms": 302.3771250000027
+    },
+    {
+      "stage": "cleanup",
+      "ms": 135.63195800000176
+    }
+  ],
+  "controllerResources": {
+    "memoryPeak": "203354112",
+    "events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu": "usage_usec 8697515\nuser_usec 5346003\nsystem_usec 3351511\nnr_periods 218\nnr_throttled 57\nthrottled_usec 7959595\nnr_bursts 0\nburst_usec 0",
+    "quota": "75000 100000"
+  },
+  "hostBoundary": "local Linux Docker fixture; not production VPS performance",
+  "context": "desktop-linux",
+  "commit": "64160384890c434bbb439c7c0cae38d9c4da02b6",
+  "dirty": true,
+  "sourceFiles": {
+    "supervisor.py": "e7680a752c8dbc382118ec1240b49d5eaa638564c2e83778a47403e263406037",
+    "learner.py": "44e4a9b3e49ed818955571ad90d06679d425decce02749d1f6af79a5b1957bc6",
+    "native-pool.mjs": "1287d638afef5c94b2ec5b6a5018a0060a9a8a5af50aec60fb8cbf8fdc485858",
+    "docker-driver.mjs": "ee7df483672a789eed2e5a3477c0d23117a71b8a780bb74affb36f637d747709",
+    "controller.mjs": "d243e338d48cf59ca9bacb90930cc26a1e2816796fcd244a73a11bf9bee60a4b",
+    "seccomp.json": "f51c3029fa73f29a5b9ce46908c0502d5d3a96ce02678454b2f26f3d7af8c7ac",
+    "budget.mjs": "258f437bafb7b36f902eb693d572cbe85544751ec8e45c8bdbdba37102e19ad4"
+  },
+  "image": "sha256:4d3668cc872e8026e752418563793e670a33f73efa3caf06cdd67ffcd3e20595",
+  "controllerImage": "sha256:013fb961cd573bacf6d5c93e6d09dedbdb92a3e0ae3548f9cfa567cbb0d9be3c",
+  "imageArchitecture": "arm64",
+  "requestedRuns": 4,
+  "cases": 10,
+  "parallel": 2,
+  "capacity": 2,
+  "completedRuns": 4,
+  "diagnosticEngineP50Ms": 4799.75592,
+  "diagnosticEngineP95Ms": 5886.504421,
+  "interrupted": false,
+  "sourceMatches": true,
+  "controllerTermination": {
+    "oomKilled": false,
+    "exitCode": 0
+  },
+  "outerCleanupConfirmed": true
+}

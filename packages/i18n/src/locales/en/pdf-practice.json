@@ -5,7 +5,7 @@
   "theory": "PDF material",
   "code": "Coding practice",
   "description": "Read the PDF beside your code. Uses the existing Run, Submit and grading settings.",
-  "same_lecture": "Choose a supplementary PDF from this lecture. Main PDFs must be changed to Main and supplementary first.",
+  "same_course": "Choose a supplementary PDF from this course. Main PDFs must be changed to Main and supplementary first.",
   "hidden": "Hidden — publish before making the practice available",
   "add": "Add PDF material",
   "retained": "The PDF is saved in this lecture even if you cancel this exercise.",

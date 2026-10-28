@@ -17,7 +17,7 @@ vi.mock('@/components/video/video-author-dialog', () => ({ VideoAuthorDialog: ()
 vi.mock('@/components/pdf/pdf-author-dialog', () => ({ PdfAuthorDialog: ({ initialPreview, editable, onClose }: { initialPreview: boolean; editable: boolean; onClose: () => void }) => <section data-pdf-mode={initialPreview ? 'preview' : 'edit'} data-editable={String(editable)}><button onClick={onClose}>{'close PDF'}</button></section> }));
 vi.mock('./builder-dnd', () => ({ DragHandle: () => null, DropIndicator: () => null, useOutlineRowDnd: (config: unknown) => { dragConfigs(config); return { setNodeRef: () => undefined, handle: {}, isDragging: false }; } }));
 vi.mock('./builder-controls', () => ({ RowVisibility: () => null }));
-vi.mock('./row-menu', () => ({ RowMenu: ({ label, renameLabel, onRename, onMove }: { label: string; renameLabel?: string; onRename: () => void; onMove?: () => void }) => <><button onClick={onRename}>{renameLabel ?? 'rename'}</button>{onMove ? <button data-move-for={label} onClick={onMove}>move {label}</button> : null}</> }));
+vi.mock('./row-menu', () => ({ RowMenu: ({ label, renameLabel, onRename, onMove }: { label: string; renameLabel?: string; onRename: () => void; onMove?: () => void }) => <><button onClick={onRename}>{renameLabel ?? 'rename'}</button>{onMove ? <button data-move-for={label} onClick={onMove}>{'move '}{label}</button> : null}</> }));
 vi.mock('./delete-modal', () => ({ DeleteModal: () => null }));
 vi.mock('./new-material-dialog', () => ({ NewMaterialDialog: () => null }));
 vi.mock('../../../_components/visibility-confirm-modal', () => ({ VisibilityConfirmModal: () => null }));

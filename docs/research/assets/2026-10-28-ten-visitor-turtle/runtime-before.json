@@ -1,0 +1,24 @@
+{
+  "browserEnabled": "true",
+  "browserAdmission": "true",
+  "runtimeId": "brython-3.15.0-2ab1760c5c7107d57457",
+  "runtimeOrigin": "https://turtle-runtime.coveedu.com",
+  "hasPilotAllowlist": true,
+  "draining": false,
+  "broker": {
+    "ready": true,
+    "pool": "trial",
+    "capacity": 1,
+    "active": 0,
+    "standby": {
+      "enabled": false,
+      "allocated": 0,
+      "ready": 0,
+      "building": 0,
+      "draining": 0,
+      "uncertain": 0,
+      "degraded": false,
+      "healthy": true
+    }
+  }
+}

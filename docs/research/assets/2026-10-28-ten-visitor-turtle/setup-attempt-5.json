@@ -1,0 +1,78 @@
+{
+  "visitorsRequested": 10,
+  "holdRequestedMs": 30000,
+  "target": "https://cs.coveedu.com/turtle",
+  "frame": "https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html",
+  "method": "Ten isolated headless Chromium contexts on one Mac; real public page, PIN, BFF, API and production runtime. Visitors prepare sequentially; Run clicks dispatch together. This is not ten physical student devices or a cold-download burst.",
+  "startedAt": "2026-10-28T07:16:20.661Z",
+  "setup": [
+    {
+      "visitor": 1,
+      "readyMs": 3284.045416,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 2,
+      "readyMs": 3767.501874999999,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 3,
+      "readyMs": 3052.199417,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 4,
+      "readyMs": 3071.5682500000003,
+      "visibility": "visible"
+    }
+  ],
+  "runs": [],
+  "cleanup": [
+    {
+      "visitor": 4,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 2,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 1,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 3,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 5,
+      "accessRevoked": true
+    }
+  ],
+  "failures": [
+    "expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('iframe[title=\"Drawing\"]')\nExpected: \"https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html\"\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"to.have.attribute.value\" with timeout 20000ms\n  - waiting for locator('iframe[title=\"Drawing\"]"
+  ],
+  "browserVersion": "151.0.7922.34",
+  "success": false,
+  "failedWorkspaces": [
+    {
+      "visitor": 1,
+      "visibleCode": "1\nfrom custom import *; speed(1); color(\"blue\"); [(TForward(160), TLeft(90)) for i in range(200)]"
+    },
+    {
+      "visitor": 2,
+      "visibleCode": "1\nfrom custom import *; speed(1); color(\"blue\"); [(TForward(160), TLeft(90)) for i in range(200)]"
+    },
+    {
+      "visitor": 3,
+      "visibleCode": "1\nfrom custom import *; speed(1); color(\"blue\"); [(TForward(160), TLeft(90)) for i in range(200)]"
+    },
+    {
+      "visitor": 4,
+      "visibleCode": "1\nfrom custom import *; speed(1); color(\"blue\"); [(TForward(160), TLeft(90)) for i in range(200)]"
+    }
+  ],
+  "finishedAt": "2026-10-28T07:16:56.923Z",
+  "cleanupComplete": true
+}

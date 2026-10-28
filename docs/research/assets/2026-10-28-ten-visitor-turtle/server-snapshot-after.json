@@ -1,0 +1,25 @@
+{
+  "scope": "Single mid-phase container sample; not a measured CPU peak or capacity ceiling",
+  "services": [
+    {
+      "Name": "cove-production-studio-1",
+      "CPUPerc": "0.27%",
+      "MemUsage": "120.9MiB / 1.5GiB"
+    },
+    {
+      "Name": "cove-production-api-1",
+      "CPUPerc": "0.32%",
+      "MemUsage": "241MiB / 1.5GiB"
+    },
+    {
+      "Name": "cove-production-caddy-1",
+      "CPUPerc": "0.00%",
+      "MemUsage": "44.79MiB / 256MiB"
+    },
+    {
+      "Name": "cove-production-redis-1",
+      "CPUPerc": "1.02%",
+      "MemUsage": "26.3MiB / 768MiB"
+    }
+  ]
+}

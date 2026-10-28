@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-28",
+  "target": "https://cs.coveedu.com/turtle",
+  "simultaneousPreparedVisitors": 10,
+  "verifiedOverlapSeconds": 31.577,
+  "successfulLeaseRenewalsPerVisitor": 2,
+  "independentGrantCookies": 10,
+  "independentRunIds": 10,
+  "reportedFirstStrokeMs": {
+    "min": 323.8999999985099,
+    "median": 651.320000000298,
+    "max": 835.5949999988079,
+    "samples": [
+      801.0850000008941,
+      616.625,
+      802.339999999851,
+      833.6849999986589,
+      611.480000000447,
+      323.8999999985099,
+      493.6000000014901,
+      835.5949999988079,
+      686.015000000596,
+      607.855000000447
+    ]
+  },
+  "reportedAdmissionMs": {
+    "min": 251.9049999974668,
+    "median": 460.8525000009686,
+    "max": 539.625
+  },
+  "nativeGuestsBeforeDuringAfter": [
+    0,
+    0,
+    0
+  ],
+  "allTenAccessGrantsRevoked": true,
+  "client": {
+    "cpu": "Apple M2",
+    "ramBytes": 8589934592,
+    "os": "macOS 26.6.2",
+    "browser": "151.0.7922.34",
+    "contexts": "Ten isolated headless Chromium contexts on one computer",
+    "swapBeforeEarlierSetup": "vm.swapusage: total = 7168.00M  used = 6170.94M  free = 997.06M  (encrypted)",
+    "swapAfterAudit": "vm.swapusage: total = 9216.00M  used = 7720.94M  free = 1495.06M  (encrypted)"
+  },
+  "qualification": "Prepared-session Run concurrency passed. Every successful cohort visitor reloaded after authorization. Two earlier fresh-entry attempts lost the drawing frame before Run; root cause not established. This is not a clean first-entry acceptance pass or ten physical student devices.",
+  "priorSetupAttempts": [
+    {
+      "attempt": 1,
+      "readyVisitors": 0,
+      "createdContexts": 1,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "locator.fill: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Classroom code', { exact: true })\u001b[22m\n"
+      ]
+    },
+    {
+      "attempt": 2,
+      "readyVisitors": 0,
+      "createdContexts": 1,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "locator.waitFor: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('section[aria-label=\"Python code\"]').getByText('speed(1)', { exact: true }) to be visible\u001b[22m\n"
+      ]
+    },
+    {
+      "attempt": 3,
+      "readyVisitors": 1,
+      "createdContexts": 2,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "locator.waitFor: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('section[aria-label=\"Python code\"]').getByText('speed(1)', { exact: true }) to be visible\u001b[22m\n"
+      ]
+    },
+    {
+      "attempt": 4,
+      "readyVisitors": 1,
+      "createdContexts": 2,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "locator.waitFor: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('textbox', { name: /Editor content/ }) to be visible\u001b[22m\n\u001b[2m    38 \u00d7 locator resolved to hidden <div tabindex=\"0\" role=\"textbox\" autocorrect=\"off\" autocomplete=\"off\" spellcheck=\"false\" autocapitalize=\"off\" aria-required=\"false\" aria-multiline=\"true\" aria-autocomple"
+      ]
+    },
+    {
+      "attempt": 5,
+      "readyVisitors": 4,
+      "createdContexts": 5,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('iframe[title=\"Drawing\"]')\nExpected: \"https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html\"\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"to.have.attribute.value\" with timeout 20000ms\n  - waiting for locator('iframe[title=\"Drawing\"]"
+      ]
+    },
+    {
+      "attempt": 6,
+      "readyVisitors": 5,
+      "createdContexts": 6,
+      "concurrentRunsStarted": 0,
+      "cleanupComplete": true,
+      "failures": [
+        "expect(locator).toHaveAttribute(expected) failed\n\nLocator: locator('iframe[title=\"Drawing\"]')\nExpected: \"https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html\"\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"to.have.attribute.value\" with timeout 20000ms\n  - waiting for locator('iframe[title=\"Drawing\"]"
+      ]
+    }
+  ]
+}

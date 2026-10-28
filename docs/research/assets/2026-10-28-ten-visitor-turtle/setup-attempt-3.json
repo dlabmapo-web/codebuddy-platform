@@ -1,0 +1,43 @@
+{
+  "visitorsRequested": 10,
+  "holdRequestedMs": 30000,
+  "target": "https://cs.coveedu.com/turtle",
+  "frame": "https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html",
+  "method": "Ten isolated headless Chromium contexts on one Mac; real public page, PIN, BFF, API and production runtime. Visitors prepare sequentially; Run clicks dispatch together. This is not ten physical student devices or a cold-download burst.",
+  "startedAt": "2026-10-28T07:11:46.418Z",
+  "setup": [
+    {
+      "visitor": 1,
+      "readyMs": 3272.769167,
+      "visibility": "visible"
+    }
+  ],
+  "runs": [],
+  "cleanup": [
+    {
+      "visitor": 1,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 2,
+      "accessRevoked": true
+    }
+  ],
+  "failures": [
+    "locator.waitFor: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('section[aria-label=\"Python code\"]').getByText('speed(1)', { exact: true }) to be visible\u001b[22m\n"
+  ],
+  "browserVersion": "151.0.7922.34",
+  "success": false,
+  "failedWorkspaces": [
+    {
+      "visitor": 1,
+      "visibleCode": "1\n2\n3\n4\n5\n6\n7\nfrom custom import *\nspeed(1)\ncolor(\" #2879df\")\nfor i in range(200):\n    TForward(160)\n        TLeft(90)\n        "
+    },
+    {
+      "visitor": 2,
+      "visibleCode": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\nfrom random import *\nfrom shape import *\nfrom custom import *\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)"
+    }
+  ],
+  "finishedAt": "2026-10-28T07:11:56.746Z",
+  "cleanupComplete": true
+}

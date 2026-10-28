@@ -1,0 +1,414 @@
+{
+  "visitorsRequested": 10,
+  "holdRequestedMs": 30000,
+  "target": "https://cs.coveedu.com/turtle",
+  "frame": "https://turtle-runtime.coveedu.com/brython-3.15.0-2ab1760c5c7107d57457/index.html",
+  "method": "Ten isolated headless Chromium contexts on one Mac; real public page, PIN, BFF, API and production runtime. Visitors authorize sequentially, reload once with their own grant, then wait for the runtime and editor; Run clicks dispatch together. Fresh-entry frame failures from earlier attempts remain separate. This is not ten physical student devices or a cold-download burst.",
+  "startedAt": "2026-10-28T07:24:25.677Z",
+  "setup": [
+    {
+      "visitor": 1,
+      "readyMs": 3904.5849170000006,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 2,
+      "readyMs": 3850.2498750000004,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 3,
+      "readyMs": 3309.1787079999995,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 4,
+      "readyMs": 3359.1962920000005,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 5,
+      "readyMs": 3516.1208749999987,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 6,
+      "readyMs": 2378.610499999999,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 7,
+      "readyMs": 3564.915500000003,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 8,
+      "readyMs": 2334.631540999999,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 9,
+      "readyMs": 3169.8989580000016,
+      "visibility": "visible"
+    },
+    {
+      "visitor": 10,
+      "readyMs": 3160.806417,
+      "visibility": "visible"
+    }
+  ],
+  "runs": [
+    {
+      "visitor": 1,
+      "dispatchBeganMs": 0.5326659999991534,
+      "clickReturnedMs": 133.65429099999892,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 801.0850000008941,
+        "admissionMs": 479.2800000011921,
+        "dispatchToStrokeMs": 309.0400000028312
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 2,
+      "dispatchBeganMs": 0.6722499999959837,
+      "clickReturnedMs": 126.87008300000161,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 616.625,
+        "admissionMs": 436.19999999925494,
+        "dispatchToStrokeMs": 175.23999999836087
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 3,
+      "dispatchBeganMs": 0.7364999999990687,
+      "clickReturnedMs": 126.83904099999927,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 802.339999999851,
+        "admissionMs": 489.429999999702,
+        "dispatchToStrokeMs": 305.91999999806285
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 4,
+      "dispatchBeganMs": 0.7832500000004075,
+      "clickReturnedMs": 126.7697909999988,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 833.6849999986589,
+        "admissionMs": 539.3500000014901,
+        "dispatchToStrokeMs": 287.3999999985099
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 5,
+      "dispatchBeganMs": 0.8432499999980791,
+      "clickReturnedMs": 126.90233299999818,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 611.480000000447,
+        "admissionMs": 457.07500000298023,
+        "dispatchToStrokeMs": 146.535000000149
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 6,
+      "dispatchBeganMs": 0.8834999999962747,
+      "clickReturnedMs": 125.15324999999575,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 323.8999999985099,
+        "admissionMs": 251.9049999974668,
+        "dispatchToStrokeMs": 66.2199999988079
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 7,
+      "dispatchBeganMs": 0.9164999999993597,
+      "clickReturnedMs": 126.80574999999953,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 493.6000000014901,
+        "admissionMs": 400.3800000026822,
+        "dispatchToStrokeMs": 86.20500000193715
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 8,
+      "dispatchBeganMs": 0.9677910000027623,
+      "clickReturnedMs": 126.61433299999771,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 835.5949999988079,
+        "admissionMs": 539.625,
+        "dispatchToStrokeMs": 283.8449999988079
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 9,
+      "dispatchBeganMs": 1.022540999998455,
+      "clickReturnedMs": 126.68629099999816,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 686.015000000596,
+        "admissionMs": 464.6299999989569,
+        "dispatchToStrokeMs": 207.49500000104308
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    },
+    {
+      "visitor": 10,
+      "dispatchBeganMs": 1.0704580000019632,
+      "clickReturnedMs": 140.13254099999904,
+      "metrics": {
+        "phase": "RENDERING",
+        "firstStrokeMs": 607.855000000447,
+        "admissionMs": 361.6199999973178,
+        "dispatchToStrokeMs": 243.35500000044703
+      },
+      "successfulRenewals": 2,
+      "errors": []
+    }
+  ],
+  "cleanup": [
+    {
+      "visitor": 5,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 1,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 7,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 4,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 8,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 3,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 9,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 10,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 6,
+      "accessRevoked": true
+    },
+    {
+      "visitor": 2,
+      "accessRevoked": true
+    }
+  ],
+  "failures": [],
+  "browserVersion": "151.0.7922.34",
+  "independentGrantCookies": 10,
+  "independentRunIds": 10,
+  "activeSnapshots": [
+    {
+      "label": "all-first-strokes-observed",
+      "active": 10,
+      "observedAt": "2026-10-28T07:25:03.331Z",
+      "ui": [
+        {
+          "visitor": 1,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 2,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 3,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 4,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 5,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 6,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 7,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 8,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 9,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 10,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        }
+      ]
+    },
+    {
+      "label": "after-normal-lease-renewal",
+      "active": 10,
+      "observedAt": "2026-10-28T07:25:21.460Z",
+      "ui": [
+        {
+          "visitor": 1,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 2,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 3,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 4,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 5,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 6,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 7,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 8,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 9,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 10,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        }
+      ]
+    },
+    {
+      "label": "end-of-hold",
+      "active": 10,
+      "observedAt": "2026-10-28T07:25:34.908Z",
+      "ui": [
+        {
+          "visitor": 1,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 2,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 3,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 4,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 5,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 6,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 7,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 8,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 9,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        },
+        {
+          "visitor": 10,
+          "phase": "RENDERING",
+          "fullPythonOffered": false
+        }
+      ]
+    }
+  ],
+  "success": true,
+  "finishedAt": "2026-10-28T07:25:35.917Z",
+  "cleanupComplete": true
+}

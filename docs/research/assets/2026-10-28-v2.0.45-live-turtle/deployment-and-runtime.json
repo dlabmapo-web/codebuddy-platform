@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-28",
+  "release": "v2.0.45",
+  "revision": "e41050757eedaf752c1142643221802985bc6578",
+  "workflow": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/40636085498",
+  "workflowConclusion": "success",
+  "studioApiJudgeInspectedHealthy": true,
+  "browserEnabled": false,
+  "browserAdmissionEnabled": false,
+  "publicRuntime": {
+    "capacity": 1,
+    "warmEnabled": false,
+    "healthy": true
+  },
+  "observations": [
+    {
+      "phase": "valid test queued",
+      "openSessions": 2,
+      "allocatedGuests": 1
+    },
+    {
+      "phase": "slot subsequently idle",
+      "openSessions": 0,
+      "allocatedGuests": 0
+    },
+    {
+      "phase": "after stopping audit final run",
+      "openSessions": 0,
+      "allocatedGuests": 0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "successfulRuns": 5,
+  "firstPositiveObservationSeconds": [
+    2.741,
+    3.111,
+    3.018,
+    3.01,
+    2.876
+  ],
+  "sampleMedianFirstPositiveSeconds": 3.01,
+  "queuedAttemptNoLineSeconds": 8.038,
+  "notes": "First-positive times include click dispatch and screenshot control uncertainty; conservative brackets are in timings.json. Not a p95 estimate."
+}

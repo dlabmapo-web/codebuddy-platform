@@ -1,0 +1,92 @@
+[
+  {
+    "Service": "alertmanager",
+    "Image": "prom/alertmanager:v0.28.1",
+    "State": "running",
+    "Health": ""
+  },
+  {
+    "Service": "api",
+    "Image": "ghcr.io/dlabmapo-web/cove-api:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "caddy",
+    "Image": "caddy:2.10.0-alpine",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "cadvisor",
+    "Image": "gcr.io/cadvisor/cadvisor:v0.52.1",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "grafana",
+    "Image": "grafana/grafana:12.1.0",
+    "State": "running",
+    "Health": ""
+  },
+  {
+    "Service": "gui-service",
+    "Image": "ghcr.io/dlabmapo-web/cove-gui-service:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "home",
+    "Image": "ghcr.io/dlabmapo-web/cove-home:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "judge-sandbox",
+    "Image": "ghcr.io/dlabmapo-web/cove-judge:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "judge-worker",
+    "Image": "ghcr.io/dlabmapo-web/cove-judge:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "mvp",
+    "Image": "ghcr.io/dlabmapo-web/cove-mvp:sha-4743173f4aa0b3a9bfe6107a7d933b4ce94026e3",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "node-exporter",
+    "Image": "prom/node-exporter:v1.9.1",
+    "State": "running",
+    "Health": ""
+  },
+  {
+    "Service": "prometheus",
+    "Image": "prom/prometheus:v3.5.0",
+    "State": "running",
+    "Health": ""
+  },
+  {
+    "Service": "redis",
+    "Image": "redis:8.0.3-alpine",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "studio",
+    "Image": "ghcr.io/dlabmapo-web/cove-studio:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": "healthy"
+  },
+  {
+    "Service": "video-worker",
+    "Image": "ghcr.io/dlabmapo-web/cove-video-worker:sha-0ae56bc6ce882ce1fad5730c1bc19e5d8677c238",
+    "State": "running",
+    "Health": ""
+  }
+]

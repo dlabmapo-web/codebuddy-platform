@@ -1,0 +1,1815 @@
+{
+  "clip": {
+    "height": 422,
+    "width": 714,
+    "x": 726,
+    "y": 113
+  },
+  "results": [
+    {
+      "index": 1,
+      "color": "red",
+      "startedAt": "2026-10-28T06:43:36.834Z",
+      "frames": [
+        {
+          "startMs": 476.4664580002427,
+          "endMs": 594.9084999999031,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 595.6962080001831,
+          "endMs": 661.2661659996957,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 661.5248330002651,
+          "endMs": 694.4294579997659,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 694.6948330001906,
+          "endMs": 764.4416249999776,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 764.9021250000224,
+          "endMs": 826.2869999995455,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 827.0810829997063,
+          "endMs": 876.410624999553,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 876.9869999997318,
+          "endMs": 927.5281659998,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 928.3997080000117,
+          "endMs": 993.2862080000341,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 994.238749999553,
+          "endMs": 1043.0855829995126,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1044.2410829998553,
+          "endMs": 1111.917082999833,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1112.923541000113,
+          "endMs": 1177.9119999995455,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1178.6453329995275,
+          "endMs": 1245.2685829997063,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1245.9872500002384,
+          "endMs": 1293.7775830002502,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1294.4228330003098,
+          "endMs": 1344.5990000003949,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1345.2012909995392,
+          "endMs": 1393.9023329997435,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1394.3020000001416,
+          "endMs": 1427.4034580001608,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1427.8700000001118,
+          "endMs": 1477.574416000396,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1478.2750000003725,
+          "endMs": 1510.6561249997467,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1511.6121659995988,
+          "endMs": 1559.9057909995317,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1560.8402500003576,
+          "endMs": 1594.0831249998882,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1595.0620830003172,
+          "endMs": 1644.162208000198,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1645.4403330003843,
+          "endMs": 1694.2209160001948,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1694.892833000049,
+          "endMs": 1744.1593329999596,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1745.182791000232,
+          "endMs": 1779.038332999684,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1779.9093329999596,
+          "endMs": 1844.9782499996945,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1845.5067079998553,
+          "endMs": 1894.4539580000564,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1895.1567909996957,
+          "endMs": 1944.8343749996275,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1945.5256249997765,
+          "endMs": 1977.284582999535,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1977.7624159995466,
+          "endMs": 2027.3073330000043,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2027.9476250000298,
+          "endMs": 2060.3947080001235,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2061.085291000083,
+          "endMs": 2110.9229159997776,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2111.622415999882,
+          "endMs": 2143.684333000332,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2144.388875000179,
+          "endMs": 2193.9360830001533,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2194.794790999964,
+          "endMs": 2227.1437910003588,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2227.736041000113,
+          "endMs": 2277.5627499995753,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2278.2692499998957,
+          "endMs": 2327.286666000262,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2328.01958299987,
+          "endMs": 2360.5751660000533,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2361.1540409997106,
+          "endMs": 2415.27912500035,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2415.956457999535,
+          "endMs": 2460.6053750002757,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2461.2675829995424,
+          "endMs": 2510.6868329998106,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2514.477874999866,
+          "endMs": 2560.862707999535,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2561.8644580002874,
+          "endMs": 2593.760250000283,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2594.31462499965,
+          "endMs": 2643.1362079996616,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2643.7837079996243,
+          "endMs": 2677.1842909995466,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2677.7266250001267,
+          "endMs": 2727.5447079995647,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2728.4955409998074,
+          "endMs": 2778.1032079998404,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2779.0044999998063,
+          "endMs": 2827.5149159999564,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2828.1564999995753,
+          "endMs": 2860.4798750001937,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2861.9792080000043,
+          "endMs": 2927.976958000101,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2928.5107079995796,
+          "endMs": 2977.459499999881,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2978.4559580003843,
+          "endMs": 3027.380540999584,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        }
+      ],
+      "clickCallMs": 476.4465410001576,
+      "metrics": {
+        "admissionMs": 250.10000000149012,
+        "dispatchToStrokeMs": 43.0,
+        "firstStrokeMs": 300.70499999821186,
+        "phase": "DISPLAYING",
+        "status": "Your drawing is ready"
+      },
+      "baseline": {
+        "matchingPixels": 0,
+        "horizontalSpan": 0,
+        "positive": false
+      },
+      "firstPositiveIndex": 3,
+      "firstPositiveMs": 764.4416249999776,
+      "conservativeBoundsMs": {
+        "lower": 185.07829200010747,
+        "upper": 764.4416249999776
+      }
+    },
+    {
+      "index": 2,
+      "color": "blue",
+      "startedAt": "2026-10-28T06:44:20.915Z",
+      "frames": [
+        {
+          "startMs": 484.1173329995945,
+          "endMs": 549.2399169998243,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 549.7591249998659,
+          "endMs": 614.8225830001757,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 615.7002079999074,
+          "endMs": 709.1188329998404,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 709.5844999998808,
+          "endMs": 848.1602079998702,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 848.7193329995498,
+          "endMs": 900.4922080002725,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 900.9591250000522,
+          "endMs": 965.0105830002576,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 965.5755420001224,
+          "endMs": 1031.2659999998286,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1031.8830420002341,
+          "endMs": 1102.7867919998243,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1106.930583000183,
+          "endMs": 1163.9962079999968,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1164.4824170004576,
+          "endMs": 1213.5732079995796,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1213.9024579999968,
+          "endMs": 1265.619583000429,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1266.108167000115,
+          "endMs": 1314.2845419999212,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1314.8518329998478,
+          "endMs": 1363.9249170003459,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1364.9104580003768,
+          "endMs": 1414.353458000347,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1414.9458750002086,
+          "endMs": 1463.926249999553,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1464.6100829998031,
+          "endMs": 1518.46074999962,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1519.2359999995679,
+          "endMs": 1565.2049169996753,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1565.8545420002192,
+          "endMs": 1631.0347079997882,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1631.8667500000447,
+          "endMs": 1697.5219580000266,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1698.026875000447,
+          "endMs": 1747.2352919997647,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1747.7264170004055,
+          "endMs": 1796.5252080000937,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1797.1890420001,
+          "endMs": 1847.3973329998553,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1847.9560829997063,
+          "endMs": 1897.208583000116,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1897.8667080001906,
+          "endMs": 1947.4016249999404,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1948.177291999571,
+          "endMs": 1996.723708000034,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1997.792500000447,
+          "endMs": 2047.2747080000117,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2047.9852080000564,
+          "endMs": 2097.252249999903,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2097.8165419995785,
+          "endMs": 2147.3353329999372,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2148.039416999556,
+          "endMs": 2197.429999999702,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2197.9694170001894,
+          "endMs": 2265.456167000346,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2266.1902919998392,
+          "endMs": 2318.6194169996306,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2319.261292000301,
+          "endMs": 2382.4597920002416,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2382.940750000067,
+          "endMs": 2430.1471669999883,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2430.5977499997243,
+          "endMs": 2480.895583000034,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2481.4491250002757,
+          "endMs": 2530.622750000097,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2531.073166999966,
+          "endMs": 2580.607667000033,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2581.1896670004353,
+          "endMs": 2646.758082999848,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2647.0653750002384,
+          "endMs": 2696.7492079995573,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2696.9592920001596,
+          "endMs": 2747.15683299955,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2747.581375000067,
+          "endMs": 2796.886167000048,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2797.203541999683,
+          "endMs": 2846.195666999556,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2846.6926250001416,
+          "endMs": 2880.568374999799,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2881.153041999787,
+          "endMs": 2947.5433750003576,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2948.645417000167,
+          "endMs": 3015.0804580003023,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        }
+      ],
+      "clickCallMs": 484.11099999956787,
+      "metrics": {
+        "admissionMs": 279.7249999977648,
+        "dispatchToStrokeMs": 80.32499999925494,
+        "firstStrokeMs": 365.6199999973178,
+        "phase": "DISPLAYING",
+        "status": "Your drawing is ready"
+      },
+      "baseline": {
+        "matchingPixels": 0,
+        "horizontalSpan": 0,
+        "positive": false
+      },
+      "firstPositiveIndex": 3,
+      "firstPositiveMs": 848.1602079998702,
+      "conservativeBoundsMs": {
+        "lower": 131.58920800033957,
+        "upper": 848.1602079998702
+      }
+    },
+    {
+      "index": 3,
+      "color": "green",
+      "startedAt": "2026-10-28T06:44:50.132Z",
+      "frames": [
+        {
+          "startMs": 514.8097080001608,
+          "endMs": 637.815874999389,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 638.7507079998031,
+          "endMs": 695.3386249998584,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 696.2082500001416,
+          "endMs": 760.9097499996424,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 761.3639580002055,
+          "endMs": 828.8921659998596,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 829.4120829999447,
+          "endMs": 912.4862909996882,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 913.2737079998478,
+          "endMs": 983.2155409995466,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 984.3597909994423,
+          "endMs": 1044.5731250001118,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1045.0310410000384,
+          "endMs": 1096.7222910001874,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1097.487790999934,
+          "endMs": 1149.5177079997957,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1150.2558329999447,
+          "endMs": 1211.8813330000266,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1212.7475829999894,
+          "endMs": 1261.9041659999639,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1262.3809159994125,
+          "endMs": 1311.5428749993443,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1312.6001249998808,
+          "endMs": 1362.6581659996882,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1363.4066659994423,
+          "endMs": 1428.6147909993306,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1429.6384159997106,
+          "endMs": 1482.555499999784,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1483.4652499994263,
+          "endMs": 1529.3225830001757,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1529.8221249999478,
+          "endMs": 1594.9906660001725,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1595.9980410002172,
+          "endMs": 1661.7872909996659,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1663.050791000016,
+          "endMs": 1712.3292079996318,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1713.0750409998,
+          "endMs": 1761.6799159999937,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1762.5164999999106,
+          "endMs": 1811.530915999785,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1812.2498329998925,
+          "endMs": 1862.0083750002086,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1862.9144999999553,
+          "endMs": 1911.5322909997776,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1912.2611250001937,
+          "endMs": 1970.8841659994796,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1971.8876660000533,
+          "endMs": 2045.5154579998925,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2046.52324999962,
+          "endMs": 2095.7262499993667,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2096.341124999337,
+          "endMs": 2160.7051659999415,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2161.4228329993784,
+          "endMs": 2211.4561660001054,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2212.0882909996435,
+          "endMs": 2261.638540999964,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2262.4692909996957,
+          "endMs": 2311.8112909998745,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2312.695208000019,
+          "endMs": 2361.261332999915,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2361.9248749995604,
+          "endMs": 2411.475374999456,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2412.0423329994082,
+          "endMs": 2478.1535409996286,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2478.4933749996126,
+          "endMs": 2528.516083000228,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2529.408458000049,
+          "endMs": 2578.28733299952,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2578.793124999851,
+          "endMs": 2628.3370409999043,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2628.957999999635,
+          "endMs": 2678.3405409995466,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2678.9847079999745,
+          "endMs": 2728.857915999368,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2734.7195830000564,
+          "endMs": 2778.774415999651,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2779.879374999553,
+          "endMs": 2851.9348329994828,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2852.7907910002396,
+          "endMs": 2895.331875000149,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2895.9757079994306,
+          "endMs": 2944.7391249993816,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2945.5326659996063,
+          "endMs": 2994.035624999553,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2994.7110409997404,
+          "endMs": 3044.666040999815,
+          "matchingPixels": 599,
+          "horizontalSpan": 98,
+          "positive": true
+        }
+      ],
+      "clickCallMs": 514.8073749998584,
+      "metrics": {
+        "admissionMs": 233.73500000312924,
+        "dispatchToStrokeMs": 78.77500000223517,
+        "firstStrokeMs": 331.679999999702,
+        "phase": "DISPLAYING",
+        "status": "Your drawing is ready"
+      },
+      "baseline": {
+        "matchingPixels": 0,
+        "horizontalSpan": 0,
+        "positive": false
+      },
+      "firstPositiveIndex": 3,
+      "firstPositiveMs": 828.8921659998596,
+      "conservativeBoundsMs": {
+        "lower": 181.40087500028312,
+        "upper": 828.8921659998596
+      }
+    },
+    {
+      "index": 4,
+      "color": "red",
+      "startedAt": "2026-10-28T06:44:58.916Z",
+      "frames": [
+        {
+          "startMs": 556.0539999995381,
+          "endMs": 646.8592499997467,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 647.9975420003757,
+          "endMs": 716.1826250003651,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 716.9626249996945,
+          "endMs": 770.9470419995487,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 771.4629999995232,
+          "endMs": 819.8818749999627,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 820.6744170002639,
+          "endMs": 863.3017499996349,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 864.4986250000075,
+          "endMs": 912.5235419999808,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 913.2043749997392,
+          "endMs": 963.5433339998126,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 963.9366669999436,
+          "endMs": 998.3171669999138,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 999.3003340000287,
+          "endMs": 1045.7984589999542,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1046.619583999738,
+          "endMs": 1093.27362500038,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1094.4470840003341,
+          "endMs": 1132.6203749999404,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1133.191874999553,
+          "endMs": 1179.234833999537,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1180.1450840001926,
+          "endMs": 1212.1329169999808,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1213.010166999884,
+          "endMs": 1280.9292919998989,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1281.823874999769,
+          "endMs": 1329.9037089999765,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1330.9328749999404,
+          "endMs": 1378.8078749999404,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1379.5181249994785,
+          "endMs": 1429.0729170003906,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1429.8962089996785,
+          "endMs": 1513.0758750000969,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1517.2409589998424,
+          "endMs": 1563.9472500002012,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1564.7567090000957,
+          "endMs": 1612.5049590002745,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1613.0752919996157,
+          "endMs": 1645.4435839997604,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1646.1320839999244,
+          "endMs": 1695.8057500002906,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1696.5394169995561,
+          "endMs": 1727.9927089996636,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1728.6509999996051,
+          "endMs": 1778.9442499997094,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1779.5808340003714,
+          "endMs": 1812.3504170002416,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1813.5484170001,
+          "endMs": 1861.7058340003714,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1862.3473749998957,
+          "endMs": 1895.5577090000734,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1896.4054169999436,
+          "endMs": 1945.6937499996275,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1946.4134170003235,
+          "endMs": 1981.2379999998957,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1981.836667000316,
+          "endMs": 2028.9371250001714,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2029.4953749999404,
+          "endMs": 2078.8337089996785,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2079.81037500035,
+          "endMs": 2128.9927920000628,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2129.6709589995444,
+          "endMs": 2162.191666999832,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2162.6924999998882,
+          "endMs": 2212.4307500002906,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2213.1921669999138,
+          "endMs": 2245.6284999996424,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2246.192834000103,
+          "endMs": 2295.6881670001894,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2296.5072499997914,
+          "endMs": 2328.769917000085,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2329.281084000133,
+          "endMs": 2380.737041999586,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2382.2862499998882,
+          "endMs": 2429.0487089995295,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2429.6140419999138,
+          "endMs": 2478.850208999589,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2479.2356669995934,
+          "endMs": 2511.943334000185,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2512.2468339996412,
+          "endMs": 2562.275209000334,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2562.9452090002596,
+          "endMs": 2595.466958999634,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2595.8877919996157,
+          "endMs": 2645.8132090000436,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2646.838499999605,
+          "endMs": 2678.8991249995306,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2679.861999999732,
+          "endMs": 2729.2524589998648,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2730.135250000283,
+          "endMs": 2778.839333999902,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2779.159292000346,
+          "endMs": 2828.2356249997392,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2829.2662920001894,
+          "endMs": 2862.1049999995157,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2862.5846669999883,
+          "endMs": 2912.38570899982,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2913.3602499999106,
+          "endMs": 2945.615709000267,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2946.38812499959,
+          "endMs": 2995.6194169996306,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2996.4031670000404,
+          "endMs": 3028.8691670000553,
+          "matchingPixels": 613,
+          "horizontalSpan": 98,
+          "positive": true
+        }
+      ],
+      "clickCallMs": 556.0518340002745,
+      "metrics": {
+        "admissionMs": 172.99500000104308,
+        "dispatchToStrokeMs": 65.54000000283122,
+        "firstStrokeMs": 239.75,
+        "phase": "DISPLAYING",
+        "status": "Your drawing is ready"
+      },
+      "baseline": {
+        "matchingPixels": 0,
+        "horizontalSpan": 0,
+        "positive": false
+      },
+      "firstPositiveIndex": 1,
+      "firstPositiveMs": 716.1826250003651,
+      "conservativeBoundsMs": {
+        "lower": 0.002165999263525009,
+        "upper": 716.1826250003651
+      }
+    },
+    {
+      "index": 5,
+      "color": "blue",
+      "startedAt": "2026-10-28T06:45:10.248Z",
+      "frames": [
+        {
+          "startMs": 465.23083299957216,
+          "endMs": 535.6613330002874,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 536.3831669995561,
+          "endMs": 581.1694579999894,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 581.8296250002459,
+          "endMs": 651.5570000000298,
+          "matchingPixels": 0,
+          "horizontalSpan": 0,
+          "positive": false
+        },
+        {
+          "startMs": 652.1105829998851,
+          "endMs": 713.8664999995381,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 714.5003329999745,
+          "endMs": 779.5664170002565,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 780.4933329997584,
+          "endMs": 846.9842079998925,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 847.7226670002565,
+          "endMs": 914.5191249996424,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 915.0300420001149,
+          "endMs": 982.8510419996455,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 984.0165419997647,
+          "endMs": 1046.2154580000788,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1046.955833000131,
+          "endMs": 1116.1480419998989,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1116.9326670002192,
+          "endMs": 1163.5665830001235,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1168.4927920000628,
+          "endMs": 1213.7140419995412,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1214.6339999996126,
+          "endMs": 1263.8063329998404,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1264.4111670004204,
+          "endMs": 1313.6648329999298,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1314.3444170001894,
+          "endMs": 1363.7846250003204,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1364.474042000249,
+          "endMs": 1413.8116250000894,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1414.8976670000702,
+          "endMs": 1463.736917000264,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1464.4383330000564,
+          "endMs": 1514.5752919996157,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1515.3632079996169,
+          "endMs": 1563.6510420003906,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1564.2626249995083,
+          "endMs": 1613.725874999538,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1614.3532079998404,
+          "endMs": 1663.7115420000628,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1664.3282080003992,
+          "endMs": 1713.8693749997765,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1714.8090420002118,
+          "endMs": 1763.7244999995455,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1764.5975420000032,
+          "endMs": 1813.862083000131,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1814.3594580003992,
+          "endMs": 1863.8533749999478,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1864.7950830003247,
+          "endMs": 1913.800625000149,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1914.505416999571,
+          "endMs": 1963.7065829997882,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 1964.676749999635,
+          "endMs": 2013.5686250003055,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2014.1809580000117,
+          "endMs": 2063.7250830000266,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2064.3274579998106,
+          "endMs": 2113.821832999587,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2114.752166999504,
+          "endMs": 2163.9527500001714,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2167.2088749995455,
+          "endMs": 2213.670249999501,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2214.243207999505,
+          "endMs": 2263.7168749999255,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2264.3008749997243,
+          "endMs": 2313.775791999884,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2314.7627919996157,
+          "endMs": 2363.8642920004204,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2364.6048750001937,
+          "endMs": 2413.698958000168,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2414.3915419997647,
+          "endMs": 2463.767833000049,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2464.508208000101,
+          "endMs": 2513.7622499996796,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2514.5340830003843,
+          "endMs": 2563.665500000119,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2564.3582920003682,
+          "endMs": 2613.84770799987,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2614.564666999504,
+          "endMs": 2663.8549579996616,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2664.598042000085,
+          "endMs": 2713.567374999635,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2714.152417000383,
+          "endMs": 2763.7784169996157,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2764.462249999866,
+          "endMs": 2843.1949579995126,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2844.1471669999883,
+          "endMs": 2903.0115419998765,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2903.6883330000564,
+          "endMs": 2967.638082999736,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        },
+        {
+          "startMs": 2968.34008300025,
+          "endMs": 3014.3208750002086,
+          "matchingPixels": 617,
+          "horizontalSpan": 98,
+          "positive": true
+        }
+      ],
+      "clickCallMs": 465.2299999995157,
+      "metrics": {
+        "admissionMs": 190.05000000074506,
+        "dispatchToStrokeMs": 55.05499999970198,
+        "firstStrokeMs": 245.5600000023842,
+        "phase": "DISPLAYING",
+        "status": "Your drawing is ready"
+      },
+      "baseline": {
+        "matchingPixels": 0,
+        "horizontalSpan": 0,
+        "positive": false
+      },
+      "firstPositiveIndex": 3,
+      "firstPositiveMs": 713.8664999995381,
+      "conservativeBoundsMs": {
+        "lower": 116.59962500073016,
+        "upper": 713.8664999995381
+      }
+    }
+  ],
+  "method": "CUA screenshots of the visible drawing section; offline hue detection requires at least 100 pixels spanning 60 horizontal pixels in the line band (center+32..130, centerY\u00b124), excluding the initial cursor. Browser DOM attributes separately expose reported click/admission/stroke durations. These are diagnostics, not p95 acceptance.",
+  "editorPreparationNote": "Before run 3, a visible-code check ran before Monaco redrew; screenshot confirmed the correct green source before Run. No extra Run was clicked and no latency sample was discarded."
+}

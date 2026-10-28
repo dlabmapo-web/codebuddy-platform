@@ -116,3 +116,10 @@ visible drawing before reporting production speed.
 [Approval gate screenshot](assets/2026-10-28-brython-activation/release-awaiting-approval.jpg).
 Local fixture servers/containers and temporary release worktrees were removed;
 ordinary developer services and production student sessions were retained.
+
+
+Deployment follow-up: v2.0.46 subsequently completed on attempt two after a
+scratch-space preflight failure and safe cleanup of obsolete migration-image
+downloads. Brython was enabled and live startup was measured. See the
+[live verification](2026-10-28-v2.0.46-live-turtle-verification.md) for the
+recovery, effective switches, actual drawing evidence and remaining limits.

@@ -1,0 +1,11 @@
+{
+  "originalDeployFailure": "Video scratch free space below required 40 GiB",
+  "previousReleaseRestored": "v2.0.45",
+  "obsoleteMigrationDownloadsRemoved": 11,
+  "reclaimedBytes": 28468666368,
+  "freeBytesAfterCleanup": 65439657984,
+  "currentFreeBytes": 62827282432,
+  "registryOriginalsRetained": true,
+  "preflightPassedAfterCleanup": true,
+  "cleanupTouchedRunningContainersVolumesOrRuntimeAllowlists": false
+}

@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-28",
+  "release": "v2.0.46",
+  "runs": 5,
+  "engine": "Brython 3.15.0",
+  "preparedRuntime": true,
+  "reportedFirstStrokeMs": {
+    "samples": [
+      300.70499999821186,
+      365.6199999973178,
+      331.679999999702,
+      239.75,
+      245.5600000023842
+    ],
+    "median": 300.70499999821186
+  },
+  "firstPositiveCaptureMs": {
+    "samples": [
+      764.4416249999776,
+      848.1602079998702,
+      828.8921659998596,
+      716.1826250003651,
+      713.8664999995381
+    ],
+    "median": 764.4416249999776
+  },
+  "scope": "Five synthetic single-visitor live runs, includes live admission; independent screenshot observations include control/capture overhead. Not a p95 or classroom-load guarantee."
+}

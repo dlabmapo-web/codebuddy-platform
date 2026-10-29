@@ -109,6 +109,7 @@ export class JudgeQueue implements OnModuleDestroy {
   private regradeInstance: Queue<RegradeJob> | null = null;
   private sampleInstance: Queue<SampleCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
+  private practiceEventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
   private rateLimitConnection: Promise<void> | null = null;
 
@@ -198,6 +199,13 @@ export class JudgeQueue implements OnModuleDestroy {
       connection: redisConnection(this.redisUrl),
     });
     return this.eventsInstance;
+  }
+
+  get practiceEvents(): QueueEvents {
+    this.practiceEventsInstance ??= new QueueEvents(PRACTICE_QUEUE, {
+      connection: redisConnection(this.redisUrl),
+    });
+    return this.practiceEventsInstance;
   }
 
   /**
@@ -356,12 +364,14 @@ export class JudgeQueue implements OnModuleDestroy {
     await this.regradeInstance?.close();
     await this.sampleInstance?.close();
     await this.eventsInstance?.close();
+    await this.practiceEventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
     this.practiceInstance = null;
     this.regradeInstance = null;
     this.sampleInstance = null;
     this.eventsInstance = null;
+    this.practiceEventsInstance = null;
     this.rateLimitClient = null;
     this.rateLimitConnection = null;
   }

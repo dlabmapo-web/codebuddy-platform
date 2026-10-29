@@ -57,7 +57,10 @@ export function useSubmission({
   reopenSolveSession?: () => Promise<{ solveSessionId: string } | null>;
 }) {
   const queryClient = useQueryClient();
-  const latest = useLatestSubmission({ academyId, materialId, classId, mode: 'student' }, userId);
+  const latest = useLatestSubmission(
+    { academyId, materialId, classId, mode: 'student' },
+    userId,
+  );
   const [submitting, setSubmitting] = React.useState(false);
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -66,6 +69,22 @@ export function useSubmission({
     initialResult,
   );
   const [error, setError] = React.useState<unknown>(null);
+  const generation = React.useRef(0);
+  const busy = React.useRef(false);
+  const request = React.useRef<{ code: string; id: string } | null>(null);
+  const activeId = React.useRef<string | null>(null);
+  const scope = JSON.stringify([academyId, userId, classId, materialId]);
+  const currentScope = React.useRef(scope);
+  const [trackedScope, setTrackedScope] = React.useState(scope);
+  if (trackedScope !== scope) {
+    setTrackedScope(scope);
+    setResult(initialResult);
+    setReported([]);
+    setError(null);
+    setSubmitting(false);
+    setSubmissionId(null);
+    setTotalCount(0);
+  }
 
   /**
    * Previous/Next swaps the exercise without remounting, so a selected
@@ -77,6 +96,9 @@ export function useSubmission({
     initialResult?.submissionId ?? null,
   );
   if (trackedResultId !== (initialResult?.submissionId ?? null)) {
+    setSubmitting(false);
+    setSubmissionId(null);
+    setTotalCount(0);
     setTrackedResultId(initialResult?.submissionId ?? null);
     setResult(initialResult);
     setReported([]);
@@ -93,35 +115,68 @@ export function useSubmission({
     fallbackRef.current = null;
   }, []);
 
-  React.useEffect(() => teardown, [teardown]);
+  const invalidateScope = React.useCallback(() => {
+    generation.current++;
+    busy.current = false;
+    activeId.current = null;
+    request.current = null;
+    teardown();
+  }, [teardown]);
+  React.useLayoutEffect(() => {
+    currentScope.current = scope;
+    return invalidateScope;
+  }, [invalidateScope, scope, initialResult?.submissionId]);
 
   const loadResult = React.useCallback(
     async (id: string) => {
+      const action = generation.current;
+      const active = () =>
+        generation.current === action &&
+        activeId.current === id &&
+        currentScope.current === scope;
+      if (!active()) return true;
       try {
         const fetched = await orpc.learn.getSubmission({
           academyId,
           submissionId: id,
         });
+        if (!active()) return true;
         if (!isTerminalStatus(fetched.status)) return false;
+        busy.current = false;
         setResult(fetched);
         setSubmitting(false);
         teardown();
         // The verdict moves progress, so the outline and catalog are stale.
         void queryClient.invalidateQueries({ queryKey: ['learn', academyId] });
-        void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
+        void queryClient.invalidateQueries({
+          queryKey: ['latest-submission', userId, academyId, materialId],
+        });
         return true;
       } catch (caught) {
+        if (!active()) return true;
+        busy.current = false;
         setError(caught);
         setSubmitting(false);
         teardown();
         return true;
       }
     },
-    [academyId, queryClient, teardown, userId, materialId],
+    [academyId, queryClient, teardown, userId, materialId, scope],
   );
 
   const submit = React.useCallback(
     async (code: string) => {
+      if (busy.current) return;
+      busy.current = true;
+      const action = ++generation.current;
+      activeId.current = null;
+      const active = () =>
+        generation.current === action && currentScope.current === scope;
+      request.current =
+        request.current?.code === code
+          ? request.current
+          : { code, id: crypto.randomUUID() };
+      const requestId = request.current.id;
       teardown();
       setSubmitting(true);
       setResult(null);
@@ -135,35 +190,47 @@ export function useSubmission({
           classId,
           materialId,
           code,
+          requestId,
           ...(solveSessionId ? { solveSessionId } : {}),
         });
       } catch (caught) {
+        if (!active()) return;
         // An expired or mismatched sitting is not the student's problem: open
         // a fresh one and retry once, so a tab left open overnight costs them
         // a moment rather than the submission.
         if (isSolveSessionInvalid(caught) && reopenSolveSession) {
-          const reopened = await reopenSolveSession();
           try {
+            const reopened = await reopenSolveSession();
+            if (!active()) return;
             accepted = await orpc.learn.submit({
               academyId,
               classId,
               materialId,
               code,
+              requestId,
               ...(reopened ? { solveSessionId: reopened.solveSessionId } : {}),
             });
           } catch (retried) {
+            if (!active()) return;
+            busy.current = false;
             setError(retried);
             setSubmitting(false);
             return;
           }
         } else {
+          busy.current = false;
           setError(caught);
           setSubmitting(false);
           return;
         }
       }
 
-      void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
+      if (!active()) return;
+      request.current = null;
+      activeId.current = accepted.submissionId;
+      void queryClient.invalidateQueries({
+        queryKey: ['latest-submission', userId, academyId, materialId],
+      });
       setSubmissionId(accepted.submissionId);
       setTotalCount(accepted.totalCount);
 
@@ -175,9 +242,14 @@ export function useSubmission({
       sourceRef.current = source;
 
       source.addEventListener('progress', (event) => {
-        const payload = submissionProgressEventSchema.safeParse(
-          JSON.parse((event as MessageEvent<string>).data),
-        );
+        if (!active()) return;
+        let data: unknown;
+        try {
+          data = JSON.parse((event as MessageEvent<string>).data);
+        } catch {
+          return;
+        }
+        const payload = submissionProgressEventSchema.safeParse(data);
         if (!payload.success) return;
         setReported((current) => [
           ...current.filter((item) => item.position !== payload.data.position),
@@ -187,11 +259,14 @@ export function useSubmission({
       });
 
       source.addEventListener('result', () => {
+        if (!active()) return;
         void loadResult(accepted.submissionId);
       });
 
       source.onerror = (event) => {
+        if (!active()) return;
         if (event instanceof MessageEvent) {
+          busy.current = false;
           setError(new Error('GRADING_UNAVAILABLE'));
           setSubmitting(false);
           teardown();
@@ -214,6 +289,7 @@ export function useSubmission({
       queryClient,
       reopenSolveSession,
       solveSessionId,
+      scope,
       teardown,
       userId,
     ],
@@ -235,7 +311,13 @@ export function useSubmission({
   );
 
   return {
-    refreshSummary: () => { void latest.refetch(); }, summaryRefreshing: latest.isFetching, latestSubmission: latest.data, summaryLoading: latest.isPending, summaryError: latest.isError,
+    refreshSummary: () => {
+      void latest.refetch();
+    },
+    summaryRefreshing: latest.isFetching,
+    latestSubmission: latest.data,
+    summaryLoading: latest.isPending,
+    summaryError: latest.isError,
     submit,
     submitting,
     submissionId,
@@ -243,7 +325,7 @@ export function useSubmission({
     error,
     cells,
     reset: () => {
-      teardown();
+      invalidateScope();
       setSubmitting(false);
       setSubmissionId(null);
       setTotalCount(0);
@@ -260,8 +342,9 @@ export function useSubmission({
 /** The one refusal a submit may recover from by opening a fresh sitting. */
 function isSolveSessionInvalid(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
-  const code = (error as { code?: unknown; data?: { code?: unknown } }).code
-    ?? (error as { data?: { code?: unknown } }).data?.code;
+  const code =
+    (error as { code?: unknown; data?: { code?: unknown } }).code ??
+    (error as { data?: { code?: unknown } }).data?.code;
   return code === 'SOLVE_SESSION_INVALID';
 }
 

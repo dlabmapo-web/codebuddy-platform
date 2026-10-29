@@ -1,3 +1,4 @@
+import { PracticeSubmissionController } from "./practice-submission.controller.js";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -27,7 +28,7 @@ import { SubmissionService } from "./submission.service.js";
 @Module({
   // `MediaModule` signs the assigned teacher's photo for the class pages.
   imports: [AcademiesModule, AuthModule, AuthorizationModule, MediaModule],
-  controllers: [SubmissionController],
+  controllers: [SubmissionController, PracticeSubmissionController],
   providers: [
     AnswerRecordsService,
     CurriculumOutlineService,

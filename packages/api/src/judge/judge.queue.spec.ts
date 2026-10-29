@@ -24,3 +24,17 @@ it('redelivers a failed durable job with its original queue identity after infra
   expect(handle.getJob.mock.calls.map(call => call[0])).toEqual(['official', 'practice', 'regrade:run:repair']);
   expect(prior.retry).toHaveBeenCalledTimes(3); expect(handle.add).not.toHaveBeenCalled();
 });
+
+it('owns and closes practice events independently of student events', async () => {
+  const queue = new JudgeQueue('redis://127.0.0.1:1');
+  const studentEvents = { close: vi.fn().mockResolvedValue(undefined) };
+  const practiceEvents = { close: vi.fn().mockResolvedValue(undefined) };
+  Object.assign(queue, { eventsInstance: studentEvents, practiceEventsInstance: practiceEvents });
+  expect(queue.practiceEvents).toBe(practiceEvents);
+  expect(queue.events).toBe(studentEvents);
+  await queue.close();
+  expect(studentEvents.close).toHaveBeenCalledOnce();
+  expect(practiceEvents.close).toHaveBeenCalledOnce();
+  await queue.close();
+  expect(practiceEvents.close).toHaveBeenCalledOnce();
+});

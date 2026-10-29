@@ -71,6 +71,8 @@ def collect_host(config):
     broker_env=dict(item.decode().split('=',1) for item in Path(f'/proc/{broker_pid}/environ').read_bytes().split(b'\0') if b'=' in item)
     for key,value in dict(GRADING_RUNTIME_MANIFEST_PATH=config['manifestPath'],GRADING_WORKER_GENERATION=config['workerGeneration'],GRADING_DAEMON_ID=config['daemonId'],GRADING_DAEMON_SOCKET=config['daemonSocket'],GRADING_CGROUP_PARENT=str(parent)).items():
         require(broker_env.get(key)==value,'Running broker configuration differs from attested release')
+    for key,env in [('journalDirectory','GRADING_JOURNAL_DIRECTORY'),('brokerOwner','GRADING_BROKER_OWNER'),('observationsPath','GRADING_OBSERVATIONS_PATH')]:
+        if key in config:require(broker_env.get(env)==config[key],'Running broker recovery identity mismatch')
     if config.get('warmProfilesPath'):
         require(broker_env.get('GRADING_WARM_PROFILES_PATH')==config['warmProfilesPath'] and digest(read_json(config['warmProfilesPath']))==config['warmProfilesIdentity'],'Broker warm profile identity mismatch')
     all_ids=set(docker(config['applicationSocket'],'ps','-q','--no-trunc').split())

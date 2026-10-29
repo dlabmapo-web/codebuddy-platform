@@ -285,17 +285,78 @@ live target preflight runs before consumers start and again after readiness.
 The retained pointer commits last. On **any** exception the pending intent remains;
 a post-start failure may already have accepted target work, so its descriptor
 manifest/images cannot be discarded. `resume-release` retries the same target with
-fresh evidence/inventories and re-fences/drains target work first.
+fresh evidence/inventories. Healthy transitions re-fence/drain target work;
+accepted-work repairs repeat the recovery gates below.
 
 If that immutable candidate cannot become healthy, `repair-release` is the explicit
 escape route. Supply a newly signed compatible binary candidate and the same
 arguments. Its previous release/config/inventory identify the FAILED TARGET;
 its complete manifest and worker authority must exactly preserve that target.
-The repair intent is durably installed before any service command, then follows
-the same fenced drain/non-overlap/preflight/commit sequence. Thus a known-good
-older reader binary can recover service with current metadata, without marker
-edits or automatic restoration of an older runtime manifest. Interrupted repairs
-are themselves resumable. Stale or missing proofs never authorize a bypass.
+All retained guest image identities, decoder mappings, snapshot readers and
+resource budgets remain protected. Healthy updates and ordinary binary rollback
+still require zero pending/recoverable/ephemeral/queued work. Explicit repair can
+preserve nonzero **versioned** accepted work; unversioned work still blocks it.
+
+Repair acceptance adds these signed `transition` fields:
+
+```json
+{
+  "recovery": {
+    "version": 1,
+    "strategy": "preserve-accepted-receipts-v1",
+    "workerStartup": "coordinator-recovery-before-admission"
+  },
+  "recoveryJournalIdentity": "<canonical SHA256 of the stopped retained journal identity>"
+}
+```
+
+Both host configurations must bind unchanged `journalDirectory`, `brokerOwner`
+and `observationsPath`, matching the installed broker environment. Live preflight
+also checks these against the running broker. A nonempty private retained journal
+owned by the dedicated account is mandatory; repair never initializes a missing
+journal as an empty history. The read-only identity command is:
+
+```sh
+python3 /opt/cove/scripts/grading/recovery.py /immutable/target-host.json
+```
+
+This prints only the canonical digest of journal-directory path/owner/device/inode
+and `state.bin` content SHA256. It does not issue authorization. The trusted proof
+issuer binds that digest, the fresh frozen inventories, exact failed manifest/
+authority and reviewed compatible application/broker artifacts to the repair.
+If the first invocation observes a journal/inventory change, it fails while
+leaving services stopped and intent retained. Collect the now-stable identity
+and inventory, renew the signed proof, and `resume-release` the same repair
+bundle. Never edit the journal, checkpoints, retained pointer or pending intent
+to make a proof match. A different repair candidate uses `repair-release` again.
+
+The repair intent is fsynced before service mutation. API admission stops first,
+then the worker stops. A complete Compose service-container census requires one
+consumer, stopped state, PID zero and no restart; duplicates/unknown state refuse
+replacement. Broker stop requires inactive/failed systemd state, MainPID zero
+and an empty service cgroup. The frozen journal identity is checked against the
+signature and saved privately in `state/grading-recovery-state.json`. Source
+intent, leases, checkpoints and queue records stay in their original app stores;
+the broker never receives database/Redis credentials.
+
+After installing the compatible artifacts and creating stopped consumers, repair
+rechecks old termination and the frozen journal, then starts the broker. A fresh
+post-start observation (at most six seconds old, checked within a bounded 30-second
+wait) must report the exact worker authority, ready state, zero preparing/running/
+quarantined guests and zero cleanup failures. Startup reconciles discovered guests
+before publishing this observation. Uncertain cleanup keeps both consumers stopped.
+Live target preflight runs before the replacement worker starts. Worker startup
+uses the existing coordinator to recover original frozen receipts/checkpoints
+before starting queue consumers/readiness; API starts only after worker health.
+Final target preflight precedes committing the retained pointer.
+
+Known cases recover their durable receipt or checkpoint under their original lease;
+source intent without a usable receipt fails as non-scoring infrastructure work.
+No missing receipt authorizes replay. Final grades/points retain their existing
+fenced transaction. A known-good older binary may therefore recover current
+metadata without restoring an older manifest. Interrupted repairs remain resumable;
+renew the frozen proof if the restarted broker changed journal bytes. Stale/missing
+proofs, changed authority/descriptors/images, overlap and uncertain cleanup refuse.
 
 ## Observations and acceptance interfaces
 

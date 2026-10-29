@@ -2,6 +2,9 @@
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
+# A disabled selection flag does not retire accepted native/v4 snapshots.
+[[ ! -e "$deploy_root/state/grading-handover.json" ]] || fail "Rootless grading handover is retained; use the forward-compatible grading release procedure. Ordinary release/rollback refused before mutation."
+
 previous="$deploy_root/state/previous-deployment.env"
 require_file "$previous"
 

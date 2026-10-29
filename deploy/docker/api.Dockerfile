@@ -19,6 +19,7 @@ COPY packages/home/package.json packages/home/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY packages/grading-runtime/package.json packages/grading-runtime/package.json
 COPY packages/web/package.json packages/web/package.json
 COPY packages/turtle-browser-runtime/package.json packages/turtle-browser-runtime/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -31,9 +32,11 @@ ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV DIRECT_URL=$DIRECT_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm --filter @cove/shared build \
+ && pnpm --filter @cove/grading-runtime build \
  && pnpm --filter @cove/api build \
  && pnpm --filter @cove/api deploy --prod /opt/cove-api \
- && cp -R packages/api/dist /opt/cove-api/dist
+ && cp -R packages/api/dist /opt/cove-api/dist \
+ && rm -rf /opt/cove-api/dist/prisma
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
@@ -57,7 +60,12 @@ CMD ["node", "dist/src/main.js"]
 # Prisma CLI is intentionally kept out of the API runtime. This target is a
 # one-shot migration image and is never started as a long-running service.
 FROM dependencies AS migration
-COPY . .
+# Explicit operational inputs only; never copy the repository/deployment context
+# into this one-shot image. The storage rollout has no application source imports.
+COPY packages/api/prisma/schema.prisma packages/api/prisma/schema.prisma
+COPY packages/api/prisma/migrations packages/api/prisma/migrations
+COPY packages/api/prisma.config.ts packages/api/prisma.config.ts
+COPY packages/api/scripts/setup-learning-storage.mts packages/api/scripts/setup-learning-storage.mts
 ENV NODE_ENV=production
 ARG DIRECT_URL=postgresql://build:build@localhost:5432/build
 ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
@@ -69,8 +77,7 @@ RUN pnpm --filter @cove/api db:generate \
  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
     /usr/local/bin/pnpm /usr/local/bin/pnpx \
  && groupadd --system --gid 1001 cove \
- && useradd --system --uid 1001 --gid cove --home-dir /app cove \
- && chown -R cove:cove /app
+ && useradd --system --uid 1001 --gid cove --home-dir /app cove
 USER cove
 WORKDIR /app/packages/api
 # Invoke Prisma directly so the final one-shot image does not retain pnpm.

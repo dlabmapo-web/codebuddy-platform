@@ -112,6 +112,7 @@ test("unconfirmed removal quarantines and retains physical funding", async (t) =
   const response = await receipt(send, r.reservationId);
   assert.equal(response.code, "UNCERTAIN");
   assert.equal(broker.census().quarantined, 1);
+  assert.ok(broker.census().cleanupFailures >= 1);
   assert.ok(broker.census().resources.bytes > 256 * 1024 * 1024);
   assert.equal((await send("health")).code, "INFRASTRUCTURE");
 });

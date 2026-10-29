@@ -3,7 +3,7 @@ FROM python:3.12.16-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21e
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
 COPY packages/grading-runtime/guest/gated-launcher.c /build/gated-launcher.c
 RUN gcc -O2 -Wall -Wextra -Werror /build/gated-launcher.c -o /build/gated-launcher
-FROM python:3.12.16-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+FROM python:3.12.16-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337 AS runtime
 ARG PACKAGE_MANIFEST_HASH
 LABEL io.cove.grading.package=$PACKAGE_MANIFEST_HASH io.cove.grading.shim="cove-guest-1" io.cove.grading.engine="cpython" io.cove.grading.version="3.12.16" io.cove.grading.python="3.12.16"
 COPY --from=compiler /build/gated-launcher /opt/guest/gated-launcher

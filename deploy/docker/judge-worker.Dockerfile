@@ -17,6 +17,7 @@ COPY packages/home/package.json packages/home/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY packages/grading-runtime/package.json packages/grading-runtime/package.json
 COPY packages/web/package.json packages/web/package.json
 COPY packages/turtle-browser-runtime/package.json packages/turtle-browser-runtime/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -29,6 +30,7 @@ ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV DIRECT_URL=$DIRECT_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm --filter @cove/shared build \
+ && pnpm --filter @cove/grading-runtime build \
  && pnpm --filter @cove/judge-worker build \
  && pnpm --filter @cove/judge-worker deploy --prod /opt/cove-judge \
  && cp -R packages/judge-worker/dist /opt/cove-judge/dist

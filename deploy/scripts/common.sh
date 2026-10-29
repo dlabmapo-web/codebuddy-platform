@@ -8,6 +8,7 @@ compose_file="$deploy_root/compose.production.yml"
 deployment_env="$deploy_root/deployment.env"
 
 compose() {
+  [[ ! -e "$deploy_root/state/grading-handover.json" ]] || fail "Retained rootless grading requires explicit compose.grading.yml and validated release."
   local profiles=()
   if feature_enabled VIDEO_LESSONS_ENABLED; then
     profiles+=(--profile video)

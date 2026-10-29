@@ -14,6 +14,8 @@ test("control reserve and FIFO physical funding", async () => {
     order.push("small");
     return v;
   });
+  assert.equal(bank.census().waiting, 2);
+  assert.ok(bank.census().oldestWaitMs >= 0);
   first.release();
   const l = await large;
   const s = await small;
@@ -21,6 +23,7 @@ test("control reserve and FIFO physical funding", async () => {
   l.release();
   s.release();
   assert.equal(bank.census().bytes, 256 * MiB);
+  assert.equal(bank.census().oldestWaitMs, 0);
 });
 test("cancelled oldest funding request unblocks smaller FIFO request", async () => {
   const bank = new ResourceBank();

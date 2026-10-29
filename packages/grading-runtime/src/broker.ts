@@ -101,6 +101,7 @@ export class Broker {
   private prepared: Prepared[] = [];
   private accepting = false;
   private faulted = false;
+  private cleanupFailures = 0;
   private serial: Promise<void> = Promise.resolve();
   constructor(
     readonly manifest: RuntimeManifest,
@@ -246,13 +247,13 @@ export class Broker {
         this.records
           .flatMap((r) => r.cases)
           .find((c) => c.allocation?.id === id)?.allocation;
-      await this.driver.remove(id, facts);
+      await this.removeAllocation(id, facts);
     }
     for (const prepared of [...this.prepared]) await this.retire(prepared);
     for (const r of this.records)
       for (const c of r.cases)
         if (c.allocation && c.state !== "REMOVED") {
-          await this.driver.remove(c.allocation.id, c.allocation);
+          await this.removeAllocation(c.allocation.id, c.allocation);
           this.funding.get(c.allocation.id)?.release();
           this.funding.delete(c.allocation.id);
           c.state = "REMOVED";
@@ -284,9 +285,18 @@ export class Broker {
         await this.prepare(profile.runtime, profile.memoryLimitMb);
     this.accepting = true;
   }
+  private async removeAllocation(id: string, allocation?: Allocation) {
+    try { await this.driver.remove(id, allocation); }
+    catch (error) { this.cleanupFailures++; throw error; }
+  }
+  observedAllocations(): readonly Allocation[] {
+    const allocations = [...this.prepared.map(p => p.allocation), ...this.records.flatMap(r => r.cases.flatMap(c => c.allocation && c.state !== "REMOVED" ? [c.allocation] : []))];
+    return [...new Map(allocations.map(a => [a.id, a])).values()];
+  }
   census() {
     const cases = this.records.flatMap((r) => r.cases);
     return {
+      cleanupFailures: this.cleanupFailures,
       records: this.records.length,
       admissionEpoch: this.admissionEpoch,
       active: this.records.filter((r) => !r.released).length,
@@ -902,7 +912,7 @@ export class Broker {
   private async retire(p: Prepared) {
     p.state = "DRAINING";
     try {
-      await this.driver.remove(p.allocation.id, p.allocation);
+      await this.removeAllocation(p.allocation.id, p.allocation);
     } catch (e) {
       p.state = "QUARANTINED";
       this.faulted = true;
@@ -1053,7 +1063,7 @@ export class Broker {
       );
       c.state = "DRAINING";
       await this.persist();
-      await this.driver.remove(allocation.id, allocation);
+      await this.removeAllocation(allocation.id, allocation);
       this.funding.get(allocation.id)!.release();
       this.funding.delete(allocation.id);
       c.state = "REMOVED";
@@ -1093,7 +1103,7 @@ export class Broker {
       if (!signal.aborted) this.faulted = true;
       if (allocation) {
         try {
-          await this.driver.remove(allocation.id, allocation);
+          await this.removeAllocation(allocation.id, allocation);
           this.funding.get(allocation.id)?.release();
           this.funding.delete(allocation.id);
           c.state = "REMOVED";

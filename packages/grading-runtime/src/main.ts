@@ -6,6 +6,7 @@ import { Broker, type WarmProfile } from "./broker.js";
 import { Journal } from "./journal.js";
 import { RootlessDriver } from "./rootless-driver.js";
 import { loadManifest } from "./manifest.js";
+import { writeObservations } from "./observations.js";
 import { serve } from "./server.js";
 import { invariant } from "./errors.js";
 function required(name: string) {
@@ -14,6 +15,7 @@ function required(name: string) {
   return value;
 }
 export async function main() {
+  const observationPath = required("GRADING_OBSERVATIONS_PATH");
   const manifest = await loadManifest(
     required("GRADING_RUNTIME_MANIFEST_PATH"),
   );
@@ -60,10 +62,22 @@ export async function main() {
     await broker.stop().catch(() => {});
     throw e;
   }
+  let observing = false;
+  const observe = async () => {
+    if (observing) return;
+    observing = true;
+    try { await writeObservations(broker, required("GRADING_CGROUP_PARENT"), observationPath); }
+    catch { console.error("Grading observations unavailable"); }
+    finally { observing = false; }
+  };
+  await observe();
+  const observationTimer = setInterval(() => void observe(), 1000);
+  observationTimer.unref();
   let stopping = false;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(observationTimer);
     server.close();
     try {
       await broker.stop();

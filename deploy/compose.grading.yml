@@ -1,0 +1,45 @@
+# Explicit handover only; requires Docker Compose >=2.24.4 (!override).
+# Host broker/daemon are NOT containers and never receive application secrets.
+services:
+  api:
+    environment:
+      GRADING_NATIVE_ENABLED: ${GRADING_NATIVE_ENABLED:-false}
+      GRADING_RUNTIME_MANIFEST_PATH: /etc/cove-grading/manifest.json
+      GRADING_WORKER_GENERATION: ${GRADING_WORKER_GENERATION:?required immutable incarnation}
+    volumes:
+      - type: bind
+        source: ${GRADING_MANIFEST_HOST_PATH:?required complete immutable manifest}
+        target: /etc/cove-grading/manifest.json
+        read_only: true
+        bind:
+          create_host_path: false
+  judge-worker:
+    environment:
+      GRADING_NATIVE_ENABLED: ${GRADING_NATIVE_ENABLED:-false}
+      GRADING_RUNTIME_MANIFEST_PATH: /etc/cove-grading/manifest.json
+      GRADING_WORKER_GENERATION: ${GRADING_WORKER_GENERATION:?required immutable incarnation}
+      JUDGE_SANDBOX_SOCKET: /run/cove-grading-control/broker.sock
+      JUDGE_CONCURRENCY: "2"
+      GRADING_MAX_SPARE: "0"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4101/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+    group_add:
+      - ${GRADING_CONTROL_GID:?required dedicated control group}
+    depends_on: !override
+      redis:
+        condition: service_healthy
+    volumes: !override
+      - type: bind
+        source: ${GRADING_MANIFEST_HOST_PATH:?required complete immutable manifest}
+        target: /etc/cove-grading/manifest.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /run/cove-grading-control
+        target: /run/cove-grading-control
+        read_only: true
+        bind:
+          create_host_path: false
+  judge-sandbox:
+    profiles: !override [legacy-grading-disabled]

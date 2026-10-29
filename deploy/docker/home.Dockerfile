@@ -12,6 +12,7 @@ COPY packages/home/package.json packages/home/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY packages/grading-runtime/package.json packages/grading-runtime/package.json
 COPY packages/web/package.json packages/web/package.json
 COPY packages/turtle-browser-runtime/package.json packages/turtle-browser-runtime/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \

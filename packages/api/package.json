@@ -84,5 +84,9 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
-  }
+  },
+  "files": [
+    "dist",
+    "scripts/grading-inventory.mjs"
+  ]
 }

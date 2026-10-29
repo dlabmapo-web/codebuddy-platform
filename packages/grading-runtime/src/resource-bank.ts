@@ -15,6 +15,7 @@ export class ResourceBank {
   private allocations = 0;
   private queue: {
     budget: Budget;
+    queuedAt: number;
     resolve: (v: Funding) => void;
     reject: (e: Error) => void;
     signal?: AbortSignal;
@@ -81,6 +82,7 @@ export class ResourceBank {
     return new Promise((resolve, reject) => {
       const entry = {
         budget: { ...b },
+        queuedAt: performance.now(),
         resolve,
         reject,
         signal,
@@ -108,6 +110,7 @@ export class ResourceBank {
       bytes: this.bytes,
       pids: this.pids,
       waiting: this.queue.length,
+      oldestWaitMs: this.queue[0] ? Math.max(0, performance.now() - this.queue[0].queuedAt) : 0,
     };
   }
 }
